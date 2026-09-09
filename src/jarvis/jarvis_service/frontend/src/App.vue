@@ -1163,19 +1163,6 @@
         <span class="toast-message">{{ toast.message }}</span>
       </div>
     </transition>
-    <!-- [AR-DEBUG] 临时调试浮层：定位自动朗读问题，验证后移除 -->
-    <div style="position:fixed;left:4px;bottom:4px;z-index:99999;background:rgba(0,0,0,0.78);color:#0f0;font-size:10px;line-height:1.35;padding:5px 7px;border-radius:5px;max-width:96vw;word-break:break-all;font-family:monospace;pointer-events:none;">
-      <div>AR-DEBUG v3</div>
-      <div>curAgent: {{ (currentAgentId||'').slice(0,8) }}</div>
-      <div>mapKeys: [{{ [...panelAutoReads.keys()].map(k=>k.slice(0,8)).join(',') }}]</div>
-      <div>mapVals: [{{ [...panelAutoReads.values()].join(',') }}]</div>
-      <div>curEnabled: {{ isAutoReadEnabled(currentAgentId) }}</div>
-      <div>lastStatus: {{ autoReadLastStatus.get(currentAgentId) || '-' }}</div>
-      <div>execStatus: {{ (agentStatuses.get(currentAgentId)||{}).execution_status || '-' }}</div>
-      <div>ttsSupported: {{ autoReadSupported }}</div>
-      <div>ttsState: {{ ttsDebugState }}</div>
-      <div>calls: {{ arDebugLog.join(' | ') }}</div>
-    </div>
   </div>
 </template>
 
@@ -1665,7 +1652,6 @@ async function loginWithPassword(password) {
     // 登录成功后立即清除密码（安全最佳实践：密码只用一次，后续使用 Token）
     auth.value.password = ''
 
-    console.log('[AUTH] Login successful, token saved, password cleared')
     return true
   } catch (error) {
     console.error('[AUTH] Login failed:', error)
@@ -1723,7 +1709,6 @@ async function logout() {
 
     showConnectModal.value = true
     connectErrorMessage.value = ''
-    console.log('[AUTH] Logged out successfully, all connections closed')
   }
 }
 
@@ -1771,7 +1756,6 @@ function loadSavedToken() {
   const savedToken = localStorage.getItem('jarvis_auth_token')
   if (savedToken) {
     auth.value.token = savedToken
-    console.log('[AUTH] Loaded saved token from localStorage')
     // 加载用户信息
     const savedUserInfo = localStorage.getItem('jarvis_user_info')
     if (savedUserInfo) {
@@ -1819,7 +1803,6 @@ async function fetchWithAuth(url, options = {}) {
   
   // 检查401未授权错误
   if (response.status === 401) {
-    console.log('[AUTH] Received 401 Unauthorized, showing login modal')
     auth.value.token = ''
     auth.value.userInfo = null
     userAccessibleNodes.value = null
@@ -3341,7 +3324,6 @@ function createEditorForAgent(agent) {
   activeEditorSessionId.value = agentId
   showEditorPanel.value = true
 
-  console.log('[editor-session] Created/activated editor session for agent:', agentName)
 }
 
 // 关闭编辑器会话
@@ -3385,7 +3367,6 @@ async function closeEditorSession(agentId) {
     }
   }
 
-  console.log('[editor-session] Closed editor session for agent:', session.agent_name)
 }
 
 // 切换编辑器会话
@@ -3719,7 +3700,6 @@ function createPanel() {
   }
   panels.value.push(panel)
   activePanelId.value = panel.id
-  console.log('[PANEL] Created panel:', panel.id, 'total:', panels.value.length)
 }
 
 // 关闭 Panel
@@ -3748,7 +3728,6 @@ function closePanel(panelId) {
       activePanelId.value = null
     }
   }
-  console.log('[PANEL] Closed panel:', panelId, 'remaining:', panels.value.length)
 }
 
 // 关闭 Panel 中的 Agent（保留 Panel）
@@ -3772,7 +3751,6 @@ function closeAgentInPanel(panelId) {
   if (currentAgentId.value === agentId) {
     currentAgentId.value = null
   }
-  console.log('[PANEL] Closed agent in panel:', panelId, 'agent:', agentId)
 }
 
 // 激活 Panel
@@ -3786,7 +3764,6 @@ function activatePanel(panelId) {
       switchAgent(agent)
     }
   }
-  console.log('[PANEL] Activated panel:', panelId)
 }
 
 // 在 Panel 中打开 Agent（替代 switchAgent）
@@ -3810,7 +3787,6 @@ function openAgentInPanel(agent, panelId = null) {
   if (existingPanel) {
     activePanelId.value = existingPanel.id
     switchAgent(agent)
-    console.log('[PANEL] Agent already open in panel, activating:', existingPanel.id, 'agent:', agent.agent_id)
     return
   }
   // 如果没有指定 Panel，使用当前激活的 Panel
@@ -3836,7 +3812,6 @@ function openAgentInPanel(agent, panelId = null) {
   activePanelId.value = targetPanel.id
   // 切换当前 Agent
   switchAgent(agent)
-  console.log('[PANEL] Opened agent in panel:', targetPanel.id, 'agent:', agent.agent_id)
 }
 
 // 获取 Panel 中的 Agent
@@ -3928,8 +3903,6 @@ function getPanelAutoRead(panel) {
 function togglePanelAutoRead(panel, value) {
   if (!panel || !panel.agentId) return
   panelAutoReads.value.set(panel.agentId, value)
-  // [AR-DEBUG] 临时调试：验证后移除
-  arDebug(`toggle ${panel.agentId.slice(0,8)} -> ${value} mapNow=${panelAutoReads.value.get(panel.agentId)}`)
   if (!value) {
     stopAutoRead()
   }
@@ -4245,7 +4218,6 @@ async function openCompletionsFromPanel(panel) {
     const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `completions/${agent.agent_id}`))
 
     const result = await response.json()
-    console.log('[COMPLETIONS] API response:', result)
 
     if (!response.ok) {
       alert(`获取补全列表失败: ${result.error?.message || result.detail || '未知错误'}`)
@@ -4254,7 +4226,6 @@ async function openCompletionsFromPanel(panel) {
 
     if (result.success && result.data) {
       completions.value = sortCompletionItems(result.data)
-      console.log('[COMPLETIONS] Loaded', result.data.length, 'completions')
     } else {
       console.error('[COMPLETIONS] Invalid format:', result)
       alert('获取补全列表失败：返回数据格式错误')
@@ -4482,14 +4453,12 @@ function setupHistoryScrollListener(el) {
     historyScrollDebounceTimer = setTimeout(() => {
       const scrollTop = el.scrollTop
       if (scrollTop <= SCROLL_THRESHOLD && !isLoadingHistory.value && hasMoreHistory.value) {
-        console.log('[HISTORY] Scrolled to top, loading more history')
         loadHistoryMessages(true) // prepend = true, 插入到开头
       }
     }, DEBOUNCE_DELAY)
   }
 
   el.addEventListener('scroll', historyScrollHandler)
-  console.log('[HISTORY] Scroll listener attached')
 }
 
 // 设置 Panel 的输出列表引用
@@ -4531,7 +4500,6 @@ function sendMessageToAgent(message, agentId = null) {
     return
   }
 
-  console.log(`[SEND] Sending message to agent ${targetAgentId}:`, message)
   ws.send(JSON.stringify(message))
 }
 
@@ -4540,28 +4508,23 @@ async function loadHistoryMessages(prepend = false, agentId = null) {
   const targetAgentId = agentId || currentAgentId.value
   // 没有激活的 agent 时，不加载历史记录
   if (!targetAgentId) {
-    console.log('[HISTORY] No active agent, skip loading history')
     return
   }
 
   if (isLoadingHistory.value) {
-    console.log('[HISTORY] Already loading, skip')
     return
   }
 
   if (!hasMoreHistory.value) {
-    console.log('[HISTORY] No more history to load')
     return
   }
 
   isLoadingHistory.value = true
-  console.log('[HISTORY] Loading history (prepend:', prepend, ', offset:', historyOffset.value, ', agent:', targetAgentId, ')')
 
   try {
     const historyMessages = historyStorage.loadHistory(historyStorage.MAX_MESSAGES_PER_PAGE, historyOffset.value, targetAgentId)
 
     if (historyMessages.length === 0) {
-      console.log('[HISTORY] No more history messages')
       hasMoreHistory.value = false
       isLoadingHistory.value = false
       return
@@ -4623,10 +4586,8 @@ async function loadHistoryMessages(prepend = false, agentId = null) {
     historyMessages.push(...mergedHistoryMessages)
 
     // 处理每条历史消息
-    console.log(`🚨 [loadHistoryMessages] Loaded ${historyMessages.length} history messages (after stream merge)`)
     const executionMessages = historyMessages.filter(msg => msg.output_type === 'execution')
     if (executionMessages.length > 0) {
-      console.log(`🚨 [loadHistoryMessages] Found ${executionMessages.length} execution messages in history`, executionMessages.map(m => ({execution_id: m.execution_id, is_finished: m.is_finished, has_content: !!m.terminal_content})))
     }
     // 不再过滤 execution 类型，因为它现在带有 is_finished 标记，可以显示历史内容
     // 修复execution消息的is_finished标记：终端执行是串行的，同一agent同一时间只有一个execution在运行
@@ -4640,11 +4601,9 @@ async function loadHistoryMessages(prepend = false, agentId = null) {
           const isLast = executionIndices.length > 0 && idx === executionIndices[executionIndices.length - 1]
           if (!isLast && !msg.is_finished) {
             // 非最后一条execution：强制标记为已完成
-            console.log(`[HISTORY] Fixing non-last execution message: ${msg.execution_id}, setting is_finished=true`)
             msg.is_finished = true
             // 如果没有terminal_content，添加占位文本，避免显示空白区域
             if (!msg.terminal_content) {
-              console.log(`[HISTORY] Non-last execution ${msg.execution_id} has no terminal_content, adding placeholder`)
               msg.terminal_content = '(终端输出未保存或执行被中断)'
             }
           }
@@ -4652,7 +4611,6 @@ async function loadHistoryMessages(prepend = false, agentId = null) {
           // 只有在收到后端的tool_stream_end事件时才会标记为已完成
           // 这样切换回Agent时，如果执行还在进行中，xterm可以正常渲染
           if (isLast && !msg.is_finished) {
-            console.log(`[HISTORY] Last execution ${msg.execution_id} is still running, keeping is_finished=false for xterm restoration`)
           }
         }
         const html = renderMessageHtml(msg)
@@ -4670,7 +4628,6 @@ async function loadHistoryMessages(prepend = false, agentId = null) {
           _stableId: stableId,
         }
       })
-    console.log(`🚨 [loadHistoryMessages] After filtering: ${processedMessages.length} messages`)
 
     // 获取目标 Agent 的消息列表
     const currentOutputs = allOutputs.value.get(targetAgentId) || []
@@ -4704,7 +4661,6 @@ async function loadHistoryMessages(prepend = false, agentId = null) {
     const totalCount = historyStorage.getTotalCount(targetAgentId)
     hasMoreHistory.value = historyOffset.value < totalCount
 
-    console.log('[HISTORY] Loaded', historyMessages.length, 'messages, total loaded:', historyOffset.value, '/', totalCount, 'hasMore:', hasMoreHistory.value)
 
     // 恢复滚动位置
     if (prepend && outputList.value) {
@@ -4712,7 +4668,6 @@ async function loadHistoryMessages(prepend = false, agentId = null) {
         requestAnimationFrame(() => {
           const newScrollHeight = outputList.value.scrollHeight
           outputList.value.scrollTop = newScrollHeight - scrollPosition
-          console.log('[HISTORY] Scroll position restored')
         })
       })
     } else {
@@ -4720,7 +4675,6 @@ async function loadHistoryMessages(prepend = false, agentId = null) {
       nextTick(() => {
         if (outputList.value && isAutoScrollEnabled(targetAgentId)) {
           outputList.value.scrollTop = outputList.value.scrollHeight
-          console.log('[HISTORY] Scrolled to bottom on initial load')
         }
       })
     }
@@ -5134,7 +5088,6 @@ watch(completionSearch, async (newSearch) => {
       
       if (response.ok && result.success && result.data) {
         fileCompletions.value = sortCompletionItems(result.data)
-        console.log('[FILE COMPLETIONS] Loaded', result.data.length, 'files')
       } else {
         fileCompletions.value = []
       }
@@ -5179,11 +5132,9 @@ const hasMoreHistory = ref(true)
 // 保存免登录设置
 function saveAutoLoginSetting() {
   localStorage.setItem('jarvis_auto_login', autoLoginEnabled.value)
-  console.log('[SETTINGS] Auto login setting saved:', autoLoginEnabled.value)
   // 如果关闭免登录，清除已保存的 token
   if (!autoLoginEnabled.value) {
     localStorage.removeItem('jarvis_auth_token')
-    console.log('[SETTINGS] Saved token cleared (auto login disabled)')
   }
 }
 
@@ -5191,17 +5142,10 @@ function saveAutoLoginSetting() {
 function saveNotifySettings() {
   localStorage.setItem('jarvis_notify_on_exit', notifyOnExit.value)
   localStorage.setItem('jarvis_notify_on_input', notifyOnInput.value)
-  console.log('[SETTINGS] Notify settings saved:', { notifyOnExit: notifyOnExit.value, notifyOnInput: notifyOnInput.value })
 }
 
 // 连接到 Gateway
 async function connect() {
-  console.log('[ws] connect() called', {
-    hasSocket: !!socket.value,
-    socketState: socket.value?.readyState,
-    connecting: connecting.value,
-    gatewayUrl: gatewayUrl.value,
-  })
   // 清空之前的错误信息
   connectErrorMessage.value = ''
   if (socket.value) return
@@ -5224,7 +5168,6 @@ async function connect() {
       return
     }
   } else {
-    console.log('[AUTH] Using existing token, skipping password login')
   }
   
   if (!hasAuthToken()) {
@@ -5237,9 +5180,7 @@ async function connect() {
   const url = buildWebSocketUrl(host, port, parsed.protocol)
   connecting.value = true
   const ws = new WebSocket(url, buildWebSocketProtocols())
-  console.log('[ws] new WebSocket created', { url, readyState: ws.readyState })
   ws.onopen = () => {
-    console.log('[ws] open', { url, readyState: ws.readyState })
     connecting.value = false
     socket.value = ws
     showConnectModal.value = false
@@ -5253,11 +5194,9 @@ async function connect() {
       clearTimeout(reconnectTimer.value)
       reconnectTimer.value = null
     }
-    console.log('[ws] Reconnect state reset')
 
     // 保存连接信息到 localStorage
     localStorage.setItem('jarvis_gateway_url', gatewayUrl.value)
-    console.log('[ws] Connection info saved:', gatewayUrl.value)
     startAgentListRefresh()
     // 刷新用户信息（确保display_name等字段最新）
     refreshUserInfo()
@@ -5274,17 +5213,14 @@ async function connect() {
     sendChatMessageToServer('chat_register', { client_id: myClientId.value, name: username.value })
     const currentOutputs = allOutputs.value.get(currentAgentId.value) || []
     if (currentOutputs.length === 0) {
-      console.log('[HISTORY] Loading history on first connect')
       loadHistoryMessages(false)
     } else {
-      console.log('[HISTORY] Skip loading history, messages already exist')
     }
     // 心跳机制已移除
   }
   ws.onmessage = (event) => {
     // 忽略非当前连接的消息（重连时旧连接可能仍收到消息）
     if (socket.value !== ws) {
-      console.log('[ws] Ignoring message from stale connection')
       return
     }
     let message = null
@@ -5300,17 +5236,9 @@ async function connect() {
     handleMessage(message)
   }
   ws.onclose = (event) => {
-    console.log('[ws] close', {
-      code: event?.code,
-      reason: event?.reason,
-      wasClean: event?.wasClean,
-      readyState: ws.readyState,
-      currentSocketMatched: socket.value === ws,
-    })
     socket.value = null
     connecting.value = false
     // 连接断开，销毁所有独立终端
-    console.log('[ws] Closing all independent terminals due to connection close')
     const allTerminalIds = terminalSessions.value.map(t => t.terminal_id)
     allTerminalIds.forEach(terminalId => closeTerminal(terminalId))
     
@@ -5322,11 +5250,9 @@ async function connect() {
       reconnecting.value = true
       reconnectAttempts.value++
 
-      console.log(`[ws] Connection closed, attempting to reconnect (attempt ${reconnectAttempts.value}) in ${reconnectInterval}ms`)
 
       // 设置重连定时器（固定5秒间隔）
       reconnectTimer.value = setTimeout(() => {
-        console.log(`[ws] Reconnecting... attempt ${reconnectAttempts.value}`)
         connect()
       }, reconnectInterval)
     } else {
@@ -5335,7 +5261,6 @@ async function connect() {
 
       if (isAutoConnecting.value) {
         // 自动连接阶段失败，显示登录弹窗
-        console.log('[ws] Auto connection failed, showing login modal')
         isAutoConnecting.value = false
         showConnectModal.value = true
         // 清除失效的 token
@@ -5344,7 +5269,6 @@ async function connect() {
         connectErrorMessage.value = '自动登录失败，请重新登录'
       } else if (userDisconnected.value) {
         // 用户主动断开，不重连
-        console.log('[ws] User disconnected, not reconnecting')
         userDisconnected.value = false // 重置标志
       }
     }
@@ -5655,7 +5579,6 @@ async function syncConfig() {
     }
 
     // 记录详细结果
-    console.log('[SETTINGS] Config sync results:', results)
   } catch (error) {
     console.error('[SETTINGS] Failed to sync config:', error)
     showToast(error.message || '配置同步失败', 'error')
@@ -5670,7 +5593,6 @@ async function updateCodeToMain() {
   }
 
   // 调试日志
-  console.debug('[SETTINGS] updateCodeToMain called, hasAuthToken:', hasAuthToken(), 'token:', auth.value.token ? 'exists' : 'missing')
 
   try {
     isUpdatingCode.value = true
@@ -5691,7 +5613,6 @@ async function updateCodeToMain() {
     for (const node of nodeOptions) {
       const nodeId = node.node_id
       try {
-        console.debug('[SETTINGS] Updating code for node:', nodeId)
         const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/nodes/${nodeId}/code-update`, {
           method: 'POST'
         })
@@ -5725,7 +5646,6 @@ async function updateCodeToMain() {
     }
 
     // 显示结果
-    console.debug('[SETTINGS] Update code results:', results)
 
     if (successCount === totalCount) {
       showToast(`代码更新成功，已更新 ${successCount}/${totalCount} 个节点`, 'success')
@@ -5739,7 +5659,6 @@ async function updateCodeToMain() {
     showToast(error.message || '代码更新失败', 'error')
   } finally {
     isUpdatingCode.value = false
-    console.debug('[SETTINGS] updateCodeToMain finished, isUpdatingCode reset to false')
   }
 }
 
@@ -5758,7 +5677,6 @@ function disconnectAll() {
   if (!confirm('确定要断开与网关的连接吗？这将清除所有认证信息并断开所有Agent连接。')) {
     return
   }
-  console.log('[WS] Disconnecting all WebSocket connections')
   
   // 关闭设置弹窗
   showSettingsModal.value = false
@@ -5766,7 +5684,6 @@ function disconnectAll() {
   // 关闭所有Agent WebSocket连接
   sockets.value.forEach((ws, agentId) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
-      console.log(`[WS] Closing WebSocket connection for agent ${agentId}`)
       ws.close()
     }
   })
@@ -5774,7 +5691,6 @@ function disconnectAll() {
   
   // 关闭主Gateway连接
   if (socket.value) {
-    console.log('[WS] Closing main Gateway WebSocket connection')
     socket.value.close()
     socket.value = null
   }
@@ -5790,9 +5706,7 @@ function disconnectAll() {
   auth.value.token = ''
   userAccessibleNodes.value = null
   autoLoginEnabled.value = false
-  console.log('[WS] Cleared saved token and auto login setting')
   // 强制刷新页面确保状态重置
-  console.log('[WS] Forcing page refresh after disconnection')
   setTimeout(() => {
     window.location.reload()
   }, 500)
@@ -5809,7 +5723,6 @@ async function connectToAgent(agent, retryCount = 0) {
   
   // 连接锁检查：防止同一 agent 并发重连建多连接
   if (connectingAgents.value.has(agentId)) {
-    console.log(`[AGENT] Connection to ${agent.name || agentId} already in progress, skipping`)
     return Promise.resolve(null)
   }
 
@@ -5818,18 +5731,14 @@ async function connectToAgent(agent, retryCount = 0) {
     const existingWs = sockets.value.get(agentId)
     // 检查现有连接是否仍然有效
     if (existingWs && existingWs.readyState === WebSocket.OPEN) {
-      console.log(`[AGENT] Already connected to ${agent.name || agentId}`)
       // 已连接，发送 get_status 请求以同步当前状态
-      console.log(`[AGENT] Requesting status update for ${agent.name || agentId}`)
       existingWs.send(JSON.stringify({ type: 'get_status', payload: {} }))
       return Promise.resolve(existingWs)
     }
     // 连接已断开或正在关闭，确保完全关闭后再清理
-    console.log(`[AGENT] Previous connection to ${agent.name || agentId} was not OPEN, cleaning up...`)
     
     // 等待旧连接完全关闭（避免与后端连接冲突）
     if (existingWs && existingWs.readyState !== WebSocket.CLOSED) {
-      console.log(`[AGENT] Waiting for old connection to close (state: ${existingWs.readyState})`)
       existingWs.close()
       // 等待最多 1 秒让连接完全关闭
       await new Promise((resolve) => {
@@ -5853,10 +5762,8 @@ async function connectToAgent(agent, retryCount = 0) {
     
     // 清理旧连接
     sockets.value.delete(agentId)
-    console.log(`[AGENT] Old connection cleaned up`)
   }
   
-  console.log(`[AGENT] Connecting to ${agent.name || agentId}`)
 
   // 加连接锁
   connectingAgents.value.add(agentId)
@@ -5901,7 +5808,6 @@ async function connectToAgent(agent, retryCount = 0) {
         // 处理 pong 响应（心跳机制）
         if (message.type === 'pong' || (message.success && message.pong)) {
           lastPongTime.value.set(agentId, Date.now())
-          console.log(`[HEARTBEAT] Received pong from agent ${agentId}`)
           return // pong 消息不需要继续处理
         }
         
@@ -5910,13 +5816,11 @@ async function connectToAgent(agent, retryCount = 0) {
       
       ws.onopen = () => {
         if (connectionHandled) {
-          console.log(`[AGENT ${agentId}] Connection already handled, ignoring onopen`)
           return
         }
         connectionHandled = true
 
         clearTimeout(timeoutId)
-        console.log(`[AGENT ${agentId}] Connected to ${url}`)
         connectingAgents.value.delete(agentId) // 释放连接锁
         agentConnecting.value = false
 
@@ -5935,7 +5839,6 @@ async function connectToAgent(agent, retryCount = 0) {
           type: 'sync_request',
           payload: { agent_seqs }
         }))
-        console.log(`[AGENT ${agentId}] Sent sync_request with seq:`, lastSeq)
 
         // 标记连接已完成（在onclose中用于判断是否需要重试）
         ws._connectionCompleted = true
@@ -5953,7 +5856,6 @@ async function connectToAgent(agent, retryCount = 0) {
         // 已建立的连接断开（connectionHandled=true 且 _connectionCompleted=true）
         // 需要触发重连，而不是忽略
         if (connectionHandled && !ws._connectionCompleted) {
-          console.log(`[AGENT ${agentId}] Connection already handled (not established), ignoring onclose`)
           return
         }
 
@@ -5962,17 +5864,14 @@ async function connectToAgent(agent, retryCount = 0) {
           clearTimeout(timeoutId)
         }
 
-        console.log(`[AGENT ${agentId}] Disconnected, code: ${event.code}, reason: ${event.reason || 'unknown'}`)
         sockets.value.delete(agentId)
         connectingAgents.value.delete(agentId) // 释放连接锁
         if (agentConnecting.value) agentConnecting.value = false
 
         // 如果断开的Agent不是当前活跃的Agent，静默重连（后台Agent需要保持消息接收）
         if (agentId !== currentAgentId.value) {
-          console.log(`[AGENT ${agentId}] Background agent disconnected, silently reconnecting...`)
           // 检查主网关连接状态，如果主网关断开则不重连Agent
           if (!socket.value || socket.value.readyState !== WebSocket.OPEN) {
-            console.log(`[AGENT ${agentId}] Gateway disconnected, skipping background agent reconnect`)
             if (!ws._connectionCompleted) {
               reject(new Error('Background agent disconnected (gateway offline)'))
             }
@@ -5991,10 +5890,8 @@ async function connectToAgent(agent, retryCount = 0) {
         }
 
         // 当前Agent断开：自动重连
-        console.log(`[AGENT ${agentId}] Current agent disconnected, auto-reconnecting in ${retryDelay}ms...`)
         // 检查主网关连接状态，如果主网关断开则不重连Agent
         if (!socket.value || socket.value.readyState !== WebSocket.OPEN) {
-          console.log(`[AGENT ${agentId}] Gateway disconnected, skipping agent reconnect`)
           if (!ws._connectionCompleted) {
             reject(new Error('Agent disconnected (gateway offline)'))
           }
@@ -6004,11 +5901,9 @@ async function connectToAgent(agent, retryCount = 0) {
           // 检查是否已有新连接，避免重复重连
           const currentWs = sockets.value.get(agentId)
           if (currentWs && currentWs.readyState === WebSocket.OPEN) {
-            console.log(`[AGENT ${agentId}] Connection already re-established, skipping reconnect`)
             return
           }
           connectToAgent({ agent_id: agentId, name: agentId, node_id: agent?.node_id }, 0)
-            .then(() => console.log(`[AGENT ${agentId}] Auto-reconnect succeeded`))
             .catch(e => console.warn(`[AGENT ${agentId}] Auto-reconnect failed:`, e.message))
         }, retryDelay)
 
@@ -6019,7 +5914,6 @@ async function connectToAgent(agent, retryCount = 0) {
       
       ws.onerror = (error) => {
         if (connectionHandled) {
-          console.log(`[AGENT ${agentId}] Connection already handled, ignoring onerror`)
           return
         }
         connectionHandled = true
@@ -6042,7 +5936,6 @@ async function connectToAgent(agent, retryCount = 0) {
       agentConnecting.value = false
       
       if (retryCount < maxRetries) {
-        console.log(`[AGENT ${agentId}] Exception occurred, retrying... (${retryCount + 1}/${maxRetries})`)
         setTimeout(() => {
           connectToAgent(agent, retryCount + 1).then(resolve).catch(reject)
         }, retryDelay)
@@ -6141,11 +6034,9 @@ async function fetchAgentStatus(agent) {
 
     // 当前 Agent 连接后根据 execution_status 恢复输入 UI
     if (agent.agent_id === currentAgentId.value) {
-      console.log(`[AGENT STATUS] Restoring UI for agent ${agent.agent_id}, execution_status:`, executionStatus)
       if (executionStatus === 'waiting_single') {
         inputMode.value = 'single'
         panelInputModes.value.set(agent.agent_id, 'single')
-        console.log('[AGENT STATUS] Set inputMode to single')
         // 聚焦输入框
         const targetPanel = panels.value.find(p => p.agentId === agent.agent_id)
         const sp = targetPanel ? sessionPanelRefs.get(targetPanel.id) : null
@@ -6153,7 +6044,6 @@ async function fetchAgentStatus(agent) {
       } else if (executionStatus === 'waiting_multi') {
         inputMode.value = 'multi'
         panelInputModes.value.set(agent.agent_id, 'multi')
-        console.log('[AGENT STATUS] Set inputMode to multi')
         // 聚焦输入框
         const targetPanel = panels.value.find(p => p.agentId === agent.agent_id)
         const sp = targetPanel ? sessionPanelRefs.get(targetPanel.id) : null
@@ -6161,7 +6051,6 @@ async function fetchAgentStatus(agent) {
       } else if (executionStatus === 'waiting_confirm') {
         // 从 status 响应中获取 pending_confirm 并显示对话框
         const pendingConfirm = result.pending_confirm
-        console.log('[AGENT STATUS] waiting_confirm detected, pending_confirm:', pendingConfirm)
         if (pendingConfirm && pendingConfirm.payload) {
           const payload = pendingConfirm.payload
           pendingConfirmAgentId.value = agent.agent_id
@@ -6188,10 +6077,8 @@ async function fetchAgentStatus(agent) {
         panelInputModes.value.set(agent.agent_id, 'multi')
       }
     } else {
-      console.log(`[AGENT STATUS] Agent ${agent.agent_id} is not current agent (${currentAgentId.value}), skipping UI restoration`)
     }
     
-    console.log(`[AGENT STATUS] Agent ${agent.agent_id} execution_status:`, executionStatus)
     return executionStatus
   } catch (error) {
     console.error(`[AGENT STATUS] Error fetching status for agent ${agent.agent_id}:`, error)
@@ -6216,7 +6103,6 @@ async function restoreSession(sessionFile) {
 
     const result = await response.json()
     if (result.success) {
-      console.log('[SESSION] Session restored successfully:', result)
       showSessionDialog.value = false
       // 加载历史消息
       loadHistoryMessages(false)
@@ -6231,7 +6117,6 @@ async function restoreSession(sessionFile) {
 }
 
 function cancelSessionDialog() {
-  console.log('[SESSION] User cancelled session selection')
   showSessionDialog.value = false
   // 加载历史消息（用户不恢复 session）
   loadHistoryMessages(false)
@@ -6630,7 +6515,6 @@ async function createAgent() {
       return
     }
     const result = await response.json()
-    console.log('[AGENT] Created:', result)
     // 后端返回格式: { success: true, data: agent }
     if (result.success && result.data) {
       const agent = {
@@ -6686,7 +6570,6 @@ async function openCompletions() {
     const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `completions/${currentAgent.value.agent_id}`))
     
     const result = await response.json()
-    console.log('[COMPLETIONS] API response:', result)
     
     if (!response.ok) {
       alert(`获取补全列表失败: ${result.error?.message || result.detail || '未知错误'}`)
@@ -6695,7 +6578,6 @@ async function openCompletions() {
     
     if (result.success && result.data) {
       completions.value = sortCompletionItems(result.data)
-      console.log('[COMPLETIONS] Loaded', result.data.length, 'completions')
     } else {
       console.error('[COMPLETIONS] Invalid format:', result)
       alert('获取补全列表失败：返回数据格式错误')
@@ -6799,11 +6681,8 @@ function handleCompletionKeydown(event) {
 function scrollToSelected() {
   nextTick(() => {
     const modal = completionsModalRef.value
-    console.log('[SCROLL] completionsModalRef:', modal, 'selectedIndex:', selectedIndex.value)
     if (!modal) return
-    console.log('[SCROLL] itemRefs:', modal.itemRefs, 'length:', modal.itemRefs?.length)
     const selectedItem = modal.itemRefs?.[selectedIndex.value]
-    console.log('[SCROLL] selectedItem:', selectedItem)
     if (selectedItem) {
       selectedItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     }
@@ -6814,17 +6693,13 @@ function scrollToSelected() {
 function scrollToDirSelected() {
   nextTick(() => {
     const dialog = dirDialogRef.value
-    console.log('[SCROLL-DIR] dirDialogRef:', dialog, 'selectedDirIndex:', selectedDirIndex.value)
     if (!dialog) return
     const listContainer = dialog.dirListRef
-    console.log('[SCROLL-DIR] listContainer:', listContainer)
     if (!listContainer) return
 
     // 找到选中项的DOM元素
     const items = listContainer.querySelectorAll('.dir-item')
-    console.log('[SCROLL-DIR] items count:', items.length, 'target index:', selectedDirIndex.value)
     const selectedItem = items[selectedDirIndex.value]
-    console.log('[SCROLL-DIR] selectedItem:', selectedItem)
     if (selectedItem) {
       selectedItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     }
@@ -6937,7 +6812,6 @@ async function fetchAgentList() {
       )
       
       if (newOnlineAgents.length > 0) {
-        console.log(`[AGENT] Found ${newOnlineAgents.length} new online agents, auto-connecting...`)
         // 异步连接，不阻塞列表刷新
         autoConnectToOnlineAgents()
       }
@@ -6946,7 +6820,6 @@ async function fetchAgentList() {
     // 更新当前 Agent 状态
     const currentAgent = agentList.value.find(a => a.agent_id === currentAgentId.value)
     if (currentAgent && currentAgent.status !== 'running') {
-      console.log('[AGENT] Current agent stopped:', currentAgent)
     }
   } catch (error) {
     console.error('[AGENT] Fetch list failed:', error)
@@ -7232,7 +7105,6 @@ async function exitNonInteractiveMode(agent) {
       // 更新本地状态
       const current = agentStatuses.value.get(agent.agent_id) || {}
       agentStatuses.value.set(agent.agent_id, {...current, non_interactive: false})
-      console.log(`[EXIT NON-INTERACTIVE] Agent ${agent.agent_id} exited non-interactive mode`)
     } else {
       console.warn(`[EXIT NON-INTERACTIVE] Failed for agent ${agent.agent_id}:`, result.error || 'Unknown error')
     }
@@ -7341,7 +7213,6 @@ async function confirmRename() {
     }
     
     await fetchAgentList()
-    console.log(`[AGENT] Successfully renamed agent ${agent.agent_id}`)
     showToast('重命名成功', 'success')
     showRenameAgentModal.value = false
   } catch (error) {
@@ -7414,7 +7285,6 @@ async function deleteAgent(agentId) {
           await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `data/${historyKey}`), {
             method: 'DELETE'
           })
-          console.log('[HISTORY] Deleted server history for:', agentId)
         } catch (historyError) {
           console.warn('[HISTORY] Failed to delete server history for', agentId, ':', historyError.message)
           // 历史删除失败不影响后续 agent 删除流程
@@ -7432,7 +7302,6 @@ async function deleteAgent(agentId) {
           return
         }
 
-        console.log('[AGENT] Deleted:', agentId)
         
         // 清除该 Agent 的历史记录
         historyStorage.clearHistoryForAgent(agentId)
@@ -7489,7 +7358,6 @@ async function regenerateAgent(agent) {
           const saveResult = await saveResp.json()
           if (saveResp.ok && saveResult.success) {
             sessionFile = saveResult.session_file || saveResult.data?.session_file || null
-            console.log('[REGENERATE] Session saved:', sessionFile)
           } else {
             console.warn('[REGENERATE] Session save failed:', saveResult)
           }
@@ -7551,7 +7419,6 @@ async function regenerateAgent(agent) {
           return
         }
 
-        console.log('[REGENERATE] Agent regenerated:', createResult.data?.agent_id)
         showToast('Agent 无损重生成功', 'success')
         // 刷新列表
         await fetchAgentList()
@@ -7598,7 +7465,6 @@ async function batchDeleteAgents() {
               await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `data/${historyKey}`), {
                 method: 'DELETE'
               })
-              console.log('[HISTORY] Deleted server history for:', agentId)
             } catch (historyError) {
               console.warn('[HISTORY] Failed to delete server history for', agentId, ':', historyError.message)
               // 历史删除失败不影响后续 agent 删除流程
@@ -7811,17 +7677,14 @@ async function toggleNodeExpand(agentId, node) {
 async function switchAgent(agent) {
   // 递增切换代数，使旧的switchAgent操作失效
   const thisGeneration = ++switchGeneration.value
-  console.log(`[AGENT] switchAgent called with generation=${thisGeneration}:`, agent)
 
   // 移动端：切换 agent 后自动隐藏侧边栏（放在最前面，确保无论什么情况都执行）
   if (windowWidth.value <= 768) {
-    console.log('[AGENT] Mobile mode: hiding sidebar')
     showAgentSidebar.value = false
   }
 
   // 如果 Agent 已停止，不触发任何网络活动（不查询状态、不连接 WebSocket）
   if (agent.status === 'stopped') {
-    console.log('[AGENT] Agent is stopped, skipping all network activities')
     // 只更新当前 agent ID，让用户可以看到该 agent 的本地历史记录
     currentAgentId.value = agent.agent_id
     // 更新 outputList 指向新 Panel 的 .messages 元素，并补绑滚动监听
@@ -7839,34 +7702,26 @@ async function switchAgent(agent) {
   }
 
   if (agent.agent_id === currentAgentId.value) {
-    console.log('[AGENT] Already on this agent, checking connection and local status...')
     const ws = sockets.value.get(agent.agent_id)
     if (!ws || ws.readyState !== WebSocket.OPEN) {
-      console.log('[AGENT] WebSocket not connected, reconnecting...')
       try {
         await connectToAgent(agent)
         // 重连后消息同步完全依赖 sync_request 机制，不再手动加载历史
-        console.log(`[AGENT] Reconnected, sync_request will handle message recovery`)
       } catch (error) {
         console.error(`[AGENT] Failed to reconnect:`, error)
         // 不中断流程，让用户看到错误
       }
     } else {
-      console.log('[AGENT] WebSocket already connected, checking local status for all interactive modes')
       // 检查本地记录的状态，如果需要恢复UI则恢复
       const localStatus = agentStatuses.value.get(agent.agent_id)
       if (localStatus?.execution_status) {
-        console.log('[AGENT] Local status:', localStatus.execution_status)
         // 恢复各种需要用户交互的状态
         if (localStatus.execution_status === 'waiting_confirm') {
-          console.log('[AGENT] Restoring waiting_confirm UI')
           restoreWaitingConfirmUI(agent.agent_id)
         } else if (localStatus.execution_status === 'waiting_single' || localStatus.execution_status === 'waiting_multi') {
-          console.log('[AGENT] Restoring waiting_input UI (mode:', localStatus.execution_status + ')')
           // 从Map中获取该Agent的输入请求
           const inputRequest = inputRequests.value.get(agent.agent_id)
           if (inputRequest) {
-            console.log('[AGENT] Found input request in Map, restoring UI')
             inputTip.value = inputRequest.tip || ''
             inputMode.value = inputRequest.mode || 'multi'
             inputText.value = inputText.value || inputRequest.preset || ''
@@ -7884,25 +7739,19 @@ async function switchAgent(agent) {
     return
   }
   
-  console.log('[AGENT] Switching to:', agent)
-  console.log('[AGENT] Current sockets before switch:', [...sockets.value.keys()])
-  console.log('[AGENT] Current agent statuses:', [...agentStatuses.value.keys()])
   // 注意：不关闭旧Agent的WebSocket连接，保留以便切回时复用
   // 旧连接断开时，onclose会检查currentAgentId，如果不是当前Agent则不重连
   const previousAgentId = currentAgentId.value
 
   // 清理当前agent的终端实例（切换离开时，从历史execution_chunks重建）
   if (previousAgentId) {
-    console.log(`[AGENT] Cleaning up terminal instances for previous agent: ${previousAgentId}`)
     let cleanedCount = 0
     terminals.value.forEach((termInfo) => {
       if (termInfo.agentId === previousAgentId && termInfo.terminal) {
-        console.log(`[AGENT] Disposing terminal: ${termInfo.sessionKey}`)
         disposeExecutionTerminal(termInfo)
         cleanedCount++
       }
     })
-    console.log(`[AGENT] Cleaned up ${cleanedCount} terminal instances`)
   }
 
   // 清理前一个Agent的terminalHosts引用
@@ -7912,12 +7761,10 @@ async function switchAgent(agent) {
       // sessionKey格式为 agentId:executionId
       const [agentId] = sessionKey.split(':')
       if (agentId === previousAgentId) {
-        console.log(`[AGENT] Cleaning up terminalHost for session: ${sessionKey}`)
         terminalHosts.value.delete(sessionKey)
         cleanedHostsCount++
       }
     }
-    console.log(`[AGENT] Cleaned up ${cleanedHostsCount} terminalHost references`)
   }
 
   
@@ -7925,7 +7772,6 @@ async function switchAgent(agent) {
   const oldAgentId = currentAgentId.value
   if (oldAgentId) {
     inputRequests.value.delete(oldAgentId)
-    console.log('[AGENT] Cleared input request for agent', oldAgentId, 'from Map')
   }
   inputText.value = ''
   inputTip.value = ''
@@ -7933,7 +7779,6 @@ async function switchAgent(agent) {
   
   // 更新当前 Agent ID
   currentAgentId.value = agent.agent_id
-  console.log('[AGENT] Current agent ID updated to:', currentAgentId.value)
 
   // 更新 outputList 指向新 Panel 的 .messages 元素，并补绑滚动监听
   const targetPanel = panels.value.find(p => p.agentId === agent.agent_id)
@@ -7951,16 +7796,11 @@ async function switchAgent(agent) {
 
   // 先连接 Agent，在收到 ready 事件后再加载历史
   // 这样可以避免历史消息和 WebSocket 推送的缓存消息重复渲染
-  console.log('[AGENT] Connecting before loading history...')
   try {
     // 切换后立即查询一次状态（即使 WebSocket 未连接）
-    console.log('[AGENT] Fetching status after switch...')
     await fetchAgentStatus(agent)
     // 如果 Agent 已停止（已完成），不尝试连接 WebSocket
-    console.log('[AGENT DEBUG] Checking agent.status:', agent.status)
     if (agent.status === 'stopped') {
-      console.log('[AGENT] Agent is stopped (completed), skipping WebSocket connection')
-      console.log('[AGENT DEBUG] windowWidth.value:', windowWidth.value, ', 768 threshold:', windowWidth.value <= 768)
       return
     }
     // 等待连接稳定（Agent启动需要时间，有限重试）
@@ -7971,7 +7811,6 @@ async function switchAgent(agent) {
     while (!stableConnection && retryCount < maxStabilityRetries) {
       // 检查是否有新的switchAgent调用
       if (switchGeneration.value !== thisGeneration) {
-        console.log(`[AGENT] Generation mismatch, aborting old switch`)
         return
       }
 
@@ -7993,7 +7832,6 @@ async function switchAgent(agent) {
 
         // 检查代数是否变化
         if (switchGeneration.value !== thisGeneration) {
-          console.log(`[AGENT] Generation changed during connect, aborting old switch`)
           return
         }
       }
@@ -8006,13 +7844,11 @@ async function switchAgent(agent) {
 
         // 检查代数是否变化
         if (switchGeneration.value !== thisGeneration) {
-          console.log(`[AGENT] Generation changed during wait, aborting old switch`)
           return
         }
 
         // 再次检查连接是否仍然有效
         if (ws.readyState === WebSocket.OPEN) {
-          console.log('[AGENT] Connection verified successfully')
           stableConnection = true
         } else {
           retryCount++
@@ -8030,14 +7866,11 @@ async function switchAgent(agent) {
       console.warn(`[AGENT] Failed to establish stable connection after ${maxStabilityRetries} retries`)
     }
     
-    console.log(`[AGENT] Stable connection established after ${retryCount} retries`)
-    console.log('[AGENT] Current sockets after connection:', [...sockets.value.keys()])
     
     // 最终检查WebSocket是否真正连接成功
     const ws = sockets.value.get(agent.agent_id)
     if (ws && ws.readyState === WebSocket.OPEN) {
       // 连接成功后再次查询状态，确保同步
-      console.log('[AGENT] Fetching status after connection...')
       await fetchAgentStatus(agent)
       
       // 会话恢复对话框已禁用（用户反馈莫名弹出列表选择框）
@@ -8046,30 +7879,25 @@ async function switchAgent(agent) {
       /*
       const currentOutputs = allOutputs.value.get(agent.agent_id) || []
       if (currentOutputs.length === 0) {
-        console.log('[AGENT] No history found, checking for recoverable sessions...')
         try {
           const { host, port } = getGatewayAddress()
           const targetNodeId = String(agent?.node_id || '').trim() || String(getCurrentAgentNodeId() || 'master').trim() || 'master'
           const sessionsResponse = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `agents/${agent.agent_id}/sessions`))
           const sessionsData = await sessionsResponse.json()
           if (sessionsData.success && sessionsData.data && sessionsData.data.length > 0) {
-            console.log('[AGENT] Found recoverable sessions:', sessionsData.data)
             availableSessions.value = sessionsData.data
             showSessionDialog.value = true
           } else {
-            console.log('[AGENT] No recoverable sessions found')
           }
         } catch (error) {
           console.error('[AGENT] Failed to fetch sessions:', error)
         }
       } else {
-        console.log('[AGENT] History already loaded, skipping session detection')
       }
       */
     } else {
       console.warn('[AGENT] Connection verification failed, WebSocket not in OPEN state')
       // WebSocket 未连接，但已经通过 HTTP 查询了状态
-      console.log('[AGENT] Status fetched via HTTP, but WebSocket not connected')
     }
   } catch (error) {
     console.error('[AGENT] Failed to connect to agent:', error)
@@ -8085,11 +7913,9 @@ async function autoConnectToOnlineAgents() {
   const onlineAgents = agentList.value.filter(agent => agent.status === 'running')
   
   if (onlineAgents.length === 0) {
-    console.log('[AUTO_CONNECT] No online agents to connect')
     return
   }
   
-  console.log(`[AUTO_CONNECT] Found ${onlineAgents.length} online agents, connecting...`)
   
   // 记录当前选中的 agent，确保不切换
   const savedCurrentAgentId = currentAgentId.value
@@ -8100,13 +7926,11 @@ async function autoConnectToOnlineAgents() {
     if (sockets.value.has(agent.agent_id)) {
       const existingWs = sockets.value.get(agent.agent_id)
       if (existingWs && existingWs.readyState === WebSocket.OPEN) {
-        console.log(`[AUTO_CONNECT] Already connected to ${agent.name || agent.agent_id}`)
         continue
       }
     }
     
     try {
-      console.log(`[AUTO_CONNECT] Connecting to ${agent.name || agent.agent_id}`)
       await connectToAgent(agent)
       // 连接间隔 500ms，避免同时建立过多连接
       await new Promise(resolve => setTimeout(resolve, 500))
@@ -8118,11 +7942,9 @@ async function autoConnectToOnlineAgents() {
   
   // 确保当前选中的 agent 没有被改变
   if (currentAgentId.value !== savedCurrentAgentId) {
-    console.log('[AUTO_CONNECT] Restoring current agent selection')
     currentAgentId.value = savedCurrentAgentId
   }
   
-  console.log(`[AUTO_CONNECT] Auto-connect completed, connected agents: ${sockets.value.size}`)
 }
 
 // 定时刷新 Agent 列表
@@ -8164,13 +7986,11 @@ function handleMessage(message, agentId = null) {
   if (type === 'ready') {
     // Agent 连接已建立并准备就绪
     // 消息同步完全依赖 sync_request 机制，不再手动加载历史或清空消息
-    console.log('[ws] Agent ready:', targetAgentId)
 
     // 恢复当前Agent的输入请求状态（从Map中获取）
     const currentAgentIdLocal = targetAgentId
     const inputRequest = inputRequests.value.get(currentAgentIdLocal)
     if (inputRequest) {
-      console.log('[ws] Restoring input request for agent', currentAgentIdLocal, 'from Map')
       inputTip.value = inputRequest.tip || ''
       inputMode.value = inputRequest.mode || 'multi'
       inputText.value = inputText.value || inputRequest.preset || ''
@@ -8190,7 +8010,6 @@ function handleMessage(message, agentId = null) {
   } else if (type === 'sync_response') {
     // 处理同步响应，一次性接收多条历史消息（增量模式）
     const messages = payload?.messages || []
-    console.log('[ws] Received sync_response with', messages.length, 'messages')
     // 与本地历史按 seq 去重合并后保存
     if (messages.length > 0) {
       // 获取本地已有消息，按 seq 建立索引
@@ -8283,7 +8102,6 @@ function handleMessage(message, agentId = null) {
         return seqA - seqB
       })
       historyStorage.setHistoryForAgent(targetAgentId, mergedMessages)
-      console.log('[ws] Merged', mergedMessages.length, 'messages (local + remote) for agent', targetAgentId)
       // 清空当前消息列表，强制从本地存储重新加载完整历史
       // 这样可以确保同步后的历史正确显示，避免与现有消息合并导致的问题
       if (targetAgentId === currentAgentId.value) {
@@ -8310,7 +8128,6 @@ function handleMessage(message, agentId = null) {
     
     // 处理流式输出
     if (outputType === 'STREAM_START') {
-      console.log('[STREAM] Start event:', payload)
       // 创建当前 Agent 的流式消息
       const currentOutputs = allOutputs.value.get(targetAgentId) || []
       const streamingMessage = {
@@ -8325,7 +8142,6 @@ function handleMessage(message, agentId = null) {
       }
       streamingMessages.value.set(targetAgentId, streamingMessage)
       currentOutputs.push(streamingMessage)
-      console.log('[STREAM] Created streaming message, total:', currentOutputs.length, 'agent:', targetAgentId)
     } else if (outputType === 'STREAM_CHUNK') {
       // 追加到当前 Agent 的流式消息
       const streamingMessage = streamingMessages.value.get(targetAgentId)
@@ -8347,7 +8163,6 @@ function handleMessage(message, agentId = null) {
         console.warn('[STREAM] Received chunk but no streaming message found for agent:', targetAgentId)
       }
     } else if (outputType === 'STREAM_END') {
-      console.log('[STREAM] End event:', payload)
       const streamingMessage = streamingMessages.value.get(targetAgentId)
       if (streamingMessage) {
         // 从当前 Agent 的 outputs 数组中删除流式消息
@@ -8355,7 +8170,6 @@ function handleMessage(message, agentId = null) {
         const index = currentOutputs.indexOf(streamingMessage)
         if (index !== -1) {
           currentOutputs.splice(index, 1)
-          console.log('[STREAM] Removed streaming message from outputs for agent:', targetAgentId)
         }
         // 清除当前 Agent 的流式消息引用
         streamingMessages.value.delete(targetAgentId)
@@ -8374,7 +8188,6 @@ function handleMessage(message, agentId = null) {
     // 检查当前是否处于 waiting_confirm 状态，如果是则跳过状态更新（不覆盖确认状态）
     const currentStatus = requestAgentId ? agentStatuses.value.get(requestAgentId)?.execution_status : null
     if (currentStatus === 'waiting_confirm') {
-      console.log('[ws] Skipping input_request, agent is in waiting_confirm state')
       return
     }
 
@@ -8382,7 +8195,6 @@ function handleMessage(message, agentId = null) {
     if (requestAgentId && payload.mode) {
       const statusKey = payload.mode === 'multi' ? 'waiting_multi' : 'waiting_single'
       agentStatuses.value.set(requestAgentId, {execution_status: statusKey})
-      console.log('[ws] Set agentStatuses based on input_request mode:', statusKey, 'for agent:', requestAgentId)
     }
     
     // 检查缓冲区是否有内容
@@ -8394,11 +8206,9 @@ function handleMessage(message, agentId = null) {
       
       if (isCompletionSignal && !isMultiLineRequest) {
         // 完成信号不能发送给单行输入（如确认对话框），清空缓冲区
-        console.log('[INPUT_REQUEST] Completion signal in buffer but request is single-line, discarding')
         inputBuffers.value.delete(requestAgentId)
       } else {
         // 普通输入或匹配的多行输入，发送缓冲区内容
-        console.log('[INPUT_REQUEST] Found buffered input, auto-sending')
         inputBuffers.value.delete(requestAgentId)
         sendInputResult(bufferedText, payload.request_id, requestAgentId, payload.mode)
       }
@@ -8414,7 +8224,6 @@ function handleMessage(message, agentId = null) {
       is_password: payload.is_password || false,
       request_id: payload.request_id
     })
-    console.log('[ws] Saved input request for agent', targetAgentId, ':', payload.mode)
 
     // 自动朗读：以 input_request 为准确触发信号（每次真正请求输入都会到达）
     // 若该 Agent 已有待处理请求（如重连恢复时重复推送），则跳过避免重复朗读
@@ -8452,7 +8261,6 @@ function handleMessage(message, agentId = null) {
       const clientHeight = outputList.value.clientHeight
       // 如果已经接近底部，则记录需要在显示输入框后滚动
       shouldScrollAfterInputShow = (scrollTop + clientHeight >= scrollHeight - SCROLL_THRESHOLD)
-      console.log('[INPUT_REQUEST] Before show - scrollTop:', scrollTop, 'scrollHeight:', scrollHeight, 'clientHeight:', clientHeight, 'shouldScroll:', shouldScrollAfterInputShow)
     }
     
     nextTick(() => {
@@ -8463,9 +8271,7 @@ function handleMessage(message, agentId = null) {
           const scrollHeight = outputList.value.scrollHeight
           const scrollTop = outputList.value.scrollTop
           const clientHeight = outputList.value.clientHeight
-          console.log('[INPUT_REQUEST] After show - Before scroll - scrollTop:', scrollTop, 'scrollHeight:', scrollHeight, 'clientHeight:', clientHeight)
           outputList.value.scrollTop = scrollHeight
-          console.log('[INPUT_REQUEST] After show - After scroll - scrollTop:', outputList.value.scrollTop)
         })
       }
     })
@@ -8584,17 +8390,14 @@ function handleMessage(message, agentId = null) {
       if (payload.execution_status === 'running' && ['waiting_single', 'waiting_multi', 'waiting_confirm'].includes(prevStatus)) {
         if (inputRequests.value.has(targetAgentId)) {
           inputRequests.value.delete(targetAgentId)
-          console.log('[STATUS_SYNC] Cleared input request for agent', targetAgentId, 'due to status change', prevStatus, '-> running')
         }
         if (confirmDialog.value && pendingConfirmAgentId.value === targetAgentId) {
           confirmDialog.value = null
           pendingConfirmAgentId.value = null
-          console.log('[STATUS_SYNC] Cleared confirm dialog for agent', targetAgentId, 'due to status change', prevStatus, '-> running')
         }
         // 清除 Panel 内嵌确认数据
         if (panelConfirmData.value.has(targetAgentId)) {
           panelConfirmData.value.delete(targetAgentId)
-          console.log('[STATUS_SYNC] Cleared panel confirm data for agent', targetAgentId, 'due to status change', prevStatus, '-> running')
         }
       }
 
@@ -8959,7 +8762,6 @@ function appendOutput(payload, agentId = null) {
       item => item.output_type === 'execution' && item.execution_id === outputItem.execution_id
     )
     if (duplicate) {
-      console.log('[appendOutput] Skipping duplicate execution:', outputItem.execution_id)
       return
     }
   }
@@ -8968,7 +8770,6 @@ function appendOutput(payload, agentId = null) {
   if (typeof outputItem.seq === 'number') {
     const duplicate = currentOutputs.find(item => item.seq === outputItem.seq)
     if (duplicate) {
-      console.log('[appendOutput] Skipping duplicate seq:', outputItem.seq)
       return
     }
   }
@@ -9063,7 +8864,6 @@ async function copyToClipboard(text, index) {
   
   try {
     await navigator.clipboard.writeText(text)
-    console.log('[COPY] Successfully copied text to clipboard')
     showToast('已复制到剪贴板', 'success')
   } catch (err) {
     console.error('[COPY] Failed to copy text:', err)
@@ -9077,7 +8877,6 @@ async function copyToClipboard(text, index) {
       textArea.select()
       document.execCommand('copy')
       document.body.removeChild(textArea)
-      console.log('[COPY] Fallback: Successfully copied using execCommand')
     } catch (fallbackErr) {
       console.error('[COPY] Fallback also failed:', fallbackErr)
       alert('复制失败，请手动复制')
@@ -9110,7 +8909,6 @@ function appendExecution(payload, agentId = null) {
   const eventType = payload?.event_type
   const targetAgentId = agentId || payload?.agent_id || currentAgentId.value
   
-  console.log(`[terminal DEBUG] appendExecution: executionId=${executionId}, eventType=${eventType}, hasData=${!!payload?.data}, encoded=${payload?.encoded}`)
   
   // 检查是否是独立终端的输出（格式：terminal_{terminal_id}）
   if (executionId.startsWith('terminal_')) {
@@ -9151,7 +8949,6 @@ function appendExecution(payload, agentId = null) {
       }
     } else {
       // 终端尚未初始化，将输出暂存到缓冲区
-      console.log(`[independent-terminal] Terminal not ready, buffering output for ${terminalId}`)
       if (!session.pending_output) {
         session.pending_output = []
       }
@@ -9164,7 +8961,6 @@ function appendExecution(payload, agentId = null) {
   let data = payload?.data || ''
   if (payload?.encoded && data) {
     try {
-      console.log(`[terminal DEBUG] Decoding base64 data, len=${data.length}`)
       // 解码 base64 数据
       const binaryString = atob(data)
       // 将二进制字符串转换为 Uint8Array，然后解码为 UTF-8
@@ -9175,7 +8971,6 @@ function appendExecution(payload, agentId = null) {
       // 使用 TextDecoder 处理 UTF-8
       const decoder = new TextDecoder('utf-8')
       data = decoder.decode(bytes)
-      console.log(`[terminal DEBUG] Decoded to string, len=${data.length}`)
     } catch (error) {
       console.error('[terminal] Failed to decode base64 data:', error)
       return
@@ -9187,7 +8982,6 @@ function appendExecution(payload, agentId = null) {
   // 检查是否需要创建新终端
   let termInfo = terminals.value.find(t => t.sessionKey === executionSessionKey)
   if (!termInfo) {
-    console.log(`[terminal] Creating new terminal for execution ${executionSessionKey}`)
     termInfo = {
       sessionKey: executionSessionKey,
       agentId: targetAgentId,
@@ -9201,11 +8995,9 @@ function appendExecution(payload, agentId = null) {
     // 终端初始化移到 setTerminalRef 中，确保 DOM 元素准备好
   }
 
-  console.log(`[terminal DEBUG] termInfo: terminal=${!!termInfo.terminal}, ended=${termInfo.ended}`)
   
   // 处理执行开始事件
   if (payload?.message_type === 'tool_stream_start' && !isExecuting.value) {
-    console.log(`[terminal] Execution ${executionId} started`)
     isExecuting.value = true
   }
   
@@ -9221,14 +9013,11 @@ function appendExecution(payload, agentId = null) {
       )
       if (execMsg?.execution_chunks?.length > 0) {
         // 后台执行场景：有数据但terminal未初始化，需要正确结束execution
-        console.log(`[terminal] Execution ${executionId} received tool_stream_end in background (terminal not initialized but has chunks), marking as finished`)
       } else {
         // 重连场景：没有数据，忽略tool_stream_end
-        console.log(`[terminal] Execution ${executionId} received tool_stream_end but terminal not initialized and no chunks, ignoring (reconnect scenario)`)
         return
       }
     }
-    console.log(`[terminal] Execution ${executionId} ended, disabling interaction`)
     termInfo.active = false
     termInfo.ended = true
     isExecuting.value = false // 更新执行状态
@@ -9250,10 +9039,8 @@ function appendExecution(payload, agentId = null) {
     }
     // 获取终端内容并保存
     try {
-      console.log(`[terminal] Saving terminal content, length: ${terminalContent.length} chars`)
       // 找到并更新 execution 消息，添加 is_finished 标记和 terminal_content
       const currentOutputs = allOutputs.value.get(targetAgentId) || []
-      console.log(`🚨 [terminal] Looking for execution message: ${executionId} in agent: ${targetAgentId}`)
       const execIndex = currentOutputs.findIndex(
         item => item.output_type === 'execution' && item.execution_id === executionId
       )
@@ -9262,7 +9049,6 @@ function appendExecution(payload, agentId = null) {
         currentOutputs[execIndex].is_finished = true
         currentOutputs[execIndex].terminal_content = terminalContent
         currentOutputs[execIndex].timestamp = new Date().toISOString()
-        console.log(`🚨 [terminal] Marked execution ${executionId} as finished, content length: ${terminalContent.length}`)
         // 触发响应式更新
         allOutputs.value.set(targetAgentId, [...currentOutputs])
         // 保存到历史记录（更新原有的 execution 消息，保留execution_chunks）
@@ -9283,7 +9069,6 @@ function appendExecution(payload, agentId = null) {
             execution_chunks: currentOutputs[execIndex].execution_chunks || [],
           }
           historyStorage.saveMessage(updatedMessage)
-          console.log(`🚨 [terminal] Saved to history: is_finished=true, content_length=${terminalContent.length}, chunks=${currentOutputs[execIndex].execution_chunks?.length || 0}`)
         } catch (error) {
           console.warn('[HISTORY] Failed to save terminal content:', error)
         }
@@ -9291,7 +9076,6 @@ function appendExecution(payload, agentId = null) {
       } else {
         console.warn(`🚨 [terminal] execution message ${executionId} not found`)
       }
-      console.log(`[terminal] Terminal content saved to history for agent: ${targetAgentId}`)
     } catch (error) {
       console.error(`[terminal] Failed to save terminal content:`, error)
     }
@@ -9300,14 +9084,12 @@ function appendExecution(payload, agentId = null) {
     disposeExecutionTerminal(termInfo)
     const executionSessionKey = getExecutionSessionKey(targetAgentId, executionId)
     terminalHosts.value.delete(executionSessionKey)
-    console.log(`[terminal] Disposed terminal and cleaned up terminalHost for completed execution: ${executionId}`)
 
     // xterm 销毁并切换为 Terminal Output 文本块后，滚动外层 session 对话容器一次（自动滚动开启时）
     scrollSessionToBottom(targetAgentId)
   }
   
   // 输出到终端
-  console.log(`[terminal] Writing to terminal: terminal=${!!termInfo.terminal}, eventType=${eventType}, data_len=${data.length}`)
   if (eventType === 'stdout' || eventType === 'stderr') {
     if (data) {
       // 追加到消息的 execution_chunks 并实时更新历史
@@ -9325,15 +9107,12 @@ function appendExecution(payload, agentId = null) {
     if (termInfo.terminal) {
       // 显示即将写入的数据（前100字符），用于调试
       const preview = data.substring(0, 100).replace(/\x1b/g, 'ESC').replace(/\r/g, 'CR').replace(/\n/g, 'LF')
-      console.log(`[terminal] About to write ${data.length} bytes to terminal, preview: ${preview}`)
       try {
         termInfo.terminal.write(data)
-        console.log(`[terminal] Write successful: ${data.length} bytes`)
       } catch (error) {
         console.error('[terminal] Write failed:', error)
       }
     } else if (data) {
-      console.log(`[terminal] Terminal not ready, chunk saved to execution_chunks (${data.length} bytes)`)
     }
   } else if (eventType === 'status') {
     const statusLine = `\r\n[status] ${payload.data || ''}`
@@ -9351,10 +9130,8 @@ function appendExecution(payload, agentId = null) {
     if (termInfo.terminal) {
       termInfo.terminal.writeln(statusLine)
     } else {
-      console.log(`[terminal] Terminal not ready, status chunk saved to execution_chunks`)
     }
   } else if (!termInfo.terminal && data) {
-    console.log(`[terminal] Terminal not ready, skipping output for eventType=${eventType}`)
   }
 }
 
@@ -9365,7 +9142,6 @@ function clearTerminalCache(agentId) {
   // 清除该 agent 的所有终端缓存（已完成的终端从历史重建，无需保留termInfo）
   terminals.value = terminals.value.filter(t => t.agentId !== agentId)
   const afterCount = terminals.value.length
-  console.log(`[TERMINAL_CACHE] Cleared ${beforeCount - afterCount} terminal caches for agent: ${agentId}`)
 }
 
 // ============ 历史输入记录管理 ============
@@ -9588,11 +9364,9 @@ function submitCompletion() {
       // 注意：完成信号只针对多行输入，单行输入（如确认对话框）不使用完成按钮
       if (executionStatus === 'waiting_multi') {
         // 后端正在等待多行输入，直接发送 Ctrl+C 信号
-        console.log('[SUBMIT] Sending Ctrl+C signal (__CTRL_C_PRESSED__) to backend (execution_status: waiting_multi)')
         sendInputDirectly('__CTRL_C_PRESSED__', 'single')
       } else {
         // 后端没有等待输入或正在等待单行输入，将完成信号保存到缓冲区（与普通输入统一机制）
-        console.log('[SUBMIT] Caching completion signal to buffer (execution_status:', executionStatus, ')')
         updateInputBuffer(agentId, '__CTRL_C_PRESSED__')
         appendOutput({
           output_type: 'system',
@@ -9625,7 +9399,6 @@ function sendInputDirectly(text, inputMode = 'multi', agentId = null) {
   // 从Map中删除该Agent的输入请求
   if (targetAgentId) {
     inputRequests.value.delete(targetAgentId)
-    console.log('[INPUT] Cleared input request for agent', targetAgentId, 'from Map')
   }
 }
 
@@ -9644,7 +9417,6 @@ function sendInputResult(text, requestId, agentId = null, inputMode = 'multi') {
       input_mode: inputMode,
     },
   }
-  console.log('[ws] send input_result (from buffer)', message, 'agent:', targetAgentId)
   if (targetAgentId) {
     const ws = sockets.value.get(targetAgentId)
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -9657,7 +9429,6 @@ function sendInputResult(text, requestId, agentId = null, inputMode = 'multi') {
   // 从Map中删除该Agent的输入请求（表示已响应）
   if (targetAgentId) {
     inputRequests.value.delete(targetAgentId)
-    console.log('[INPUT] Cleared input request for agent', targetAgentId, 'from Map after sending result')
   }
   pendingInputAgentId.value = null
 }
@@ -9725,7 +9496,6 @@ function sendConfirmResult(confirmed, agentId = null) {
       confirmed,
     },
   }
-  console.log('[ws] send confirm_result', message, 'agent:', targetAgentId)
   if (targetAgentId) {
     const ws = sockets.value.get(targetAgentId)
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -9782,7 +9552,6 @@ function restoreWaitingConfirmUI(agentId) {
   if (!agentId) return
   const confirmData = panelConfirmData.value.get(agentId)
   if (confirmData) {
-    console.log('[AGENT] Restoring waiting_confirm UI for agent', agentId, ':', confirmData.message)
     pendingConfirmAgentId.value = agentId
     // 无 Panel 时不弹全局对话框，确认请求静默等待，用户打开 Panel 后可见 confirm 控件
   } else {
@@ -9809,7 +9578,6 @@ function sendInterrupt() {
     type: 'interrupt',
     payload: {},
   }
-  console.log('[ws] send interrupt', message)
   sendMessageToAgent(message)
 }
 
@@ -9822,7 +9590,6 @@ function sendManualInterruptToPanel(panel) {
     type: 'manual_interrupt',
     payload: {},
   }
-  console.log('[ws] send manual interrupt to panel agent', panel.agentId, message)
   sendMessageToAgentById(panel.agentId, message)
 }
 
@@ -9834,7 +9601,6 @@ function confirmClearHistory() {
     '确定要清除所有历史记录吗？此操作不可撤销。',
     () => {
       if (historyStorage.clearHistory()) {
-        console.log('[HISTORY] History cleared successfully')
         // 清除当前 Agent 的消息
         allOutputs.value.set(currentAgentId.value, [])
         // 重置历史加载状态
@@ -9867,17 +9633,13 @@ function getTerminalBufferContent(terminal, trimTrailingWhitespace = false) {
 }
 
 function syncTerminalSize(executionId, termInfo) {
-  console.log(`[terminal] syncTerminalSize called for execution ${executionId}`)
   if (!termInfo) {
-    console.log(`[terminal] syncTerminalSize: termInfo is null`)
     return
   }
   if (!termInfo.terminal) {
-    console.log(`[terminal] syncTerminalSize: terminal is null`)
     return
   }
   if (!termInfo.fitAddon) {
-    console.log(`[terminal] syncTerminalSize: fitAddon is null`)
     return
   }
   
@@ -9888,11 +9650,9 @@ function syncTerminalSize(executionId, termInfo) {
   const newCols = termInfo.terminal.cols
   const newRows = termInfo.terminal.rows
   
-  console.log(`[terminal] syncTerminalSize: ${oldCols}x${oldRows} -> ${newCols}x${newRows}`)
   
   // 如果尺寸没变，跳过
   if (oldCols === newCols && oldRows === newRows) {
-    console.log(`[terminal] syncTerminalSize: size unchanged, skipping`)
     return
   }
   
@@ -9972,7 +9732,6 @@ function initExecutionTerminal(executionId, termInfo, el, agentId = null) {
   termInfo.fitAddon = new FitAddon()
   termInfo.terminal.loadAddon(termInfo.fitAddon)
   termInfo.fitAddon.fit()
-  console.log(`[terminal] FitAddon fit: cols=${termInfo.terminal.cols}, rows=${termInfo.terminal.rows}`)
 
   // xterm 创建并渲染完成后，滚动外层 session 对话容器一次（自动滚动开启时）
   // 仅当该 execution 是当前 Agent 消息列表中的最后一条（新执行刚创建）时触发，
@@ -10023,7 +9782,6 @@ function initExecutionTerminal(executionId, termInfo, el, agentId = null) {
       item => item.output_type === 'execution' && item.execution_id === executionId
     )
     if (execMsg?.execution_chunks?.length > 0) {
-      console.log(`[terminal] Replaying ${execMsg.execution_chunks.length} chunks from execution_chunks`)
       execMsg.execution_chunks.forEach((chunk, index) => {
         try {
           termInfo.terminal.write(chunk)
@@ -10045,12 +9803,7 @@ function setTerminalRef(executionId, el, agentId = null) {
   const executionSessionKey = getExecutionSessionKey(targetAgentId, executionId)
   let termInfo = terminals.value.find(t => t.sessionKey === executionSessionKey)
   if (el) {
-    console.log(`[terminal] Setting ref for execution ${executionSessionKey}`)
-    console.log(`[terminal] Element properties: clientWidth=${el.clientWidth}, clientHeight=${el.clientHeight}, offsetWidth=${el.offsetWidth}, offsetHeight=${el.offsetHeight}`)
-    console.log(`[terminal] Computed style: ${window.getComputedStyle(el).width} x ${window.getComputedStyle(el).height}`)
-    console.log(`[terminal] Parent element:`, el.parentElement)
     if (el.parentElement) {
-      console.log(`[terminal] Parent size: ${window.getComputedStyle(el.parentElement).width} x ${window.getComputedStyle(el.parentElement).height}`)
     }
     terminalHosts.value.set(executionSessionKey, el)
     if (!termInfo) {
@@ -10062,17 +9815,14 @@ function setTerminalRef(executionId, el, agentId = null) {
       
       // 如果有terminal_content，说明执行结果已保存，不需要创建xterm（直接显示文本历史即可）
       if (executionMessage?.terminal_content) {
-        console.log(`[terminal] Execution ${executionSessionKey} has terminal_content, skipping terminal creation`)
         return
       }
       // 检查是否已经finished但没有terminal_content（重连场景），不需要重新创建终端
       if (executionMessage?.is_finished) {
-        console.log(`[terminal] Execution ${executionSessionKey} marked as finished but no content, skipping terminal creation (will show empty history)`)
         return
       }
       
       // termInfo不存在，创建新的终端记录
-      console.log(`[terminal] Creating new terminal record for execution ${executionSessionKey}`)
       termInfo = {
         sessionKey: executionSessionKey,
         agentId: targetAgentId,
@@ -10094,28 +9844,22 @@ function setTerminalRef(executionId, el, agentId = null) {
       const lastMessage = agentOutputs[agentOutputs.length - 1]
       // 如果有terminal_content，说明执行结果已保存，不需要重建xterm
       if (lastMessage?.terminal_content) {
-        console.log(`[terminal] Last execution has terminal_content, skipping rebuild for ${executionSessionKey}`)
         disposeExecutionTerminal(termInfo)
         termInfo.ended = true
         return
       }
       const isLastMessageExecution = lastMessage?.output_type === 'execution' && !lastMessage?.is_finished
       if (!isLastMessageExecution) {
-        console.log(`[terminal] Last message is not an active execution, skipping rebuild for ${executionSessionKey}`)
         disposeExecutionTerminal(termInfo)
         termInfo.ended = true
         return
       }
-      console.log(`[terminal] Rebuilding terminal for execution ${executionSessionKey} on new host element`)
       disposeExecutionTerminal(termInfo)
     }
 
     if (!termInfo.terminal && !termInfo.ended) {
-      console.log(`[terminal] Initializing terminal for execution ${executionSessionKey}`)
-      console.log(`[terminal] Element size: width=${el.clientWidth}px, height=${el.clientHeight}px`)
       initExecutionTerminal(executionId, termInfo, el, targetAgentId)
     } else if (termInfo.ended) {
-      console.log(`[terminal] Terminal for execution ${executionSessionKey} already ended, skipping initialization`)
     } else {
       termInfo.hostEl = el
       if (!termInfo.resizeObserver && typeof ResizeObserver !== 'undefined') {
@@ -10142,10 +9886,8 @@ function setTerminalRef(executionId, el, agentId = null) {
 function setTerminalHostRef(terminalId, el) {
   const session = terminalSessions.value.find(t => t.terminal_id === terminalId)
   if (el) {
-    console.log(`[independent-terminal] Setting ref for terminal ${terminalId}`)
     // 如果 hostEl 相同且 terminal 已存在，说明是组件更新触发的 ref 回调，不需要重新初始化
     if (session && session.hostEl === el && session.terminal) {
-      console.log(`[independent-terminal] Host element unchanged, skipping re-init for ${terminalId}`)
       return
     }
     independentTerminalHosts.value.set(terminalId, el)
@@ -10153,7 +9895,6 @@ function setTerminalHostRef(terminalId, el) {
       session.hostEl = el
       // 如果 terminal 实例已存在（面板 detach 切换导致组件重建），重新打开
       if (session.terminal) {
-        console.log(`[independent-terminal] Terminal ${terminalId} already exists, reopening on new host element`)
         initIndependentTerminal(terminalId, el)
       }
     }
@@ -10174,7 +9915,6 @@ function initIndependentTerminal(terminalId, el) {
   
   // 如果 terminal 实例已存在（面板 detach 切换导致组件重建），先 dispose 旧实例再创建新的
   if (session.terminal) {
-    console.log(`[independent-terminal] Reopening terminal ${terminalId} with ${session.history.length} history entries`)
     try {
       // xterm.js 的 Terminal.open() 不能对同一实例调用两次，必须先 dispose 再创建新实例
       // 注意：不设置 session.terminal = null，避免触发响应式更新导致无限循环
@@ -10190,7 +9930,6 @@ function initIndependentTerminal(terminalId, el) {
     // 继续走下面的新实例创建逻辑（session.terminal 会被下面的 new Terminal() 覆盖）
   }
 
-  console.log(`[independent-terminal] Initializing terminal ${terminalId}`)
   
   // 创建终端实例
   // 注意：这里不调用 fitAddon.fit()，因为初始时元素可能不可见（v-show）
@@ -10233,9 +9972,7 @@ function initIndependentTerminal(terminalId, el) {
   // 使用 FitAddon 适配终端尺寸（仅当元素可见时）
   if (el.offsetParent !== null) {
     session.fitAddon.fit()
-    console.log(`[independent-terminal] FitAddon fit: cols=${session.terminal.cols}, rows=${session.terminal.rows}`)
   } else {
-    console.log(`[independent-terminal] Element is hidden, skipping fit`)
   }
   
   // 设置 ResizeObserver 监听尺寸变化
@@ -10268,12 +10005,10 @@ function initIndependentTerminal(terminalId, el) {
         ...(session.pending_output || []),
       ]
       if (allOutputs.length > 0) {
-        console.log(`[independent-terminal] Writing ${allOutputs.length} buffered outputs to terminal ${terminalId}`)
         try {
           for (const bufferedData of allOutputs) {
             session.terminal.write(bufferedData)
           }
-          console.log(`[independent-terminal] Successfully wrote buffered outputs`)
         } catch (error) {
           console.error('[independent-terminal] Failed to write buffered outputs:', error)
         }
@@ -10290,7 +10025,6 @@ function createTerminal() {
     return
   }
   
-  console.log('[independent-terminal] Creating new terminal')
   const nodeId = getCurrentAgentNodeId() || ''
   const payload = {}
   if (nodeId) {
@@ -10322,7 +10056,6 @@ function createTerminalForSelectedNode() {
     return
   }
 
-  console.log('[independent-terminal] Creating terminal for node:', nodeId)
   const message = {
     type: 'terminal_create',
     payload: {
@@ -10341,7 +10074,6 @@ function createTerminalForAgent(agent) {
     return
   }
 
-  console.log('[independent-terminal] Creating terminal for agent:', agent.name)
   
   // 直接使用传入的 agent 参数创建终端，不依赖异步切换
   const nodeId = String(agent?.node_id || '').trim() || ''
@@ -10364,7 +10096,6 @@ function createTerminalForAgent(agent) {
 }
 
 function closeTerminal(terminalId) {
-  console.log(`[independent-terminal] Closing terminal ${terminalId}`)
 
   // 先获取 node_id（清理前）
   const closingSession = terminalSessions.value.find(t => t.terminal_id === terminalId)
@@ -11455,7 +11186,6 @@ watch(activeEditorTabPath, () => {
 watch(showTerminalPanel, (newValue, oldValue) => {
   if (!newValue && oldValue) {
     stopTerminalPanelInteraction()
-    console.log('[independent-terminal] Panel hiding, disabling ResizeObserver for all terminals')
     terminalSessions.value.forEach(session => {
       if (session.resizeObserver) {
         session.resizeObserver.disconnect()
@@ -11464,7 +11194,6 @@ watch(showTerminalPanel, (newValue, oldValue) => {
   } else if (newValue && !oldValue) {
     ensureTerminalPanelInViewport()
     saveTerminalPanelRect()
-    console.log('[independent-terminal] Panel showing, enabling ResizeObserver for active terminal')
     nextTick(() => {
       const activeSession = terminalSessions.value.find(s => s.terminal_id === activeTerminalId.value)
       if (activeSession && activeSession.resizeObserver && activeSession.hostEl) {
@@ -11482,13 +11211,11 @@ watch(showTerminalPanel, (newValue, oldValue) => {
 watch(activeTerminalId, (newId, oldId) => {
   if (newId !== oldId) {
     // 切换终端标签
-    console.log(`[independent-terminal] Switching terminal: ${oldId} -> ${newId}`)
     
     // 禁用旧终端的 ResizeObserver
     const oldSession = terminalSessions.value.find(s => s.terminal_id === oldId)
     if (oldSession && oldSession.resizeObserver) {
       oldSession.resizeObserver.disconnect()
-      console.log(`[independent-terminal] Disabled ResizeObserver for terminal ${oldId}`)
     }
     
     // 启用新终端的 ResizeObserver
@@ -11500,7 +11227,6 @@ watch(activeTerminalId, (newId, oldId) => {
           newSession.fitAddon.fit()
           sendTerminalResize(newSession.terminal_id, newSession.terminal.rows, newSession.terminal.cols)
         }
-        console.log(`[independent-terminal] Enabled ResizeObserver for terminal ${newId}: ${newSession.terminal.cols} cols x ${newSession.terminal.rows} rows`)
       })
     }
   }
@@ -11508,7 +11234,6 @@ watch(activeTerminalId, (newId, oldId) => {
 
 
 function switchTerminal(terminalId) {
-  console.log(`[independent-terminal] Switching to terminal ${terminalId}`)
   activeTerminalId.value = terminalId
   
   // 聚焦到选中的终端
@@ -11596,7 +11321,6 @@ function handleGlobalKeydown(event) {
     
     // 切换 Agent 侧边栏显示状态
     showAgentSidebar.value = !showAgentSidebar.value
-    console.log('[app] Toggle agent sidebar:', showAgentSidebar.value)
   }
   
   // Ctrl + ` 打开/隐藏终端面板
@@ -11606,7 +11330,6 @@ function handleGlobalKeydown(event) {
     // 切换终端面板显示状态
     if (socket.value) {
       showTerminalPanel.value = !showTerminalPanel.value
-      console.log('[app] Toggle terminal panel:', showTerminalPanel.value)
     }
   }
 
@@ -11617,7 +11340,6 @@ function handleGlobalKeydown(event) {
     if (hasBufferedInput.value) {
       event.preventDefault()
       sendBufferedInput()
-      console.log('[app] Sent buffered input via Ctrl+Alt+Enter')
     }
   }
 
@@ -11626,32 +11348,25 @@ function handleGlobalKeydown(event) {
     // 如果对话框打开，关闭对话框
     if (showSettingsModal.value) {
       showSettingsModal.value = false
-      console.log('[app] Close settings modal')
     } else if (showCreateAgentModal.value) {
       showCreateAgentModal.value = false
-      console.log('[app] Close create agent modal')
     } else if (showSessionDialog.value) {
       cancelSessionDialog()
-      console.log('[app] Close session dialog')
     } else if (showDirDialog.value) {
       cancelDirDialog()
-      console.log('[app] Close dir dialog')
     }
     
     // ESC 键也关闭移动端菜单
     if (showMobileMenu.value) {
       showMobileMenu.value = false
-      console.log('[app] Close mobile menu')
     }
     
     // ESC 键也关闭Agent侧边栏和终端面板（移动端）
     if (showAgentSidebar.value && windowWidth.value <= 768) {
       showAgentSidebar.value = false
-      console.log('[app] Close agent sidebar (mobile)')
     }
     if (showTerminalPanel.value && windowWidth.value <= 768) {
       showTerminalPanel.value = false
-      console.log('[app] Close terminal panel (mobile)')
     }
   }
 }
@@ -11665,7 +11380,6 @@ const handleBeforeUnload = (e) => {
     // 有socket连接，提示用户
     e.preventDefault()
     e.returnValue = '' // Chrome需要returnValue
-    console.log('[app] Preventing page unload, socket is connected')
   }
 }
 
@@ -11674,7 +11388,6 @@ const pushOverlayState = () => {
   if (windowWidth.value <= 768) {
     history.pushState({ overlay: true }, '', '')
     historyStateCount++
-    console.log('[app] Push history state, count:', historyStateCount)
   }
 }
 
@@ -11751,7 +11464,6 @@ function sendHeartbeat() {
   const now = Date.now()
   sockets.value.forEach((ws, agentId) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
-      console.log(`[HEARTBEAT] Sending ping to agent ${agentId}`)
       // 记录发送时间（用于超时检测）
       lastPongTime.value.set(agentId, now) // 先更新为发送时间，收到 pong 后会再次更新
       ws.send(JSON.stringify({ type: 'ping' }))
@@ -11764,11 +11476,9 @@ function sendHeartbeat() {
 
 onMounted(() => {
   // 不再在页面加载时创建终端，改为动态创建
-  console.log('[app] Mounted')
 
   // 启动心跳机制
   heartbeatTimer = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL)
-  console.log(`[HEARTBEAT] Started with interval ${HEARTBEAT_INTERVAL}ms`)
 
   // seq 由 getAgentLastSeq() 从历史记录动态获取，无需初始化加载
 
@@ -11779,7 +11489,6 @@ onMounted(() => {
   if (hasAuthToken()) {
     showConnectModal.value = false
     isAutoConnecting.value = true
-    console.log('[AUTH] Auto login: token loaded, connecting...')
     connect()
   }
 
@@ -11801,7 +11510,6 @@ onMounted(() => {
   
   // 添加全局键盘事件监听（在捕获阶段处理 Ctrl+T 等快捷键）
   document.addEventListener('keydown', handleGlobalKeydown, { capture: true })
-  console.log('[app] Global keyboard listener added (capture mode)')
   
   // 监听窗口resize事件
   handleResize = () => {
@@ -11826,15 +11534,12 @@ onMounted(() => {
     }
   }
   window.addEventListener('resize', handleResize)
-  console.log('[app] Resize listener added')
   
   // 添加beforeunload监听
   window.addEventListener('beforeunload', handleBeforeUnload)
-  console.log('[app] Beforeunload listener added')
   
   // 移动端：监听返回键（popstate事件）
   handlePopState = () => {
-    console.log('[app] Back button pressed, historyStateCount:', historyStateCount)
     
     if (historyStateCount > 0) {
       // 有推送的历史状态，只是关闭浮层，不做真正的后退
@@ -11843,35 +11548,25 @@ onMounted(() => {
       // 关闭所有打开的浮层
       if (showSettingsModal.value) {
         showSettingsModal.value = false
-        console.log('[app] Close settings modal via back button')
       } else if (showCreateAgentModal.value) {
         showCreateAgentModal.value = false
-        console.log('[app] Close create agent modal via back button')
       } else if (showSessionDialog.value) {
         cancelSessionDialog()
-        console.log('[app] Close session dialog via back button')
       } else if (showDirDialog.value) {
         cancelDirDialog()
-        console.log('[app] Close dir dialog via back button')
       } else if (showAgentSidebar.value && windowWidth.value <= 768) {
         showAgentSidebar.value = false
-        console.log('[app] Close agent sidebar via back button')
       } else if (showTerminalPanel.value && windowWidth.value <= 768) {
         showTerminalPanel.value = false
-        console.log('[app] Close terminal panel via back button')
       } else if (showMobileMenu.value) {
         showMobileMenu.value = false
-        console.log('[app] Close mobile menu via back button')
       } else {
-        console.log('[app] No overlay to close')
       }
     } else {
       // 没有推送的历史状态，允许默认后退行为
-      console.log('[app] No pushed history, allow default back')
     }
   }
   window.addEventListener('popstate', handlePopState)
-  console.log('[app] Popstate listener added')
 
   // MutationObserver: 监听 outputList DOM 变化，自动渲染 mermaid/dot 图表
   if (outputList.value) {
@@ -11887,16 +11582,10 @@ onMounted(() => {
       }, 50)
     })
     diagramObserver.observe(outputList.value, { childList: true, subtree: true })
-    console.log('[app] Diagram MutationObserver started')
   }
 })
 
 onUnmounted(() => {
-  console.log('[app] onUnmounted', {
-    hasSocket: !!socket.value,
-    socketState: socket.value?.readyState,
-    connecting: connecting.value,
-  })
 
   // 清理滚动监听
   if (historyScrollListenerEl && historyScrollHandler) {
@@ -11913,7 +11602,6 @@ onUnmounted(() => {
   if (heartbeatTimer) {
     clearInterval(heartbeatTimer)
     heartbeatTimer = null
-    console.log('[HEARTBEAT] Stopped')
   }
   
   stopAgentSidebarResize()
@@ -11929,25 +11617,20 @@ onUnmounted(() => {
 
   // 移除全局键盘事件监听
   document.removeEventListener('keydown', handleGlobalKeydown, { capture: true })
-  console.log('[app] Global keyboard listener removed')
   
   // 移除窗口resize监听
   window.removeEventListener('resize', handleResize)
-  console.log('[app] Resize listener removed')
   
   // 移除beforeunload监听
   window.removeEventListener('beforeunload', handleBeforeUnload)
-  console.log('[app] Beforeunload listener removed')
   
   // 移除返回键监听
   window.removeEventListener('popstate', handlePopState)
-  console.log('[app] Popstate listener removed')
 
   // 断开图表渲染 MutationObserver
   if (diagramObserver) {
     diagramObserver.disconnect()
     diagramObserver = null
-    console.log('[app] Diagram MutationObserver disconnected')
   }
 })
 
@@ -11979,7 +11662,6 @@ function playChatNotificationSound() {
     playChatSingleTone(audioContext, now, 880, 'triangle', 0.25)
     playChatSingleTone(audioContext, now + 0.18, 1320, 'triangle', 0.3)
   } catch (e) {
-    console.log('[ChatNotification] 无法播放提示音:', e)
   }
 }
 
@@ -12015,14 +11697,11 @@ function playNotificationSound() {
     // 最后一声在 now + 0.5 开始、持续 0.2s，留出少量余量
     return new Promise(resolve => setTimeout(resolve, 750))
   } catch (e) {
-    console.log('[Notification] 无法播放提示音:', e)
     return Promise.resolve()
   }
 }
 
 // ---- 自动朗读（浏览器内置 SpeechSynthesis） ----
-// 记录每个 agent 最近一次已触发朗读的等待状态，用于去重（不依赖 agentStatuses）
-const autoReadLastStatus = ref(new Map())
 const autoReadSupported = typeof window !== 'undefined' && 'speechSynthesis' in window
 // 停止自动朗读（复用 SessionPanel 的停止逻辑，保证图标状态同步）
 function stopAutoRead() {
@@ -12055,38 +11734,20 @@ function getAutoReadTarget(agentId, executionStatus) {
   return { text: tip || '等待输入' }
 }
 
-// [AR-DEBUG] 临时调试状态：定位自动朗读问题，验证后移除
-const arDebugLog = ref([])
-const ttsDebugState = ref('-')
-function arDebug(msg) {
-  const t = new Date().toISOString().slice(11, 19)
-  arDebugLog.value = [...arDebugLog.value, `${t} ${msg}`].slice(-6)
-}
-
 // 进入等待输入状态时：先播提示音，结束后触发对应消息的朗读按钮逻辑
 async function handleAutoRead(agentId, executionStatus) {
-  arDebug(`enter ${executionStatus} en=${isAutoReadEnabled(agentId)}`)
   if (!isAutoReadEnabled(agentId)) return
   await playNotificationSound()
-  arDebug('beeped')
   // 等待期间开关可能被关闭或状态已变化，再次校验
-  if (!isAutoReadEnabled(agentId)) { arDebug('abort-disabled'); return }
+  if (!isAutoReadEnabled(agentId)) return
   const target = getAutoReadTarget(agentId, executionStatus)
   const panel = panels.value.find(p => p.agentId === agentId)
   const sp = panel ? sessionPanelRefs.get(panel.id) : null
-  arDebug(`panel=${!!panel} sp=${!!sp} msg=${!!target.message} speakMsg=${!!sp?.speakMessage} speakTxt=${!!sp?.speakText}`)
   if (target.message && sp?.speakMessage) {
     // 复用消息列表的朗读逻辑，图标状态自动同步
     sp.speakMessage(target.message)
-    arDebug('speakMessage-called')
   } else if (sp?.speakText) {
     sp.speakText(target.text)
-    arDebug('speakText-called')
-  } else {
-    arDebug('NO-SPEAK-METHOD')
-  }
-  if (autoReadSupported) {
-    ttsDebugState.value = `${speechSynthesis.speaking ? 'speaking' : 'idle'}/${speechSynthesis.pending ? 'pending' : 'ok'}`
   }
 }
 
@@ -12097,7 +11758,6 @@ let notificationPermissionRequested = false
 function sendSystemNotification(message) {
   // 检查浏览器是否支持 Notification API
   if (!('Notification' in window)) {
-    console.log('[Notification] 浏览器不支持系统通知')
     return
   }
 

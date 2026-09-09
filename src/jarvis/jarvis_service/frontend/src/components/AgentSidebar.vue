@@ -345,7 +345,6 @@ watch(() => props.agentStatuses, (newStatuses) => {
             saveClickedWaitingAgents(clickedWaitingAgents.value)
             // 触发响应式更新
             clickedWaitingAgents.value = new Set(clickedWaitingAgents.value)
-            console.log(`[AGENT_SIDEBAR] Cleared clicked mark for agent ${agentId} (status changed from ${prevExecutionStatus} to ${executionStatus})`)
           }
         }
       }
