@@ -248,13 +248,23 @@ class AgentRunLoop:
         return None
 
     def _recover_interrupt_addon(self, ag) -> None:
-        """KeyboardInterrupt 恢复：把用户补充信息并入 addon，并置下一轮运行 input handler。"""
+        """KeyboardInterrupt 恢复：把用户补充信息并入 addon，并置下一轮运行 input handler。
+
+        原生 function calling 模式下额外清理待执行的工具调用状态：
+        - 清空 _pending_native_tool_calls / _native_continue，避免中断后重复执行已排队工具
+        - 本轮用户消息已写入模型历史，清空 session.prompt，防止下一轮重复追加同一段用户输入
+        """
         addon_info = self._handle_interrupt_with_input()
         if addon_info:
             ag.session.addon_prompt = ensure_str(
                 join_prompts([ag.session.addon_prompt, addon_info])
             )
         ag.run_input_handlers_next_turn = True
+
+        if ag._native_active():
+            ag._pending_native_tool_calls = None
+            ag._native_continue = False
+            ag.session.prompt = ""
 
     def _augment_round_prompt(self, prompt) -> Any:
         """组装本轮模型输入：追加全局输入缓冲、并在非空时前置当前时间。
