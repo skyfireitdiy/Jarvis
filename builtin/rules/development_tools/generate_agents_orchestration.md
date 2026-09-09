@@ -7,7 +7,7 @@ description: 当需要生成Agents编排文件以批量创建Agent时触发。�
 
 ## 规则简介
 
-此规则用以指导用户创建YAML格式之Agents编排文件，配合`@OrganizeAgents`命令，实现批量创建Agent之功能。
+此规则用以指导用户创建YAML格式的Agents编排文件，配合`@OrganizeAgents`命令，实现批量创建Agent的功能。
 
 ## 你必须遵守的原则
 
@@ -15,16 +15,16 @@ description: 当需要生成Agents编排文件以批量创建Agent时触发。�
 
 **要求说明：**
 
-- **必**：用YAML格式
-- **必**：用UTF-8编码
-- **必**：文件根节点含`agents`列表
-- **禁**：编排文件中用Tab缩进（YAML不支持Tab）
+- **必须**：用YAML格式
+- **必须**：用UTF-8编码
+- **必须**：文件根节点含`agents`列表
+- **禁止**：编排文件中用Tab缩进（YAML不支持Tab）
 
 ### 2. 字段定义
 
 #### agents列表（必填）
 
-`agents`乃一列表，每元素定义一Agent之配置。
+`agents`乃一列表，每元素定义一Agent的配置。
 
 #### Agent配置字段
 
@@ -46,9 +46,9 @@ description: 当需要生成Agents编排文件以批量创建Agent时触发。�
 
 **必守：**
 
-- `working_dir`必为有效之目录路径
-- `type`必为支持之Agent类型（`agent`或`code_agent`）
-- **禁**：默认用`no_interaction_mode: true`，当优先用交互模式以便人工确认与调整
+- `working_dir`必为有效的目录路径
+- `type`必为支持的Agent类型（`agent`或`code_agent`）
+- **禁止**：默认用`no_interaction_mode: true`，当优先用交互模式以便人工确认与调整
 - 当`no_interaction_mode: true`时，`task`字段必填
 - `name`当具描述性，便于识别
 
@@ -57,15 +57,15 @@ description: 当需要生成Agents编排文件以批量创建Agent时触发。�
 创建编排文件前，当明以下信息：
 
 1. 需创建多少Agent？
-2. 每Agent之类型为何？
-3. 每Agent之工作目录为何？
+2. 每Agent的类型为何？
+3. 每Agent的工作目录为何？
 4. 需指定模型组否？
 5. 需设置初始任务否？
 6. 需无交互模式否？（仅当明确需无人值守运行时方启用，默认不启用）
 
 ### 操作 2：编写编排文件
 
-依需求编写YAML格式之编排文件。
+依需求编写YAML格式的编排文件。
 
 **基本模板（推荐，交互模式）：**
 
@@ -100,7 +100,7 @@ agents:
     quick_mode: true
 ```
 
-**无人值守模板（仅当明确需无人值守时用之）：**
+**无人值守模板（仅当明确需无人值守时用的）：**
 
 ```yaml
 agents:
@@ -118,7 +118,7 @@ agents:
 1. YAML语法正确
 2. `agents`列表存在且非空
 3. 每Agent配置含必填字段`working_dir`
-4. 无交互模式之Agent含`task`字段
+4. 无交互模式的Agent含`task`字段
 
 ## 编排文件示例
 
@@ -137,7 +137,7 @@ agents:
     working_dir: "/home/user/backend"
 ```
 
-### 示例 2：带任务之编排（交互模式，推荐）
+### 示例 2：带任务的编排（交互模式，推荐）
 
 创建多个Agent并分配初始任务，用交互模式便于人工确认：
 
@@ -196,18 +196,18 @@ agents:
 ### 3. 任务描述
 
 - 任务描述当具体、可执行
-- 含明确之目标与范围
-- 避过于笼统之描述
+- 含明确的目标与范围
+- 避过于笼统的描述
 
 ### 4. 交互模式优先
 
-- **必**：默认用交互模式（不设`no_interaction_mode`或设为`false`）
+- **必须**：默认用交互模式（不设`no_interaction_mode`或设为`false`）
 - 交互模式允许人工确认与调整Agent行为，提高可控性
 - 仅当明确需无人值守运行时方启用`no_interaction_mode: true`
 
 ### 5. 模型组选择
 
-- 依任务复杂度选合适之模型组
+- 依任务复杂度选合适的模型组
 - 简单任务可用默认模型组
 - 复杂任务建议用高级模型组
 
@@ -219,7 +219,7 @@ agents:
 - [ ] 文件含`agents`列表
 - [ ] 每Agent配置含`working_dir`字段
 - [ ] 默认用交互模式（未设`no_interaction_mode`或设为`false`）
-- [ ] 如有用`no_interaction_mode: true`之Agent，确认含`task`字段
+- [ ] 如有用`no_interaction_mode: true`的Agent，确认含`task`字段
 - [ ] 所有路径用正确格式
 - [ ] YAML语法正确（无缩进错误）
 

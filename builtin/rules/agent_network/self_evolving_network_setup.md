@@ -10,7 +10,7 @@ license: MIT
 
 ### 规则目的
 
-本规则提供完整之自进化Agent网络搭建流程指导，确保搭建过程规范、可验证、可回溯。
+本规则提供完整的自进化Agent网络搭建流程指导，确保搭建过程规范、可验证、可回溯。
 
 ### 适用场景
 
@@ -30,21 +30,21 @@ license: MIT
 
 **Agent（智能体）**：
 
-- 独立之智能实体，有其工作目录、模型、任务
-- 用 `gateway_manager` 工具之 `create_agent` 操作创建
+- 独立的智能实体，有其工作目录、模型、任务
+- 用 `gateway_manager` 工具的 `create_agent` 操作创建
 - agent_type 必为 `'agent'` 或 `'codeagent'`
 - 示例：知识库Agent、监控Agent、调度Agent
 
 **Tool（工具）**：
 
-- 供Agent调用之功能模块
+- 供Agent调用的功能模块
 - 用 `meta_agent` 工具创建（不在此规则范围内）
 - 示例：memory工具、execute_script工具、read_code工具
 
 **常见错误警示**：
 
-- ❌ 混淆Agent与工具之概念
-- ❌ 用错误之agent_type（如'knowledge'、'monitor'等）
+- ❌ 混淆Agent与工具的概念
+- ❌ 用错误的agent_type（如'knowledge'、'monitor'等）
 - ❌ 尝试以工具创建方式创建Agent
 
 ## 3. 搭建流程
@@ -53,7 +53,7 @@ license: MIT
 
 #### 目标
 
-创建知识库之目录结构与配置文件。
+创建知识库的目录结构与配置文件。
 
 #### 操作步骤
 
@@ -146,7 +146,7 @@ ls -la /path/to/project/.jarvis/knowledge_base/
 
 #### 目标
 
-创建负责管理知识库之Agent。
+创建负责管理知识库的Agent。
 
 #### 操作步骤
 
@@ -172,7 +172,7 @@ ls -la /path/to/project/.jarvis/knowledge_base/
 - `task`：详细描述Agent职责与知识库路径
 
 **步骤2.2：记录Agent ID**
-创建成功后，记录返回之 `agent_id`，后续操作需用。
+创建成功后，记录返回的 `agent_id`，后续操作需用。
 
 #### 验证方法
 
@@ -282,7 +282,7 @@ ls -la /path/to/project/.jarvis/knowledge_base/
 
 #### 验证方法
 
-- 检索结果应包含刚保存之架构信息
+- 检索结果应包含刚保存的架构信息
 - 内容完整且格式正确
 
 #### 目标

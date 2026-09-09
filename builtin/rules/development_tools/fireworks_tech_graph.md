@@ -53,14 +53,14 @@ python3 ./fireworks-tech-graph/scripts/generate-from-template.py architecture ./
 
 1. **分类**图表类型
 2. **提取结构** — 从用户描述中识别层、节点、边、流与语义组
-3. **规划布局** — 应用图表类型之布局规则
+3. **规划布局** — 应用图表类型的布局规则
 4. **加载样式参考** — 默认加载style-1-flat-icon
 5. **将节点映射至形状** — 使用形状词汇表
 6. **检查图标需求**
 7. **编写SVG** — 使用Python List方法（强制）
 8. **验证**：运行`rsvg-convert file.svg -o /dev/null 2>&1`
 9. **导出PNG**：`rsvg-convert -w 1920 file.svg -o file.png`
-10. **报告**生成之文件路径
+10. **报告**生成的文件路径
 11. **（可选）视觉自查**
 
 ## 图表类型与布局规则
@@ -76,7 +76,7 @@ python3 ./fireworks-tech-graph/scripts/generate-from-template.py architecture ./
 
 ### 数据流图
 
-强调数据移动之所向。关注数据转换。
+强调数据移动的所向。关注数据转换。
 
 - 为每箭头标注数据类型（如embeddings、query、context）
 - 用更宽箭头（stroke-width: 2.5）示主要数据路径
@@ -104,11 +104,11 @@ python3 ./fireworks-tech-graph/scripts/generate-from-template.py architecture ./
 - **工具层**：工具调用、API、搜索、代码执行
 - **输出层**：响应、动作、副作用
 
-以循环箭头（循环弧）示迭代推理。视觉上分离不同类型之记忆。
+以循环箭头（循环弧）示迭代推理。视觉上分离不同类型的记忆。
 
 ### 记忆架构图（Mem0、MemGPT风格）
 
-专注于记忆操作之Agent图。
+专注于记忆操作的Agent图。
 
 - 分别显示记忆写入路径与读取路径（不同箭头颜色）
 - 记忆层级：工作记忆 → 短期 → 长期 → 外部存储
@@ -117,17 +117,17 @@ python3 ./fireworks-tech-graph/scripts/generate-from-template.py architecture ./
 
 ### 序列图
 
-参与者之间按时间排序之消息交换。
+参与者的间按时间排序的消息交换。
 
 - 参与者为垂直生命线（顶部标签 + 垂直虚线）
-- 消息为生命线间之水平箭头，自上而下时间排序
-- 激活框（生命线上之细填充矩形）示活动处理
+- 消息为生命线间的水平箭头，自上而下时间排序
+- 激活框（生命线上的细填充矩形）示活动处理
 - 以`<rect>`循环/alt框架分组，标签在左上角
 - ViewBox高度 = 80 + (消息数 × 50)
 
 ### 对比/特性矩阵
 
-方法、系统或组件之并排比较。
+方法、系统或组件的并排比较。
 
 - 列标题=系统，行标题=属性
 - 行高：40px；列宽：最小120px；标题行高：50px
@@ -137,16 +137,16 @@ python3 ./fireworks-tech-graph/scripts/generate-from-template.py architecture ./
 
 ### 时间线/甘特图
 
-显示持续时间、阶段与里程碑之水平时间轴。
+显示持续时间、阶段与里程碑的水平时间轴。
 
 - X轴=时间（周/月/季度）；Y轴=项目/任务/阶段
 - 条形：圆角矩形，按类别着色，内部或旁标注
-- 里程碑标记：特定x位置之菱形或填充圆，标签在上方
+- 里程碑标记：特定x位置的菱形或填充圆，标签在上方
 - ViewBox：0 0 960 400典型；更多时间段更宽：0 0 1200 400
 
 ### 思维导图/概念图
 
-从中心概念之径向布局。
+从中心概念的径向布局。
 
 - 中心节点在cx=480, cy=280
 - 一级分支：围绕中心均匀分布（360/N度）
@@ -155,7 +155,7 @@ python3 ./fireworks-tech-graph/scripts/generate-from-template.py architecture ./
 
 ### 类图（UML）
 
-显示类、属性、方法与关系之静态结构。
+显示类、属性、方法与关系的静态结构。
 
 - **类框**：3分区矩形（名称/属性/方法），最小宽度160px
 - **关系**：继承（实线+空心三角）、实现（虚线+空心三角）、关联（实线+开放箭头）、聚合（空心菱形）、组合（实心菱形）、依赖（虚线+开放箭头）
@@ -173,11 +173,11 @@ python3 ./fireworks-tech-graph/scripts/generate-from-template.py architecture ./
 
 ### 状态机图（UML）
 
-实体之生命周期状态与转换。
+实体的生命周期状态与转换。
 
 - **状态**：圆角矩形带状态名，最小120×50px
 - **初始状态**：实心黑色圆（r=8）
-- **最终状态**：空心圆内之实心圆
+- **最终状态**：空心圆内的实心圆
 - **转换**：箭头，可选标签event [guard] / action
 - ViewBox：0 0 960 600标准
 
@@ -186,7 +186,7 @@ python3 ./fireworks-tech-graph/scripts/generate-from-template.py architecture ./
 数据库模式与数据关系。
 
 - **实体**：矩形，标题区粗体示实体名，下方属性
-- **关系**：连接线上之菱形
+- **关系**：连接线上的菱形
 - **基数标签**：1、N、0..1、0.._、1.._
 - ViewBox：0 0 960 600标准；更多实体更宽：0 0 1200 600
 
@@ -202,7 +202,7 @@ python3 ./fireworks-tech-graph/scripts/generate-from-template.py architecture ./
 
 ## 形状词汇表
 
-将语义概念映射至一致之形状：
+将语义概念映射至一致的形状：
 
 | 概念         | 形状                     | 备注           |
 | ------------ | ------------------------ | -------------- |
@@ -258,7 +258,7 @@ python3 ./fireworks-tech-graph/scripts/generate-from-template.py architecture ./
 - 优先正交（L形）路径以最小化交叉
 - 在组件边缘锚定箭头，而非几何中心
 - 绕过密集节点集群，平行箭头用不同y偏移
-- 不可避免之交叉用跳弧（5px半径）
+- 不可避免的交叉用跳弧（5px半径）
 
 **线重叠预防**（关键 - 最常见bug）：
 
@@ -271,7 +271,7 @@ python3 ./fireworks-tech-graph/scripts/generate-from-template.py architecture ./
 1. **箭头-组件碰撞**：箭头不得穿过组件内部
 2. **文本溢出**：所有文本必在8px内边距内
 3. **箭头-文本对齐**：箭头端点必连接至形状边缘
-4. **容器规则**：优先通过组件间之开放间隙进出
+4. **容器规则**：优先通过组件间的开放间隙进出
 
 ## SVG技术规则
 
@@ -303,9 +303,9 @@ EOF
 
 **预调用清单**（关键 - 每次使用）：
 
-1. ✅ 吾能立即写出完整之命令/内容乎？
-2. ✅ 吾已备好所有必需参数乎？
-3. ✅ 吾已检查准备内容之语法错误乎？
+1. ✅ 我能立即写出完整的命令/内容乎？
+2. ✅ 我已备好所有必需参数乎？
+3. ✅ 我已检查准备内容的语法错误乎？
 
 **错误恢复协议**：
 
@@ -333,10 +333,10 @@ rsvg-convert file.svg -o /tmp/test.png 2>&1 && echo "✓ Valid" && rm /tmp/test.
 
 ## 常见模式
 
-此等模式常现 — 当内化之：
+此等模式常现 — 当内化的：
 
 - **RAG管道**：Query → Embed → VectorSearch → Retrieve → Augment → LLM → Response
-- **Agentic RAG**：于Query与LLM之间添加Agent循环与工具使用
+- **Agentic RAG**：于Query与LLM的间添加Agent循环与工具使用
 - **Agentic Search**：Query → Planner → [Search Tool / Calculator / Code] → Synthesizer → Response
 - **Mem0 / 记忆层**：Input → Memory Manager → [Write: VectorDB + GraphDB] / [Read: Retrieve+Rank] → Context
 - **Agent记忆类型**：Sensory（原始输入） → Working（上下文窗口） → Episodic（过去交互） → Semantic（事实） → Procedural（技能）

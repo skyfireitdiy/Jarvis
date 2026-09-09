@@ -8,14 +8,14 @@ license: MIT
 
 ## 规则简介
 
-此规则用于修复Markdown文件中之PlantUML代码块。PlantUML乃常用之UML图表绘制工具，然在Markdown文件中嵌入时或出现语法错误或格式问题。
+此规则用于修复Markdown文件中的PlantUML代码块。PlantUML乃常用的UML图表绘制工具，然在Markdown文件中嵌入时或出现语法错误或格式问题。
 
 **工作流程：**
 
-1. **提取**：用脚本从Markdown文件中提取PlantUML代码块为单独之`.puml`文件
-2. **校验**：用脚本调用PlantUML程序校验`.puml`文件之语法并报告错误
+1. **提取**：用脚本从Markdown文件中提取PlantUML代码块为单独的`.puml`文件
+2. **校验**：用脚本调用PlantUML程序校验`.puml`文件的语法并报告错误
 3. **修复**：AI根据错误信息修复`.puml`文件内容
-4. **写回**：用脚本将修复后之`.puml`文件内容写回Markdown文件
+4. **写回**：用脚本将修复后的`.puml`文件内容写回Markdown文件
 
 **重要说明：**
 
@@ -28,18 +28,18 @@ license: MIT
 
 **要求说明：**
 
-- **必**：修改前备份原始文件
-- **必**：验证PlantUML程序可用性后再执行修复
-- **禁**：直接覆盖原始文件而不保留备份
+- **必须**：修改前备份原始文件
+- **必须**：验证PlantUML程序可用性后再执行修复
+- **禁止**：直接覆盖原始文件而不保留备份
 
 ### 2. 准确性原则
 
 **要求说明：**
 
-- **必**：准确提取PlantUML代码块（含开始与结束标记）
-- **必**：用PlantUML官方程序进行语法校验
-- **必**：保留原始代码之缩进与格式
-- **禁**：修改非PlantUML代码块之内容
+- **必须**：准确提取PlantUML代码块（含开始与结束标记）
+- **必须**：用PlantUML官方程序进行语法校验
+- **必须**：保留原始代码的缩进与格式
+- **禁止**：修改非PlantUML代码块的内容
 
 ## 你必须执行的操作作
 
@@ -62,7 +62,7 @@ python3 {{ rule_file_dir }}/plantuml_fix.py extract <markdown_file>
 脚本会：
 
 - 从Markdown文件中提取所有PlantUML代码块
-- 为每个代码块创建单独之`.puml`文件
+- 为每个代码块创建单独的`.puml`文件
 - 自动添加`@startuml`与`@enduml`标记（若缺失）
 - 默认输出至系统临时目录（如`/tmp/plantuml_<filename>/`），避免被git管理
 - 用`-o`参数可指定输出目录
@@ -88,11 +88,11 @@ plantuml -checkonly <filename>_plantuml/*.puml
 1. 根据校验错误信息，用`edit_file`工具修复`.puml`文件
 2. 常见修复包括：
    - 修复箭头语法（`-->`、`->`等）
-   - 添加缺失之分号
+   - 添加缺失的分号
    - 修复注释格式
-   - 添加缺失之`@startuml`/`@enduml`标记
+   - 添加缺失的`@startuml`/`@enduml`标记
 
-### 操作5：将修复后之内容写回Markdown
+### 操作5：将修复后的内容写回Markdown
 
 **执行步骤：**
 
@@ -103,8 +103,8 @@ python3 {{ rule_file_dir }}/plantuml_fix.py writeback <markdown_file> <puml_dir>
 脚本会：
 
 - 自动备份原始Markdown文件（`.bak`后缀）
-- 将`.puml`文件内容替换回对应之PlantUML代码块
-- 保持Markdown文件之其他内容不变
+- 将`.puml`文件内容替换回对应的PlantUML代码块
+- 保持Markdown文件的其他内容不变
 
 ## 检查清单
 
@@ -114,9 +114,9 @@ python3 {{ rule_file_dir }}/plantuml_fix.py writeback <markdown_file> <puml_dir>
 - [ ] 规则文件已创建于`{{ rule_file_dir }}/plantuml_fix.md`
 - [ ] 脚本具有可执行权限
 - [ ] PlantUML程序已正确安装
-- [ ] 测试文件中之PlantUML代码块能被正确提取
-- [ ] 修复后之代码能通过PlantUML语法校验
-- [ ] 修复后之内容已正确写回Markdown文件
+- [ ] 测试文件中的PlantUML代码块能被正确提取
+- [ ] 修复后的代码能通过PlantUML语法校验
+- [ ] 修复后的内容已正确写回Markdown文件
 
 ## 常见错误类型与修复方法
 
@@ -126,13 +126,13 @@ python3 {{ rule_file_dir }}/plantuml_fix.py writeback <markdown_file> <puml_dir>
 
 **修复方法：**
 
-- 移除不支持之`!theme`指令
+- 移除不支持的`!theme`指令
 - 检查PlantUML版本：`plantuml -version`
 - 用`-checkonly`验证语法兼容性
 
 ### 2. Activity Diagram语法问题
 
-**问题：** 单独之代码行非有效语法
+**问题：** 单独的代码行非有效语法
 
 ```plantuml
 # 错误示例
@@ -149,7 +149,7 @@ enqueueCommandInLane();  # 单独之代码行无效
 
 ### 3. 变量赋值语法问题
 
-**问题：** 单独之变量赋值行无效
+**问题：** 单独的变量赋值行无效
 
 ```plantuml
 # 错误示例
@@ -217,7 +217,7 @@ A -> B: 消息
 A --> B: 消息
 ```
 
-**修复方法：** 根据图表类型用正确之箭头
+**修复方法：** 根据图表类型用正确的箭头
 
 - 类图：用`-->`或`--*`等
 - 时序图：用`->`或`-->`
@@ -228,7 +228,7 @@ A --> B: 消息
 ### 最小化修改原则
 
 1. 只修复语法错误，不改变语义
-2. 保持原始代码之缩进与格式
+2. 保持原始代码的缩进与格式
 3. 优先合并代码行，而非删除
 
 ### 修复顺序
