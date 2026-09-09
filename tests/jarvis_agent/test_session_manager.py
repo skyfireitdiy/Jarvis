@@ -195,3 +195,68 @@ class TestSessionManager:
             session_manager, "_iter_name_platforms", return_value=[mock_model]
         ):
             assert session_manager._generate_session_name() == "未命名会话"
+
+    def test_generate_session_name_skips_compressed_summary(
+        self, session_manager, mock_model
+    ):
+        """压缩摘要消息（含代码变更统计等元信息）被跳过，不污染会话主题判断"""
+        compressed_summary = (
+            "[历史摘要] ## 任务浓缩上下文\n\n"
+            "**当前目标**：修复所有 ty 告警\n\n"
+            "## 代码变更统计\n```\n3 files changed, 278 insertions\n```\n"
+            "## 任务列表状态\n- 已完成: 5\n"
+        )
+        mock_model.get_messages.return_value = [
+            {"role": "user", "content": compressed_summary},
+            {"role": "assistant", "content": "好的，我来分析这段代码的性能瓶颈"},
+            {"role": "user", "content": "帮我优化这个排序算法"},
+        ]
+        mock_model.complete.return_value = "算法优化"
+
+        with patch.object(
+            session_manager, "_iter_name_platforms", return_value=[mock_model]
+        ):
+            name = session_manager._generate_session_name()
+            assert name == "算法优化"
+            # 验证传给 LLM 的 prompt 不含压缩摘要的元信息
+            prompt_arg = mock_model.complete.call_args[0][0]
+            assert "代码变更统计" not in prompt_arg
+            assert "任务列表状态" not in prompt_arg
+            assert "帮我优化这个排序算法" in prompt_arg
+
+    def test_generate_session_name_only_compressed_summary(
+        self, session_manager, mock_model
+    ):
+        """历史中只有压缩摘要（无真实对话）时返回默认名称"""
+        mock_model.get_messages.return_value = [
+            {
+                "role": "user",
+                "content": "[历史摘要] ## 任务浓缩上下文\n\n**当前目标**：修复 ty 告警",
+            }
+        ]
+
+        with patch.object(
+            session_manager, "_iter_name_platforms", return_value=[mock_model]
+        ):
+            assert session_manager._generate_session_name() == "未命名会话"
+
+    def test_is_compressed_summary_msg(self, session_manager):
+        """_is_compressed_summary_msg 正确识别压缩摘要消息"""
+        assert session_manager._is_compressed_summary_msg(
+            {"role": "user", "content": "[历史摘要] 摘要内容"}
+        )
+        assert session_manager._is_compressed_summary_msg(
+            {"role": "user", "content": "  [历史摘要] 带前导空格"}
+        )
+        # 普通用户消息不是压缩摘要
+        assert not session_manager._is_compressed_summary_msg(
+            {"role": "user", "content": "帮我分析代码"}
+        )
+        # assistant 消息即使以 [历史摘要] 开头也不算（压缩摘要总是 user 角色）
+        assert not session_manager._is_compressed_summary_msg(
+            {"role": "assistant", "content": "[历史摘要] 不是压缩摘要"}
+        )
+        # 空 content 不是压缩摘要
+        assert not session_manager._is_compressed_summary_msg(
+            {"role": "user", "content": ""}
+        )
