@@ -8,7 +8,7 @@ license: MIT
 
 ## 规则简介
 
-markitdown乃微软所创的轻量级Python工具，专用于将各类文件格式转换为Markdown格式，尤适于LLM与文本分析管道。其支持PDF、PowerPoint、Word、Excel、图像、音频、HTML等多种格式的转换，能保留重要的文档结构（标题、列表、表格、链接等）。
+markitdown 是微软开发的轻量级 Python 工具，专用于将各类文件格式转换为Markdown格式，很适合 LLM 与文本分析管道使用。支持 PDF、PowerPoint、Word、Excel、图像、音频、HTML 等多种格式的转换，能够保留重要的文档结构（标题、列表、表格、链接等）。
 
 ## 你必须遵守的原则
 
@@ -17,12 +17,12 @@ markitdown乃微软所创的轻量级Python工具，专用于将各类文件格�
 **要求说明：**
 
 - **必须**：直接安装完整功能版本以获最佳体验
-- **荐**：用uv工具进行安装管理
+- **推荐**：使用 uv 工具进行安装管理
 
 **示例：**
 
 ```bash
-# 用uv安装markitdown完整功能版本
+# 使用 uv 安装 markitdown 完整功能版本
 uv tool install 'markitdown[all]'
 ```
 
@@ -31,11 +31,11 @@ uv tool install 'markitdown[all]'
 **要求说明：**
 
 - **必须**：处理敏感文档时确保环境安全
-- **必须**：用Azure文档智能时配置正确的端点
-- **禁止**：将API密钥等敏感信息硬编码于代码中
+- **必须**：使用 Azure 文档智能时配置正确的端点
+- **禁止**：不要把 API 密钥等敏感信息硬编码在代码中
 - **禁止**：处理未知来源的恶意文件
 
-## 你必须执行的操作作
+## 你必须执行的操作
 
 ### 操作1：命令行使用
 
@@ -76,7 +76,7 @@ md = MarkItDown(enable_plugins=False)
 result = md.convert("document.docx")
 print(result.text_content)
 
-# 用LLM进行图像描述
+# 使用 LLM 进行图像描述
 from openai import OpenAI
 
 client = OpenAI()
@@ -94,7 +94,7 @@ result = md.convert("image.jpg")
 
 1. 安装插件
 2. 启用插件功能
-3. 用插件增强功能
+3. 使用插件增强功能
 
 **示例：**
 
@@ -114,7 +114,7 @@ markitdown --use-plugins document.pdf
 **执行步骤：**
 
 1. 配置Azure文档智能端点
-2. 用文档智能功能
+2. 使用文档智能功能
 3. 处理转换结果
 
 **示例：**
@@ -150,7 +150,7 @@ markitdown支持按需安装的功能模块：
 用markitdown完成任务后，请务必确认：
 
 - [ ] 已正确安装markitdown与所需依赖
-- [ ] 虚拟环境已激活（若用）
+- [ ] 虚拟环境已激活（如果使用）
 - [ ] 输入文件格式受支持
 - [ ] 输出Markdown内容结构正确
 - [ ] 敏感信息已妥善处理
