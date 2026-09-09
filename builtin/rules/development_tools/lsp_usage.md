@@ -310,7 +310,7 @@ codeAction-by-name → 应用修复方案
 
 **必守原则**：
 
-- **必须**：若LSP server不存在，必先安装对应的LSP server
+- **必须**：若LSP server不存在，应先安装对应的LSP server
 - **必须**：安装LSP server后，确保其在系统PATH中可访问
 
 **通用LSP Server安装流程**：
