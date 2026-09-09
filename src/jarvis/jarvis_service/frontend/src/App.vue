@@ -1004,6 +1004,8 @@
     <SettingsModal
       :visible="showSettingsModal"
       :autoLoginEnabled="autoLoginEnabled"
+      :notifyOnExit="notifyOnExit"
+      :notifyOnInput="notifyOnInput"
       :historyStorage="historyStorage"
       :socket="socket"
       :auth="auth"
@@ -1014,6 +1016,9 @@
       @update:visible="showSettingsModal = $event"
       @update:autoLoginEnabled="autoLoginEnabled = $event"
       @saveAutoLoginSetting="saveAutoLoginSetting"
+      @update:notifyOnExit="notifyOnExit = $event"
+      @update:notifyOnInput="notifyOnInput = $event"
+      @saveNotifySettings="saveNotifySettings"
       @confirmClearHistory="confirmClearHistory"
       @disconnectAll="disconnectAll"
     />
@@ -1592,6 +1597,8 @@ const agentConnecting = ref(false) // Agent 连接状态（独立于主网关连
 const connectingAgents = ref(new Set()) // Agent 连接锁：防止同一 agent 并发重连建多连接
 const connectErrorMessage = ref('')  // 连接错误信息
 const autoLoginEnabled = ref(localStorage.getItem('jarvis_auto_login') === 'true')  // 免登录开关
+const notifyOnExit = ref(localStorage.getItem('jarvis_notify_on_exit') === 'true')  // Agent 退出通知开关（默认关闭）
+const notifyOnInput = ref(localStorage.getItem('jarvis_notify_on_input') === 'true')  // 需要输入通知开关（默认关闭）
 const isRestartingGateway = ref(false)
 const restartNodeId = ref('') // 重启服务时选择的节点ID
 const restartFrontendService = ref(false) // 是否同时重启前端服务
@@ -5164,6 +5171,13 @@ function saveAutoLoginSetting() {
   }
 }
 
+// 保存通知开关设置
+function saveNotifySettings() {
+  localStorage.setItem('jarvis_notify_on_exit', notifyOnExit.value)
+  localStorage.setItem('jarvis_notify_on_input', notifyOnInput.value)
+  console.log('[SETTINGS] Notify settings saved:', { notifyOnExit: notifyOnExit.value, notifyOnInput: notifyOnInput.value })
+}
+
 // 连接到 Gateway
 async function connect() {
   console.log('[ws] connect() called', {
@@ -8585,14 +8599,18 @@ function handleMessage(message, agentId = null) {
       if (['stopped', 'finished'].includes(payload.execution_status)) {
         const agentInList = agentList.value.find(a => a.agent_id === targetAgentId)
         const agentName = agentInList?.name || agentInList?.agent_type || 'Agent'
-        sendSystemNotification(`${agentName} 已退出`)
+        if (notifyOnExit.value) {
+          sendSystemNotification(`${agentName} 已退出`)
+        }
       }
 
       // 从运行状态切换到输入状态时发送系统通知
       if (['waiting_single', 'waiting_confirm', 'waiting_multi'].includes(payload.execution_status)) {
         const agentInList = agentList.value.find(a => a.agent_id === targetAgentId)
         const agentName = agentInList?.name || agentInList?.agent_type || 'Agent'
-        sendSystemNotification(`${agentName} 等待输入`)
+        if (notifyOnInput.value) {
+          sendSystemNotification(`${agentName} 等待输入`)
+        }
 
         // 自动朗读：用独立标记去重，避免依赖 agentStatuses（input_request 可能先于 status_update 写入该 Map）
         if (autoReadLastStatus.value.get(targetAgentId) !== payload.execution_status) {

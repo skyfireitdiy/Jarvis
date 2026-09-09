@@ -132,10 +132,11 @@
             ref="multiInputRef"
             :value="inputText"
             :data-agent-id="agent?.agent_id || ''"
-            :placeholder="isInputDisabled ? 'Agent 未运行' : (inputTip || '输入内容 (Ctrl+Enter / Ctrl+D 发送)')"
+            :placeholder="isInputDisabled ? 'Agent 未运行' : (inputTip || '输入内容 (Ctrl+Enter / Ctrl+D 发送，右Ctrl 语音输入)')"
             :disabled="isInputDisabled"
             @input="$emit('input-change', $event)"
-            @keydown="$emit('keydown', $event)"
+            @keydown="handleInputKeydown($event)"
+            @keyup="handleInputKeyup($event)"
             @paste="$emit('paste', $event)"
           ></textarea>
 
@@ -149,7 +150,8 @@
             :placeholder="isInputDisabled ? 'Agent 未运行' : (inputTip || '输入内容 (Enter 发送)')"
             :disabled="isInputDisabled"
             @input="$emit('input-change', $event)"
-            @keydown="$emit('keydown', $event)"
+            @keydown="handleInputKeydown($event)"
+            @keyup="handleInputKeyup($event)"
             @paste="$emit('paste', $event)"
           />
           <!-- 缓冲区指示器 -->
@@ -462,6 +464,11 @@ function toggleRecord() {
     stopRecord()
     return
   }
+  startRecord()
+}
+
+function startRecord() {
+  if (!asrSupported || isRecording.value) return
   recordPrefix = props.inputText || ''
   userStopped = false
   recognizer = new SpeechRecognitionImpl()
@@ -513,6 +520,45 @@ function toggleRecord() {
   } catch (e) {
     emit('show-toast', '无法启动语音识别', 'error')
     isRecording.value = false
+  }
+}
+
+// 右 Ctrl 按住说话：keydown 开始，keyup 停止（左 Ctrl 不生效）
+// 右 Ctrl 快速双击：发送
+// 输入框已有 keydown 监听（发送等），此处保留原有事件转发
+const DOUBLE_TAP_MS = 300 // 双击判定窗口
+const QUICK_TAP_MS = 250  // 单次“快速按下”判定（区别于长按说话）
+let ctrlDownTime = 0
+let lastQuickTapTime = 0
+
+function handleInputKeydown(event) {
+  if (event.code === 'ControlRight') {
+    event.preventDefault()
+    const now = Date.now()
+    // 上一轮是快速单击，且间隔在双击窗口内 → 判定为双击发送
+    if (lastQuickTapTime && now - lastQuickTapTime < DOUBLE_TAP_MS) {
+      lastQuickTapTime = 0
+      emit('send')
+      return
+    }
+    ctrlDownTime = now
+    if (!isRecording.value) startRecord()
+    return
+  }
+  emit('keydown', event)
+}
+
+function handleInputKeyup(event) {
+  if (event.code === 'ControlRight') {
+    event.preventDefault()
+    // 按下时间很短视为“快速单击”，为下一次双击判定做记录
+    if (ctrlDownTime && Date.now() - ctrlDownTime < QUICK_TAP_MS) {
+      lastQuickTapTime = Date.now()
+    } else {
+      lastQuickTapTime = 0
+    }
+    ctrlDownTime = 0
+    if (isRecording.value) stopRecord()
   }
 }
 

@@ -19,6 +19,32 @@
         </div>
       </div>
 
+      <div class="form-group">
+        <div class="toggle-wrapper">
+          <label class="toggle-switch">
+            <input type="checkbox" v-model="localNotifyOnExit" @change="handleNotifyOnExitChange" class="toggle-input" />
+            <span class="toggle-slider"></span>
+          </label>
+          <div class="toggle-info">
+            <span class="toggle-label-text">Agent 退出时弹出通知</span>
+            <span class="form-help">启用后，Agent 结束运行时弹出系统通知提醒。</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="toggle-wrapper">
+          <label class="toggle-switch">
+            <input type="checkbox" v-model="localNotifyOnInput" @change="handleNotifyOnInputChange" class="toggle-input" />
+            <span class="toggle-slider"></span>
+          </label>
+          <div class="toggle-info">
+            <span class="toggle-label-text">需要输入时弹出通知</span>
+            <span class="form-help">启用后，Agent 等待输入时弹出系统通知提醒。</span>
+          </div>
+        </div>
+      </div>
+
       <!-- 我的账户 -->
       <div class="form-group">
         <label>当前用户</label>
@@ -91,6 +117,14 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  notifyOnExit: {
+    type: Boolean,
+    default: false
+  },
+  notifyOnInput: {
+    type: Boolean,
+    default: false
+  },
   auth: { type: Object, default: () => ({}) },
   fetchWithAuth: { type: Function, default: null },
   gatewayUrl: { type: String, default: '127.0.0.1:8000' },
@@ -103,11 +137,16 @@ const emit = defineEmits([
   'confirmClearHistory',
   'disconnectAll',
   'update:autoLoginEnabled',
-  'saveAutoLoginSetting'
+  'saveAutoLoginSetting',
+  'update:notifyOnExit',
+  'update:notifyOnInput',
+  'saveNotifySettings'
 ])
 
 // 本地状态
 const localAutoLoginEnabled = ref(props.autoLoginEnabled)
+const localNotifyOnExit = ref(props.notifyOnExit)
+const localNotifyOnInput = ref(props.notifyOnInput)
 const changePasswordForm = ref({ old_password: '', new_password: '', confirm_password: '' })
 const loading = ref(false)
 
@@ -117,7 +156,21 @@ const currentUserId = computed(() => props.auth?.userInfo?.user_id || '')
 
 // 辅助函数
 function getGatewayAddress() {
-  const parts = (props.gatewayUrl || '127.0.0.1:8000').split(':')
+  const raw = (props.gatewayUrl || '127.0.0.1:8000').trim()
+  // 完整 URL（如 wss://jvs-ai.cn）需用 URL 解析，避免 split(':') 误判
+  if (raw.includes('://')) {
+    try {
+      const url = new URL(raw)
+      const isTls = url.protocol === 'https:' || url.protocol === 'wss:'
+      return {
+        host: url.hostname || '127.0.0.1',
+        port: url.port || (isTls ? '443' : '80'),
+      }
+    } catch (e) {
+      return { host: '127.0.0.1', port: '8000' }
+    }
+  }
+  const parts = raw.split(':')
   return { host: parts[0] || '127.0.0.1', port: parts[1] || '8000' }
 }
 
@@ -132,6 +185,14 @@ watch(() => props.autoLoginEnabled, (newVal) => {
   localAutoLoginEnabled.value = newVal
 })
 
+watch(() => props.notifyOnExit, (newVal) => {
+  localNotifyOnExit.value = newVal
+})
+
+watch(() => props.notifyOnInput, (newVal) => {
+  localNotifyOnInput.value = newVal
+})
+
 // 关闭弹窗
 function close() {
   emit('update:visible', false)
@@ -141,6 +202,18 @@ function close() {
 function handleAutoLoginChange() {
   emit('update:autoLoginEnabled', localAutoLoginEnabled.value)
   emit('saveAutoLoginSetting')
+}
+
+// 处理 Agent 退出通知开关变更
+function handleNotifyOnExitChange() {
+  emit('update:notifyOnExit', localNotifyOnExit.value)
+  emit('saveNotifySettings')
+}
+
+// 处理需要输入通知开关变更
+function handleNotifyOnInputChange() {
+  emit('update:notifyOnInput', localNotifyOnInput.value)
+  emit('saveNotifySettings')
 }
 
 
