@@ -10,15 +10,15 @@ description: 当需要先编写规范再实现代码的SDD开发流程时触发�
 ### Spec-实现-验证循环（严格执行）
 
 1. **📝 Spec 阶段（编写功能规范）**：
-   - 在编写任何代码的前，必先编写详细的功能规范（Spec）
+   - 在编写任何代码的前，应先编写详细的功能规范（Spec）
    - Spec 必清晰描述功能目标、输入输出、边界条件、异常处理
-   - Spec 必含明确的验收标准（Acceptance Criteria）
+   - Spec 应包含明确的验收标准（Acceptance Criteria）
    - Spec 必经过评审和确认后才能进入实现阶段
 
 2. **⚡ 实现阶段（基于规范编码）**：
    - 严格按照 Spec 的描述进行代码实现
    - 不得偏离 Spec 定义的功能边界和接口设计
-   - 实现过程中遇到 Spec 不明确的地方，必先更新 Spec 再继续实现
+   - 实现过程中遇到 Spec 不明确的地方，应先更新 Spec 再继续实现
    - 编写代码时同时考虑如何验证 Spec 的验收标准
 
 3. **✅ 验证阶段（验证符合规范）**：
@@ -38,11 +38,11 @@ description: 当需要先编写规范再实现代码的SDD开发流程时触发�
 
 ### 规范完整性原则
 
-- **必须**：Spec 必含功能描述（做什么）
-- **必须**：Spec 必含接口定义（输入输出）
-- **必须**：Spec 必含边界条件（edge cases）
-- **必须**：Spec 必含异常处理（error cases）
-- **必须**：Spec 必含验收标准（如何验证完成）
+- **必须**：Spec 应包含功能描述（做什么）
+- **必须**：Spec 应包含接口定义（输入输出）
+- **必须**：Spec 应包含边界条件（edge cases）
+- **必须**：Spec 应包含异常处理（error cases）
+- **必须**：Spec 应包含验收标准（如何验证完成）
 
 ### 规范一致性原则
 
@@ -81,7 +81,7 @@ description: 当需要先编写规范再实现代码的SDD开发流程时触发�
 - ✅ 正确：`user_auth_spec.md`, `data_processing_spec.md`
 - ❌ 错误：`UserAuthSpec.md`, `user-auth-spec.md`
 
-### 2. Spec 必含的内容
+### 2. Spec 应包含的内容
 
 0. **YAML 头部（必）**
    - **必须**：Spec 文件顶部含 YAML front matter header

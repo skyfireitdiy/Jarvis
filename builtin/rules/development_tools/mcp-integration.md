@@ -45,8 +45,8 @@ description: 当需要集成MCP服务或扩展工具功能时触发。每当用�
 
 ### 类型安全原则
 
-- **必须**：stdio类型必含`command`字段
-- **必须**：sse与streamable类型必含`base_url`字段
+- **必须**：stdio类型应包含`command`字段
+- **必须**：sse与streamable类型应包含`base_url`字段
 - **必须**：用正确的YAML语法与格式
 - **禁止**：在配置中用未定义的字段
 
@@ -71,7 +71,7 @@ description: 当需要集成MCP服务或扩展工具功能时触发。每当用�
 
 **基本配置格式：**
 
-每个MCP配置项必含以下字段：
+每个MCP配置项应包含以下字段：
 
 ```yaml
 mcp:
