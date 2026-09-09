@@ -93,7 +93,7 @@ class GatewayManagerTool:
                     "chat_send_room_message",
                     "chat_send_private_message",
                 ],
-                "description": "操作类型：send_to_agent（向 Agent 发送消息）、list_agents（获取所有 Agent 列表）、list_nodes（获取节点列表信息）、list_model_groups（获取指定节点的模型组列表）、create_agent（创建新的 Agent）、list_directory（获取文件/目录列表）、delete_agent（删除指定的 Agent）、get_node_secret（获取网关的节点连接私钥）、update_nodes_code（更新所有节点代码到 main 分支）、restart_nodes（一键重启所有节点服务，跳过当前节点）、create_timer（创建定时任务）、list_timers（查询所有节点定时任务）、get_timer（查询单个定时任务）、delete_timer（删除定时任务）、create_group（创建群组）、list_groups（查询所有群组）、get_group（查询群组详情）、join_group（加入群组）、leave_group（退出群组）、send_group_message（发送群组消息）、regenerate_agent（无损重生指定 Agent）、chat_list_rooms（获取聊天室列表）、chat_get_online_clients（获取在线用户列表）、chat_get_room_members（获取聊天室成员列表）、chat_send_room_message（发送聊天室消息）、chat_send_private_message（发送私聊消息）",
+                "description": "要执行的操作类型，一次只能选一个；其余参数随操作而定（见各参数说明）。常用：send_to_agent 发消息给 Agent、list_agents 列 Agent、create_agent 新建 Agent、restart_nodes 重启所有节点、create_timer 建定时任务。其余操作按名称即可理解，完整清单见上方 enum。",
             },
             # send_to_agent 操作的参数
             "agent_id": {
