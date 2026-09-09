@@ -1004,6 +1004,8 @@
     <SettingsModal
       :visible="showSettingsModal"
       :autoLoginEnabled="autoLoginEnabled"
+      :notifyOnExit="notifyOnExit"
+      :notifyOnInput="notifyOnInput"
       :historyStorage="historyStorage"
       :socket="socket"
       :auth="auth"
@@ -1014,6 +1016,9 @@
       @update:visible="showSettingsModal = $event"
       @update:autoLoginEnabled="autoLoginEnabled = $event"
       @saveAutoLoginSetting="saveAutoLoginSetting"
+      @update:notifyOnExit="notifyOnExit = $event"
+      @update:notifyOnInput="notifyOnInput = $event"
+      @saveNotifySettings="saveNotifySettings"
       @confirmClearHistory="confirmClearHistory"
       @disconnectAll="disconnectAll"
     />
@@ -1158,6 +1163,19 @@
         <span class="toast-message">{{ toast.message }}</span>
       </div>
     </transition>
+    <!-- [AR-DEBUG] 临时调试浮层：定位自动朗读问题，验证后移除 -->
+    <div style="position:fixed;left:4px;bottom:4px;z-index:99999;background:rgba(0,0,0,0.78);color:#0f0;font-size:10px;line-height:1.35;padding:5px 7px;border-radius:5px;max-width:96vw;word-break:break-all;font-family:monospace;pointer-events:none;">
+      <div>AR-DEBUG v3</div>
+      <div>curAgent: {{ (currentAgentId||'').slice(0,8) }}</div>
+      <div>mapKeys: [{{ [...panelAutoReads.keys()].map(k=>k.slice(0,8)).join(',') }}]</div>
+      <div>mapVals: [{{ [...panelAutoReads.values()].join(',') }}]</div>
+      <div>curEnabled: {{ isAutoReadEnabled(currentAgentId) }}</div>
+      <div>lastStatus: {{ autoReadLastStatus.get(currentAgentId) || '-' }}</div>
+      <div>execStatus: {{ (agentStatuses.get(currentAgentId)||{}).execution_status || '-' }}</div>
+      <div>ttsSupported: {{ autoReadSupported }}</div>
+      <div>ttsState: {{ ttsDebugState }}</div>
+      <div>calls: {{ arDebugLog.join(' | ') }}</div>
+    </div>
   </div>
 </template>
 
@@ -1592,6 +1610,9 @@ const agentConnecting = ref(false) // Agent 连接状态（独立于主网关连
 const connectingAgents = ref(new Set()) // Agent 连接锁：防止同一 agent 并发重连建多连接
 const connectErrorMessage = ref('')  // 连接错误信息
 const autoLoginEnabled = ref(localStorage.getItem('jarvis_auto_login') === 'true')  // 免登录开关
+// 通知开关仅控制系统通知弹窗，不影响提示音（提示音由自动朗读等逻辑独立触发）
+const notifyOnExit = ref(localStorage.getItem('jarvis_notify_on_exit') === 'true')  // Agent 退出通知开关（默认关闭）
+const notifyOnInput = ref(localStorage.getItem('jarvis_notify_on_input') === 'true')  // 需要输入通知开关（默认关闭）
 const isRestartingGateway = ref(false)
 const restartNodeId = ref('') // 重启服务时选择的节点ID
 const restartFrontendService = ref(false) // 是否同时重启前端服务
@@ -3907,6 +3928,8 @@ function getPanelAutoRead(panel) {
 function togglePanelAutoRead(panel, value) {
   if (!panel || !panel.agentId) return
   panelAutoReads.value.set(panel.agentId, value)
+  // [AR-DEBUG] 临时调试：验证后移除
+  arDebug(`toggle ${panel.agentId.slice(0,8)} -> ${value} mapNow=${panelAutoReads.value.get(panel.agentId)}`)
   if (!value) {
     stopAutoRead()
   }
@@ -5162,6 +5185,13 @@ function saveAutoLoginSetting() {
     localStorage.removeItem('jarvis_auth_token')
     console.log('[SETTINGS] Saved token cleared (auto login disabled)')
   }
+}
+
+// 保存通知开关设置（仅控制弹窗，不影响提示音）
+function saveNotifySettings() {
+  localStorage.setItem('jarvis_notify_on_exit', notifyOnExit.value)
+  localStorage.setItem('jarvis_notify_on_input', notifyOnInput.value)
+  console.log('[SETTINGS] Notify settings saved:', { notifyOnExit: notifyOnExit.value, notifyOnInput: notifyOnInput.value })
 }
 
 // 连接到 Gateway
@@ -8376,6 +8406,7 @@ function handleMessage(message, agentId = null) {
     }
     
     // 保存输入请求到Map中，用于重连后恢复和Agent切换
+    const hadPendingRequest = inputRequests.value.has(targetAgentId)
     inputRequests.value.set(targetAgentId, {
       tip: payload.tip || '',
       mode: payload.mode || 'multi',
@@ -8384,6 +8415,12 @@ function handleMessage(message, agentId = null) {
       request_id: payload.request_id
     })
     console.log('[ws] Saved input request for agent', targetAgentId, ':', payload.mode)
+
+    // 自动朗读：以 input_request 为准确触发信号（每次真正请求输入都会到达）
+    // 若该 Agent 已有待处理请求（如重连恢复时重复推送），则跳过避免重复朗读
+    if (!hadPendingRequest) {
+      handleAutoRead(targetAgentId, payload.mode === 'multi' ? 'waiting_multi' : 'waiting_single')
+    }
     
     // 如果是当前Agent，更新全局UI状态并显示输入框
     if (isCurrentAgent(targetAgentId)) {
@@ -8585,19 +8622,17 @@ function handleMessage(message, agentId = null) {
       if (['stopped', 'finished'].includes(payload.execution_status)) {
         const agentInList = agentList.value.find(a => a.agent_id === targetAgentId)
         const agentName = agentInList?.name || agentInList?.agent_type || 'Agent'
-        sendSystemNotification(`${agentName} 已退出`)
+        if (notifyOnExit.value) {
+          sendSystemNotification(`${agentName} 已退出`)
+        }
       }
 
       // 从运行状态切换到输入状态时发送系统通知
       if (['waiting_single', 'waiting_confirm', 'waiting_multi'].includes(payload.execution_status)) {
         const agentInList = agentList.value.find(a => a.agent_id === targetAgentId)
         const agentName = agentInList?.name || agentInList?.agent_type || 'Agent'
-        sendSystemNotification(`${agentName} 等待输入`)
-
-        // 自动朗读：用独立标记去重，避免依赖 agentStatuses（input_request 可能先于 status_update 写入该 Map）
-        if (autoReadLastStatus.value.get(targetAgentId) !== payload.execution_status) {
-          autoReadLastStatus.value.set(targetAgentId, payload.execution_status)
-          handleAutoRead(targetAgentId, payload.execution_status)
+        if (notifyOnInput.value) {
+          sendSystemNotification(`${agentName} 等待输入`)
         }
       }
     }
@@ -12020,31 +12055,46 @@ function getAutoReadTarget(agentId, executionStatus) {
   return { text: tip || '等待输入' }
 }
 
+// [AR-DEBUG] 临时调试状态：定位自动朗读问题，验证后移除
+const arDebugLog = ref([])
+const ttsDebugState = ref('-')
+function arDebug(msg) {
+  const t = new Date().toISOString().slice(11, 19)
+  arDebugLog.value = [...arDebugLog.value, `${t} ${msg}`].slice(-6)
+}
+
 // 进入等待输入状态时：先播提示音，结束后触发对应消息的朗读按钮逻辑
 async function handleAutoRead(agentId, executionStatus) {
+  arDebug(`enter ${executionStatus} en=${isAutoReadEnabled(agentId)}`)
   if (!isAutoReadEnabled(agentId)) return
   await playNotificationSound()
+  arDebug('beeped')
   // 等待期间开关可能被关闭或状态已变化，再次校验
-  if (!isAutoReadEnabled(agentId)) return
+  if (!isAutoReadEnabled(agentId)) { arDebug('abort-disabled'); return }
   const target = getAutoReadTarget(agentId, executionStatus)
   const panel = panels.value.find(p => p.agentId === agentId)
   const sp = panel ? sessionPanelRefs.get(panel.id) : null
+  arDebug(`panel=${!!panel} sp=${!!sp} msg=${!!target.message} speakMsg=${!!sp?.speakMessage} speakTxt=${!!sp?.speakText}`)
   if (target.message && sp?.speakMessage) {
     // 复用消息列表的朗读逻辑，图标状态自动同步
     sp.speakMessage(target.message)
+    arDebug('speakMessage-called')
   } else if (sp?.speakText) {
     sp.speakText(target.text)
+    arDebug('speakText-called')
+  } else {
+    arDebug('NO-SPEAK-METHOD')
+  }
+  if (autoReadSupported) {
+    ttsDebugState.value = `${speechSynthesis.speaking ? 'speaking' : 'idle'}/${speechSynthesis.pending ? 'pending' : 'ok'}`
   }
 }
 
 // 通知权限状态
 let notificationPermissionRequested = false
 
-// 发送系统通知
+// 发送系统通知（仅弹窗，不播放提示音）
 function sendSystemNotification(message) {
-  // 播放提示音
-  playNotificationSound()
-
   // 检查浏览器是否支持 Notification API
   if (!('Notification' in window)) {
     console.log('[Notification] 浏览器不支持系统通知')
