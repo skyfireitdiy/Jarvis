@@ -137,9 +137,6 @@ function loadHistory(
     const end = messages.length - offset;
     const result = messages.slice(start, end);
 
-    console.log(
-      `[historyStorage] Loaded ${result.length} messages (offset: ${offset}, agentId: ${agentId}, total: ${messages.length})`,
-    );
     return result;
   } catch (error) {
     console.error("[historyStorage] Failed to load history:", error);
@@ -176,7 +173,6 @@ function clearHistory() {
   try {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(METADATA_KEY);
-    console.log("[historyStorage] History cleared");
     return true;
   } catch (error) {
     console.error("[historyStorage] Failed to clear history:", error);
@@ -198,13 +194,9 @@ function clearHistoryForAgent(agentId) {
 
     if (filteredMessages.length !== allMessages.length) {
       saveAllMessages(filteredMessages);
-      console.log(
-        `[historyStorage] Cleared ${allMessages.length - filteredMessages.length} messages for agent ${agentId}`,
-      );
       return true;
     }
 
-    console.log(`[historyStorage] No messages found for agent ${agentId}`);
     return true;
   } catch (error) {
     console.error("[historyStorage] Failed to clear agent history:", error);
@@ -265,9 +257,6 @@ function getHistoryForAgent(agentId) {
   try {
     const allMessages = getAllMessages();
     const agentMessages = allMessages.filter((msg) => msg.agent_id === agentId);
-    console.log(
-      `[historyStorage] Got ${agentMessages.length} messages for agent ${agentId}`,
-    );
     return agentMessages;
   } catch (error) {
     console.error("[historyStorage] Failed to get agent history:", error);
@@ -295,9 +284,6 @@ function setHistoryForAgent(agentId, data) {
     }));
     const combined = [...otherMessages, ...newMessages];
     saveAllMessages(combined);
-    console.log(
-      `[historyStorage] Set ${newMessages.length} messages for agent ${agentId}`,
-    );
     return true;
   } catch (error) {
     console.error("[historyStorage] Failed to set agent history:", error);

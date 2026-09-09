@@ -307,7 +307,7 @@ async function copyToClipboard(text, index) {
 
   try {
     await navigator.clipboard.writeText(text)
-    console.log('[COPY] Successfully copied text to clipboard')
+
     emit('show-toast', '已复制到剪贴板', 'success')
   } catch (err) {
     console.error('[COPY] Failed to copy text:', err)
@@ -321,7 +321,7 @@ async function copyToClipboard(text, index) {
       textArea.select()
       document.execCommand('copy')
       document.body.removeChild(textArea)
-      console.log('[COPY] Fallback: Successfully copied using execCommand')
+
       emit('show-toast', '已复制到剪贴板', 'success')
     } catch (fallbackErr) {
       console.error('[COPY] Fallback also failed:', fallbackErr)
