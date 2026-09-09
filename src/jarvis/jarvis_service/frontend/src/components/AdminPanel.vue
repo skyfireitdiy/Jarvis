@@ -317,7 +317,21 @@ const resourceLabels = {
 const currentUserId = computed(() => props.auth?.userInfo?.user_id || '')
 // 辅助函数
 function getGatewayAddress() {
-  const parts = (props.gatewayUrl || '127.0.0.1:8000').split(':')
+  const raw = (props.gatewayUrl || '127.0.0.1:8000').trim()
+  // 完整 URL（如 wss://jvs-ai.cn）需用 URL 解析，避免 split(':') 误判
+  if (raw.includes('://')) {
+    try {
+      const url = new URL(raw)
+      const isTls = url.protocol === 'https:' || url.protocol === 'wss:'
+      return {
+        host: url.hostname || '127.0.0.1',
+        port: url.port || (isTls ? '443' : '80'),
+      }
+    } catch (e) {
+      return { host: '127.0.0.1', port: '8000' }
+    }
+  }
+  const parts = raw.split(':')
   return { host: parts[0] || '127.0.0.1', port: parts[1] || '8000' }
 }
 
