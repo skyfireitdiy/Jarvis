@@ -6082,9 +6082,7 @@ function getStatusClass(agent) {
 // 判断是否处于等待输入状态
 function isWaitingInput(agent) {
   const statusClass = getStatusClass(agent)
-  const result = statusClass === 'waiting_multi' || statusClass === 'waiting_single' || statusClass === 'waiting_confirm'
-  console.log('[BREATHING DEBUG] Agent:', agent.agent_id, 'Status:', statusClass, 'isWaiting:', result)
-  return result
+  return statusClass === 'waiting_multi' || statusClass === 'waiting_single' || statusClass === 'waiting_confirm'
 }
 
 // 查询 Agent 状态（通过网关代理）
