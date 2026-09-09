@@ -3477,6 +3477,11 @@ class Agent:
 
         set_interrupt(False)
 
+        # 原生工具调用路径：中断后丢弃本轮尚未执行的待调用工具，
+        # 避免 run_loop 主循环在中断恢复后仍执行这些 tool_calls。
+        # （模型下一轮会基于用户补充信息重新决策，而非沿用已中断的输出）
+        self._pending_native_tool_calls = None
+
         # 被中断时，如果当前是非交互模式，立即切换到交互模式（在获取用户输入前）
         if self.non_interactive:
             self.set_non_interactive(False)
