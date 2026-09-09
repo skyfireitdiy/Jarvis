@@ -590,7 +590,7 @@ processor.process_order(order)
 
 ## SOLID 检查清单
 
-编写代码时，汝必确认：
+编写代码时，请务必确认：
 
 ### 单一职责原则 (SRP)
 

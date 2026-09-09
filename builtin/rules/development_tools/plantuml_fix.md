@@ -22,7 +22,7 @@ license: MIT
 - 脚本只负责提取、校验报告与写回
 - 修复工作由AI执行，AI需根据校验错误信息手动修复`.puml`文件
 
-## 汝必守之原则
+## 你必须遵守的原则
 
 ### 1. 安全性原则
 
@@ -41,7 +41,7 @@ license: MIT
 - **必**：保留原始代码之缩进与格式
 - **禁**：修改非PlantUML代码块之内容
 
-## 汝必行之操作
+## 你必须执行的操作作
 
 ### 操作1：检查环境依赖
 
@@ -108,7 +108,7 @@ python3 {{ rule_file_dir }}/plantuml_fix.py writeback <markdown_file> <puml_dir>
 
 ## 检查清单
 
-完成任务后，汝必确认：
+完成任务后，请务必确认：
 
 - [ ] 脚本文件已创建于`{{ rule_file_dir }}/plantuml_fix.py`
 - [ ] 规则文件已创建于`{{ rule_file_dir }}/plantuml_fix.md`

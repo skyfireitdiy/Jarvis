@@ -17,7 +17,7 @@ description: 当需要将Go代码转为Rust代码时触发。每当用户提及"
 - **并发模型**：goroutines、channels、select、sync.WaitGroup、sync.Mutex、sync.RWMutex 等
 - **标准库**：strings、bytes、io、fmt、context、time、net 等
 
-## 汝必遵守之原则
+## 你必须遵守的原则
 
 ### 1. 任务管原则（核心）
 
@@ -359,7 +359,7 @@ pub fn calculate(x: i32) -> i32 {
 - 文档内容：必含阶段概述、行过程、关键决策、问题与解决方案、验结果
 - 文档链接：在任务列表之预期输出中含文档路径
 
-## 汝必行之操作
+## 你必须执行的操作作
 
 **重要提示：** 在开始转译前，必据转译规模选合适之任务列表层级：
 

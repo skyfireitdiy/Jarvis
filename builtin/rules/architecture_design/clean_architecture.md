@@ -273,7 +273,7 @@ class HttpUserService(UserService):
 
 ## 整洁架构检查清单
 
-编写代码前，汝必确认：
+编写代码前，请务必确认：
 
 ### 依赖方向检查
 

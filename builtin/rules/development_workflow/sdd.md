@@ -27,7 +27,7 @@ description: 当需要先编写规范再实现代码的SDD开发流程时触发�
    - 运行测试、代码审查、文档检查等验证活动
    - 若验证失败，必回到实现或 Spec 阶段进行修正
 
-## 汝必遵守之原则
+## 你必须遵守的原则
 
 ### Spec 优先原则
 
@@ -261,7 +261,7 @@ def filter_and_double_positive_numbers(numbers: list[int]) -> list[int]:
 
 ## 执行检查清单
 
-在开始实现功能前，汝必确认：
+在开始实现功能前，请务必确认：
 
 - [ ] 已编写完整之功能规范文档
 - [ ] Spec 文件已放置在 `{{ git_root_dir }}/.jarvis/rules/spec/` 目录
@@ -274,13 +274,13 @@ def filter_and_double_positive_numbers(numbers: list[int]) -> list[int]:
 - [ ] Spec 含明确之验收标准
 - [ ] Spec 已经过评审和确认
 
-在实现功能时，汝必确认：
+在实现功能时，请务必确认：
 
 - [ ] 严格按照 Spec 进行实现
 - [ ] 没有超出 Spec 范围之实现
 - [ ] 遇到 Spec 不明确时先更新 Spec
 
-在完成实现后，汝必确认：
+在完成实现后，请务必确认：
 
 - [ ] 全验收标准都已满足
 - [ ] 代码实现与 Spec 一致
