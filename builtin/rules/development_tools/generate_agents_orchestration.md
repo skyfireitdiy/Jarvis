@@ -24,7 +24,7 @@ description: 当需要生成Agents编排文件以批量创建Agent时触发。�
 
 #### agents列表（必填）
 
-`agents`乃一列表，每元素定义一Agent的配置。
+`agents`是一个列表，每元素定义一Agent的配置。
 
 #### Agent配置字段
 

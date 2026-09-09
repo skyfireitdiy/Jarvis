@@ -8,7 +8,7 @@ license: MIT
 
 ## 规则简介
 
-此规则用于修复Markdown文件中的PlantUML代码块。PlantUML乃常用的UML图表绘制工具，然在Markdown文件中嵌入时或出现语法错误或格式问题。
+此规则用于修复Markdown文件中的PlantUML代码块。PlantUML是常用的UML图表绘制工具，然在Markdown文件中嵌入时或出现语法错误或格式问题。
 
 **工作流程：**
 

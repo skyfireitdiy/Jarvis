@@ -144,7 +144,7 @@ def calculate_total(items: list[Item], discount: float = 0.0) -> float:
 
 **代码注释：**
 
-- [ ] 所有公共 API 皆有文档字符串
+- [ ] 所有公共 API 都有文档字符串
 - [ ] 复杂逻辑有注释说明
 - [ ] 注释解释"为何"而非"做何"
 - [ ] 无过时的注释
@@ -158,8 +158,8 @@ def calculate_total(items: list[Item], discount: float = 0.0) -> float:
 
 **API 文档：**
 
-- [ ] 所有公共 API 皆有文档
-- [ ] 参数与返回值皆有说明
+- [ ] 所有公共 API 都有文档
+- [ ] 参数与返回值都有说明
 - [ ] 有使用示例
 - [ ] 说明可能抛出的异常
 
