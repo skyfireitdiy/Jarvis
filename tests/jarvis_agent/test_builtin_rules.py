@@ -12,9 +12,8 @@ def test_entries_are_subset_of_full_rules():
     assert all(e.lower() in full for e in entries)
 
 
-def test_superpowers_only_entry_skill_md_selected():
+def test_removed_noise_categories_not_listed():
     entries = list_builtin_rule_entries()
-    super_entries = [e for e in entries if "superpowers" in e]
-    # vendored superpowers 每个 skill 目录只应暴露 SKILL.md 入口
-    assert super_entries
-    assert all(e.lower().endswith("/skill.md") for e in super_entries)
+    # 已清理的低价值/惰性目录不应再作为自动选择候选
+    for marker in ("superpowers", "agent_personality", "investment_analysis", "technical_analysis"):
+        assert not any(marker in e for e in entries), marker
