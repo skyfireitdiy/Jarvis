@@ -58,11 +58,13 @@
               </svg>
             </button>
             <div class="message-body markdown-content" v-html="item.html"></div>
-            <div class="message-meta" v-if="item.agent_name || item.timestamp || item.non_interactive">
+            <div class="message-meta" v-if="item.agent_name || item.timestamp || item.non_interactive || item.agent_list">
               <span class="message-agent" v-if="item.agent_name">{{ item.agent_name }}</span>
-              <span class="message-separator" v-if="item.agent_name && item.timestamp"> · </span>
+              <span class="message-separator" v-if="item.agent_name && item.agent_list"> · </span>
+              <span class="message-agent-list" v-if="item.agent_list" title="当前进程内的 Agent 链">{{ item.agent_list }}</span>
+              <span class="message-separator" v-if="(item.agent_name || item.agent_list) && item.timestamp"> · </span>
               <span class="message-time" v-if="item.timestamp">{{ formatMessageTime(item.timestamp) }}</span>
-              <span class="message-separator" v-if="(item.agent_name || item.timestamp) && (item.non_interactive !== undefined)"> · </span>
+              <span class="message-separator" v-if="(item.agent_name || item.agent_list || item.timestamp) && (item.non_interactive !== undefined)"> · </span>
               <span class="message-silent" v-if="item.non_interactive === true" title="静默模式">🔇</span>
               <span class="message-silent" v-if="item.non_interactive === false" title="交互模式">🔊</span>
             </div>
@@ -707,6 +709,15 @@ function getTerminalStyle(terminalContent) {
 
 .message-agent {
   color: var(--color-accent);
+}
+
+.message-agent-list {
+  color: var(--color-text-secondary);
+  opacity: 0.85;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 40ch;
 }
 
 .message-separator {

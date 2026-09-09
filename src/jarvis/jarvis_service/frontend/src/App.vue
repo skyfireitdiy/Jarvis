@@ -4605,6 +4605,7 @@ async function loadHistoryMessages(prepend = false, agentId = null) {
           timestamp: msg.timestamp || '',
           agent_name: msg.agent_name || '',
           non_interactive: msg.non_interactive !== undefined ? msg.non_interactive : false,
+          agent_list: msg.agent_list || msg.context?.agent_list || '',
           _stableId: stableId,
         }
       })
@@ -8829,6 +8830,7 @@ function appendOutput(payload, agentId = null) {
   const context = payload?.context || {}
   const agentName = payload?.agent_name || context.agent_name || context.agent || ''
   const nonInteractive = payload?.non_interactive !== undefined ? payload?.non_interactive : (context.non_interactive || false)
+  const agentList = payload?.agent_list || context.agent_list || ''
   const resolvedAgentId = agentId || payload?.agent_id || context.agent_id || currentAgentId.value
   
   // 生成稳定ID，避免v-for使用index作为key导致DOM重建
@@ -8842,6 +8844,7 @@ function appendOutput(payload, agentId = null) {
     timestamp: now,
     agent_name: agentName,
     non_interactive: nonInteractive,
+    agent_list: agentList,
     agent_id: resolvedAgentId,
     _stableId: stableId,
   }
@@ -8895,6 +8898,7 @@ function appendOutput(payload, agentId = null) {
         lang: outputItem.lang || 'text',
         agent_name: outputItem.agent_name,
         non_interactive: outputItem.non_interactive,
+        agent_list: outputItem.agent_list,
         timestamp: outputItem.timestamp,
         execution_id: outputItem.execution_id,
         context: outputItem.context,
@@ -8914,6 +8918,7 @@ function appendOutput(payload, agentId = null) {
         lang: outputItem.lang,
         agent_name: outputItem.agent_name,
         non_interactive: outputItem.non_interactive,
+        agent_list: outputItem.agent_list,
         timestamp: outputItem.timestamp,
         context: outputItem.context,
         seq: outputItem.seq, // 保存 seq

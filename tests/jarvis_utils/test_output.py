@@ -503,6 +503,48 @@ nested:
         assert "Agent1🔇" in result
         assert "Agent2🔊" in result
 
+    @patch(
+        "jarvis.jarvis_utils.output.get_agent_list", return_value="[2]Agent1, Agent2"
+    )
+    @patch("jarvis.jarvis_utils.output.get_agent")
+    def test_get_agent_list_with_emoji(self, mock_get_agent, mock_get_agent_list):
+        """测试 get_agent_list_with_emoji 返回带 emoji 的 agent 列表"""
+        mock_agent1 = Mock()
+        mock_agent1.non_interactive = True
+        mock_agent2 = Mock()
+        mock_agent2.non_interactive = False
+        mock_get_agent.side_effect = [mock_agent1, mock_agent2]
+
+        result = PrettyOutput.get_agent_list_with_emoji()
+        assert result == "[2]Agent1🔇, Agent2🔊"
+
+    @patch("jarvis.jarvis_utils.output.get_agent_list", return_value="")
+    def test_get_agent_list_with_emoji_empty(self, mock_get_agent_list):
+        """测试无 agent 时 get_agent_list_with_emoji 返回空字符串"""
+        assert PrettyOutput.get_agent_list_with_emoji() == ""
+
+    @patch("jarvis.jarvis_utils.output.get_agent_list", return_value="[1]Agent1")
+    @patch("jarvis.jarvis_utils.output.get_agent")
+    def test_print_context_contains_agent_list(
+        self, mock_get_agent, mock_get_agent_list
+    ):
+        """测试 _print 会将 agent_list 写入 context"""
+        mock_agent = Mock()
+        mock_agent.non_interactive = False
+        mock_get_agent.return_value = mock_agent
+
+        captured = {}
+
+        def fake_emit_output(event):
+            captured["context"] = event.context
+
+        with patch(
+            "jarvis.jarvis_utils.output.emit_output", side_effect=fake_emit_output
+        ):
+            PrettyOutput._print("hello", OutputType.INFO)
+
+        assert captured["context"].get("agent_list") == "[1]Agent1🔊"
+
     @patch("jarvis.jarvis_utils.output.console")
     def test_print_gradient_text_single_line(self, mock_console):
         """测试渐变文本（单行）"""
