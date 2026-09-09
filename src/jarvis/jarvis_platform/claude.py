@@ -466,6 +466,7 @@ class ClaudeModel(BasePlatform):
         # 复用文本协议路径的流式渲染管线（pretty/simple/suppressed 三模式）
         import time
         from jarvis.jarvis_utils.config import get_pretty_output
+        from jarvis.jarvis_utils.globals import get_interrupt
 
         # 工具续轮 message 可能为 None，渲染层需要非 None 的展示消息（中断时保存历史用）
         render_message: Union[str, List[ContentBlock]] = (
@@ -476,6 +477,10 @@ class ClaudeModel(BasePlatform):
         # 与文本协议路径 chat_until_success 的 while_true 重试机制对齐。
         max_retries = 6
         for attempt in range(max_retries):
+            # 与文本协议路径 while_true/while_success 对齐：每轮开始前检查中断信号，
+            # 用户点击“人工介入”后立即停止重试，避免继续空转重试。
+            if get_interrupt() > 0:
+                break
             try:
                 # 累积器：content 逐块 yield 供流式渲染；final_message 在流结束后存入闭包供外部解析 tool_calls
                 content_parts: List[str] = []
@@ -532,7 +537,13 @@ class ClaudeModel(BasePlatform):
                         PrettyOutput.auto_print(
                             f"⚠️ 模型输出为空或陷入重复，重试中 ({attempt + 1}/{max_retries})，等待 {sleep_time}s..."
                         )
-                        time.sleep(sleep_time)
+                        # 分段睡眠以便及时响应中断信号
+                        for _ in range(sleep_time):
+                            if get_interrupt() > 0:
+                                break
+                            time.sleep(1)
+                        if get_interrupt() > 0:
+                            break
                         continue
                     # 重试耗尽仍未获得有效输出，跳出循环统一回滚
                     break
