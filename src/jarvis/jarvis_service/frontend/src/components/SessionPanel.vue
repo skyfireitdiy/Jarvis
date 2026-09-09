@@ -27,6 +27,14 @@
           {{ autoScroll ? '⤓' : '⤒' }}
         </button>
         <button
+          class="session-auto-scroll-btn"
+          :class="{ 'active': autoRead }"
+          @click.stop="$emit('toggle-auto-read', !autoRead)"
+          :title="autoRead ? '自动朗读已开启' : '自动朗读已关闭'"
+        >
+          {{ autoRead ? '🔊' : '🔇' }}
+        </button>
+        <button
           class="session-exit-non-interactive-btn"
           @click.stop="$emit('exit-non-interactive')"
           title="退出非交互模式（不中断当前对话）"
@@ -222,6 +230,7 @@ const props = defineProps({
   resizeDirections: { type: Array, default: () => [] },
   panelStyle: { type: Object, default: null },
   autoScroll: { type: Boolean, default: true },
+  autoRead: { type: Boolean, default: false },
   nonInteractive: { type: Boolean, default: false },
   socket: { type: [Object, null], default: null },
 })
@@ -233,6 +242,7 @@ const emit = defineEmits([
   'show-buffer', 'clear-buffer',
   'set-output-list', 'set-terminal-ref',
   'toggle-auto-scroll',
+  'toggle-auto-read',
   'exit-non-interactive',
   'manual-interrupt',
   'show-toast',
@@ -276,7 +286,7 @@ function focusInput() {
   }, 50)
 }
 
-defineExpose({ focusInput })
+defineExpose({ focusInput, speakMessage, speakText, stopSpeak })
 
 function setOutputListRef(el) {
   outputListRef.value = el
@@ -375,6 +385,39 @@ function toggleSpeak(item) {
   speakingKey.value = key
   window.speechSynthesis.speak(utterance)
 }
+
+// 供外部（如自动朗读）直接朗读指定消息，复用同一套图标状态
+function speakMessage(item) {
+  if (!ttsSupported || !item) return
+  const text = extractSpeakText(item)
+  if (!text) return
+  const key = messageKey(item, props.messages.indexOf(item))
+  window.speechSynthesis.cancel()
+  const utterance = new SpeechSynthesisUtterance(text)
+  utterance.lang = 'zh-CN'
+  utterance.rate = 2.0
+  utterance.onend = () => {
+    if (speakingKey.value === key) speakingKey.value = null
+  }
+  utterance.onerror = () => {
+    if (speakingKey.value === key) speakingKey.value = null
+  }
+  speakingKey.value = key
+  window.speechSynthesis.speak(utterance)
+}
+
+// 供外部直接朗读任意文本（无对应消息时使用），不占用消息图标状态
+function speakText(text) {
+  if (!ttsSupported) return
+  const content = String(text || '').replace(/\s+/g, ' ').trim()
+  if (!content) return
+  window.speechSynthesis.cancel()
+  const utterance = new SpeechSynthesisUtterance(content)
+  utterance.lang = 'zh-CN'
+  utterance.rate = 2.0
+  window.speechSynthesis.speak(utterance)
+}
+
 
 onBeforeUnmount(() => {
   if (ttsSupported) {

@@ -128,6 +128,8 @@
         :confirm-data="getPanelConfirmData(panel)"
         :auto-scroll="getPanelAutoScroll(panel)"
         @toggle-auto-scroll="togglePanelAutoScroll(panel, $event)"
+        :auto-read="getPanelAutoRead(panel)"
+        @toggle-auto-read="togglePanelAutoRead(panel, $event)"
         :non-interactive="getPanelNonInteractive(panel)"
         :socket="socket"
         @exit-non-interactive="exitNonInteractiveMode(getPanelAgent(panel))"
@@ -494,6 +496,8 @@
         :confirm-data="getPanelConfirmData(panel)"
         :auto-scroll="getPanelAutoScroll(panel)"
         @toggle-auto-scroll="togglePanelAutoScroll(panel, $event)"
+        :auto-read="getPanelAutoRead(panel)"
+        @toggle-auto-read="togglePanelAutoRead(panel, $event)"
         :non-interactive="getPanelNonInteractive(panel)"
         :socket="socket"
         @exit-non-interactive="exitNonInteractiveMode(getPanelAgent(panel))"
@@ -3488,6 +3492,7 @@ const pendingInputAgentId = ref(null) // 当前待响应输入请求所属 Agent
 const pendingConfirmAgentId = ref(null) // 当前待响应确认请求所属 Agent
 const panelConfirmData = ref(new Map()) // 每个 Panel 的确认数据（key: agentId, value: {message, defaultConfirm}）
 const panelAutoScrolls = ref(new Map()) // 每个 Panel 的自动滚动开关（key: agentId, value: boolean，默认 true）
+const panelAutoReads = ref(new Map()) // 每个 Panel 的自动朗读开关（key: agentId, value: boolean，默认 false）
 const inputBuffers = ref(new Map()) // 每个 Agent 的输入缓冲区（key: agentId, value：内容）
 
 // 历史输入记录
@@ -3736,6 +3741,8 @@ function closeAgentInPanel(panelId) {
   panelConfirmData.value.delete(agentId)
   // 清除该 Agent 的 Panel 自动滚动开关
   panelAutoScrolls.value.delete(agentId)
+  // 清除该 Agent 的 Panel 自动朗读开关
+  panelAutoReads.value.delete(agentId)
   // 清除该 Agent 的 Panel 输入状态
   panelInputTexts.value.delete(agentId)
   panelInputTips.value.delete(agentId)
@@ -3888,6 +3895,27 @@ function togglePanelAutoScroll(panel, value) {
 function isAutoScrollEnabled(agentId) {
   if (!agentId) return true
   return panelAutoScrolls.value.get(agentId) !== false
+}
+
+// 获取 Panel 的自动朗读开关状态（默认 false）
+function getPanelAutoRead(panel) {
+  if (!panel || !panel.agentId) return false
+  return panelAutoReads.value.get(panel.agentId) === true
+}
+
+// 切换 Panel 的自动朗读开关
+function togglePanelAutoRead(panel, value) {
+  if (!panel || !panel.agentId) return
+  panelAutoReads.value.set(panel.agentId, value)
+  if (!value) {
+    stopAutoRead()
+  }
+}
+
+// 判断指定 Agent 是否启用自动朗读（默认 false）
+function isAutoReadEnabled(agentId) {
+  if (!agentId) return false
+  return panelAutoReads.value.get(agentId) === true
 }
 
 // 获取 Panel 的终端列表
@@ -8563,10 +8591,16 @@ function handleMessage(message, agentId = null) {
       }
 
       // 从运行状态切换到输入状态时发送系统通知
-      if (['waiting', 'waiting_confirm', 'waiting_multi'].includes(payload.execution_status)) {
+      if (['waiting_single', 'waiting_confirm', 'waiting_multi'].includes(payload.execution_status)) {
         const agentInList = agentList.value.find(a => a.agent_id === targetAgentId)
         const agentName = agentInList?.name || agentInList?.agent_type || 'Agent'
         sendSystemNotification(`${agentName} 等待输入`)
+
+        // 自动朗读：用独立标记去重，避免依赖 agentStatuses（input_request 可能先于 status_update 写入该 Map）
+        if (autoReadLastStatus.value.get(targetAgentId) !== payload.execution_status) {
+          autoReadLastStatus.value.set(targetAgentId, payload.execution_status)
+          handleAutoRead(targetAgentId, payload.execution_status)
+        }
       }
     }
   } else if (type === 'file_upload_response') {
@@ -11934,7 +11968,7 @@ function playChatSingleTone(audioContext, startTime, frequency, type, duration) 
   oscillator.stop(startTime + duration)
 }
 
-// 播放提示音（连续三次）
+// 播放提示音（连续三次），返回在最后一声结束后 resolve 的 Promise
 function playNotificationSound() {
   try {
     const audioContext = new (window.AudioContext || window.webkitAudioContext)()
@@ -11944,8 +11978,64 @@ function playNotificationSound() {
     playSingleBeep(audioContext, now)
     playSingleBeep(audioContext, now + 0.25)
     playSingleBeep(audioContext, now + 0.5)
+
+    // 最后一声在 now + 0.5 开始、持续 0.2s，留出少量余量
+    return new Promise(resolve => setTimeout(resolve, 750))
   } catch (e) {
     console.log('[Notification] 无法播放提示音:', e)
+    return Promise.resolve()
+  }
+}
+
+// ---- 自动朗读（浏览器内置 SpeechSynthesis） ----
+// 记录每个 agent 最近一次已触发朗读的等待状态，用于去重（不依赖 agentStatuses）
+const autoReadLastStatus = ref(new Map())
+const autoReadSupported = typeof window !== 'undefined' && 'speechSynthesis' in window
+// 停止自动朗读（复用 SessionPanel 的停止逻辑，保证图标状态同步）
+function stopAutoRead() {
+  if (!autoReadSupported) return
+  for (const sp of sessionPanelRefs.values()) {
+    sp?.stopSpeak?.()
+  }
+}
+
+// 从渲染后的 HTML 提取纯文本，避免把 Markdown 标记念出来
+function extractAutoReadText(item) {
+  if (!item) return ''
+  if (item.html) {
+    const tmp = document.createElement('div')
+    tmp.innerHTML = item.html
+    return (tmp.textContent || '').replace(/\s+/g, ' ').trim()
+  }
+  return String(item.text || '').trim()
+}
+
+// 获取自动朗读目标：多行输入取最后一条有文本的消息，单行/确认取输入提示
+function getAutoReadTarget(agentId, executionStatus) {
+  if (executionStatus === 'waiting_multi') {
+    const messages = allOutputs.value.get(agentId) || []
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (extractAutoReadText(messages[i])) return { message: messages[i] }
+    }
+  }
+  const tip = panelInputTips.value.get(agentId) || ''
+  return { text: tip || '等待输入' }
+}
+
+// 进入等待输入状态时：先播提示音，结束后触发对应消息的朗读按钮逻辑
+async function handleAutoRead(agentId, executionStatus) {
+  if (!isAutoReadEnabled(agentId)) return
+  await playNotificationSound()
+  // 等待期间开关可能被关闭或状态已变化，再次校验
+  if (!isAutoReadEnabled(agentId)) return
+  const target = getAutoReadTarget(agentId, executionStatus)
+  const panel = panels.value.find(p => p.agentId === agentId)
+  const sp = panel ? sessionPanelRefs.get(panel.id) : null
+  if (target.message && sp?.speakMessage) {
+    // 复用消息列表的朗读逻辑，图标状态自动同步
+    sp.speakMessage(target.message)
+  } else if (sp?.speakText) {
+    sp.speakText(target.text)
   }
 }
 
