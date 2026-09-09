@@ -6450,11 +6450,16 @@ def create_app(
             normalized_path = "/" + normalized_path[len("/api/") :].lstrip("/")
 
         # 构造模拟Request，传递user_info给需要request参数的API函数
+        # 注意：Request.state 是只读 property（无 setter），不能直接赋值，
+        # 需通过内部 _state 属性注入，否则会抛 AttributeError。
+        from starlette.datastructures import State as _State
+
         class _MockRequest(Request):
-            state: Any
+            pass
 
         _mock_req = _MockRequest.__new__(_MockRequest)
-        _mock_req.state = type("state", (), {"user_info": user_info})()
+        _mock_req.scope = {"type": "http", "state": {}}
+        _mock_req._state = _State({"user_info": user_info})
         # 若无user_info，尝试从headers解析JWT
         if user_info is None:
             auth_header = headers.get("authorization", headers.get("Authorization", ""))
@@ -6465,7 +6470,7 @@ def create_app(
                     token = auth_header[7:]
                     token_payload = validate_jwt_token(token)
                     if token_payload:
-                        _mock_req.state.user_info = token_payload
+                        _mock_req._state.user_info = token_payload
                 except Exception:
                     pass
 
