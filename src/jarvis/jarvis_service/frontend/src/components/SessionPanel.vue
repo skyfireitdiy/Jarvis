@@ -441,8 +441,11 @@ const isRecording = ref(false)
 let recognizer = null
 // 识别前输入框已有内容，作为前缀保留
 let recordPrefix = ''
+// 标记本次结束是否由用户主动停止（用于区分浏览器自动结束）
+let userStopped = false
 
 function stopRecord() {
+  userStopped = true
   if (recognizer) {
     try {
       recognizer.stop()
@@ -460,6 +463,7 @@ function toggleRecord() {
     return
   }
   recordPrefix = props.inputText || ''
+  userStopped = false
   recognizer = new SpeechRecognitionImpl()
   recognizer.lang = 'zh-CN'
   recognizer.continuous = true
@@ -490,6 +494,16 @@ function toggleRecord() {
   }
 
   recognizer.onend = () => {
+    // 移动端浏览器不支持真正的 continuous，会自动结束识别。
+    // 若非用户主动停止，则自动重启，保持“连续”体验。
+    if (!userStopped && isRecording.value) {
+      try {
+        recognizer.start()
+        return
+      } catch (e) {
+        // 重启失败则回落到停止状态
+      }
+    }
     isRecording.value = false
   }
 
