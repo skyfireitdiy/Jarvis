@@ -1,0 +1,8 @@
+{
+  "id": "20260909_144803_122263",
+  "type": "project_long_term",
+  "tags": ["Jarvis", "前端", "通知", "提示音", "App.vue"],
+  "content": "Jarvis 前端（src/jarvis/jarvis_service/frontend/src/App.vue）存在两套独立的提示音触发路径，排查通知/声音问题需区分：\n1) sendSystemNotification(message)（约 App.vue:12062）：内部先 playNotificationSound() 再发浏览器 Notification；仅被两处调用——Agent 退出（stopped/finished）与等待输入（waiting_single/confirm/multi），分别受设置开关 notifyOnExit / notifyOnInput（localStorage: jarvis_notify_on_exit / jarvis_notify_on_input，默认 false）控制。\n2) handleAutoRead(agentId, status)（约 App.vue:12042）：自动朗读功能，内部也调用 playNotificationSound()（约 12044），由每个 Panel 的「自动朗读」开关 panelAutoReads（默认 false）控制，与上述两个通知开关无关。\n部署链路：https://jvs-ai.cn/ (154.40.44.163) nginx 443 → proxy_pass http://127.0.0.1:5173（vite preview，工作目录即 frontend 目录）；改源码后需 npm run build 才生效。\n排查经验：用户反馈“开关关了仍弹通知/响声音”时，先确认是系统通知（右下角弹窗）还是仅提示音，再区分是 sendSystemNotification 还是 handleAutoRead 触发。",
+  "created_at": "2026-09-09T14:48:03.122303",
+  "updated_at": "2026-09-09T14:48:03.122309"
+}
