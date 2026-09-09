@@ -10,6 +10,8 @@ import asyncio
 from collections import deque
 from contextlib import asynccontextmanager
 import json
+from queue import Empty
+from queue import Queue
 import logging
 import os
 import pathlib
@@ -17,6 +19,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import threading
 import time
 import uuid
 
@@ -374,6 +377,10 @@ class WebGateway(BaseGateway):
             str, Dict[str, Any]
         ] = {}  # 已发送但未收到回复：{session_id: message}
 
+        # 前端 JS 执行等待队列：call_id -> Queue
+        self._js_eval_waiters: Dict[str, Queue] = {}
+        self._js_eval_lock = threading.Lock()
+
     def emit_output(self, event: GatewayOutputEvent) -> None:
         # 多用户模式：广播到所有活跃session，检查任意session是否已授权
         session_id = None  # None触发路由器广播到所有session
@@ -560,6 +567,65 @@ class WebGateway(BaseGateway):
         self._sent_inputs.pop(confirm_key, None)
 
         return GatewayConfirmResult(confirmed=confirmed, metadata=metadata)
+
+    def request_frontend_js(
+        self, code: str, timeout: float = 30.0, target: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """向前端下发 JS 并等待执行结果。
+
+        Args:
+            code: 要执行的 JavaScript 代码
+            timeout: 等待超时（秒）
+            target: 目标前端；None/"current" 取第一个已授权会话，"all" 广播，
+                其它值视为具体 session_id
+
+        Returns:
+            dict: 前端回传的结果（含 success/result 或 success/error）
+        """
+        if target in (None, "", "current"):
+            session_id: Optional[str] = next(
+                (
+                    sid
+                    for sid, auth in self._auth_store.items()
+                    if auth and self._check_auth(auth)[0]
+                ),
+                None,
+            )
+            if session_id is None:
+                return {"success": False, "error": "没有可用的前端连接"}
+        elif target == "all":
+            session_id = None  # 广播
+        else:
+            session_id = target
+
+        call_id = uuid.uuid4().hex
+        waiter: Queue = Queue()
+        with self._js_eval_lock:
+            self._js_eval_waiters[call_id] = waiter
+
+        message = {
+            "type": "eval_js_request",
+            "payload": {"call_id": call_id, "code": code, "timeout": timeout},
+        }
+        self._router.publish(message, session_id=session_id)
+
+        try:
+            return cast(Dict[str, Any], waiter.get(timeout=timeout))
+        except Empty:
+            return {"success": False, "error": f"前端执行超时（{timeout}s）"}
+        finally:
+            with self._js_eval_lock:
+                self._js_eval_waiters.pop(call_id, None)
+
+    def submit_js_eval_result(self, payload: Dict[str, Any]) -> None:
+        """接收前端回传的 JS 执行结果，唤醒对应等待者。"""
+        call_id = payload.get("call_id")
+        if not call_id:
+            return
+        with self._js_eval_lock:
+            waiter = self._js_eval_waiters.get(call_id)
+        if waiter is not None:
+            waiter.put(payload)
 
     def publish_execution_event(
         self,
@@ -914,6 +980,9 @@ class WebSocketConnectionManager:
         if message_type == "confirm_result":
             confirmed = payload.get("confirmed", False)
             self._input_registry.submit_confirm(session_id, confirmed)
+            return
+        if message_type == "eval_js_result":
+            self._gateway.submit_js_eval_result(payload)
             return
         if message_type == "terminal_input":
             execution_id = payload.get("execution_id")

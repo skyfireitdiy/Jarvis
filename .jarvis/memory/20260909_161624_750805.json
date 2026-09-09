@@ -1,0 +1,13 @@
+{
+  "id": "20260909_161624_750805",
+  "type": "project_long_term",
+  "tags": [
+    "eval_js",
+    "前端JS执行",
+    "gateway",
+    "架构"
+  ],
+  "content": "Jarvis 新增 eval_js 工具（Agent 向前端下发 JS 执行并回传结果），仅 gateway 模式生效。实现链路：\n1) 工具 src/jarvis/jarvis_tools/eval_js.py（类名必须=文件名 eval_js，registry 按 filename==class.name 自动发现），参数 code/timeout/target，非 gateway 模式返回明确错误。\n2) 后端 src/jarvis/jarvis_web_gateway/app.py：WebGateway.request_frontend_js(code, timeout, target) 用 _js_eval_waiters(call_id->Queue)+_js_eval_lock，router.publish {type:eval_js_request}，阻塞等回包、超时返回错误；submit_js_eval_result 唤醒等待者；_handle_message 新增 eval_js_result 分支。target: current/None 取第一个已授权 session，all 广播，其它视为 session_id。\n3) 前端 App.vue handleMessage 新增 eval_js_request 分支 → handleEvalJsRequest（new Function 包 async IIFE 支持 await）→ safeSerialize（DOM/函数/循环引用降级字符串，1MB 限制）→ 回发 eval_js_result。\n验证：npm run build 通过；ToolRegistry 可注册；CLI 模式报错。改前端后必须 npm run build。",
+  "created_at": "2026-09-09T16:16:24.750858",
+  "updated_at": "2026-09-09T16:16:24.750865"
+}

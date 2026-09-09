@@ -8441,9 +8441,50 @@ function handleMessage(message, agentId = null) {
     }
   } else if (type === 'file_upload_response') {
     handleFileUploadResponse(payload)
+  } else if (type === 'eval_js_request') {
+    handleEvalJsRequest(payload)
   } else if (type && type.startsWith('chat_')) {
     handleChatMessage(type, payload)
   }
+}
+
+// 处理后端下发的 JS 执行请求，执行后将结果回传
+async function handleEvalJsRequest(payload) {
+  const callId = payload?.call_id
+  const code = payload?.code
+  if (!callId) return
+  let response
+  try {
+    const fn = new Function(`return (async () => { ${code} })()`)
+    const value = await fn()
+    response = { call_id: callId, success: true, result: safeSerialize(value) }
+  } catch (e) {
+    response = { call_id: callId, success: false, error: String(e?.stack || e) }
+  }
+  if (socket.value && socket.value.readyState === WebSocket.OPEN) {
+    socket.value.send(JSON.stringify({ type: 'eval_js_result', payload: response }))
+  }
+}
+
+// 将 JS 执行结果转换为可安全传输的 JSON 结构
+function safeSerialize(value) {
+  if (value === undefined) return null
+  try {
+    const json = JSON.stringify(value)
+    if (json !== undefined) return JSON.parse(json)
+  } catch (e) {
+    // 循环引用或不可序列化，走降级逻辑
+  }
+  let text
+  if (typeof Element !== 'undefined' && value instanceof Element) {
+    text = `[Element ${value.tagName}] ${value.outerHTML.slice(0, 2000)}`
+  } else if (typeof value === 'function') {
+    text = `[Function ${value.name || 'anonymous'}]`
+  } else {
+    text = String(value)
+  }
+  if (text.length > 1048576) text = text.slice(0, 1048576) + '...[truncated]'
+  return text
 }
 
 // 聊天室消息处理
