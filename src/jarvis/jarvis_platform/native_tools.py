@@ -248,25 +248,18 @@ def to_anthropic_messages(
 _TIMER_PROPERTIES: Dict[str, Any] = {
     "after": {
         "type": "integer",
-        "description": "延迟执行：N 秒后执行本工具（与其它实参一起用，不要单独使用）",
+        "description": "延迟 N 秒后再执行本工具（与其它实参同用，勿单用）",
     },
     "at": {
         "type": "string",
-        "description": "定时执行：ISO8601 时间点执行本工具（与其它实参一起用，不要单独使用）",
+        "description": "到该 ISO8601 时间点执行本工具（与其它实参同用，勿单用）",
     },
     "loop": {
         "type": "integer",
-        "description": "循环执行：每 N 秒执行一次本工具（与其它实参一起用，不要单独使用）",
+        "description": "每 N 秒重复执行本工具（与其它实参同用，勿单用）",
     },
 }
 _TIMER_KEYS = ("after", "at", "loop")
-
-_WANT_PROPERTY: Dict[str, Any] = {
-    "want": {
-        "type": "string",
-        "description": "（意图说明，可选）用一句话向用户说明本次工具调用的目的与期望；仅用于展示调用意图，不会作为参数传给工具",
-    }
-}
 
 
 def with_timer_params(schema: Dict[str, Any]) -> Dict[str, Any]:
@@ -280,26 +273,6 @@ def with_timer_params(schema: Dict[str, Any]) -> Dict[str, Any]:
         return schema
     merged = dict(properties)
     merged.update(_TIMER_PROPERTIES)
-    out = dict(schema)
-    out["properties"] = merged
-    return out
-
-
-def with_want(schema: Dict[str, Any]) -> Dict[str, Any]:
-    """在工具参数 schema 上附加可选 intent 字段 want（若工具自身未定义同名参数）。
-
-    模型在发起工具调用时可在 arguments 中带 ``want`` 一句话说明目的，
-    供执行前打印给用户看；执行时会从实参中剥离，不传给工具。
-    """
-    if not isinstance(schema, dict):
-        return schema
-    properties = schema.get("properties")
-    if not isinstance(properties, dict):
-        return schema
-    if "want" in properties:
-        return schema
-    merged = dict(properties)
-    merged.update(_WANT_PROPERTY)
     out = dict(schema)
     out["properties"] = merged
     return out
@@ -327,7 +300,7 @@ def build_openai_tools(registry: Any) -> List[Dict[str, Any]]:
     tools = []
     for tool in registry.tools.values():
         parameters = getattr(tool, "parameters", None) or {}
-        parameters = with_want(with_timer_params(ensure_object_schema(parameters)))
+        parameters = with_timer_params(ensure_object_schema(parameters))
         tools.append(
             {
                 "type": "function",
@@ -346,7 +319,7 @@ def build_anthropic_tools(registry: Any) -> List[Dict[str, Any]]:
     tools = []
     for tool in registry.tools.values():
         parameters = getattr(tool, "parameters", None) or {}
-        parameters = with_want(with_timer_params(ensure_object_schema(parameters)))
+        parameters = with_timer_params(ensure_object_schema(parameters))
         tools.append(
             {
                 "name": tool.name,

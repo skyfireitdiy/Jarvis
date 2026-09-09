@@ -28,3 +28,50 @@ class TestAgentSystemPrompts:
         assert "规划决策要点" in prompt
         assert "## 工作方法" in prompt
         assert "## 沟通" in prompt
+
+
+def test_classify_returns_recommended_temperature(monkeypatch):
+    """分类结果里应带按任务性质推荐的温度档（low/medium/high → 0.5/0.7/1.0）"""
+
+    from jarvis.jarvis_agent.agent_prompts import classify_user_request
+    from jarvis.jarvis_platform.registry import PlatformRegistry
+
+    class _FakePlatform:
+        def __init__(self, text):
+            self._text = text
+
+        def set_suppress_output(self, value):
+            pass
+
+        def chat_until_success(self, prompt):
+            assert "temperature:" in prompt  # 分类 prompt 需请求温度档
+            return self._text
+
+    monkeypatch.setattr(
+        PlatformRegistry,
+        "get_cheap_platform",
+        lambda self: _FakePlatform(
+            "scenario: default\ndifficulty: medium\ntemperature: low"
+        ),
+    )
+    _, difficulty, temperature = classify_user_request("修复一个精确的 bug")
+    assert difficulty == "medium"
+    assert temperature == 0.5
+
+    monkeypatch.setattr(
+        PlatformRegistry,
+        "get_cheap_platform",
+        lambda self: _FakePlatform("scenario: default\ndifficulty: easy"),
+    )
+    _, _, temperature = classify_user_request("闲聊")
+    assert temperature == 0.7  # 缺省回落到均衡
+
+    monkeypatch.setattr(
+        PlatformRegistry,
+        "get_cheap_platform",
+        lambda self: _FakePlatform(
+            "scenario: default\ndifficulty: medium\ntemperature: high"
+        ),
+    )
+    _, _, temperature = classify_user_request("写一篇创意文案")
+    assert temperature == 1.0

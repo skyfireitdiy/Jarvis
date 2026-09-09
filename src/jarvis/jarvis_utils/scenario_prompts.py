@@ -187,7 +187,7 @@ def classify_user_request(
     default_scenario_name: str = "通用任务",
     classification_context: str = "场景类型",
     difficulty_descriptions: Dict[str, str] | None = None,
-) -> Tuple[str, str]:
+) -> Tuple[str, str, float]:
     """使用 normal_llm 对用户需求进行分类
 
     参数:
@@ -198,8 +198,18 @@ def classify_user_request(
         difficulty_descriptions: 难度等级描述字典
 
     返回:
-        Tuple[str, str]: (场景类型, 难度等级)
+        Tuple[str, str, float]: (场景类型, 难度等级, 推荐采样温度)
     """
+    # 任务性质 → 温度档位（只让分类模型选档，数值在代码内映射并做范围保护）。
+    # 档位依据"需要确定性还是创意"而非难度：改码/修 bug 偏 low，创意/开放偏 high。
+    temperature_descriptions = {
+        "low": "需精确、守规、结果可预期：精确修改、bug 修复、重构、严格遵循规范/规则的改动",
+        "medium": "常规多步任务、一般开发与问答（默认）",
+        "high": "需创意与发散：创意写作、文案润色、头脑风暴、开放式方案探索",
+    }
+    # 档位 → 采样温度（刻意避开过低值，避免陷入大段重复）
+    temperature_map = {"low": 0.5, "medium": 0.7, "high": 1.0}
+
     if difficulty_descriptions is None:
         difficulty_descriptions = {
             "easy": "简易问答、单步操作、明晰小务（涉代码修改者，难度至少为medium，不得评easy）",
@@ -243,7 +253,12 @@ def classify_user_request(
             for k, v in difficulty_descriptions.items()
         )
 
-        classification_prompt = f"""析用户所请，判其属何{classification_context}，并量任之难易。
+        temperature_text = "\n".join(
+            f"- {k}（{'偏精确' if k == 'low' else '均衡' if k == 'medium' else '偏创意'}）：{v}"
+            for k, v in temperature_descriptions.items()
+        )
+
+        classification_prompt = f"""析用户所请，判其属何{classification_context}，量任之难易，并择所需温度档。
 
 用户所请：
 {user_input}
@@ -254,12 +269,17 @@ def classify_user_request(
 难度等级：
 {difficulty_text}
 
-依下述格式应答（仅此两行，勿杂他辞）：
+所需温度档（依任务性质而非难度选择）：
+{temperature_text}
+
+依下述格式应答（仅此三行，勿杂他辞）：
 scenario: <场景>
 difficulty: <难度>
+temperature: <档位>
 
 若难定场景，scenario 返 default。
 若难定难度，difficulty 返 medium。
+若难定温度，temperature 返 medium。
 """
 
         response = platform.chat_until_success(classification_prompt)
@@ -267,6 +287,7 @@ difficulty: <难度>
 
         scenario = "default"
         difficulty = "medium"
+        temperature = 0.7
 
         # 获取当前场景类型列表用于验证
         current_scenario_types = _get_scenario_types(scenario_subdir)
@@ -287,18 +308,25 @@ difficulty: <难度>
                 difficulty_value = line.split(":", 1)[1].strip()
                 if difficulty_value in ["easy", "medium", "hard"]:
                     difficulty = difficulty_value
+            elif line.startswith("temperature:"):
+                temperature_value = line.split(":", 1)[1].strip()
+                if temperature_value in temperature_map:
+                    temperature = temperature_map[temperature_value]
 
         difficulty_display = {"easy": "简单", "medium": "中等", "hard": "困难"}.get(
             difficulty, difficulty
         )
-        PrettyOutput.auto_print(
-            f"📋 需求分类结果: {current_scenario_types.get(scenario, default_scenario_name)} ({scenario}) | 难度: {difficulty_display} ({difficulty})"
+        temperature_display = {0.5: "偏精确", 0.7: "均衡", 1.0: "偏创意"}.get(
+            temperature, temperature
         )
-        return scenario, difficulty
+        PrettyOutput.auto_print(
+            f"📋 需求分类结果: {current_scenario_types.get(scenario, default_scenario_name)} ({scenario}) | 难度: {difficulty_display} ({difficulty}) | 温度: {temperature_display} ({temperature})"
+        )
+        return scenario, difficulty, temperature
 
     except Exception:
         PrettyOutput.auto_print("⚠")
-        return "default", "medium"
+        return "default", "medium", 0.7
 
 
 def _front_matter_dict(

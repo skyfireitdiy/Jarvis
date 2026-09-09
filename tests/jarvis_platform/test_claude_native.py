@@ -89,3 +89,18 @@ def test_tool_round_without_new_user_message():
     # 没有额外 user 消息
     assert m.messages[-1]["role"] == "assistant"
     assert sum(1 for msg in m.messages if msg["role"] == "user") == 1
+
+
+def test_sampling_overrides_reach_stream_kwargs():
+    stream = _text_stream(
+        ["好"],
+        [_tool_use_block("tu_1", "add", {"a": 1, "b": 2})],
+        stop_reason="tool_use",
+    )
+    m = _make_model(stream)
+    m.max_tokens = 4096
+    m.temperature = 0.7
+    m.chat_native_once("算一下", ANTHROPIC_TOOLS)
+    kwargs = m.client.messages.stream.call_args.kwargs
+    assert kwargs["max_tokens"] == 4096
+    assert kwargs["temperature"] == 0.7

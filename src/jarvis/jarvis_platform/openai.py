@@ -253,6 +253,15 @@ class OpenAIModel(BasePlatform):
                     PrettyOutput.auto_print("⚠️ openai_proxy 格式错误，应为字符串")
             except Exception as e:
                 PrettyOutput.auto_print(f"⚠️ 设置 OpenAI 代理失败: {e}")
+        # 采样参数：可在 llm_config（temperature/top_p/max_tokens）中覆盖。
+        # 默认 temperature=0.7（温和、不贪心，避免过低温度导致大段重复）；
+        # top_p 默认 None 不发送（即服务端默认 1.0），避免温度+top_p 双重收窄。
+        # 任一字段为 None 表示请求时不携带。
+        self.temperature: Optional[float] = llm_config.get("temperature", 0.7)
+        self.top_p: Optional[float] = llm_config.get("top_p")
+        _mt = llm_config.get("max_tokens")
+        self.max_tokens: Optional[int] = _mt if _mt not in (None, "") else None
+
         # Initialize OpenAI client, try to pass default headers if SDK supports it
         from jarvis.jarvis_utils.config import get_request_timeout
 
@@ -474,9 +483,16 @@ class OpenAIModel(BasePlatform):
                 "model": self.model_name,
                 "messages": to_openai_messages(self.messages),
                 "stream": use_streaming,
-                "temperature": 0.1,
-                "top_p": 0.3,
             }
+            _temperature = getattr(self, "temperature", 0.7)
+            _top_p = getattr(self, "top_p", None)
+            _max_tokens = getattr(self, "max_tokens", None)
+            if _temperature is not None:
+                api_params["temperature"] = _temperature
+            if _top_p is not None:
+                api_params["top_p"] = _top_p
+            if _max_tokens is not None:
+                api_params["max_tokens"] = _max_tokens
             # 只有在配置了 reasoning_effort 时才添加 reasoning_effort 参数
             if self.reasoning_effort:
                 api_params["reasoning_effort"] = self.reasoning_effort
@@ -623,10 +639,17 @@ class OpenAIModel(BasePlatform):
             "model": self.model_name,
             "messages": to_openai_messages(self.messages),
             "stream": True,
-            "temperature": 0.1,
-            "top_p": 0.3,
             "tools": tools,
         }
+        _temperature = getattr(self, "temperature", 0.7)
+        _top_p = getattr(self, "top_p", None)
+        _max_tokens = getattr(self, "max_tokens", None)
+        if _temperature is not None:
+            api_params["temperature"] = _temperature
+        if _top_p is not None:
+            api_params["top_p"] = _top_p
+        if _max_tokens is not None:
+            api_params["max_tokens"] = _max_tokens
         if self.reasoning_effort:
             api_params["reasoning_effort"] = self.reasoning_effort
         if self.extra_body:

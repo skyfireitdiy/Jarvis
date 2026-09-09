@@ -115,6 +115,11 @@ class ClaudeModel(BasePlatform):
             self.client = _build_client()
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ Anthropic 客户端初始化失败: {e}")
+        # 采样参数：llm_config 可覆盖 max_tokens / temperature。
+        # 默认 temperature=0.7：不依赖服务端 1.0，改为温和且偏收敛的显式值，
+        # 也不像 0.x 低值那样容易在大段重复中越陷越深。设 None 则请求不携带。
+        self.max_tokens: int = llm_config.get("max_tokens", 16000)
+        self.temperature: Optional[float] = llm_config.get("temperature", 0.7)
         # 消息历史
         self.messages: List[Dict[str, Any]] = []
         self.system_message = ""
@@ -368,8 +373,11 @@ class ClaudeModel(BasePlatform):
             ] = {
                 "model": self.model_name,
                 "messages": anthropic_messages,
-                "max_tokens": 16000,
+                "max_tokens": getattr(self, "max_tokens", None) or 16000,
             }
+            _temperature = getattr(self, "temperature", 0.7)
+            if _temperature is not None:
+                stream_kwargs["temperature"] = _temperature
             if system_param:
                 stream_kwargs["system"] = system_param
 
@@ -443,9 +451,12 @@ class ClaudeModel(BasePlatform):
         stream_kwargs: Dict[str, Any] = {
             "model": self.model_name,
             "messages": anthropic_messages,
-            "max_tokens": 16000,
+            "max_tokens": getattr(self, "max_tokens", None) or 16000,
             "tools": tools,
         }
+        _temperature = getattr(self, "temperature", 0.7)
+        if _temperature is not None:
+            stream_kwargs["temperature"] = _temperature
         if system_text:
             stream_kwargs["system"] = [{"type": "text", "text": system_text}]
         proxy_headers = self._get_proxy_extra_headers()

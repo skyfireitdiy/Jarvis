@@ -24,14 +24,14 @@ SCENARIO_TYPES: Dict[str, str] = _get_scenario_types(_SCENARIO_SUBDIR)
 
 def classify_user_request(
     user_input: Union[str, List[ContentBlock]],
-) -> Tuple[str, str]:
+) -> Tuple[str, str, float]:
     """以 normal_llm 分类用户需求
 
     参数:
         user_input: 用户所请之述（纯文本或多模态皆可）
 
     返回:
-        Tuple[str, str]: (场景类型, 难度等级)
+        Tuple[str, str, float]: (场景类型, 难度等级, 推荐采样温度)
     """
     return _classify_user_request_impl(
         user_input,

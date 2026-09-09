@@ -214,7 +214,7 @@ class TestSchema:
         otools = build_openai_tools(reg)
         assert otools[0]["function"]["parameters"]["type"] == "object"
 
-    def test_want_advertised_in_schema(self):
+    def test_want_not_advertised_in_schema(self):
         reg = _FakeRegistry(
             [
                 _FakeTool(
@@ -226,9 +226,10 @@ class TestSchema:
         )
         otools = build_openai_tools(reg)
         props = otools[0]["function"]["parameters"]["properties"]
-        assert props["want"]["type"] == "string"
+        assert "want" not in props
+        assert "after" in props and "at" in props and "loop" in props
         atools = build_anthropic_tools(reg)
-        assert atools[0]["input_schema"]["properties"]["want"]["type"] == "string"
+        assert "want" not in atools[0]["input_schema"]["properties"]
 
     def test_timer_params_advertised_in_schema(self):
         reg = _FakeRegistry(

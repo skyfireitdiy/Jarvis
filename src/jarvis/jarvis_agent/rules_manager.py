@@ -26,6 +26,28 @@ from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_rules_load_dirs
 from jarvis.jarvis_utils.utils import daily_check_git_updates
 
+# 注入上下文的单条规则体上限：超过则截断并提示用 load_rule 补取完整文本。
+# 完整规则内容仍完整保留在 _loaded_rules，供 load_rule/load_all_rules 等按需读取。
+_RULE_INJECT_LIMIT = 4000
+
+
+def _limit_rule_body(rule_name: str, body: str) -> str:
+    """把过长的规则体截短为上下文友好的摘要，避免一次注入打爆窗口。
+
+    保留首部要点与结构；需要完整内容时模型可用 load_rule 读取原文。
+    """
+    if len(body) <= _RULE_INJECT_LIMIT:
+        return body
+    head = body[:_RULE_INJECT_LIMIT]
+    newline = head.rfind("\n")
+    if newline > _RULE_INJECT_LIMIT * 0.7:
+        head = body[:newline]
+    return (
+        head
+        + f"\n\n[注：规则 {rule_name} 内容较长，以上为前部摘要；"
+        "涉及具体执行细节前，请先用 `load_rule` 工具加载其完整文本]"
+    )
+
 
 class RulesManager:
     """规则管理器，负责加载和管理各种规则"""
@@ -821,6 +843,29 @@ class RulesManager:
         """
         return self._merged_rules
 
+    def get_injectable_rules_content(self) -> str:
+        """返回注入提示词用的合并规则内容（单条过长时截短为摘要）。
+
+        与 get_loaded_rules_content 的区别：此法面向"注入用户提示/会话上下文"的场景，
+        单条规则超过 _RULE_INJECT_LIMIT 时截短并提示用 load_rule 取全文，
+        避免超大技能把上下文窗口一次性打爆。API 展示等场景仍用完整内容。
+        """
+        parts = []
+        for rule_name in sorted(self.loaded_rules):
+            body = self._loaded_rules.get(rule_name)
+            if body is None:
+                continue
+            rule_path = self.get_rule_file_path(rule_name)
+            description = ""
+            if rule_path and rule_path != "--":
+                description = self._extract_rule_description(rule_path) or ""
+            body = _limit_rule_body(rule_name, body)
+            if description:
+                parts.append(f"**规则描述**: {description}\n\n{body}")
+            else:
+                parts.append(body)
+        return "\n\n".join(parts)
+
     def get_rule_status(self, name: str) -> str:
         """获取规则的状态
 
@@ -1073,6 +1118,8 @@ class RulesManager:
             Optional[List[str]]: 推荐的规则名称列表（带前缀，如 builtin:xxx.md），
                                 如果无法选择则返回 None，最多返回3个规则
         """
+        # 自动选择上限：宁可让模型中途用 load_rule 补载，也不要一次注入太多规则体
+        MAX_AUTO_RULES = 3
         try:
             # 获取所有可用规则
             all_rules_dict = self.get_all_available_rule_names()
@@ -1134,8 +1181,8 @@ class RulesManager:
 
 要求：
 一、仔细分析任务描述，选出与之匹配的规则
-二、**数量限制**：最多选 1 到 5 条，不要超过 5 条
-三、如有多个相关规则，只选最相关的 1 到 5 条，不要选太多
+二、**数量限制**：最多选 1 到 {MAX_AUTO_RULES} 条，不要超过 {MAX_AUTO_RULES} 条
+三、如有多个相关规则，只选最相关的 1 到 {MAX_AUTO_RULES} 条，不要选太多
 四、**重要**：如果没有合适规则、或规则与任务无关，可返回 "NONE" 或 "none"
 五、**任务不需要规则**：如果任务非常简单（如寒暄、简单计算、查询时间等），不需要任何规则/技能就能完成，请返回 "__NO_RULES_NEEDED__"
 六、请按下式返回序号：<NUM>序号1,序号2,序号3,序号4,序号5</NUM>
@@ -1186,8 +1233,8 @@ class RulesManager:
                 if not selected_indices:
                     return None
 
-                # 限制最多返回5个规则
-                selected_indices = selected_indices[:5]
+                # 限制最多返回 MAX_AUTO_RULES 个规则
+                selected_indices = selected_indices[:MAX_AUTO_RULES]
             except ValueError:
                 PrettyOutput.auto_print(
                     f"⚠️  模型返回的编号格式错误: {selected_index_str}"

@@ -999,18 +999,21 @@ class Agent:
         classify_fn: Callable,
         get_prompt_fn: Callable,
     ) -> None:
-        """执行需求分类、模型切换和系统提示词更新的统一流程
+        """执行需求分类、模型切换、采样温度适配和系统提示词更新的统一流程
 
         参数:
             user_input: 用户输入的需求描述
-            classify_fn: 分类函数，签名为 (user_input) -> (scenario, difficulty)
+            classify_fn: 分类函数，签名为 (user_input) -> (scenario, difficulty, temperature)
             get_prompt_fn: 获取系统提示词函数，签名为 (scenario) -> str
         """
         try:
-            scenario, difficulty = classify_fn(user_input)
+            scenario, difficulty, temperature = classify_fn(user_input)
 
-            # 根据难度切换模型
+            # 根据难度切换模型（可能重建 self.model）
             self._switch_model_by_difficulty(difficulty)
+
+            # 按任务性质调整采样温度（须在可能的重建之后应用）
+            self._apply_task_temperature(temperature)
 
             # 根据分类结果获取对应的系统提示词并更新
             scenario_system_prompt = get_prompt_fn(scenario)
@@ -1026,6 +1029,44 @@ class Agent:
                         self.model.set_system_prompt(self.system_prompt)
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 需求分类失败: {e}，使用默认配置")
+
+    def _apply_task_temperature(self, temperature: Optional[float]) -> None:
+        """按任务性质把推荐采样温度应用到当前模型（带范围保护）。
+
+        温度只改当前 Agent 自己的平台实例（registry 每次新建），不影响其它 Agent。
+        """
+        try:
+            model = getattr(self, "model", None)
+            if model is None:
+                return
+            if temperature is None:
+                return
+            # 尊重用户在 llm_config 里显式锁定的 temperature：显式配置优先于自动调整
+            try:
+                from jarvis.jarvis_utils.config import get_llm_config
+
+                pinned = get_llm_config(getattr(model, "platform_type", "normal")).get(
+                    "temperature"
+                )
+            except Exception:
+                pinned = None
+            if pinned is not None:
+                return
+            # 范围保护：拒绝明显异常的数值，避免把采样推到极端
+            try:
+                temp = float(temperature)
+            except (TypeError, ValueError):
+                return
+            temp = min(max(temp, 0.1), 1.5)
+            if not hasattr(model, "temperature"):
+                return
+            model.temperature = temp
+            PrettyOutput.auto_print(
+                f"🌡️ 按任务性质调整采样温度: {temp}"
+            )
+        except Exception:
+            # 温度调整失败不影响主流程
+            pass
 
     def _setup_system_prompt(self) -> None:
         """设置系统提示词"""
@@ -3186,8 +3227,6 @@ class Agent:
         if self._native_active():
             tool_lines = (
                 "- 需要执行操作时，直接发起工具调用；工具名与参数以当前上下文给出的工具定义为准"
-                "\n        - 每次工具调用请在 arguments 中带 `want`：用一句话说明本次调用的目的"
-                "（写给用户看，让用户明白你为何调用；纯查询也写一句用途）。want 仅作说明、不会传给工具执行"
                 "\n        - 一次可调用一个或多个互不依赖的工具；有依赖则先等前一个结果再调用下一个"
             )
             actions_line = ""
@@ -3360,7 +3399,7 @@ class Agent:
                     )
 
             # 将已加载的规则内容添加到用户输入的最前面
-            active_rules_content = self.rules_manager.get_loaded_rules_content()
+            active_rules_content = self.rules_manager.get_injectable_rules_content()
             if active_rules_content:
                 enhanced_input = (
                     f"<rules>\n{active_rules_content}\n</rules>\n\n{enhanced_input}"
@@ -3707,7 +3746,7 @@ class Agent:
         try:
             import re
 
-            content = self.rules_manager.get_loaded_rules_content()
+            content = self.rules_manager.get_injectable_rules_content()
             if not content:
                 return text
             block = f"<rules>\n{content}\n</rules>"
