@@ -1698,9 +1698,7 @@ class ToolRegistry(OutputHandlerProtocol):
         """
         if name in self.tools:
             PrettyOutput.auto_print(f"⚠️ 警告: 工具 '{name}' 已存在，将被覆盖")
-        tool = Tool(
-            name, description, parameters, func, protocol_version, interactive
-        )
+        tool = Tool(name, description, parameters, func, protocol_version, interactive)
         self.tools[name] = tool
         # 同时更新 _all_tools，确保新注册的工具可以被调用
         if hasattr(self, "_all_tools"):
@@ -1914,9 +1912,7 @@ class ToolRegistry(OutputHandlerProtocol):
                     pass
 
             platform = (
-                getattr(agent_instance, "model", None)
-                if agent_instance
-                else None
+                getattr(agent_instance, "model", None) if agent_instance else None
             )
             if not result.get("success", False):
                 _stderr = result.get("stderr", "") or ""
@@ -1940,7 +1936,7 @@ class ToolRegistry(OutputHandlerProtocol):
 
             # 内容过大时用 cheap 模型提取关键信息
             if is_context_overflow(output, platform):
-                return self._summarize_with_cheap_model(output)
+                return self._summarize_with_cheap_model(output, name)
             return output
         except Exception as e:
             PrettyOutput.auto_print(f"❌ 执行工具调用 {name} 失败：{str(e)}")
@@ -2130,6 +2126,45 @@ class ToolRegistry(OutputHandlerProtocol):
 
         return output
 
+    def _dump_tool_output(self, output: str, tool_name: str = "") -> Optional[str]:
+        """将超长工具输出完整落盘，供模型按需读取。
+
+        截断/摘要会丢弃完整内容，落盘后模型需要时可用 read_code 读取原文件。
+        目录：<当前工作目录>/.jarvis/tool_results/（随 agent 工作目录隔离，无需清理）。
+
+        参数:
+            output: 要落盘的完整输出内容
+            tool_name: 工具名称（用于文件命名）
+
+        返回:
+            Optional[str]: 落盘文件的绝对路径；落盘失败返回 None
+        """
+        try:
+            if not output:
+                return None
+            # 落盘到当前工作目录的 .jarvis/tool_results/ 下，随 agent 工作目录天然隔离
+            disk_dir = os.path.join(os.getcwd(), ".jarvis", "tool_results")
+            os.makedirs(disk_dir, exist_ok=True)
+
+            # 文件名：时间戳_工具名_序号.txt（避免同名工具同秒多次调用冲突）
+            safe_name = re.sub(r"[^\w\-]", "_", tool_name or "tool")[:40]
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            seq = 0
+            while True:
+                filepath = os.path.join(disk_dir, f"{timestamp}_{safe_name}_{seq}.txt")
+                if not os.path.exists(filepath):
+                    break
+                seq += 1
+
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(output)
+            return filepath
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_tools.registry", function="_dump_tool_output"
+            )
+            return None
+
     def _truncate_for_summary(self, output: str, max_chars: int = 120000) -> str:
         """为cheap模型总结而截断超长内容，保留首尾。
 
@@ -2151,7 +2186,7 @@ class ToolRegistry(OutputHandlerProtocol):
         )
         return truncated
 
-    def _summarize_with_cheap_model(self, output: str) -> str:
+    def _summarize_with_cheap_model(self, output: str, tool_name: str = "") -> str:
         """使用cheap模型提取超长工具输出的关键信息。
 
         当工具输出超过上下文限制时，用cheap模型总结关键信息，
@@ -2159,12 +2194,27 @@ class ToolRegistry(OutputHandlerProtocol):
         内容过长时先截断（保留首尾）再总结，防止超过cheap模型上下文。
         失败时回退到截断处理。
 
+        截断/摘要会丢弃完整内容，故先落盘完整输出，返回结果附文件路径，
+        模型需要时可用 read_code 读取完整内容。
+
         参数:
             output: 要总结的输出内容
+            tool_name: 工具名称（用于落盘文件命名）
 
         返回:
             str: 总结后的内容
         """
+        # 先落盘完整输出，供模型按需读取（截断/摘要会丢弃完整内容）
+        disk_path = self._dump_tool_output(output, tool_name)
+        disk_hint = ""
+        if disk_path:
+            disk_hint = (
+                f"\n\n<tool_output_disk>\n"
+                f"（原始输出过长{len(output)}字符，完整内容已保存至文件）\n"
+                f"完整结果文件: {disk_path}\n"
+                f"如需完整内容，请用 read_code 读取该文件。\n"
+                f"</tool_output_disk>"
+            )
         try:
             from jarvis.jarvis_platform.registry import PlatformRegistry
 
@@ -2194,7 +2244,7 @@ class ToolRegistry(OutputHandlerProtocol):
                     f"<tool_output_summary>\n"
                     f"（原始输出过长{len(output)}字符，已由cheap模型总结关键信息）\n\n"
                     f"{result}\n"
-                    f"</tool_output_summary>"
+                    f"</tool_output_summary>" + disk_hint
                 )
         except Exception as e:
             save_exception(
@@ -2207,7 +2257,7 @@ class ToolRegistry(OutputHandlerProtocol):
             )
 
         # 失败回退到截断
-        return self._truncate_output(output)
+        return self._truncate_output(output) + disk_hint
 
     def handle_tool_calls(self, tool_call: Dict[str, Any], agent: Any) -> str:
         try:
@@ -2396,7 +2446,7 @@ class ToolRegistry(OutputHandlerProtocol):
 
             if is_large_content:
                 # 使用cheap模型提取关键信息，避免超长上下文持续占用后续对话
-                return self._summarize_with_cheap_model(output)
+                return self._summarize_with_cheap_model(output, name)
 
             return output
 
