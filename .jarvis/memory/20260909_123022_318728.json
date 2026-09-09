@@ -1,0 +1,15 @@
+{
+  "id": "20260909_123022_318728",
+  "type": "project_long_term",
+  "tags": [
+    "native-tool-calling",
+    "interrupt",
+    "KeyboardInterrupt",
+    "bug-fix",
+    "_pending_native_tool_calls",
+    "_handle_run_interrupt"
+  ],
+  "content": "原生工具调用路径 Ctrl+C 中断后待调用工具清理修复：问题——原生模式下 _call_model→_invoke_model 调用 chat_native_once 流式输出，用户 Ctrl+C 时 SIGINT handler 设 g_interrupt，渲染层 stream_chat_with_panel(output.py:1552) 检测中断 break 正常返回（不抛 KeyboardInterrupt），chat_native_once 仍会把已累积的部分 tool_calls 解析返回并存入 _pending_native_tool_calls。run_loop 主循环 1127 行 _handle_run_interrupt 检测中断后，1145 行仍会执行 _execute_pending_native_calls 误执行这些用户已中断的工具。修复：在 Agent._handle_run_interrupt(__init__.py:3478 set_interrupt(False) 之后) 清理 self._pending_native_tool_calls = None，中断后丢弃待调用工具，模型下一轮基于用户补充信息重新决策。关键文件：src/jarvis/jarvis_agent/__init__.py(_handle_run_interrupt:3465)、run_loop.py(1127/1145)、openai.py chat_native_once:591、output.py stream_chat_with_panel:1552。测试：tests/jarvis_agent/test_native_interrupt_cleanup.py（用 object.__new__(Agent) 构造最小实例，mock _multiline_input 返回空走 _complete_task 分支）。",
+  "created_at": "2026-09-09T12:30:22.318751",
+  "updated_at": "2026-09-09T12:30:22.318755"
+}
