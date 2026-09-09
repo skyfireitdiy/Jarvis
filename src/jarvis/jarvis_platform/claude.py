@@ -368,7 +368,7 @@ class ClaudeModel(BasePlatform):
             ] = {
                 "model": self.model_name,
                 "messages": anthropic_messages,
-                "max_tokens": 4096,
+                "max_tokens": 16000,
             }
             if system_param:
                 stream_kwargs["system"] = system_param
@@ -443,7 +443,7 @@ class ClaudeModel(BasePlatform):
         stream_kwargs: Dict[str, Any] = {
             "model": self.model_name,
             "messages": anthropic_messages,
-            "max_tokens": 4096,
+            "max_tokens": 16000,
             "tools": tools,
         }
         if system_text:
