@@ -1,0 +1,8 @@
+{
+  "id": "20260909_002720_208619",
+  "type": "project_long_term",
+  "tags": ["jarvis", "session_manager", "会话名称", "压缩摘要", "bug_fix"],
+  "content": "修复会话名称误判：_generate_session_name（session_manager.py:59）遍历所有 user/assistant 消息拼接 conversation_text 时，会拼入 Jarvis 注入的上下文压缩摘要消息（以 [历史摘要] 开头，含代码变更统计/任务列表状态等系统元信息，且常超4000字符截断阈值挤掉真实对话），导致 LLM 误判会话主题为'代码统计'之类。修复：新增 _is_compressed_summary_msg(msg)（session_manager.py:129）识别 role=user 且 content 以 [历史摘要] 开头（含多模态文本块、容忍前导空格）的消息，在 _generate_session_name 遍历时跳过。验证：真实会话文件端到端确认 conversation_text 不再含'代码变更统计'、从真实对话开始；tests/jarvis_agent 95测试全通过。注意：压缩摘要识别标记 [历史摘要] 来自 _format_compressed_summary（__init__.py:2553，滑动窗口/预压缩路径）；另一条 _format_summary_message 路径（_handle_history_with_summary）生成的摘要不以 [历史摘要] 开头，但该路径会 reset 历史后重建，通常不残留为待命名会话首条消息。",
+  "created_at": "2026-09-09T00:27:20.208650",
+  "updated_at": "2026-09-09T00:27:20.208656"
+}

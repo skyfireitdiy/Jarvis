@@ -74,6 +74,10 @@ class SessionManager:
             for msg in messages:
                 role = msg.get("role", "")
                 content = msg.get("content", "")
+                # 跳过 Jarvis 注入的上下文压缩摘要消息（以 [历史摘要] 开头），
+                # 避免其中的系统级元信息（代码变更统计/任务列表状态等）污染会话主题判断
+                if self._is_compressed_summary_msg(msg):
+                    continue
                 # 提取用户和助手的文本内容
                 if role in ["user", "assistant"] and content:
                     if isinstance(content, str):
@@ -121,6 +125,28 @@ class SessionManager:
 
         # 所有平台都失败时返回默认名称
         return "未命名会话"
+
+    def _is_compressed_summary_msg(self, msg: Dict[str, Any]) -> bool:
+        """判断消息是否为 Jarvis 注入的上下文压缩摘要消息。
+
+        压缩摘要（滑动窗口/预压缩路径 _format_compressed_summary）以
+        "[历史摘要]" 开头，作为 user 消息插入历史，其中含代码变更统计、
+        任务列表状态等系统级元信息，不应参与会话主题判断。
+        """
+        if msg.get("role") != "user":
+            return False
+        content = msg.get("content", "")
+        if isinstance(content, str):
+            return content.lstrip().startswith("[历史摘要]")
+        if isinstance(content, list):
+            # 多模态消息：检查首个文本块是否以 [历史摘要] 开头
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    text = block.get("text", "")
+                    if isinstance(text, str) and text.lstrip().startswith("[历史摘要]"):
+                        return True
+                    break
+        return False
 
     def _iter_name_platforms(self):
         """返回用于生成会话名称的平台迭代器（cheap模型优先，回退到当前对话模型）"""
