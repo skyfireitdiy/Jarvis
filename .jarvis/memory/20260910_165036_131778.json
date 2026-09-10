@@ -1,0 +1,8 @@
+{
+  "id": "20260910_165036_131778",
+  "type": "project_long_term",
+  "tags": ["网关", "WebSocket", "协议", "app.py", "前端"],
+  "content": "Jarvis 前端 → 网关 WebSocket 消息协议（在 src/jarvis/jarvis_web_gateway/app.py 的 _handle_message 中按 message_type 分派）：\n- {type:'manual_interrupt', payload:{}} → 人工介入，等价 Ctrl+C（app.py:1040），受 ACL interact 权限拦截\n- {type:'get_status', payload:{}} → 网关回 {type:'status_update', payload:{execution_status}}（app.py:1050）\n- 其他：input_result / confirm_result / terminal_create / terminal_input / terminal_resize / sync_request\n前端统一通过 App.vue 的 sendMessageToAgent(message, agentId)（约 4486 行）发送，该函数已内含 ws 存在性与 readyState===OPEN 检查。",
+  "created_at": "2026-09-10T16:50:36.131798",
+  "updated_at": "2026-09-10T16:50:36.131803"
+}

@@ -1,0 +1,15 @@
+{
+  "id": "20260910_165036_130279",
+  "type": "project_long_term",
+  "tags": [
+    "frontend",
+    "AgentSidebar",
+    "pet",
+    "网关操作",
+    "WebSocket",
+    "App.vue"
+  ],
+  "content": "Jarvis 前端宠物挂件已从纯玩具升级为「网关操作入口」（AgentSidebar.vue + App.vue）。设计模式：子组件只 emit 语义化事件，网关调用统一在 App.vue 实现。\n\n已实现的网关操作：\n1) 宠物头顶 .pet-badge 状态徽标：petWaitingAgents/petRunningCount/petBadgeText 三个 computed 聚合，有等待输入时橙色呼吸高亮显示等待数，否则显示运行数。\n2) 单击智能分支：若有 Agent 等待输入，则跳过原有跳跃逻辑，直接 emit('petGotoWaiting') 跳转；否则走原单击逻辑。\n3) 右键菜单新增网关操作组（保留原娱乐项）：⏹中断当前 / 🚨奔赴等待 / 🔄同步状态 / 📋切换侧栏 / 📁折叠分组。\n\n新增 emits：petSyncStatus / petInterruptCurrent / petGotoWaiting / petToggleSidebar（petCollapseAll 在组件内部直接折叠 collapsedGroupsMap，不 emit）。\n\nApp.vue 对应实现（约 4910-4946 行）：\n- petSyncAllStatus()：遍历 sockets，对每个 OPEN 连接发 {type:'get_status',payload:{}}，toast 报告数量\n- petInterruptCurrent()：对 currentAgentId 发 {type:'manual_interrupt',payload:{}}（等价 Ctrl+C 人工介入）\n- petGotoWaitingAgent()：找第一个 isWaitingInput 为真的 agent，调 openAgentInPanel() 跳转\n- petToggleSidebar 直接复用已有 toggleAgentSidebar\n\n注意：manual_interrupt 受后端 ACL 的 interact 权限限制，无权限用户点击会静默失败（前端仍显示成功 toast）。",
+  "created_at": "2026-09-10T16:50:36.130311",
+  "updated_at": "2026-09-10T16:50:36.130317"
+}

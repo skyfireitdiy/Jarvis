@@ -1,0 +1,8 @@
+{
+  "id": "20260910_163350_158009",
+  "type": "project_long_term",
+  "tags": ["frontend", "vue", "AgentSidebar", "pet", "css", "scoped"],
+  "content": "Jarvis 前端宠物挂件位于 src/jarvis/jarvis_service/frontend/src/components/AgentSidebar.vue，class 统一用 pet- 前缀。关键约定：\n1) 宠物 DOM 在 <Teleport to=\"body\"> 内，通过 v-show=\"!petHidden\" 控制显隐。\n2) 动态创建并 append 到 document.body 的特效元素（.pet-fx/.pet-confetti/.pet-heart-fx/.pet-food/.pet-ball/.pet-note）不受 <style scoped> 影响，必须放在单独的非 scoped <style> 块中。\n3) 交互判定：单击延迟 300ms 判定以区分双击；长按 600ms 未移动触发摸头；拖拽开始即取消长按；长按触发后抑制后续单击/双击。\n4) 所有定时器（petClickTimer/petLongPressTimer/petSpeechTimer/petHideTimer/petActTimer）与 interval（petPettingFxTimer）必须在 onUnmounted 清理。\n5) 音效统一用已有 petTone(freq,start,dur,type,vol,slideTo) 合成，无外部资源；音效开关状态存 localStorage 'jarvis_pet_sfx'，位置存 'jarvis_pet_pos'。\n6) 状态 class 由 petClasses computed 生成：is-waiting/is-running/is-idle（Agent 状态联动）、is-hover/is-drag/is-jump/is-speak/is-sleep/is-petting，动作用 act-* 前缀。",
+  "created_at": "2026-09-10T16:33:50.158045",
+  "updated_at": "2026-09-10T16:33:50.158051"
+}
