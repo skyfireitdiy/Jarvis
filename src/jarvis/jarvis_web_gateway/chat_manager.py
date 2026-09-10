@@ -484,8 +484,10 @@ class ChatManager:
                 }
 
         # 保存消息
+        sender_user_id = self._chat_clients[sender_id].get("user_id") or sender_id
         msg = {
             "sender_id": sender_id,
+            "sender_user_id": sender_user_id,
             "sender_name": self._chat_clients[sender_id]["name"],
             "sender_display_name": self._chat_clients[sender_id].get(
                 "display_name", self._chat_clients[sender_id]["name"]
@@ -513,7 +515,11 @@ class ChatManager:
                         await info["websocket"].send_json(
                             {
                                 "type": "chat_private_message",
-                                "payload": {"session_id": session_id, "message": msg},
+                                "payload": {
+                                    "session_id": session_id,
+                                    "sender_user_id": sender_user_id,
+                                    "message": msg,
+                                },
                             }
                         )
                         sent_count += 1
