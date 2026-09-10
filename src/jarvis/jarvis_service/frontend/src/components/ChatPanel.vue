@@ -96,12 +96,12 @@
               v-for="member in roomMembers"
               :key="member.client_id"
               class="chat-client-item"
-              :class="{ active: activePrivateId === member.client_id }"
-              @click="$emit('selectPrivate', member.client_id)"
+              :class="{ active: activePrivateId === (member.user_id || member.client_id) }"
+              @click="$emit('selectPrivate', member.user_id || member.client_id)"
             >
               <span class="chat-status-dot" :class="member.online ? 'online' : 'offline'"></span>
               <span class="chat-client-name">{{ member.display_name && member.display_name !== member.name ? member.display_name + ' (' + member.name + ')' : member.name }}</span>
-              <span v-if="unreadMap['private_' + member.client_id]" class="chat-unread-badge chat-client-unread">{{ unreadMap['private_' + member.client_id] }}</span>
+              <span v-if="unreadMap['private_' + (member.user_id || member.client_id)]" class="chat-unread-badge chat-client-unread">{{ unreadMap['private_' + (member.user_id || member.client_id)] }}</span>
             </div>
           </div>
         </div>
@@ -116,12 +116,12 @@
               v-for="client in clients"
               :key="client.client_id"
               class="chat-client-item"
-              :class="{ active: activePrivateId === client.client_id }"
-              @click="$emit('selectPrivate', client.client_id)"
+              :class="{ active: activePrivateId === (client.user_id || client.client_id) }"
+              @click="$emit('selectPrivate', client.user_id || client.client_id)"
             >
               <span class="chat-status-dot online"></span>
               <span class="chat-client-name">{{ client.display_name && client.display_name !== client.name ? client.display_name + ' (' + client.name + ')' : client.name }}</span>
-              <span v-if="unreadMap['private_' + client.client_id]" class="chat-unread-badge chat-client-unread">{{ unreadMap['private_' + client.client_id] }}</span>
+              <span v-if="unreadMap['private_' + (client.user_id || client.client_id)]" class="chat-unread-badge chat-client-unread">{{ unreadMap['private_' + (client.user_id || client.client_id)] }}</span>
             </div>
             <div v-if="clients.length === 0" class="chat-empty">暂无在线用户</div>
           </div>
