@@ -4476,9 +4476,9 @@ function setPanelOutputList(panel, el) {
 function setPanelTerminalRef(panel, executionId, el, agentId) {
   if (!panel || !panel.agentId) return
   const targetAgentId = agentId || panel.agentId
-  if (!executionId || !el) return
-  const sessionKey = getExecutionSessionKey(targetAgentId, executionId)
-  terminalHosts.value.set(sessionKey, el)
+  if (!executionId) return
+  // 委托给 setTerminalRef：统一处理 xterm 的初始化/重建/清理
+  setTerminalRef(executionId, el, targetAgentId)
 }
 
 // 发送消息到指定 Agent
@@ -8946,7 +8946,24 @@ function _debouncedSaveExecHistory(executionId, targetAgentId) {
     const msg = currentOutputs.find(item => item.output_type === 'execution' && item.execution_id === executionId)
     if (msg) {
       try {
-        historyStorage.saveMessage({ ...msg })
+        // 使用与 appendOutput/appendExecution 一致的 id，确保更新同一条记录而非新增
+        historyStorage.saveMessage({
+          id: `execution_${executionId}`,
+          agent_id: targetAgentId,
+          output_type: msg.output_type,
+          text: msg.text || '',
+          lang: msg.lang || 'text',
+          agent_name: msg.agent_name,
+          non_interactive: msg.non_interactive,
+          agent_list: msg.agent_list,
+          timestamp: msg.timestamp,
+          execution_id: msg.execution_id,
+          context: msg.context,
+          is_finished: msg.is_finished || false,
+          terminal_content: msg.terminal_content || '',
+          execution_chunks: msg.execution_chunks || [],
+          seq: msg.seq,
+        })
       } catch (e) {
         // 静默失败
       }
@@ -9783,13 +9800,16 @@ function initExecutionTerminal(executionId, termInfo, el, agentId = null) {
   termInfo.terminal.loadAddon(termInfo.fitAddon)
   termInfo.fitAddon.fit()
 
-  // xterm 创建并渲染完成后，滚动外层 session 对话容器一次（自动滚动开启时）
-  // 仅当该 execution 是当前 Agent 消息列表中的最后一条（新执行刚创建）时触发，
-  // 避免切换回 Agent 重建 xterm 时干扰用户查看历史
-  const currentOutputs = allOutputs.value.get(targetAgentId) || []
-  const lastMsg = currentOutputs[currentOutputs.length - 1]
-  if (lastMsg?.output_type === 'execution' && lastMsg.execution_id === executionId && !lastMsg.is_finished) {
-    scrollSessionToBottom(targetAgentId)
+  // 该 execution 是否为当前 Agent 消息列表中的最后一条（新执行刚创建）
+  // 用于判断是否需要滚动外层 session 对话容器，避免切换回 Agent 重建 xterm 时干扰用户查看历史
+  const isLatestExecution = () => {
+    const currentOutputs = allOutputs.value.get(targetAgentId) || []
+    const lastMsg = currentOutputs[currentOutputs.length - 1]
+    return !!(
+      lastMsg?.output_type === 'execution' &&
+      lastMsg.execution_id === executionId &&
+      !lastMsg.is_finished
+    )
   }
 
   if (typeof ResizeObserver !== 'undefined') {
@@ -9818,10 +9838,17 @@ function initExecutionTerminal(executionId, termInfo, el, agentId = null) {
 
   requestAnimationFrame(() => {
     syncTerminalSize(executionId, termInfo)
+    if (isLatestExecution()) {
+      scrollSessionToBottom(targetAgentId)
+    }
   })
 
+  // xterm 首次渲染后高度才稳定，此时再滚动一次，确保新建的终端可见
   setTimeout(() => {
     syncTerminalSize(executionId, termInfo)
+    if (isLatestExecution()) {
+      scrollSessionToBottom(targetAgentId)
+    }
   }, 300)
 
   // 从消息的 execution_chunks 回放（切换回来时）
