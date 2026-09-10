@@ -133,6 +133,51 @@
     ></div>
   </aside>
 
+  <!-- 宠物挂件：浮动于页面，可拖拽并记忆位置 -->
+  <Teleport to="body">
+    <div
+      class="pet-float"
+      :class="petClasses"
+      :style="{ left: petPos.x + 'px', top: petPos.y + 'px' }"
+      aria-hidden="true"
+    >
+      <div class="pet-inner">
+        <div class="pet-glow"></div>
+        <div class="pet-bubble">需要输入</div>
+        <div class="pet-body">
+          <div class="pet-head" :style="petHeadStyle">
+            <div class="pet-ear l"></div>
+            <div class="pet-ear r"></div>
+            <div class="pet-eye l"><div class="pet-pupil" :style="petPupilStyle"></div></div>
+            <div class="pet-eye r"><div class="pet-pupil" :style="petPupilStyle"></div></div>
+            <div class="pet-mouth"></div>
+          </div>
+          <div class="pet-tail"></div>
+        </div>
+        <div class="pet-shadow"></div>
+        <div class="pet-spark s1"></div>
+        <div class="pet-spark s2"></div>
+        <div class="pet-spark s3"></div>
+        <div class="pet-label">✦ JARVIS ✦</div>
+        <button
+          class="pet-sfx-btn"
+          :class="{ 'is-off': !petSfxOn }"
+          :title="petSfxOn ? '关闭宠物音效' : '开启宠物音效'"
+          @click.stop="togglePetSfx"
+        >{{ petSfxOn ? '🔊' : '🔇' }}</button>
+        <div
+          class="pet-hit"
+          @pointerdown="onPetPointerDown"
+          @pointermove="onPetPointerMove"
+          @pointerup="onPetPointerUp"
+          @pointercancel="onPetPointerUp"
+          @mouseenter="petHover = true"
+          @mouseleave="petHover = false"
+        ></div>
+      </div>
+    </div>
+  </Teleport>
+
   <!-- 加入分组弹窗 -->
   <Teleport to="body">
     <div v-if="showGroupModal" class="group-modal-overlay" @click.self="closeGroupModal">
@@ -166,7 +211,7 @@
 </template>
 
 <script setup>
-import { ref, watch, defineProps, defineEmits, onMounted } from 'vue'
+import { ref, computed, watch, defineProps, defineEmits, onMounted, onUnmounted } from 'vue'
 
 // 分组折叠状态管理 - 使用对象存储，避免 Set 响应式问题
 const collapsedGroupsMap = ref({})
@@ -376,6 +421,287 @@ watch(() => props.currentAgentId, (newAgentId) => {
     collapsedGroupsMap.value[groupKey] = false
   }
 })
+// ==================== 宠物挂件 ====================
+const PET_POS_KEY = 'jarvis_pet_pos'
+const PET_W = 200
+const PET_H = 230
+
+const petPos = ref({ x: 0, y: 0 })
+const petHover = ref(false)
+const petDrag = ref(false)
+const petJump = ref(false)
+const petAction = ref('')
+const petPupil = ref({ x: 0, y: 0 })
+const petTilt = ref(0)
+
+// 宠物状态：waiting（有 Agent 等待输入）| running（有 Agent 运行中）| idle
+const petState = computed(() => {
+  const list = props.agentList || []
+  if (list.some(a => props.isWaitingInput && props.isWaitingInput(a))) return 'waiting'
+  const statuses = props.agentStatuses
+  if (statuses && list.some(a => {
+    const st = statuses.get(a.agent_id)
+    return st && (st.execution_status === 'running' || st.execution_status === 'executing')
+  })) return 'running'
+  return 'idle'
+})
+
+const petClasses = computed(() => [
+  'is-' + petState.value,
+  {
+    'is-hover': petHover.value,
+    'is-drag': petDrag.value,
+    'is-jump': petJump.value,
+  },
+  petAction.value ? 'act-' + petAction.value : '',
+])
+
+const petPupilStyle = computed(() => ({
+  transform: `translate(calc(-50% + ${petPupil.value.x}px), calc(-50% + ${petPupil.value.y}px))`,
+}))
+
+const petHeadStyle = computed(() => {
+  if (petHover.value || petDrag.value) return {}
+  return { transform: `translateX(-50%) rotate(${petTilt.value}deg)` }
+})
+
+function clampPetPos(x, y) {
+  const maxX = Math.max(0, window.innerWidth - PET_W)
+  const maxY = Math.max(0, window.innerHeight - PET_H)
+  return { x: Math.max(0, Math.min(maxX, x)), y: Math.max(0, Math.min(maxY, y)) }
+}
+
+function savePetPos() {
+  try {
+    localStorage.setItem(PET_POS_KEY, JSON.stringify(petPos.value))
+  } catch (e) {
+    console.warn('[AGENT_SIDEBAR] Failed to save pet position:', e)
+  }
+}
+
+function initPetPos() {
+  let saved = null
+  try {
+    saved = JSON.parse(localStorage.getItem(PET_POS_KEY) || 'null')
+  } catch (e) {
+    saved = null
+  }
+  if (saved && typeof saved.x === 'number' && typeof saved.y === 'number') {
+    petPos.value = clampPetPos(saved.x, saved.y)
+    return
+  }
+  // 默认位置：侧边栏底部居中
+  const sidebar = document.querySelector('.agent-sidebar')
+  const rect = sidebar ? sidebar.getBoundingClientRect() : { left: 0, width: 320 }
+  petPos.value = clampPetPos(
+    rect.left + (rect.width - PET_W) / 2,
+    window.innerHeight - PET_H - 8
+  )
+}
+
+let petRaf = 0
+function onPetMouseMove(e) {
+  if (petRaf) return
+  petRaf = requestAnimationFrame(() => {
+    petRaf = 0
+    const head = document.querySelector('.pet-float .pet-head')
+    if (!head) return
+    const r = head.getBoundingClientRect()
+    const cx = r.left + r.width / 2
+    const cy = r.top + r.height / 2
+    const dx = e.clientX - cx
+    const dy = e.clientY - cy
+    const d = Math.hypot(dx, dy) || 1
+    const max = 4.5
+    petPupil.value = {
+      x: (dx / d) * Math.min(max, d / 14),
+      y: (dy / d) * Math.min(max, d / 14),
+    }
+    if (!petHover.value && !petDrag.value) {
+      petTilt.value = Math.max(-6, Math.min(6, dx / 22))
+    }
+  })
+}
+
+let petDragging = false
+let petMoved = false
+let petStartX = 0
+let petStartY = 0
+let petOriginX = 0
+let petOriginY = 0
+let petLastClick = 0
+
+function onPetPointerDown(e) {
+  petDragging = true
+  petMoved = false
+  petStartX = e.clientX
+  petStartY = e.clientY
+  petOriginX = petPos.value.x
+  petOriginY = petPos.value.y
+  e.target.setPointerCapture?.(e.pointerId)
+  e.preventDefault()
+}
+
+function onPetPointerMove(e) {
+  if (!petDragging) return
+  const dx = e.clientX - petStartX
+  const dy = e.clientY - petStartY
+  if (!petMoved && Math.hypot(dx, dy) > 5) {
+    petMoved = true
+    petDrag.value = true
+  }
+  if (petMoved) {
+    petPos.value = clampPetPos(petOriginX + dx, petOriginY + dy)
+  }
+}
+
+function onPetPointerUp(e) {
+  if (!petDragging) return
+  petDragging = false
+  e.target.releasePointerCapture?.(e.pointerId)
+  if (petMoved) {
+    petDrag.value = false
+    savePetPos()
+    return
+  }
+  petDrag.value = false
+  const now = Date.now()
+  if (now - petLastClick < 280) return
+  petLastClick = now
+  petJump.value = true
+  setTimeout(() => { petJump.value = false }, 560)
+  spawnPetFx(e.clientX, e.clientY)
+  petSfxChirp()
+}
+
+function spawnPetFx(x, y) {
+  const icons = ['❤', '✨', '★', '💫', '✦']
+  for (let i = 0; i < 4; i++) {
+    const el = document.createElement('div')
+    el.className = 'pet-fx'
+    el.textContent = icons[Math.floor(Math.random() * icons.length)]
+    el.style.left = (x + (Math.random() * 36 - 18)) + 'px'
+    el.style.top = (y + (Math.random() * 14 - 7)) + 'px'
+    el.style.color = Math.random() > 0.5 ? '#7ee7ff' : '#ff8ad8'
+    el.style.setProperty('--rot', (Math.random() * 60 - 30) + 'deg')
+    el.style.animationDelay = (i * 0.06) + 's'
+    document.body.appendChild(el)
+    setTimeout(() => el.remove(), 1400)
+  }
+}
+
+// ==================== 宠物音效（Web Audio 合成，无外部资源） ====================
+const PET_SFX_KEY = 'jarvis_pet_sfx'
+const petSfxOn = ref(true)
+
+let petAudioCtx = null
+function getPetAudioCtx() {
+  if (typeof window === 'undefined') return null
+  const AC = window.AudioContext || window.webkitAudioContext
+  if (!AC) return null
+  if (!petAudioCtx) petAudioCtx = new AC()
+  if (petAudioCtx.state === 'suspended') petAudioCtx.resume()
+  return petAudioCtx
+}
+
+function petTone(freq, start, dur, type, vol, slideTo) {
+  const ctx = getPetAudioCtx()
+  if (!ctx) return
+  try {
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.type = type || 'sine'
+    const t0 = ctx.currentTime + start
+    osc.frequency.setValueAtTime(freq, t0)
+    if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur)
+    gain.gain.setValueAtTime(0.0001, t0)
+    gain.gain.exponentialRampToValueAtTime(vol || 0.08, t0 + 0.012)
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur)
+    osc.start(t0)
+    osc.stop(t0 + dur + 0.02)
+  } catch (e) {
+    // 忽略音频异常，不影响交互
+  }
+}
+
+// 点击：清脆"啾啾"
+function petSfxChirp() {
+  if (!petSfxOn.value) return
+  petTone(900, 0, 0.09, 'triangle', 0.09, 1500)
+  petTone(1500, 0.07, 0.11, 'triangle', 0.07, 2100)
+}
+
+// 随机小动作配音
+function petSfxAction(action) {
+  if (!petSfxOn.value) return
+  switch (action) {
+    case 'look':
+      petTone(1200, 0, 0.07, 'sine', 0.05, 1400)
+      break
+    case 'yawn':
+      petTone(700, 0, 0.42, 'sine', 0.06, 380)
+      break
+    case 'spin':
+      petTone(700, 0, 0.08, 'triangle', 0.06)
+      petTone(1000, 0.08, 0.08, 'triangle', 0.06)
+      petTone(1400, 0.16, 0.1, 'triangle', 0.06)
+      break
+    case 'hop':
+      petTone(600, 0, 0.12, 'sine', 0.08, 1300)
+      break
+  }
+}
+
+function togglePetSfx() {
+  petSfxOn.value = !petSfxOn.value
+  try {
+    localStorage.setItem(PET_SFX_KEY, petSfxOn.value ? '1' : '0')
+  } catch (e) {
+    // 忽略存储异常
+  }
+  if (petSfxOn.value) petSfxChirp()
+}
+
+// 随机小动作
+const PET_ACTIONS = ['look', 'yawn', 'spin', 'hop']
+let petActTimer = 0
+function schedulePetAction() {
+  petActTimer = window.setTimeout(() => {
+    if (!document.hidden && !petHover.value && !petDrag.value) {
+      const act = PET_ACTIONS[Math.floor(Math.random() * PET_ACTIONS.length)]
+      petAction.value = act
+      petSfxAction(act)
+      setTimeout(() => { petAction.value = '' }, 1700)
+    }
+    schedulePetAction()
+  }, 5000 + Math.random() * 7000)
+}
+
+function onPetResize() {
+  petPos.value = clampPetPos(petPos.value.x, petPos.value.y)
+}
+
+onMounted(() => {
+  initPetPos()
+  try {
+    petSfxOn.value = localStorage.getItem(PET_SFX_KEY) !== '0'
+  } catch (e) {
+    petSfxOn.value = true
+  }
+  document.addEventListener('mousemove', onPetMouseMove)
+  window.addEventListener('resize', onPetResize)
+  schedulePetAction()
+})
+
+onUnmounted(() => {
+  document.removeEventListener('mousemove', onPetMouseMove)
+  window.removeEventListener('resize', onPetResize)
+  clearTimeout(petActTimer)
+  if (petRaf) cancelAnimationFrame(petRaf)
+})
+
 </script>
 
 <style scoped>
@@ -493,6 +819,480 @@ watch(() => props.currentAgentId, (newAgentId) => {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+/* 宠物挂件：浮动于页面，可拖拽并记忆位置 */
+.pet-float {
+  position: fixed;
+  z-index: 900;
+  width: 200px;
+  height: 230px;
+  pointer-events: none;
+  touch-action: none;
+}
+
+.pet-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.pet-glow {
+  position: absolute;
+  left: 50%;
+  bottom: 26px;
+  width: 236px;
+  height: 52px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0.25;
+  background: radial-gradient(50% 50% at 50% 50%, rgba(32, 200, 255, 0.35) 0%, transparent 70%);
+  animation: pet-glow 2.6s ease-in-out infinite;
+}
+
+.pet-hit {
+  position: absolute;
+  left: 50%;
+  bottom: 44px;
+  width: 150px;
+  height: 130px;
+  transform: translateX(-50%);
+  cursor: grab;
+  pointer-events: auto;
+  z-index: 3;
+}
+
+.pet-float.is-drag .pet-hit {
+  cursor: grabbing;
+}
+
+.pet-body {
+  position: absolute;
+  left: 50%;
+  bottom: 52px;
+  width: 126px;
+  height: 110px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  animation: pet-bob 2.6s ease-in-out infinite;
+}
+
+.pet-head {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 95px;
+  height: 83px;
+  transform: translateX(-50%);
+  background: linear-gradient(160deg, #2ee6ff 0%, #1a9fd6 55%, #0e6f9e 100%);
+  border-radius: 50% 50% 46% 46%;
+  box-shadow: 0 0 18px rgba(32, 200, 255, 0.45), inset 0 -6px 12px rgba(0, 0, 0, 0.25),
+    inset 0 4px 8px rgba(255, 255, 255, 0.18);
+  transition: transform 0.25s ease;
+}
+
+.pet-ear {
+  position: absolute;
+  top: -18px;
+  width: 0;
+  height: 0;
+  border-left: 18px solid transparent;
+  border-right: 18px solid transparent;
+  border-bottom: 27px solid #23b9e8;
+  filter: drop-shadow(0 0 6px rgba(32, 200, 255, 0.5));
+  transition: transform 0.25s ease;
+}
+
+.pet-ear.l {
+  left: 4px;
+  transform: rotate(-18deg);
+}
+
+.pet-ear.r {
+  right: 4px;
+  transform: rotate(18deg);
+}
+
+.pet-eye {
+  position: absolute;
+  top: 31px;
+  width: 16px;
+  height: 19px;
+  border-radius: 50%;
+  background: #06131f;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.75);
+  animation: pet-blink 4.2s infinite;
+}
+
+.pet-eye.l {
+  left: 22px;
+}
+
+.pet-eye.r {
+  right: 22px;
+}
+
+.pet-pupil {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(234, 252, 255, 0.9);
+  transform: translate(-50%, -50%);
+  transition: transform 0.12s ease-out;
+}
+
+.pet-mouth {
+  position: absolute;
+  left: 50%;
+  top: 60px;
+  width: 23px;
+  height: 12px;
+  transform: translateX(-50%);
+  border-bottom: 2px solid rgba(6, 19, 31, 0.75);
+  border-radius: 0 0 8px 8px;
+  transition: all 0.2s ease;
+}
+
+.pet-tail {
+  position: absolute;
+  right: -19px;
+  bottom: 16px;
+  width: 43px;
+  height: 43px;
+  border: 3px solid #23b9e8;
+  border-color: #23b9e8 transparent transparent transparent;
+  border-radius: 50%;
+  transform-origin: 0% 100%;
+  animation: pet-tail 1.6s ease-in-out infinite;
+  filter: drop-shadow(0 0 6px rgba(32, 200, 255, 0.45));
+}
+
+.pet-shadow {
+  position: absolute;
+  left: 50%;
+  bottom: 39px;
+  width: 102px;
+  height: 18px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.35);
+  filter: blur(2px);
+  pointer-events: none;
+  animation: pet-shadow 2.6s ease-in-out infinite;
+}
+
+.pet-spark {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #7ee7ff;
+  box-shadow: 0 0 6px #7ee7ff;
+  opacity: 0;
+  pointer-events: none;
+  animation: pet-spark 3.2s ease-in-out infinite;
+}
+
+.pet-spark.s1 {
+  left: 22%;
+  bottom: 102px;
+  animation-delay: 0.2s;
+}
+
+.pet-spark.s2 {
+  left: 74%;
+  bottom: 137px;
+  animation-delay: 1.1s;
+}
+
+.pet-spark.s3 {
+  left: 50%;
+  bottom: 166px;
+  animation-delay: 2s;
+}
+
+.pet-label {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  font-size: 13px;
+  letter-spacing: 2px;
+  color: rgba(126, 231, 255, 0.55);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.pet-sfx-btn {
+  position: absolute;
+  right: 8px;
+  bottom: 4px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  line-height: 1;
+  border: none;
+  border-radius: 50%;
+  background: rgba(32, 200, 255, 0.12);
+  cursor: pointer;
+  pointer-events: auto;
+  opacity: 0.5;
+  transition: opacity 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.pet-sfx-btn:hover {
+  opacity: 1;
+  background: rgba(32, 200, 255, 0.25);
+  transform: scale(1.12);
+}
+
+.pet-sfx-btn.is-off {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+
+/* 悬停反应 */
+.pet-float.is-hover .pet-tail {
+  animation-duration: 0.7s;
+}
+
+.pet-float.is-hover .pet-eye {
+  animation-duration: 1.8s;
+}
+
+.pet-float.is-hover .pet-head {
+  transform: translateX(-50%) translateY(-6px) scale(1.04);
+}
+
+.pet-float.is-hover .pet-mouth {
+  width: 28px;
+  border-bottom-width: 3px;
+}
+
+/* 拖拽反馈 */
+.pet-float.is-drag .pet-body {
+  animation-play-state: paused;
+}
+
+.pet-float.is-drag .pet-head {
+  transform: translateX(-50%) scale(1.06);
+}
+
+.pet-float.is-drag .pet-shadow {
+  transform: translateX(-50%) scale(0.6);
+  opacity: 0.15;
+}
+
+.pet-float.is-drag .pet-tail {
+  animation-duration: 0.5s;
+}
+
+/* 点击反馈 */
+.pet-float.is-jump .pet-body {
+  animation: pet-jump 0.55s cubic-bezier(0.3, -0.4, 0.4, 1.4);
+}
+
+/* 状态联动 */
+.pet-float.is-run .pet-body {
+  animation-duration: 1.8s;
+}
+
+.pet-float.is-run .pet-tail {
+  animation-duration: 1.1s;
+}
+
+.pet-float.is-idle .pet-body {
+  animation-duration: 3.6s;
+}
+
+.pet-float.is-idle .pet-tail {
+  animation-duration: 2.4s;
+}
+
+.pet-float.is-idle .pet-eye {
+  animation-duration: 6.5s;
+}
+
+.pet-float.is-waiting .pet-body {
+  animation-duration: 1.4s;
+}
+
+/* 等待输入提示气泡 */
+.pet-bubble {
+  position: absolute;
+  left: 50%;
+  top: 6px;
+  transform: translateX(-50%) scale(0.6);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #06131f;
+  background: linear-gradient(135deg, #7ee7ff, #20c8ff);
+  box-shadow: 0 0 14px rgba(32, 200, 255, 0.6);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.pet-float.is-waiting .pet-bubble {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+  animation: pet-bubble-bounce 1s ease-in-out infinite;
+}
+
+/* 随机小动作 */
+.pet-float.act-look .pet-head {
+  animation: pet-look 1.6s ease-in-out;
+}
+
+.pet-float.act-yawn .pet-mouth {
+  animation: pet-yawn 1.6s ease-in-out;
+}
+
+.pet-float.act-spin .pet-body {
+  animation: pet-spin 1.4s ease-in-out;
+}
+
+.pet-float.act-hop .pet-body {
+  animation: pet-jump 0.6s cubic-bezier(0.3, -0.4, 0.4, 1.4);
+}
+
+@keyframes pet-bob {
+  0%,
+  100% {
+    transform: translateX(-50%) translateY(0);
+  }
+  50% {
+    transform: translateX(-50%) translateY(-13px);
+  }
+}
+
+@keyframes pet-shadow {
+  0%,
+  100% {
+    transform: translateX(-50%) scale(1);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translateX(-50%) scale(0.82);
+    opacity: 0.2;
+  }
+}
+
+@keyframes pet-tail {
+  0%,
+  100% {
+    transform: rotate(-8deg);
+  }
+  50% {
+    transform: rotate(14deg);
+  }
+}
+
+@keyframes pet-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  96% {
+    transform: scaleY(0.1);
+  }
+}
+
+@keyframes pet-glow {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes pet-spark {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translateY(0) scale(0.6);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-10px) scale(1);
+  }
+}
+
+@keyframes pet-jump {
+  0% {
+    transform: translateX(-50%) translateY(0) scale(1, 1);
+  }
+  30% {
+    transform: translateX(-50%) translateY(-26px) scale(0.94, 1.08);
+  }
+  60% {
+    transform: translateX(-50%) translateY(0) scale(1.06, 0.94);
+  }
+  100% {
+    transform: translateX(-50%) translateY(0) scale(1, 1);
+  }
+}
+
+@keyframes pet-look {
+  0%,
+  100% {
+    transform: translateX(-50%) rotate(0deg);
+  }
+  25% {
+    transform: translateX(-50%) rotate(-7deg);
+  }
+  75% {
+    transform: translateX(-50%) rotate(7deg);
+  }
+}
+
+@keyframes pet-yawn {
+  0%,
+  100% {
+    height: 12px;
+    width: 23px;
+  }
+  50% {
+    height: 22px;
+    width: 30px;
+    border-bottom-width: 4px;
+  }
+}
+
+@keyframes pet-spin {
+  0% {
+    transform: translateX(-50%) rotate(0deg) scale(1);
+  }
+  50% {
+    transform: translateX(-50%) rotate(180deg) scale(0.92);
+  }
+  100% {
+    transform: translateX(-50%) rotate(360deg) scale(1);
+  }
+}
+
+@keyframes pet-bubble-bounce {
+  0%,
+  100% {
+    transform: translateX(-50%) scale(1) translateY(0);
+  }
+  50% {
+    transform: translateX(-50%) scale(1.06) translateY(-4px);
+  }
 }
 
 .hello-user-banner {

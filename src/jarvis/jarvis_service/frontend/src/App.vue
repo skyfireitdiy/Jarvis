@@ -66,7 +66,7 @@
         </div>
         
         <div class="header-title">
-          <img src="/icons/jarvis-logo.png" alt="Jarvis" class="header-logo" />
+          <img src="/icons/jarvis-pet.svg" alt="Jarvis" class="header-logo" />
           <span class="header-brand">JARVIS</span>
           <div class="status mobile-only">
             <span :class="['dot', connectionStatus]"></span>
@@ -11847,7 +11847,7 @@ function sendSystemNotification(message) {
   if (Notification.permission === 'granted') {
     new Notification('Jarvis', {
       body: message,
-      icon: '/icons/jarvis-logo.png'
+      icon: '/icons/jarvis-pet.svg'
     })
   }
   // 如果还没有拒绝且尚未请求过权限，请求权限
@@ -11857,7 +11857,7 @@ function sendSystemNotification(message) {
       if (permission === 'granted') {
         new Notification('Jarvis', {
           body: message,
-          icon: '/icons/jarvis-logo.png'
+          icon: '/icons/jarvis-pet.svg'
         })
       }
     })

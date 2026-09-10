@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="petHeadGrad" x1="0" y1="0" x2="0.6" y2="1">
+      <stop offset="0%" stop-color="#2ee6ff"/>
+      <stop offset="55%" stop-color="#1a9fd6"/>
+      <stop offset="100%" stop-color="#0e6f9e"/>
+    </linearGradient>
+    <radialGradient id="petGlowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#20c8ff" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#20c8ff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="32" cy="34" r="30" fill="url(#petGlowGrad)"/>
+  <path d="M14 16 L20 6 L26 17 Z" fill="#23b9e8"/>
+  <path d="M50 16 L44 6 L38 17 Z" fill="#23b9e8"/>
+  <path d="M32 10 C46 10 54 20 54 32 C54 45 44 54 32 54 C20 54 10 45 10 32 C10 20 18 10 32 10 Z"
+        fill="url(#petHeadGrad)" stroke="#7ee7ff" stroke-opacity="0.5" stroke-width="1.2"/>
+  <ellipse cx="23" cy="30" rx="4.2" ry="5.2" fill="#06131f"/>
+  <ellipse cx="41" cy="30" rx="4.2" ry="5.2" fill="#06131f"/>
+  <circle cx="24.4" cy="28.2" r="1.5" fill="#eafcff" fill-opacity="0.9"/>
+  <circle cx="42.4" cy="28.2" r="1.5" fill="#eafcff" fill-opacity="0.9"/>
+  <path d="M28 41 Q32 45 36 41" fill="none" stroke="#06131f" stroke-opacity="0.8" stroke-width="2" stroke-linecap="round"/>
+  <ellipse cx="16.5" cy="38" rx="3.4" ry="2.2" fill="#ff5cc8" fill-opacity="0.35"/>
+  <ellipse cx="47.5" cy="38" rx="3.4" ry="2.2" fill="#ff5cc8" fill-opacity="0.35"/>
+</svg>
