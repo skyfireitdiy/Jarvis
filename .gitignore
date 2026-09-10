@@ -171,3 +171,6 @@ test
 
 # A/B harness 输出
 .ab_harness_out/
+.swn
+.swm
+.swl
