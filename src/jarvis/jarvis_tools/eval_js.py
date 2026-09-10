@@ -30,7 +30,13 @@ class eval_js:
 **限制**：
 - 仅在 Web 网关模式下可用
 - 默认超时 30 秒，结果大小限制 1MB
-- 返回值需可序列化（DOM/函数/循环引用会降级为字符串）"""
+- 返回值需可序列化（DOM/函数/循环引用会降级为字符串）
+
+**target 取值**：
+- `current`（默认）：当前活跃前端
+- 具体 `client_id`：精确投递到某一个前端连接（可用 gateway_manager 的 list_sessions 获取）
+- 具体 `session_id`：投递到该会话下的所有前端连接
+- `all`：广播到所有前端"""
 
     parameters = {
         "type": "object",
@@ -47,7 +53,8 @@ class eval_js:
                 "type": "string",
                 "description": (
                     "目标前端：默认 current（当前活跃前端）；"
-                    "也可指定具体 session_id 或 all（广播到所有前端）"
+                    "也可指定具体 client_id（精确投递到某一个前端连接）、"
+                    "具体 session_id，或 all（广播到所有前端）"
                 ),
             },
         },
@@ -84,9 +91,7 @@ class eval_js:
                     "stderr": "eval_js 仅在 Web 网关模式下可用",
                 }
 
-            result = request_frontend_js(
-                str(code), timeout=timeout, target=str(target)
-            )
+            result = request_frontend_js(str(code), timeout=timeout, target=str(target))
 
             if not isinstance(result, dict):
                 return {
