@@ -8225,9 +8225,11 @@ function handleMessage(message, agentId = null) {
       request_id: payload.request_id
     })
 
-    // 自动朗读：以 input_request 为准确触发信号（每次真正请求输入都会到达）
-    // 若该 Agent 已有待处理请求（如重连恢复时重复推送），则跳过避免重复朗读
+    // 提示音：以 input_request 为准确触发信号（每次真正请求输入都会到达）
+    // 若该 Agent 已有待处理请求（如重连恢复时重复推送），则跳过避免重复播放
     if (!hadPendingRequest) {
+      notifyInputRequest()
+      // 自动朗读：以 input_request 为准确触发信号（每次真正请求输入都会到达）
       handleAutoRead(targetAgentId, payload.mode === 'multi' ? 'waiting_multi' : 'waiting_single')
     }
     
@@ -8276,6 +8278,8 @@ function handleMessage(message, agentId = null) {
       }
     })
   } else if (type === 'confirm') {
+    // 确认请求同样视为需要输入，无条件播放提示音
+    notifyInputRequest()
 
     pendingConfirmAgentId.value = targetAgentId
     // 更新 Agent 状态为 waiting_confirm
@@ -11744,6 +11748,11 @@ function playNotificationSound() {
   } catch (e) {
     return Promise.resolve()
   }
+}
+
+// 收到输入请求时播放提示音（不受自动朗读开关限制，任何情况下都播放）
+function notifyInputRequest() {
+  playNotificationSound()
 }
 
 // ---- 自动朗读（浏览器内置 SpeechSynthesis） ----
