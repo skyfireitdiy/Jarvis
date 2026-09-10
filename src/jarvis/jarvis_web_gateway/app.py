@@ -2029,6 +2029,12 @@ def create_app(
         clients = manager._chat_manager.get_clients()
         return {"success": True, "clients": clients}
 
+    @app.get("/api/chat/sessions", dependencies=[Depends(verify_token)])
+    async def api_chat_get_sessions(request: Request) -> Dict[str, Any]:
+        """获取所有活跃会话列表（每个连接一条，含对应用户信息）。"""
+        sessions = manager._chat_manager.get_sessions()
+        return {"success": True, "sessions": sessions}
+
     @app.get("/api/chat/room-members", dependencies=[Depends(verify_token)])
     async def api_chat_get_room_members(request: Request) -> Dict[str, Any]:
         """获取聊天室成员列表。"""
