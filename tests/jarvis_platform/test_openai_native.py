@@ -59,25 +59,16 @@ def test_multiple_parallel_tool_calls():
 def test_malformed_arguments_not_crash():
     stream = [_chunk(tool_calls=[_tool_call(0, "id", "t", "{not json}")])]
     content, calls = _accumulate_openai_stream(stream)
-    assert calls[0]["arguments"].get("raw_arguments") == "{not json}"
+    # 非法 JSON 不再包装为 raw_arguments，而是传空参数由工具层报缺失
+    assert calls[0]["arguments"] == {}
 
 
-def test_raw_arguments_wrapped_unwrapped():
-    # 模型把真正的参数包在 raw_arguments 字段里（字符串），应展开为顶级参数
+def test_raw_arguments_not_special_cased():
+    # raw_arguments 不再被特殊处理：它就是普通参数名，原样透传
     import json
 
     inner = json.dumps({"files": [{"file_path": "a.py"}]})
     wrapped = json.dumps({"raw_arguments": inner})
     stream = [_chunk(tool_calls=[_tool_call(0, "id", "edit_file", wrapped)])]
     content, calls = _accumulate_openai_stream(stream)
-    assert calls[0]["arguments"] == {"files": [{"file_path": "a.py"}]}
-
-
-def test_raw_arguments_dict_value_unwrapped():
-    # raw_arguments 值为 dict 时也应展开
-    import json
-
-    wrapped = json.dumps({"raw_arguments": {"files": [{"file_path": "a.py"}]}})
-    stream = [_chunk(tool_calls=[_tool_call(0, "id", "edit_file", wrapped)])]
-    content, calls = _accumulate_openai_stream(stream)
-    assert calls[0]["arguments"] == {"files": [{"file_path": "a.py"}]}
+    assert calls[0]["arguments"] == {"raw_arguments": inner}

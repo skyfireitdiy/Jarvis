@@ -25,32 +25,6 @@ import jarvis.jarvis_utils.globals as jglobals
 logger = logging.getLogger(__name__)
 
 
-def _unwrap_raw_arguments(args: Any) -> Any:
-    """兼容模型把参数包在 raw_arguments 字段里的情况。
-
-    部分模型（如 deepseek 等 openai 兼容模型）在 tool_calls 里返回
-    {"raw_arguments": "<真正的参数JSON字符串>"} 而非直接返回顶级参数。
-    若解析后的 arguments 顶层含 raw_arguments 键，则尝试把其值解析为真正的参数。
-    """
-    if not isinstance(args, dict) or "raw_arguments" not in args:
-        return args
-    raw = args.get("raw_arguments")
-    parsed = None
-    if isinstance(raw, str):
-        try:
-            parsed = json.loads(raw) if raw.strip() else {}
-        except Exception:
-            parsed = None
-    elif isinstance(raw, dict):
-        parsed = raw
-    if not isinstance(parsed, dict):
-        # 无法解析则保留原样（含 raw_arguments），交给工具层报错
-        return args
-    # raw_arguments 解析出的参数为基底，其余显式键覆盖/补充
-    rest = {k: v for k, v in args.items() if k != "raw_arguments"}
-    return {**parsed, **rest}
-
-
 def _accumulate_openai_stream(
     stream: Any,
 ) -> Tuple[Optional[str], Optional[List[Dict[str, Any]]]]:
@@ -92,9 +66,8 @@ def _accumulate_openai_stream(
         try:
             args = json.loads(raw_args) if raw_args.strip() else {}
         except Exception:
-            args = {"raw_arguments": raw_args}
-        # 兼容模型把参数包在 raw_arguments 字段里的情况
-        args = _unwrap_raw_arguments(args)
+            # 参数不是合法 JSON（截断/夹带文本等），传空参数由工具层报缺失
+            args = {}
         tool_calls.append(
             {"id": e.get("id", ""), "name": e.get("name", ""), "arguments": args}
         )
@@ -631,9 +604,7 @@ class OpenAIModel(BasePlatform):
         # 追加用户消息（工具后续轮 append_user=False，避免重复加空消息）
         # 同时清理孤立代理字符，避免 httpx 编码请求体时抛 UnicodeEncodeError
         if append_user and message:
-            self.messages.append(
-                sanitize_message({"role": "user", "content": message})
-            )
+            self.messages.append(sanitize_message({"role": "user", "content": message}))
         next_key = self._get_next_api_key()
         if next_key:
             self.api_key = next_key
@@ -735,9 +706,8 @@ class OpenAIModel(BasePlatform):
                     try:
                         args = json.loads(raw_args) if raw_args.strip() else {}
                     except Exception:
-                        args = {"raw_arguments": raw_args}
-                    # 兼容模型把参数包在 raw_arguments 字段里的情况
-                    args = _unwrap_raw_arguments(args)
+                        # 参数不是合法 JSON（截断/夹带文本等），传空参数由工具层报缺失
+                        args = {}
                     tool_calls.append(
                         {
                             "id": e.get("id", ""),
