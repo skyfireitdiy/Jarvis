@@ -56,7 +56,7 @@ class GatewayManagerTool:
 - 节点/网关：list_nodes 节点信息；list_model_groups 模型组列表；list_directory 目录浏览；update_nodes_code 更新所有节点代码；restart_nodes 一键重启节点服务
 - 定时任务：create_timer / list_timers / get_timer / delete_timer
 - 群组：create_group / list_groups / get_group / join_group / leave_group / send_group_message
-- 聊天：chat_list_rooms / chat_get_online_clients / chat_get_room_members / chat_send_room_message / chat_send_private_message（消息会自动加 [Agent名字] 前缀，并以 owner 身份发送）
+- 聊天：chat_list_rooms / chat_get_online_clients / list_sessions / chat_get_room_members / chat_send_room_message / chat_send_private_message（消息会自动加 [Agent名字] 前缀，并以 owner 身份发送）；list_sessions 返回每个活跃连接（会话）及其对应用户
 
 多数操作需要指定目标节点/Agent；具体字段与取值以 operation 参数说明为准。"""
 
