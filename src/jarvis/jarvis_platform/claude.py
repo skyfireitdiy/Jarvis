@@ -13,7 +13,7 @@ from anthropic.types import MessageParam
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.content_types import ContentBlock
-from jarvis.jarvis_platform.native_tools import to_anthropic_messages
+from jarvis.jarvis_platform.native_tools import sanitize_message, to_anthropic_messages
 from jarvis.jarvis_utils.output import PrettyOutput
 import jarvis.jarvis_utils.globals as jglobals
 
@@ -346,7 +346,9 @@ class ClaudeModel(BasePlatform):
                         # 未知类型，忽略或报错
                         pass
 
-            anthropic_messages.append({"role": "user", "content": user_message_content})
+            anthropic_messages.append(
+                sanitize_message({"role": "user", "content": user_message_content})
+            )
 
             # 累计完整响应
             accumulated_response = ""
@@ -396,7 +398,9 @@ class ClaudeModel(BasePlatform):
             if accumulated_response:
                 # 将多模态消息转换为字符串表示形式存储在历史中
                 user_content = message if isinstance(message, str) else "[多模态消息]"
-                self.messages.append({"role": "user", "content": user_content})
+                self.messages.append(
+                    sanitize_message({"role": "user", "content": user_content})
+                )
                 self.messages.append(
                     {"role": "assistant", "content": accumulated_response}
                 )
@@ -441,12 +445,17 @@ class ClaudeModel(BasePlatform):
             self.client.api_key = next_key
 
         # 追加用户消息（工具后续轮 append_user=False，避免重复加空消息）
+        # 同时清理孤立代理字符，避免 SDK 编码请求体时抛 UnicodeEncodeError
         if append_user and message:
-            self.messages.append({"role": "user", "content": message})
+            self.messages.append(
+                sanitize_message({"role": "user", "content": message})
+            )
 
         system_text, anthropic_messages = to_anthropic_messages(self.messages)
         if append_user and message:
-            anthropic_messages.append({"role": "user", "content": message})
+            anthropic_messages.append(
+                sanitize_message({"role": "user", "content": message})
+            )
 
         stream_kwargs: Dict[str, Any] = {
             "model": self.model_name,
@@ -505,10 +514,6 @@ class ClaudeModel(BasePlatform):
                         content, _reasoning, _ft = self._chat_with_simple_output(
                             render_message, start_time, chat_iterator=gen
                         )
-                    # 与文本协议 _chat 对齐：打印模型响应统计信息
-                    self._print_response_stats(
-                        content or "", _reasoning or "", _ft, start_time
-                    )
                 else:
                     content, _reasoning = self._chat_with_suppressed_output(
                         render_message, chat_iterator=gen
@@ -555,6 +560,15 @@ class ClaudeModel(BasePlatform):
                 if tool_calls:
                     assistant_msg["tool_calls"] = tool_calls
                 self.messages.append(assistant_msg)
+                # 与文本协议 _chat 对齐：打印模型响应统计信息（含工具调用 token）
+                if not self.suppress_output:
+                    self._print_response_stats(
+                        content or "",
+                        _reasoning or "",
+                        _ft,
+                        start_time,
+                        tool_calls=tool_calls or None,
+                    )
                 return (content or None), (tool_calls or None)
             except Exception as e:
                 PrettyOutput.auto_print(

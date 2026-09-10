@@ -14,6 +14,58 @@ import json
 from typing import Any, Dict, List, Optional
 
 
+def _sanitize_surrogates(text: str) -> str:
+    """把孤立 UTF-16 代理字符替换为 U+FFFD，保证文本可被 UTF-8 编码。
+
+    背景：消息历史中可能混入孤立代理字符（U+D800-U+DFFF 单独出现，属非法
+    Unicode）。常见来源：
+    - 以 ``errors="surrogateescape"`` 解码非法字节（Python 文件系统编码默认
+      即为 ``utf-8/surrogateescape``）；
+    - 前端 JS ``JSON.stringify`` 把孤立代理转义为 ``\\udXXX``，经 Python
+      ``json.loads`` 还原为真正的代理字符。
+
+    ``json.dumps`` 能正常处理这类字符，但发送请求时 httpx 会执行
+    ``json_dumps(..., ensure_ascii=False).encode("utf-8")``，此时抛
+    ``UnicodeEncodeError: surrogates not allowed``，导致原生工具调用失败并
+    降级为纯文本协议。故在序列化出口统一清理。
+
+    注意：Python 中合法的 BMP 外字符（如 ``😀`` U+1F600）是单个码点，不落在
+    代理区，天然不受影响，会被原样保留。
+    """
+    if not text:
+        return text
+    # 快速路径：绝大多数文本不含代理字符，避免逐字符扫描开销
+    if not any(0xD800 <= ord(ch) <= 0xDFFF for ch in text):
+        return text
+    return "".join(
+        "\ufffd" if 0xD800 <= ord(ch) <= 0xDFFF else ch for ch in text
+    )
+
+
+def _sanitize_value(value: Any) -> Any:
+    """递归清理任意嵌套结构中的孤立代理字符，返回新对象（不修改入参）。"""
+    if isinstance(value, str):
+        return _sanitize_surrogates(value)
+    if isinstance(value, dict):
+        return {k: _sanitize_value(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_sanitize_value(v) for v in value]
+    if isinstance(value, tuple):
+        return tuple(_sanitize_value(v) for v in value)
+    return value
+
+
+def sanitize_message(msg: Dict[str, Any]) -> Dict[str, Any]:
+    """清理一条规范消息中所有字符串字段的孤立代理字符。
+
+    覆盖 content、tool_calls 的 name/arguments、tool_call_id、name 等字段，
+    返回新对象，不原地修改入参。
+    """
+    if not isinstance(msg, dict):
+        return msg
+    return {k: _sanitize_value(v) for k, v in msg.items()}
+
+
 def make_tool_call_msg(
     content: Optional[str], tool_calls: List[Dict[str, Any]]
 ) -> Dict[str, Any]:
@@ -192,7 +244,12 @@ def to_openai_message(msg: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def to_openai_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    return [to_openai_message(m) for m in ensure_tool_pairing(messages)]
+    # 出口统一清理孤立代理字符，避免 httpx 以 UTF-8 编码请求体时抛
+    # UnicodeEncodeError（详见 _sanitize_surrogates 说明）。
+    return [
+        to_openai_message(sanitize_message(m))
+        for m in ensure_tool_pairing(messages)
+    ]
 
 
 def to_anthropic_messages(
@@ -203,6 +260,9 @@ def to_anthropic_messages(
     - system 消息拼接为顶层 system 文本；
     - assistant 工具调用转成 content 块（text + tool_use）；
     - 连续的 role=tool 结果合并进紧随其后的 user 消息的 tool_result 内容块。
+
+    出口统一清理孤立代理字符，避免 Anthropic SDK 以 UTF-8 编码请求体时抛
+    UnicodeEncodeError（详见 _sanitize_surrogates 说明）。
     """
     system_parts: List[str] = []
     out: List[Dict[str, Any]] = []
@@ -224,7 +284,8 @@ def to_anthropic_messages(
         # 因此总是新开一条仅含 tool_result 的 user 消息（Anthropic 允许）。
         out.append({"role": "user", "content": blocks})
 
-    for msg in ensure_tool_pairing(messages):
+    for raw_msg in ensure_tool_pairing(messages):
+        msg = sanitize_message(raw_msg)
         role = msg.get("role")
         if role == "system":
             system_parts.append(msg_content_text(msg))

@@ -40,6 +40,7 @@ from jarvis.jarvis_utils.globals import set_in_chat
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ct
 from jarvis.jarvis_utils.tag import ot
+from jarvis.jarvis_utils.utils import atomic_write_json
 from jarvis.jarvis_utils.utils import while_success
 from jarvis.jarvis_utils.utils import while_true
 from jarvis.jarvis_platform.content_types import ContentBlock
@@ -264,16 +265,31 @@ class BasePlatform(ABC):
         reasoning_content: str,
         first_token_time: float,
         start_time: float,
+        tool_calls: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
-        """打印模型响应统计信息（与 _chat 对齐，供原生工具路径复用）。"""
+        """打印模型响应统计信息（与 _chat 对齐，供原生工具路径复用）。
+
+        tool_calls: 原生工具调用列表；其序列化后的 token 也计入输出 token 与速度，
+        避免模型仅返回工具调用（无文本 content）时速度/Token 统计为 0。
+        """
         import time
 
         end_time = time.time()
         duration = end_time - start_time
 
-        # 计算性能指标
-        response_tokens = get_context_token_count(response) + get_context_token_count(
-            reasoning_content
+        # 工具调用序列化文本（用于 token 统计）
+        tool_calls_text = ""
+        if tool_calls:
+            try:
+                tool_calls_text = json.dumps(tool_calls, ensure_ascii=False)
+            except Exception:
+                tool_calls_text = str(tool_calls)
+
+        # 计算性能指标（含工具调用部分）
+        response_tokens = (
+            get_context_token_count(response)
+            + get_context_token_count(reasoning_content)
+            + get_context_token_count(tool_calls_text)
         )
         generation_time = max(
             0.0,
@@ -286,14 +302,15 @@ class BasePlatform(ABC):
         # 获取Token使用信息
         try:
             usage_percent, percent_color, progress_bar = self._get_token_usage_info(
-                response
+                response + tool_calls_text
             )
             threshold = get_conversation_turn_threshold()
-            # 计算当前使用的token数和总token数
+            # 计算当前使用的token数和总token数（含工具调用部分）
             used_tokens = (
                 self.get_used_token_count()
                 + get_context_token_count(response)
                 + get_context_token_count(reasoning_content)
+                + get_context_token_count(tool_calls_text)
             )
             max_tokens = self._get_platform_max_input_token_count()
             PrettyOutput.auto_print(
@@ -609,14 +626,11 @@ class BasePlatform(ABC):
         返回:
             如果保存成功返回True，否则返回False。
         """
-        import json
-
         state = {
             "messages": self.get_messages(),
         }
         try:
-            with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(state, f, ensure_ascii=False, indent=4)
+            atomic_write_json(file_path, state, indent=4, ensure_ascii=False)
             self._saved = True
             from jarvis.jarvis_utils.output import PrettyOutput
 

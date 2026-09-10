@@ -1,5 +1,5 @@
 <template>
-  <div class="app">
+  <div class="app" :class="{ 'not-connected': showConnectModal }">
 <!-- Agent 侧边栏 -->
     <AgentSidebar
       :visible="showAgentSidebar"
@@ -11921,6 +11921,12 @@ body::-webkit-scrollbar {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
+}
+
+/* 未登录时隐藏后台界面，仅保留登录弹窗与背景 */
+.app.not-connected :deep(.agent-sidebar),
+.app.not-connected > .main-content-wrapper {
+  visibility: hidden;
 }
 
 /* 主内容区 */

@@ -2208,6 +2208,100 @@ def daily_check_git_updates(repo_dirs: List[str], repo_type: str) -> None:
             PrettyOutput.auto_print(f"⚠️ 无法写入git更新检查时间戳: {e}")
 
 
+def atomic_write_json(
+    file_path: Union[str, Path],
+    data: Any,
+    *,
+    indent: Optional[int] = None,
+    ensure_ascii: bool = False,
+    default: Optional[Callable[[Any], Any]] = None,
+) -> None:
+    """原子地写入 JSON 文件，避免进程中断留下截断的无效 JSON。
+
+    直接 ``open(path, "w") + json.dump`` 是流式写入：若进程在写入过程中被
+    中断（Ctrl+C、被 kill、崩溃），目标文件会停留在“写了一半”的状态，
+    下次读取时抛 ``JSONDecodeError: Expecting value``，导致会话无法恢复。
+
+    本函数先写入同目录下的临时文件，flush + fsync 后再用 ``os.replace``
+    原子替换目标文件。这样任何时刻目标文件要么是旧的完整内容，要么是新的
+    完整内容，不会出现截断。
+
+    参数:
+        file_path: 目标文件路径
+        data: 要序列化的对象
+        indent: 缩进（None 表示紧凑输出）
+        ensure_ascii: 是否转义非 ASCII 字符
+        default: 不可序列化对象的转换函数
+    """
+    import tempfile
+
+    path = Path(file_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    # 临时文件必须与目标文件同目录，否则 os.replace 可能跨设备失败
+    fd, tmp_path = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent)
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(
+                data,
+                f,
+                ensure_ascii=ensure_ascii,
+                indent=indent,
+                default=default,
+            )
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, path)
+    except BaseException:
+        # 任何异常（含 KeyboardInterrupt）都要清理临时文件，避免残留
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+def cleanup_stale_tmp_files(
+    directory: Union[str, Path], max_age_seconds: float = 3600
+) -> int:
+    """清理目录下由 :func:`atomic_write_json` 遗留的临时文件。
+
+    正常情况下临时文件会被删除或 rename；但进程被 SIGKILL 时无法执行清理，
+    会残留 ``.<name>.<random>.tmp``。这些残留文件不影响数据正确性（目标文件
+    始终完整），但会污染目录，故提供本函数供启动时清理。
+
+    参数:
+        directory: 要清理的目录
+        max_age_seconds: 只清理修改时间早于该秒数的文件，避免误删正在写入的临时文件
+
+    返回:
+        int: 实际删除的文件数
+    """
+    import time
+
+    removed = 0
+    try:
+        entries = os.listdir(directory)
+    except OSError:
+        return 0
+
+    now = time.time()
+    for name in entries:
+        if not (name.startswith(".") and name.endswith(".tmp")):
+            continue
+        full = os.path.join(str(directory), name)
+        try:
+            if now - os.path.getmtime(full) < max_age_seconds:
+                continue
+            os.unlink(full)
+            removed += 1
+        except OSError:
+            continue
+    return removed
+
+
 def find_repeated_pattern(
     text: str, min_pattern_len: int = 10, min_repeat_count: int = 2
 ) -> Tuple[str, int, float]:

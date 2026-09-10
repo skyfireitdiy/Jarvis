@@ -16,6 +16,8 @@ from typing import cast
 from jarvis.jarvis_platform.content_types import ContentBlock
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.input import get_single_line_input
+from jarvis.jarvis_utils.utils import atomic_write_json
+from jarvis.jarvis_utils.utils import cleanup_stale_tmp_files
 
 if TYPE_CHECKING:
     from jarvis.jarvis_platform.base import BasePlatform
@@ -440,6 +442,8 @@ class SessionManager:
         """Saves the current session state to a file."""
         session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
         os.makedirs(session_dir, exist_ok=True)
+        # 清理上次进程被强杀时遗留的原子写临时文件
+        cleanup_stale_tmp_files(session_dir)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         # 确定会话名称
@@ -546,8 +550,7 @@ class SessionManager:
             commit_file = (
                 session_file[:-5] + "_commit.json"
             )  # 去掉 ".json" 加上 "_commit.json"
-            with open(commit_file, "w", encoding="utf-8") as f:
-                json.dump(commit_info, f, ensure_ascii=False, indent=4)
+            atomic_write_json(commit_file, commit_info, indent=4, ensure_ascii=False)
 
         except Exception as e:
             # 保存 commit 信息失败不影响主流程
@@ -1203,16 +1206,15 @@ class SessionManager:
             }
 
             # 保存到文件
-            with open(tasklist_file, "w", encoding="utf-8") as f:
-                json.dump(
-                    {
-                        "task_lists": task_lists_data,
-                        "manager_state": manager_state,
-                    },
-                    f,
-                    ensure_ascii=False,
-                    indent=2,
-                )
+            atomic_write_json(
+                tasklist_file,
+                {
+                    "task_lists": task_lists_data,
+                    "manager_state": manager_state,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
 
             return True
         except Exception as e:
@@ -1420,8 +1422,13 @@ class SessionManager:
         from jarvis.jarvis_agent import SafeEncoder
 
         try:
-            with open(state_file, "w", encoding="utf-8") as f:
-                json.dump(state_data, f, ensure_ascii=False, indent=2, cls=SafeEncoder)
+            atomic_write_json(
+                state_file,
+                state_data,
+                ensure_ascii=False,
+                indent=2,
+                default=SafeEncoder().default,
+            )
             PrettyOutput.auto_print("✅ Agent状态已保存")
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 保存Agent状态失败: {e}")
