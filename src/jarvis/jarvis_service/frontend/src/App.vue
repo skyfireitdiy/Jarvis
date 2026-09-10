@@ -10643,6 +10643,7 @@ const activeChatRoomId = ref('')
 const activePrivateClientId = ref('')
 const chatUnreadCount = ref(0)
 const chatName = computed(() => auth.value.userInfo?.display_name || username.value)
+const myUserId = computed(() => auth.value.userInfo?.user_id || myClientId.value)
 const chatSidebarWidth = ref(parseInt(localStorage.getItem('jarvis_chat_sidebar_width') || '160'))
 const chatUnreadMap = ref({})
 const CHAT_JOINED_ROOMS_KEY = 'jarvis_chat_joined_rooms'
@@ -11213,7 +11214,7 @@ function selectPrivateClient(clientId) {
     chatUnreadMap.value = rest
     // 获取私聊历史
     sendChatMessageToServer('chat_get_private_history', {
-      client_id: myClientId.value,
+      client_id: myUserId.value,
       other_id: clientId,
     })
   }
