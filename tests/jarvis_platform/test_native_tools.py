@@ -4,11 +4,13 @@
 import json
 
 from jarvis.jarvis_platform.native_tools import (
+    _sanitize_surrogates,
     build_anthropic_tools,
     build_openai_tools,
     make_tool_call,
     make_tool_call_msg,
     make_tool_result_msg,
+    sanitize_message,
     to_anthropic_messages,
     to_openai_messages,
     to_text,
@@ -267,6 +269,99 @@ class TestSchema:
         assert "after" in props and "at" in props and "loop" in props
         atools = build_anthropic_tools(reg)
         assert "want" not in atools[0]["input_schema"]["properties"]
+
+class TestSurrogateSanitization:
+    """孤立 UTF-16 代理字符清理：防止 UTF-8 编码抛 UnicodeEncodeError。
+
+    背景：消息历史中若混入孤立代理（如 \\ud83d），OpenAI/Anthropic SDK 经 httpx
+    以 ensure_ascii=False 序列化后 .encode("utf-8") 会抛
+    UnicodeEncodeError: surrogates not allowed，导致原生工具调用降级为纯文本。
+    """
+
+    def test_sanitize_isolated_high_surrogate(self):
+        assert _sanitize_surrogates("abc\ud83ddef") == "abc\ufffddef"
+
+    def test_sanitize_isolated_low_surrogate(self):
+        assert _sanitize_surrogates("x\udcffy") == "x\ufffdy"
+
+    def test_sanitize_multiple_consecutive_surrogates(self):
+        assert _sanitize_surrogates("\ud83d\udc4d") == "\ufffd\ufffd"
+
+    def test_sanitize_no_surrogate_returns_same_object(self):
+        text = "正常文本 😀"
+        assert _sanitize_surrogates(text) is text
+
+    def test_sanitize_keeps_valid_astral_chars(self):
+        # U+1F600 是合法码点，不在代理区，必须原样保留
+        assert _sanitize_surrogates("😀") == "😀"
+
+    def test_sanitize_message_does_not_mutate_input(self):
+        msg = {"role": "user", "content": "abc\ud83ddef"}
+        out = sanitize_message(msg)
+        assert out["content"] == "abc\ufffddef"
+        assert msg["content"] == "abc\ud83ddef"
+
+    def test_openai_user_content_encodable(self):
+        msgs = to_openai_messages([{"role": "user", "content": "abc\ud83ddef"}])
+        assert msgs[0]["content"] == "abc\ufffddef"
+        json.dumps(msgs, ensure_ascii=False).encode("utf-8")
+
+    def test_openai_tool_result_encodable(self):
+        msgs = to_openai_messages(
+            [
+                {"role": "user", "content": "hi"},
+                make_tool_call_msg(None, [make_tool_call("c1", "read_code", {})]),
+                make_tool_result_msg("c1", "read_code", "x\udcffy"),
+            ]
+        )
+        assert msgs[2]["content"] == "x\ufffdy"
+        json.dumps(msgs, ensure_ascii=False).encode("utf-8")
+
+    def test_openai_tool_call_arguments_encodable(self):
+        msgs = to_openai_messages(
+            [
+                {"role": "user", "content": "hi"},
+                make_tool_call_msg(
+                    "查一下",
+                    [make_tool_call("c1", "read_code", {"path": "a\ud83d.py"})],
+                ),
+                make_tool_result_msg("c1", "read_code", "ok"),
+            ]
+        )
+        args = msgs[1]["tool_calls"][0]["function"]["arguments"]
+        assert "\ud83d" not in args and "\ufffd" in args
+        json.dumps(msgs, ensure_ascii=False).encode("utf-8")
+
+    def test_anthropic_path_encodable(self):
+        history = [
+            {"role": "system", "content": "系统\ud83d提示"},
+            {"role": "user", "content": "abc\ud83ddef"},
+            make_tool_call_msg(None, [make_tool_call("c1", "read_code", {})]),
+            make_tool_result_msg("c1", "read_code", "x\udcffy"),
+        ]
+        system, msgs = to_anthropic_messages(history)
+        assert system == "系统\ufffd提示"
+        assert msgs[0]["content"] == "abc\ufffddef"
+        json.dumps({"system": system, "messages": msgs}, ensure_ascii=False).encode(
+            "utf-8"
+        )
+
+    def test_normal_text_unchanged_regression(self):
+        history = [
+            {"role": "system", "content": "系统提示"},
+            {"role": "user", "content": "测试 😀 正常文本"},
+            make_tool_call_msg(None, [make_tool_call("c1", "read_code", {"p": "中文"})]),
+            make_tool_result_msg("c1", "read_code", "结果 😀"),
+        ]
+        o_msgs = to_openai_messages(history)
+        assert o_msgs[1]["content"] == "测试 😀 正常文本"
+        assert o_msgs[3]["content"] == "结果 😀"
+        assert json.loads(o_msgs[2]["tool_calls"][0]["function"]["arguments"]) == {
+            "p": "中文"
+        }
+        system, a_msgs = to_anthropic_messages(history)
+        assert system == "系统提示"
+        assert a_msgs[0]["content"] == "测试 😀 正常文本"
 
     def test_timer_params_advertised_in_schema(self):
         reg = _FakeRegistry(

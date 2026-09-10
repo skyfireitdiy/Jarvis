@@ -2156,7 +2156,9 @@ class ToolRegistry(OutputHandlerProtocol):
                     break
                 seq += 1
 
-            with open(filepath, "w", encoding="utf-8") as f:
+            # errors="replace"：工具输出可能含孤立代理字符（如前端回传），
+            # 默认严格模式会抛 UnicodeEncodeError 导致落盘失败、输出静默丢失。
+            with open(filepath, "w", encoding="utf-8", errors="replace") as f:
                 f.write(output)
             return filepath
         except Exception as e:

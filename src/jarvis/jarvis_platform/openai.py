@@ -15,7 +15,7 @@ from typing import cast
 from openai import OpenAI
 
 from jarvis.jarvis_platform.base import BasePlatform
-from jarvis.jarvis_platform.native_tools import to_openai_messages
+from jarvis.jarvis_platform.native_tools import sanitize_message, to_openai_messages
 from jarvis.jarvis_platform.content_types import ContentBlock
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ot, ct
@@ -473,7 +473,11 @@ class OpenAIModel(BasePlatform):
                         # 未知类型，忽略或报错
                         pass
 
-            self.messages.append({"role": "user", "content": user_message_content})
+            # 清理孤立代理字符：当前用户消息可能来自 eval_js 等前端回传，
+            # 若含孤立代理会在 httpx 编码请求体时抛 UnicodeEncodeError。
+            self.messages.append(
+                sanitize_message({"role": "user", "content": user_message_content})
+            )
 
             # 循环处理，直到不是因为长度限制而结束
             # 构造 API 调用参数
@@ -625,10 +629,11 @@ class OpenAIModel(BasePlatform):
             return content, None
 
         # 追加用户消息（工具后续轮 append_user=False，避免重复加空消息）
+        # 同时清理孤立代理字符，避免 httpx 编码请求体时抛 UnicodeEncodeError
         if append_user and message:
-            self.messages.append({"role": "user", "content": message})
-
-        # 轮询切换下一个 key
+            self.messages.append(
+                sanitize_message({"role": "user", "content": message})
+            )
         next_key = self._get_next_api_key()
         if next_key:
             self.api_key = next_key
@@ -717,10 +722,6 @@ class OpenAIModel(BasePlatform):
                         content, _reasoning, _ft = self._chat_with_simple_output(
                             render_message, start_time, chat_iterator=_gen()
                         )
-                    # 与文本协议 _chat 对齐：打印模型响应统计信息
-                    self._print_response_stats(
-                        content or "", _reasoning or "", _ft, start_time
-                    )
                 else:
                     content, _reasoning = self._chat_with_suppressed_output(
                         render_message, chat_iterator=_gen()
@@ -771,6 +772,15 @@ class OpenAIModel(BasePlatform):
                 if tool_calls:
                     assistant_msg["tool_calls"] = tool_calls
                 self.messages.append(assistant_msg)
+                # 与文本协议 _chat 对齐：打印模型响应统计信息（含工具调用 token）
+                if not self.suppress_output:
+                    self._print_response_stats(
+                        content or "",
+                        _reasoning or "",
+                        _ft,
+                        start_time,
+                        tool_calls=tool_calls or None,
+                    )
                 return (content or None), (tool_calls or None)
             except Exception as e:
                 PrettyOutput.auto_print(

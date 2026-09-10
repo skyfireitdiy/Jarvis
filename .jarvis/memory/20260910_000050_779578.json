@@ -1,0 +1,14 @@
+{
+  "id": "20260910_000050_779578",
+  "type": "project_long_term",
+  "tags": [
+    "故障排查",
+    "Unicode",
+    "代理字符",
+    "原生工具调用",
+    "native_tools"
+  ],
+  "content": "【Jarvis 故障：原生工具调用降级纯文本】\n\n根因：消息历史/当前用户消息含孤立 UTF-16 代理字符（U+D800-U+DFFF，如 \\ud83d），httpx 以 json_dumps(..., ensure_ascii=False).encode('utf-8') 编码请求体时抛 UnicodeEncodeError: surrogates not allowed，被 openai.py:775 / claude.py:559 的 except Exception 兜底捕获后打印\"原生工具调用不可用\"并降级纯文本。\n\n关键事实：json.dumps 能处理孤立代理不报错，只有 .encode('utf-8') 会失败；代理来源为 surrogateescape 解码或前端 JS JSON.stringify 的 \\udXXX 经 json.loads 还原（eval_js 链路）。\n\n修复（最小改动、修根因）：\n1. native_tools.py 新增 _sanitize_surrogates（孤立代理→\\ufffd，无代理快速返回）、_sanitize_value（递归 str/dict/list/tuple）、sanitize_message；to_openai_messages / to_anthropic_messages 出口统一清理。\n2. 关键补充：当前用户消息在序列化之后才 append，必须单独 sanitize——openai.py:476(chat)、openai.py:629(chat_native_once)、claude.py:349(chat)、claude.py:447+449(chat_native_once)、claude.py:401(历史回写)。这是本次故障的主要触发路径。\n3. registry.py:2159 _dump_tool_output 加 errors='replace'，避免含代理的工具输出落盘失败静默丢失。\n\n验证：tests/jarvis_platform/ 61 passed；+tests/jarvis_tools/ 174 passed。\n\n遗留风险：memory.py:220、exception_utils.py:82 的 json.dump 写盘无 errors 参数（被 try/except 吞掉，影响小）。",
+  "created_at": "2026-09-10T00:00:50.779633",
+  "updated_at": "2026-09-10T00:00:50.779647"
+}
