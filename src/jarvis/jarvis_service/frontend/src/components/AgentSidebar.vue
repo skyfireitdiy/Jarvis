@@ -14,8 +14,8 @@
     </div>
     <div class="agent-list">
       <div class="hello-user-banner" aria-hidden="true">
-        <span class="hello-user-glow">Hello, {{ currentUserName || 'Penbo' }}</span>
-        <span class="hello-user-sub">✦ 你好，{{ currentUserName || 'Penbo' }} ✦</span>
+        <span class="hello-user-glow">Hello, {{ currentUserName || '' }}</span>
+        <span class="hello-user-sub">✦ 你好，{{ currentUserName || '' }} ✦</span>
       </div>
       <template v-for="agentGroup in displayGroups" :key="agentGroup.key">
         <div v-if="agentGroup.isCollapsible && agentGroup.agents.length > 0" class="agent-collapsed-section">
@@ -509,16 +509,16 @@ watch(() => props.currentAgentId, (newAgentId) => {
 }
 
 .hello-user-glow {
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: 1px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
   background: linear-gradient(90deg, #7b5cff, #00d4ff, #ff5cc8, #7b5cff);
   background-size: 300% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   animation: hello-user-flow 4s linear infinite;
-  filter: drop-shadow(0 0 6px rgba(123, 92, 255, 0.55));
+  filter: drop-shadow(0 0 5px rgba(123, 92, 255, 0.45));
 }
 
 .hello-user-sub {
