@@ -8618,7 +8618,8 @@ function handleChatMessage(type, payload) {
     case 'chat_private_message':
       // 私聊消息（过滤自己发送的，本地已追加）
       if (payload?.message?.sender_id === myClientId.value) break
-      const privMsgKey = `private_${payload?.message?.sender_id}`
+      const privPeerId = payload?.message?.sender_user_id || payload?.sender_user_id || payload?.message?.sender_id
+      const privMsgKey = `private_${privPeerId}`
       if (!chatMessages.value[privMsgKey]) chatMessages.value[privMsgKey] = []
       const privMsg = {
         client_id: payload?.message?.sender_id,
@@ -8639,8 +8640,8 @@ function handleChatMessage(type, payload) {
           chatUnreadCount.value++
         }
         // 按私聊维度记录未读数
-        const privUnreadKey = `private_${payload?.message?.sender_id}`
-        if (activePrivateClientId.value !== payload?.message?.sender_id) {
+        const privUnreadKey = `private_${privPeerId}`
+        if (activePrivateClientId.value !== privPeerId) {
           chatUnreadMap.value = { ...chatUnreadMap.value, [privUnreadKey]: (chatUnreadMap.value[privUnreadKey] || 0) + 1 }
         }
       }
