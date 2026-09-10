@@ -214,6 +214,32 @@ class ChatManager:
                     latest = {"client_id": cid, **info}
         return latest
 
+    def get_sessions(self) -> List[Dict[str, Any]]:
+        """获取所有活跃会话（每个连接一条，不做去重），并附带对应用户信息。"""
+        sessions: List[Dict[str, Any]] = []
+        for cid, info in self._chat_clients.items():
+            user_id = info.get("user_id") or cid
+            username = None
+            display_name = info.get("display_name") or info.get("name")
+            if self._user_manager and info.get("user_id"):
+                user = self._user_manager.get_user(info["user_id"])
+                if user:
+                    username = user.get("username")
+                    display_name = user.get("display_name") or username
+            sessions.append(
+                {
+                    "session_id": cid,
+                    "client_id": cid,
+                    "user_id": user_id,
+                    "username": username,
+                    "name": info.get("name", ""),
+                    "display_name": display_name or "",
+                    "connection_id": info.get("connection_id", ""),
+                    "registered_at": info.get("registered_at", 0),
+                }
+            )
+        return sessions
+
     def get_clients(self) -> list[Dict[str, Any]]:
         """获取所有在线客户端列表（按user_id去重，同用户多设备仅显示一次）。"""
         user_map: Dict[str, Dict[str, Any]] = {}  # user_id -> 聚合信息
