@@ -138,12 +138,16 @@ const emit = defineEmits([
 
 .terminal-panel {
   position: fixed;
-  background: var(--color-bg-primary);
+  background: rgba(9, 16, 28, 0.86);
   border: 1px solid var(--color-border-subtle);
-  border-radius: var(--tile-radius);
+  border-radius: 14px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(32, 200, 255, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -170,8 +174,11 @@ const emit = defineEmits([
   justify-content: space-between;
   align-items: center;
   padding: 6px 10px;
-  background: var(--color-bg-secondary);
+  background:
+    linear-gradient(160deg, rgba(32, 200, 255, 0.10) 0%, transparent 46%),
+    var(--color-bg-tertiary);
   border-bottom: 1px solid var(--color-border-subtle);
+  border-left: 2px solid var(--color-accent);
   border-radius: var(--tile-radius-xs) var(--tile-radius-xs) 0 0;
   cursor: move;
   min-height: 32px;
@@ -240,11 +247,12 @@ const emit = defineEmits([
   gap: 6px;
   padding: 6px 12px;
   background: var(--color-bg-secondary);
-  border: none;
+  border: 1px solid transparent;
   border-radius: var(--tile-radius-xs);
   font-size: 12px;
   color: var(--color-text-secondary);
   cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
 .terminal-tab:hover {
@@ -256,6 +264,7 @@ const emit = defineEmits([
   background: var(--color-accent-subtle);
   color: var(--color-accent);
   border-color: var(--color-accent);
+  box-shadow: 0 0 12px rgba(32, 200, 255, 0.15);
 }
 
 .terminal-tab-title {

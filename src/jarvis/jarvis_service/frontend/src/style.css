@@ -83,6 +83,71 @@ p {
   padding: 0;
   display: grid;
   gap: 10px;
+  position: relative;
+  isolation: isolate;
+}
+
+/* 主工作台背景氛围：动态网格 + 极光呼吸（与连接页统一） */
+.app::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(
+      circle at 18% 22%,
+      rgba(32, 200, 255, 0.1),
+      transparent 42%
+    ),
+    radial-gradient(
+      circle at 82% 78%,
+      rgba(54, 255, 124, 0.07),
+      transparent 45%
+    ),
+    linear-gradient(rgba(32, 200, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(32, 200, 255, 0.045) 1px, transparent 1px);
+  background-size:
+    100% 100%,
+    100% 100%,
+    46px 46px,
+    46px 46px;
+  mask-image: radial-gradient(circle at 50% 45%, #000 0%, transparent 85%);
+  -webkit-mask-image: radial-gradient(
+    circle at 50% 45%,
+    #000 0%,
+    transparent 85%
+  );
+  animation:
+    app-grid-drift 26s linear infinite,
+    app-aurora 11s ease-in-out infinite;
+}
+
+@keyframes app-grid-drift {
+  from {
+    background-position:
+      0 0,
+      0 0,
+      0 0,
+      0 0;
+  }
+  to {
+    background-position:
+      0 0,
+      0 0,
+      46px 46px,
+      46px 46px;
+  }
+}
+
+@keyframes app-aurora {
+  0%,
+  100% {
+    opacity: 0.65;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 /* 头部样式 - 磁贴 */
@@ -465,17 +530,46 @@ button:disabled {
   width: 32px;
   height: 32px;
   object-fit: contain;
+  position: relative;
+  filter: drop-shadow(0 0 8px rgba(32, 200, 255, 0.45));
+  animation: header-logo-halo 3.6s ease-in-out infinite;
+}
+
+@keyframes header-logo-halo {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 6px rgba(32, 200, 255, 0.35));
+  }
+  50% {
+    filter: drop-shadow(0 0 14px rgba(32, 200, 255, 0.75));
+  }
 }
 
 .header-brand {
   font-size: 18px;
   font-weight: 700;
   letter-spacing: 2px;
-  background: var(--gradient-blue);
+  background: linear-gradient(
+    100deg,
+    #20c8ff 0%,
+    #7ee7ff 28%,
+    #36ff7c 52%,
+    #20c8ff 78%
+  );
+  background-size: 220% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  text-shadow: 0 0 8px rgba(32, 200, 255, 0.5);
+  animation: header-brand-sheen 6s linear infinite;
+}
+
+@keyframes header-brand-sheen {
+  from {
+    background-position: 0% 50%;
+  }
+  to {
+    background-position: 220% 50%;
+  }
 }
 
 /* ===== 动画特效 ===== */
@@ -1087,4 +1181,150 @@ button:not(:disabled):active,
 .form-row input:focus {
   border-color: #20c8ff !important;
   box-shadow: 0 0 8px rgba(32, 200, 255, 0.2) !important;
+}
+
+/* ===== 消息正文排版（会话面板内部渲染内容） ===== */
+.message-body.markdown-content {
+  color: #d6e4f0;
+}
+
+/* 段落间距与行高 */
+.message-body.markdown-content p {
+  margin: 0 0 8px 0;
+  line-height: 1.7;
+}
+
+.message-body.markdown-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* 标题层级 */
+.message-body.markdown-content h1,
+.message-body.markdown-content h2,
+.message-body.markdown-content h3,
+.message-body.markdown-content h4 {
+  margin: 12px 0 6px 0;
+  font-weight: 700;
+  color: #7ee7ff;
+  line-height: 1.4;
+}
+
+.message-body.markdown-content h1 {
+  font-size: 18px;
+}
+.message-body.markdown-content h2 {
+  font-size: 16px;
+}
+.message-body.markdown-content h3 {
+  font-size: 14px;
+}
+.message-body.markdown-content h4 {
+  font-size: 13px;
+}
+
+.message-body.markdown-content h1:first-child,
+.message-body.markdown-content h2:first-child,
+.message-body.markdown-content h3:first-child,
+.message-body.markdown-content h4:first-child {
+  margin-top: 0;
+}
+
+/* 强调 */
+.message-body.markdown-content strong {
+  color: #7ee7ff;
+  font-weight: 700;
+}
+
+.message-body.markdown-content em {
+  color: #a8c8e0;
+  font-style: italic;
+}
+
+/* 行内代码胶囊（排除 diff 内容，避免覆盖 diff 语法高亮） */
+.message-body.markdown-content code:not(pre code) {
+  background: rgba(32, 200, 255, 0.12);
+  border: 1px solid rgba(32, 200, 255, 0.22);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 12px;
+  color: #7ee7ff;
+  font-family: "Consolas", "Microsoft YaHei", monospace;
+}
+
+/* diff 内代码：不套胶囊，保留 diff.css 原有配色 */
+.message-body.markdown-content .diff-content code {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  color: inherit;
+  font-size: 12px;
+}
+
+/* 代码块 */
+.message-body.markdown-content pre {
+  margin: 8px 0;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(32, 200, 255, 0.18);
+  border-left: 2px solid #20c8ff;
+  border-radius: 8px;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+
+.message-body.markdown-content pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #d6e4f0;
+  font-size: 12px;
+  font-family: "Consolas", "Microsoft YaHei", monospace;
+}
+
+/* 引用块 */
+.message-body.markdown-content blockquote {
+  margin: 8px 0;
+  padding: 6px 12px;
+  border-left: 3px solid #20c8ff;
+  background: rgba(32, 200, 255, 0.06);
+  border-radius: 0 6px 6px 0;
+  color: #a8c8e0;
+}
+
+/* 链接 */
+.message-body.markdown-content a {
+  color: #20c8ff;
+  text-decoration: none;
+  border-bottom: 1px dashed rgba(32, 200, 255, 0.5);
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.message-body.markdown-content a:hover {
+  color: #7ee7ff;
+  border-bottom-color: #7ee7ff;
+}
+
+/* 分割线 */
+.message-body.markdown-content hr {
+  margin: 12px 0;
+  border: none;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(32, 200, 255, 0.35),
+    transparent
+  );
+}
+
+/* 列表间距 */
+.message-body.markdown-content li {
+  line-height: 1.7;
+}
+
+.message-body.markdown-content li::marker {
+  color: #20c8ff;
 }

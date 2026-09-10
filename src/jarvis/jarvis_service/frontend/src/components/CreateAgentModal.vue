@@ -331,10 +331,14 @@ function toggleAclInteract(userId, event) {
 
 /* 模态框基础样式 */
 .modal-overlay .modal {
-  background: var(--color-bg-secondary);
-  border: none;
-  border-radius: var(--tile-radius-sm);
+  background: rgba(9, 16, 28, 0.86);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 14px;
   padding: 28px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(32, 200, 255, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .modal-overlay .modal.create-agent-modal {
@@ -399,16 +403,19 @@ function toggleAclInteract(userId, event) {
   width: 100%;
   padding: 10px 12px;
   background: var(--color-bg-tertiary);
-  border: none;
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--tile-radius-xs);
   color: var(--color-text-primary);
   font-size: 14px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .create-agent-modal .form-control:focus {
   outline: none;
   border-color: var(--color-accent);
   background: var(--color-bg-tertiary);
+  box-shadow: 0 0 0 2px var(--color-accent-subtle),
+    0 0 12px rgba(32, 200, 255, 0.2);
 }
 
 .create-agent-modal select.form-control option {
@@ -435,19 +442,26 @@ function toggleAclInteract(userId, event) {
 .create-agent-modal .btn.secondary {
   background: var(--color-bg-tertiary);
   color: var(--color-text-primary);
+  border: 1px solid var(--color-border-subtle);
 }
 
 .create-agent-modal .btn.secondary:hover {
-  background: var(--color-bg-tertiary);
+  background: var(--color-bg-hover);
+  border-color: var(--color-accent);
 }
 
 .create-agent-modal .btn.primary {
-  background: var(--color-success);
+  background: linear-gradient(135deg, #0a3a5c 0%, #20c8ff 100%);
   color: #060911;
+  font-weight: 600;
+  border: 1px solid rgba(32, 200, 255, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 120, 190, 0.25);
+  transition: all 0.2s ease;
 }
 
 .create-agent-modal .btn.primary:hover {
   transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(32, 200, 255, 0.35);
 }
 
 .create-agent-modal .btn:disabled {
