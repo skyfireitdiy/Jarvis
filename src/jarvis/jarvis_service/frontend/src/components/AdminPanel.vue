@@ -687,14 +687,21 @@ const maskedNodeSecret = computed(() => {
   z-index: 3000;
 }
 .admin-modal {
-  background: var(--bg-secondary, #0b1424); color: var(--text-primary, #d6e4f0);
-  border-radius: 12px; width: 80%; max-width: 1200px; max-height: 90vh;
+  background: rgba(9, 16, 28, 0.86); color: var(--text-primary, #d6e4f0);
+  border: 1px solid rgba(32, 200, 255, 0.15);
+  border-radius: 14px; width: 80%; max-width: 1200px; max-height: 90vh;
   display: flex; flex-direction: column; overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(32, 200, 255, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 .modal-header {
   display: flex; justify-content: space-between; align-items: center;
   padding: 16px 24px; border-bottom: 1px solid var(--border-color, #1a2a3a);
+  border-left: 2px solid var(--accent, #20c8ff);
+  background: linear-gradient(160deg, rgba(32, 200, 255, 0.10) 0%, transparent 46%),
+    var(--color-bg-tertiary, rgba(18, 30, 50, 0.65));
 }
 .modal-header h2 { margin: 0; font-size: 18px; }
 .close-btn {
@@ -713,9 +720,18 @@ const maskedNodeSecret = computed(() => {
   padding: 10px 20px; cursor: pointer; border: none; background: none;
   color: var(--text-secondary, #8ba3b8); font-size: 14px;
   border-bottom: 2px solid transparent; transition: all 0.2s;
+  border-radius: 8px 8px 0 0;
 }
-.admin-tab:hover { color: var(--text-primary, #d6e4f0); }
-.admin-tab.active { color: var(--accent, #20c8ff); border-bottom-color: var(--accent, #20c8ff); }
+.admin-tab:hover {
+  color: var(--text-primary, #d6e4f0);
+  background: rgba(32, 200, 255, 0.08);
+}
+.admin-tab.active {
+  color: var(--accent, #20c8ff);
+  border-bottom-color: var(--accent, #20c8ff);
+  background: linear-gradient(180deg, rgba(32, 200, 255, 0.14) 0%, transparent 100%);
+  text-shadow: 0 0 10px rgba(32, 200, 255, 0.5);
+}
 
 /* Tab内容区 */
 .tab-content {
@@ -767,13 +783,20 @@ const maskedNodeSecret = computed(() => {
   width: 100%; border-collapse: collapse; font-size: 13px;
 }
 .admin-table th {
-  text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border-color, #1a2a3a);
-  color: var(--text-secondary, #8ba3b8); font-weight: 500;
+  text-align: left; padding: 8px 12px; border-bottom: 1px solid rgba(32, 200, 255, 0.25);
+  color: var(--accent, #20c8ff); font-weight: 600;
+  letter-spacing: 0.02em;
 }
 .admin-table td {
-  padding: 8px 12px; border-bottom: 1px solid rgba(26,42,58,0.3);
+  padding: 8px 12px; border-bottom: 1px solid rgba(26, 42, 58, 0.3);
 }
-.admin-table tr:hover { background: rgba(32,200,255,0.05); }
+.admin-table tr {
+  transition: background 0.2s ease;
+}
+.admin-table tr:hover {
+  background: rgba(32, 200, 255, 0.08);
+  box-shadow: inset 2px 0 0 var(--accent, #20c8ff);
+}
 
 /* 展开区域 */
 .expand-section {

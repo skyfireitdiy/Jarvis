@@ -271,10 +271,14 @@ async function changePassword() {
 
 /* 模态框基础样式 */
 .modal-overlay .modal {
-  background: var(--color-bg-secondary);
-  border: 0.5px solid var(--color-border);
-  border-radius: var(--tile-radius-sm);
+  background: rgba(9, 16, 28, 0.86);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 14px;
   padding: 28px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(32, 200, 255, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 /* ========== Form Group 样式（从 App.vue 全局样式迁移） ========== */
@@ -514,6 +518,11 @@ async function changePassword() {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+  padding: 10px 14px;
+  border-left: 2px solid var(--color-accent);
+  border-radius: 10px;
+  background: linear-gradient(160deg, rgba(32, 200, 255, 0.10) 0%, transparent 46%),
+    var(--color-bg-tertiary);
 }
 
 .modal-header h2 {

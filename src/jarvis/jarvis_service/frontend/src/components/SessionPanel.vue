@@ -604,18 +604,22 @@ function getTerminalStyle(terminalContent) {
   min-width: 0;
   min-height: 0;
   position: fixed;
-  background: var(--color-bg-secondary);
+  background: rgba(9, 16, 28, 0.86);
   border: 1px solid var(--color-border-subtle);
-  border-radius: 4px;
+  border-radius: 14px;
   overflow: hidden;
   cursor: pointer;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(32, 200, 255, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .session-panel.active {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 1px var(--color-accent), 0 0 12px rgba(32, 200, 255, 0.15);
+  border-color: rgba(32, 200, 255, 0.55);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(32, 200, 255, 0.5),
+    0 0 24px rgba(32, 200, 255, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .session-panel-embedded {
@@ -748,8 +752,11 @@ function getTerminalStyle(terminalContent) {
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
-  background: var(--color-bg-tertiary);
+  background:
+    linear-gradient(160deg, rgba(32, 200, 255, 0.10) 0%, transparent 46%),
+    var(--color-bg-tertiary);
   border-bottom: 1px solid var(--color-border-subtle);
+  border-left: 2px solid var(--color-accent);
   flex-shrink: 0;
 }
 
@@ -928,10 +935,18 @@ function getTerminalStyle(terminalContent) {
 }
 
 .message {
-  background: var(--color-bg-tertiary);
+  position: relative;
+  background: rgba(18, 30, 50, 0.45);
   border-radius: var(--tile-radius);
   padding: 6px 10px;
-  border: none;
+  border: 1px solid var(--color-border-subtle);
+  border-left: 2px solid var(--color-accent);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.message:hover {
+  border-color: var(--color-border);
+  box-shadow: 0 6px 20px rgba(0, 120, 190, 0.18);
 }
 
 .message-user_input {
@@ -940,7 +955,7 @@ function getTerminalStyle(terminalContent) {
 }
 
 .message-STREAM {
-  background: var(--color-bg-tertiary);
+  background: rgba(18, 30, 50, 0.45);
   border-left: 3px solid var(--color-border-subtle);
 }
 

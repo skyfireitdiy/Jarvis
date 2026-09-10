@@ -538,12 +538,16 @@ watch(
 
 .chat-panel {
   position: fixed;
-  background: var(--color-bg-primary);
-  border: none;
-  border-radius: var(--tile-radius);
+  background: rgba(9, 16, 28, 0.86);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 14px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(32, 200, 255, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .chat-panel-dragging {
@@ -585,7 +589,11 @@ watch(
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  background: var(--color-bg-secondary);
+  background:
+    linear-gradient(160deg, rgba(32, 200, 255, 0.10) 0%, transparent 46%),
+    var(--color-bg-tertiary);
+  border-bottom: 1px solid var(--color-border-subtle);
+  border-left: 2px solid var(--color-accent);
   cursor: move;
   flex-shrink: 0;
 }
