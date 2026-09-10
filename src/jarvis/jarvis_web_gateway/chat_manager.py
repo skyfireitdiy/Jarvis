@@ -472,8 +472,8 @@ class ChatManager:
             return {"success": False, "error": "接收者不在线"}
 
         # 统一使用 user_id 作为会话标识，避免同一用户多设备/重连导致 client_id 不一致
-        sender_user_id = self._chat_clients[sender_id].get("user_id") or sender_id
-        receiver_user_id = None
+        sender_user_id: str = self._chat_clients[sender_id].get("user_id") or sender_id
+        receiver_user_id: str = receiver_id
         for cid, info in self._chat_clients.items():
             if info.get("user_id") == receiver_id or cid == receiver_id:
                 receiver_user_id = info.get("user_id") or cid
