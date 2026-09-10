@@ -81,9 +81,10 @@ jca   # 代码 Agent</code></pre>
               <div class="qs-step-title"><span class="qs-step-no">4</span>启动 Master 服务</div>
               <div class="qs-hint">服务以 master 或 child 模式启动（默认 master）。单机部署只需启动 master，安装为 systemd 常驻服务：</div>
               <pre class="qs-code"><code>jarvis-service install --node-mode master \
-  --gateway-host 0.0.0.0 --gateway-port 8000
+  --gateway-host 0.0.0.0 --gateway-port 8000 \
+  --frontend-host 0.0.0.0 --frontend-port 5173
 jarvis-service start master</code></pre>
-              <div class="qs-hint">默认监听 127.0.0.1:8000，可用 --gateway-host / --gateway-port 调整；未指定 --node-secret 时会自动生成并保存，启动后可在顶栏「管理」→「节点连接私钥」获取</div>
+              <div class="qs-hint">默认监听 127.0.0.1:8000（网关）与 127.0.0.1:5173（前端），可用 --gateway-host / --gateway-port / --frontend-host / --frontend-port 调整；未指定 --node-secret 时会自动生成并保存，启动后可在顶栏「管理」→「节点连接私钥」获取</div>
             </div>
             <div class="qs-step">
               <div class="qs-step-title"><span class="qs-step-no">5</span>获取初始密码并连接</div>
