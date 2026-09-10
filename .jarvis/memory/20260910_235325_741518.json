@@ -1,0 +1,8 @@
+{
+  "id": "20260910_235325_741518",
+  "type": "project_long_term",
+  "tags": ["jarvis", "frontend", "命令面板", "registry", "Ctrl+K"],
+  "content": "Jarvis 前端新增统一动作注册表与命令面板（2026-09-10）：\n- src/jarvis/jarvis_service/frontend/src/actions/registry.js：纯 JS 模块，导出 ACTIONS（{id,label,group,icon,keywords,shortcut?,enabled(ctx),run(ctx)}）、filterActions(actions,query)、groupActions(actions)。11 个动作：interrupt-current/goto-waiting/sync-status/create-agent/refresh-agents/restart-gateway/restart-all-nodes/toggle-sidebar/toggle-terminal/toggle-chat/open-settings。\n- src/.../components/CommandPalette.vue：props visible/actions/ctx/title，emits update:visible/run/close；.cmd-* 类；搜索框上绑定键盘（ArrowUp/Down 跳过 disabled、Enter 执行、Esc 关闭）。注意：键盘事件绑在 input 元素上，测试需 dispatch 到 input 而非 document。\n- App.vue 接线：import CommandPalette + ACTIONS；showCommandPalette ref；commandPaletteCtx computed（字段须与 registry 对齐：petInterruptCurrent/petGotoWaitingAgent/syncAllStatus(=petSyncAllStatus)/openCreateAgentModal/refreshAgentList(=fetchAgentList)/restartGateway/restartAllNodes/toggleAgentSidebar/toggleTerminalPanel/toggleChatPanel/openSettings，及 currentAgentId/agentList/waitingAgents）；appActions computed；onCommandRun 带 try/catch；handleGlobalKeydown 新增 Ctrl/Cmd+K 分支，Escape 分支最前优先关面板。\n- 验证方式：npm run build EXIT=0；eval_js 触发 Ctrl+K 验证面板/搜索/Enter/Esc 全链路。eval_js 可用（reload 后需 sleep 等服务端返回新 index.html）。",
+  "created_at": "2026-09-10T23:53:25.741552",
+  "updated_at": "2026-09-10T23:53:25.741557"
+}
