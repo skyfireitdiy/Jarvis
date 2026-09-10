@@ -119,10 +119,9 @@ jarvis-service start master</code></pre>
               <pre class="qs-code"><code>jarvis-service install --node-mode child \
   --node-id worker-01 \
   --master-url ws://master-host:8000 \
-  --node-secret your_secret_key \
-  --frontend-host 0.0.0.0 --frontend-port 5173
+  --node-secret your_secret_key
 jarvis-service start child</code></pre>
-              <div class="qs-hint">node-id 需唯一；node-secret 与 Master 保持一致；前端默认监听 127.0.0.1:5173，可用 --frontend-host / --frontend-port 调整</div>
+              <div class="qs-hint">node-id 需唯一；node-secret 与 Master 保持一致；child 不启动前端，仅 master 提供前端页面</div>
             </div>
             <div class="qs-hint"><b>切换模式</b>：使用 <code>jarvis-service switch master|child</code> 切换（会自动停掉另一模式并启用目标模式）。</div>
         </div>
