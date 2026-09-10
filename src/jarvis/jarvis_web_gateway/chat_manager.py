@@ -471,20 +471,27 @@ class ChatManager:
         if not receiver_online:
             return {"success": False, "error": "接收者不在线"}
 
+        # 统一使用 user_id 作为会话标识，避免同一用户多设备/重连导致 client_id 不一致
+        sender_user_id = self._chat_clients[sender_id].get("user_id") or sender_id
+        receiver_user_id = None
+        for cid, info in self._chat_clients.items():
+            if info.get("user_id") == receiver_id or cid == receiver_id:
+                receiver_user_id = info.get("user_id") or cid
+                break
+
         # 查找或创建私聊会话
-        session_id = self._find_private_session(sender_id, receiver_id)
+        session_id = self._find_private_session(sender_user_id, receiver_user_id)
         if not session_id:
             async with self._lock:
                 self._chat_private_seq += 1
                 session_id = f"private_{self._chat_private_seq}"
                 self._chat_private_sessions[session_id] = {
-                    "client_a": sender_id,
-                    "client_b": receiver_id,
+                    "client_a": sender_user_id,
+                    "client_b": receiver_user_id,
                     "messages": [],
                 }
 
         # 保存消息
-        sender_user_id = self._chat_clients[sender_id].get("user_id") or sender_id
         msg = {
             "sender_id": sender_id,
             "sender_user_id": sender_user_id,
@@ -500,12 +507,6 @@ class ChatManager:
         self._chat_private_sessions[session_id]["messages"].append(msg)
 
         # 【新增】按user_id查找所有在线设备并广播
-        receiver_user_id = None
-        for cid, info in self._chat_clients.items():
-            if info.get("user_id") == receiver_id or cid == receiver_id:
-                receiver_user_id = info.get("user_id") or cid
-                break
-
         # 向所有匹配user_id的设备发送消息
         sent_count = 0
         for cid, info in self._chat_clients.items():
