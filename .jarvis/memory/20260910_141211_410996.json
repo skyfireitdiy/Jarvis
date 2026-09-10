@@ -1,0 +1,8 @@
+{
+  "id": "20260910_141211_410996",
+  "type": "project_long_term",
+  "tags": ["eval_js", "gateway", "agent", "client_id", "bug"],
+  "content": "Jarvis eval_js 定向投递超时根因（已修复）：Agent 进程会启动自己的 WebGateway（jarvis.py:1544-1552，uvicorn 独立端口），eval_js 工具通过 get_current_gateway() 拿到的是 Agent 自己的 gateway 实例；而 client_id→connection 映射 _client_connection_map 只在 master 网关被写入（前端 chat_register 只走主网关 socket，Agent socket 只发 sync_request）。因此 Agent 侧映射恒为空，target=client_id 时 mapped is None，退化成把 client_id 当 session_id 投递 → 静默丢弃 → 30s 超时；current/all 不依赖该映射所以正常。\n\n修复方案（用户决策）：把 eval_js 改成 gateway_manager 的一个 action，通过 HTTP 打到 master 网关（gateway_manager 的 _request_gateway 走 master_url），映射与 waiter 都在 master 进程内，天然一致。具体：master 网关新增 POST /api/frontend/eval-js（verify_token 鉴权，asyncio.to_thread 包装阻塞的 request_frontend_js）；gateway_manager 新增 action=eval_js（参数 code/timeout/target），_request_gateway 增加 timeout 参数（HTTP 超时 = JS 超时 + 15s）；删除独立工具 src/jarvis/jarvis_tools/eval_js.py 及 code_agent 工具列表注册项。网关侧 request_frontend_js/eval_js_request/eval_js_result 逻辑保留。",
+  "created_at": "2026-09-10T14:12:11.411029",
+  "updated_at": "2026-09-10T14:12:11.411034"
+}

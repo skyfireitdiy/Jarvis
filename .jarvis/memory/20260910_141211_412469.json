@@ -1,0 +1,8 @@
+{
+  "id": "20260910_141211_412469",
+  "type": "project_long_term",
+  "tags": ["jarvis", "gateway", "agent", "architecture"],
+  "content": "Jarvis 架构要点：每个 Agent 进程运行独立的 WebGateway（jarvis.py 中 uvicorn 起在独立端口），前端通过 agent/<agentId>/ws 直连 Agent 网关；get_current_gateway() 在 Agent 进程内返回的是 Agent 自己的 gateway，不是 master。因此任何依赖 master 侧状态（如 _client_connection_map、_auth_store、router 订阅）的工具，若在 Agent 进程内直接调用 gateway 方法会拿不到 master 的数据。正确做法是让工具通过 HTTP（jglobals.master_url）调用 master 网关的端点。",
+  "created_at": "2026-09-10T14:12:11.412493",
+  "updated_at": "2026-09-10T14:12:11.412498"
+}

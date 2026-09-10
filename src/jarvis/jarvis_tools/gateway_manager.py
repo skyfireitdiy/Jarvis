@@ -57,6 +57,7 @@ class GatewayManagerTool:
 - 定时任务：create_timer / list_timers / get_timer / delete_timer
 - 群组：create_group / list_groups / get_group / join_group / leave_group / send_group_message
 - 聊天：chat_list_rooms / chat_get_online_clients / list_sessions / chat_get_room_members / chat_send_room_message / chat_send_private_message（消息会自动加 [Agent名字] 前缀，并以 owner 身份发送）；list_sessions 返回每个活跃连接（会话）及其对应用户
+- 前端 JS：eval_js 将一段 JS 下发到前端浏览器执行并取回结果（需 code；可选 timeout/target）
 
 多数操作需要指定目标节点/Agent；具体字段与取值以 operation 参数说明为准。"""
 
@@ -93,6 +94,7 @@ class GatewayManagerTool:
                     "chat_get_room_members",
                     "chat_send_room_message",
                     "chat_send_private_message",
+                    "eval_js",
                 ],
                 "description": "要执行的操作类型，一次只能选一个；其余参数随操作而定（见各参数说明）。常用：send_to_agent 发消息给 Agent、list_agents 列 Agent、create_agent 新建 Agent、restart_nodes 重启所有节点、create_timer 建定时任务。其余操作按名称即可理解，完整清单见上方 enum。",
             },
@@ -207,6 +209,19 @@ class GatewayManagerTool:
                 "type": "string",
                 "description": "接收者 ID（chat_send_private_message 操作必填，可以是 client_id 或 user_id）",
             },
+            # eval_js 操作的参数
+            "code": {
+                "type": "string",
+                "description": "要执行的 JavaScript 代码（eval_js 操作必填），支持 async/await，返回值会被回传",
+            },
+            "timeout": {
+                "type": "number",
+                "description": "等待前端执行结果的超时时间（秒，eval_js 操作可选，默认 30）",
+            },
+            "target": {
+                "type": "string",
+                "description": "目标前端（eval_js 操作可选，默认 current）：current 当前活跃前端；具体 client_id 精确投递到某个前端连接（可用 list_sessions 获取）；具体 session_id 投递到该会话下所有前端；all 广播到所有前端",
+            },
         },
         "required": ["action"],
     }
@@ -240,6 +255,9 @@ class GatewayManagerTool:
         group_description: Optional[str] = None,
         room_id: Optional[str] = None,
         receiver_id: Optional[str] = None,
+        code: str = "",
+        timeout: float = 30.0,
+        target: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """执行 Gateway 管理操作
@@ -271,6 +289,9 @@ class GatewayManagerTool:
             group_description: 群组描述（create_group）
             room_id: 聊天室 ID（chat_get_room_members、chat_send_room_message）
             receiver_id: 接收者 ID（chat_send_private_message）
+            code: 要执行的 JavaScript 代码（eval_js）
+            timeout: 等待前端执行结果的超时秒数（eval_js）
+            target: 目标前端（eval_js）
             **kwargs: 其他参数
 
         返回:
@@ -305,6 +326,9 @@ class GatewayManagerTool:
             group_description = args.get("group_description")
             room_id = args.get("room_id")
             receiver_id = args.get("receiver_id")
+            code = args.get("code", "")
+            timeout = args.get("timeout", 30.0)
+            target = args.get("target")
         try:
             if action == "send_to_agent":
                 return self._send_to_agent(agent_id, message, node_id=node_id)
@@ -382,6 +406,8 @@ class GatewayManagerTool:
                 return self._chat_send_private_message(
                     receiver_id=receiver_id, message=message
                 )
+            elif action == "eval_js":
+                return self._eval_js(code=code, timeout=timeout, target=target)
             elif action == "regenerate_agent":
                 # 支持批量重生
                 if isinstance(agent_id, list):
@@ -453,6 +479,7 @@ class GatewayManagerTool:
         json_data: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, str]] = None,
         error_prefix: str = "Request failed",
+        timeout: float = 10.0,
     ) -> Dict[str, Any]:
         """向 Gateway 发送 HTTP 请求。
 
@@ -462,6 +489,7 @@ class GatewayManagerTool:
             json_data: POST 请求的 JSON 数据
             params: GET/DELETE 请求的 query 参数
             error_prefix: 错误提示前缀
+            timeout: HTTP 请求超时（秒）
 
         返回:
             Dict[str, Any]: 请求结果，包含 success/status_code/data 字段
@@ -470,7 +498,7 @@ class GatewayManagerTool:
         headers = self._build_auth_headers()
 
         try:
-            with httpx.Client(timeout=10.0) as client:
+            with httpx.Client(timeout=timeout) as client:
                 if method.upper() == "POST":
                     response = client.post(url, json=json_data, headers=headers)
                 elif method.upper() == "DELETE":
@@ -2190,6 +2218,58 @@ class GatewayManagerTool:
             error_prefix="Failed to list sessions",
         )
         return self._handle_gateway_response(result, success_data_key="sessions")
+
+    def _eval_js(
+        self,
+        code: str = "",
+        timeout: float = 30.0,
+        target: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """向前端浏览器下发 JS 并取回执行结果。
+
+        参数:
+            code: 要执行的 JavaScript 代码
+            timeout: 等待前端执行结果的超时秒数
+            target: 目标前端；None/current 取当前活跃前端，all 广播，
+                已注册的 client_id 精确投递到该前端连接，其它值视为 session_id
+        """
+        if not code or not str(code).strip():
+            return {"success": False, "stdout": "", "stderr": "code is required"}
+        err = self._get_master_url("eval js")
+        if err:
+            return err
+        try:
+            timeout_val = float(timeout)
+        except (TypeError, ValueError):
+            timeout_val = 30.0
+        result = self._request_gateway(
+            method="POST",
+            path="/api/frontend/eval-js",
+            json_data={
+                "code": str(code),
+                "timeout": timeout_val,
+                "target": target or "current",
+            },
+            error_prefix="Failed to eval js",
+            # HTTP 超时需大于前端执行超时，留出网络与转输余量
+            timeout=timeout_val + 15.0,
+        )
+        if not result["success"]:
+            return {"success": False, "stdout": "", "stderr": result["error"]}
+        gateway_data = result["data"]
+        if not gateway_data.get("success"):
+            error_info = gateway_data.get("error", "unknown error")
+            error_msg = (
+                error_info.get("message", "unknown error")
+                if isinstance(error_info, dict)
+                else str(error_info)
+            )
+            return {"success": False, "stdout": "", "stderr": error_msg}
+        value = gateway_data.get("result")
+        stdout = (
+            value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+        )
+        return {"success": True, "stdout": stdout, "stderr": ""}
 
     def _chat_get_room_members(self, room_id: Optional[str] = None) -> Dict[str, Any]:
         """获取聊天室成员列表。
