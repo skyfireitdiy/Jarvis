@@ -20,6 +20,7 @@ from jarvis.jarvis_mcp import McpClient
 from jarvis.jarvis_mcp.sse_mcp_client import SSEMcpClient
 from jarvis.jarvis_mcp.stdio_mcp_client import StdioMcpClient
 from jarvis.jarvis_mcp.streamable_mcp_client import StreamableMcpClient
+from jarvis.jarvis_platform.openai import PARSE_ERROR_KEY
 from jarvis.jarvis_tools.base import Tool
 from jarvis.jarvis_utils.config import calculate_token_limit
 from jarvis.jarvis_utils.exception_utils import save_exception
@@ -2283,6 +2284,22 @@ class ToolRegistry(OutputHandlerProtocol):
                         usage_prompt = tool_call_help
                     PrettyOutput.auto_print("❌ 工具参数格式无效")
                     return f"工具参数格式无效: {name}。arguments 应为可解析之 Jsonnet 或对象，请按工具调用格式提供。\n\n{usage_prompt}"
+
+            # 模型返回的 arguments 不是合法 JSON 时，平台层会把原文放在 PARSE_ERROR_KEY 下。
+            # 这里给出可自我纠正的提示，避免误报为“缺少参数”。
+            if isinstance(args, dict) and PARSE_ERROR_KEY in args:
+                raw = args.get(PARSE_ERROR_KEY)
+                raw_text = raw if isinstance(raw, str) else str(raw)
+                preview = raw_text[:200]
+                if len(raw_text) > 200:
+                    preview += "..."
+                PrettyOutput.auto_print("❌ 工具参数 JSON 解析失败")
+                return (
+                    f"工具参数 JSON 解析失败，无法执行 {name}。\n"
+                    "你的 arguments 不是完整合法的 JSON（可能被输出长度截断，或夹带了非 JSON 内容）。\n"
+                    f"原始片段：{preview}\n"
+                    "请重新调用本工具，确保 arguments 是一个完整、合法的 JSON 对象。"
+                )
 
             # 检查是否包含定时参数（after/at/loop）
             if isinstance(args, dict):
