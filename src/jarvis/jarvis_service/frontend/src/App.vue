@@ -1161,6 +1161,17 @@
       </div>
     </div>
 
+    <!-- 命令面板（Ctrl+K） -->
+    <CommandPalette
+      :visible="showCommandPalette"
+      :actions="appActions"
+      :ctx="commandPaletteCtx"
+      title="命令面板"
+      @update:visible="showCommandPalette = $event"
+      @run="onCommandRun"
+      @close="showCommandPalette = false"
+    />
+
     <!-- Toast 提示 -->
     <transition name="toast-fade">
       <div v-if="toast.show" class="toast" :class="`toast-${toast.type}`">
@@ -1223,6 +1234,8 @@ import SessionPanel from './components/SessionPanel.vue'
 import { renderSideBySideDiff, escapeHtml } from './diffRenderer.js'
 import RenameAgentModal from './components/RenameAgentModal.vue'
 import AdminPanel from './components/AdminPanel.vue'
+import CommandPalette from './components/CommandPalette.vue'
+import { ACTIONS as actionDefs } from './actions/registry.js'
 
 const PLANTUML_SERVER_URL = 'https://www.plantuml.com/plantuml/svg/'
 const PLANTUML_BLOCK_LANGUAGE = 'plantuml'
@@ -4945,6 +4958,39 @@ function petGotoWaitingAgent() {
   showToast(`已切换到等待输入的 Agent：${target.name || target.agent_id}`, 'success')
 }
 
+// 命令面板上下文：统一暴露宠物菜单与命令面板共用的动作回调
+const commandPaletteCtx = computed(() => ({
+  currentAgentId: currentAgentId.value,
+  agentList: agentList.value,
+  waitingAgents: (agentList.value || []).filter(a => isWaitingInput(a)),
+  petInterruptCurrent,
+  petGotoWaitingAgent,
+  syncAllStatus: petSyncAllStatus,
+  openCreateAgentModal,
+  refreshAgentList: fetchAgentList,
+  restartGateway,
+  restartAllNodes,
+  toggleAgentSidebar,
+  toggleTerminalPanel,
+  toggleChatPanel,
+  openSettings: () => { showSettingsModal.value = true },
+}))
+
+// 命令面板动作清单（来自统一注册表）
+const appActions = computed(() => actionDefs)
+
+// 执行命令面板中的动作
+function onCommandRun(action) {
+  showCommandPalette.value = false
+  if (!action || typeof action.run !== 'function') return
+  try {
+    action.run(commandPaletteCtx.value)
+  } catch (err) {
+    console.error('命令执行失败', err)
+    showToast('命令执行失败', 'error')
+  }
+}
+
 // 切换单个 Agent 的选中状态
 function toggleSelectAgent(agentId) {
   if (selectedAgents.value.has(agentId)) {
@@ -5151,6 +5197,9 @@ const selectedIndex = ref(-1) // 当前选中的补全条目索引，-1 表示�
 
 // 流式消息跟踪
 const streamingMessages = ref(new Map()) // 按 agent_id 跟踪当前流式消息
+
+// 命令面板（Ctrl+K）
+const showCommandPalette = ref(false)
 
 // 执行状态
 const isExecuting = ref(false)
@@ -11413,6 +11462,13 @@ function sendTerminalResize(terminalId, rows, cols) {
 function handleGlobalKeydown(event) {
   const isModifierPressed = event.ctrlKey || event.metaKey
 
+  // Ctrl/Cmd + K 打开/关闭命令面板
+  if (isModifierPressed && event.code === 'KeyK') {
+    event.preventDefault()
+    showCommandPalette.value = !showCommandPalette.value
+    return
+  }
+
   // Ctrl/Cmd + S 保存当前编辑器标签
   if (isModifierPressed && event.key === 's') {
     if (showEditorPanel.value && activeEditorTab.value && !activeEditorTab.value.loading) {
@@ -11469,6 +11525,11 @@ function handleGlobalKeydown(event) {
 
   // ESC 键关闭所有对话框
   if (event.key === 'Escape') {
+    // 命令面板打开时优先关闭它
+    if (showCommandPalette.value) {
+      showCommandPalette.value = false
+      return
+    }
     // 如果对话框打开，关闭对话框
     if (showSettingsModal.value) {
       showSettingsModal.value = false
