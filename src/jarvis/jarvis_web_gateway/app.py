@@ -2077,6 +2077,34 @@ def create_app(
         sessions = manager._chat_manager.get_sessions()
         return {"success": True, "sessions": sessions}
 
+    @app.post("/api/frontend/eval-js", dependencies=[Depends(verify_token)])
+    async def api_frontend_eval_js(request: Request) -> Dict[str, Any]:
+        """向前端下发 JS 并等待执行结果。
+
+        请求体：{"code": str, "timeout": float, "target": str}
+        target 取值：current（默认）/ all / client_id / session_id
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return {"success": False, "error": "invalid json body"}
+        code = body.get("code")
+        if not code or not str(code).strip():
+            return {"success": False, "error": "code is required"}
+        try:
+            timeout = float(body.get("timeout", 30))
+        except (TypeError, ValueError):
+            timeout = 30.0
+        target = body.get("target") or "current"
+        # request_frontend_js 为阻塞调用（Queue.get），放入线程池避免阻塞事件循环
+        result = await asyncio.to_thread(
+            manager._gateway.request_frontend_js,
+            str(code),
+            timeout,
+            str(target),
+        )
+        return result
+
     @app.get("/api/chat/room-members", dependencies=[Depends(verify_token)])
     async def api_chat_get_room_members(request: Request) -> Dict[str, Any]:
         """获取聊天室成员列表。"""

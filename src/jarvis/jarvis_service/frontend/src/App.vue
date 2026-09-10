@@ -8446,7 +8446,8 @@ function handleMessage(message, agentId = null) {
   } else if (type === 'file_upload_response') {
     handleFileUploadResponse(payload)
   } else if (type === 'eval_js_request') {
-    handleEvalJsRequest(payload, targetAgentId)
+    // 回传必须用收到请求的连接来源 agentId（主网关消息为 null），不能用 targetAgentId
+    handleEvalJsRequest(payload, agentId)
   } else if (type && type.startsWith('chat_')) {
     handleChatMessage(type, payload)
   }
