@@ -136,6 +136,7 @@
   <!-- 宠物挂件：浮动于页面，可拖拽并记忆位置 -->
   <Teleport to="body">
     <div
+      v-show="!petHidden"
       class="pet-float"
       :class="petClasses"
       :style="{ left: petPos.x + 'px', top: petPos.y + 'px' }"
@@ -143,7 +144,7 @@
     >
       <div class="pet-inner">
         <div class="pet-glow"></div>
-        <div class="pet-bubble">需要输入</div>
+        <div class="pet-bubble">{{ petBubbleText }}</div>
         <div class="pet-body">
           <div class="pet-head" :style="petHeadStyle">
             <div class="pet-ear l"></div>
@@ -158,6 +159,15 @@
         <div class="pet-spark s1"></div>
         <div class="pet-spark s2"></div>
         <div class="pet-spark s3"></div>
+        <div class="pet-zzz z1">z</div>
+        <div class="pet-zzz z2">z</div>
+        <div class="pet-zzz z3">Z</div>
+        <div
+          v-if="petBadgeText"
+          class="pet-badge"
+          :class="{ 'is-alert': petWaitingAgents.length > 0 }"
+          :title="petWaitingAgents.length > 0 ? (petWaitingAgents.length + ' 个 Agent 等待输入') : (petRunningCount + ' 个 Agent 运行中')"
+        >{{ petBadgeText }}</div>
         <div class="pet-label">✦ JARVIS ✦</div>
         <button
           class="pet-sfx-btn"
@@ -171,11 +181,42 @@
           @pointermove="onPetPointerMove"
           @pointerup="onPetPointerUp"
           @pointercancel="onPetPointerUp"
+          @contextmenu.prevent="onPetContextMenu"
           @mouseenter="petHover = true"
           @mouseleave="petHover = false"
         ></div>
       </div>
     </div>
+
+    <!-- 右键菜单 -->
+    <div
+      v-if="petMenu.show"
+      class="pet-menu"
+      :style="{ left: petMenu.x + 'px', top: petMenu.y + 'px' }"
+      @pointerdown.stop
+      @contextmenu.prevent
+    >
+      <div class="pet-menu-item" @click="petFeed"><span class="pet-menu-ico">🍖</span>喂食</div>
+      <div class="pet-menu-item" @click="petPlayBall"><span class="pet-menu-ico">🎾</span>玩球</div>
+      <div class="pet-menu-item" @click="togglePetSleep"><span class="pet-menu-ico">{{ petSleep ? '☀️' : '💤' }}</span>{{ petSleep ? '唤醒' : '打盹' }}</div>
+      <div class="pet-menu-item" @click="petSing"><span class="pet-menu-ico">🎵</span>唱歌</div>
+      <div class="pet-menu-sep"></div>
+      <div class="pet-menu-item" :class="{ 'is-disabled': !currentAgentId }" @click="petInterrupt"><span class="pet-menu-ico">⏹</span>中断当前</div>
+      <div class="pet-menu-item" :class="{ 'is-disabled': petWaitingAgents.length === 0 }" @click="petGotoWaiting"><span class="pet-menu-ico">🚨</span>奔赴等待</div>
+      <div class="pet-menu-item" @click="petSyncStatus"><span class="pet-menu-ico">🔄</span>同步状态</div>
+      <div class="pet-menu-item" @click="petToggleSidebar"><span class="pet-menu-ico">📋</span>切换侧栏</div>
+      <div class="pet-menu-item" @click="petCollapseAll"><span class="pet-menu-ico">📁</span>折叠分组</div>
+      <div class="pet-menu-sep"></div>
+      <div class="pet-menu-item" @click="petHide"><span class="pet-menu-ico">👻</span>隐藏宠物</div>
+    </div>
+
+    <!-- 隐藏后的还原按钮 -->
+    <button
+      v-if="petHidden"
+      class="pet-restore"
+      title="唤回宠物"
+      @click="showPet"
+    >🐾</button>
   </Teleport>
 
   <!-- 加入分组弹窗 -->
@@ -304,7 +345,9 @@ const props = defineProps({
   isWaitingInput: Function,
   agentGroups: { type: Array, default: () => [] },
   currentUserId: { type: String, default: '' },
-  currentUserName: { type: String, default: '' }
+  currentUserName: { type: String, default: '' },
+  // 流式输出状态：{ streaming, agentId, chars, tail }
+  petStreaming: { type: Object, default: null }
 })
 
 // 分组弹窗状态
@@ -363,6 +406,10 @@ const emit = defineEmits([
   'startResize',
   'editAccess',
   'regenerateAgent',
+  'petSyncStatus',
+  'petInterruptCurrent',
+  'petGotoWaiting',
+  'petToggleSidebar',
 ])
 
 // 监听 agentStatuses 变化，当 agent 状态从等待输入变为非等待输入时清除点击标记
@@ -433,6 +480,27 @@ const petJump = ref(false)
 const petAction = ref('')
 const petPupil = ref({ x: 0, y: 0 })
 const petTilt = ref(0)
+const petFaceDir = ref(1)   // 朝向：1 向右，-1 向左
+// 丰富交互新增状态
+const petSleep = ref(false)      // 打盹中
+const petPetting = ref(false)    // 摸头中
+const petHidden = ref(false)     // 已隐藏
+const petWalking = ref(false)    // 随机漫步中
+const petSpeech = ref('')        // 随机台词
+const petMenu = ref({ show: false, x: 0, y: 0 })  // 右键菜单
+const petTyping = ref(false)     // "正在输出"打字中
+
+// 随机台词库
+const PET_LINES = [
+  '你好呀~',
+  '今天也要加油鸭！',
+  '需要帮忙吗？',
+  '我在这儿陪着你~',
+  '记得休息一下哦',
+  '嘿嘿，被你摸到了',
+  '有新的任务吗？',
+  '我一直都在呢 ✦',
+]
 
 // 宠物状态：waiting（有 Agent 等待输入）| running（有 Agent 运行中）| idle
 const petState = computed(() => {
@@ -446,12 +514,58 @@ const petState = computed(() => {
   return 'idle'
 })
 
+// 流式输出状态（空值保护）
+const petStreaming = computed(() => props.petStreaming || { streaming: false, agentId: '', chars: 0, tail: '' })
+// 当前是否有 Agent 正在流式输出
+const petStreamingActive = computed(() => !!petStreaming.value.streaming)
+
+// 气泡文本：流式输出优先（像宠物自己在吐字），其次等待输入，最后随机台词
+const petBubbleText = computed(() => {
+  if (petStreamingActive.value) {
+    const tail = (petStreaming.value.tail || '').trim()
+    return '✎ ' + (tail || '正在输出…')
+  }
+  if (petState.value === 'waiting') return '需要输入'
+  return petSpeech.value
+})
+
+// ==================== 网关操作：宠物状态聚合 ====================
+// 等待输入的 Agent 列表
+const petWaitingAgents = computed(() =>
+  (props.agentList || []).filter(a => props.isWaitingInput && props.isWaitingInput(a))
+)
+
+// 运行中的 Agent 数量
+const petRunningCount = computed(() => {
+  const list = props.agentList || []
+  const statuses = props.agentStatuses
+  if (!statuses) return 0
+  return list.filter(a => {
+    const st = statuses.get(a.agent_id)
+    return st && (st.execution_status === 'running' || st.execution_status === 'executing')
+  }).length
+})
+
+// 徽标文本：优先显示等待数，其次显示运行数
+const petBadgeText = computed(() => {
+  if (petWaitingAgents.value.length > 0) return String(petWaitingAgents.value.length)
+  if (petRunningCount.value > 0) return String(petRunningCount.value)
+  return ''
+})
+
 const petClasses = computed(() => [
   'is-' + petState.value,
   {
     'is-hover': petHover.value,
     'is-drag': petDrag.value,
     'is-jump': petJump.value,
+    'is-speak': !!petSpeech.value,
+    'is-sleep': petSleep.value,
+    'is-petting': petPetting.value,
+    'is-walk': petWalking.value,
+    'is-streaming': petStreamingActive.value,
+    'is-typing': petTyping.value,
+    'face-left': petFaceDir.value < 0,
   },
   petAction.value ? 'act-' + petAction.value : '',
 ])
@@ -504,6 +618,8 @@ function onPetMouseMove(e) {
   if (petRaf) return
   petRaf = requestAnimationFrame(() => {
     petRaf = 0
+    // 睡眠/隐藏时不跟踪鼠标
+    if (petSleep.value || petHidden.value) return
     const head = document.querySelector('.pet-float .pet-head')
     if (!head) return
     const r = head.getBoundingClientRect()
@@ -529,17 +645,36 @@ let petStartX = 0
 let petStartY = 0
 let petOriginX = 0
 let petOriginY = 0
-let petLastClick = 0
+
+// 交互判定定时器
+let petClickTimer = 0    // 单击延迟判定
+let petLongPressTimer = 0  // 长按判定
+let petSpeechTimer = 0   // 台词气泡
+let petHideTimer = 0     // 隐藏后自动恢复
+let petLongPressFired = false  // 本次长按已触发
+let petPettingFxTimer = 0      // 摸头爱心循环
 
 function onPetPointerDown(e) {
+  if (e.button !== undefined && e.button !== 0) return  // 仅左键
+  stopPetWalk()
   petDragging = true
   petMoved = false
+  petLongPressFired = false
   petStartX = e.clientX
   petStartY = e.clientY
   petOriginX = petPos.value.x
   petOriginY = petPos.value.y
   e.target.setPointerCapture?.(e.pointerId)
   e.preventDefault()
+  hidePetMenu()
+  // 长按判定：600ms 未移动则触发摸头
+  clearTimeout(petLongPressTimer)
+  petLongPressTimer = window.setTimeout(() => {
+    if (petDragging && !petMoved) {
+      petLongPressFired = true
+      startPetting()
+    }
+  }, 600)
 }
 
 function onPetPointerMove(e) {
@@ -549,6 +684,9 @@ function onPetPointerMove(e) {
   if (!petMoved && Math.hypot(dx, dy) > 5) {
     petMoved = true
     petDrag.value = true
+    // 拖拽开始则取消长按
+    clearTimeout(petLongPressTimer)
+    if (petPetting.value) stopPetting()
   }
   if (petMoved) {
     petPos.value = clampPetPos(petOriginX + dx, petOriginY + dy)
@@ -558,6 +696,7 @@ function onPetPointerMove(e) {
 function onPetPointerUp(e) {
   if (!petDragging) return
   petDragging = false
+  clearTimeout(petLongPressTimer)
   e.target.releasePointerCapture?.(e.pointerId)
   if (petMoved) {
     petDrag.value = false
@@ -565,12 +704,274 @@ function onPetPointerUp(e) {
     return
   }
   petDrag.value = false
-  const now = Date.now()
-  if (now - petLastClick < 280) return
-  petLastClick = now
+  // 长按已触发：结束摸头，不再触发单击/双击
+  if (petLongPressFired) {
+    petLongPressFired = false
+    stopPetting()
+    return
+  }
+  // 单击 / 双击判定
+  if (petClickTimer) {
+    // 300ms 内第二次：双击
+    clearTimeout(petClickTimer)
+    petClickTimer = 0
+    onPetDoubleClick(e.clientX, e.clientY)
+    return
+  }
+  const cx = e.clientX
+  const cy = e.clientY
+  petClickTimer = window.setTimeout(() => {
+    petClickTimer = 0
+    onPetSingleClick(cx, cy)
+  }, 300)
+}
+
+// 单击：睡眠则唤醒；否则跳跃 + 粒子 + 音效 + 随机台词
+function onPetSingleClick(x, y) {
+  if (petSleep.value) {
+    petSleep.value = false
+    petSfxChirp()
+    return
+  }
   petJump.value = true
   setTimeout(() => { petJump.value = false }, 560)
-  spawnPetFx(e.clientX, e.clientY)
+  spawnPetFx(x, y)
+  petSfxChirp()
+  showPetSpeech()
+}
+
+// 双击：撒花庆祝
+function onPetDoubleClick(x, y) {
+  if (petSleep.value) petSleep.value = false
+  petJump.value = true
+  setTimeout(() => { petJump.value = false }, 560)
+  petAction.value = 'cheer'
+  setTimeout(() => { if (petAction.value === 'cheer') petAction.value = '' }, 1600)
+  spawnPetConfetti(x, y)
+  spawnPetFx(x, y)
+  petSfxCheer()
+  showPetSpeech()
+}
+
+// 随机台词气泡：显示 2s
+function showPetSpeech() {
+  petSpeech.value = PET_LINES[Math.floor(Math.random() * PET_LINES.length)]
+  clearTimeout(petSpeechTimer)
+  petSpeechTimer = window.setTimeout(() => { petSpeech.value = '' }, 2000)
+}
+
+// 撒花特效
+function spawnPetConfetti(x, y) {
+  const colors = ['#20c8ff', '#7ee7ff', '#ff8ad8', '#ffd166', '#a78bfa']
+  for (let i = 0; i < 14; i++) {
+    const el = document.createElement('div')
+    el.className = 'pet-confetti'
+    el.style.left = x + 'px'
+    el.style.top = y + 'px'
+    el.style.background = colors[i % colors.length]
+    el.style.setProperty('--dx', (Math.random() * 120 - 60) + 'px')
+    el.style.setProperty('--dy', (-40 - Math.random() * 70) + 'px')
+    el.style.setProperty('--rot', (Math.random() * 540 - 270) + 'deg')
+    el.style.animationDelay = (i * 0.02) + 's'
+    document.body.appendChild(el)
+    setTimeout(() => el.remove(), 1400)
+  }
+}
+
+// 摸头
+function startPetting() {
+  if (petSleep.value) petSleep.value = false
+  petPetting.value = true
+  petSfxPurr()
+  spawnPetHearts()
+  clearInterval(petPettingFxTimer)
+  petPettingFxTimer = window.setInterval(spawnPetHearts, 420)
+}
+
+function stopPetting() {
+  petPetting.value = false
+  clearInterval(petPettingFxTimer)
+  petPettingFxTimer = 0
+}
+
+// 冒出爱心（基于宠物当前位置）
+function spawnPetHearts() {
+  const el = document.querySelector('.pet-float')
+  const r = el ? el.getBoundingClientRect() : { left: petPos.value.x, top: petPos.value.y, width: PET_W, height: PET_H }
+  const x = r.left + r.width / 2
+  const y = r.top + r.height * 0.28
+  for (let i = 0; i < 2; i++) {
+    const h = document.createElement('div')
+    h.className = 'pet-heart-fx'
+    h.textContent = Math.random() > 0.5 ? '❤' : '💗'
+    h.style.left = (x + (Math.random() * 40 - 20)) + 'px'
+    h.style.top = (y + (Math.random() * 16 - 8)) + 'px'
+    h.style.setProperty('--dx', (Math.random() * 50 - 25) + 'px')
+    document.body.appendChild(h)
+    setTimeout(() => h.remove(), 1300)
+  }
+}
+
+// ==================== 右键菜单 ====================
+function onPetContextMenu(e) {
+  const MENU_W = 148
+  const MENU_H = 330
+  petMenu.value = {
+    show: true,
+    x: Math.min(e.clientX, window.innerWidth - MENU_W - 8),
+    y: Math.min(e.clientY, window.innerHeight - MENU_H - 8),
+  }
+}
+
+function hidePetMenu() {
+  if (petMenu.value.show) petMenu.value = { show: false, x: 0, y: 0 }
+}
+
+function onPetDocPointerDown(e) {
+  if (!petMenu.value.show) return
+  const menu = document.querySelector('.pet-menu')
+  if (menu && menu.contains(e.target)) return
+  hidePetMenu()
+}
+
+// ==================== 菜单动作 ====================
+// 喂食：食物落下 + 咀嚼
+function petFeed() {
+  hidePetMenu()
+  if (petSleep.value) petSleep.value = false
+  const el = document.querySelector('.pet-float')
+  const r = el ? el.getBoundingClientRect() : { left: petPos.value.x, top: petPos.value.y, width: PET_W, height: PET_H }
+  const food = document.createElement('div')
+  food.className = 'pet-food'
+  food.textContent = '🍖'
+  food.style.left = (r.left + r.width / 2) + 'px'
+  food.style.top = (r.top + r.height * 0.1) + 'px'
+  document.body.appendChild(food)
+  setTimeout(() => food.remove(), 900)
+  setTimeout(() => {
+    petAction.value = 'chomp'
+    setTimeout(() => { if (petAction.value === 'chomp') petAction.value = '' }, 1000)
+    petSfxChomp()
+    spawnPetHearts()
+  }, 520)
+}
+
+// 玩球：球飞过 + 追逐
+function petPlayBall() {
+  hidePetMenu()
+  if (petSleep.value) petSleep.value = false
+  const el = document.querySelector('.pet-float')
+  const r = el ? el.getBoundingClientRect() : { left: petPos.value.x, top: petPos.value.y, width: PET_W, height: PET_H }
+  const ball = document.createElement('div')
+  ball.className = 'pet-ball'
+  ball.textContent = '🎾'
+  ball.style.left = (r.left - 30) + 'px'
+  ball.style.top = (r.top + r.height * 0.62) + 'px'
+  ball.style.setProperty('--fly', (r.width + 70) + 'px')
+  document.body.appendChild(ball)
+  setTimeout(() => ball.remove(), 1500)
+  petAction.value = 'chase'
+  setTimeout(() => { if (petAction.value === 'chase') petAction.value = '' }, 1400)
+  petSfxChirp()
+}
+
+// 打盹 / 唤醒
+function togglePetSleep() {
+  hidePetMenu()
+  petSleep.value = !petSleep.value
+  if (petSleep.value) {
+    petSpeech.value = ''
+    petSfxYawn()
+  } else {
+    petSfxChirp()
+  }
+}
+
+// 唱歌：音符飘出 + 音阶
+function petSing() {
+  hidePetMenu()
+  if (petSleep.value) petSleep.value = false
+  const el = document.querySelector('.pet-float')
+  const r = el ? el.getBoundingClientRect() : { left: petPos.value.x, top: petPos.value.y, width: PET_W, height: PET_H }
+  const notes = ['♪', '♫', '🎵', '♬']
+  for (let i = 0; i < 6; i++) {
+    const n = document.createElement('div')
+    n.className = 'pet-note'
+    n.textContent = notes[i % notes.length]
+    n.style.left = (r.left + r.width / 2 + (Math.random() * 50 - 25)) + 'px'
+    n.style.top = (r.top + r.height * 0.3) + 'px'
+    n.style.setProperty('--dx', (Math.random() * 50 - 25) + 'px')
+    n.style.animationDelay = (i * 0.16) + 's'
+    document.body.appendChild(n)
+    setTimeout(() => n.remove(), 1800)
+  }
+  petAction.value = 'sing'
+  setTimeout(() => { if (petAction.value === 'sing') petAction.value = '' }, 1400)
+  petSfxSong()
+}
+
+// 隐藏宠物（15s 后自动恢复）
+function petHide() {
+  hidePetMenu()
+  stopPetting()
+  petHidden.value = true
+  clearTimeout(petHideTimer)
+  petHideTimer = window.setTimeout(() => { petHidden.value = false }, 15000)
+}
+
+function showPet() {
+  clearTimeout(petHideTimer)
+  petHidden.value = false
+  petSfxChirp()
+}
+
+// ==================== 网关操作 ====================
+// 同步所有已连接 Agent 的状态
+function petSyncStatus() {
+  hidePetMenu()
+  emit('petSyncStatus')
+  petAction.value = 'cheer'
+  setTimeout(() => { if (petAction.value === 'cheer') petAction.value = '' }, 1200)
+  petSfxChirp()
+}
+
+// 中断当前 Agent（人工介入）
+function petInterrupt() {
+  hidePetMenu()
+  if (!props.currentAgentId) {
+    petSpeech.value = '没有选中的 Agent'
+    clearTimeout(petSpeechTimer)
+    petSpeechTimer = window.setTimeout(() => { petSpeech.value = '' }, 2000)
+    return
+  }
+  emit('petInterruptCurrent')
+  petAction.value = 'chomp'
+  setTimeout(() => { if (petAction.value === 'chomp') petAction.value = '' }, 1000)
+  petSfxChomp()
+}
+
+// 奔赴等待输入的 Agent
+function petGotoWaiting() {
+  hidePetMenu()
+  if (petWaitingAgents.value.length === 0) return
+  emit('petGotoWaiting')
+  petSfxChirp()
+}
+
+// 切换侧边栏显示/隐藏
+function petToggleSidebar() {
+  hidePetMenu()
+  emit('petToggleSidebar')
+}
+
+// 折叠所有可折叠分组
+function petCollapseAll() {
+  hidePetMenu()
+  const map = { ...collapsedGroupsMap.value }
+  ;(props.displayGroups || []).forEach(g => {
+    if (g.isCollapsible) map[g.key] = true
+  })
+  collapsedGroupsMap.value = map
   petSfxChirp()
 }
 
@@ -589,6 +990,62 @@ function spawnPetFx(x, y) {
     setTimeout(() => el.remove(), 1400)
   }
 }
+
+// ==================== 流式输出：宠物"正在输出"表现 ====================
+let petTypingFxTimer = 0      // 打字字符粒子循环
+let petTypingSfxTimer = 0     // 打字音效节拍
+let petTypingStopTimer = 0    // 结束后收尾
+
+// 打字字符粒子：从头部附近飘出的小字符，表现"在吐字"
+function spawnPetTypingFx() {
+  if (petHidden.value || document.hidden) return
+  const anchor = document.querySelector('.pet-float .pet-head')
+  if (!anchor) return
+  const r = anchor.getBoundingClientRect()
+  const icons = ['·', '⌁', '✦', '0', '1', '✎']
+  const el = document.createElement('div')
+  el.className = 'pet-type-fx'
+  el.textContent = icons[Math.floor(Math.random() * icons.length)]
+  el.style.left = (r.left + r.width * (0.35 + Math.random() * 0.4)) + 'px'
+  el.style.top = (r.top + r.height * (0.4 + Math.random() * 0.4)) + 'px'
+  el.style.setProperty('--pet-type-dx', (Math.random() * 26 - 13) + 'px')
+  el.style.setProperty('--pet-type-rot', (Math.random() * 50 - 25) + 'deg')
+  document.body.appendChild(el)
+  setTimeout(() => el.remove(), 1100)
+}
+
+function startPetTyping() {
+  stopPetTyping()
+  petTyping.value = true
+  petSfxTyping()
+  petTypingFxTimer = window.setInterval(spawnPetTypingFx, 300)
+  petTypingSfxTimer = window.setInterval(petSfxTyping, 900)
+}
+
+function stopPetTyping() {
+  if (petTypingFxTimer) { clearInterval(petTypingFxTimer); petTypingFxTimer = 0 }
+  if (petTypingSfxTimer) { clearInterval(petTypingSfxTimer); petTypingSfxTimer = 0 }
+  if (petTypingStopTimer) { clearTimeout(petTypingStopTimer); petTypingStopTimer = 0 }
+  petTyping.value = false
+}
+
+// 流式开始/结束时切换表现：开始则停下漫步、边吐字边打字；结束则缓缓收尾
+watch(petStreamingActive, (active) => {
+  if (active) {
+    stopPetWalk()
+    // 有输出时醒过来，别让睡着的宠物在打字
+    if (petSleep.value) petSleep.value = false
+    startPetTyping()
+  } else {
+    // 保留一小段"吐完最后几个字"的余韵，避免切换突兀
+    if (petTyping.value) {
+      if (petTypingFxTimer) { clearInterval(petTypingFxTimer); petTypingFxTimer = 0 }
+      if (petTypingSfxTimer) { clearInterval(petTypingSfxTimer); petTypingSfxTimer = 0 }
+      clearTimeout(petTypingStopTimer)
+      petTypingStopTimer = window.setTimeout(() => { petTyping.value = false }, 700)
+    }
+  }
+})
 
 // ==================== 宠物音效（Web Audio 合成，无外部资源） ====================
 const PET_SFX_KEY = 'jarvis_pet_sfx'
@@ -633,6 +1090,14 @@ function petSfxChirp() {
   petTone(1500, 0.07, 0.11, 'triangle', 0.07, 2100)
 }
 
+// 流式输出：轻小的"嗒嗒"打字声，很轻微，不打扰
+function petSfxTyping() {
+  if (!petSfxOn.value) return
+  petTone(1600, 0, 0.03, 'square', 0.018, 1300)
+  petTone(1250, 0.05, 0.03, 'square', 0.015, 1500)
+  petTone(1750, 0.1, 0.035, 'square', 0.013, 1400)
+}
+
 // 随机小动作配音
 function petSfxAction(action) {
   if (!petSfxOn.value) return
@@ -654,6 +1119,41 @@ function petSfxAction(action) {
   }
 }
 
+// 双击欢呼
+function petSfxCheer() {
+  if (!petSfxOn.value) return
+  petTone(880, 0, 0.1, 'triangle', 0.08, 1320)
+  petTone(1320, 0.09, 0.1, 'triangle', 0.08, 1760)
+  petTone(1760, 0.18, 0.18, 'triangle', 0.07, 2200)
+}
+
+// 咀嚼：短促双音
+function petSfxChomp() {
+  if (!petSfxOn.value) return
+  petTone(320, 0, 0.07, 'square', 0.05, 180)
+  petTone(300, 0.14, 0.07, 'square', 0.05, 170)
+}
+
+// 呼噜：低频颤音
+function petSfxPurr() {
+  if (!petSfxOn.value) return
+  petTone(180, 0, 0.5, 'sawtooth', 0.035, 210)
+  petTone(150, 0.06, 0.45, 'sine', 0.03, 175)
+}
+
+// 唱歌：音阶序列
+function petSfxSong() {
+  if (!petSfxOn.value) return
+  const scale = [523, 587, 659, 784, 880, 1047]
+  scale.forEach((f, i) => petTone(f, i * 0.14, 0.16, 'sine', 0.06))
+}
+
+// 打盹哈欠
+function petSfxYawn() {
+  if (!petSfxOn.value) return
+  petTone(620, 0, 0.45, 'sine', 0.06, 300)
+}
+
 function togglePetSfx() {
   petSfxOn.value = !petSfxOn.value
   try {
@@ -669,7 +1169,7 @@ const PET_ACTIONS = ['look', 'yawn', 'spin', 'hop']
 let petActTimer = 0
 function schedulePetAction() {
   petActTimer = window.setTimeout(() => {
-    if (!document.hidden && !petHover.value && !petDrag.value) {
+    if (!document.hidden && !petHover.value && !petDrag.value && !petSleep.value && !petHidden.value && !petPetting.value && !petWalking.value) {
       const act = PET_ACTIONS[Math.floor(Math.random() * PET_ACTIONS.length)]
       petAction.value = act
       petSfxAction(act)
@@ -683,6 +1183,80 @@ function onPetResize() {
   petPos.value = clampPetPos(petPos.value.x, petPos.value.y)
 }
 
+// ==================== 随机漫步 ====================
+let petWanderTimer = 0   // 下次醒来的时间
+let petWanderRaf = 0     // 漫步动画帧
+// 当前是否可自由漫步：未拖拽/悬停/睡眠/隐藏/摸头，且页面可见
+function canPetWander() {
+  return !document.hidden && !petHover.value && !petDrag.value &&
+    !petSleep.value && !petHidden.value && !petPetting.value && !petWalking.value &&
+    !petTyping.value
+}
+
+function schedulePetWander() {
+  clearTimeout(petWanderTimer)
+  petWanderTimer = window.setTimeout(() => {
+    if (canPetWander()) startPetWalk()
+    schedulePetWander()
+  }, 9000 + Math.random() * 14000)
+}
+
+// 随机选一个附近的目的地：多数时候小范围踱步，偶尔走远一点
+function pickPetDestination() {
+  const maxX = Math.max(0, window.innerWidth - PET_W)
+  const maxY = Math.max(0, window.innerHeight - PET_H)
+  const far = Math.random() < 0.15
+  const rangeX = far ? window.innerWidth * 0.4 : 170
+  const rangeY = far ? window.innerHeight * 0.35 : 90
+  const nx = petPos.value.x + (Math.random() * 2 - 1) * rangeX
+  const ny = petPos.value.y + (Math.random() * 2 - 1) * rangeY
+  return {
+    x: Math.max(0, Math.min(maxX, nx)),
+    y: Math.max(0, Math.min(maxY, ny)),
+  }
+}
+
+function startPetWalk() {
+  const from = { x: petPos.value.x, y: petPos.value.y }
+  const to = pickPetDestination()
+  const dist = Math.hypot(to.x - from.x, to.y - from.y)
+  // 移动太小就不走了，避免原地抖动
+  if (dist < 40) return
+  // 朝向：根据水平方向翻转
+  petFaceDir.value = to.x < from.x ? -1 : 1
+  petWalking.value = true
+  // 悄悄移动就不发声了，避免打扰
+  const dur = Math.max(1600, Math.min(6000, dist * 11))
+  const t0 = performance.now()
+  const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2)
+  const step = (now) => {
+    const t = Math.min(1, (now - t0) / dur)
+    const e = easeInOut(t)
+    petPos.value = clampPetPos(
+      from.x + (to.x - from.x) * e,
+      from.y + (to.y - from.y) * e
+    )
+    if (t < 1) {
+      petWanderRaf = requestAnimationFrame(step)
+    } else {
+      petWanderRaf = 0
+      petWalking.value = false
+      savePetPos()
+    }
+  }
+  cancelAnimationFrame(petWanderRaf)
+  petWanderRaf = requestAnimationFrame(step)
+}
+
+// 中断漫步（拖拽/交互时）
+function stopPetWalk() {
+  if (petWanderRaf) {
+    cancelAnimationFrame(petWanderRaf)
+    petWanderRaf = 0
+  }
+  petWalking.value = false
+}
+
 onMounted(() => {
   initPetPos()
   try {
@@ -691,15 +1265,28 @@ onMounted(() => {
     petSfxOn.value = true
   }
   document.addEventListener('mousemove', onPetMouseMove)
+  document.addEventListener('pointerdown', onPetDocPointerDown)
   window.addEventListener('resize', onPetResize)
   schedulePetAction()
+  schedulePetWander()
 })
 
 onUnmounted(() => {
   document.removeEventListener('mousemove', onPetMouseMove)
+  document.removeEventListener('pointerdown', onPetDocPointerDown)
   window.removeEventListener('resize', onPetResize)
   clearTimeout(petActTimer)
+  clearTimeout(petClickTimer)
+  clearTimeout(petLongPressTimer)
+  clearTimeout(petSpeechTimer)
+  clearTimeout(petHideTimer)
+  clearInterval(petPettingFxTimer)
+  clearTimeout(petWanderTimer)
   if (petRaf) cancelAnimationFrame(petRaf)
+  if (petWanderRaf) cancelAnimationFrame(petWanderRaf)
+  if (petTypingFxTimer) clearInterval(petTypingFxTimer)
+  if (petTypingSfxTimer) clearInterval(petTypingSfxTimer)
+  if (petTypingStopTimer) clearTimeout(petTypingStopTimer)
 })
 
 </script>
@@ -1100,6 +1687,24 @@ onUnmounted(() => {
   animation: pet-jump 0.55s cubic-bezier(0.3, -0.4, 0.4, 1.4);
 }
 
+/* 随机漫步：走路时身体轻微起伏、尾巴加速摆动 */
+.pet-float.is-walk .pet-body {
+  animation: pet-walk 0.5s ease-in-out infinite;
+}
+
+.pet-float.is-walk .pet-tail {
+  animation-duration: 0.45s;
+}
+
+.pet-float.is-walk .pet-shadow {
+  animation: pet-walk-shadow 0.5s ease-in-out infinite;
+}
+
+/* 朝向翻转：只翻转身体本体，不影响气泡/徽标/文字 */
+.pet-float.face-left .pet-body {
+  --pet-flip: -1;
+}
+
 /* 状态联动 */
 .pet-float.is-run .pet-body {
   animation-duration: 1.8s;
@@ -1150,6 +1755,95 @@ onUnmounted(() => {
   animation: pet-bubble-bounce 1s ease-in-out infinite;
 }
 
+/* 流式输出：气泡展示"正在吐字"的尾巴，单行省略防溢出 */
+.pet-float.is-streaming .pet-bubble {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: linear-gradient(135deg, #a8f2ff, #35d2ff);
+  box-shadow: 0 0 14px rgba(32, 200, 255, 0.75);
+}
+
+.pet-float.is-streaming .pet-bubble,
+.pet-float.is-typing .pet-bubble {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+  animation: pet-bubble-type 0.9s ease-in-out infinite;
+}
+
+/* 流式输出：像小宠物自己在打字吐字 */
+.pet-float.is-streaming .pet-body,
+.pet-float.is-typing .pet-body {
+  animation: pet-typing 0.42s ease-in-out infinite;
+}
+
+.pet-float.is-streaming .pet-head,
+.pet-float.is-typing .pet-head {
+  transform: translateX(-50%) rotate(0deg) translateY(1px);
+}
+
+.pet-float.is-streaming .pet-mouth,
+.pet-float.is-typing .pet-mouth {
+  animation: pet-typing-mouth 0.3s steps(2, end) infinite;
+}
+
+.pet-float.is-streaming .pet-tail,
+.pet-float.is-typing .pet-tail {
+  animation-duration: 0.6s;
+}
+
+.pet-float.is-streaming .pet-pupil,
+.pet-float.is-typing .pet-pupil {
+  animation: pet-typing-eye 0.5s ease-in-out infinite;
+}
+
+@keyframes pet-typing {
+  0%,
+  100% {
+    transform: translateX(-50%) scaleX(var(--pet-flip, 1)) translateY(0);
+  }
+  50% {
+    transform: translateX(-50%) scaleX(var(--pet-flip, 1)) translateY(-4px);
+  }
+}
+
+@keyframes pet-typing-mouth {
+  0% {
+    width: 23px;
+    height: 8px;
+  }
+  50% {
+    width: 15px;
+    height: 13px;
+  }
+  100% {
+    width: 23px;
+    height: 8px;
+  }
+}
+
+@keyframes pet-typing-eye {
+  0%,
+  100% {
+    transform: translate(-50%, -50%);
+  }
+  50% {
+    transform: translate(calc(-50% + 1.5px), -50%);
+  }
+}
+
+@keyframes pet-bubble-type {
+  0%,
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+  50% {
+    opacity: 0.78;
+    transform: translateX(-50%) scale(0.985);
+  }
+}
+
 /* 随机小动作 */
 .pet-float.act-look .pet-head {
   animation: pet-look 1.6s ease-in-out;
@@ -1170,10 +1864,33 @@ onUnmounted(() => {
 @keyframes pet-bob {
   0%,
   100% {
-    transform: translateX(-50%) translateY(0);
+    transform: translateX(-50%) scaleX(var(--pet-flip, 1)) translateY(0);
   }
   50% {
-    transform: translateX(-50%) translateY(-13px);
+    transform: translateX(-50%) scaleX(var(--pet-flip, 1)) translateY(-13px);
+  }
+}
+
+/* 漫步时的小碎步起伏与压扁影子（--pet-flip 承载朝向，默认 1） */
+@keyframes pet-walk {
+  0%,
+  100% {
+    transform: translateX(-50%) scaleX(var(--pet-flip, 1)) translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateX(-50%) scaleX(var(--pet-flip, 1)) translateY(-7px) rotate(2deg);
+  }
+}
+
+@keyframes pet-walk-shadow {
+  0%,
+  100% {
+    transform: translateX(-50%) scale(1);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translateX(-50%) scale(0.82);
+    opacity: 0.22;
   }
 }
 
@@ -1234,16 +1951,16 @@ onUnmounted(() => {
 
 @keyframes pet-jump {
   0% {
-    transform: translateX(-50%) translateY(0) scale(1, 1);
+    transform: translateX(-50%) scaleX(var(--pet-flip, 1)) translateY(0) scale(1, 1);
   }
   30% {
-    transform: translateX(-50%) translateY(-26px) scale(0.94, 1.08);
+    transform: translateX(-50%) scaleX(var(--pet-flip, 1)) translateY(-26px) scale(0.94, 1.08);
   }
   60% {
-    transform: translateX(-50%) translateY(0) scale(1.06, 0.94);
+    transform: translateX(-50%) scaleX(var(--pet-flip, 1)) translateY(0) scale(1.06, 0.94);
   }
   100% {
-    transform: translateX(-50%) translateY(0) scale(1, 1);
+    transform: translateX(-50%) scaleX(var(--pet-flip, 1)) translateY(0) scale(1, 1);
   }
 }
 
@@ -1275,13 +1992,13 @@ onUnmounted(() => {
 
 @keyframes pet-spin {
   0% {
-    transform: translateX(-50%) rotate(0deg) scale(1);
+    transform: translateX(-50%) scaleX(var(--pet-flip, 1)) rotate(0deg) scale(1);
   }
   50% {
-    transform: translateX(-50%) rotate(180deg) scale(0.92);
+    transform: translateX(-50%) scaleX(var(--pet-flip, 1)) rotate(180deg) scale(0.92);
   }
   100% {
-    transform: translateX(-50%) rotate(360deg) scale(1);
+    transform: translateX(-50%) scaleX(var(--pet-flip, 1)) rotate(360deg) scale(1);
   }
 }
 
@@ -1776,5 +2493,342 @@ onUnmounted(() => {
   color: var(--color-text-secondary);
   border: none;
   margin-left: 4px;
+}
+/* ==================== 新增交互样式 ==================== */
+/* 右键菜单 */
+.pet-menu {
+  position: fixed;
+  z-index: 3200;
+  min-width: 132px;
+  padding: 6px;
+  border-radius: 12px;
+  background: rgba(15, 30, 48, 0.96);
+  border: 1px solid rgba(32, 200, 255, 0.28);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 14px rgba(32, 200, 255, 0.18);
+  backdrop-filter: blur(6px);
+  animation: pet-menu-in 0.14s ease-out;
+}
+
+.pet-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #cfe9f5;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+
+.pet-menu-item:hover {
+  background: rgba(32, 200, 255, 0.18);
+  color: #eafcff;
+}
+
+.pet-menu-ico {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.pet-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: rgba(126, 231, 255, 0.18);
+}
+
+.pet-menu-item.is-disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* 宠物头顶状态徽标（等待/运行）*/
+.pet-badge {
+  position: absolute;
+  left: 50%;
+  top: 44px;
+  transform: translateX(-50%);
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #06131f;
+  background: linear-gradient(135deg, #7ee7ff, #20c8ff);
+  border-radius: 11px;
+  box-shadow: 0 0 12px rgba(32, 200, 255, 0.6);
+  pointer-events: none;
+  z-index: 4;
+}
+
+.pet-badge.is-alert {
+  background: linear-gradient(135deg, #ffd166, #ff9800);
+  box-shadow: 0 0 14px rgba(255, 152, 0, 0.7);
+  animation: pet-badge-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pet-badge-pulse {
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  50% { transform: translateX(-50%) scale(1.12); }
+}
+
+@keyframes pet-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 隐藏后的还原按钮 */
+.pet-restore {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 900;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+  border: 1px solid rgba(32, 200, 255, 0.4);
+  border-radius: 50%;
+  background: rgba(15, 30, 48, 0.9);
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45), 0 0 12px rgba(32, 200, 255, 0.3);
+  animation: pet-restore-in 0.25s ease-out;
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+
+.pet-restore:hover {
+  transform: scale(1.1);
+  background: rgba(32, 200, 255, 0.22);
+}
+
+@keyframes pet-restore-in {
+  from { opacity: 0; transform: scale(0.6); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* ZZZ 睡眠标识 */
+.pet-zzz {
+  position: absolute;
+  color: rgba(126, 231, 255, 0.85);
+  font-weight: 700;
+  opacity: 0;
+  pointer-events: none;
+  text-shadow: 0 0 8px rgba(32, 200, 255, 0.6);
+}
+
+.pet-zzz.z1 { left: 58%; top: 42px; font-size: 13px; }
+.pet-zzz.z2 { left: 68%; top: 26px; font-size: 15px; }
+.pet-zzz.z3 { left: 78%; top: 8px; font-size: 18px; }
+
+.pet-float.is-sleep .pet-zzz {
+  animation: pet-zzz 2.4s ease-in-out infinite;
+}
+
+.pet-float.is-sleep .pet-zzz.z2 { animation-delay: 0.5s; }
+.pet-float.is-sleep .pet-zzz.z3 { animation-delay: 1s; }
+
+@keyframes pet-zzz {
+  0% { opacity: 0; transform: translateY(6px) scale(0.8); }
+  40% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-14px) scale(1.1); }
+}
+
+/* 睡眠：合眼、身体呼吸放慢 */
+.pet-float.is-sleep .pet-eye {
+  animation: none;
+  height: 4px;
+  border-radius: 3px;
+  margin-top: 8px;
+}
+
+.pet-float.is-sleep .pet-pupil {
+  opacity: 0;
+}
+
+.pet-float.is-sleep .pet-body {
+  animation-duration: 4.4s;
+}
+
+.pet-float.is-sleep .pet-tail {
+  animation-duration: 3.6s;
+}
+
+.pet-float.is-sleep .pet-mouth {
+  width: 14px;
+  height: 8px;
+}
+
+/* 摸头 */
+.pet-float.is-petting .pet-head {
+  animation: pet-pet-head 0.9s ease-in-out infinite;
+}
+
+.pet-float.is-petting .pet-eye {
+  animation-duration: 1.6s;
+}
+
+.pet-float.is-petting .pet-tail {
+  animation-duration: 0.6s;
+}
+
+@keyframes pet-pet-head {
+  0%, 100% { transform: translateX(-50%) translateY(0) rotate(0deg); }
+  50% { transform: translateX(-50%) translateY(-4px) rotate(2deg); }
+}
+
+/* 台词气泡：非等待输入时也显示 */
+.pet-float.is-speak .pet-bubble {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+/* 双击撒花（cheer） */
+.pet-float.act-cheer .pet-body {
+  animation: pet-jump 0.5s cubic-bezier(0.3, -0.4, 0.4, 1.4) 2;
+}
+
+/* 喂食咀嚼 */
+.pet-float.act-chomp .pet-mouth {
+  animation: pet-chomp 0.36s ease-in-out 3;
+}
+
+@keyframes pet-chomp {
+  0%, 100% { transform: translateX(-50%) scaleY(1); }
+  50% { transform: translateX(-50%) scaleY(2.2); }
+}
+
+/* 追球 */
+.pet-float.act-chase .pet-body {
+  animation: pet-chase 1.3s ease-in-out;
+}
+
+@keyframes pet-chase {
+  0%, 100% { transform: translateX(-50%) translateY(0) rotate(0deg); }
+  25% { transform: translateX(-50%) translateY(-8px) rotate(-7deg); }
+  75% { transform: translateX(-50%) translateY(-8px) rotate(7deg); }
+}
+
+/* 唱歌摇摆 */
+.pet-float.act-sing .pet-body {
+  animation: pet-sing 0.7s ease-in-out 2;
+}
+
+@keyframes pet-sing {
+  0%, 100% { transform: translateX(-50%) rotate(-4deg); }
+  50% { transform: translateX(-50%) rotate(4deg); }
+}
+
+
+</style>
+
+<!-- 动态特效元素（append 到 body，需非 scoped 样式） -->
+<style>
+.pet-fx,
+.pet-confetti,
+.pet-heart-fx,
+.pet-food,
+.pet-ball,
+.pet-note {
+  position: fixed;
+  z-index: 3100;
+  pointer-events: none;
+  user-select: none;
+}
+
+.pet-fx {
+  font-size: 15px;
+  animation: pet-fx-float 1.3s ease-out forwards;
+}
+
+@keyframes pet-fx-float {
+  0% { opacity: 0; transform: translateY(0) scale(0.6) rotate(0deg); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-46px) scale(1.15) rotate(var(--rot, 0deg)); }
+}
+
+.pet-confetti {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  animation: pet-confetti-fly 1.2s cubic-bezier(0.2, 0.7, 0.4, 1) forwards;
+}
+
+@keyframes pet-confetti-fly {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
+  60% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--dx, 0), var(--dy, -60px)) rotate(var(--rot, 180deg)) scale(0.5); }
+}
+
+.pet-heart-fx {
+  font-size: 16px;
+  color: #ff8ad8;
+  animation: pet-heart-float 1.2s ease-out forwards;
+}
+
+@keyframes pet-heart-float {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.6); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--dx, 0), -52px) scale(1.2); }
+}
+
+.pet-food {
+  font-size: 22px;
+  animation: pet-food-drop 0.85s cubic-bezier(0.5, 0, 0.8, 1) forwards;
+}
+
+@keyframes pet-food-drop {
+  0% { opacity: 0; transform: translate(-50%, -30px) scale(0.7); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, 46px) scale(1.05); }
+}
+
+.pet-ball {
+  font-size: 20px;
+  animation: pet-ball-fly 1.4s ease-in-out forwards;
+}
+
+@keyframes pet-ball-fly {
+  0% { opacity: 0; transform: translate(0, 0) rotate(0deg); }
+  15% { opacity: 1; }
+  50% { transform: translate(calc(var(--fly, 200px) / 2), -34px) rotate(180deg); }
+  100% { opacity: 0; transform: translate(var(--fly, 200px), 0) rotate(360deg); }
+}
+
+.pet-note {
+  font-size: 17px;
+  color: #7ee7ff;
+  text-shadow: 0 0 8px rgba(32, 200, 255, 0.6);
+  animation: pet-note-float 1.6s ease-out forwards;
+}
+
+@keyframes pet-note-float {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.7); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--dx, 0), -70px) scale(1.1) rotate(12deg); }
+}
+
+/* 流式输出：从头部飘出的打字字符 */
+.pet-type-fx {
+  font-size: 13px;
+  font-weight: 700;
+  color: #7ee7ff;
+  text-shadow: 0 0 8px rgba(32, 200, 255, 0.75);
+  animation: pet-type-float 1.05s ease-out forwards;
+}
+
+@keyframes pet-type-float {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.6) rotate(0deg); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--pet-type-dx, 0), -38px) scale(1.05) rotate(var(--pet-type-rot, 0deg)); }
 }
 </style>

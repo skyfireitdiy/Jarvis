@@ -19,6 +19,7 @@
       :getProxyNodeLabel="getAgentProxyNodeLabel"
       :isSelected="isAgentSelected"
       :isWaitingInput="isWaitingInput"
+      :petStreaming="petStreamingInfo"
       :agentGroups="agentGroups"
       :currentUserId="auth.userInfo?.user_id || ''"
       :currentUserName="auth.userInfo?.display_name || auth.userInfo?.username || ''"
@@ -38,6 +39,10 @@
       @createGroupWithAgents="createGroupWithAgents"
       @startResize="startAgentSidebarResize"
       @editAccess="editAgentAccess"
+      @petSyncStatus="petSyncAllStatus"
+      @petInterruptCurrent="petInterruptCurrent"
+      @petGotoWaiting="petGotoWaitingAgent"
+      @petToggleSidebar="toggleAgentSidebar"
     />
 
     <!-- 主内容区 -->
@@ -884,7 +889,7 @@
       :selectedIndex="selectedIndex"
       @update:searchText="completionSearch = $event"
       @close="closeCompletionsWithoutSelect()"
-      @select="(item) => insertCompletion(item, completionAgentId.value)"
+      @select="(item) => insertCompletion(item, completionAgentId)"
       @keydown="handleCompletionKeydown"
     />
 
@@ -4901,6 +4906,46 @@ function handleAgentItemClick(agent, event) {
   }
 }
 
+// ========== 宠物网关操作 ==========
+// 同步所有已连接 Agent 的状态
+function petSyncAllStatus() {
+  let count = 0
+  sockets.value.forEach((ws) => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'get_status', payload: {} }))
+      count++
+    }
+  })
+  if (count > 0) {
+    showToast(`已同步 ${count} 个 Agent 的状态`, 'success')
+  } else {
+    showToast('没有已连接的 Agent', 'error')
+  }
+}
+
+// 中断当前 Agent（人工介入）
+function petInterruptCurrent() {
+  const agentId = currentAgentId.value
+  if (!agentId) {
+    showToast('没有选中的 Agent', 'error')
+    return
+  }
+  sendMessageToAgent({ type: 'manual_interrupt', payload: {} }, agentId)
+  showToast('已发送中断信号', 'success')
+}
+
+// 奔赴等待输入的 Agent
+function petGotoWaitingAgent() {
+  const list = agentList.value || []
+  const target = list.find(a => isWaitingInput(a))
+  if (!target) {
+    showToast('没有等待输入的 Agent', 'info')
+    return
+  }
+  openAgentInPanel(target)
+  showToast(`已切换到等待输入的 Agent：${target.name || target.agent_id}`, 'success')
+}
+
 // 切换单个 Agent 的选中状态
 function toggleSelectAgent(agentId) {
   if (selectedAgents.value.has(agentId)) {
@@ -5107,6 +5152,32 @@ const selectedIndex = ref(-1) // 当前选中的补全条目索引，-1 表示�
 
 // 流式消息跟踪
 const streamingMessages = ref(new Map()) // 按 agent_id 跟踪当前流式消息
+
+// 供宠物挂件使用的流式输出状态（有 Agent 正在流式输出时，宠物表现出"正在输出"）
+const petStreamingInfo = computed(() => {
+  const map = streamingMessages.value
+  if (!map || map.size === 0) {
+    return { streaming: false, agentId: '', chars: 0, tail: '' }
+  }
+  let activeId = ''
+  let activeText = ''
+  for (const [agentId, msg] of map.entries()) {
+    const text = (msg && msg.text) || ''
+    if (text.length >= activeText.length) {
+      activeId = agentId
+      activeText = text
+    }
+  }
+  // 去掉 markdown 符号与空白，避免气泡里出现噪音字符
+  const cleaned = activeText.replace(/[\s#*`>\-\[\]()|~]/g, '')
+  const source = cleaned || activeText
+  return {
+    streaming: true,
+    agentId: activeId,
+    chars: activeText.length,
+    tail: source.slice(-24),
+  }
+})
 
 // 执行状态
 const isExecuting = ref(false)
