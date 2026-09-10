@@ -11779,11 +11779,8 @@ function getAutoReadTarget(agentId, executionStatus) {
   return { text: tip || '等待输入' }
 }
 
-// 进入等待输入状态时：先播提示音，结束后触发对应消息的朗读按钮逻辑
+// 进入等待输入状态时触发对应消息的朗读按钮逻辑（提示音由 notifyInputRequest 独立播放）
 async function handleAutoRead(agentId, executionStatus) {
-  if (!isAutoReadEnabled(agentId)) return
-  await playNotificationSound()
-  // 等待期间开关可能被关闭或状态已变化，再次校验
   if (!isAutoReadEnabled(agentId)) return
   const target = getAutoReadTarget(agentId, executionStatus)
   const panel = panels.value.find(p => p.agentId === agentId)
