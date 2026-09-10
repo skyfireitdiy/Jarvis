@@ -66,6 +66,15 @@
               </svg>
             </button>
             <div class="message-body markdown-content" v-html="item.html"></div>
+            <!-- 流式输出打字机光标（宠物缩略图） -->
+            <span v-if="item.isStreaming && item.output_type === 'STREAM'" class="stream-caret" aria-hidden="true">
+              <span class="stream-caret-pet">
+                <span class="stream-caret-ear l"></span>
+                <span class="stream-caret-ear r"></span>
+                <span class="stream-caret-eye l"></span>
+                <span class="stream-caret-eye r"></span>
+              </span>
+            </span>
             <div class="message-meta" v-if="item.agent_name || item.timestamp || item.non_interactive || item.agent_list">
               <span class="message-agent" v-if="item.agent_name">{{ item.agent_name }}</span>
               <span class="message-separator" v-if="item.agent_name && item.agent_list"> · </span>
@@ -968,6 +977,78 @@ function getTerminalStyle(terminalContent) {
   line-height: 1.6;
   word-break: break-word;
   font-family: 'Consolas', 'Microsoft YaHei', sans-serif;
+}
+
+/* 流式输出末尾的打字机光标（宠物缩略图） */
+.stream-caret {
+  display: inline-block;
+  vertical-align: text-bottom;
+  margin-left: 2px;
+  padding-bottom: 1px;
+  animation: stream-caret-blink 1s steps(2, start) infinite;
+}
+
+.stream-caret-pet {
+  position: relative;
+  display: block;
+  width: 12px;
+  height: 11px;
+  border-radius: 50% 50% 46% 46%;
+  background: linear-gradient(180deg, #7ee7ff 0%, #20c8ff 100%);
+  box-shadow: 0 0 6px rgba(32, 200, 255, 0.65), 0 0 2px rgba(126, 231, 255, 0.9);
+}
+
+.stream-caret-pet .stream-caret-ear {
+  position: absolute;
+  top: -3px;
+  width: 5px;
+  height: 5px;
+  background: #20c8ff;
+  border-radius: 2px 2px 0 0;
+}
+
+.stream-caret-pet .stream-caret-ear.l {
+  left: 0;
+  transform: rotate(-18deg);
+}
+
+.stream-caret-pet .stream-caret-ear.r {
+  right: 0;
+  transform: rotate(18deg);
+}
+
+.stream-caret-pet .stream-caret-eye {
+  position: absolute;
+  top: 4px;
+  width: 2.5px;
+  height: 2.5px;
+  background: #08243a;
+  border-radius: 50%;
+}
+
+.stream-caret-pet .stream-caret-eye.l {
+  left: 2px;
+}
+
+.stream-caret-pet .stream-caret-eye.r {
+  right: 2px;
+}
+
+@keyframes stream-caret-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stream-caret {
+    animation: none;
+  }
 }
 
 .message-meta {

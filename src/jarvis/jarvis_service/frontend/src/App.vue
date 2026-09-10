@@ -19,7 +19,6 @@
       :getProxyNodeLabel="getAgentProxyNodeLabel"
       :isSelected="isAgentSelected"
       :isWaitingInput="isWaitingInput"
-      :petStreaming="petStreamingInfo"
       :agentGroups="agentGroups"
       :currentUserId="auth.userInfo?.user_id || ''"
       :currentUserName="auth.userInfo?.display_name || auth.userInfo?.username || ''"
@@ -5152,32 +5151,6 @@ const selectedIndex = ref(-1) // 当前选中的补全条目索引，-1 表示�
 
 // 流式消息跟踪
 const streamingMessages = ref(new Map()) // 按 agent_id 跟踪当前流式消息
-
-// 供宠物挂件使用的流式输出状态（有 Agent 正在流式输出时，宠物表现出"正在输出"）
-const petStreamingInfo = computed(() => {
-  const map = streamingMessages.value
-  if (!map || map.size === 0) {
-    return { streaming: false, agentId: '', chars: 0, tail: '' }
-  }
-  let activeId = ''
-  let activeText = ''
-  for (const [agentId, msg] of map.entries()) {
-    const text = (msg && msg.text) || ''
-    if (text.length >= activeText.length) {
-      activeId = agentId
-      activeText = text
-    }
-  }
-  // 去掉 markdown 符号与空白，避免气泡里出现噪音字符
-  const cleaned = activeText.replace(/[\s#*`>\-\[\]()|~]/g, '')
-  const source = cleaned || activeText
-  return {
-    streaming: true,
-    agentId: activeId,
-    chars: activeText.length,
-    tail: source.slice(-24),
-  }
-})
 
 // 执行状态
 const isExecuting = ref(false)

@@ -345,9 +345,7 @@ const props = defineProps({
   isWaitingInput: Function,
   agentGroups: { type: Array, default: () => [] },
   currentUserId: { type: String, default: '' },
-  currentUserName: { type: String, default: '' },
-  // 流式输出状态：{ streaming, agentId, chars, tail }
-  petStreaming: { type: Object, default: null }
+  currentUserName: { type: String, default: '' }
 })
 
 // 分组弹窗状态
@@ -488,7 +486,6 @@ const petHidden = ref(false)     // 已隐藏
 const petWalking = ref(false)    // 随机漫步中
 const petSpeech = ref('')        // 随机台词
 const petMenu = ref({ show: false, x: 0, y: 0 })  // 右键菜单
-const petTyping = ref(false)     // "正在输出"打字中
 
 // 随机台词库
 const PET_LINES = [
@@ -514,17 +511,8 @@ const petState = computed(() => {
   return 'idle'
 })
 
-// 流式输出状态（空值保护）
-const petStreaming = computed(() => props.petStreaming || { streaming: false, agentId: '', chars: 0, tail: '' })
-// 当前是否有 Agent 正在流式输出
-const petStreamingActive = computed(() => !!petStreaming.value.streaming)
-
-// 气泡文本：流式输出优先（像宠物自己在吐字），其次等待输入，最后随机台词
+// 气泡文本：等待输入优先，其次随机台词
 const petBubbleText = computed(() => {
-  if (petStreamingActive.value) {
-    const tail = (petStreaming.value.tail || '').trim()
-    return '✎ ' + (tail || '正在输出…')
-  }
   if (petState.value === 'waiting') return '需要输入'
   return petSpeech.value
 })
@@ -563,8 +551,6 @@ const petClasses = computed(() => [
     'is-sleep': petSleep.value,
     'is-petting': petPetting.value,
     'is-walk': petWalking.value,
-    'is-streaming': petStreamingActive.value,
-    'is-typing': petTyping.value,
     'face-left': petFaceDir.value < 0,
   },
   petAction.value ? 'act-' + petAction.value : '',
@@ -991,62 +977,6 @@ function spawnPetFx(x, y) {
   }
 }
 
-// ==================== 流式输出：宠物"正在输出"表现 ====================
-let petTypingFxTimer = 0      // 打字字符粒子循环
-let petTypingSfxTimer = 0     // 打字音效节拍
-let petTypingStopTimer = 0    // 结束后收尾
-
-// 打字字符粒子：从头部附近飘出的小字符，表现"在吐字"
-function spawnPetTypingFx() {
-  if (petHidden.value || document.hidden) return
-  const anchor = document.querySelector('.pet-float .pet-head')
-  if (!anchor) return
-  const r = anchor.getBoundingClientRect()
-  const icons = ['·', '⌁', '✦', '0', '1', '✎']
-  const el = document.createElement('div')
-  el.className = 'pet-type-fx'
-  el.textContent = icons[Math.floor(Math.random() * icons.length)]
-  el.style.left = (r.left + r.width * (0.35 + Math.random() * 0.4)) + 'px'
-  el.style.top = (r.top + r.height * (0.4 + Math.random() * 0.4)) + 'px'
-  el.style.setProperty('--pet-type-dx', (Math.random() * 26 - 13) + 'px')
-  el.style.setProperty('--pet-type-rot', (Math.random() * 50 - 25) + 'deg')
-  document.body.appendChild(el)
-  setTimeout(() => el.remove(), 1100)
-}
-
-function startPetTyping() {
-  stopPetTyping()
-  petTyping.value = true
-  petSfxTyping()
-  petTypingFxTimer = window.setInterval(spawnPetTypingFx, 300)
-  petTypingSfxTimer = window.setInterval(petSfxTyping, 900)
-}
-
-function stopPetTyping() {
-  if (petTypingFxTimer) { clearInterval(petTypingFxTimer); petTypingFxTimer = 0 }
-  if (petTypingSfxTimer) { clearInterval(petTypingSfxTimer); petTypingSfxTimer = 0 }
-  if (petTypingStopTimer) { clearTimeout(petTypingStopTimer); petTypingStopTimer = 0 }
-  petTyping.value = false
-}
-
-// 流式开始/结束时切换表现：开始则停下漫步、边吐字边打字；结束则缓缓收尾
-watch(petStreamingActive, (active) => {
-  if (active) {
-    stopPetWalk()
-    // 有输出时醒过来，别让睡着的宠物在打字
-    if (petSleep.value) petSleep.value = false
-    startPetTyping()
-  } else {
-    // 保留一小段"吐完最后几个字"的余韵，避免切换突兀
-    if (petTyping.value) {
-      if (petTypingFxTimer) { clearInterval(petTypingFxTimer); petTypingFxTimer = 0 }
-      if (petTypingSfxTimer) { clearInterval(petTypingSfxTimer); petTypingSfxTimer = 0 }
-      clearTimeout(petTypingStopTimer)
-      petTypingStopTimer = window.setTimeout(() => { petTyping.value = false }, 700)
-    }
-  }
-})
-
 // ==================== 宠物音效（Web Audio 合成，无外部资源） ====================
 const PET_SFX_KEY = 'jarvis_pet_sfx'
 const petSfxOn = ref(true)
@@ -1088,14 +1018,6 @@ function petSfxChirp() {
   if (!petSfxOn.value) return
   petTone(900, 0, 0.09, 'triangle', 0.09, 1500)
   petTone(1500, 0.07, 0.11, 'triangle', 0.07, 2100)
-}
-
-// 流式输出：轻小的"嗒嗒"打字声，很轻微，不打扰
-function petSfxTyping() {
-  if (!petSfxOn.value) return
-  petTone(1600, 0, 0.03, 'square', 0.018, 1300)
-  petTone(1250, 0.05, 0.03, 'square', 0.015, 1500)
-  petTone(1750, 0.1, 0.035, 'square', 0.013, 1400)
 }
 
 // 随机小动作配音
@@ -1189,8 +1111,7 @@ let petWanderRaf = 0     // 漫步动画帧
 // 当前是否可自由漫步：未拖拽/悬停/睡眠/隐藏/摸头，且页面可见
 function canPetWander() {
   return !document.hidden && !petHover.value && !petDrag.value &&
-    !petSleep.value && !petHidden.value && !petPetting.value && !petWalking.value &&
-    !petTyping.value
+    !petSleep.value && !petHidden.value && !petPetting.value && !petWalking.value
 }
 
 function schedulePetWander() {
@@ -1284,9 +1205,6 @@ onUnmounted(() => {
   clearTimeout(petWanderTimer)
   if (petRaf) cancelAnimationFrame(petRaf)
   if (petWanderRaf) cancelAnimationFrame(petWanderRaf)
-  if (petTypingFxTimer) clearInterval(petTypingFxTimer)
-  if (petTypingSfxTimer) clearInterval(petTypingSfxTimer)
-  if (petTypingStopTimer) clearTimeout(petTypingStopTimer)
 })
 
 </script>
@@ -1753,95 +1671,6 @@ onUnmounted(() => {
   opacity: 1;
   transform: translateX(-50%) scale(1);
   animation: pet-bubble-bounce 1s ease-in-out infinite;
-}
-
-/* 流式输出：气泡展示"正在吐字"的尾巴，单行省略防溢出 */
-.pet-float.is-streaming .pet-bubble {
-  max-width: 190px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  background: linear-gradient(135deg, #a8f2ff, #35d2ff);
-  box-shadow: 0 0 14px rgba(32, 200, 255, 0.75);
-}
-
-.pet-float.is-streaming .pet-bubble,
-.pet-float.is-typing .pet-bubble {
-  opacity: 1;
-  transform: translateX(-50%) scale(1);
-  animation: pet-bubble-type 0.9s ease-in-out infinite;
-}
-
-/* 流式输出：像小宠物自己在打字吐字 */
-.pet-float.is-streaming .pet-body,
-.pet-float.is-typing .pet-body {
-  animation: pet-typing 0.42s ease-in-out infinite;
-}
-
-.pet-float.is-streaming .pet-head,
-.pet-float.is-typing .pet-head {
-  transform: translateX(-50%) rotate(0deg) translateY(1px);
-}
-
-.pet-float.is-streaming .pet-mouth,
-.pet-float.is-typing .pet-mouth {
-  animation: pet-typing-mouth 0.3s steps(2, end) infinite;
-}
-
-.pet-float.is-streaming .pet-tail,
-.pet-float.is-typing .pet-tail {
-  animation-duration: 0.6s;
-}
-
-.pet-float.is-streaming .pet-pupil,
-.pet-float.is-typing .pet-pupil {
-  animation: pet-typing-eye 0.5s ease-in-out infinite;
-}
-
-@keyframes pet-typing {
-  0%,
-  100% {
-    transform: translateX(-50%) scaleX(var(--pet-flip, 1)) translateY(0);
-  }
-  50% {
-    transform: translateX(-50%) scaleX(var(--pet-flip, 1)) translateY(-4px);
-  }
-}
-
-@keyframes pet-typing-mouth {
-  0% {
-    width: 23px;
-    height: 8px;
-  }
-  50% {
-    width: 15px;
-    height: 13px;
-  }
-  100% {
-    width: 23px;
-    height: 8px;
-  }
-}
-
-@keyframes pet-typing-eye {
-  0%,
-  100% {
-    transform: translate(-50%, -50%);
-  }
-  50% {
-    transform: translate(calc(-50% + 1.5px), -50%);
-  }
-}
-
-@keyframes pet-bubble-type {
-  0%,
-  100% {
-    opacity: 1;
-    transform: translateX(-50%) scale(1);
-  }
-  50% {
-    opacity: 0.78;
-    transform: translateX(-50%) scale(0.985);
-  }
 }
 
 /* 随机小动作 */
@@ -2817,18 +2646,4 @@ onUnmounted(() => {
   100% { opacity: 0; transform: translate(var(--dx, 0), -70px) scale(1.1) rotate(12deg); }
 }
 
-/* 流式输出：从头部飘出的打字字符 */
-.pet-type-fx {
-  font-size: 13px;
-  font-weight: 700;
-  color: #7ee7ff;
-  text-shadow: 0 0 8px rgba(32, 200, 255, 0.75);
-  animation: pet-type-float 1.05s ease-out forwards;
-}
-
-@keyframes pet-type-float {
-  0% { opacity: 0; transform: translate(0, 0) scale(0.6) rotate(0deg); }
-  25% { opacity: 1; }
-  100% { opacity: 0; transform: translate(var(--pet-type-dx, 0), -38px) scale(1.05) rotate(var(--pet-type-rot, 0deg)); }
-}
 </style>
