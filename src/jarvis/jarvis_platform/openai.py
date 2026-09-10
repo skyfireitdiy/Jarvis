@@ -24,6 +24,10 @@ import jarvis.jarvis_utils.globals as jglobals
 # 配置日志
 logger = logging.getLogger(__name__)
 
+# 模型返回的 tool_calls.arguments 不是合法 JSON 时（截断、夹带文本等），
+# 用它作为键把原始字符串传给工具层，由工具层给出可自我纠正的提示。
+PARSE_ERROR_KEY = "__argument_parse_error__"
+
 
 def _accumulate_openai_stream(
     stream: Any,
@@ -66,8 +70,8 @@ def _accumulate_openai_stream(
         try:
             args = json.loads(raw_args) if raw_args.strip() else {}
         except Exception:
-            # 参数不是合法 JSON（截断/夹带文本等），传空参数由工具层报缺失
-            args = {}
+            # 参数不是合法 JSON（截断/夹带文本等），保留原文供工具层给出可自我纠正的提示
+            args = {PARSE_ERROR_KEY: raw_args}
         tool_calls.append(
             {"id": e.get("id", ""), "name": e.get("name", ""), "arguments": args}
         )
@@ -706,8 +710,8 @@ class OpenAIModel(BasePlatform):
                     try:
                         args = json.loads(raw_args) if raw_args.strip() else {}
                     except Exception:
-                        # 参数不是合法 JSON（截断/夹带文本等），传空参数由工具层报缺失
-                        args = {}
+                        # 参数不是合法 JSON（截断/夹带文本等），保留原文供工具层给出可自我纠正的提示
+                        args = {PARSE_ERROR_KEY: raw_args}
                     tool_calls.append(
                         {
                             "id": e.get("id", ""),

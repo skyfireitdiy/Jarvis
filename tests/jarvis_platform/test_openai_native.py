@@ -3,7 +3,7 @@
 
 from types import SimpleNamespace
 
-from jarvis.jarvis_platform.openai import _accumulate_openai_stream
+from jarvis.jarvis_platform.openai import PARSE_ERROR_KEY, _accumulate_openai_stream
 
 
 def _chunk(content=None, tool_calls=None):
@@ -59,8 +59,16 @@ def test_multiple_parallel_tool_calls():
 def test_malformed_arguments_not_crash():
     stream = [_chunk(tool_calls=[_tool_call(0, "id", "t", "{not json}")])]
     content, calls = _accumulate_openai_stream(stream)
-    # 非法 JSON 不再包装为 raw_arguments，而是传空参数由工具层报缺失
-    assert calls[0]["arguments"] == {}
+    # 非法 JSON 保留原文，供工具层给出可自我纠正的提示
+    assert calls[0]["arguments"] == {PARSE_ERROR_KEY: "{not json}"}
+
+
+def test_truncated_arguments_preserved_for_tool_layer():
+    # 模拟流式分片被截断（如 edit_file 的大参数撞上输出上限）
+    truncated = '{"files": [{"file_path": "/home/skyfire/code/Ja'
+    stream = [_chunk(tool_calls=[_tool_call(0, "id", "edit_file", truncated)])]
+    content, calls = _accumulate_openai_stream(stream)
+    assert calls[0]["arguments"] == {PARSE_ERROR_KEY: truncated}
 
 
 def test_raw_arguments_not_special_cased():
