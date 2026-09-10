@@ -2190,6 +2190,7 @@ class GatewayManagerTool:
             error_prefix="Failed to list sessions",
         )
         return self._handle_gateway_response(result, success_data_key="sessions")
+
     def _chat_get_room_members(self, room_id: Optional[str] = None) -> Dict[str, Any]:
         """获取聊天室成员列表。
 
