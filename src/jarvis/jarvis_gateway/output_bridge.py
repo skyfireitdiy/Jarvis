@@ -84,12 +84,23 @@ class SessionOutputRouter(OutputMessagePublisher):
                 self._subscribers.pop(route_key, None)
 
     def publish(
-        self, message: Dict[str, Any], session_id: Optional[str] = None
+        self,
+        message: Dict[str, Any],
+        session_id: Optional[str] = None,
+        connection_id: Optional[str] = None,
     ) -> None:
         callbacks: Dict[str, Callable[[Dict[str, Any]], None]] = {}
         with self._lock:
-            for route_key in self._resolve_route_keys(session_id):
-                callbacks.update(self._subscribers.get(route_key, {}))
+            if connection_id is not None:
+                # 连接级定向：仅在目标会话下精确匹配该 connection_id
+                for route_key in self._resolve_route_keys(session_id):
+                    sender = self._subscribers.get(route_key, {}).get(connection_id)
+                    if sender is not None:
+                        callbacks[connection_id] = sender
+                        break
+            else:
+                for route_key in self._resolve_route_keys(session_id):
+                    callbacks.update(self._subscribers.get(route_key, {}))
 
         if not callbacks:
             return
@@ -116,6 +127,16 @@ class SessionOutputRouter(OutputMessagePublisher):
         """检查是否有活跃的订阅者连接。"""
         with self._lock:
             return bool(self._subscribers)
+
+    def has_connection(
+        self, connection_id: str, session_id: Optional[str] = None
+    ) -> bool:
+        """检查指定连接是否在线（可限定在某个 session 下）。"""
+        with self._lock:
+            for route_key in self._resolve_route_keys(session_id):
+                if connection_id in self._subscribers.get(route_key, {}):
+                    return True
+            return False
 
 
 def serialize_output_event(

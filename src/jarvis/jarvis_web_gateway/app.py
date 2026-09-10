@@ -380,6 +380,8 @@ class WebGateway(BaseGateway):
         # 前端 JS 执行等待队列：call_id -> Queue
         self._js_eval_waiters: Dict[str, Queue] = {}
         self._js_eval_lock = threading.Lock()
+        # client_id -> (WS connection_id, session_id)，用于 eval_js 按前端连接精确投递
+        self._client_connection_map: Dict[str, tuple[str, str]] = {}
 
     def emit_output(self, event: GatewayOutputEvent) -> None:
         # 多用户模式：广播到所有活跃session，检查任意session是否已授权
@@ -577,11 +579,12 @@ class WebGateway(BaseGateway):
             code: 要执行的 JavaScript 代码
             timeout: 等待超时（秒）
             target: 目标前端；None/"current" 取第一个已授权会话，"all" 广播，
-                其它值视为具体 session_id
+                已注册的 client_id 精确投递到该前端连接，其它值视为具体 session_id
 
         Returns:
             dict: 前端回传的结果（含 success/result 或 success/error）
         """
+        connection_id: Optional[str] = None
         if target in (None, "", "current"):
             session_id: Optional[str] = next(
                 (
@@ -596,7 +599,19 @@ class WebGateway(BaseGateway):
         elif target == "all":
             session_id = None  # 广播
         else:
-            session_id = target
+            # 优先按 client_id 精确投递到某一个前端连接
+            mapped = self._client_connection_map.get(str(target))
+            if mapped is not None:
+                connection_id, session_id = mapped
+                if not self._router.has_connection(
+                    connection_id, session_id=session_id
+                ):
+                    return {
+                        "success": False,
+                        "error": f"前端连接已断开: {target}",
+                    }
+            else:
+                session_id = target
 
         call_id = uuid.uuid4().hex
         waiter: Queue = Queue()
@@ -607,7 +622,9 @@ class WebGateway(BaseGateway):
             "type": "eval_js_request",
             "payload": {"call_id": call_id, "code": code, "timeout": timeout},
         }
-        self._router.publish(message, session_id=session_id)
+        self._router.publish(
+            message, session_id=session_id, connection_id=connection_id
+        )
 
         try:
             return cast(Dict[str, Any], waiter.get(timeout=timeout))
@@ -777,7 +794,9 @@ class WebSocketConnectionManager:
         try:
             while True:
                 message = await websocket.receive_json()
-                await self._handle_message(session_id, message, websocket)
+                await self._handle_message(
+                    session_id, message, websocket, connection_id
+                )
         except WebSocketDisconnect:
             print(
                 "[WS DISCONNECT] "
@@ -797,6 +816,12 @@ class WebSocketConnectionManager:
             for cid, client in list(self._chat_manager._chat_clients.items()):
                 if client.get("connection_id") == connection_id:
                     await self._chat_manager.unregister_client(cid)
+            # 清理 client_id -> connection_id 映射
+            for cid, (ws_conn_id, _sid) in list(
+                self._gateway._client_connection_map.items()
+            ):
+                if ws_conn_id == connection_id:
+                    self._gateway._client_connection_map.pop(cid, None)
             async with self._connection_state_lock:
                 connections = self._active_connections.get(session_id)
                 if connections:
@@ -884,7 +909,11 @@ class WebSocketConnectionManager:
         print("[SYNC_REQUEST] sync_response sent successfully")
 
     async def _handle_message(
-        self, session_id: str, message: Any, websocket: WebSocket
+        self,
+        session_id: str,
+        message: Any,
+        websocket: WebSocket,
+        connection_id: Optional[str] = None,
     ) -> None:
         if not isinstance(message, dict):
             return
@@ -1325,7 +1354,7 @@ class WebSocketConnectionManager:
         # ============================================================
         if message_type.startswith("chat_"):
             await self._handle_chat_message(
-                message_type, payload, websocket, session_id
+                message_type, payload, websocket, session_id, connection_id
             )
             return
 
@@ -1335,11 +1364,14 @@ class WebSocketConnectionManager:
         payload: Dict[str, Any],
         websocket: WebSocket,
         session_id: str,
+        connection_id: Optional[str] = None,
     ) -> None:
         """处理聊天室相关消息。"""
         try:
             if message_type == "chat_register":
-                await self._handle_chat_register(payload, websocket, session_id)
+                await self._handle_chat_register(
+                    payload, websocket, session_id, connection_id
+                )
             elif message_type == "chat_get_rooms":
                 await self._handle_chat_get_rooms(websocket)
             elif message_type == "chat_create_room":
@@ -1379,7 +1411,11 @@ class WebSocketConnectionManager:
                 pass
 
     async def _handle_chat_register(
-        self, payload: Dict[str, Any], websocket: WebSocket, session_id: str
+        self,
+        payload: Dict[str, Any],
+        websocket: WebSocket,
+        session_id: str,
+        connection_id: Optional[str] = None,
     ) -> None:
         """注册聊天客户端。"""
         client_id = payload.get("client_id", "")
@@ -1392,6 +1428,12 @@ class WebSocketConnectionManager:
                 }
             )
             return
+        if connection_id:
+            # 记录 client_id 到 WS 连接的映射，供 eval_js 等按连接精确投递
+            self._gateway._client_connection_map[client_id] = (
+                connection_id,
+                session_id,
+            )
         connection_id = str(uuid.uuid4())
         # 从认证信息获取user_id
         auth_payload = self._auth_store.get(session_id)
