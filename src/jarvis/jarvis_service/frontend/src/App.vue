@@ -21,6 +21,7 @@
       :isWaitingInput="isWaitingInput"
       :agentGroups="agentGroups"
       :currentUserId="auth.userInfo?.user_id || ''"
+      :currentUserName="auth.userInfo?.display_name || auth.userInfo?.username || ''"
       @close="showAgentSidebar = false"
       @toggleBatchMode="toggleBatchMode"
       @createAgent="openCreateAgentModal"

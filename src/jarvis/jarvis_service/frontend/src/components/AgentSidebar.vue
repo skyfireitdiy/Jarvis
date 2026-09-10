@@ -13,6 +13,10 @@
       </div>
     </div>
     <div class="agent-list">
+      <div class="hello-user-banner" aria-hidden="true">
+        <span class="hello-user-glow">Hello, {{ currentUserName || 'Penbo' }}</span>
+        <span class="hello-user-sub">✦ 你好，{{ currentUserName || 'Penbo' }} ✦</span>
+      </div>
       <template v-for="agentGroup in displayGroups" :key="agentGroup.key">
         <div v-if="agentGroup.isCollapsible && agentGroup.agents.length > 0" class="agent-collapsed-section">
           <button
@@ -254,7 +258,8 @@ const props = defineProps({
   isSelected: Function,
   isWaitingInput: Function,
   agentGroups: { type: Array, default: () => [] },
-  currentUserId: { type: String, default: '' }
+  currentUserId: { type: String, default: '' },
+  currentUserName: { type: String, default: '' }
 })
 
 // 分组弹窗状态
@@ -488,6 +493,43 @@ watch(() => props.currentAgentId, (newAgentId) => {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.hello-user-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 14px 8px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(120, 80, 255, 0.18), rgba(0, 200, 255, 0.18));
+  border: 1px solid rgba(150, 120, 255, 0.35);
+}
+
+.hello-user-glow {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  background: linear-gradient(90deg, #7b5cff, #00d4ff, #ff5cc8, #7b5cff);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: hello-user-flow 4s linear infinite;
+  filter: drop-shadow(0 0 6px rgba(123, 92, 255, 0.55));
+}
+
+.hello-user-sub {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--color-text-secondary, #9aa4b2);
+}
+
+@keyframes hello-user-flow {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 300% 50%; }
 }
 
 .agent-collapsed-section {
