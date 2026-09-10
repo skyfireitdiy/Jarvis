@@ -89,6 +89,7 @@ class GatewayManagerTool:
                     "regenerate_agent",
                     "chat_list_rooms",
                     "chat_get_online_clients",
+                    "list_sessions",
                     "chat_get_room_members",
                     "chat_send_room_message",
                     "chat_send_private_message",
@@ -371,6 +372,8 @@ class GatewayManagerTool:
                 return self._chat_list_rooms()
             elif action == "chat_get_online_clients":
                 return self._chat_get_online_clients()
+            elif action == "list_sessions":
+                return self._list_sessions()
             elif action == "chat_get_room_members":
                 return self._chat_get_room_members(room_id=room_id)
             elif action == "chat_send_room_message":
