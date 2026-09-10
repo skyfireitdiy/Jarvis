@@ -4,7 +4,7 @@
       <div class="brand-panel">
         <div class="brand-header">
           <div class="brand-logo-wrap">
-            <img src="/icons/jarvis-logo.png" alt="Jarvis" class="brand-logo" />
+            <img src="/icons/jarvis-pet.svg" alt="Jarvis" class="brand-logo" />
           </div>
           <div class="brand-title">
             <h1>JARVIS</h1>
