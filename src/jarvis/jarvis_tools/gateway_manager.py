@@ -2179,6 +2179,17 @@ class GatewayManagerTool:
         )
         return self._handle_gateway_response(result, success_data_key="clients")
 
+    def _list_sessions(self) -> Dict[str, Any]:
+        """获取所有活跃会话列表（每个连接一条，含对应用户信息）。"""
+        err = self._get_master_url("list sessions")
+        if err:
+            return err
+        result = self._request_gateway(
+            method="GET",
+            path="/api/chat/sessions",
+            error_prefix="Failed to list sessions",
+        )
+        return self._handle_gateway_response(result, success_data_key="sessions")
     def _chat_get_room_members(self, room_id: Optional[str] = None) -> Dict[str, Any]:
         """获取聊天室成员列表。
 
