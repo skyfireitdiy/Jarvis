@@ -1856,6 +1856,82 @@ class ChildNodeClient:
             request_id,
         )
 
+        # exec 动作不依赖终端会话管理器，权限由 master 统一校验，child 直接执行
+        if action == "exec":
+            command = str(inner_payload.get("command") or "").strip()
+            if not command:
+                return build_node_message(
+                    NODE_TERMINAL_RESPONSE,
+                    {
+                        "success": False,
+                        "error": {
+                            "code": "INVALID_COMMAND",
+                            "message": "command is required",
+                        },
+                    },
+                    request_id=request_id,
+                )
+            interpreter = str(
+                inner_payload.get("interpreter") or os.environ.get("SHELL") or "bash"
+            ).strip()
+            raw_working_dir = inner_payload.get("working_dir")
+            working_dir = str(raw_working_dir).strip() if raw_working_dir else ""
+            if not working_dir:
+                working_dir = str(pathlib.Path.home())
+            try:
+                exec_timeout = float(inner_payload.get("timeout") or 60.0)
+            except (TypeError, ValueError):
+                exec_timeout = 60.0
+            try:
+                proc = await asyncio.create_subprocess_shell(
+                    command,
+                    shell=True,
+                    executable=interpreter,
+                    cwd=working_dir,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                try:
+                    stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                        proc.communicate(), timeout=exec_timeout
+                    )
+                except asyncio.TimeoutError:
+                    proc.kill()
+                    await proc.wait()
+                    return build_node_message(
+                        NODE_TERMINAL_RESPONSE,
+                        {
+                            "success": False,
+                            "error": {
+                                "code": "TIMEOUT",
+                                "message": f"command timed out after {exec_timeout}s",
+                            },
+                        },
+                        request_id=request_id,
+                    )
+                return build_node_message(
+                    NODE_TERMINAL_RESPONSE,
+                    {
+                        "success": True,
+                        "data": {
+                            "stdout": stdout_bytes.decode("utf-8", "replace"),
+                            "stderr": stderr_bytes.decode("utf-8", "replace"),
+                            "exit_code": proc.returncode,
+                        },
+                    },
+                    request_id=request_id,
+                )
+            except Exception as exc:
+                logger.error("[NODE EXEC] child exec failed: %s", exc)
+                return build_node_message(
+                    NODE_TERMINAL_RESPONSE,
+                    {
+                        "success": False,
+                        "error": {"code": "EXEC_FAILED", "message": str(exc)},
+                    },
+                    request_id=request_id,
+                )
+
         if tsm is None:
             return build_node_message(
                 NODE_TERMINAL_RESPONSE,

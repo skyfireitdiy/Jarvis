@@ -22,20 +22,21 @@ class GatewayManagerTool:
     4. **list_model_groups**: 获取指定节点的模型组列表
     5. **create_agent**: 创建新的 Agent
     6. **list_directory**: 获取指定路径下的文件/目录列表，支持跨节点查询
-    7. **delete_agent**: 删除指定的 Agent
-    8. **get_node_secret**: 获取网关的节点连接私钥
-    9. **update_nodes_code**: 更新所有节点代码到 main 分支
-    10. **restart_nodes**: 一键重启所有节点服务（跳过当前节点）
-    11. **create_timer**: 创建定时任务（支持指定节点）
-    12. **list_timers**: 查询所有节点的定时任务（汇总）
-    13. **get_timer**: 查询单个定时任务
-    14. **delete_timer**: 删除定时任务
-    15. **create_group**: 创建群组
-    16. **list_groups**: 查询所有群组
-    17. **get_group**: 查询群组详情
-    18. **join_group**: 加入群组
-    19. **leave_group**: 退出群组
-    20. **send_group_message**: 发送群组消息
+    7. **exec_command**: 在指定节点上执行 shell 命令，支持跨节点
+    8. **delete_agent**: 删除指定的 Agent
+    9. **get_node_secret**: 获取网关的节点连接私钥
+    10. **update_nodes_code**: 更新所有节点代码到 main 分支
+    11. **restart_nodes**: 一键重启所有节点服务（跳过当前节点）
+    12. **create_timer**: 创建定时任务（支持指定节点）
+    13. **list_timers**: 查询所有节点的定时任务（汇总）
+    14. **get_timer**: 查询单个定时任务
+    15. **delete_timer**: 删除定时任务
+    16. **create_group**: 创建群组
+    17. **list_groups**: 查询所有群组
+    18. **get_group**: 查询群组详情
+    19. **join_group**: 加入群组
+    20. **leave_group**: 退出群组
+    21. **send_group_message**: 发送群组消息
 
     **重要提示**：
     - 每次调用只能执行一种操作
@@ -53,7 +54,7 @@ class GatewayManagerTool:
 
 每次调用只能执行一个 operation（见 operation 参数），其余参数随 operation 而异。操作大致分几类：
 - Agent：send_to_agent 向 Agent 发消息；list_agents 列出 Agent；create_agent 创建 Agent；delete_agent 删除 Agent；regenerate_agent 无损重生 Agent；get_node_secret 取节点连接密钥
-- 节点/网关：list_nodes 节点信息；list_model_groups 模型组列表；list_directory 目录浏览；update_nodes_code 更新所有节点代码；restart_nodes 一键重启节点服务
+- 节点/网关：list_nodes 节点信息；list_model_groups 模型组列表；list_directory 目录浏览；exec_command 在指定节点执行 shell 命令（需 command，可选 node_id/working_dir/timeout）；update_nodes_code 更新所有节点代码；restart_nodes 一键重启节点服务
 - 定时任务：create_timer / list_timers / get_timer / delete_timer
 - 群组：create_group / list_groups / get_group / join_group / leave_group / send_group_message
 - 聊天：chat_list_rooms / chat_get_online_clients / list_sessions / chat_get_room_members / chat_send_room_message / chat_send_private_message（消息会自动加 [Agent名字] 前缀，并以 owner 身份发送）；list_sessions 返回每个活跃连接（会话）及其对应用户
@@ -73,6 +74,7 @@ class GatewayManagerTool:
                     "list_model_groups",
                     "create_agent",
                     "list_directory",
+                    "exec_command",
                     "delete_agent",
                     "get_node_secret",
                     "update_nodes_code",
@@ -119,6 +121,11 @@ class GatewayManagerTool:
             "path": {
                 "type": "string",
                 "description": "目录路径（list_directory 操作可选，默认为空表示用户主目录）",
+            },
+            # exec_command 操作的参数
+            "command": {
+                "type": "string",
+                "description": "要执行的 shell 命令（exec_command 操作必填）",
             },
             # create_agent 操作的参数
             "agent_type": {
@@ -233,6 +240,7 @@ class GatewayManagerTool:
         message: str = "",
         node_id: Optional[str] = None,
         path: str = "",
+        command: str = "",
         agent_type: Optional[str] = None,
         working_dir: Optional[str] = None,
         agent_name: Optional[str] = None,
@@ -305,6 +313,7 @@ class GatewayManagerTool:
             message = args.get("message", "")
             node_id = args.get("node_id")
             path = args.get("path", "")
+            command = args.get("command", "")
             agent_type = args.get("agent_type")
             working_dir = args.get("working_dir")
             agent_name = args.get("agent_name")
@@ -357,6 +366,13 @@ class GatewayManagerTool:
                 )
             elif action == "list_directory":
                 return self._list_directory(path=path, node_id=node_id)
+            elif action == "exec_command":
+                return self._exec_command(
+                    command=command,
+                    node_id=node_id,
+                    working_dir=working_dir,
+                    timeout=timeout,
+                )
             elif action == "delete_agent":
                 return self._delete_agent(agent_id=agent_id, node_id=node_id)
             elif action == "get_node_secret":
@@ -1185,6 +1201,72 @@ class GatewayManagerTool:
                     error_msg = error_detail.get("message", str(error_detail))
                 else:
                     error_msg = str(error_detail)
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"Gateway returned error: {error_msg}",
+                }
+
+            data = gateway_data.get("data", {})
+            return {
+                "success": True,
+                "stdout": json.dumps(data, ensure_ascii=False, indent=2),
+                "stderr": "",
+            }
+        else:
+            return {"success": False, "stdout": "", "stderr": result["error"]}
+
+    def _exec_command(
+        self,
+        command: str,
+        node_id: Optional[str] = None,
+        working_dir: Optional[str] = None,
+        timeout: float = 30.0,
+    ) -> Dict[str, Any]:
+        """在指定节点上执行 shell 命令。
+
+        通过 Web Gateway 的 POST /api/node/{node_id}/exec 接口执行命令，
+        权限校验（terminal:create + 节点访问权）统一由 master 网关负责，
+        子节点信任 master 的判定，不再重复鉴权。
+
+        参数:
+            command: 要执行的 shell 命令（必填）
+            node_id: 目标节点 ID，默认为 master
+            working_dir: 命令执行的工作目录（可选）
+            timeout: 命令执行超时秒数
+
+        返回:
+            Dict[str, Any]: 执行结果，包含 stdout/stderr/exit_code
+        """
+        if not command:
+            return {"success": False, "stdout": "", "stderr": "command is required"}
+
+        err = self._get_master_url("execute command")
+        if err:
+            return err
+
+        target_node = node_id or "master"
+        body: Dict[str, Any] = {"command": command, "timeout": timeout}
+        if working_dir:
+            body["working_dir"] = working_dir
+
+        result = self._request_gateway(
+            method="POST",
+            path=f"/api/node/{target_node}/exec",
+            json_data=body,
+            error_prefix="Failed to execute command",
+            timeout=timeout + 10.0,
+        )
+
+        if result["success"]:
+            gateway_data = result["data"]
+            if not gateway_data.get("success"):
+                error_info = gateway_data.get("error", {})
+                error_msg = (
+                    error_info.get("message", "unknown error")
+                    if isinstance(error_info, dict)
+                    else str(error_info)
+                )
                 return {
                     "success": False,
                     "stdout": "",
