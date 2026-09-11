@@ -5051,6 +5051,24 @@ const commandPaletteCtx = computed(() => ({
   toggleCurrentAutoRead,
   exitCurrentNonInteractive,
   interruptCurrentAgent,
+  // 当前 Agent 侧边栏操作（重命名/复制/权限管理/无损重生/删除）
+  renameCurrentAgent: () => { const a = getCurrentAgentOrNull(); if (a) renameAgent(a) },
+  copyCurrentAgent: () => { const a = getCurrentAgentOrNull(); if (a) copyAgent(a) },
+  editCurrentAgentAccess: () => { const a = getCurrentAgentOrNull(); if (a) editAgentAccess(a) },
+  regenerateCurrentAgent: () => { const a = getCurrentAgentOrNull(); if (a) regenerateAgent(a) },
+  deleteCurrentAgent: () => { const a = getCurrentAgentOrNull(); if (a) deleteAgent(a.agent_id) },
+  // 侧边栏中「权限管理」「无损重生」仅对 Agent 属主可见，这里保持一致
+  isCurrentAgentOwner: (() => {
+    const a = getCurrentAgentOrNull()
+    return !!a && a.owner_id === (auth.value.userInfo?.user_id || '')
+  })(),
+  // 命令面板「切换 Agent」（a> / A> 前缀）所需
+  switchToAgent: (agent) => { if (agent) openAgentInPanel(agent) },
+  getAgentNodeLabel,
+  getStatusClass,
+  isWaitingInput,
+  // 已在某个 Panel 中打开的 Agent（用于把“激活”的 Agent 排在列表上方）
+  openedAgentIds: new Set(panels.value.filter(p => p.agentId).map(p => p.agentId)),
 }))
 
 // 命令面板动作清单（来自统一注册表）
