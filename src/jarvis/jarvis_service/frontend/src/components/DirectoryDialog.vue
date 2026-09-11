@@ -1,9 +1,9 @@
 <template>
-  <div class="modal-overlay" v-if="visible">
-    <div class="modal dir-modal">
-      <div class="modal-header">
+  <div class="palette-overlay" v-if="visible">
+    <div class="palette-panel dir-modal">
+      <div class="dir-modal-header">
         <h2>选择工作目录</h2>
-        <button class="close-btn" @click="$emit('cancel')">×</button>
+        <button class="dir-close-btn" @click="$emit('cancel')">×</button>
       </div>
       <div class="path-header">
         <button class="path-btn" @click="$emit('refresh', currentPath)">🔄 刷新</button>
@@ -37,7 +37,7 @@
       <div class="empty-state" v-else>
         <p>该目录下没有子目录</p>
       </div>
-      <div class="modal-actions">
+      <div class="dir-modal-actions">
         <button class="btn secondary" @click="$emit('cancel')">取消</button>
         <button class="btn primary" @click="$emit('confirm')">确认</button>
       </div>
@@ -80,112 +80,117 @@ defineExpose({
 </script>
 
 <style scoped>
-.modal-overlay {
+.palette-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: var(--color-overlay);
+  inset: 0;
+  background: rgba(4, 8, 16, 0.55);
+  backdrop-filter: blur(2px);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   z-index: 3000;
-  padding: 20px;
+  padding: 12vh 20px 20px;
 }
 
-.modal {
+.palette-panel {
   background: var(--color-bg-secondary);
-  border: none;
-  border-radius: var(--tile-radius-sm);
-  padding: 28px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--tile-radius);
+  box-shadow: var(--tile-shadow, 0 8px 30px rgba(0, 120, 190, 0.25));
+  overflow: hidden;
   width: 100%;
 }
 
 .dir-modal {
   max-width: 700px;
   width: 95%;
-  min-height: 500px;
+  max-height: 72vh;
+  display: flex;
+  flex-direction: column;
 }
 
-.modal-header {
+.dir-modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
-.modal-header h2 {
+.dir-modal-header h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 14px;
   color: var(--color-text-primary);
+  font-weight: 600;
 }
 
-.close-btn {
+.dir-close-btn {
   background: none;
   border: none;
   color: var(--color-text-secondary);
-  font-size: 20px;
+  font-size: 16px;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
-.close-btn:hover {
+.dir-close-btn:hover {
   color: var(--color-text-primary);
+  background: var(--color-bg-hover);
 }
 
 .path-header {
   display: flex;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: 8px;
+  padding: 8px 12px 0;
 }
 
 .path-btn {
   flex: 1;
-  padding: 8px 12px;
-  background: var(--color-bg-tertiary);
-  color: var(--color-text-primary);
-  border: none;
-  border-radius: var(--tile-radius-xs);
-  font-size: 13px;
+  padding: 6px 10px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--tile-radius-sm);
+  font-size: 12px;
   cursor: pointer;
 }
 
 .path-btn:hover {
-  background: var(--color-bg-tertiary);
-  transform: translateY(-1px);
+  color: var(--color-text-primary);
+  background: var(--color-bg-hover);
 }
 
 .current-path {
-  padding: 12px 14px;
+  margin: 8px 12px 0;
+  padding: 7px 10px;
   background: var(--color-bg-primary);
-  border-radius: 8px;
+  border-radius: var(--tile-radius-sm);
   font-family: 'Consolas', 'Microsoft YaHei', monospace;
-  font-size: 13px;
-  color: var(--color-text-primary);
-  margin-bottom: 16px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
   word-break: break-all;
   line-height: 1.4;
 }
 
 .dir-search {
-  margin-bottom: 16px;
+  padding: 8px 12px;
 }
 
 .dir-search-input {
   width: 100%;
-  padding: 12px 16px;
-  background: var(--color-bg-primary);
-  border: none;
-  border-radius: var(--tile-radius);
+  padding: 7px 10px;
+  background: transparent;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--tile-radius-sm);
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: 13px;
+  font-family: inherit;
 }
 
 .dir-search-input:focus {
   outline: none;
-  border-color: var(--color-accent);
-  background: var(--color-bg-primary);
+  border-color: rgba(32, 200, 255, 0.35);
 }
 
 .dir-search-input::placeholder {
@@ -193,71 +198,82 @@ defineExpose({
 }
 
 .dir-list {
-  max-height: 350px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  background: var(--color-bg-primary);
-  border-radius: var(--tile-radius);
-  border: none;
-  margin-bottom: 20px;
+  padding: 6px;
 }
 
 .dir-item {
   display: flex;
   align-items: center;
-  padding: 12px 14px;
+  gap: 10px;
+  padding: 7px 10px;
   cursor: pointer;
-  border-radius: var(--tile-radius-xs);
-  margin: 4px;
+  border-radius: var(--tile-radius-sm);
+  color: var(--color-text-primary);
+  font-size: 13px;
 }
 
 .dir-item:hover {
-  background: var(--color-bg-tertiary);
+  background: var(--color-bg-hover);
 }
 
 .dir-item.selected {
-  background: var(--color-accent-subtle);
-  border-color: var(--color-accent);
+  background: var(--color-bg-hover);
+  box-shadow: inset 0 0 0 1px rgba(32, 200, 255, 0.35);
 }
 
 .dir-item.selected:hover {
-  background: var(--color-accent-subtle);
+  background: var(--color-bg-hover);
 }
 
 .dir-icon {
-  font-size: 18px;
-  margin-right: 12px;
+  font-size: 14px;
+  width: 18px;
+  text-align: center;
+  flex: none;
 }
 
 .dir-name {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--color-text-primary);
   font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dir-path {
   font-size: 11px;
   color: var(--color-text-secondary);
   margin-left: auto;
-  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 55%;
 }
 
 .empty-state {
   text-align: center;
-  padding: 24px;
+  padding: 24px 12px;
   color: var(--color-text-secondary);
+  font-size: 13px;
 }
 
-.modal-actions {
+.dir-modal-actions {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+  padding: 10px 12px;
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .btn {
-  padding: 10px 20px;
+  padding: 7px 16px;
   border: none;
-  border-radius: var(--tile-radius);
-  font-size: 14px;
+  border-radius: var(--tile-radius-sm);
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -265,19 +281,21 @@ defineExpose({
 .btn.secondary {
   background: transparent;
   color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-subtle);
 }
 
 .btn.secondary:hover {
-  background: var(--color-bg-tertiary);
+  background: var(--color-bg-hover);
   color: var(--color-text-primary);
 }
 
 .btn.primary {
-  background: var(--color-success);
+  background: var(--color-accent);
   color: #060911;
 }
 
 .btn.primary:hover {
-  background: var(--color-success);
+  background: var(--color-accent);
+  filter: brightness(1.08);
 }
 </style>
