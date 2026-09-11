@@ -23,6 +23,7 @@
       :nodes="availableNodeOptions"
       :currentUserId="auth.userInfo?.user_id || ''"
       :currentUserName="auth.userInfo?.display_name || auth.userInfo?.username || ''"
+      :isConnected="!!socket && !showConnectModal"
       @close="showAgentSidebar = false"
       @toggleBatchMode="toggleBatchMode"
       @createAgent="openCreateAgentModal"
@@ -11482,8 +11483,9 @@ function sendTerminalResize(terminalId, rows, cols) {
 function handleGlobalKeydown(event) {
   const isModifierPressed = event.ctrlKey || event.metaKey
 
-  // Ctrl/Cmd + K 打开/关闭命令面板
+  // Ctrl/Cmd + K 打开/关闭命令面板（登录界面不响应）
   if (isModifierPressed && event.code === 'KeyK') {
+    if (showConnectModal.value) return
     event.preventDefault()
     showCommandPalette.value = !showCommandPalette.value
     return
