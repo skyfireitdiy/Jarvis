@@ -1,9 +1,9 @@
 <template>
-  <div class="modal-overlay" v-if="visible">
-    <div class="modal completions-modal">
-      <div class="modal-header">
+  <div class="palette-overlay" v-if="visible">
+    <div class="palette-panel completions-modal">
+      <div class="completions-modal-header">
         <h3>插入补全</h3>
-        <button class="icon-btn" @click="$emit('close')">✕</button>
+        <button class="completions-close-btn" @click="$emit('close')">✕</button>
       </div>
       <div class="completions-search">
         <input
@@ -74,114 +74,111 @@ defineExpose({
 </script>
 
 <style scoped>
-.modal-overlay {
+.palette-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: var(--color-overlay);
+  inset: 0;
+  background: rgba(4, 8, 16, 0.55);
+  backdrop-filter: blur(2px);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   z-index: 3000;
-  padding: 20px;
+  padding: 12vh 20px 20px;
 }
 
-.modal {
+.palette-panel {
   background: var(--color-bg-secondary);
-  border: none;
-  border-radius: var(--tile-radius-sm);
-  padding: 28px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--tile-radius);
+  box-shadow: var(--tile-shadow, 0 8px 30px rgba(0, 120, 190, 0.25));
+  overflow: hidden;
   width: 100%;
 }
 
 .completions-modal {
   max-width: 520px;
-  max-height: 600px;
+  max-height: 62vh;
   display: flex;
   flex-direction: column;
 }
 
-.modal-header {
+.completions-modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
-.modal-header h3 {
+.completions-modal-header h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--color-text-primary);
 }
 
-.icon-btn {
+.completions-close-btn {
   background: none;
   border: none;
   color: var(--color-text-secondary);
-  font-size: 20px;
+  font-size: 16px;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
-.icon-btn:hover {
+.completions-close-btn:hover {
   color: var(--color-text-primary);
+  background: var(--color-bg-hover);
 }
 
 .completions-search {
-  margin-bottom: 16px;
+  padding: 8px 12px;
 }
 
 .completions-search input {
   width: 100%;
-  padding: 12px 16px;
-  background: var(--color-bg-primary);
-  border: none;
-  border-radius: var(--tile-radius);
+  padding: 7px 10px;
+  background: transparent;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--tile-radius-sm);
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: 13px;
+  font-family: inherit;
 }
 
 .completions-search input:focus {
   outline: none;
-  border-color: var(--color-accent);
-  background: var(--color-bg-primary);
+  border-color: rgba(32, 200, 255, 0.35);
 }
 
 .completions-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  max-height: 400px;
-  border: none;
-  border-radius: var(--tile-radius);
-  background: var(--color-bg-primary);
+  padding: 6px;
 }
 
 .completion-item {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 12px 16px;
-  border-bottom: 0.5px solid var(--color-border-subtle);
+  gap: 2px;
+  padding: 7px 10px;
+  border-radius: var(--tile-radius-sm);
   cursor: pointer;
 }
 
-.completion-item:last-child {
-  border-bottom: none;
-}
-
 .completion-item:hover {
-  background: var(--color-accent-subtle);
+  background: var(--color-bg-hover);
 }
 
 .completion-item.selected {
-  background: var(--color-accent-subtle);
+  background: var(--color-bg-hover);
+  box-shadow: inset 0 0 0 1px rgba(32, 200, 255, 0.35);
 }
 
 .completion-value {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--color-text-primary);
   font-family: 'Consolas', 'Microsoft YaHei', monospace;
