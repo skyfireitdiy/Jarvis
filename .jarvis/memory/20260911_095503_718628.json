@@ -1,0 +1,8 @@
+{
+  "id": "20260911_095503_718628",
+  "type": "project_long_term",
+  "tags": ["jarvis", "权限", "跨节点", "upload", "架构原则", "故障排查"],
+  "content": "Jarvis 多节点权限架构原则（用户明确）：用户信息只有 master 有，所有权限控制都在 master 进行；child 节点对 master 的所有操作都不需要鉴权（信任 master 判定）。\n\n故障：admin 向 worker-92 上传文件报 403 Permission denied: file:upload。\n根因：child 的 _dispatch_node_http_request 的 /upload 分支用 child 本地 permission_manager.check_permission 判定，child 本地用户库无 master 用户 → admin 旁路失效 → 403。\n\n修复（src/jarvis/jarvis_web_gateway/app.py，两处）：\n1) _dispatch_node_http_request 的 /upload 分支：用 `if node_config.is_master:` 包裹权限校验，child 不再校验（与 check_node_access 同模式）。\n2) node_http_proxy 远端转发分支（check_node_access 之后）：对 path=='upload' 在 master 侧统一做 file:upload 校验，避免 child 不校验后远端上传无任何权限门。\n\n验证矩阵：admin→worker-92=200；admin→master=200；有节点访问权但无 file:upload 的用户→worker-92/master=403（master 拦截）；无节点访问权的用户→worker-92=403。\n\n部署方式：worker 源码 /home/wangmaobin/Jarvis/，通过 POST /api/node/worker-92/file-write 写 app.py（<1MB），再 POST /api/service/restart {\"node_id\":\"worker-92\",\"restart_frontend\":false}。master 改动需重启 master 网关才生效。\n\n注意：重启 master 网关后 JARVIS_AUTH_TOKEN 会重新随机生成（进程内存，/proc/pid/environ 不含运行时 os.environ 修改），旧 token 失效；验证用真实用户登录 /api/auth/login 拿 JWT（admin/mn123nm1）。\n\n清理 worker 文件：无删除 API，需通过 WS（/ws，subprotocol jarvis-ws + jarvis-token.<JWT>）发 terminal_create(node_id=worker-92) → terminal_session_input（注意字段名是 data 不是 input）执行 rm。",
+  "created_at": "2026-09-11T09:55:03.718659",
+  "updated_at": "2026-09-11T09:55:03.718665"
+}

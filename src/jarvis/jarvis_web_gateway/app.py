@@ -3759,6 +3759,29 @@ def create_app(
                     media_type="application/json",
                 )
 
+            # 上传接口的 file:upload 权限同样由 master 统一把关
+            # （子节点本地无 auth 数据，不再重复校验）。
+            if (
+                str(path or "").strip("/") == "upload"
+                and _proxy_user_id
+                and _proxy_user_id != "system"
+                and permission_manager
+                and not permission_manager.check_permission(
+                    _proxy_user_id, "file:upload"
+                )
+            ):
+                logger.warning(
+                    f"[NODE HTTP PROXY] 权限拒绝: user_id={_proxy_user_id}, permission=file:upload"
+                )
+                return Response(
+                    content=(
+                        '{"success": false, "error": {"code": "PERMISSION_DENIED", '
+                        '"message": "Permission denied: file:upload"}}'
+                    ),
+                    status_code=403,
+                    media_type="application/json",
+                )
+
             response = await node_connection_manager.send_request_to_node(
                 normalized_node_id,
                 NODE_HTTP_PROXY_REQUEST,
@@ -6695,20 +6718,27 @@ def create_app(
             result = await _handle_file_write_request(payload)
         elif normalized_method == "POST" and normalized_path == "/upload":
             # 权限校验：file:upload
-            _upload_user_info = getattr(_mock_req.state, "user_info", None)
-            _upload_user_id = (
-                _upload_user_info.get("user_id", "") if _upload_user_info else ""
-            )
-            if _upload_user_id and _upload_user_id != "system":
-                if not permission_manager.check_permission(
-                    _upload_user_id, "file:upload"
-                ):
-                    return {
-                        "success": False,
-                        "status_code": 403,
-                        "headers": {"content-type": "application/json"},
-                        "body": json.dumps({"error": "Permission denied: file:upload"}),
-                    }
+            # 节点访问校验：仅在 master 上执行。
+            # 子节点本地没有 auth 数据（权限数据不同步），无法独立判定；
+            # 跨节点请求的权限已由 master 在转发前统一把关，
+            # 故子节点信任 master 的判定，不再重复校验。
+            if node_config.is_master:
+                _upload_user_info = getattr(_mock_req.state, "user_info", None)
+                _upload_user_id = (
+                    _upload_user_info.get("user_id", "") if _upload_user_info else ""
+                )
+                if _upload_user_id and _upload_user_id != "system":
+                    if not permission_manager.check_permission(
+                        _upload_user_id, "file:upload"
+                    ):
+                        return {
+                            "success": False,
+                            "status_code": 403,
+                            "headers": {"content-type": "application/json"},
+                            "body": json.dumps(
+                                {"error": "Permission denied: file:upload"}
+                            ),
+                        }
             result = await _handle_file_upload(payload)
         elif normalized_path.startswith("/data/"):
             from jarvis.jarvis_web_gateway.data_storage import (
