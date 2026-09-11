@@ -3409,13 +3409,13 @@ def create_app(
                     "message": "command is required",
                 },
             }
-        interpreter = str(
-            request_body.get("interpreter") or os.environ.get("SHELL") or "bash"
-        ).strip()
+        # interpreter / working_dir 的默认值必须在“实际执行命令的节点”本地解析：
+        # master 与子节点的 SHELL、home 目录可能不同（例如 master 为 fish、
+        # 子节点无该解释器），若在 master 侧解析后跨节点传递会导致子节点报
+        # [Errno 2] No such file or directory。故仅在用户显式指定时才向下传递。
+        raw_interpreter = str(request_body.get("interpreter") or "").strip()
         raw_working_dir = request_body.get("working_dir")
-        working_dir = str(raw_working_dir).strip() if raw_working_dir else ""
-        if not working_dir:
-            working_dir = str(pathlib.Path.home())
+        explicit_working_dir = str(raw_working_dir).strip() if raw_working_dir else ""
         try:
             exec_timeout = float(request_body.get("timeout") or 60.0)
         except (TypeError, ValueError):
@@ -3424,6 +3424,8 @@ def create_app(
         try:
             # 本地节点直接执行
             if node_id in (node_runtime.local_node_id, "master"):
+                interpreter = raw_interpreter or os.environ.get("SHELL") or "bash"
+                working_dir = explicit_working_dir or str(pathlib.Path.home())
                 proc = await asyncio.create_subprocess_shell(
                     command,
                     shell=True,
@@ -3475,7 +3477,8 @@ def create_app(
                     },
                 }
 
-            # 转发到远程节点执行
+            # 转发到远程节点执行（interpreter/working_dir 未显式指定时传空，
+            # 由子节点按本地环境解析，避免跨节点默认值不兼容）。
             response = await node_connection_manager.send_request_to_node(
                 node_id,
                 NODE_TERMINAL_REQUEST,
@@ -3483,8 +3486,8 @@ def create_app(
                     "action": "exec",
                     "payload": {
                         "command": command,
-                        "interpreter": interpreter,
-                        "working_dir": working_dir,
+                        "interpreter": raw_interpreter,
+                        "working_dir": explicit_working_dir,
                         "timeout": exec_timeout,
                     },
                 },
