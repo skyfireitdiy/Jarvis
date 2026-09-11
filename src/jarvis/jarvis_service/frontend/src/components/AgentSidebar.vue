@@ -144,6 +144,17 @@
     >
       <div class="pet-inner">
         <div class="pet-glow"></div>
+        <div class="pet-rune-ring" aria-hidden="true">
+          <div class="pet-rune-orbit">
+            <span
+              v-for="(b, i) in petRuneBits"
+              :key="i"
+              class="pet-rune-bit"
+              :style="petRuneBitStyle(i)"
+            ><span class="pet-rune-glyph">{{ b }}</span></span>
+          </div>
+          <div class="pet-rune-core"></div>
+        </div>
         <div class="pet-bubble">{{ petBubbleText }}</div>
         <div class="pet-body">
           <div class="pet-head" :style="petHeadStyle">
@@ -513,6 +524,25 @@ const petSpeech = ref('')        // 随机台词
 const petMenu = ref({ show: false, x: 0, y: 0 })  // 右键菜单
 const petTopoOn = ref(true)      // 是否显示迷你拓扑图
 
+// 头顶数字法环：一圈 0/1 灵符，玄幻风格，随状态联动
+const PET_RUNE_COUNT = 18
+const PET_RUNE_RADIUS = 62
+const petRuneBits = Array.from({ length: PET_RUNE_COUNT }, (_, i) =>
+  (i * 7 + 3) % 3 === 0 ? '1' : '0'
+)
+function petRuneBitStyle(i) {
+  const step = 360 / PET_RUNE_COUNT
+  const angle = i * step
+  // 每个字符随机相位/时长，形成灵光闪烁的错落感
+  const delay = ((i * 37) % 100) / 100 * 2.4
+  const dur = 1.8 + ((i * 53) % 100) / 100 * 1.6
+  return {
+    transform: `rotate(${angle}deg) translateY(-${PET_RUNE_RADIUS}px)`,
+    '--rune-glow-delay': delay.toFixed(2) + 's',
+    '--rune-glow-dur': dur.toFixed(2) + 's',
+  }
+}
+
 // 未连接（如登录界面）时不显示宠物及其附属 UI
 const petVisible = computed(() => props.isConnected && !petHidden.value)
 
@@ -581,6 +611,9 @@ const petClasses = computed(() => [
     'is-petting': petPetting.value,
     'is-walk': petWalking.value,
     'face-left': petFaceDir.value < 0,
+    'rune-running': petState.value === 'running',
+    'rune-waiting': petWaitingAgents.length > 0,
+    'rune-sleep': petSleep.value,
   },
   petAction.value ? 'act-' + petAction.value : '',
 ])
@@ -1219,6 +1252,10 @@ function petSfxAction(action) {
     case 'hop':
       petTone(600, 0, 0.12, 'sine', 0.08, 1300)
       break
+    case 'throw':
+      petTone(500, 0, 0.09, 'triangle', 0.07, 1600)
+      petTone(1600, 0.1, 0.1, 'triangle', 0.06, 900)
+      break
   }
 }
 
@@ -1280,7 +1317,7 @@ function togglePetTopo() {
 }
 
 // 随机小动作
-const PET_ACTIONS = ['look', 'yawn', 'spin', 'hop']
+const PET_ACTIONS = ['look', 'yawn', 'spin', 'hop', 'throw']
 let petActTimer = 0
 function schedulePetAction() {
   clearTimeout(petActTimer)
@@ -1289,7 +1326,8 @@ function schedulePetAction() {
       const act = PET_ACTIONS[Math.floor(Math.random() * PET_ACTIONS.length)]
       petAction.value = act
       petSfxAction(act)
-      setTimeout(() => { petAction.value = '' }, 1700)
+      const actDur = act === 'throw' ? 2600 : 1700
+      setTimeout(() => { petAction.value = '' }, actDur)
     }
     schedulePetAction()
   }, 5000 + Math.random() * 7000)
@@ -1591,6 +1629,136 @@ onUnmounted(() => {
   animation: pet-glow 2.6s ease-in-out infinite;
 }
 
+/* ==================== 头顶数字光环（天使光环造型的 0/1 灵符圈） ==================== */
+.pet-rune-ring {
+  position: absolute;
+  left: 50%;
+  top: 40px;
+  width: 0;
+  height: 0;
+  /* 天使光环：整体压扁成椭圆并略微倾斜（前低后高），悬于头顶上方；随宠物朝向镜像 */
+  transform: translateX(-50%) rotate(-10deg) scaleY(0.42) scaleX(var(--pet-flip, 1));
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* 光环整体缓慢自转，营造灵阵运转之感（周期由 --rune-spin-dur 统一控制） */
+.pet-rune-orbit {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  animation: pet-rune-spin var(--rune-spin-dur, 26s) linear infinite;
+}
+
+/* 每个灵符：外层只负责定位（先转到方位角，再沿半径外推），不做动画 */
+.pet-rune-bit {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 内层字符：抵消光环自转与压扁，使字符始终正立且不被压扁；同时做呼吸闪烁 */
+.pet-rune-glyph {
+  font-family: 'Courier New', Consolas, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  color: #b8f4ff;
+  text-shadow: 0 0 6px rgba(126, 231, 255, 0.95), 0 0 14px rgba(32, 200, 255, 0.7);
+  opacity: 0.85;
+  /* 反向旋转抵消 orbit 自转，使字符始终正立；压扁由容器统一处理 */
+  animation-name: pet-rune-counter, pet-rune-glow;
+  animation-duration: var(--rune-spin-dur, 26s), var(--rune-glow-dur, 2.4s);
+  animation-timing-function: linear, ease-in-out;
+  animation-delay: 0s, var(--rune-glow-delay, 0s);
+  animation-iteration-count: infinite, infinite;
+}
+
+/* 光环内圈：淡青灵光，衬托宠物头顶（同样压扁成椭圆） */
+.pet-rune-core {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 124px;
+  height: 124px;
+  margin: -62px 0 0 -62px;
+  border-radius: 50%;
+  border: 1px solid rgba(126, 231, 255, 0.22);
+  box-shadow: inset 0 0 24px rgba(32, 200, 255, 0.18), 0 0 18px rgba(32, 200, 255, 0.12);
+  opacity: 0.7;
+  animation: pet-rune-breathe 3.4s ease-in-out infinite;
+}
+
+@keyframes pet-rune-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 与 pet-rune-spin 同周期反向，抵消父级自转使字符正立；scaleY 补偿容器压扁 */
+@keyframes pet-rune-counter {
+  from { transform: rotate(0deg) scaleY(2.381); }
+  to { transform: rotate(-360deg) scaleY(2.381); }
+}
+
+@keyframes pet-rune-glow {
+  0%, 100% { opacity: 0.35; filter: brightness(0.9); }
+  50% { opacity: 1; filter: brightness(1.5); }
+}
+
+@keyframes pet-rune-breathe {
+  0%, 100% { opacity: 0.45; transform: scale(0.96); }
+  50% { opacity: 0.85; transform: scale(1.04); }
+}
+
+/* —— 状态联动（转速统一由 --rune-spin-dur 控制，orbit 与字符反向自转同步）—— */
+/* 运行中：灵符转快、青芒炽盛 */
+.pet-float.rune-running {
+  --rune-spin-dur: 9s;
+}
+.pet-float.rune-running .pet-rune-glyph {
+  color: #d8fbff;
+  text-shadow: 0 0 8px rgba(126, 231, 255, 1), 0 0 20px rgba(32, 200, 255, 0.95);
+}
+.pet-float.rune-running .pet-rune-core {
+  border-color: rgba(126, 231, 255, 0.5);
+  box-shadow: inset 0 0 30px rgba(32, 200, 255, 0.35), 0 0 26px rgba(32, 200, 255, 0.35);
+}
+
+/* 等待输入：转为金色脉冲，警示感 */
+.pet-float.rune-waiting {
+  --rune-spin-dur: 14s;
+}
+.pet-float.rune-waiting .pet-rune-glyph {
+  color: #ffe6a8;
+  text-shadow: 0 0 8px rgba(255, 209, 102, 1), 0 0 18px rgba(255, 152, 0, 0.85);
+}
+.pet-float.rune-waiting .pet-rune-core {
+  border-color: rgba(255, 209, 102, 0.6);
+  box-shadow: inset 0 0 30px rgba(255, 152, 0, 0.35), 0 0 28px rgba(255, 152, 0, 0.45);
+  animation-duration: 1.4s;
+}
+
+/* 打盹：灵光暗淡、近乎停滞 */
+.pet-float.rune-sleep {
+  --rune-spin-dur: 90s;
+}
+.pet-float.rune-sleep .pet-rune-ring {
+  opacity: 0.28;
+  transition: opacity 0.6s ease;
+}
+.pet-float.rune-sleep .pet-rune-glyph {
+  color: #7fa6b8;
+  text-shadow: 0 0 6px rgba(126, 231, 255, 0.4);
+}
+
 .pet-hit {
   position: absolute;
   left: 50%;
@@ -1858,6 +2026,11 @@ onUnmounted(() => {
   --pet-flip: -1;
 }
 
+/* 朝向翻转时，头顶光环一并镜像（含倾斜方向） */
+.pet-float.face-left .pet-rune-ring {
+  --pet-flip: -1;
+}
+
 /* 状态联动 */
 .pet-float.is-run .pet-body {
   animation-duration: 1.8s;
@@ -1919,6 +2092,16 @@ onUnmounted(() => {
 
 .pet-float.act-spin .pet-body {
   animation: pet-spin 1.4s ease-in-out;
+}
+
+/* 空翻时头顶光环同步翻转一圈，与宠物动作呼应 */
+.pet-float.act-spin .pet-rune-ring {
+  animation: pet-rune-flip 1.4s ease-in-out;
+}
+
+/* 头顶光环被抛出去再飞回来：飞行与自转都很快，用 linear 保证自转匀速 */
+.pet-float.act-throw .pet-rune-ring {
+  animation: pet-rune-throw 2.4s linear;
 }
 
 .pet-float.act-hop .pet-body {
@@ -2063,6 +2246,38 @@ onUnmounted(() => {
   }
   100% {
     transform: translateX(-50%) scaleX(var(--pet-flip, 1)) rotate(360deg) scale(1);
+  }
+}
+
+/* 头顶光环空翻：在原有压扁/倾斜/镜像基础上叠加一圈旋转 */
+@keyframes pet-rune-flip {
+  0% {
+    transform: translateX(-50%) rotate(-10deg) scaleY(0.42) scaleX(var(--pet-flip, 1)) rotate(0deg);
+  }
+  50% {
+    transform: translateX(-50%) rotate(-10deg) scaleY(0.42) scaleX(var(--pet-flip, 1)) rotate(180deg);
+  }
+  100% {
+    transform: translateX(-50%) rotate(-10deg) scaleY(0.42) scaleX(var(--pet-flip, 1)) rotate(360deg);
+  }
+}
+
+/* 抛出：快速飞到屏幕边缘并匀速自转，停顿一瞬后快速飞回原位 */
+@keyframes pet-rune-throw {
+  0% {
+    transform: translateX(-50%) rotate(-10deg) scaleY(0.42) scaleX(var(--pet-flip, 1)) translate(0, 0) rotate(0deg);
+  }
+  40% {
+    transform: translateX(-50%) rotate(-10deg) scaleY(0.42) scaleX(var(--pet-flip, 1)) translate(calc(46vw * var(--pet-flip, 1)), -42vh) rotate(720deg);
+  }
+  52% {
+    transform: translateX(-50%) rotate(-10deg) scaleY(0.42) scaleX(var(--pet-flip, 1)) translate(calc(50vw * var(--pet-flip, 1)), -45vh) rotate(936deg);
+  }
+  88% {
+    transform: translateX(-50%) rotate(-10deg) scaleY(0.42) scaleX(var(--pet-flip, 1)) translate(calc(5vw * var(--pet-flip, 1)), -4vh) rotate(1584deg);
+  }
+  100% {
+    transform: translateX(-50%) rotate(-10deg) scaleY(0.42) scaleX(var(--pet-flip, 1)) translate(0, 0) rotate(1800deg);
   }
 }
 
