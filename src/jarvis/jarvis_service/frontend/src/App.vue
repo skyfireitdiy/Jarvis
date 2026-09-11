@@ -20,6 +20,7 @@
       :isSelected="isAgentSelected"
       :isWaitingInput="isWaitingInput"
       :agentGroups="agentGroups"
+      :nodes="availableNodeOptions"
       :currentUserId="auth.userInfo?.user_id || ''"
       :currentUserName="auth.userInfo?.display_name || auth.userInfo?.username || ''"
       @close="showAgentSidebar = false"
@@ -42,6 +43,7 @@
       @petInterruptCurrent="petInterruptCurrent"
       @petGotoWaiting="petGotoWaitingAgent"
       @petToggleSidebar="toggleAgentSidebar"
+      @petOpenTopology="openTopologyOverlay"
     />
 
     <!-- 主内容区 -->
@@ -1161,6 +1163,16 @@
       </div>
     </div>
 
+    <!-- 网络拓扑大图 -->
+    <TopologyOverlay
+      :visible="showTopologyOverlay"
+      :nodes="availableNodeOptions"
+      :agents="agentList"
+      :getStatusClass="getStatusClass"
+      @update:visible="showTopologyOverlay = $event"
+      @close="showTopologyOverlay = false"
+    />
+
     <!-- 命令面板（Ctrl+K） -->
     <CommandPalette
       :visible="showCommandPalette"
@@ -1235,6 +1247,7 @@ import { renderSideBySideDiff, escapeHtml } from './diffRenderer.js'
 import RenameAgentModal from './components/RenameAgentModal.vue'
 import AdminPanel from './components/AdminPanel.vue'
 import CommandPalette from './components/CommandPalette.vue'
+import TopologyOverlay from './components/TopologyOverlay.vue'
 import { ACTIONS as actionDefs } from './actions/registry.js'
 
 const PLANTUML_SERVER_URL = 'https://www.plantuml.com/plantuml/svg/'
@@ -4958,6 +4971,11 @@ function petGotoWaitingAgent() {
   showToast(`已切换到等待输入的 Agent：${target.name || target.agent_id}`, 'success')
 }
 
+// 打开网络拓扑大图（点击宠物旁迷你图或右键菜单触发）
+function openTopologyOverlay() {
+  showTopologyOverlay.value = true
+}
+
 // 命令面板上下文：统一暴露宠物菜单与命令面板共用的动作回调
 const commandPaletteCtx = computed(() => ({
   currentAgentId: currentAgentId.value,
@@ -4973,6 +4991,7 @@ const commandPaletteCtx = computed(() => ({
   toggleAgentSidebar,
   toggleTerminalPanel,
   toggleChatPanel,
+  openTopology: openTopologyOverlay,
   openSettings: () => { showSettingsModal.value = true },
 }))
 
@@ -5200,6 +5219,7 @@ const streamingMessages = ref(new Map()) // 按 agent_id 跟踪当前流式消�
 
 // 命令面板（Ctrl+K）
 const showCommandPalette = ref(false)
+const showTopologyOverlay = ref(false) // 网络拓扑大图浮层
 
 // 执行状态
 const isExecuting = ref(false)
@@ -11528,6 +11548,11 @@ function handleGlobalKeydown(event) {
     // 命令面板打开时优先关闭它
     if (showCommandPalette.value) {
       showCommandPalette.value = false
+      return
+    }
+    // 网络拓扑大图打开时优先关闭它
+    if (showTopologyOverlay.value) {
+      showTopologyOverlay.value = false
       return
     }
     // 如果对话框打开，关闭对话框

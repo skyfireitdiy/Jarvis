@@ -204,12 +204,24 @@
       <div class="pet-menu-item" :class="{ 'is-disabled': !currentAgentId }" @click="petInterrupt"><span class="pet-menu-ico">⏹</span>中断当前</div>
       <div class="pet-menu-item" :class="{ 'is-disabled': petWaitingAgents.length === 0 }" @click="petGotoWaiting"><span class="pet-menu-ico">🚨</span>奔赴等待</div>
       <div class="pet-menu-item" @click="petSyncStatus"><span class="pet-menu-ico">🔄</span>同步状态</div>
+      <div class="pet-menu-item" @click="petOpenTopology"><span class="pet-menu-ico">🗺️</span>网络拓扑</div>
+      <div class="pet-menu-item" @click="togglePetTopo"><span class="pet-menu-ico">{{ petTopoOn ? '👁️' : '🙈' }}</span>{{ petTopoOn ? '隐藏迷你拓扑' : '显示迷你拓扑' }}</div>
       <div class="pet-menu-item" @click="petToggleSidebar"><span class="pet-menu-ico">📋</span>切换侧栏</div>
       <div class="pet-menu-item" @click="petCollapseAll"><span class="pet-menu-ico">📁</span>折叠分组</div>
       <div class="pet-menu-sep"></div>
       <div class="pet-menu-item" @click="petHide"><span class="pet-menu-ico">👻</span>隐藏宠物</div>
     </div>
 
+    <!-- 宠物旁的迷你网络拓扑 -->
+    <PetMiniTopology
+      v-show="!petHidden && petTopoOn"
+      :nodes="nodes"
+      :agents="agentList || []"
+      :getStatusClass="getStatusClass"
+      :x="petMiniPos.x"
+      :y="petMiniPos.y"
+      @open="petOpenTopology"
+    />
     <!-- 隐藏后的还原按钮 -->
     <button
       v-if="petHidden"
@@ -253,6 +265,7 @@
 
 <script setup>
 import { ref, computed, watch, defineProps, defineEmits, onMounted, onUnmounted } from 'vue'
+import PetMiniTopology from './PetMiniTopology.vue'
 
 // 分组折叠状态管理 - 使用对象存储，避免 Set 响应式问题
 const collapsedGroupsMap = ref({})
@@ -344,6 +357,7 @@ const props = defineProps({
   isSelected: Function,
   isWaitingInput: Function,
   agentGroups: { type: Array, default: () => [] },
+  nodes: { type: Array, default: () => [] },
   currentUserId: { type: String, default: '' },
   currentUserName: { type: String, default: '' }
 })
@@ -408,6 +422,7 @@ const emit = defineEmits([
   'petInterruptCurrent',
   'petGotoWaiting',
   'petToggleSidebar',
+  'petOpenTopology',
 ])
 
 // 监听 agentStatuses 变化，当 agent 状态从等待输入变为非等待输入时清除点击标记
@@ -468,6 +483,7 @@ watch(() => props.currentAgentId, (newAgentId) => {
 })
 // ==================== 宠物挂件 ====================
 const PET_POS_KEY = 'jarvis_pet_pos'
+const PET_TOPO_KEY = 'jarvis_pet_topo'
 const PET_W = 200
 const PET_H = 230
 
@@ -486,6 +502,7 @@ const petHidden = ref(false)     // 已隐藏
 const petWalking = ref(false)    // 随机漫步中
 const petSpeech = ref('')        // 随机台词
 const petMenu = ref({ show: false, x: 0, y: 0 })  // 右键菜单
+const petTopoOn = ref(true)      // 是否显示迷你拓扑图
 
 // 随机台词库
 const PET_LINES = [
@@ -556,12 +573,66 @@ const petClasses = computed(() => [
   petAction.value ? 'act-' + petAction.value : '',
 ])
 
+// 是否正在看迷你拓扑图（开着且宠物可见/清醒）
+const petWatchingTopo = computed(() => petTopoOn.value && !petHidden.value && !petSleep.value)
+
+// 迷你图水平方向相对宠物中心的偏移：-1 左 / 0 中 / 1 右
+const petTopoDirX = computed(() => {
+  const headCx = petPos.value.x + PET_W / 2
+  const topoCx = petMiniPos.value.x + 48
+  const d = topoCx - headCx
+  if (d > 8) return 1
+  if (d < -8) return -1
+  return 0
+})
+
+// 实际瞳孔偏移：看迷你图时抬头向上看（朝其方向），否则跟随鼠标
+const petEffectivePupil = computed(() => {
+  if (petWatchingTopo.value && !petHover.value && !petDrag.value) {
+    return { x: petTopoDirX.value * 3, y: -4 }
+  }
+  return petPupil.value
+})
+
 const petPupilStyle = computed(() => ({
-  transform: `translate(calc(-50% + ${petPupil.value.x}px), calc(-50% + ${petPupil.value.y}px))`,
+  transform: `translate(calc(-50% + ${petEffectivePupil.value.x}px), calc(-50% + ${petEffectivePupil.value.y}px))`,
 }))
+
+// 迷你拓扑位置：放在宠物头顶前方（不遮挡宠物身体），空间不足时回退到下方/侧边，并限制在视口内
+const petMiniPos = computed(() => {
+  const MINI = 96
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const maxX = Math.max(4, vw - MINI - 4)
+  const maxY = Math.max(4, vh - MINI - 4)
+  const clampX = (x) => Math.max(4, Math.min(maxX, x))
+  const clampY = (y) => Math.max(4, Math.min(maxY, y))
+
+  // 首选：宠物头顶上方居中（宠物抬头看向它）
+  const topX = petPos.value.x + PET_W / 2 - MINI / 2
+  const topY = petPos.value.y - MINI - 6
+  if (topY >= 4) return { x: clampX(topX), y: topY }
+
+  // 回退1：宠物下方居中
+  const belowY = petPos.value.y + PET_H + 6
+  if (belowY <= maxY) return { x: clampX(topX), y: belowY }
+
+  // 回退2：宠物右侧
+  const sideX = petPos.value.x + PET_W + 6
+  const sideY = petPos.value.y + PET_H / 2 - MINI / 2
+  if (sideX <= maxX) return { x: sideX, y: clampY(sideY) }
+
+  // 最终：宠物左侧
+  return { x: clampX(petPos.value.x - MINI - 6), y: clampY(sideY) }
+})
 
 const petHeadStyle = computed(() => {
   if (petHover.value || petDrag.value) return {}
+  // 看迷你拓扑图时：抬头（轻微上移）并偏向迷你图一侧
+  if (petWatchingTopo.value) {
+    const tilt = petTopoDirX.value * 4
+    return { transform: `translateX(-50%) translateY(-3px) rotate(${tilt}deg)` }
+  }
   return { transform: `translateX(-50%) rotate(${petTilt.value}deg)` }
 })
 
@@ -636,7 +707,7 @@ let petOriginY = 0
 let petClickTimer = 0    // 单击延迟判定
 let petLongPressTimer = 0  // 长按判定
 let petSpeechTimer = 0   // 台词气泡
-let petHideTimer = 0     // 隐藏后自动恢复
+let petHideTimer = 0     // 隐藏定时器（兼容保留）
 let petLongPressFired = false  // 本次长按已触发
 let petPettingFxTimer = 0      // 摸头爱心循环
 
@@ -896,18 +967,19 @@ function petSing() {
   petSfxSong()
 }
 
-// 隐藏宠物（15s 后自动恢复）
+// 隐藏宠物（保持隐藏直到手动唤回；同时停掉相关运算以节省资源）
 function petHide() {
   hidePetMenu()
   stopPetting()
   petHidden.value = true
   clearTimeout(petHideTimer)
-  petHideTimer = window.setTimeout(() => { petHidden.value = false }, 15000)
+  stopPetLoops()
 }
 
 function showPet() {
   clearTimeout(petHideTimer)
   petHidden.value = false
+  startPetLoops()
   petSfxChirp()
 }
 
@@ -948,6 +1020,13 @@ function petGotoWaiting() {
 function petToggleSidebar() {
   hidePetMenu()
   emit('petToggleSidebar')
+}
+
+// 打开网络拓扑大图
+function petOpenTopology() {
+  hidePetMenu()
+  emit('petOpenTopology')
+  petSfxChirp()
 }
 
 // 折叠所有可折叠分组
@@ -1086,10 +1165,22 @@ function togglePetSfx() {
   if (petSfxOn.value) petSfxChirp()
 }
 
+// 切换迷你拓扑图显示
+function togglePetTopo() {
+  petTopoOn.value = !petTopoOn.value
+  try {
+    localStorage.setItem(PET_TOPO_KEY, petTopoOn.value ? '1' : '0')
+  } catch (e) {
+    // 忽略存储异常
+  }
+  petSfxChirp()
+}
+
 // 随机小动作
 const PET_ACTIONS = ['look', 'yawn', 'spin', 'hop']
 let petActTimer = 0
 function schedulePetAction() {
+  clearTimeout(petActTimer)
   petActTimer = window.setTimeout(() => {
     if (!document.hidden && !petHover.value && !petDrag.value && !petSleep.value && !petHidden.value && !petPetting.value && !petWalking.value) {
       const act = PET_ACTIONS[Math.floor(Math.random() * PET_ACTIONS.length)]
@@ -1178,6 +1269,27 @@ function stopPetWalk() {
   petWalking.value = false
 }
 
+// 宠物隐藏时停掉所有常驻运算（小动作/漫步调度、动画帧、鼠标跟踪监听），节省资源
+function stopPetLoops() {
+  clearTimeout(petActTimer)
+  petActTimer = 0
+  clearTimeout(petWanderTimer)
+  petWanderTimer = 0
+  stopPetWalk()
+  if (petRaf) {
+    cancelAnimationFrame(petRaf)
+    petRaf = 0
+  }
+  document.removeEventListener('mousemove', onPetMouseMove)
+}
+
+// 宠物重新显示时重启常驻运算（幂等：已在运行时不会重复启动）
+function startPetLoops() {
+  if (!petActTimer) schedulePetAction()
+  if (!petWanderTimer) schedulePetWander()
+  document.addEventListener('mousemove', onPetMouseMove)
+}
+
 onMounted(() => {
   initPetPos()
   try {
@@ -1185,11 +1297,15 @@ onMounted(() => {
   } catch (e) {
     petSfxOn.value = true
   }
+  try {
+    petTopoOn.value = localStorage.getItem(PET_TOPO_KEY) !== '0'
+  } catch (e) {
+    petTopoOn.value = true
+  }
   document.addEventListener('mousemove', onPetMouseMove)
   document.addEventListener('pointerdown', onPetDocPointerDown)
   window.addEventListener('resize', onPetResize)
-  schedulePetAction()
-  schedulePetWander()
+  startPetLoops()
 })
 
 onUnmounted(() => {
