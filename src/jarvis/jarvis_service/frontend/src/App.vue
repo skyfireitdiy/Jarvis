@@ -8313,12 +8313,14 @@ function handleMessage(message, agentId = null) {
         streamingMessage.text += payload.text || ''
         // 使用 renderMessageHtml 确保流式消息和历史消息使用相同的渲染逻辑
         streamingMessage.html = renderMessageHtml(streamingMessage)
-        // 流式消息触发滚动（自动滚动开启时），优先使用对应 Panel 的滚动容器
-        const targetPanel = panels.value.find(p => p.agentId === targetAgentId)
+        // 流式消息触发滚动（自动滚动开启时），只滚动该 Agent 自己的容器；
+        // 仅当该 Agent 就是当前查看的 Agent 且无独立 Panel 容器时，才回退到 outputList，
+        // 避免后台 Agent 的流式输出把用户正在查看的其他 Agent 视图滚到底。
         nextTick(() => {
           if (!isAutoScrollEnabled(targetAgentId)) return
+          const targetPanel = panels.value.find(p => p.agentId === targetAgentId)
           const targetOutputList = targetPanel ? panelOutputLists.get(targetPanel.id) : null
-          const scrollEl = targetOutputList || outputList.value
+          const scrollEl = targetOutputList || (isCurrentAgent(targetAgentId) ? outputList.value : null)
           if (scrollEl) {
             scrollEl.scrollTop = scrollEl.scrollHeight
           }
@@ -9061,7 +9063,9 @@ function scrollSessionToBottom(targetAgentId) {
   if (!targetAgentId || !isAutoScrollEnabled(targetAgentId)) return
   const targetPanel = panels.value.find(p => p.agentId === targetAgentId)
   const targetOutputList = targetPanel ? panelOutputLists.get(targetPanel.id) : null
-  const scrollEl = targetOutputList || outputList.value
+  // 只滚动该 Agent 自己的容器；仅当它就是当前查看的 Agent 且无独立 Panel 容器时，
+  // 才回退到 outputList，避免后台 Agent 的终端输出把用户正在查看的其他 Agent 视图滚到底。
+  const scrollEl = targetOutputList || (isCurrentAgent(targetAgentId) ? outputList.value : null)
   if (!scrollEl) return
   nextTick(() => {
     requestAnimationFrame(() => {
