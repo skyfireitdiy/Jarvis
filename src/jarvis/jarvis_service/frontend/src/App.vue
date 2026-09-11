@@ -5051,6 +5051,27 @@ function isCurrentAgent(agentId) {
   return agentId === currentAgentId.value
 }
 
+// 是否有任何模态弹窗/浮层处于打开状态。
+// 用于阻止 Agent 推送的 input_request/confirm/ready 抢占用户焦点：
+// 用户正在弹窗中操作（如创建 Agent）时，焦点不应被自动聚焦逻辑夺走。
+function isAnyModalOpen() {
+  return Boolean(
+    showConnectModal.value ||
+    showSettingsModal.value ||
+    showDiffModal.value ||
+    showRulesModal.value ||
+    showCreateAgentModal.value ||
+    showRenameAgentModal.value ||
+    showSessionDialog.value ||
+    showDirDialog.value ||
+    showCommandPalette.value ||
+    showToolsModal.value ||
+    showEditAccessModal.value ||
+    showTopologyOverlay.value ||
+    confirmDialog.value
+  )
+}
+
 // 判断输入框是否应该禁用（没有激活的 agent 或 agent 状态不是 running）
 const isInputDisabled = computed(() => {
   if (!currentAgentId.value) {
@@ -7862,10 +7883,13 @@ async function switchAgent(agent) {
             inputMode.value = inputRequest.mode || 'multi'
             inputText.value = inputText.value || inputRequest.preset || ''
             pendingInputAgentId.value = agent.agent_id
-            nextTick(() => {
-              const inputEl = document.querySelector(inputMode.value === 'multi' ? 'textarea' : 'input[type="text"]')
-              inputEl?.focus()
-            })
+            if (!isAnyModalOpen()) {
+              nextTick(() => {
+                if (isAnyModalOpen()) return
+                const inputEl = document.querySelector(inputMode.value === 'multi' ? 'textarea' : 'input[type="text"]')
+                inputEl?.focus()
+              })
+            }
           } else {
             console.warn('[AGENT] No input request found in Map for this agent')
           }
@@ -8138,10 +8162,14 @@ function handleMessage(message, agentId = null) {
         panelInputTexts.value.set(currentAgentIdLocal, inputRequest.preset)
       }
       pendingInputAgentId.value = currentAgentIdLocal
-      nextTick(() => {
-        const inputEl = document.querySelector(inputMode.value === 'multi' ? 'textarea' : 'input[type="text"]')
-        inputEl?.focus()
-      })
+      // 弹窗打开时不抢焦点（避免恢复输入状态时夺走用户正在操作的焦点）
+      if (!isAnyModalOpen()) {
+        nextTick(() => {
+          if (isAnyModalOpen()) return
+          const inputEl = document.querySelector(inputMode.value === 'multi' ? 'textarea' : 'input[type="text"]')
+          inputEl?.focus()
+        })
+      }
     }
   } else if (type === 'sync_response') {
     // 处理同步响应，一次性接收多条历史消息（增量模式）
@@ -8383,10 +8411,10 @@ function handleMessage(message, agentId = null) {
       }
       pendingInputAgentId.value = targetAgentId
 
-      // 聚焦输入框
+      // 聚焦输入框（弹窗打开时不抢焦点）
       const targetPanel = panels.value.find(p => p.agentId === targetAgentId)
       const sp = targetPanel ? sessionPanelRefs.get(targetPanel.id) : null
-      if (sp?.focusInput) sp.focusInput()
+      if (sp?.focusInput && !isAnyModalOpen()) sp.focusInput()
 
     }
     
@@ -8432,10 +8460,10 @@ function handleMessage(message, agentId = null) {
     panelInputModes.value.set(targetAgentId, 'single')
     inputTip.value = payload.message || '请确认 (y/n/Enter)'
     panelInputTips.value.set(targetAgentId, payload.message || '请确认 (y/n/Enter)')
-    // 聚焦输入框
+    // 聚焦输入框（仅当前 Agent 且无弹窗时，避免其他 Agent 的确认请求抢焦点）
     const targetPanel = panels.value.find(p => p.agentId === targetAgentId)
     const sp = targetPanel ? sessionPanelRefs.get(targetPanel.id) : null
-    if (sp?.focusInput) sp.focusInput()
+    if (sp?.focusInput && isCurrentAgent(targetAgentId) && !isAnyModalOpen()) sp.focusInput()
     // 无 Panel 时不弹全局对话框，确认请求静默等待，用户打开 Panel 后可见 confirm 控件
   } else if (type === 'execution') {
     appendExecution(payload, targetAgentId)
