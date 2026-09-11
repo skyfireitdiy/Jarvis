@@ -3743,6 +3743,7 @@ def create_app(
                     "query": str(request.query_params),
                     "headers": dict(request.headers),
                     "body": body,
+                    "user_info": getattr(request.state, "user_info", None),
                 },
             )
             payload = response.get("payload") or {}
