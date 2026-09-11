@@ -9,7 +9,7 @@
             class="cmd-input"
             v-model="query"
             type="text"
-            :placeholder="title"
+            :placeholder="isAgentMode ? '搜索 Agent…' : title"
             autocomplete="off"
             spellcheck="false"
             @keydown="onInputKeydown"
@@ -33,12 +33,15 @@
                 @mousemove="onItemHover(entry.flatIndex)"
               >
                 <span class="cmd-item-ico">{{ entry.action.icon }}</span>
-                <span class="cmd-item-label">{{ entry.action.label }}<span v-if="entry.action.en" class="cmd-item-en">{{ entry.action.en }}</span></span>
+                <span class="cmd-item-label">
+                  <span class="cmd-item-title">{{ entry.action.label }}<span v-if="entry.action.en" class="cmd-item-en">{{ entry.action.en }}</span></span>
+                  <span v-if="entry.action.meta" class="cmd-item-meta">{{ entry.action.meta }}</span>
+                </span>
                 <span v-if="entry.action.shortcut" class="cmd-item-shortcut">{{ entry.action.shortcut }}</span>
               </button>
             </div>
           </template>
-          <div v-else class="cmd-empty">无匹配命令</div>
+          <div v-else class="cmd-empty">{{ isAgentMode ? '无匹配 Agent' : '无匹配命令' }}</div>
         </div>
 
         <div class="cmd-footer">
@@ -70,13 +73,71 @@ const inputEl = ref(null)
 const itemRefs = new Map()
 
 function isDisabled(action) {
-  return typeof action.enabled === 'function' ? !action.enabled(props.ctx || {}) : false
+  if (typeof action.enabled === 'function') return !action.enabled(props.ctx || {})
+  // Agent 切换条目直接携带布尔 disabled，避免与上面的 enabled 回调判断冲突
+  return action?.disabled === true
 }
+
+// ===== Agent 切换模式：输入 a> 或 A> 时，列表改为展示 Agent =====
+const AGENT_PREFIX = /^\s*a>\s*/i
+const isAgentMode = computed(() => AGENT_PREFIX.test(query.value))
+const agentQuery = computed(() => query.value.replace(AGENT_PREFIX, ''))
+
+function agentStatusIcon(agent) {
+  const ctx = props.ctx || {}
+  if (typeof ctx.isWaitingInput === 'function' && ctx.isWaitingInput(agent)) return '🚨'
+  const status = typeof ctx.getStatusClass === 'function' ? ctx.getStatusClass(agent) : 'running'
+  if (status === 'stopped') return '○'
+  return '●'
+}
+
+// 将 Agent 列表转换为动作对象，复用命令面板的渲染与键盘导航
+const agentEntries = computed(() => {
+  const ctx = props.ctx || {}
+  const list = Array.isArray(ctx.agentList) ? ctx.agentList : []
+  const opened = ctx.openedAgentIds instanceof Set ? ctx.openedAgentIds : new Set()
+  const q = agentQuery.value.trim().toLowerCase()
+  const isOpened = agent => opened.has(agent?.agent_id)
+  return list
+    .filter(agent => {
+      if (!q) return true
+      const nodeLabel = typeof ctx.getAgentNodeLabel === 'function' ? ctx.getAgentNodeLabel(agent) : ''
+      const haystack = [agent?.name, agent?.agent_id, nodeLabel].filter(Boolean).join(' ').toLowerCase()
+      return haystack.includes(q)
+    })
+    // 已在 Panel 中打开的（激活的）排在前面，其余保持原顺序
+    .sort((a, b) => (isOpened(b) ? 1 : 0) - (isOpened(a) ? 1 : 0))
+    .map(agent => {
+      const nodeLabel = typeof ctx.getAgentNodeLabel === 'function' ? ctx.getAgentNodeLabel(agent) : ''
+      const active = agent?.agent_id === ctx.currentAgentId
+      const metaParts = []
+      if (nodeLabel) metaParts.push(`🖥 ${nodeLabel}`)
+      if (agent?.proxy_node) metaParts.push(`🔀 代理 ${agent.proxy_node}`)
+      if (agent?.llm_group) metaParts.push(`🧠 ${agent.llm_group}`)
+      if (agent?.quick_mode) metaParts.push('⚡ 极速')
+      if (agent?.worktree) metaParts.push('🌿 worktree')
+      if (agent?.working_dir) metaParts.push(`📁 ${agent.working_dir}`)
+      return {
+        id: `agent-switch:${agent.agent_id}`,
+        label: agent?.name || agent?.agent_id,
+        en: agent?.agent_id,
+        group: '切换 Agent',
+        icon: agentStatusIcon(agent),
+        keywords: [nodeLabel],
+        meta: metaParts.join('   '),
+        disabled: active,
+        run: (c) => c.switchToAgent && c.switchToAgent(agent),
+      }
+    })
+})
 
 // 过滤 + 扁平化（用连续索引做键盘导航，与分组展示解耦）
 const flatEntries = computed(() => {
   let flatIndex = 0
-  return filterActions(props.actions, query.value).map(action => ({
+  const matched = isAgentMode.value
+    ? agentEntries.value
+    : filterActions(props.actions, query.value)
+  return matched.map(action => ({
     action,
     disabled: isDisabled(action),
     flatIndex: flatIndex++,
@@ -314,6 +375,21 @@ defineExpose({ focus: () => inputEl.value?.focus() })
 .cmd-item-label {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.cmd-item-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cmd-item-meta {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  opacity: 0.8;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
