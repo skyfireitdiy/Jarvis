@@ -824,8 +824,7 @@ function onPetPointerUp(e) {
 // 单击：睡眠则唤醒；否则跳跃 + 粒子 + 音效 + 随机台词
 function onPetSingleClick(x, y) {
   if (petSleep.value) {
-    petSleep.value = false
-    petSfxChirp()
+    wakePet()
     return
   }
   petJump.value = true
@@ -837,7 +836,7 @@ function onPetSingleClick(x, y) {
 
 // 双击：撒花庆祝，并唤起命令面板
 function onPetDoubleClick(x, y) {
-  if (petSleep.value) petSleep.value = false
+  wakePet()
   petJump.value = true
   setTimeout(() => { petJump.value = false }, 560)
   petAction.value = 'cheer'
@@ -876,7 +875,7 @@ function spawnPetConfetti(x, y) {
 
 // 摸头
 function startPetting() {
-  if (petSleep.value) petSleep.value = false
+  wakePet()
   petPetting.value = true
   petSfxPurr()
   spawnPetHearts()
@@ -911,7 +910,7 @@ function spawnPetHearts() {
 // ==================== 菜单动作 ====================
 // 喂食：食物落下 + 咀嚼
 function petFeed() {
-  if (petSleep.value) petSleep.value = false
+  wakePet()
   const el = document.querySelector('.pet-float')
   const r = el ? el.getBoundingClientRect() : { left: petPos.value.x, top: petPos.value.y, width: PET_W, height: PET_H }
   const food = document.createElement('div')
@@ -931,7 +930,7 @@ function petFeed() {
 
 // 玩球：球飞过 + 追逐
 function petPlayBall() {
-  if (petSleep.value) petSleep.value = false
+  wakePet()
   const el = document.querySelector('.pet-float')
   const r = el ? el.getBoundingClientRect() : { left: petPos.value.x, top: petPos.value.y, width: PET_W, height: PET_H }
   const ball = document.createElement('div')
@@ -948,19 +947,42 @@ function petPlayBall() {
 }
 
 // 打盹 / 唤醒
+let petSleepTimer = 0   // 睡一会自动醒来的定时器
+// 每次入睡随机小睡 20~40 秒后自己醒来
+function schedulePetWake() {
+  clearTimeout(petSleepTimer)
+  petSleepTimer = window.setTimeout(() => {
+    petSleepTimer = 0
+    if (petSleep.value) wakePet()
+  }, 20000 + Math.random() * 20000)
+}
+
+// 唤醒（若在睡眠中），并清理自动醒来定时器
+function wakePet() {
+  clearTimeout(petSleepTimer)
+  petSleepTimer = 0
+  if (petSleep.value) {
+    petSleep.value = false
+    petSfxChirp()
+  }
+}
+
 function togglePetSleep() {
   petSleep.value = !petSleep.value
   if (petSleep.value) {
     petSpeech.value = ''
     petSfxYawn()
+    schedulePetWake()
   } else {
+    clearTimeout(petSleepTimer)
+    petSleepTimer = 0
     petSfxChirp()
   }
 }
 
 // 唱歌：音符飘出 + 音阶
 function petSing() {
-  if (petSleep.value) petSleep.value = false
+  wakePet()
   const el = document.querySelector('.pet-float')
   const r = el ? el.getBoundingClientRect() : { left: petPos.value.x, top: petPos.value.y, width: PET_W, height: PET_H }
   const notes = ['♪', '♫', '🎵', '♬']
@@ -1352,6 +1374,8 @@ function stopPetLoops() {
   petActTimer = 0
   clearTimeout(petWanderTimer)
   petWanderTimer = 0
+  clearTimeout(petSleepTimer)
+  petSleepTimer = 0
   stopPetWalk()
   if (petRaf) {
     cancelAnimationFrame(petRaf)
@@ -1409,6 +1433,7 @@ onUnmounted(() => {
   clearTimeout(petHideTimer)
   clearInterval(petPettingFxTimer)
   clearTimeout(petWanderTimer)
+  clearTimeout(petSleepTimer)
   if (petRaf) cancelAnimationFrame(petRaf)
   if (petWanderRaf) cancelAnimationFrame(petWanderRaf)
 })
