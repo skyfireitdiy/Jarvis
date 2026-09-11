@@ -1201,25 +1201,71 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 PrettyOutput.auto_print("⚠ 当前目录不在 Git 仓库中，无法推送代码")
                 return "", True
 
-            PrettyOutput.auto_print("🚀 正在推送代码到远端...")
+            PrettyOutput.auto_print("🚀 正在推送代码到所有远端...")
             try:
                 from jarvis.jarvis_tools.execute_script import ScriptTool
+
+                if sys.platform == "win32":
+                    interpreter = "powershell"
+                    script_content = (
+                        "$remotes = git remote; "
+                        "if (-not $remotes) { Write-Output 'NO_REMOTE'; exit 0 }; "
+                        "$branch = git branch --show-current; "
+                        "$failed = @(); "
+                        "foreach ($r in $remotes) { "
+                        'Write-Output "=== PUSH $r ==="; '
+                        "git push $r; "
+                        "if ($LASTEXITCODE -ne 0) { "
+                        "if ($branch) { git push $r $branch }; "
+                        "if ($LASTEXITCODE -ne 0) { $failed += $r } "
+                        "} "
+                        "}; "
+                        "if ($failed.Count -gt 0) { "
+                        "Write-Output (\"FAILED_REMOTES: \" + ($failed -join ', ')); exit 1 } "
+                        "else { Write-Output 'ALL_PUSH_OK' }"
+                    )
+                else:
+                    interpreter = "bash"
+                    script_content = (
+                        "remotes=$(git remote); "
+                        "if [ -z \"$remotes\" ]; then echo 'NO_REMOTE'; exit 0; fi; "
+                        "branch=$(git branch --show-current); "
+                        "failed=''; "
+                        "for r in $remotes; do "
+                        'echo "=== PUSH $r ==="; '
+                        'git push "$r" || { '
+                        'if [ -n "$branch" ]; then git push "$r" "$branch"; fi; '
+                        "}; "
+                        'if [ $? -ne 0 ]; then failed="$failed $r"; fi; '
+                        "done; "
+                        'if [ -n "$failed" ]; then '
+                        'echo "FAILED_REMOTES:$failed"; exit 1; '
+                        "else echo 'ALL_PUSH_OK'; fi"
+                    )
 
                 script_tool = ScriptTool()
                 result = script_tool.execute(
                     {
-                        "script_content": "git push",
+                        "interpreter": interpreter,
+                        "script_content": script_content,
                         "execution_mode": "interactive",
                     }
                 )
+                stdout = result.get("stdout", "") or ""
+                stderr = result.get("stderr", "") or ""
                 if result.get("success"):
-                    PrettyOutput.auto_print("✅ 代码推送成功")
-                    stdout = result.get("stdout", "")
+                    if "NO_REMOTE" in stdout:
+                        PrettyOutput.auto_print("⚠ 未配置任何远端仓库，无需推送")
+                    else:
+                        PrettyOutput.auto_print("✅ 代码已推送到所有远端")
+                        if stdout.strip():
+                            PrettyOutput.auto_print(stdout.strip())
+                else:
+                    PrettyOutput.auto_print("❌ 部分或全部远端推送失败")
                     if stdout.strip():
                         PrettyOutput.auto_print(stdout.strip())
-                else:
-                    stderr = result.get("stderr", "未知错误")
-                    PrettyOutput.auto_print(f"❌ 代码推送失败: {stderr}")
+                    if stderr.strip():
+                        PrettyOutput.auto_print(stderr.strip())
             except Exception as e:
                 PrettyOutput.auto_print(f"❌ 代码推送异常: {e}")
             return "", True
