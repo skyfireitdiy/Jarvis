@@ -1,0 +1,8 @@
+{
+  "id": "20260911_020647_150092",
+  "type": "project_long_term",
+  "tags": ["jarvis", "frontend", "topology", "TopologyOverlay", "master-node"],
+  "content": "Jarvis 拓扑大图 TopologyOverlay.vue 主节点与连线（2026-09-11 追加）：\n- 主节点（master）已改为与子节点**同款服务器机箱造型**（用户明确要求），仅靠颜色/尺寸区分：CENTER_W=76 / CENTER_H=66（子节点 NODE_R*2=60 × NODE_R*1.72≈51.6）；填充用金色渐变 url(#topo-center-fill)（#ffe89a→#f0b429），描边 centerColor（online=#ffd75e 金、offline=#ff5d6c、unknown=#8a9bb0）；机箱细节同子节点（顶部插槽/散热格栅 3 条/指示灯/底部状态条）。已删除原皇冠 path 与黑色服务器纹饰。CENTER_R 常量已删除（无残留）。\n- 主节点文字：.topo-center-label fill=#3a2a00（深棕，压金色底），.topo-node.is-center > .topo-node-count fill=#ffe89a。\n- 连线共三类（模板顺序：master→节点、节点↔节点、节点→agent）：\n  1) lines：master→各子节点（实线，url(#topo-line) 渐变，offline 虚线红）；\n  2) peerLinks：子节点按圆周顺序相邻连成环（虚线 2 4，蓝 rgba(32,200,255,0.45)，任一端 offline 则红虚线）；\n  3) agentLinks：节点→其 agent（虚线 3 3，颜色=agent 状态色，opacity 0.45）。\n- 验证：npm run build EXIT=0。",
+  "created_at": "2026-09-11T02:06:47.150124",
+  "updated_at": "2026-09-11T02:06:47.150129"
+}

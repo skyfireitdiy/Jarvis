@@ -1,0 +1,8 @@
+{
+  "id": "20260911_015729_961790",
+  "type": "project_long_term",
+  "tags": ["jarvis", "frontend", "topology", "topology.js", "TopologyOverlay"],
+  "content": "Jarvis 拓扑大图（TopologyOverlay.vue + topology.js）布局要点（2026-09-11）：\n- 画布 W=1200 H=640；NODE_R=30 CENTER_R=44 AGENT_R=13；节点圆周半径 = min(W,H)*0.34 = 217.6（layoutTopology）。\n- layoutTopology 现在给每个节点输出 angle（方位角，-90° 起顺时针）。\n- layoutAgents 语义：中心节点 agent 环绕一周（centerRing=70，避开 CENTER_R=44 装饰环 54 与 MASTER 标签）；子节点 agent 只分布在『背向中心』的外侧扇形内（半角 spreadDeg=clamp(180/n-10, 38, 80)），从根本上避免 A 节点 agent 撞 B 节点。\n- agent 标签沿径向朝外摆放：layoutAgents 返回 labelX/labelY/labelAnchor/labelBaseline（text-anchor 由 cos 决定、dominant-baseline 由 sin 决定），不再固定正下方，避免压住节点自身标签。\n- agent 环半径自适应：minGap=26，r=max(ring, minGap/(2*sin(step/2)))，但受 canvas+edgePad 限制（ringLimitAt 取节点到四边最小余量 - edgePad，edgePad=AGENT_R+24），保证不溢出画布。\n- 连线：master→各节点（实线，url(#topo-line) 渐变，offline 虚线红）；节点→其 agent（agentLinks，虚线 3 3，颜色=agent 状态色，opacity 0.45）。\n- 验证方式：node --input-type=module 直接 import topology.js 跑 buildTopology/layoutTopology/layoutAgents，断言 A-A>=26、A-Node>=0、画布内；再 npm run build。无需浏览器。\n- 已知物理限制：单节点 6+ agent 时环半径顶到画布上限，agent 会挤到 12~17px（不可避免）。",
+  "created_at": "2026-09-11T01:57:29.961820",
+  "updated_at": "2026-09-11T01:57:29.961826"
+}

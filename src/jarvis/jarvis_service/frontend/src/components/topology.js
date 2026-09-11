@@ -166,13 +166,15 @@ export function layoutTopology(model, width, height) {
   const nodes = (model && model.nodes) || [];
   const count = nodes.length;
   const positioned = nodes.map((node, index) => {
-    if (count === 0) return { id: node.id, x: cx, y: cy };
+    if (count === 0) return { id: node.id, x: cx, y: cy, angle: -Math.PI / 2 };
     // 从正上方（-90°）开始顺时针均匀分布
     const angle = -Math.PI / 2 + (index * 2 * Math.PI) / count;
     return {
       id: node.id,
       x: cx + radius * Math.cos(angle),
       y: cy + radius * Math.sin(angle),
+      // 记录方位角：agent 布局据此把 agent 排到「背向中心」的外侧
+      angle,
     };
   });
   return {
@@ -182,41 +184,90 @@ export function layoutTopology(model, width, height) {
   };
 }
 
-// 将「参与绘制」的 agent 以环绕形式布局到各自节点周围
-// 返回：{ agents: [{ id, name, state, nodeId, x, y }] }
-// options.ring：环绕半径；options.agentRingStart：起始角度（弧度）
+// 将「参与绘制」的 agent 布局到各自节点周围：
+// - 中心节点：agent 环绕一周
+// - 其余节点：agent 只分布在「背向中心」的外侧扇形内，避免朝内侧的 agent
+//   与相邻节点（及其 agent）重叠
+// 每个 agent 附带标签坐标：标签沿径向朝外摆放，避免压住节点本体文字
+// options.ring：子节点 agent 环绕半径；options.centerRing：中心 agent 环绕半径；
+// options.labelGap：标签相对 agent 中心额外外移的距离；
+// options.minGap：相邻 agent 圆心最小间距（不足时自动放大环半径）；
+// options.canvas：{ width, height }，用于限制环半径不溢出画布；
+// options.edgePad：环外沿到画布边缘的最小预留（agent 半径 + 标签）
 export function layoutAgents(model, nodeLayout, options = {}) {
   const ring = Number(options.ring) || 34;
-  const startAngle = Number(options.agentRingStart) || -Math.PI / 2;
+  const centerRing = Number(options.centerRing) || ring;
+  const labelGap = Number(options.labelGap) || 12;
+  const minGap = Number(options.minGap) || 26;
+  const canvas = options.canvas || null;
+  const edgePad = Number(options.edgePad) || 0;
   const placed = [];
+
+  // 节点处环半径上限：不超出画布（各方向取最小余量）
+  const ringLimitAt = (pos) => {
+    if (!canvas) return Infinity;
+    const w = Number(canvas.width) || 0;
+    const h = Number(canvas.height) || 0;
+    return Math.max(0, Math.min(pos.x, w - pos.x, pos.y, h - pos.y) - edgePad);
+  };
 
   if (!model || !nodeLayout) return { agents: placed };
 
-  const pushNodeAgents = (node, pos) => {
-    const list = (node && node.drawAgents) || [];
-    const total = list.length;
-    if (total === 0) return;
-    list.forEach((agent, i) => {
-      // 围绕节点均匀分布
-      const angle = startAngle + (i * 2 * Math.PI) / total;
-      placed.push({
-        id: agent.id,
-        name: agent.name,
-        type: agent.type || "agent",
-        state: agent.state,
-        nodeId: node.id,
-        x: pos.x + ring * Math.cos(angle),
-        y: pos.y + ring * Math.sin(angle),
-      });
+  const push = (agent, nodeId, pos, r, angle) => {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const labelDist = r + labelGap;
+    placed.push({
+      id: agent.id,
+      name: agent.name,
+      type: agent.type || "agent",
+      state: agent.state,
+      nodeId,
+      x: pos.x + r * cos,
+      y: pos.y + r * sin,
+      labelX: pos.x + labelDist * cos,
+      labelY: pos.y + labelDist * sin,
+      labelAnchor: cos > 0.35 ? "start" : cos < -0.35 ? "end" : "middle",
+      labelBaseline: sin > 0.4 ? "hanging" : sin < -0.4 ? "auto" : "middle",
     });
   };
 
+  // 中心节点：agent 环绕一周
   const centerPos = nodeLayout.center;
+  if (model.center && centerPos) {
+    const list = model.center.drawAgents || [];
+    const total = list.length;
+    list.forEach((agent, i) => {
+      const angle = -Math.PI / 2 + (i * 2 * Math.PI) / total;
+      push(agent, model.center.id, centerPos, centerRing, angle);
+    });
+  }
+
+  // 其余节点：agent 分布在背向中心的扇形内
+  const nodeCount = (model.nodes || []).length || 1;
+  // 扇形半角：节点越多，扇形越窄，避免相邻节点的扇形互相侵入
+  const spreadDeg = Math.min(80, Math.max(38, 180 / nodeCount - 10));
+  const spread = (spreadDeg * Math.PI) / 180;
   const posMap = new Map((nodeLayout.nodes || []).map((p) => [p.id, p]));
-  if (model.center) pushNodeAgents(model.center, centerPos);
   (model.nodes || []).forEach((node) => {
     const pos = posMap.get(node.id);
-    if (pos) pushNodeAgents(node, pos);
+    const list = node.drawAgents || [];
+    if (!pos || list.length === 0) return;
+    // 朝外方向：节点相对中心的方位角
+    const baseAngle = Number.isFinite(pos.angle) ? pos.angle : -Math.PI / 2;
+    const total = list.length;
+    const step = total > 1 ? (spread * 2) / (total - 1) : 0;
+    // agent 多时弧距不足，自动放大环半径（保证相邻 agent 圆心间距 >= minGap）
+    // 但不超过该节点到画布边缘的可用余量，避免溢出画布
+    const limit = ringLimitAt(pos);
+    const r =
+      total > 1 && step > 0
+        ? Math.min(limit, Math.max(ring, minGap / (2 * Math.sin(step / 2))))
+        : Math.min(ring, limit);
+    list.forEach((agent, i) => {
+      const angle = total > 1 ? baseAngle - spread + i * step : baseAngle;
+      push(agent, node.id, pos, r, angle);
+    });
   });
 
   return { agents: placed };

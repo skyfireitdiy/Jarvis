@@ -6201,6 +6201,32 @@ async function fetchAgentStatus(agent) {
   }
 }
 
+// 主动同步在线 agent 的执行状态（避免仅靠 WebSocket 推送，错过等待输入状态）
+const syncingAgentStatuses = new Set()
+let lastStatusSyncAt = 0
+const STATUS_SYNC_INTERVAL = 5000 // 状态同步最小间隔（毫秒）
+
+function syncOnlineAgentStatuses() {
+  const now = Date.now()
+  if (now - lastStatusSyncAt < STATUS_SYNC_INTERVAL) {
+    return
+  }
+  lastStatusSyncAt = now
+
+  for (const agent of agentList.value) {
+    if (agent.status !== 'running') continue
+    if (syncingAgentStatuses.has(agent.agent_id)) continue
+    syncingAgentStatuses.add(agent.agent_id)
+    fetchAgentStatus(agent)
+      .catch((error) => {
+        console.warn(`[AGENT STATUS] Sync failed for ${agent.agent_id}:`, error?.message)
+      })
+      .finally(() => {
+        syncingAgentStatuses.delete(agent.agent_id)
+      })
+  }
+}
+
 // Session 恢复相关函数
 async function restoreSession(sessionFile) {
   if (!sessionFile || !currentAgentId.value) {
@@ -6912,24 +6938,19 @@ async function fetchAgentList() {
     
     // 更新列表（后端返回格式: { success: true, data: agents }）
     if (result.success && result.data) {
-      // 记录旧的 agent ID 列表，用于检测新创建的 agent
-      const oldAgentIds = new Set(agentList.value.map(a => a.agent_id))
-      
       // 反转数组，让后创建的 agent 排在前面
       agentList.value = result.data.slice().reverse().map(agent => ({
         ...agent,
         node_id: String(agent?.node_id || '').trim() || 'master',
       }))
-      
-      // 检测新创建的在线 agent 并自动连接
-      const newOnlineAgents = agentList.value.filter(agent => 
-        agent.status === 'running' && !oldAgentIds.has(agent.agent_id)
-      )
-      
-      if (newOnlineAgents.length > 0) {
-        // 异步连接，不阻塞列表刷新
-        autoConnectToOnlineAgents()
-      }
+
+      // 确保所有在线 agent 都已建立连接（内部会跳过已连接的，重复调用安全），
+      // 这样未被点击过的 agent 也能实时接收状态更新。
+      autoConnectToOnlineAgents()
+
+      // 主动同步在线 agent 的执行状态（如等待输入），
+      // 避免因错过 WebSocket 推送导致状态停留在 running。
+      syncOnlineAgentStatuses()
     }
     
     // 更新当前 Agent 状态
