@@ -46,7 +46,10 @@
 
         <div class="cmd-footer">
           <span><b>↑↓</b> 选择</span>
-          <span><b>Enter</b> 执行</span>
+          <span><b>Enter</b> {{ isAgentMode ? '当前面板打开' : '执行' }}</span>
+          <span v-if="isAgentMode"><b>Tab</b> 新面板打开</span>
+          <span v-if="!isAgentMode"><b>a&gt;</b> 切换 Agent</span>
+          <span v-else><b>⌫</b> 返回命令</span>
           <span><b>Esc</b> 关闭</span>
         </div>
       </div>
@@ -126,7 +129,8 @@ const agentEntries = computed(() => {
         keywords: [nodeLabel],
         meta: metaParts.join('   '),
         disabled: active,
-        run: (c) => c.switchToAgent && c.switchToAgent(agent),
+        isAgentEntry: true,
+        run: (c, openMode) => c.switchToAgent && c.switchToAgent(agent, openMode),
       }
     })
 })
@@ -184,9 +188,9 @@ function onItemHover(index) {
   activeIndex.value = index
 }
 
-function run(action) {
+function run(action, openMode = 'current') {
   if (!action || isDisabled(action)) return
-  emit('run', action)
+  emit('run', action, openMode)
 }
 
 function close() {
@@ -233,7 +237,12 @@ function onInputKeydown(event) {
   } else if (event.key === 'Enter') {
     event.preventDefault()
     const entry = flatEntries.value[activeIndex.value]
-    if (entry && !entry.disabled) run(entry.action)
+    if (entry && !entry.disabled) run(entry.action, 'current')
+  } else if (event.key === 'Tab' && isAgentMode.value) {
+    // Agent 模式：Tab 在新的 Panel 中打开
+    event.preventDefault()
+    const entry = flatEntries.value[activeIndex.value]
+    if (entry && !entry.disabled) run(entry.action, 'new')
   } else if (event.key === 'Escape') {
     event.preventDefault()
     close()
