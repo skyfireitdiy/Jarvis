@@ -27,11 +27,15 @@
                 <stop offset="0%" stop-color="#20c8ff" stop-opacity="0.9" />
                 <stop offset="100%" stop-color="#20c8ff" stop-opacity="0.25" />
               </linearGradient>
+              <linearGradient id="topo-center-fill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#ffe89a" />
+                <stop offset="100%" stop-color="#f0b429" />
+              </linearGradient>
             </defs>
 
             <rect :width="W" :height="H" fill="url(#topo-bg)" />
 
-            <!-- 连线 -->
+            <!-- 连线：master -> 各节点 -->
             <g class="topo-links">
               <line
                 v-for="l in lines"
@@ -45,6 +49,37 @@
                 :stroke-dasharray="l.state === 'offline' ? '6 5' : ''"
                 class="topo-link"
                 :class="{ 'is-hot': l.hot, 'is-flow': l.state !== 'offline' }"
+              />
+            </g>
+
+            <!-- 连线：子节点之间（按圆周顺序连成环） -->
+            <g class="topo-peer-links">
+              <line
+                v-for="pl in peerLinks"
+                :key="'P' + pl.id"
+                :x1="pl.x1"
+                :y1="pl.y1"
+                :x2="pl.x2"
+                :y2="pl.y2"
+                :stroke="pl.state === 'offline' ? 'rgba(255,93,108,0.3)' : 'rgba(32,200,255,0.45)'"
+                stroke-width="1.4"
+                :stroke-dasharray="pl.state === 'offline' ? '6 5' : '2 4'"
+              />
+            </g>
+
+            <!-- 连线：节点 -> 其 agent -->
+            <g class="topo-agent-links">
+              <line
+                v-for="al in agentLinks"
+                :key="'AL' + al.id"
+                :x1="al.x1"
+                :y1="al.y1"
+                :x2="al.x2"
+                :y2="al.y2"
+                :stroke="agentColor(al.state)"
+                stroke-width="1"
+                stroke-dasharray="3 3"
+                opacity="0.45"
               />
             </g>
 
@@ -76,7 +111,7 @@
               </template>
               <!-- 嘴/呼吸灯 -->
               <rect :x="a.x - 3" :y="a.y + 4" :width="6" :height="2" rx="1" fill="#041018" opacity="0.75" />
-              <text :x="a.x" :y="a.y + AGENT_R + 14" text-anchor="middle" class="topo-agent-label">{{ agentShort(a.name) }}</text>
+              <text :x="a.labelX" :y="a.labelY" :text-anchor="a.labelAnchor" :dominant-baseline="a.labelBaseline" class="topo-agent-label">{{ agentShort(a.name) }}</text>
             </g>
 
             <!-- 其余节点（服务器机箱造型） -->
@@ -110,20 +145,30 @@
               <text :x="n.x" :y="n.y + NODE_R * 0.86 + 29" text-anchor="middle" class="topo-node-count">{{ n.drawAgents.length }}/{{ n.agents.length }} agent</text>
             </g>
 
-            <!-- 中心 master（主服务器：双环 + 皇冠） -->
+            <!-- 中心 master（与子节点同款服务器机箱，仅靠颜色/尺寸区分主次） -->
             <g class="topo-node is-center" :class="'st-' + model.center.state" @mouseenter="hovered = 'master'">
-              <circle :cx="layout.center.x" :cy="layout.center.y" :r="CENTER_R + 10" :stroke="centerColor" stroke-width="1" fill="none" class="topo-ring" />
-              <circle :cx="layout.center.x" :cy="layout.center.y" :r="CENTER_R + 4" :stroke="centerColor" stroke-width="1.2" fill="none" opacity="0.6" />
-              <circle :cx="layout.center.x" :cy="layout.center.y" :r="CENTER_R" :fill="centerFill" :stroke="centerColor" stroke-width="2.4" filter="url(#topo-glow)" />
-              <!-- 皇冠 -->
-              <path :d="`M${layout.center.x - 16} ${layout.center.y - 12} l5 -10 6 7 5 -10 5 10 6 -7 5 10 z`"
-                    fill="#ffd75e" stroke="#ffb347" stroke-width="0.8" />
-              <!-- 服务器纹饰 -->
-              <rect :x="layout.center.x - 18" :y="layout.center.y + 4" :width="36" :height="6" rx="3" fill="#041018" opacity="0.35" />
-              <line v-for="k in 3" :key="'mg' + k" :x1="layout.center.x - 15 + k * 12" :y1="layout.center.y + 4"
-                    :x2="layout.center.x - 15 + k * 12" :y2="layout.center.y + 10" stroke="#041018" stroke-width="1" opacity="0.5" />
-              <text :x="layout.center.x" :y="layout.center.y + CENTER_R + 18" text-anchor="middle" class="topo-center-label">MASTER</text>
-              <text :x="layout.center.x" :y="layout.center.y + CENTER_R + 32" text-anchor="middle" class="topo-node-count">{{ model.center.drawAgents.length }}/{{ model.center.agents.length }} agent</text>
+              <rect v-if="model.center.state !== 'offline'" :x="layout.center.x - CENTER_W / 2 - 5" :y="layout.center.y - CENTER_H / 2 - 5" :width="CENTER_W + 10" :height="CENTER_H + 10" rx="11"
+                    :stroke="centerColor" stroke-width="1.4" fill="none" class="topo-ring" />
+              <!-- 机箱主体 -->
+              <rect :x="layout.center.x - CENTER_W / 2" :y="layout.center.y - CENTER_H / 2" :width="CENTER_W" :height="CENTER_H" rx="7"
+                    :fill="centerFill" :stroke="centerColor" stroke-width="2.2" class="topo-server" filter="url(#topo-glow)" />
+              <!-- 顶部插槽 -->
+              <line :x1="layout.center.x - CENTER_W / 2 + 8" :y1="layout.center.y - CENTER_H / 2 + 9"
+                    :x2="layout.center.x + CENTER_W / 2 - 8" :y2="layout.center.y - CENTER_H / 2 + 9"
+                    :stroke="centerColor" stroke-width="1.6" opacity="0.7" />
+              <!-- 散热格栅 -->
+              <line v-for="k in 3" :key="'mg' + k"
+                    :x1="layout.center.x - CENTER_W / 2 + 10" :y1="layout.center.y - CENTER_H / 2 + 8 + k * 5.4"
+                    :x2="layout.center.x + CENTER_W / 2 - 20" :y2="layout.center.y - CENTER_H / 2 + 8 + k * 5.4"
+                    :stroke="centerColor" stroke-width="1.2" opacity="0.4" />
+              <!-- 指示灯 -->
+              <circle :cx="layout.center.x + CENTER_W / 2 - 12" :cy="layout.center.y - 2" r="2.8" :fill="centerColor" class="topo-led" />
+              <circle :cx="layout.center.x + CENTER_W / 2 - 12" :cy="layout.center.y + 6" r="2.8" :fill="centerColor" opacity="0.4" />
+              <!-- 底部状态条 -->
+              <rect :x="layout.center.x - CENTER_W / 2 + 8" :y="layout.center.y + CENTER_H / 2 - 9" :width="CENTER_W - 16" :height="3.5" rx="1.75"
+                    :fill="centerColor" opacity="0.55" />
+              <text :x="layout.center.x" :y="layout.center.y + CENTER_H / 2 + 18" text-anchor="middle" class="topo-center-label">MASTER</text>
+              <text :x="layout.center.x" :y="layout.center.y + CENTER_H / 2 + 32" text-anchor="middle" class="topo-node-count">{{ model.center.drawAgents.length }}/{{ model.center.agents.length }} agent</text>
             </g>
           </svg>
 
@@ -210,18 +255,32 @@ const props = defineProps({
 
 const emit = defineEmits(['update:visible', 'close'])
 
-const W = 920
-const H = 560
+const W = 1200
+const H = 640
 const NODE_R = 30
-const CENTER_R = 44
+// 主节点机箱尺寸（比子节点略大，同款造型）
+const CENTER_W = 76
+const CENTER_H = 66
 const AGENT_R = 13
-const AGENT_RING = 52
+// 子节点 agent 环绕半径（较小，避免与相邻节点/其 agent 相撞）
+const AGENT_RING = 62
+// 中心 agent 环绕半径（略大，避开中心装饰环与 MASTER 标签）
+const CENTER_AGENT_RING = 70
+// agent 环外沿到画布边缘的预留（agent 半径 + 标签空间）
+const AGENT_EDGE_PAD = AGENT_R + 24
 
 const model = computed(() => buildTopology(props.nodes, props.agents, props.getStatusClass))
 const layout = computed(() => layoutTopology(model.value, W, H))
 const counts = computed(() => model.value.counts)
 // 参与绘制的 agent（已停止的不绘制，仅作数据显示）
-const agentLayout = computed(() => layoutAgents(model.value, layout.value, { ring: AGENT_RING }))
+const agentLayout = computed(() =>
+  layoutAgents(model.value, layout.value, {
+    ring: AGENT_RING,
+    centerRing: CENTER_AGENT_RING,
+    canvas: { width: W, height: H },
+    edgePad: AGENT_EDGE_PAD,
+  }),
+)
 
 const NODE_COLORS = { online: '#34d99b', offline: '#ff5d6c', unknown: '#8a9bb0' }
 const AGENT_COLORS = { running: '#20c8ff', waiting: '#ffb347', idle: '#8a9bb0', stopped: '#ff5d6c' }
@@ -282,10 +341,49 @@ const lines = computed(() =>
   }))
 )
 
-const centerColor = computed(() => nodeColor(model.value.center.state))
-const centerFill = computed(() =>
-  model.value.center.state === 'offline' ? 'rgba(255,93,108,0.9)' : 'rgba(32,200,255,0.92)'
-)
+// 节点间连线：按圆周顺序把相邻子节点连成环（子节点 ↔ 子节点）
+const peerLinks = computed(() => {
+  const pts = nodePoints.value
+  if (pts.length < 2) return []
+  return pts.map((n, i) => {
+    const next = pts[(i + 1) % pts.length]
+    return {
+      id: n.id + '-' + next.id,
+      x1: n.x,
+      y1: n.y,
+      x2: next.x,
+      y2: next.y,
+      state: n.state === 'offline' || next.state === 'offline' ? 'offline' : 'online',
+    }
+  })
+})
+
+// 节点 -> agent 连线：每个 agent 连回其所属节点（master 连到中心）
+const agentLinks = computed(() => {
+  const posMap = new Map(layout.value.nodes.map(p => [p.id, p]))
+  return agentLayout.value.agents
+    .map(a => {
+      const origin = a.nodeId === 'master' ? layout.value.center : posMap.get(a.nodeId)
+      if (!origin) return null
+      return { id: a.id, x1: origin.x, y1: origin.y, x2: a.x, y2: a.y, state: a.state }
+    })
+    .filter(Boolean)
+})
+
+const centerColor = computed(() => {
+  const state = model.value.center.state
+  if (state === 'offline') return '#ff5d6c'
+  if (state === 'unknown') return '#8a9bb0'
+  // 在线主节点用金色强调，与子节点（绿/蓝）区分
+  return '#ffd75e'
+})
+const centerFill = computed(() => {
+  const state = model.value.center.state
+  if (state === 'offline') return 'rgba(255,93,108,0.85)'
+  if (state === 'unknown') return 'rgba(138,155,176,0.8)'
+  // 在线主节点：金色渐变填充
+  return 'url(#topo-center-fill)'
+})
 
 const hoverInfo = computed(() => {
   const id = hovered.value
@@ -348,8 +446,9 @@ defineExpose({ close })
   backdrop-filter: blur(3px);
 }
 .topo-panel {
-  width: min(820px, 94vw);
-  max-height: 92vh;
+  width: 96vw;
+  height: 92vh;
+  max-width: 1600px;
   display: flex;
   flex-direction: column;
   background: var(--color-bg-secondary);
@@ -406,7 +505,7 @@ defineExpose({ close })
 .topo-svg {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
 }
 .topo-link {
   transition: stroke-width 0.15s ease;
@@ -474,12 +573,12 @@ defineExpose({ close })
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
-  fill: #04222f;
+  fill: #3a2a00;
   pointer-events: none;
 }
 .topo-node.is-center > .topo-node-count {
-  fill: #e6f4ff;
-  opacity: 0.85;
+  fill: #ffe89a;
+  opacity: 0.9;
 }
 .topo-card {
   position: absolute;
