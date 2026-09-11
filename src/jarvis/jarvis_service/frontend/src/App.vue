@@ -473,6 +473,32 @@
           </aside>
         </template>
       </EditorPanel>
+
+      <!-- 空状态：无任何可见 Panel 时的欢迎背景特效 -->
+      <div v-if="hasNoPanel" class="empty-stage">
+        <div class="empty-stage-grid"></div>
+        <div class="empty-stage-glow empty-stage-glow-a"></div>
+        <div class="empty-stage-glow empty-stage-glow-b"></div>
+        <div class="empty-stage-orbit">
+          <span class="empty-stage-ring"></span>
+          <span class="empty-stage-ring empty-stage-ring-2"></span>
+          <span class="empty-stage-core">
+            <img src="/icons/jarvis-pet.svg" alt="Jarvis" class="empty-stage-logo" />
+          </span>
+        </div>
+        <div class="empty-stage-text">
+          <h1 class="empty-stage-title">JARVIS</h1>
+          <p class="empty-stage-slogan">独当一面，与众共事</p>
+          <p class="empty-stage-sub">让 AI 从「独自工作」走向「与众共事」</p>
+          <div class="empty-stage-quadrants">
+            <span class="empty-stage-quadrant"><b>单人单 Agent</b>独当一面</span>
+            <span class="empty-stage-quadrant"><b>单人多 Agent</b>一人驱动一个团队</span>
+            <span class="empty-stage-quadrant"><b>多人单 Agent</b>团队共享一个 AI</span>
+            <span class="empty-stage-quadrant"><b>多人多 Agent</b>分布式协作网络</span>
+          </div>
+          <p class="empty-stage-hint">按 <kbd>Ctrl</kbd>+<kbd>P</kbd> 打开命令面板，或从侧边栏创建一个 Agent</p>
+        </div>
+      </div>
     </main>
     <template v-for="panel in panels" :key="'floating-' + panel.id">
       <SessionPanel
@@ -1944,7 +1970,7 @@ function getGatewayAddress() {
 const showConnectModal = ref(true)  // 首次打开显示欢迎界面
 const showSettingsModal = ref(false) // 设置弹窗
 const showAdminPanel = ref(false) // 管理面板
-const showAgentSidebar = ref(true)    // Agent 侧边栏
+const showAgentSidebar = ref(false)    // Agent 侧边栏（默认收起）
 const agentSidebarRef = ref(null)     // Agent 侧边栏组件引用（用于调用宠物显隐）
 const showTerminalPanel = ref(false)  // 终端面板
 const showChatPanel = ref(false)     // 聊天室面板
@@ -3834,6 +3860,66 @@ function openAgentInPanel(agent, panelId = null) {
   switchAgent(agent)
 }
 
+// 「在当前 Panel 中打开 Agent」：命令面板按 Enter 时使用
+// - Agent 已在某个 Panel 中：激活该 Panel
+// - 否则放入当前激活的 Panel（覆盖其中已有的 Agent）；没有 Panel 时创建
+function openAgentInCurrentPanel(agent) {
+  if (!agent) return
+  // 移动端不支持多 Panel，直接切换
+  if (windowWidth.value <= 768) {
+    openAgentInPanel(agent)
+    return
+  }
+  const existingPanel = panels.value.find(p => p.agentId === agent.agent_id)
+  if (existingPanel) {
+    activePanelId.value = existingPanel.id
+    switchAgent(agent)
+    return
+  }
+  let targetPanel = panels.value.find(p => p.id === activePanelId.value)
+  if (!targetPanel) {
+    if (panels.value.length >= MAX_PANELS) {
+      showToast(`最多支持 ${MAX_PANELS} 个 Panel`, 'warning')
+      return
+    }
+    targetPanel = { id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, agentId: null }
+    panels.value.push(targetPanel)
+  } else if (targetPanel.agentId && targetPanel.agentId !== agent.agent_id) {
+    // 复用当前 Panel：先清掉其中已有 Agent 的 Panel 级状态，避免残留
+    closeAgentInPanel(targetPanel.id)
+  }
+  targetPanel.agentId = agent.agent_id
+  activePanelId.value = targetPanel.id
+  switchAgent(agent)
+}
+
+// 「在新的 Panel 中打开 Agent」：命令面板按 Tab 时使用
+// - Agent 已在某个 Panel 中：激活它（避免重复打开同一 Agent）
+// - 否则始终新建 Panel；达到数量上限时回退到在当前 Panel 中打开
+function openAgentInNewPanel(agent) {
+  if (!agent) return
+  if (windowWidth.value <= 768) {
+    openAgentInPanel(agent)
+    return
+  }
+  const existingPanel = panels.value.find(p => p.agentId === agent.agent_id)
+  if (existingPanel) {
+    activePanelId.value = existingPanel.id
+    switchAgent(agent)
+    return
+  }
+  if (panels.value.length >= MAX_PANELS) {
+    showToast(`最多支持 ${MAX_PANELS} 个 Panel，已在当前面板打开`, 'warning')
+    openAgentInCurrentPanel(agent)
+    return
+  }
+  const targetPanel = { id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, agentId: null }
+  panels.value.push(targetPanel)
+  targetPanel.agentId = agent.agent_id
+  activePanelId.value = targetPanel.id
+  switchAgent(agent)
+}
+
 // 获取 Panel 中的 Agent
 function getPanelAgent(panel) {
   if (!panel || !panel.agentId) return null
@@ -3984,16 +4070,23 @@ function getPanelHistoryState(panel) {
   }
 }
 
+// 内嵌面板数量（非 detach 且可见的面板）
+const embeddedPanelCount = computed(() => {
+  let count = 0
+  if (showTerminalPanel.value && !terminalDetached.value) count++
+  if (showChatPanel.value && !chatDetached.value) count++
+  if (showEditorPanel.value && !editorDetached.value) count++
+  // 内嵌 SessionPanel 数量 = 总面板数 - 已 detach 的面板数
+  count += panels.value.filter(p => !sessionDetachedPanels.value.has(p.id)).length
+  return count
+})
+
+// 当前是否没有任何可见的内嵌 Panel（用于展示空状态欢迎背景）
+const hasNoPanel = computed(() => embeddedPanelCount.value === 0)
+
 // 获取 Panel 的布局样式
 function getPanelLayout() {
-  // 计算内嵌面板数量（非 detach 且可见的面板）
-  let embeddedCount = 0
-  if (showTerminalPanel.value && !terminalDetached.value) embeddedCount++
-  if (showChatPanel.value && !chatDetached.value) embeddedCount++
-  if (showEditorPanel.value && !editorDetached.value) embeddedCount++
-  // 内嵌 SessionPanel 数量 = 总面板数 - 已 detach 的面板数
-  const embeddedSessionCount = panels.value.filter(p => !sessionDetachedPanels.value.has(p.id)).length
-  const count = embeddedSessionCount + embeddedCount
+  const count = embeddedPanelCount.value
   if (count === 0) return {}
   if (count === 1) return { gridTemplateColumns: '1fr', gridTemplateRows: '1fr' }
   if (count === 2) return { gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr' }
@@ -5128,7 +5221,15 @@ const commandPaletteCtx = computed(() => ({
     return !!a && a.owner_id === (auth.value.userInfo?.user_id || '')
   })(),
   // 命令面板「切换 Agent」（a> / A> 前缀）所需
-  switchToAgent: (agent) => { if (agent) openAgentInPanel(agent) },
+  // Enter（不带 openMode / 'current'）：在当前 Panel 中打开；Tab（'new'）：在新的 Panel 中打开
+  switchToAgent: (agent, openMode) => {
+    if (!agent) return
+    if (openMode === 'new') {
+      openAgentInNewPanel(agent)
+    } else {
+      openAgentInCurrentPanel(agent)
+    }
+  },
   getAgentNodeLabel,
   getStatusClass,
   isWaitingInput,
@@ -5140,11 +5241,11 @@ const commandPaletteCtx = computed(() => ({
 const appActions = computed(() => actionDefs)
 
 // 执行命令面板中的动作
-function onCommandRun(action) {
+function onCommandRun(action, openMode) {
   showCommandPalette.value = false
   if (!action || typeof action.run !== 'function') return
   try {
-    action.run(commandPaletteCtx.value)
+    action.run(commandPaletteCtx.value, openMode)
   } catch (err) {
     console.error('命令执行失败', err)
     showToast('命令执行失败', 'error')
@@ -11796,6 +11897,31 @@ function handleGlobalKeydown(event) {
       showTopologyOverlay.value = false
       return
     }
+    // 弹出面板（diff/rules/tools/缓存/重命名/权限管理）：Esc 关闭
+    if (showDiffModal.value) {
+      showDiffModal.value = false
+      return
+    }
+    if (showRulesModal.value) {
+      showRulesModal.value = false
+      return
+    }
+    if (showToolsModal.value) {
+      showToolsModal.value = false
+      return
+    }
+    if (showRenameAgentModal.value) {
+      showRenameAgentModal.value = false
+      return
+    }
+    if (showEditAccessModal.value) {
+      showEditAccessModal.value = false
+      return
+    }
+    if (showBufferPanel.value) {
+      showBufferPanel.value = false
+      return
+    }
     // 如果对话框打开，关闭对话框
     if (showSettingsModal.value) {
       showSettingsModal.value = false
@@ -14060,6 +14186,218 @@ body::-webkit-scrollbar {
   box-sizing: border-box;
   min-height: 0;
   min-width: 0;
+}
+
+/* 空状态：无任何可见 Panel 时的欢迎背景特效 */
+.empty-stage {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  overflow: hidden;
+  min-height: 0;
+  border-radius: var(--tile-radius);
+}
+
+/* 缓慢漂移的网格底板 */
+.empty-stage-grid {
+  position: absolute;
+  inset: -20%;
+  background-image:
+    linear-gradient(rgba(32, 200, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(32, 200, 255, 0.06) 1px, transparent 1px);
+  background-size: 52px 52px, 52px 52px;
+  mask-image: radial-gradient(circle at 50% 50%, #000 0%, transparent 72%);
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 0%, transparent 72%);
+  animation: emptyGridDrift 32s linear infinite;
+}
+
+/* 极光光斑 */
+.empty-stage-glow {
+  position: absolute;
+  width: 60vmax;
+  height: 60vmax;
+  border-radius: 50%;
+  filter: blur(40px);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.empty-stage-glow-a {
+  top: -18%;
+  left: -12%;
+  background: radial-gradient(circle, rgba(32, 200, 255, 0.28) 0%, transparent 62%);
+  animation: emptyGlowPulse 9s ease-in-out infinite;
+}
+
+.empty-stage-glow-b {
+  bottom: -22%;
+  right: -14%;
+  background: radial-gradient(circle, rgba(54, 255, 124, 0.22) 0%, transparent 62%);
+  animation: emptyGlowPulse 11s ease-in-out infinite reverse;
+}
+
+/* 中心旋转光环 */
+.empty-stage-orbit {
+  position: relative;
+  width: 168px;
+  height: 168px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.empty-stage-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(32, 200, 255, 0.35);
+  border-top-color: var(--color-accent);
+  box-shadow: 0 0 24px rgba(32, 200, 255, 0.25);
+  animation: emptySpin 14s linear infinite;
+}
+
+.empty-stage-ring-2 {
+  inset: 18px;
+  border-color: rgba(54, 255, 124, 0.3);
+  border-bottom-color: var(--color-success);
+  box-shadow: 0 0 20px rgba(54, 255, 124, 0.2);
+  animation: emptySpin 9s linear infinite reverse;
+}
+
+.empty-stage-core {
+  position: relative;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle, rgba(32, 200, 255, 0.18) 0%, transparent 72%);
+  box-shadow: inset 0 0 30px rgba(32, 200, 255, 0.25);
+}
+
+.empty-stage-logo {
+  width: 64px;
+  height: 64px;
+  filter: drop-shadow(0 0 14px rgba(32, 200, 255, 0.6));
+  animation: emptyFloat 6s ease-in-out infinite;
+}
+
+/* 文案区 */
+.empty-stage-text {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 0 24px;
+}
+
+.empty-stage-title {
+  font-size: 34px;
+  letter-spacing: 0.32em;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  text-shadow: 0 0 22px rgba(32, 200, 255, 0.55);
+  margin: 0;
+}
+
+.empty-stage-slogan {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  background: var(--gradient-accent);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  margin: 0;
+}
+
+.empty-stage-sub {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.empty-stage-quadrants {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
+  max-width: 620px;
+}
+
+.empty-stage-quadrant {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 14px;
+  border-radius: var(--tile-radius-sm);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border-subtle);
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.empty-stage-quadrant b {
+  font-size: 12px;
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.empty-stage-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.empty-stage-hint kbd {
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  font-size: 11px;
+}
+
+@keyframes emptyGridDrift {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-52px, -52px, 0); }
+}
+
+@keyframes emptySpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes emptyFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes emptyGlowPulse {
+  0%, 100% { opacity: 0.38; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.08); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .empty-stage-grid,
+  .empty-stage-glow,
+  .empty-stage-ring,
+  .empty-stage-logo {
+    animation: none;
+  }
 }
 
 /* 聊天容器 */
