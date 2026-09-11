@@ -2,6 +2,7 @@
   <div class="app" :class="{ 'not-connected': showConnectModal }">
 <!-- Agent 侧边栏 -->
     <AgentSidebar
+      ref="agentSidebarRef"
       :visible="showAgentSidebar"
       :resizeState="agentSidebarResizeState"
       :sidebarStyle="agentSidebarStyle"
@@ -45,6 +46,7 @@
       @petGotoWaiting="petGotoWaitingAgent"
       @petToggleSidebar="toggleAgentSidebar"
       @petOpenTopology="openTopologyOverlay"
+      @petOpenCommandPalette="openCommandPalette"
     />
 
     <!-- 主内容区 -->
@@ -134,14 +136,6 @@
         :agent-status="getPanelAgentStatus(panel)"
         :active="panel.id === activePanelId"
         :confirm-data="getPanelConfirmData(panel)"
-        :auto-scroll="getPanelAutoScroll(panel)"
-        @toggle-auto-scroll="togglePanelAutoScroll(panel, $event)"
-        :auto-read="getPanelAutoRead(panel)"
-        @toggle-auto-read="togglePanelAutoRead(panel, $event)"
-        :non-interactive="getPanelNonInteractive(panel)"
-        :socket="socket"
-        @exit-non-interactive="exitNonInteractiveMode(getPanelAgent(panel))"
-        @manual-interrupt="sendManualInterruptToPanel(panel)"
         @confirm="handlePanelConfirm(panel)"
         @cancel-confirm="handlePanelCancelConfirm(panel)"
         @activate="activatePanel(panel.id)"
@@ -159,11 +153,6 @@
         @set-terminal-ref="(executionId, el, agentId) => setPanelTerminalRef(panel, executionId, el, agentId)"
         @show-toast="showToast"
         @detach="detachPanel('session', panel.id)"
-        @viewDiff="viewDiff(getPanelAgent(panel))"
-        @viewRules="viewRules(getPanelAgent(panel))"
-        @viewTools="viewTools(getPanelAgent(panel))"
-        @createTerminal="createTerminalForAgent(getPanelAgent(panel))"
-        @openEditor="createEditorForAgent(getPanelAgent(panel))"
       />
 
       <!-- 内嵌终端面板 -->
@@ -502,14 +491,6 @@
         :agent-status="getPanelAgentStatus(panel)"
         :active="panel.id === activePanelId"
         :confirm-data="getPanelConfirmData(panel)"
-        :auto-scroll="getPanelAutoScroll(panel)"
-        @toggle-auto-scroll="togglePanelAutoScroll(panel, $event)"
-        :auto-read="getPanelAutoRead(panel)"
-        @toggle-auto-read="togglePanelAutoRead(panel, $event)"
-        :non-interactive="getPanelNonInteractive(panel)"
-        :socket="socket"
-        @exit-non-interactive="exitNonInteractiveMode(getPanelAgent(panel))"
-        @manual-interrupt="sendManualInterruptToPanel(panel)"
         :interaction="sessionPanelInteraction"
         :resizeDirections="sessionResizeDirections"
         :panelStyle="getSessionPanelStyle(panel.id)"
@@ -1964,6 +1945,7 @@ const showConnectModal = ref(true)  // 首次打开显示欢迎界面
 const showSettingsModal = ref(false) // 设置弹窗
 const showAdminPanel = ref(false) // 管理面板
 const showAgentSidebar = ref(true)    // Agent 侧边栏
+const agentSidebarRef = ref(null)     // Agent 侧边栏组件引用（用于调用宠物显隐）
 const showTerminalPanel = ref(false)  // 终端面板
 const showChatPanel = ref(false)     // 聊天室面板
 const showEditorPanel = ref(false)    // 编辑器浮动面板
@@ -3755,7 +3737,13 @@ function closePanel(panelId) {
   if (activePanelId.value === panelId) {
     if (panels.value.length > 0) {
       const newIndex = Math.min(index, panels.value.length - 1)
-      activePanelId.value = panels.value[newIndex].id
+      const nextPanel = panels.value[newIndex]
+      activePanelId.value = nextPanel.id
+      // 关闭当前 Panel 时 currentAgentId 会被清空，需切回新激活 Panel 的 Agent
+      if (nextPanel.agentId && currentAgentId.value !== nextPanel.agentId) {
+        const nextAgent = agentList.value.find(a => a.agent_id === nextPanel.agentId)
+        if (nextAgent) switchAgent(nextAgent)
+      }
     } else {
       activePanelId.value = null
     }
@@ -3892,13 +3880,6 @@ function getPanelInputRequest(panel) {
 function getPanelAgentStatus(panel) {
   if (!panel || !panel.agentId) return null
   return agentStatuses.value.get(panel.agentId) || null
-}
-
-// 获取 Panel 的 Agent 是否处于非交互模式
-function getPanelNonInteractive(panel) {
-  if (!panel || !panel.agentId) return false
-  const status = agentStatuses.value.get(panel.agentId)
-  return !!(status && status.non_interactive)
 }
 
 // 获取 Panel 的确认数据
@@ -4977,11 +4958,76 @@ function openTopologyOverlay() {
   showTopologyOverlay.value = true
 }
 
+// 打开命令面板（双击宠物触发）
+function openCommandPalette() {
+  if (showConnectModal.value) return
+  showCommandPalette.value = true
+}
+
+// 切换宠物显示/隐藏（命令面板触发，代理到 AgentSidebar 内部逻辑）
+function togglePetVisibility() {
+  agentSidebarRef.value?.togglePet?.()
+}
+
+// ===== 当前 Agent 菜单动作（命令面板「当前 Agent」组）=====
+// 取当前激活 Panel，回退到承载当前 Agent 的 Panel
+function getCurrentPanel() {
+  const activePanel = panels.value.find(p => p.id === activePanelId.value)
+  if (activePanel && activePanel.agentId) return activePanel
+  return panels.value.find(p => p.agentId === currentAgentId.value)
+    || panels.value.find(p => p.agentId)
+    || activePanel
+    || null
+}
+// 命令面板「当前 Agent」组使用的 Agent ID：
+// 优先当前激活 Panel 内的 Agent，其次 currentAgentId，最后回退到任意承载 Agent 的 Panel
+const commandPaletteCurrentAgentId = computed(() => {
+  const panel = getCurrentPanel()
+  if (panel && panel.agentId) return panel.agentId
+  return currentAgentId.value || null
+})
+// 当前 Agent 对象（无选中时为 null）
+function getCurrentAgentOrNull() {
+  const agentId = commandPaletteCurrentAgentId.value
+  if (agentId) {
+    const agent = agentList.value.find(a => a.agent_id === agentId)
+    if (agent) return agent
+  }
+  return currentAgent.value || null
+}
+// 切换当前 Agent 面板的自动滚动
+function toggleCurrentAutoScroll() {
+  const panel = getCurrentPanel()
+  if (!panel || !panel.agentId) return
+  togglePanelAutoScroll(panel, !getPanelAutoScroll(panel))
+}
+// 切换当前 Agent 面板的自动朗读
+function toggleCurrentAutoRead() {
+  const panel = getCurrentPanel()
+  if (!panel || !panel.agentId) return
+  togglePanelAutoRead(panel, !getPanelAutoRead(panel))
+}
+// 退出当前 Agent 的非交互模式
+function exitCurrentNonInteractive() {
+  const agent = getCurrentAgentOrNull()
+  if (agent) exitNonInteractiveMode(agent)
+}
+// 对当前 Agent 发送人工介入信号
+function interruptCurrentAgent() {
+  const panel = getCurrentPanel()
+  if (panel && panel.agentId) {
+    sendManualInterruptToPanel(panel)
+  } else {
+    petInterruptCurrent()
+  }
+}
+
 // 命令面板上下文：统一暴露宠物菜单与命令面板共用的动作回调
 const commandPaletteCtx = computed(() => ({
-  currentAgentId: currentAgentId.value,
+  currentAgentId: commandPaletteCurrentAgentId.value,
   agentList: agentList.value,
   waitingAgents: (agentList.value || []).filter(a => isWaitingInput(a)),
+  currentAgent: getCurrentAgentOrNull(),
   petInterruptCurrent,
   petGotoWaitingAgent,
   syncAllStatus: petSyncAllStatus,
@@ -4994,6 +5040,17 @@ const commandPaletteCtx = computed(() => ({
   toggleChatPanel,
   openTopology: openTopologyOverlay,
   openSettings: () => { showSettingsModal.value = true },
+  togglePetVisibility,
+  // 当前 Agent 组
+  viewCurrentDiff: () => { const a = getCurrentAgentOrNull(); if (a) viewDiff(a) },
+  viewCurrentRules: () => { const a = getCurrentAgentOrNull(); if (a) viewRules(a) },
+  viewCurrentTools: () => { const a = getCurrentAgentOrNull(); if (a) viewTools(a) },
+  createTerminalForCurrent: () => { const a = getCurrentAgentOrNull(); if (a) createTerminalForAgent(a) },
+  openEditorForCurrent: () => { const a = getCurrentAgentOrNull(); if (a) createEditorForAgent(a) },
+  toggleCurrentAutoScroll,
+  toggleCurrentAutoRead,
+  exitCurrentNonInteractive,
+  interruptCurrentAgent,
 }))
 
 // 命令面板动作清单（来自统一注册表）
@@ -5242,6 +5299,26 @@ const streamingMessages = ref(new Map()) // 按 agent_id 跟踪当前流式消�
 // 命令面板（Ctrl+K）
 const showCommandPalette = ref(false)
 const showTopologyOverlay = ref(false) // 网络拓扑大图浮层
+
+// 命令面板关闭后，若没有其它弹窗接管焦点，则把焦点交还给当前 Agent 的输入框
+function focusCurrentPanelInput() {
+  const panel = getCurrentPanel()
+  if (!panel || !panel.agentId) return
+  const sessionPanel = sessionPanelRefs.get(panel.id)
+  if (sessionPanel?.focusInput) {
+    sessionPanel.focusInput()
+  }
+}
+
+watch(showCommandPalette, (visible, wasVisible) => {
+  if (visible || !wasVisible) return
+  // 面板关闭动作可能同时打开了其它弹窗（如命令执行打开设置/拓扑），此时不抢焦点
+  if (isAnyModalOpen()) return
+  nextTick(() => {
+    if (isAnyModalOpen()) return
+    focusCurrentPanelInput()
+  })
+})
 
 // 执行状态
 const isExecuting = ref(false)

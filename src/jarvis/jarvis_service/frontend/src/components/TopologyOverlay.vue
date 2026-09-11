@@ -13,6 +13,29 @@
         </div>
 
         <div class="topo-body" ref="bodyEl" @mousemove="onMove" @mouseleave="hovered = null">
+          <!-- 左上角统计卡片 -->
+          <div class="topo-stats">
+            <div class="topo-stats-title">Agent 概览</div>
+            <div class="topo-stats-list">
+              <div class="topo-stats-item" :style="{ '--stat-color': AGENT_COLORS.running }">
+                <span class="topo-stats-icon">▶</span>
+                <span class="topo-stats-label">运行中</span>
+                <span class="topo-stats-value">{{ counts.running || 0 }}</span>
+              </div>
+              <div class="topo-stats-item" :style="{ '--stat-color': AGENT_COLORS.waiting }">
+                <span class="topo-stats-icon">⏸</span>
+                <span class="topo-stats-label">等待输入</span>
+                <span class="topo-stats-value">{{ counts.waiting || 0 }}</span>
+              </div>
+              <div class="topo-stats-item" :style="{ '--stat-color': AGENT_COLORS.stopped }">
+                <span class="topo-stats-icon">⏹</span>
+                <span class="topo-stats-label">已停止</span>
+                <span class="topo-stats-value">{{ counts.stopped || 0 }}</span>
+              </div>
+            </div>
+            <div class="topo-stats-foot">共 {{ counts.agents || 0 }} 个 Agent</div>
+          </div>
+
           <svg class="topo-svg" :width="W" :height="H" :viewBox="`0 0 ${W} ${H}`">
             <defs>
               <radialGradient id="topo-bg" cx="50%" cy="50%" r="70%">
@@ -508,6 +531,69 @@ defineExpose({ close })
   display: block;
   width: 100%;
   height: 100%;
+}
+/* 左上角统计卡片 */
+.topo-stats {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  z-index: 3;
+  min-width: 148px;
+  padding: 10px 12px;
+  background: rgba(8, 16, 28, 0.92);
+  border: 1px solid rgba(32, 200, 255, 0.28);
+  border-radius: var(--tile-radius-sm, 8px);
+  box-shadow: 0 8px 24px rgba(0, 60, 100, 0.35);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+  user-select: none;
+}
+.topo-stats-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--color-text-secondary, #8a9bb0);
+  margin-bottom: 8px;
+}
+.topo-stats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.topo-stats-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--color-text-primary, #e6f4ff);
+}
+.topo-stats-icon {
+  flex: none;
+  width: 14px;
+  text-align: center;
+  font-size: 10px;
+  color: var(--stat-color, #8a9bb0);
+}
+.topo-stats-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+}
+.topo-stats-value {
+  flex: none;
+  min-width: 20px;
+  text-align: right;
+  font-weight: 700;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: var(--stat-color, #e6f4ff);
+}
+.topo-stats-foot {
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid var(--color-border-subtle, rgba(255, 255, 255, 0.08));
+  font-size: 10px;
+  color: var(--color-text-secondary, #8a9bb0);
 }
 .topo-link {
   transition: stroke-width 0.15s ease;

@@ -13,42 +13,7 @@
       <div class="session-panel-header" @mousedown="!embedded && $emit('startMove', $event)">
         <span class="session-agent-name">{{ agent.name || agent.agent_id }}</span>
         <span class="session-agent-status" :class="getStatusClass(agent)">{{ getStatusLabel(agent) }}</span>
-        <button v-if="agent.status !== 'stopped'" class="session-action-btn" @click.stop="$emit('viewDiff', agent)" title="查看变更">🔀</button>
-        <button v-if="agent.status !== 'stopped'" class="session-action-btn" @click.stop="$emit('viewRules', agent)" title="查看规则">📜</button>
-        <button v-if="agent.status !== 'stopped'" class="session-action-btn" @click.stop="$emit('viewTools', agent)" title="查看工具">🔧</button>
-        <button class="session-action-btn" @click.stop="$emit('createTerminal', agent)" :disabled="!socket" title="创建终端">💻</button>
-        <button class="session-action-btn" @click.stop="$emit('openEditor', agent)" :disabled="!socket" title="打开编辑器">📝</button>
-        <button
-          class="session-auto-scroll-btn"
-          :class="{ 'active': autoScroll }"
-          @click.stop="$emit('toggle-auto-scroll', !autoScroll)"
-          :title="autoScroll ? '自动滚动已开启' : '自动滚动已关闭'"
-        >
-          {{ autoScroll ? '⤓' : '⤒' }}
-        </button>
-        <button
-          class="session-auto-scroll-btn"
-          :class="{ 'active': autoRead }"
-          @click.stop="$emit('toggle-auto-read', !autoRead)"
-          :title="autoRead ? '自动朗读已开启' : '自动朗读已关闭'"
-        >
-          {{ autoRead ? '🔊' : '🔇' }}
-        </button>
-        <button
-          class="session-exit-non-interactive-btn"
-          @click.stop="$emit('exit-non-interactive')"
-          title="退出非交互模式（不中断当前对话）"
-        >
-          🔓
-        </button>
-        <button
-          v-if="(agentStatus?.execution_status ?? 'running') === 'running'"
-          class="session-manual-interrupt-btn"
-          @click.stop="$emit('manual-interrupt')"
-          title="人工介入（中断当前执行）"
-        >
-          🛑
-        </button>
+        <!-- 操作图标已迁移至 Ctrl+K 命令面板「当前 Agent」组 -->
         <div class="session-header-actions">
           <button class="session-close-panel-btn" @click.stop="$emit('detach')" :title="embedded ? '分离为浮动窗口' : '嵌入回主界面'">⧉</button>
           <button class="session-close-panel-btn" @click.stop="$emit('close-panel')" title="关闭面板">✕</button>
@@ -240,10 +205,6 @@ const props = defineProps({
   interaction: { type: Object, default: null },
   resizeDirections: { type: Array, default: () => [] },
   panelStyle: { type: Object, default: null },
-  autoScroll: { type: Boolean, default: true },
-  autoRead: { type: Boolean, default: false },
-  nonInteractive: { type: Boolean, default: false },
-  socket: { type: [Object, null], default: null },
 })
 
 const emit = defineEmits([
@@ -252,15 +213,9 @@ const emit = defineEmits([
   'input-change', 'keydown', 'paste',
   'show-buffer', 'clear-buffer',
   'set-output-list', 'set-terminal-ref',
-  'toggle-auto-scroll',
-  'toggle-auto-read',
-  'exit-non-interactive',
-  'manual-interrupt',
   'show-toast',
   'confirm', 'cancel-confirm',
   'startMove', 'startResize',
-  'viewDiff', 'viewRules', 'viewTools',
-  'createTerminal', 'openEditor',
 ])
 
 function handlePanelClick() {
@@ -834,100 +789,6 @@ function getTerminalStyle(terminalContent) {
 .session-agent-status.waiting_confirm {
   background: rgba(255, 133, 32, 0.2);
   color: var(--color-warning);
-}
-
-.session-action-btn {
-  width: 20px;
-  height: 20px;
-  border: none;
-  border-radius: 3px;
-  background: transparent;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  font-size: 11px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-  flex-shrink: 0;
-}
-
-.session-action-btn:hover {
-  background: var(--color-bg-hover);
-  color: var(--color-text-primary);
-}
-
-.session-action-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.session-auto-scroll-btn {
-  width: 20px;
-  height: 20px;
-  border: none;
-  border-radius: 3px;
-  background: transparent;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  font-size: 11px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-  flex-shrink: 0;
-}
-
-.session-auto-scroll-btn:hover {
-  background: var(--color-bg-hover);
-  color: var(--color-text-primary);
-}
-
-.session-auto-scroll-btn.active {
-  color: var(--color-accent);
-}
-
-.session-exit-non-interactive-btn {
-  height: 20px;
-  border: none;
-  border-radius: 3px;
-  background: rgba(255, 133, 32, 0.15);
-  color: var(--color-warning);
-  cursor: pointer;
-  font-size: 11px;
-  padding: 0 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-
-.session-exit-non-interactive-btn:hover {
-  background: rgba(255, 133, 32, 0.3);
-  color: var(--color-text-primary);
-}
-
-.session-manual-interrupt-btn {
-  width: 20px;
-  height: 20px;
-  border: none;
-  border-radius: 3px;
-  background: rgba(255, 60, 72, 0.15);
-  color: var(--color-error);
-  cursor: pointer;
-  font-size: 11px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-  flex-shrink: 0;
-}
-
-.session-manual-interrupt-btn:hover {
-  background: rgba(255, 60, 72, 0.3);
-  color: var(--color-text-primary);
 }
 
 .session-header-actions {
