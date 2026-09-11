@@ -32,7 +32,7 @@
                 @mousemove="onItemHover(entry.flatIndex)"
               >
                 <span class="cmd-item-ico">{{ entry.action.icon }}</span>
-                <span class="cmd-item-label">{{ entry.action.label }}</span>
+                <span class="cmd-item-label">{{ entry.action.label }}<span v-if="entry.action.en" class="cmd-item-en">{{ entry.action.en }}</span></span>
                 <span v-if="entry.action.shortcut" class="cmd-item-shortcut">{{ entry.action.shortcut }}</span>
               </button>
             </div>
@@ -289,6 +289,12 @@ defineExpose({ focus: () => inputEl.value?.focus() })
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.cmd-item-en {
+  margin-left: 8px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  opacity: 0.7;
 }
 
 .cmd-item-shortcut {

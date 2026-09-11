@@ -6,6 +6,7 @@
 // {
 //   id: string,
 //   label: string,
+//   en: string,
 //   group: string,
 //   icon: string,
 //   keywords: string[],
@@ -18,6 +19,7 @@ export const ACTIONS = [
   {
     id: "interrupt-current",
     label: "中断当前 Agent",
+    en: "Interrupt Current Agent",
     group: "执行",
     icon: "⏹",
     keywords: ["中断", "停止", "interrupt", "stop", "cancel"],
@@ -27,6 +29,7 @@ export const ACTIONS = [
   {
     id: "goto-waiting",
     label: "奔赴等待输入的 Agent",
+    en: "Go to Waiting Agent",
     group: "执行",
     icon: "🚨",
     keywords: ["等待", "输入", "切换", "waiting", "input", "goto"],
@@ -39,6 +42,7 @@ export const ACTIONS = [
   {
     id: "sync-status",
     label: "同步 Agent 状态",
+    en: "Sync Agent Status",
     group: "执行",
     icon: "🔄",
     keywords: ["同步", "刷新", "状态", "sync", "refresh", "status"],
@@ -47,6 +51,7 @@ export const ACTIONS = [
   {
     id: "create-agent",
     label: "新建 Agent",
+    en: "New Agent",
     group: "Agent",
     icon: "➕",
     keywords: ["新建", "创建", "agent", "create", "add"],
@@ -55,6 +60,7 @@ export const ACTIONS = [
   {
     id: "refresh-agents",
     label: "刷新 Agent 列表",
+    en: "Refresh Agent List",
     group: "Agent",
     icon: "🔃",
     keywords: ["刷新", "列表", "refresh", "agents", "list"],
@@ -63,6 +69,7 @@ export const ACTIONS = [
   {
     id: "restart-gateway",
     label: "重启网关",
+    en: "Restart Gateway",
     group: "网关",
     icon: "♻",
     keywords: ["重启", "网关", "restart", "gateway"],
@@ -71,6 +78,7 @@ export const ACTIONS = [
   {
     id: "restart-all-nodes",
     label: "重启所有节点",
+    en: "Restart All Nodes",
     group: "网关",
     icon: "🔁",
     keywords: ["重启", "节点", "全部", "restart", "nodes", "all"],
@@ -79,6 +87,7 @@ export const ACTIONS = [
   {
     id: "toggle-sidebar",
     label: "切换 Agent 侧边栏",
+    en: "Toggle Agent Sidebar",
     group: "界面",
     icon: "📋",
     keywords: ["侧边栏", "侧栏", "sidebar", "toggle"],
@@ -87,6 +96,7 @@ export const ACTIONS = [
   {
     id: "toggle-terminal",
     label: "切换终端面板",
+    en: "Toggle Terminal Panel",
     group: "界面",
     icon: "🖥",
     keywords: ["终端", "terminal", "toggle"],
@@ -95,6 +105,7 @@ export const ACTIONS = [
   {
     id: "toggle-chat",
     label: "切换聊天面板",
+    en: "Toggle Chat Panel",
     group: "界面",
     icon: "💬",
     keywords: ["聊天", "群聊", "chat", "toggle"],
@@ -103,6 +114,7 @@ export const ACTIONS = [
   {
     id: "open-topology",
     label: "查看网络拓扑",
+    en: "View Network Topology",
     group: "界面",
     icon: "🗺",
     keywords: ["拓扑", "网络", "节点", "topology", "network", "nodes"],
@@ -111,6 +123,7 @@ export const ACTIONS = [
   {
     id: "open-settings",
     label: "打开设置",
+    en: "Open Settings",
     group: "界面",
     icon: "⚙",
     keywords: ["设置", "配置", "settings", "config", "preferences"],
@@ -128,6 +141,7 @@ export function filterActions(actions, query) {
   return list.filter((action) => {
     const haystack = [
       action?.label,
+      action?.en,
       action?.id,
       action?.group,
       ...(action?.keywords || []),
