@@ -66,6 +66,10 @@
             💻
           </button>
 
+          <button class="icon-btn" @click="openCommandPalette()" title="命令面板">
+            ⌘
+          </button>
+
           <button class="icon-btn" @click="showSettingsModal = true; pushOverlayState()" :disabled="!socket" title="设置">
             ⚙
           </button>
@@ -103,6 +107,9 @@
           </button>
           <button class="icon-btn" @click="toggleTerminalPanel()" :disabled="!socket" title="终端面板">
             💻
+          </button>
+          <button class="icon-btn" @click="openCommandPalette()" title="命令面板 (Ctrl+P)">
+            ⌘
           </button>
           <button class="icon-btn" @click="showSettingsModal = true; pushOverlayState()" :disabled="!socket">
             ⚙

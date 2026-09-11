@@ -158,6 +158,20 @@
         <div class="pet-spark s1"></div>
         <div class="pet-spark s2"></div>
         <div class="pet-spark s3"></div>
+        <div class="pet-orbit orbit-a" aria-hidden="true">
+          <div class="pet-orbit-track">
+            <span class="pet-orbit-mote"></span>
+            <span class="pet-orbit-mote"></span>
+            <span class="pet-orbit-mote"></span>
+          </div>
+        </div>
+        <div class="pet-orbit orbit-b" aria-hidden="true">
+          <div class="pet-orbit-track">
+            <span class="pet-orbit-rune">✦</span>
+            <span class="pet-orbit-rune">✧</span>
+            <span class="pet-orbit-rune">✶</span>
+          </div>
+        </div>
         <div class="pet-zzz z1">z</div>
         <div class="pet-zzz z2">z</div>
         <div class="pet-zzz z3">Z</div>
@@ -486,6 +500,7 @@ const petHidden = ref(false)     // 已隐藏
 const petWalking = ref(false)    // 随机漫步中
 const petSpeech = ref('')        // 随机台词
 const petTopoOn = ref(true)      // 是否显示迷你拓扑图
+const petCast = ref('')          // 正在施放的法术类型（'' 表示未施法）
 
 // 头顶数字法环：一圈 0/1 灵符，玄幻风格，随状态联动
 const PET_RUNE_COUNT = 18
@@ -563,6 +578,13 @@ const petBadgeText = computed(() => {
   return ''
 })
 
+// 当前施放法术的类别（array/throw/beam/burst/swarm），用于区分特效与状态类
+const PET_CAST_KINDS = {
+  thunder: 'array', flame: 'array', frost: 'array', star: 'array',
+  rune: 'throw', bolt: 'beam', sword: 'beam', ring: 'burst', wave: 'burst', swarm: 'swarm',
+}
+const petCastKind = computed(() => PET_CAST_KINDS[petCast.value] || '')
+
 const petClasses = computed(() => [
   'is-' + petState.value,
   {
@@ -577,10 +599,12 @@ const petClasses = computed(() => [
     'rune-running': petState.value === 'running',
     'rune-waiting': petWaitingAgents.length > 0,
     'rune-sleep': petSleep.value,
+    // is-casting 仅用于「法阵类」法术，避免覆盖 act-throw 等其它法术的动画
+    'is-casting': petCastKind.value === 'array',
   },
   petAction.value ? 'act-' + petAction.value : '',
+  petCast.value ? 'cast-' + petCast.value : '',
 ])
-
 // 是否正在看迷你拓扑图（开着且宠物可见/清醒）
 const petWatchingTopo = computed(() => petTopoOn.value && !petHidden.value && !petSleep.value)
 
@@ -1142,6 +1166,304 @@ function spawnPetFx(x, y) {
   }
 }
 
+// ==================== 玄幻法术特效 ====================
+// kind: array=脚下法阵 | throw=抛出头顶法环 | beam=远程灵光 | burst=范围冲击 | swarm=万剑归宗
+const PET_SPELLS = [
+  { key: 'thunder', kind: 'array', glyphs: ['⚡', '雷', '✦'], color: '#9fd8ff', glow: '#5db2ff' },
+  { key: 'flame',   kind: 'array', glyphs: ['🔥', '炎', '✷'], color: '#ffb066', glow: '#ff7a2f' },
+  { key: 'frost',   kind: 'array', glyphs: ['❄', '冰', '✳'], color: '#bff2ff', glow: '#6fe3ff' },
+  { key: 'star',    kind: 'array', glyphs: ['✨', '星', '✴'], color: '#ffe6a8', glow: '#ffd166' },
+  { key: 'rune',    kind: 'throw' },                          // 抛出头顶数字光环
+  { key: 'bolt',    kind: 'beam', color: '#9fd8ff', glow: '#5db2ff' },  // 远程：雷光箭
+  { key: 'sword',   kind: 'beam', color: '#c8e6ff', glow: '#7aa8ff' },  // 远程：御剑
+  { key: 'ring',    kind: 'burst', color: '#bff2ff', glow: '#6fe3ff' }, // 范围：冰环
+  { key: 'wave',    kind: 'burst', color: '#ffb066', glow: '#ff7a2f' }, // 范围：炎爆
+  { key: 'swarm',   kind: 'swarm', color: '#cfe8ff', glow: '#6f9dff' }, // 万剑归宗：随机曲线飞散后归巢
+]
+
+// 宠物本体（含头顶法环）的屏幕矩形，兜底用宠物位置
+function petStageRect() {
+  const el = document.querySelector('.pet-float')
+  return el
+    ? el.getBoundingClientRect()
+    : { left: petPos.value.x, top: petPos.value.y, width: PET_W, height: PET_H }
+}
+
+// 抛出头顶法环：复用现有的 throw 动作与 pet-rune-throw 动画
+function petCastRuneThrow() {
+  petAction.value = 'throw'
+  petSfxAction('throw')
+  setTimeout(() => { if (petAction.value === 'throw') petAction.value = '' }, 2600)
+}
+
+// 远程释放：从宠物朝随机方向射出一道灵光，抵达后爆开
+function petCastBeam(spell) {
+  const r = petStageRect()
+  const ox = r.left + r.width / 2
+  const oy = r.top + r.height * 0.4
+  // 随机瞄准屏幕内任一点（含四角），保证能打到全屏范围
+  const tx = Math.random() * window.innerWidth
+  const ty = Math.random() * window.innerHeight
+  const dx = tx - ox
+  const dy = ty - oy
+  const dist = Math.hypot(dx, dy) || 1
+  const angle = Math.atan2(dy, dx) * 180 / Math.PI
+  // 时长随距离增长（越远飞越久），并保证足够慢以看清轨迹
+  const dur = Math.max(0.75, Math.min(1.8, dist / 900))
+
+  // 光束
+  const beam = document.createElement('div')
+  beam.className = 'pet-spell-beam'
+  beam.style.left = ox + 'px'
+  beam.style.top = oy + 'px'
+  beam.style.width = dist + 'px'
+  beam.style.transform = `rotate(${angle}deg)`
+  beam.style.setProperty('--spell-color', spell.color)
+  beam.style.setProperty('--spell-glow', spell.glow)
+  beam.style.setProperty('--beam-dur', dur + 's')
+  document.body.appendChild(beam)
+  setTimeout(() => beam.remove(), (dur + 0.5) * 1000)
+
+  // 飞行灵符
+  const bolt = document.createElement('div')
+  bolt.className = 'pet-spell-bolt'
+  bolt.textContent = '✦'
+  bolt.style.left = ox + 'px'
+  bolt.style.top = oy + 'px'
+  bolt.style.color = spell.color
+  bolt.style.textShadow = `0 0 10px ${spell.glow}, 0 0 20px ${spell.glow}`
+  bolt.style.setProperty('--bx', dx + 'px')
+  bolt.style.setProperty('--by', dy + 'px')
+  bolt.style.setProperty('--beam-dur', dur + 's')
+  document.body.appendChild(bolt)
+  setTimeout(() => bolt.remove(), (dur + 0.5) * 1000)
+
+  // 命中爆点
+  const hit = document.createElement('div')
+  hit.className = 'pet-spell-hit'
+  hit.style.left = tx + 'px'
+  hit.style.top = ty + 'px'
+  hit.style.borderColor = spell.glow
+  hit.style.boxShadow = `0 0 26px ${spell.glow}, inset 0 0 26px ${spell.glow}`
+  hit.style.animationDelay = dur + 's'
+  document.body.appendChild(hit)
+  setTimeout(() => hit.remove(), (dur + 0.9) * 1000)
+}
+
+// 范围释放：以宠物为中心，向外扩散多重符环 + 迸发灵光
+function petCastBurst(spell) {
+  const r = petStageRect()
+  const cx = r.left + r.width / 2
+  const cy = r.top + r.height * 0.55
+  // 以宠物到屏幕四角的最远距离为半径，保证冲击波能扫满全屏
+  const maxR = Math.max(
+    Math.hypot(cx, cy),
+    Math.hypot(window.innerWidth - cx, cy),
+    Math.hypot(cx, window.innerHeight - cy),
+    Math.hypot(window.innerWidth - cx, window.innerHeight - cy),
+  )
+
+  // 多层冲击环（错峰扩散）
+  for (let i = 0; i < 3; i++) {
+    const ring = document.createElement('div')
+    ring.className = 'pet-spell-burst-ring'
+    ring.style.left = cx + 'px'
+    ring.style.top = cy + 'px'
+    ring.style.setProperty('--maxr', maxR + 'px')
+    ring.style.borderColor = spell.glow
+    ring.style.boxShadow = `0 0 20px ${spell.glow}, inset 0 0 20px ${spell.glow}`
+    ring.style.animationDelay = (i * 0.22) + 's'
+    document.body.appendChild(ring)
+    setTimeout(() => ring.remove(), 2000 + i * 220)
+  }
+
+  // 中心绽放光核
+  const flash = document.createElement('div')
+  flash.className = 'pet-spell-burst-core'
+  flash.style.left = cx + 'px'
+  flash.style.top = cy + 'px'
+  flash.style.background = `radial-gradient(circle, #ffffff 0%, ${spell.color} 35%, transparent 70%)`
+  flash.style.boxShadow = `0 0 40px ${spell.glow}`
+  document.body.appendChild(flash)
+  setTimeout(() => flash.remove(), 900)
+
+  // 向外迸射的符文
+  const glyphs = ['✦', '✧', '✴', '❋', '✺', '✳']
+  for (let i = 0; i < 10; i++) {
+    const g = document.createElement('div')
+    g.className = 'pet-spell-burst-spark'
+    g.textContent = glyphs[i % glyphs.length]
+    g.style.left = cx + 'px'
+    g.style.top = cy + 'px'
+    g.style.color = spell.color
+    g.style.textShadow = `0 0 8px ${spell.glow}, 0 0 16px ${spell.glow}`
+    const a = (i / 10) * Math.PI * 2
+    g.style.setProperty('--bx', (Math.cos(a) * (maxR * 0.6)).toFixed(0) + 'px')
+    g.style.setProperty('--by', (Math.sin(a) * (maxR * 0.6)).toFixed(0) + 'px')
+    g.style.animationDelay = (Math.random() * 0.12) + 's'
+    document.body.appendChild(g)
+    setTimeout(() => g.remove(), 1400)
+  }
+}
+
+// 万剑归宗：一群飞剑沿随机曲线向外刺出，划弧后全部归拢回宠物本体
+function petCastSwarm(spell) {
+  const r = petStageRect()
+  const ox = r.left + r.width / 2
+  const oy = r.top + r.height * 0.42
+  // 剑出鞘要先「蓄势」：宠物本体抖一下
+  petAction.value = 'throw'
+  setTimeout(() => { if (petAction.value === 'throw') petAction.value = '' }, 900)
+
+  const N = 9
+  const maxR = Math.min(window.innerWidth, window.innerHeight) * 0.62
+  for (let i = 0; i < N; i++) {
+    const sword = document.createElement('div')
+    sword.className = 'pet-spell-sword'
+    sword.innerHTML = '<i class="pet-sword-blade"></i><i class="pet-sword-hilt"></i>'
+    sword.style.left = ox + 'px'
+    sword.style.top = oy + 'px'
+    sword.style.color = spell.color
+    sword.style.setProperty('--spell-glow', spell.glow)
+
+    // 目标点：以随机角度、随机距离飞散，使每把剑路径都不同
+    const a = (i / N) * Math.PI * 2 + (Math.random() - 0.5) * 0.7
+    const reach = maxR * (0.75 + Math.random() * 0.4)
+    const dx = Math.cos(a) * reach
+    const dy = Math.sin(a) * reach - maxR * 0.18   // 略偏上，像腾空
+    // 控制点：垂直于主轴方向偏移，形成弯月般的曲线去程（系数放大以飞得更远）
+    const c1x = dx * 0.8 + -dy * (0.35 + Math.random() * 0.4)
+    const c1y = dy * 0.8 + dx * (0.35 + Math.random() * 0.4)
+    // 控制点 2：返程回弯
+    const c2x = dx * 0.9 - dy * 0.75
+    const c2y = dy * 0.9 + dx * 0.75
+
+    // offset-path 的 path() 无法在 CSS 里解析 var()，故在 JS 侧拼好完整路径字符串
+    sword.style.setProperty('--sw-path',
+      `path('M 0 0 C ${c1x.toFixed(0)} ${c1y.toFixed(0)}, ${c2x.toFixed(0)} ${c2y.toFixed(0)}, 0 0')`)
+    sword.style.setProperty('--sw-dur', (1.7 + Math.random() * 0.5).toFixed(2) + 's')
+    sword.style.animationDelay = (i * 0.06 + Math.random() * 0.05).toFixed(2) + 's'
+    document.body.appendChild(sword)
+    setTimeout(() => sword.remove(), 3200)
+  }
+
+  // 剑阵起势：脚下浮现一圈剑意灵光
+  const sigil = document.createElement('div')
+  sigil.className = 'pet-spell-swarm-sigil'
+  sigil.style.left = ox + 'px'
+  sigil.style.top = (r.top + r.height - 26) + 'px'
+  sigil.style.borderColor = spell.glow
+  sigil.style.boxShadow = `0 0 18px ${spell.glow}, inset 0 0 18px ${spell.glow}`
+  document.body.appendChild(sigil)
+  setTimeout(() => sigil.remove(), 3400)
+
+  // 归位瞬间的中心聚光
+  const core = document.createElement('div')
+  core.className = 'pet-spell-swarm-core'
+  core.style.left = ox + 'px'
+  core.style.top = oy + 'px'
+  core.style.background = `radial-gradient(circle, #ffffff 0%, ${spell.color} 40%, transparent 72%)`
+  core.style.boxShadow = `0 0 42px ${spell.glow}`
+  core.style.animationDelay = '1.55s'
+  document.body.appendChild(core)
+  setTimeout(() => core.remove(), 2700)
+}
+
+// 施放一波法术：在宠物脚下展开一座旋转的灵光法阵
+function petCastSpell(spell) {
+  const r = petStageRect()
+  const cx = r.left + r.width / 2
+  const cy = r.top + r.height - 34   // 法阵落在宠物脚下
+
+  const array = document.createElement('div')
+  array.className = 'pet-spell-array'
+  array.style.left = cx + 'px'
+  array.style.top = cy + 'px'
+  array.style.setProperty('--spell-color', spell.color)
+  array.style.setProperty('--spell-glow', spell.glow)
+
+  // 外层旋转符箓圈：一圈法术字符
+  const glyphRing = document.createElement('div')
+  glyphRing.className = 'pet-array-glyphring'
+  const N = 12
+  for (let i = 0; i < N; i++) {
+    const g = document.createElement('span')
+    g.className = 'pet-array-glyph'
+    g.textContent = spell.glyphs[i % spell.glyphs.length]
+    const angle = (i / N) * 360
+    g.style.transform = `rotate(${angle}deg) translateY(-58px)`
+    glyphRing.appendChild(g)
+  }
+  array.appendChild(glyphRing)
+
+  // 内层反向旋转的刻线环
+  const lineRing = document.createElement('div')
+  lineRing.className = 'pet-array-linering'
+  array.appendChild(lineRing)
+
+  // 中心几何法印：两个交叠方形（旋转 45°）构成八角星形
+  const seal = document.createElement('div')
+  seal.className = 'pet-array-seal'
+  seal.innerHTML = '<i></i><i></i>'
+  array.appendChild(seal)
+
+  // 中心光核
+  const core = document.createElement('div')
+  core.className = 'pet-array-core'
+  array.appendChild(core)
+
+  document.body.appendChild(array)
+  setTimeout(() => array.remove(), 1900)
+}
+
+// 施放指定法术（按 kind 分发特效与音效）
+function castSpell(spell) {
+  if (!spell) return
+  petCast.value = spell.key
+  if (spell.kind === 'throw')      petCastRuneThrow()
+  else if (spell.kind === 'beam')  petCastBeam(spell)
+  else if (spell.kind === 'burst') petCastBurst(spell)
+  else if (spell.kind === 'swarm') petCastSwarm(spell)
+  else                             petCastSpell(spell)
+  petSfxCast(spell.kind)
+  clearTimeout(petCastTimer)
+  petCastTimer = window.setTimeout(() => { petCast.value = '' }, 2600)
+}
+
+// 随机施放一波法术
+function castRandomSpell() {
+  if (petCast.value) return
+  castSpell(PET_SPELLS[Math.floor(Math.random() * PET_SPELLS.length)])
+}
+
+// 调试钩子：window.__jarvisPetCast('swarm') 手动触发指定法术，便于预览
+function installPetCastDebugHook() {
+  try {
+    window.__jarvisPetCast = (key) => {
+      const spell = PET_SPELLS.find(s => s.key === key)
+      if (!spell) return { ok: false, error: 'unknown spell: ' + key, available: PET_SPELLS.map(s => s.key) }
+      castSpell(spell)
+      return { ok: true, spell: spell.key, kind: spell.kind }
+    }
+    window.__jarvisPetSpells = () => PET_SPELLS.map(s => ({ key: s.key, kind: s.kind }))
+  } catch (e) {
+    // 忽略：调试钩子失败不影响正常功能
+  }
+}
+
+// 约 30s 放一波法术（±5s 抖动，避免过于机械）
+let petCastTimer = 0
+function schedulePetCast() {
+  clearTimeout(petCastTimer)
+  petCastTimer = window.setTimeout(() => {
+    if (!document.hidden && !petHover.value && !petDrag.value && !petSleep.value &&
+        !petHidden.value && !petPetting.value && !petWalking.value) {
+      castRandomSpell()
+    }
+    schedulePetCast()
+  }, 25000 + Math.random() * 10000)
+}
+
 // ==================== 宠物音效（Web Audio 合成，无外部资源） ====================
 const PET_SFX_KEY = 'jarvis_pet_sfx'
 const petSfxOn = ref(true)
@@ -1245,6 +1567,49 @@ function petSfxYawn() {
   petTone(620, 0, 0.45, 'sine', 0.06, 300)
 }
 
+// 施法：玄妙上扬的和声
+function petSfxCast(type) {
+  if (!petSfxOn.value) return
+  switch (type) {
+    case 'thunder':
+      petTone(220, 0, 0.5, 'sawtooth', 0.05, 880)
+      petTone(660, 0.06, 0.3, 'triangle', 0.05, 1320)
+      break
+    case 'flame':
+      petTone(300, 0, 0.4, 'sawtooth', 0.045, 620)
+      petTone(880, 0.08, 0.25, 'sine', 0.05, 1180)
+      break
+    case 'frost':
+      petTone(1600, 0, 0.35, 'sine', 0.05, 900)
+      petTone(1200, 0.1, 0.3, 'triangle', 0.045, 1900)
+      break
+    case 'beam':   // 远程：破空疾射
+      petTone(1400, 0, 0.22, 'sawtooth', 0.045, 320)
+      petTone(210, 0.02, 0.3, 'triangle', 0.05, 160)
+      break
+    case 'burst':  // 范围：轰鸣扩散
+      petTone(90, 0, 0.55, 'sawtooth', 0.06, 40)
+      petTone(520, 0, 0.4, 'triangle', 0.045, 1400)
+      petTone(1500, 0.1, 0.35, 'sine', 0.04, 500)
+      break
+    case 'throw':  // 抛出法环
+      petTone(700, 0, 0.2, 'triangle', 0.05, 1400)
+      petTone(1180, 0.12, 0.35, 'sine', 0.045, 1760)
+      break
+    case 'swarm':  // 万剑归宗：锵然剑鸣 + 剑气呼啸
+      petTone(2400, 0, 0.18, 'sawtooth', 0.05, 520)
+      petTone(1500, 0.04, 0.3, 'triangle', 0.045, 2600)
+      petTone(320, 0.5, 0.5, 'sine', 0.05, 180)
+      petTone(1900, 1.5, 0.4, 'triangle', 0.045, 900)
+      break
+    default: // star
+      petTone(784, 0, 0.16, 'sine', 0.05, 1046)
+      petTone(1046, 0.14, 0.16, 'sine', 0.05, 1318)
+      petTone(1318, 0.28, 0.3, 'sine', 0.045, 1568)
+      break
+  }
+}
+
 function togglePetSfx() {
   petSfxOn.value = !petSfxOn.value
   try {
@@ -1267,7 +1632,8 @@ function togglePetTopo() {
 }
 
 // 随机小动作
-const PET_ACTIONS = ['look', 'yawn', 'spin', 'hop', 'throw']
+// 随机小动作（throw 已归入法术特效，见 PET_SPELLS）
+const PET_ACTIONS = ['look', 'yawn', 'spin', 'hop']
 // 随机趣味行为：偶尔自发喂食/玩球/唱歌/打盹（不再由菜单触发）
 const PET_FUN_ACTIONS = [petFeed, petPlayBall, petSing, togglePetSleep]
 let petActTimer = 0
@@ -1376,6 +1742,9 @@ function stopPetLoops() {
   petWanderTimer = 0
   clearTimeout(petSleepTimer)
   petSleepTimer = 0
+  clearTimeout(petCastTimer)
+  petCastTimer = 0
+  petCast.value = ''
   stopPetWalk()
   if (petRaf) {
     cancelAnimationFrame(petRaf)
@@ -1388,6 +1757,7 @@ function stopPetLoops() {
 function startPetLoops() {
   if (!petActTimer) schedulePetAction()
   if (!petWanderTimer) schedulePetWander()
+  if (!petCastTimer) schedulePetCast()
   document.addEventListener('mousemove', onPetMouseMove)
 }
 
@@ -1411,6 +1781,7 @@ onMounted(() => {
   }
   document.addEventListener('mousemove', onPetMouseMove)
   window.addEventListener('resize', onPetResize)
+  installPetCastDebugHook()
   startPetLoops()
 })
 
@@ -1434,8 +1805,15 @@ onUnmounted(() => {
   clearInterval(petPettingFxTimer)
   clearTimeout(petWanderTimer)
   clearTimeout(petSleepTimer)
+  clearTimeout(petCastTimer)
   if (petRaf) cancelAnimationFrame(petRaf)
   if (petWanderRaf) cancelAnimationFrame(petWanderRaf)
+  try {
+    delete window.__jarvisPetCast
+    delete window.__jarvisPetSpells
+  } catch (e) {
+    // 忽略
+  }
 })
 
 defineExpose({
@@ -1681,6 +2059,121 @@ defineExpose({
   0%, 100% { opacity: 0.45; transform: scale(0.96); }
   50% { opacity: 0.85; transform: scale(1.04); }
 }
+
+/* ==================== 环绕宠物的轨道灵珠/符文（与头顶光环同一套玄幻语言） ==================== */
+/* 两圈不同倾角、反向旋转的椭圆轨道，各带灵珠/符文绕身体公转 */
+.pet-orbit {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  opacity: 0.75;
+  transition: opacity 0.6s ease;
+}
+
+/* 轨道 A：较平缓，青色灵珠 */
+.pet-orbit.orbit-a {
+  --orbit-tilt: 18deg;
+  --orbit-squash: 0.34;
+  --orbit-dur: 14s;
+  transform: translateX(-50%) rotateZ(var(--orbit-tilt)) scaleY(var(--orbit-squash));
+}
+
+/* 轨道 B：较陡，反向旋转的星光符文 */
+.pet-orbit.orbit-b {
+  --orbit-tilt: -32deg;
+  --orbit-squash: 0.5;
+  --orbit-dur: 20s;
+  transform: translateX(-50%) rotateZ(var(--orbit-tilt)) scaleY(var(--orbit-squash));
+}
+
+.pet-orbit-track {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  animation: pet-orbit-spin var(--orbit-dur, 16s) linear infinite;
+}
+
+/* 反向旋转的轨道整体转向相反 */
+.pet-orbit.orbit-b .pet-orbit-track {
+  animation-direction: reverse;
+}
+
+/* 灵珠：沿轨道均分分布，补偿压扁使圆点仍为圆 */
+.pet-orbit-mote {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffffff 0%, #9fe9ff 45%, transparent 75%);
+  box-shadow: 0 0 8px rgba(126, 231, 255, 0.95);
+  transform: translateY(-96px) scaleY(calc(1 / var(--orbit-squash, 1)));
+}
+
+.pet-orbit-mote:nth-child(1) { transform: rotate(0deg) translateY(-96px) scaleY(calc(1 / var(--orbit-squash, 1))); }
+.pet-orbit-mote:nth-child(2) { transform: rotate(120deg) translateY(-96px) scaleY(calc(1 / var(--orbit-squash, 1))); }
+.pet-orbit-mote:nth-child(3) { transform: rotate(240deg) translateY(-96px) scaleY(calc(1 / var(--orbit-squash, 1))); }
+
+/* 符文：沿轨道分布，自身反向自转保持正立 */
+.pet-orbit-rune {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+  color: #d8f6ff;
+  text-shadow: 0 0 6px rgba(126, 231, 255, 0.95), 0 0 12px rgba(32, 200, 255, 0.7);
+  transform: translateY(-104px) scaleY(calc(1 / var(--orbit-squash, 1)));
+  animation: pet-orbit-rune-glow 2.6s ease-in-out infinite;
+}
+
+.pet-orbit-rune:nth-child(1) { transform: rotate(0deg) translateY(-104px) scaleY(calc(1 / var(--orbit-squash, 1))); }
+.pet-orbit-rune:nth-child(2) { transform: rotate(120deg) translateY(-104px) scaleY(calc(1 / var(--orbit-squash, 1))); }
+.pet-orbit-rune:nth-child(3) { transform: rotate(240deg) translateY(-104px) scaleY(calc(1 / var(--orbit-squash, 1))); }
+
+@keyframes pet-orbit-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pet-orbit-rune-glow {
+  0%, 100% { opacity: 0.4; filter: brightness(0.9); }
+  50% { opacity: 1; filter: brightness(1.5); }
+}
+
+/* 运行中：轨道转快、灵光大盛 */
+.pet-float.rune-running .pet-orbit {
+  opacity: 1;
+}
+.pet-float.rune-running .pet-orbit.orbit-a { --orbit-dur: 8s; }
+.pet-float.rune-running .pet-orbit.orbit-b { --orbit-dur: 11s; }
+
+/* 打盹：轨道近乎停滞、黯淡 */
+.pet-float.rune-sleep .pet-orbit {
+  opacity: 0.22;
+}
+.pet-float.rune-sleep .pet-orbit.orbit-a { --orbit-dur: 120s; }
+.pet-float.rune-sleep .pet-orbit.orbit-b { --orbit-dur: 150s; }
+
+/* 施法瞬间：轨道骤然加速 */
+.pet-float.is-casting .pet-orbit {
+  opacity: 1;
+}
+.pet-float.is-casting .pet-orbit.orbit-a { --orbit-dur: 3s; }
+.pet-float.is-casting .pet-orbit.orbit-b { --orbit-dur: 4.5s; }
 
 /* —— 状态联动（转速统一由 --rune-spin-dur 控制，orbit 与字符反向自转同步）—— */
 /* 运行中：灵符转快、青芒炽盛 */
@@ -2902,6 +3395,39 @@ defineExpose({
   50% { transform: translateX(-50%) rotate(4deg); }
 }
 
+/* 施法：身体微微悬起、头顶法环急促旋转并放大发光 */
+.pet-float.is-casting .pet-body {
+  animation: pet-cast-float 1.5s ease-in-out;
+}
+
+.pet-float.is-casting .pet-rune-ring {
+  --rune-spin-dur: 3.2s;
+  animation: pet-cast-ring 1.5s ease-out;
+}
+
+.pet-float.is-casting .pet-rune-glyph {
+  animation-duration: var(--rune-spin-dur, 26s), 0.5s;
+}
+
+.pet-float.is-casting .pet-rune-core {
+  animation-duration: 0.5s;
+  border-color: rgba(126, 231, 255, 0.85);
+  box-shadow: inset 0 0 34px rgba(32, 200, 255, 0.55), 0 0 30px rgba(32, 200, 255, 0.5);
+}
+
+@keyframes pet-cast-float {
+  0%, 100% { transform: translateX(-50%) scaleX(var(--pet-flip, 1)) translateY(0) scale(1); }
+  30% { transform: translateX(-50%) scaleX(var(--pet-flip, 1)) translateY(-12px) scale(1.05); }
+  60% { transform: translateX(-50%) scaleX(var(--pet-flip, 1)) translateY(-6px) scale(1.02); }
+}
+
+/* 施法时头顶光环爆发式放大后回落 */
+@keyframes pet-cast-ring {
+  0% { transform: translateX(-50%) rotate(-10deg) scaleY(0.42) scaleX(var(--pet-flip, 1)) scale(1); }
+  35% { transform: translateX(-50%) rotate(-10deg) scaleY(0.42) scaleX(var(--pet-flip, 1)) scale(1.5); }
+  100% { transform: translateX(-50%) rotate(-10deg) scaleY(0.42) scaleX(var(--pet-flip, 1)) scale(1); }
+}
+
 
 </style>
 
@@ -2912,11 +3438,127 @@ defineExpose({
 .pet-heart-fx,
 .pet-food,
 .pet-ball,
-.pet-note {
+.pet-note,
+.pet-spell-array {
   position: fixed;
   z-index: 3100;
   pointer-events: none;
   user-select: none;
+}
+
+/* ==================== 施法：脚下灵光法阵 ==================== */
+.pet-spell-array {
+  width: 0;
+  height: 0;
+  /* 压扁成贴地的椭圆，营造俯视透视感 */
+  transform: translate(-50%, -50%) rotateX(62deg);
+  transform-style: preserve-3d;
+  animation: pet-array-in 1.9s ease-out forwards;
+}
+
+/* 外层符箓圈：整圈缓慢自转 */
+.pet-array-glyphring {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  animation: pet-array-spin 6s linear infinite;
+}
+
+.pet-array-glyph {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--spell-color, #9fd8ff);
+  text-shadow: 0 0 8px var(--spell-glow, #5db2ff), 0 0 16px var(--spell-glow, #5db2ff);
+}
+
+/* 内层刻线环：反向旋转，虚线光边 */
+.pet-array-linering {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 92px;
+  height: 92px;
+  margin: -46px 0 0 -46px;
+  border-radius: 50%;
+  border: 1.5px dashed var(--spell-glow, #5db2ff);
+  box-shadow: 0 0 14px var(--spell-glow, #5db2ff), inset 0 0 14px var(--spell-glow, #5db2ff);
+  opacity: 0.85;
+  animation: pet-array-spin-rev 4.5s linear infinite;
+}
+
+/* 中心几何法印：两个交叠方形旋转 45° 成八角星 */
+.pet-array-seal {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  animation: pet-array-pulse 1.4s ease-in-out infinite;
+}
+
+.pet-array-seal i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 62px;
+  height: 62px;
+  margin: -31px 0 0 -31px;
+  border: 1.5px solid var(--spell-color, #9fd8ff);
+  box-shadow: 0 0 10px var(--spell-glow, #5db2ff), inset 0 0 10px var(--spell-glow, #5db2ff);
+  opacity: 0.9;
+}
+
+.pet-array-seal i:nth-child(2) {
+  transform: rotate(45deg);
+}
+
+/* 中心光核：耀眼一点 */
+.pet-array-core {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffffff 0%, var(--spell-color, #9fd8ff) 40%, transparent 72%);
+  box-shadow: 0 0 22px var(--spell-glow, #5db2ff), 0 0 44px var(--spell-glow, #5db2ff);
+  animation: pet-array-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes pet-array-in {
+  0% { opacity: 0; scale: 0.4; }
+  18% { opacity: 1; scale: 1.08; }
+  30% { scale: 1; }
+  78% { opacity: 1; scale: 1; }
+  100% { opacity: 0; scale: 1.06; }
+}
+
+@keyframes pet-array-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pet-array-spin-rev {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+
+@keyframes pet-array-pulse {
+  0%, 100% { opacity: 0.75; }
+  50% { opacity: 1; }
 }
 
 .pet-fx {
@@ -2990,5 +3632,217 @@ defineExpose({
   20% { opacity: 1; }
   100% { opacity: 0; transform: translate(var(--dx, 0), -70px) scale(1.1) rotate(12deg); }
 }
+/* ==================== 施法：远程灵光 / 范围冲击 / 万剑归宗 ==================== */
+/* 远程光束：从宠物射出的能量轨迹 */
+.pet-spell-beam {
+  position: fixed;
+  z-index: 3100;
+  pointer-events: none;
+  height: 3px;
+  border-radius: 3px;
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    var(--spell-glow, #5db2ff) 12%,
+    var(--spell-color, #9fd8ff) 55%,
+    #ffffff 100%);
+  box-shadow: 0 0 10px var(--spell-glow, #5db2ff), 0 0 22px var(--spell-glow, #5db2ff);
+  animation: pet-beam-fire var(--beam-dur, 0.7s) cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+}
 
+@keyframes pet-beam-fire {
+  0% { opacity: 0; scale: 0 0.4; }
+  25% { opacity: 1; scale: 1 1; }
+  100% { opacity: 0; scale: 1 1; }
+}
+
+/* 飞行灵符：沿光束方向疾行 */
+.pet-spell-bolt {
+  position: fixed;
+  z-index: 3101;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+  font-size: 24px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pet-bolt-fly var(--beam-dur, 0.7s) cubic-bezier(0.3, 0.5, 0.2, 1) forwards;
+}
+
+@keyframes pet-bolt-fly {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5) rotate(0deg); }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--bx, 0px)), calc(-50% + var(--by, 0px))) scale(1.15) rotate(540deg); }
+}
+
+/* 命中爆点：抵达目标位置后炸开 */
+.pet-spell-hit {
+  position: fixed;
+  z-index: 3101;
+  pointer-events: none;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  opacity: 0;
+  animation: pet-hit-burst 0.5s ease-out forwards;
+}
+
+@keyframes pet-hit-burst {
+  0% { opacity: 0; transform: scale(0.3); }
+  30% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(7); }
+}
+
+/* 范围冲击环：以宠物为中心向外扩散 */
+.pet-spell-burst-ring {
+  position: fixed;
+  z-index: 3099;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  opacity: 0;
+  animation: pet-burst-expand 1.5s cubic-bezier(0.15, 0.7, 0.3, 1) forwards;
+}
+
+@keyframes pet-burst-expand {
+  0% { opacity: 0; width: 0; height: 0; margin: 0; }
+  15% { opacity: 0.95; }
+  100% {
+    opacity: 0;
+    width: calc(var(--maxr, 600px) * 2);
+    height: calc(var(--maxr, 600px) * 2);
+    margin: calc(var(--maxr, 600px) * -1);
+  }
+}
+
+/* 范围中心绽放光核 */
+.pet-spell-burst-core {
+  position: fixed;
+  z-index: 3100;
+  pointer-events: none;
+  width: 120px;
+  height: 120px;
+  margin: -60px 0 0 -60px;
+  border-radius: 50%;
+  animation: pet-burst-core 0.85s ease-out forwards;
+}
+
+@keyframes pet-burst-core {
+  0% { opacity: 0; transform: scale(0.2); }
+  25% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(2.6); }
+}
+
+/* 向外迸射的符文 */
+.pet-spell-burst-spark {
+  position: fixed;
+  z-index: 3101;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pet-burst-spark 1.05s cubic-bezier(0.2, 0.7, 0.4, 1) forwards;
+}
+
+@keyframes pet-burst-spark {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--bx, 0px)), calc(-50% + var(--by, 0px))) scale(1.3) rotate(240deg); }
+}
+
+/* ==================== 万剑归宗 ==================== */
+.pet-spell-sword {
+  position: fixed;
+  z-index: 3101;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+  /* 沿 JS 生成的贝塞尔曲线飞行；起点即元素定位点 */
+  offset-path: var(--sw-path);
+  offset-rotate: auto;
+  animation: pet-sword-swarm var(--sw-dur, 1.7s) cubic-bezier(0.32, 0.02, 0.5, 1) forwards;
+}
+
+/* 剑刃：细长光锥，指向飞行方向 */
+.pet-sword-blade {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 26px;
+  height: 2.5px;
+  margin: -1.25px 0 0 -2px;
+  border-radius: 2px 50% 50% 2px;
+  background: linear-gradient(90deg, transparent 0%, var(--spell-glow, #6f9dff) 30%, #ffffff 100%);
+  box-shadow: 0 0 8px var(--spell-glow, #6f9dff), 0 0 16px var(--spell-glow, #6f9dff);
+}
+
+/* 剑柄：短一截的暗色基座 */
+.pet-sword-hilt {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 8px;
+  height: 3px;
+  margin: -1.5px 0 0 -8px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--spell-glow, #6f9dff) 70%, #ffffff 30%);
+  box-shadow: 0 0 6px var(--spell-glow, #6f9dff);
+}
+
+/* 沿曲线外刺并归巢：起止均在宠物本体（曲线闭合），中途飞远 */
+@keyframes pet-sword-swarm {
+  0% { opacity: 0; offset-distance: 0%; scale: 0.6; }
+  12% { opacity: 1; }
+  50% { offset-distance: 50%; scale: 1.15; }
+  90% { opacity: 1; }
+  100% { opacity: 0; offset-distance: 100%; scale: 0.5; }
+}
+
+/* 剑阵起势：脚下的剑意光环 */
+.pet-spell-swarm-sigil {
+  position: fixed;
+  z-index: 3099;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  border: 1.5px dashed transparent;
+  animation: pet-swarm-sigil 1.6s ease-out forwards;
+}
+
+@keyframes pet-swarm-sigil {
+  0% { opacity: 0; width: 0; height: 0; margin: 0; }
+  20% { opacity: 1; width: 70px; height: 70px; margin: -35px 0 0 -35px; }
+  100% { opacity: 0; width: 190px; height: 190px; margin: -95px 0 0 -95px; }
+}
+
+/* 归位瞬间的中心聚光 */
+.pet-spell-swarm-core {
+  position: fixed;
+  z-index: 3100;
+  pointer-events: none;
+  width: 90px;
+  height: 90px;
+  margin: -45px 0 0 -45px;
+  border-radius: 50%;
+  opacity: 0;
+  animation: pet-swarm-core 0.9s ease-out forwards;
+}
+
+@keyframes pet-swarm-core {
+  0% { opacity: 0; transform: scale(1.6); }
+  35% { opacity: 1; transform: scale(0.9); }
+  100% { opacity: 0; transform: scale(0.3); }
+}
 </style>

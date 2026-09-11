@@ -75,6 +75,33 @@ const activeIndex = ref(0)
 const inputEl = ref(null)
 const itemRefs = new Map()
 
+// ===== 最近使用：记录执行过的命令 id（最多 5 个，最近在前），持久化到 localStorage =====
+const RECENT_STORAGE_KEY = 'jarvis_cmd_palette_recent'
+const RECENT_LIMIT = 5
+
+function loadRecentIds() {
+  try {
+    const raw = localStorage.getItem(RECENT_STORAGE_KEY)
+    const parsed = JSON.parse(raw || '[]')
+    return Array.isArray(parsed) ? parsed.filter(id => typeof id === 'string').slice(0, RECENT_LIMIT) : []
+  } catch (err) {
+    return []
+  }
+}
+
+const recentIds = ref(loadRecentIds())
+
+function recordRecent(actionId) {
+  if (!actionId) return
+  const next = [actionId, ...recentIds.value.filter(id => id !== actionId)].slice(0, RECENT_LIMIT)
+  recentIds.value = next
+  try {
+    localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(next))
+  } catch (err) {
+    /* 忽略写入失败（如隐私模式） */
+  }
+}
+
 function isDisabled(action) {
   if (typeof action.enabled === 'function') return !action.enabled(props.ctx || {})
   // Agent 切换条目直接携带布尔 disabled，避免与上面的 enabled 回调判断冲突
@@ -135,17 +162,34 @@ const agentEntries = computed(() => {
     })
 })
 
+// 「最近使用」条目：把记录的命令 id 映射为动作对象；仅在无搜索词、非 Agent 模式下展示
+const recentActions = computed(() => {
+  if (isAgentMode.value || query.value.trim()) return []
+  const byId = new Map((props.actions || []).map(a => [a.id, a]))
+  return recentIds.value.map(id => byId.get(id)).filter(Boolean)
+})
+
 // 过滤 + 扁平化（用连续索引做键盘导航，与分组展示解耦）
 const flatEntries = computed(() => {
   let flatIndex = 0
   const matched = isAgentMode.value
     ? agentEntries.value
     : filterActions(props.actions, query.value)
-  return matched.map(action => ({
-    action,
+  // 最近使用条目置顶（group 标记为「最近使用」，由 groupActions 聚合成最顶部分组），并从常规列表中剔除避免重复
+  const recentIdSet = new Set(recentActions.value.map(a => a.id))
+  const recentEntries = recentActions.value.map(action => ({
+    action: { ...action, group: '最近使用' },
     disabled: isDisabled(action),
     flatIndex: flatIndex++,
   }))
+  const restEntries = matched
+    .filter(action => !recentIdSet.has(action.id))
+    .map(action => ({
+      action,
+      disabled: isDisabled(action),
+      flatIndex: flatIndex++,
+    }))
+  return isAgentMode.value ? restEntries : [...recentEntries, ...restEntries]
 })
 
 const entryById = computed(() => new Map(flatEntries.value.map(e => [e.action.id, e])))
@@ -190,6 +234,7 @@ function onItemHover(index) {
 
 function run(action, openMode = 'current') {
   if (!action || isDisabled(action)) return
+  if (!action.isAgentEntry) recordRecent(action.id)
   emit('run', action, openMode)
 }
 
