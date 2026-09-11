@@ -5063,22 +5063,24 @@ def create_app(
         # 权限检查：只有owner或admin可以更新Agent
         user_info = getattr(request.state, "user_info", None)
         if user_info and user_info.get("user_id") != "system":
-            agent_info = agent_manager.get_agent(agent_id)
-            if (
-                agent_info
-                and agent_info.owner_id
-                and agent_info.owner_id != user_info.get("user_id")
-            ):
-                if not permission_manager.check_permission(
-                    user_info["user_id"], "agent:delete"
+            is_admin = user_info.get("is_admin", False)
+            if not is_admin:
+                agent_info = agent_manager.get_agent(agent_id)
+                if (
+                    agent_info
+                    and agent_info.owner_id
+                    and agent_info.owner_id != user_info.get("user_id")
                 ):
-                    return {
-                        "success": False,
-                        "error": {
-                            "code": "FORBIDDEN",
-                            "message": "You can only update your own agents",
-                        },
-                    }
+                    if not permission_manager.check_permission(
+                        user_info["user_id"], "agent:delete"
+                    ):
+                        return {
+                            "success": False,
+                            "error": {
+                                "code": "FORBIDDEN",
+                                "message": "You can only update your own agents",
+                            },
+                        }
         try:
             name = request_body.get("name")
             target_node_id = str(request_body.get("node_id") or "").strip()
@@ -5149,19 +5151,21 @@ def create_app(
         """更新 Agent 的访问控制列表（仅 owner 可操作）。"""
         user_info = getattr(request.state, "user_info", None)
         if user_info and user_info.get("user_id") != "system":
-            agent_info = agent_manager.get_agent(agent_id)
-            if (
-                agent_info
-                and agent_info.owner_id
-                and agent_info.owner_id != user_info.get("user_id")
-            ):
-                return {
-                    "success": False,
-                    "error": {
-                        "code": "FORBIDDEN",
-                        "message": "Only the agent owner can update access control",
-                    },
-                }
+            is_admin = user_info.get("is_admin", False)
+            if not is_admin:
+                agent_info = agent_manager.get_agent(agent_id)
+                if (
+                    agent_info
+                    and agent_info.owner_id
+                    and agent_info.owner_id != user_info.get("user_id")
+                ):
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "FORBIDDEN",
+                            "message": "Only the agent owner can update access control",
+                        },
+                    }
 
         access_acl = request_body.get("access_acl")
         if access_acl is not None and not isinstance(access_acl, dict):
@@ -5195,22 +5199,24 @@ def create_app(
         # 权限检查：只有owner或admin可以删除Agent
         user_info = getattr(request.state, "user_info", None)
         if user_info and user_info.get("user_id") != "system":
-            agent_info = agent_manager.get_agent(agent_id)
-            if (
-                agent_info
-                and agent_info.owner_id
-                and agent_info.owner_id != user_info.get("user_id")
-            ):
-                if not permission_manager.check_permission(
-                    user_info["user_id"], "agent:delete"
+            is_admin = user_info.get("is_admin", False)
+            if not is_admin:
+                agent_info = agent_manager.get_agent(agent_id)
+                if (
+                    agent_info
+                    and agent_info.owner_id
+                    and agent_info.owner_id != user_info.get("user_id")
                 ):
-                    return {
-                        "success": False,
-                        "error": {
-                            "code": "FORBIDDEN",
-                            "message": "You can only delete your own agents",
-                        },
-                    }
+                    if not permission_manager.check_permission(
+                        user_info["user_id"], "agent:delete"
+                    ):
+                        return {
+                            "success": False,
+                            "error": {
+                                "code": "FORBIDDEN",
+                                "message": "You can only delete your own agents",
+                            },
+                        }
         try:
             resolved_target_node = str(node_id or "").strip()
             route = node_runtime.agent_route_registry.get(agent_id)

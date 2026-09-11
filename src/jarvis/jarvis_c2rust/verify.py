@@ -657,8 +657,10 @@ def _run_optimization(
 2. **read_code**: 读取 C 源码或 Rust 代码文件
    - 读取 Rust 文件时，使用相对于 crate 根目录的路径（如 `src/xxx.rs`）或绝对路径
    - 读取 C 文件时，使用 C 源文件的完整路径
-3. **edit_file**: 修改 Rust 代码文件
-4. **execute_script**: 执行编译和测试命令（如 `cargo check`, `cargo test`）
+3. **edit_file**: 修改 Rust 代码文件（查找替换）
+4. **edit_file_by_line**: 按行号区间替换 Rust 代码文件
+5. **write_file**: 整文件覆写 Rust 代码文件
+6. **execute_script**: 执行编译和测试命令（如 `cargo check`, `cargo test`）
 
 ## 优化工作流程
 
@@ -685,7 +687,7 @@ def _run_optimization(
 
 ### 第四步：执行修复（EXECUTE）
 4. 逐个修复问题：
-   - 使用 `edit_file` 工具修改 Rust 代码
+   - 使用 `edit_file` 工具修改 Rust 代码（大范围重写可用 `write_file`，按行号替换可用 `edit_file_by_line`）
    - 每次修改后，使用 `execute_script` 执行 `cargo check` 验证编译
    - 如果报告中有测试用例，执行 `cargo test` 验证功能
    - 确保修复后代码能够编译通过

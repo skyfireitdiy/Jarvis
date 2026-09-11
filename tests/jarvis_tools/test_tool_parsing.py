@@ -95,13 +95,9 @@ class TestToolParsing:
         edit_file
         ```json
         {
-            "files": [{
-                "file_path": "test.py",
-                "diffs": [{
-                    "search": "old",
-                    "replace": "new"
-                }]
-            }]
+            "file_path": "test.py",
+            "search": "old",
+            "replace": "new"
         }
         ```
         """
@@ -109,7 +105,7 @@ class TestToolParsing:
         result, _, _ = ToolRegistry._extract_tool_calls(content)
         assert len(result) == 1
         assert result[0]["name"] == "edit_file"
-        assert result[0]["arguments"]["files"][0]["file_path"] == "test.py"
+        assert result[0]["arguments"]["file_path"] == "test.py"
 
     def test_ignore_incomplete_json_in_code_block(self):
         """测试：代码块中不完整的 JSON（不应该被识别）"""
@@ -194,8 +190,8 @@ class TestToolParsing:
         content = """
         <tool_call name="edit_file">
         [
-            {"file_path": "a.py", "diffs": [{"search": "old", "replace": "new"}]},
-            {"file_path": "b.py", "diffs": [{"search": "x", "replace": "y"}]}
+            {"file_path": "a.py", "search": "old", "replace": "new"},
+            {"file_path": "b.py", "search": "x", "replace": "y"}
         ]
         </tool_call>
         """

@@ -85,7 +85,7 @@ plantuml -checkonly <filename>_plantuml/*.puml
 
 **执行步骤：**
 
-1. 根据校验错误信息，用`edit_file`工具修复`.puml`文件
+1. 根据校验错误信息，用`edit_file`（查找替换）或`write_file`（整文件重写）工具修复`.puml`文件
 2. 常见修复包括：
    - 修复箭头语法（`-->`、`->`等）
    - 添加缺失的分号
