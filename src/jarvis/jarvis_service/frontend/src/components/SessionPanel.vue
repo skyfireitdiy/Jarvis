@@ -285,11 +285,27 @@ const inputCollapsed = ref(false)
 const multiInputRef = ref(null)
 const singleInputRef = ref(null)
 
+// 判断当前焦点是否允许被本面板输入框接管：
+// 无焦点(body)、焦点已在本面板输入框内、或焦点在页面其他非输入控件上时才允许，
+// 避免轮询刷新状态时抢走用户正在使用的输入框（如命令面板搜索框）焦点。
+function canStealFocus() {
+  const active = document.activeElement
+  if (!active || active === document.body) return true
+  const currentEl = props.inputMode === 'multi' ? multiInputRef.value : singleInputRef.value
+  if (currentEl && active === currentEl) return true
+  const tagName = String(active.tagName || '').toLowerCase()
+  // 用户正在其他输入控件（input/textarea/contenteditable）中操作，不抢焦点
+  if (tagName === 'input' || tagName === 'textarea' || active.isContentEditable) return false
+  return true
+}
+
 // 聚焦输入框
 function focusInput() {
   inputCollapsed.value = false
+  if (!canStealFocus()) return
   // 等待 DOM 更新后再聚焦
   setTimeout(() => {
+    if (!canStealFocus()) return
     const el = props.inputMode === 'multi' ? multiInputRef.value : singleInputRef.value
     if (el) {
       el.focus()
