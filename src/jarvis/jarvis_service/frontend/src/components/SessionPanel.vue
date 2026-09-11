@@ -289,6 +289,8 @@ const singleInputRef = ref(null)
 // 无焦点(body)、焦点已在本面板输入框内、或焦点在页面其他非输入控件上时才允许，
 // 避免轮询刷新状态时抢走用户正在使用的输入框（如命令面板搜索框）焦点。
 function canStealFocus() {
+  // 有模态弹窗打开时，用户正在弹窗内操作，不抢焦点
+  if (hasVisibleModalOverlay()) return false
   const active = document.activeElement
   if (!active || active === document.body) return true
   const currentEl = props.inputMode === 'multi' ? multiInputRef.value : singleInputRef.value
@@ -297,6 +299,19 @@ function canStealFocus() {
   // 用户正在其他输入控件（input/textarea/contenteditable）中操作，不抢焦点
   if (tagName === 'input' || tagName === 'textarea' || active.isContentEditable) return false
   return true
+}
+
+// 检测页面是否存在可见的模态遮罩（Element Plus 弹窗/对话框等）。
+// 有弹窗打开时，用户正在弹窗内操作，不应被自动聚焦抢走焦点。
+function hasVisibleModalOverlay() {
+  const overlays = document.querySelectorAll('.el-overlay, .modal-overlay, .dialog-overlay, .diff-modal-overlay')
+  for (const el of overlays) {
+    const style = window.getComputedStyle(el)
+    if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+      return true
+    }
+  }
+  return false
 }
 
 // 聚焦输入框
