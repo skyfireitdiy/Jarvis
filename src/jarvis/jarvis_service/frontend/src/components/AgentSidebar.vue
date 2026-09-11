@@ -136,7 +136,7 @@
   <!-- 宠物挂件：浮动于页面，可拖拽并记忆位置 -->
   <Teleport to="body">
     <div
-      v-show="!petHidden"
+      v-show="petVisible"
       class="pet-float"
       :class="petClasses"
       :style="{ left: petPos.x + 'px', top: petPos.y + 'px' }"
@@ -190,7 +190,7 @@
 
     <!-- 右键菜单 -->
     <div
-      v-if="petMenu.show"
+      v-if="petVisible && petMenu.show"
       class="pet-menu"
       :style="{ left: petMenu.x + 'px', top: petMenu.y + 'px' }"
       @pointerdown.stop
@@ -214,7 +214,7 @@
 
     <!-- 宠物旁的迷你网络拓扑 -->
     <PetMiniTopology
-      v-show="!petHidden && petTopoOn"
+      v-show="petVisible && petTopoOn"
       :nodes="nodes"
       :agents="agentList || []"
       :getStatusClass="getStatusClass"
@@ -224,10 +224,14 @@
     />
     <!-- 隐藏后的还原按钮 -->
     <button
-      v-if="petHidden"
+      v-if="props.isConnected && petHidden"
       class="pet-restore"
-      title="唤回宠物"
-      @click="showPet"
+      :style="{ left: restorePos.x + 'px', top: restorePos.y + 'px' }"
+      title="唤回宠物（可拖动）"
+      @pointerdown="onRestorePointerDown"
+      @pointermove="onRestorePointerMove"
+      @pointerup="onRestorePointerUp"
+      @pointercancel="onRestorePointerUp"
     >🐾</button>
   </Teleport>
 
@@ -359,7 +363,8 @@ const props = defineProps({
   agentGroups: { type: Array, default: () => [] },
   nodes: { type: Array, default: () => [] },
   currentUserId: { type: String, default: '' },
-  currentUserName: { type: String, default: '' }
+  currentUserName: { type: String, default: '' },
+  isConnected: { type: Boolean, default: true }
 })
 
 // 分组弹窗状态
@@ -484,10 +489,13 @@ watch(() => props.currentAgentId, (newAgentId) => {
 // ==================== 宠物挂件 ====================
 const PET_POS_KEY = 'jarvis_pet_pos'
 const PET_TOPO_KEY = 'jarvis_pet_topo'
+const PET_RESTORE_POS_KEY = 'jarvis_pet_restore_pos'
 const PET_W = 200
 const PET_H = 230
-
+const RESTORE_W = 40
+const RESTORE_H = 40
 const petPos = ref({ x: 0, y: 0 })
+const restorePos = ref({ x: 0, y: 0 })
 const petHover = ref(false)
 const petDrag = ref(false)
 const petJump = ref(false)
@@ -503,6 +511,9 @@ const petWalking = ref(false)    // 随机漫步中
 const petSpeech = ref('')        // 随机台词
 const petMenu = ref({ show: false, x: 0, y: 0 })  // 右键菜单
 const petTopoOn = ref(true)      // 是否显示迷你拓扑图
+
+// 未连接（如登录界面）时不显示宠物及其附属 UI
+const petVisible = computed(() => props.isConnected && !petHidden.value)
 
 // 随机台词库
 const PET_LINES = [
@@ -640,6 +651,37 @@ function clampPetPos(x, y) {
   const maxX = Math.max(0, window.innerWidth - PET_W)
   const maxY = Math.max(0, window.innerHeight - PET_H)
   return { x: Math.max(0, Math.min(maxX, x)), y: Math.max(0, Math.min(maxY, y)) }
+}
+
+// 还原按钮独立于宠物尺寸，可拖到屏幕任意边角
+function clampRestorePos(x, y) {
+  const maxX = Math.max(0, window.innerWidth - RESTORE_W)
+  const maxY = Math.max(0, window.innerHeight - RESTORE_H)
+  return { x: Math.max(0, Math.min(maxX, x)), y: Math.max(0, Math.min(maxY, y)) }
+}
+
+function saveRestorePos() {
+  try {
+    localStorage.setItem(PET_RESTORE_POS_KEY, JSON.stringify(restorePos.value))
+  } catch (e) {
+    console.warn('[AGENT_SIDEBAR] Failed to save pet restore position:', e)
+  }
+}
+
+function initRestorePos() {
+  let saved = null
+  try {
+    saved = JSON.parse(localStorage.getItem(PET_RESTORE_POS_KEY) || 'null')
+  } catch (e) {
+    saved = null
+  }
+  if (saved && typeof saved.x === 'number' && typeof saved.y === 'number') {
+    restorePos.value = clampRestorePos(saved.x, saved.y)
+    restoreUserMoved = true
+    return
+  }
+  // 默认与宠物当前位置一致
+  restorePos.value = clampRestorePos(petPos.value.x, petPos.value.y)
 }
 
 function savePetPos() {
@@ -873,11 +915,21 @@ function spawnPetHearts() {
 function onPetContextMenu(e) {
   const MENU_W = 148
   const MENU_H = 330
-  petMenu.value = {
-    show: true,
-    x: Math.min(e.clientX, window.innerWidth - MENU_W - 8),
-    y: Math.min(e.clientY, window.innerHeight - MENU_H - 8),
-  }
+  const MARGIN = 8
+  // 先显示再测量，确保首次右键也能按真实尺寸做边界收敛
+  petMenu.value = { show: true, x: e.clientX, y: e.clientY }
+  requestAnimationFrame(() => {
+    const menuEl = document.querySelector('.pet-menu')
+    const menuW = menuEl ? menuEl.offsetWidth : MENU_W
+    const menuH = menuEl ? menuEl.offsetHeight : MENU_H
+    const maxX = Math.max(MARGIN, window.innerWidth - menuW - MARGIN)
+    const maxY = Math.max(MARGIN, window.innerHeight - menuH - MARGIN)
+    petMenu.value = {
+      show: true,
+      x: Math.min(Math.max(MARGIN, e.clientX), maxX),
+      y: Math.min(Math.max(MARGIN, e.clientY), maxY),
+    }
+  })
 }
 
 function hidePetMenu() {
@@ -971,6 +1023,10 @@ function petSing() {
 function petHide() {
   hidePetMenu()
   stopPetting()
+  // 未手动拖过还原按钮时，让它出现在宠物当前位置，体验连贯
+  if (!restoreUserMoved) {
+    restorePos.value = clampRestorePos(petPos.value.x, petPos.value.y)
+  }
   petHidden.value = true
   clearTimeout(petHideTimer)
   stopPetLoops()
@@ -981,6 +1037,49 @@ function showPet() {
   petHidden.value = false
   startPetLoops()
   petSfxChirp()
+}
+
+// 还原按钮（🐾）拖动：位置独立于宠物尺寸，可拖到屏幕任意边角
+let restoreDragging = false
+let restoreMoved = false
+let restoreUserMoved = false  // 用户是否手动拖动过还原按钮
+let restoreStartX = 0
+let restoreStartY = 0
+let restoreOriginX = 0
+let restoreOriginY = 0
+
+function onRestorePointerDown(e) {
+  if (e.button !== undefined && e.button !== 0) return  // 仅左键
+  restoreDragging = true
+  restoreMoved = false
+  restoreStartX = e.clientX
+  restoreStartY = e.clientY
+  restoreOriginX = restorePos.value.x
+  restoreOriginY = restorePos.value.y
+  e.target.setPointerCapture?.(e.pointerId)
+  e.preventDefault()
+}
+
+function onRestorePointerMove(e) {
+  if (!restoreDragging) return
+  const dx = e.clientX - restoreStartX
+  const dy = e.clientY - restoreStartY
+  if (!restoreMoved && Math.hypot(dx, dy) > 5) restoreMoved = true
+  if (restoreMoved) {
+    restorePos.value = clampRestorePos(restoreOriginX + dx, restoreOriginY + dy)
+  }
+}
+
+function onRestorePointerUp(e) {
+  if (!restoreDragging) return
+  restoreDragging = false
+  e.target.releasePointerCapture?.(e.pointerId)
+  if (restoreMoved) {
+    restoreUserMoved = true
+    saveRestorePos()
+  } else {
+    showPet()
+  }
 }
 
 // ==================== 网关操作 ====================
@@ -1167,6 +1266,7 @@ function togglePetSfx() {
 
 // 切换迷你拓扑图显示
 function togglePetTopo() {
+  hidePetMenu()
   petTopoOn.value = !petTopoOn.value
   try {
     localStorage.setItem(PET_TOPO_KEY, petTopoOn.value ? '1' : '0')
@@ -1292,6 +1392,7 @@ function startPetLoops() {
 
 onMounted(() => {
   initPetPos()
+  initRestorePos()
   try {
     petSfxOn.value = localStorage.getItem(PET_SFX_KEY) !== '0'
   } catch (e) {
@@ -1306,6 +1407,16 @@ onMounted(() => {
   document.addEventListener('pointerdown', onPetDocPointerDown)
   window.addEventListener('resize', onPetResize)
   startPetLoops()
+})
+
+// 未连接（登录界面）时宠物不可见，同步停止/恢复其常驻运算
+watch(() => props.isConnected, (connected) => {
+  if (connected) {
+    startPetLoops()
+  } else {
+    petMenu.value.show = false
+    stopPetLoops()
+  }
 })
 
 onUnmounted(() => {
@@ -2534,8 +2645,6 @@ onUnmounted(() => {
 /* 隐藏后的还原按钮 */
 .pet-restore {
   position: fixed;
-  right: 18px;
-  bottom: 18px;
   z-index: 900;
   width: 40px;
   height: 40px;
@@ -2545,12 +2654,12 @@ onUnmounted(() => {
   border: 1px solid rgba(32, 200, 255, 0.4);
   border-radius: 50%;
   background: rgba(15, 30, 48, 0.9);
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45), 0 0 12px rgba(32, 200, 255, 0.3);
   animation: pet-restore-in 0.25s ease-out;
-  transition: transform 0.18s ease, background 0.18s ease;
+  transition: background 0.18s ease;
 }
-
 .pet-restore:hover {
   transform: scale(1.1);
   background: rgba(32, 200, 255, 0.22);
