@@ -3,17 +3,11 @@
   <div class="pt-mini" :style="{ left: x + 'px', top: y + 'px' }" @click="onOpen" :title="tip">
     <svg class="pt-mini-svg" :width="W" :height="H" :viewBox="`0 0 ${W} ${H}`">
       <defs>
-        <radialGradient id="pt-mini-bg" cx="50%" cy="50%" r="65%">
-          <stop offset="0%" stop-color="rgba(32,200,255,0.16)" />
-          <stop offset="100%" stop-color="rgba(6,12,22,0.92)" />
-        </radialGradient>
         <filter id="pt-mini-glow" x="-60%" y="-60%" width="220%" height="220%">
           <feGaussianBlur stdDeviation="1.6" result="b" />
           <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
         </filter>
       </defs>
-
-      <rect x="0.5" y="0.5" :width="W - 1" :height="H - 1" rx="8" fill="url(#pt-mini-bg)" stroke="rgba(32,200,255,0.28)" />
 
       <!-- 连线：master -> 各节点 -->
       <line

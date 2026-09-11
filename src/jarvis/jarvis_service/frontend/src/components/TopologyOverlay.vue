@@ -277,6 +277,8 @@ const agentLayout = computed(() =>
   layoutAgents(model.value, layout.value, {
     ring: AGENT_RING,
     centerRing: CENTER_AGENT_RING,
+    agentRadius: AGENT_R,
+    labelGap: 16,
     canvas: { width: W, height: H },
     edgePad: AGENT_EDGE_PAD,
   }),

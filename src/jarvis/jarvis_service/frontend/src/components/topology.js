@@ -190,7 +190,8 @@ export function layoutTopology(model, width, height) {
 //   与相邻节点（及其 agent）重叠
 // 每个 agent 附带标签坐标：标签沿径向朝外摆放，避免压住节点本体文字
 // options.ring：子节点 agent 环绕半径；options.centerRing：中心 agent 环绕半径；
-// options.labelGap：标签相对 agent 中心额外外移的距离；
+// options.labelGap：标签相对 agent 图标外沿额外外移的距离；
+// options.agentRadius：agent 图标半径（标签在此基础上再外移 labelGap，避免与图标/天线重叠）；
 // options.minGap：相邻 agent 圆心最小间距（不足时自动放大环半径）；
 // options.canvas：{ width, height }，用于限制环半径不溢出画布；
 // options.edgePad：环外沿到画布边缘的最小预留（agent 半径 + 标签）
@@ -198,6 +199,7 @@ export function layoutAgents(model, nodeLayout, options = {}) {
   const ring = Number(options.ring) || 34;
   const centerRing = Number(options.centerRing) || ring;
   const labelGap = Number(options.labelGap) || 12;
+  const agentRadius = Number(options.agentRadius) || 0;
   const minGap = Number(options.minGap) || 26;
   const canvas = options.canvas || null;
   const edgePad = Number(options.edgePad) || 0;
@@ -216,7 +218,8 @@ export function layoutAgents(model, nodeLayout, options = {}) {
   const push = (agent, nodeId, pos, r, angle) => {
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
-    const labelDist = r + labelGap;
+    // 标签从「agent 图标外沿」再向外偏移 labelGap，避免压住图标与天线
+    const labelDist = r + agentRadius + labelGap;
     placed.push({
       id: agent.id,
       name: agent.name,
