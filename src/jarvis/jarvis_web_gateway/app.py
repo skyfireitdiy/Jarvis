@@ -3365,6 +3365,158 @@ def create_app(
                     close_exc,
                 )
 
+    # HTTP API：在指定节点执行 shell 命令（权限与 terminal 一致）
+    # 注意：必须注册在下方通配路由 /api/node/{node_id}/{path:path} 之前，
+    # 否则通配路由会优先匹配 /exec 并误判为 unsupported node api path。
+    @app.post("/api/node/{node_id}/exec", dependencies=[Depends(verify_token)])
+    async def node_exec(
+        node_id: str, request_body: Dict[str, Any], request: Request
+    ) -> Dict[str, Any]:
+        """在指定节点同步执行一条 shell 命令并返回输出。
+
+        权限控制与 terminal 一致：需要 terminal:create 权限，且对目标节点有访问权。
+        命令在 master 或子节点本地执行，子节点不重复鉴权（信任 master 判定）。
+        """
+        from fastapi import HTTPException
+
+        user_info = getattr(request.state, "user_info", None)
+        if user_info and user_info.get("user_id") != "system" and permission_manager:
+            user_id = user_info["user_id"]
+            if not permission_manager.check_permission(user_id, "terminal:create"):
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "code": "PERMISSION_DENIED",
+                        "message": "Permission denied: terminal:create",
+                    },
+                )
+            check_node_id = node_id or "master"
+            if not permission_manager.check_node_access(user_id, check_node_id):
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "code": "PERMISSION_DENIED",
+                        "message": f"Permission denied: no access to node {check_node_id}",
+                    },
+                )
+
+        command = str(request_body.get("command") or "").strip()
+        if not command:
+            return {
+                "success": False,
+                "error": {
+                    "code": "INVALID_COMMAND",
+                    "message": "command is required",
+                },
+            }
+        interpreter = str(
+            request_body.get("interpreter") or os.environ.get("SHELL") or "bash"
+        ).strip()
+        raw_working_dir = request_body.get("working_dir")
+        working_dir = str(raw_working_dir).strip() if raw_working_dir else ""
+        if not working_dir:
+            working_dir = str(pathlib.Path.home())
+        try:
+            exec_timeout = float(request_body.get("timeout") or 60.0)
+        except (TypeError, ValueError):
+            exec_timeout = 60.0
+
+        try:
+            # 本地节点直接执行
+            if node_id in (node_runtime.local_node_id, "master"):
+                proc = await asyncio.create_subprocess_shell(
+                    command,
+                    shell=True,
+                    executable=interpreter,
+                    cwd=working_dir,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                try:
+                    stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                        proc.communicate(), timeout=exec_timeout
+                    )
+                except asyncio.TimeoutError:
+                    proc.kill()
+                    await proc.wait()
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "TIMEOUT",
+                            "message": f"command timed out after {exec_timeout}s",
+                        },
+                    }
+                return {
+                    "success": True,
+                    "data": {
+                        "node_id": node_id,
+                        "stdout": stdout_bytes.decode("utf-8", "replace"),
+                        "stderr": stderr_bytes.decode("utf-8", "replace"),
+                        "exit_code": proc.returncode,
+                    },
+                }
+
+            # 远程节点状态检查
+            node_info = node_runtime.node_registry.get(node_id)
+            if node_info is None:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "NODE_NOT_FOUND",
+                        "message": f"Node not found: {node_id}",
+                    },
+                }
+            if node_info.status != "online":
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "NODE_OFFLINE",
+                        "message": f"Node is offline: {node_id}",
+                    },
+                }
+
+            # 转发到远程节点执行
+            response = await node_connection_manager.send_request_to_node(
+                node_id,
+                NODE_TERMINAL_REQUEST,
+                {
+                    "action": "exec",
+                    "payload": {
+                        "command": command,
+                        "interpreter": interpreter,
+                        "working_dir": working_dir,
+                        "timeout": exec_timeout,
+                    },
+                },
+                timeout=exec_timeout + 10.0,
+            )
+            payload = response.get("payload") or {}
+            if payload.get("success"):
+                return {
+                    "success": True,
+                    "data": {
+                        "node_id": node_id,
+                        **(payload.get("data") or {}),
+                    },
+                }
+            return {
+                "success": False,
+                "error": payload.get("error")
+                or {"code": "EXEC_FAILED", "message": "command execution failed"},
+            }
+        except Exception as e:
+            error_message = str(e).strip() or f"exec failed for node: {node_id}"
+            logger.error(
+                "[NODE EXEC] failed node_id=%s error=%s",
+                node_id,
+                error_message,
+                exc_info=True,
+            )
+            return {
+                "success": False,
+                "error": {"code": "EXEC_FAILED", "message": error_message},
+            }
+
     @app.api_route(
         "/api/node/{node_id}/{path:path}",
         methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
@@ -4587,156 +4739,6 @@ def create_app(
                     "code": "UPDATE_FAILED",
                     "message": error_message,
                 },
-            }
-
-    # HTTP API：在指定节点执行 shell 命令（权限与 terminal 一致）
-    @app.post("/api/node/{node_id}/exec", dependencies=[Depends(verify_token)])
-    async def node_exec(
-        node_id: str, request_body: Dict[str, Any], request: Request
-    ) -> Dict[str, Any]:
-        """在指定节点同步执行一条 shell 命令并返回输出。
-
-        权限控制与 terminal 一致：需要 terminal:create 权限，且对目标节点有访问权。
-        命令在 master 或子节点本地执行，子节点不重复鉴权（信任 master 判定）。
-        """
-        from fastapi import HTTPException
-
-        user_info = getattr(request.state, "user_info", None)
-        if user_info and user_info.get("user_id") != "system" and permission_manager:
-            user_id = user_info["user_id"]
-            if not permission_manager.check_permission(user_id, "terminal:create"):
-                raise HTTPException(
-                    status_code=403,
-                    detail={
-                        "code": "PERMISSION_DENIED",
-                        "message": "Permission denied: terminal:create",
-                    },
-                )
-            check_node_id = node_id or "master"
-            if not permission_manager.check_node_access(user_id, check_node_id):
-                raise HTTPException(
-                    status_code=403,
-                    detail={
-                        "code": "PERMISSION_DENIED",
-                        "message": f"Permission denied: no access to node {check_node_id}",
-                    },
-                )
-
-        command = str(request_body.get("command") or "").strip()
-        if not command:
-            return {
-                "success": False,
-                "error": {
-                    "code": "INVALID_COMMAND",
-                    "message": "command is required",
-                },
-            }
-        interpreter = str(
-            request_body.get("interpreter") or os.environ.get("SHELL") or "bash"
-        ).strip()
-        raw_working_dir = request_body.get("working_dir")
-        working_dir = str(raw_working_dir).strip() if raw_working_dir else ""
-        if not working_dir:
-            working_dir = str(pathlib.Path.home())
-        try:
-            exec_timeout = float(request_body.get("timeout") or 60.0)
-        except (TypeError, ValueError):
-            exec_timeout = 60.0
-
-        try:
-            # 本地节点直接执行
-            if node_id in (node_runtime.local_node_id, "master"):
-                proc = await asyncio.create_subprocess_shell(
-                    command,
-                    shell=True,
-                    executable=interpreter,
-                    cwd=working_dir,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                try:
-                    stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                        proc.communicate(), timeout=exec_timeout
-                    )
-                except asyncio.TimeoutError:
-                    proc.kill()
-                    await proc.wait()
-                    return {
-                        "success": False,
-                        "error": {
-                            "code": "TIMEOUT",
-                            "message": f"command timed out after {exec_timeout}s",
-                        },
-                    }
-                return {
-                    "success": True,
-                    "data": {
-                        "node_id": node_id,
-                        "stdout": stdout_bytes.decode("utf-8", "replace"),
-                        "stderr": stderr_bytes.decode("utf-8", "replace"),
-                        "exit_code": proc.returncode,
-                    },
-                }
-
-            # 远程节点状态检查
-            node_info = node_runtime.node_registry.get(node_id)
-            if node_info is None:
-                return {
-                    "success": False,
-                    "error": {
-                        "code": "NODE_NOT_FOUND",
-                        "message": f"Node not found: {node_id}",
-                    },
-                }
-            if node_info.status != "online":
-                return {
-                    "success": False,
-                    "error": {
-                        "code": "NODE_OFFLINE",
-                        "message": f"Node is offline: {node_id}",
-                    },
-                }
-
-            # 转发到远程节点执行
-            response = await node_connection_manager.send_request_to_node(
-                node_id,
-                NODE_TERMINAL_REQUEST,
-                {
-                    "action": "exec",
-                    "payload": {
-                        "command": command,
-                        "interpreter": interpreter,
-                        "working_dir": working_dir,
-                        "timeout": exec_timeout,
-                    },
-                },
-                timeout=exec_timeout + 10.0,
-            )
-            payload = response.get("payload") or {}
-            if payload.get("success"):
-                return {
-                    "success": True,
-                    "data": {
-                        "node_id": node_id,
-                        **(payload.get("data") or {}),
-                    },
-                }
-            return {
-                "success": False,
-                "error": payload.get("error")
-                or {"code": "EXEC_FAILED", "message": "command execution failed"},
-            }
-        except Exception as e:
-            error_message = str(e).strip() or f"exec failed for node: {node_id}"
-            logger.error(
-                "[NODE EXEC] failed node_id=%s error=%s",
-                node_id,
-                error_message,
-                exc_info=True,
-            )
-            return {
-                "success": False,
-                "error": {"code": "EXEC_FAILED", "message": error_message},
             }
 
     # HTTP API：创建 Agent（需要认证）
