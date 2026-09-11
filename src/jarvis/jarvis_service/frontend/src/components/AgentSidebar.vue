@@ -55,13 +55,7 @@
                 <span class="agent-meta-tag" v-if="agent.worktree">🌿</span>
                 <span class="agent-meta-tag" v-if="agent.quick_mode">⚡</span>
               </div>
-              <div class="agent-item-actions">
-                <button class="icon-btn-small" @click.stop="$emit('renameAgent', agent)" title="重命名">✏</button>
-                <button class="icon-btn-small" @click.stop="$emit('copyAgent', agent)" title="复制 Agent">📋</button>
-                <button v-if="agent.owner_id === currentUserId" class="icon-btn-small" @click.stop="$emit('editAccess', agent)" title="权限管理">🔒</button>
-                <button v-if="agent.owner_id === currentUserId" class="icon-btn-small" @click.stop="$emit('regenerateAgent', agent)" title="无损重生">🔄</button>
-                <button class="icon-btn-small stop-btn" @click.stop="$emit('deleteAgent', agent.agent_id)" title="删除 Agent">🗑</button>
-              </div>
+              <!-- 列表项操作按钮（重命名/复制/权限/重生/删除）已移至 Ctrl+P 命令面板，此处不再显示 -->
             </div>
           </div>
         </div>
@@ -89,13 +83,7 @@
               <span class="agent-meta-tag" v-if="agent.worktree">🌿</span>
               <span class="agent-meta-tag" v-if="agent.quick_mode">⚡</span>
             </div>
-            <div class="agent-item-actions">
-              <button class="icon-btn-small" @click.stop="$emit('renameAgent', agent)" title="重命名">✏</button>
-              <button class="icon-btn-small" @click.stop="$emit('copyAgent', agent)" title="复制 Agent">📋</button>
-              <button v-if="agent.owner_id === currentUserId" class="icon-btn-small" @click.stop="$emit('editAccess', agent)" title="权限管理">🔒</button>
-              <button v-if="agent.owner_id === currentUserId" class="icon-btn-small" @click.stop="$emit('regenerateAgent', agent)" title="无损重生">🔄</button>
-              <button class="icon-btn-small stop-btn" @click.stop="$emit('deleteAgent', agent.agent_id)" title="删除 Agent">🗑</button>
-            </div>
+            <!-- 列表项操作按钮（重命名/复制/权限/重生/删除）已移至 Ctrl+P 命令面板，此处不再显示 -->
           </div>
         </template>
       </template>
@@ -2638,15 +2626,6 @@ defineExpose({
   line-height: 1.3;
   flex: 1;
   min-width: 0;
-}
-
-.agent-item-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 2px;
-  margin-top: 4px;
-  justify-content: flex-end;
 }
 
 .agent-actions {
