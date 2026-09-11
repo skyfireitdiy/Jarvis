@@ -490,6 +490,7 @@ watch(() => props.currentAgentId, (newAgentId) => {
 const PET_POS_KEY = 'jarvis_pet_pos'
 const PET_TOPO_KEY = 'jarvis_pet_topo'
 const PET_RESTORE_POS_KEY = 'jarvis_pet_restore_pos'
+const PET_HIDDEN_KEY = 'jarvis_pet_hidden'
 const PET_W = 200
 const PET_H = 230
 const RESTORE_W = 40
@@ -1028,6 +1029,7 @@ function petHide() {
     restorePos.value = clampRestorePos(petPos.value.x, petPos.value.y)
   }
   petHidden.value = true
+  try { localStorage.setItem(PET_HIDDEN_KEY, '1') } catch (e) {}
   clearTimeout(petHideTimer)
   stopPetLoops()
 }
@@ -1035,6 +1037,7 @@ function petHide() {
 function showPet() {
   clearTimeout(petHideTimer)
   petHidden.value = false
+  try { localStorage.setItem(PET_HIDDEN_KEY, '0') } catch (e) {}
   startPetLoops()
   petSfxChirp()
 }
@@ -1402,6 +1405,11 @@ onMounted(() => {
     petTopoOn.value = localStorage.getItem(PET_TOPO_KEY) !== '0'
   } catch (e) {
     petTopoOn.value = true
+  }
+  try {
+    petHidden.value = localStorage.getItem(PET_HIDDEN_KEY) === '1'
+  } catch (e) {
+    petHidden.value = false
   }
   document.addEventListener('mousemove', onPetMouseMove)
   document.addEventListener('pointerdown', onPetDocPointerDown)
