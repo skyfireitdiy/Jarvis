@@ -5319,12 +5319,12 @@ const showCommandPalette = ref(false)
 const showTopologyOverlay = ref(false) // 网络拓扑大图浮层
 
 // 命令面板关闭后，若没有其它弹窗接管焦点，则把焦点交还给当前 Agent 的输入框
-function focusCurrentPanelInput() {
+function focusCurrentPanelInput(force = false) {
   const panel = getCurrentPanel()
   if (!panel || !panel.agentId) return
   const sessionPanel = sessionPanelRefs.get(panel.id)
   if (sessionPanel?.focusInput) {
-    sessionPanel.focusInput()
+    sessionPanel.focusInput(force)
   }
 }
 
@@ -11639,6 +11639,14 @@ function handleGlobalKeydown(event) {
     return
   }
 
+  // Ctrl/Cmd + 左/右方向键：在打开的 Panel 之间循环切换激活 Panel
+  if (event.ctrlKey && !event.altKey && !event.shiftKey && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+    event.preventDefault()
+    showCommandPalette.value = false
+    cycleActivePanel(event.key === 'ArrowRight' ? 1 : -1)
+    return
+  }
+
   // Ctrl/Cmd + S 保存当前编辑器标签
   if (isModifierPressed && event.key === 's') {
     if (showEditorPanel.value && activeEditorTab.value && !activeEditorTab.value.loading) {
@@ -11734,6 +11742,21 @@ function handleGlobalKeydown(event) {
       showTerminalPanel.value = false
     }
   }
+}
+
+// 在当前打开的 Panel 之间循环切换激活 Panel（按方向循环）
+function cycleActivePanel(step) {
+  const list = panels.value
+  if (list.length < 2) return
+  const currentIndex = list.findIndex(p => p.id === activePanelId.value)
+  const baseIndex = currentIndex === -1 ? 0 : currentIndex
+  const nextIndex = (baseIndex + step + list.length) % list.length
+  activatePanel(list[nextIndex].id)
+  // 切换后把焦点交还给新激活 Panel 的输入框（force：即使焦点仍在旧输入框也要切换）
+  nextTick(() => {
+    if (isAnyModalOpen()) return
+    focusCurrentPanelInput(true)
+  })
 }
 
 // 移动端历史管理变量

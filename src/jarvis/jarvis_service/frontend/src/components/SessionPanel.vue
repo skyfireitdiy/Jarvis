@@ -270,12 +270,13 @@ function hasVisibleModalOverlay() {
 }
 
 // 聚焦输入框
-function focusInput() {
+// force=true 时用于显式切换焦点（如切换 Panel），跳过“用户正在其他输入框”这一保护
+function focusInput(force = false) {
   inputCollapsed.value = false
-  if (!canStealFocus()) return
+  if (!force && !canStealFocus()) return
   // 等待 DOM 更新后再聚焦
   setTimeout(() => {
-    if (!canStealFocus()) return
+    if (!force && !canStealFocus()) return
     const el = props.inputMode === 'multi' ? multiInputRef.value : singleInputRef.value
     if (el) {
       el.focus()
