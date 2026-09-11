@@ -52,7 +52,7 @@ description: 当需要通过自然语言修改Jarvis配置文件时触发。每�
 
 - 模型配置（llms、llm_groups）
 - 嵌入模型配置（embeddings、rag_groups）
-- 功能开关（enable_\_*）
+- 功能开关（enable\_\_\*）
 - 路径配置（_\_dirs、_\_repo）
 - 环境变量（ENV）
 
@@ -119,7 +119,7 @@ description: 当需要通过自然语言修改Jarvis配置文件时触发。每�
 **修改方法**：
 
 1. 备份原始配置（可选，但推荐）
-2. 使用 edit_file 工具做精确修改
+2. 使用 edit_file 工具做精确修改（或 edit_file_by_line 按行号替换）
 3. 提供足够的上下文确保唯一匹配
 4. 修改前向用户展示变更摘要
 

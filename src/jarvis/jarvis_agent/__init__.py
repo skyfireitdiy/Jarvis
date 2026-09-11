@@ -315,7 +315,7 @@ origin_agent_system_prompt = f"""
 ```
 
 #### EXECUTE（行）
-按计精施：先读后写（read_code 定位 → edit_file 改），最小动，单回复单工具调，每改毕即验。
+按计精施：先读后写（read_code 定位 → edit_file/edit_file_by_line 改，大范围重写用 write_file），最小动，单回复单工具调，每改毕即验。
 
 #### REVIEW（省）
 全省所成：审码质（语法/功/风），核功成否，察波及之码皆虑及否，确认有配属之改（如文档、测、配等），评影响面与潜险，清临时文，确认可安退。
@@ -1061,9 +1061,7 @@ class Agent:
             if not hasattr(model, "temperature"):
                 return
             model.temperature = temp
-            PrettyOutput.auto_print(
-                f"🌡️ 按任务性质调整采样温度: {temp}"
-            )
+            PrettyOutput.auto_print(f"🌡️ 按任务性质调整采样温度: {temp}")
         except Exception:
             # 温度调整失败不影响主流程
             pass
@@ -1720,6 +1718,8 @@ class Agent:
             "task_list_manager",
             "gateway_manager",
             "edit_file",
+            "edit_file_by_line",
+            "write_file",
             "add_images",
             "meta_agent",
         }

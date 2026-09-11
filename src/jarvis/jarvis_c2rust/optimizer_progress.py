@@ -399,6 +399,8 @@ class ProgressManager:
             # 只关注可能修改代码的工具
             edit_tools = {
                 "edit_file",
+                "edit_file_by_line",
+                "write_file",
                 "apply_patch",
             }
             if last_tool not in edit_tools:
