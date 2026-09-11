@@ -1155,7 +1155,7 @@
       @close="showTopologyOverlay = false"
     />
 
-    <!-- 命令面板（Ctrl+K） -->
+    <!-- 命令面板（Ctrl+P） -->
     <CommandPalette
       :visible="showCommandPalette"
       :actions="appActions"
@@ -4381,7 +4381,9 @@ function handlePanelKeydown(panel, event) {
   }
 
   // 向上箭头：检查是否在第一行，是才触发历史
+  // 带 Ctrl/Alt/Meta 修饰键时交由全局快捷键处理，不做历史导航
   if (event.key === 'ArrowUp') {
+    if (event.ctrlKey || event.altKey || event.metaKey) return
     const textarea = event.target
     if (isCursorAtFirstLine(textarea)) {
       event.preventDefault()
@@ -4392,6 +4394,7 @@ function handlePanelKeydown(panel, event) {
 
   // 向下箭头：检查是否在最后一行，是才触发历史
   if (event.key === 'ArrowDown') {
+    if (event.ctrlKey || event.altKey || event.metaKey) return
     const textarea = event.target
     if (isCursorAtLastLine(textarea)) {
       event.preventDefault()
@@ -4958,9 +4961,13 @@ function openTopologyOverlay() {
   showTopologyOverlay.value = true
 }
 
+// 打开命令面板时，记录"打开前"焦点所在的面板区域
+// （命令面板会抢走焦点，导致执行关闭/分离时无法从活动元素推断目标）
+let commandPaletteFocusKey = null
 // 打开命令面板（双击宠物触发）
 function openCommandPalette() {
   if (showConnectModal.value) return
+  commandPaletteFocusKey = getFocusedZoneKey()
   showCommandPalette.value = true
 }
 
@@ -5022,6 +5029,61 @@ function interruptCurrentAgent() {
   }
 }
 
+// 判断某个焦点区域 key 当前是否有效（面板仍存在/可见）
+function isFocusKeyAvailable(key) {
+  if (!key) return false
+  if (key === 'terminal') return !!(showTerminalPanel.value && !terminalDetached.value && document.querySelector('.terminal-panel'))
+  if (key === 'editor') return !!(showEditorPanel.value && !editorDetached.value && document.querySelector('.editor-panel'))
+  if (key === 'chat') return !!(showChatPanel.value && !chatDetached.value && document.querySelector('.chat-panel'))
+  if (key.startsWith('session:')) {
+    const panelId = key.slice('session:'.length)
+    return panels.value.some(p => p.id === panelId && p.agentId)
+  }
+  return false
+}
+
+// 当前焦点所处面板的 key（session:<id> / terminal / editor / chat）
+// 命令面板打开时会抢走焦点，此时优先用"打开前"记录的快照（且该面板须仍有效）；
+// 否则依据真实 DOM 焦点，最后回退到当前激活 Panel
+function getFocusedPanelKey() {
+  if (showCommandPalette.value && isFocusKeyAvailable(commandPaletteFocusKey)) {
+    return commandPaletteFocusKey
+  }
+  const focusedKey = getFocusedZoneKey()
+  if (focusedKey) return focusedKey
+  if (isFocusKeyAvailable(commandPaletteFocusKey)) return commandPaletteFocusKey
+  const panel = getCurrentPanel()
+  if (panel && panel.agentId) return `session:${panel.id}`
+  return null
+}
+// 关闭当前焦点所在的面板（会话/终端/编辑器/聊天）
+function closeFocusedPanel() {
+  const key = getFocusedPanelKey()
+  if (!key) return
+  if (key === 'terminal') {
+    showTerminalPanel.value = false
+  } else if (key === 'editor') {
+    showEditorPanel.value = false
+  } else if (key === 'chat') {
+    showChatPanel.value = false
+  } else if (key.startsWith('session:')) {
+    closePanel(key.slice('session:'.length))
+  }
+}
+// 分离/停靠当前焦点所在的面板
+function detachFocusedPanel() {
+  const key = getFocusedPanelKey()
+  if (!key) return
+  if (key === 'terminal') {
+    detachPanel('terminal')
+  } else if (key === 'editor') {
+    detachPanel('editor')
+  } else if (key === 'chat') {
+    detachPanel('chat')
+  } else if (key.startsWith('session:')) {
+    detachPanel('session', key.slice('session:'.length))
+  }
+}
 // 命令面板上下文：统一暴露宠物菜单与命令面板共用的动作回调
 const commandPaletteCtx = computed(() => ({
   currentAgentId: commandPaletteCurrentAgentId.value,
@@ -5057,6 +5119,9 @@ const commandPaletteCtx = computed(() => ({
   editCurrentAgentAccess: () => { const a = getCurrentAgentOrNull(); if (a) editAgentAccess(a) },
   regenerateCurrentAgent: () => { const a = getCurrentAgentOrNull(); if (a) regenerateAgent(a) },
   deleteCurrentAgent: () => { const a = getCurrentAgentOrNull(); if (a) deleteAgent(a.agent_id) },
+  // 当前焦点面板：分离 / 关闭（面板头部图标保留不变）
+  detachFocusedPanel,
+  closeFocusedPanel,
   // 侧边栏中「权限管理」「无损重生」仅对 Agent 属主可见，这里保持一致
   isCurrentAgentOwner: (() => {
     const a = getCurrentAgentOrNull()
@@ -5314,7 +5379,7 @@ const selectedIndex = ref(-1) // 当前选中的补全条目索引，-1 表示�
 // 流式消息跟踪
 const streamingMessages = ref(new Map()) // 按 agent_id 跟踪当前流式消息
 
-// 命令面板（Ctrl+K）
+// 命令面板（Ctrl+P）
 const showCommandPalette = ref(false)
 const showTopologyOverlay = ref(false) // 网络拓扑大图浮层
 
@@ -6462,7 +6527,10 @@ function handleDirSearchKeydown(event) {
     event.preventDefault()
     return
   }
-  
+
+  // 带 Ctrl/Alt/Meta 修饰键时交由全局快捷键处理，不做列表导航
+  if (event.ctrlKey || event.altKey || event.metaKey) return
+
   if (event.key === 'ArrowDown') {
     // 向下键：选择下一个目录
     if (selectedDirIndex.value < maxIndex) {
@@ -6897,6 +6965,9 @@ function handleCompletionKeydown(event) {
     event.preventDefault()
     return
   }
+
+  // 带 Ctrl/Alt/Meta 修饰键时交由全局快捷键处理，不做列表导航
+  if (event.ctrlKey || event.altKey || event.metaKey) return
 
   if (event.key === 'ArrowDown') {
     // 向下键：选择下一个条目
@@ -11631,19 +11702,26 @@ function sendTerminalResize(terminalId, rows, cols) {
 function handleGlobalKeydown(event) {
   const isModifierPressed = event.ctrlKey || event.metaKey
 
-  // Ctrl/Cmd + K 打开/关闭命令面板（登录界面不响应）
-  if (isModifierPressed && event.code === 'KeyK') {
+  // Ctrl/Cmd + P 打开/关闭命令面板（登录界面不响应）
+  if (isModifierPressed && event.code === 'KeyP') {
     if (showConnectModal.value) return
     event.preventDefault()
+    if (!showCommandPalette.value) {
+      // 打开前记录焦点所在区域，供"关闭/分离当前焦点面板"使用
+      commandPaletteFocusKey = getFocusedZoneKey()
+    }
     showCommandPalette.value = !showCommandPalette.value
     return
   }
 
-  // Ctrl/Cmd + 左/右方向键：在打开的 Panel 之间循环切换激活 Panel
-  if (event.ctrlKey && !event.altKey && !event.shiftKey && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+  // Ctrl/Cmd + Alt + 方向键：依据当前布局，向对应方向切换到最近的焦点区域（Session Panel / 集成终端 / 编辑器）
+  // 使用 Ctrl+Alt 组合，避免与输入框/其它控件的方向键行为冲突
+  if (event.ctrlKey && event.altKey && !event.shiftKey &&
+      (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
     event.preventDefault()
     showCommandPalette.value = false
-    cycleActivePanel(event.key === 'ArrowRight' ? 1 : -1)
+    const dirMap = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' }
+    moveFocusInDirection(dirMap[event.key])
     return
   }
 
@@ -11744,21 +11822,233 @@ function handleGlobalKeydown(event) {
   }
 }
 
-// 在当前打开的 Panel 之间循环切换激活 Panel（按方向循环）
-function cycleActivePanel(step) {
-  const list = panels.value
-  if (list.length < 2) return
-  const currentIndex = list.findIndex(p => p.id === activePanelId.value)
-  const baseIndex = currentIndex === -1 ? 0 : currentIndex
-  const nextIndex = (baseIndex + step + list.length) % list.length
-  activatePanel(list[nextIndex].id)
-  // 切换后把焦点交还给新激活 Panel 的输入框（force：即使焦点仍在旧输入框也要切换）
-  nextTick(() => {
-    if (isAnyModalOpen()) return
-    focusCurrentPanelInput(true)
-  })
+
+// 聚焦集成终端内的活动终端
+function focusActiveTerminal() {
+  const session = terminalSessions.value.find(s => s.terminal_id === activeTerminalId.value)
+    || terminalSessions.value[0]
+  if (session?.terminal) {
+    session.terminal.focus()
+    return true
+  }
+  return false
 }
 
+// 区域容器兜底聚焦：当区域内部没有可聚焦元素时（如空终端/空编辑器），
+// 让焦点落到区域容器上，保证方向键导航有落地反馈、且后续导航起点正确
+function focusZoneContainer(el) {
+  if (!el) return
+  if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '-1')
+  if (typeof el.focus === 'function') el.focus({ preventScroll: true })
+}
+
+// 是否是真正可聚焦的元素（排除 disabled / 不可见）
+function isFocusableTarget(el) {
+  if (!el || typeof el.focus !== 'function') return false
+  if (el.disabled) return false
+  if (el.hasAttribute && el.hasAttribute('disabled')) return false
+  return true
+}
+
+// 在区域内查找首个可聚焦元素并聚焦；找不到则回退聚焦容器
+function focusFirstIn(el, selector) {
+  if (!el) return
+  const defaultSel = 'textarea, input, [contenteditable="true"], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  const list = selector ? el.querySelectorAll(`${selector}:not([disabled])`) : el.querySelectorAll(defaultSel)
+  for (const target of list) {
+    if (isFocusableTarget(target)) {
+      target.focus({ preventScroll: true })
+      return
+    }
+  }
+  focusZoneContainer(el)
+}
+
+// 构建可聚焦区域列表（仅当前可见项），并附上其屏幕矩形用于几何导航
+// 顺序：各 Session Panel → 集成终端 → 编辑器 → 聊天室
+function getFocusZones() {
+  const zones = []
+  for (const panel of panels.value) {
+    if (!panel.agentId) continue
+    zones.push({
+      key: `session:${panel.id}`,
+      kind: 'session',
+      focus: () => {
+        activatePanel(panel.id)
+        nextTick(() => {
+          if (isAnyModalOpen()) return
+          focusCurrentPanelInput(true)
+        })
+      },
+    })
+  }
+  if (showTerminalPanel.value && !terminalDetached.value) {
+    zones.push({
+      key: 'terminal',
+      kind: 'terminal',
+      focus: () => {
+        focusWindow('terminal')
+        nextTick(() => {
+          if (focusActiveTerminal()) return
+          // 无活跃终端时，回退聚焦终端内首个可聚焦控件（如"新建终端"按钮），
+          // 避免聚焦到不可交互的容器后被框架重置焦点
+          focusFirstIn(document.querySelector('.terminal-panel'))
+        })
+      },
+    })
+  }
+  if (showEditorPanel.value && !editorDetached.value) {
+    zones.push({
+      key: 'editor',
+      kind: 'editor',
+      focus: () => {
+        focusWindow('editor')
+        nextTick(() => {
+          if (cmEditorView) {
+            cmEditorView.focus()
+            return
+          }
+          // 无编辑器内容时，回退聚焦编辑器内首个可聚焦控件（如活动栏按钮），
+          // 避免聚焦到不可交互的容器后被框架重置焦点
+          focusFirstIn(document.querySelector('.editor-panel'))
+        })
+      },
+    })
+  }
+  if (showChatPanel.value && !chatDetached.value) {
+    zones.push({
+      key: 'chat',
+      kind: 'chat',
+      focus: () => {
+        focusWindow('chat')
+        nextTick(() => {
+          focusFirstIn(document.querySelector('.chat-panel'), '.chat-input')
+        })
+      },
+    })
+  }
+  return zones
+}
+
+// 根据真实 DOM 焦点推断当前所处区域 key（比 activeWindow 更可靠：
+// activeWindow 仅在显式调用 focusWindow 时更新，用户点击面板输入框时不会同步）
+function getFocusedZoneKey() {
+  const el = document.activeElement
+  if (!el) return null
+  const termEl = document.querySelector('.terminal-panel')
+  if (termEl && termEl.contains(el)) return 'terminal'
+  const editorEl = document.querySelector('.editor-panel')
+  if (editorEl && editorEl.contains(el)) return 'editor'
+  const chatEl = document.querySelector('.chat-panel')
+  if (chatEl && chatEl.contains(el)) return 'chat'
+  for (const panel of panels.value) {
+    if (!panel.agentId) continue
+    const root = sessionPanelRefs.get(panel.id)?.$el
+    if (root && root.contains(el)) return `session:${panel.id}`
+  }
+  return null
+}
+
+// 当前所处的焦点区域 key（用于几何导航定位起点）
+function getActiveFocusZoneKey() {
+  // 优先依据真实焦点位置
+  const focusedKey = getFocusedZoneKey()
+  if (focusedKey) return focusedKey
+  // 回退：依据显式记录的当前窗口
+  if (activeWindow.value === 'terminal' && showTerminalPanel.value && !terminalDetached.value) {
+    return 'terminal'
+  }
+  if (activeWindow.value === 'editor' && showEditorPanel.value && !editorDetached.value) {
+    return 'editor'
+  }
+  if (activeWindow.value === 'chat' && showChatPanel.value && !chatDetached.value) {
+    return 'chat'
+  }
+  const panel = getCurrentPanel()
+  if (panel && panel.agentId) return `session:${panel.id}`
+  return null
+}
+
+// 取焦点区域的屏幕矩形；不可见/无 DOM 时返回 null
+function getFocusZoneRect(zone) {
+  if (!zone) return null
+  let el = null
+  if (zone.kind === 'session') {
+    const panelId = zone.key.slice('session:'.length)
+    el = sessionPanelRefs.get(panelId)?.$el || null
+  } else if (zone.kind === 'terminal') {
+    el = document.querySelector('.terminal-panel')
+  } else if (zone.kind === 'editor') {
+    el = document.querySelector('.editor-panel')
+  } else if (zone.kind === 'chat') {
+    el = document.querySelector('.chat-panel')
+  }
+  if (!el || typeof el.getBoundingClientRect !== 'function') return null
+  const rect = el.getBoundingClientRect()
+  if (rect.width <= 0 && rect.height <= 0) return null
+  return rect
+}
+
+// 判断候选区域相对当前区域是否位于给定方向，并返回排序打分（越小越优先）
+// dir: 'left' | 'right' | 'up' | 'down'
+function scoreFocusZoneByDirection(curRect, candRect, dir) {
+  const curCenterX = curRect.left + curRect.width / 2
+  const curCenterY = curRect.top + curRect.height / 2
+  const candCenterX = candRect.left + candRect.width / 2
+  const candCenterY = candRect.top + candRect.height / 2
+
+  if (dir === 'left') {
+    if (candCenterX >= curCenterX) return null
+    const primary = curRect.left - candRect.right
+    // 垂直方向中心线位移越小越优先
+    const secondary = Math.abs(candCenterY - curCenterY)
+    return primary * 1000 + secondary
+  }
+  if (dir === 'right') {
+    if (candCenterX <= curCenterX) return null
+    const primary = candRect.left - curRect.right
+    const secondary = Math.abs(candCenterY - curCenterY)
+    return primary * 1000 + secondary
+  }
+  if (dir === 'up') {
+    if (candCenterY >= curCenterY) return null
+    const primary = curRect.top - candRect.bottom
+    const secondary = Math.abs(candCenterX - curCenterX)
+    return primary * 1000 + secondary
+  }
+  if (dir === 'down') {
+    if (candCenterY <= curCenterY) return null
+    const primary = candRect.top - curRect.bottom
+    const secondary = Math.abs(candCenterX - curCenterX)
+    return primary * 1000 + secondary
+  }
+  return null
+}
+
+// 按几何布局在可聚焦区域之间移动：根据当前区域矩形，选择该方向上最贴近的区域
+function moveFocusInDirection(dir) {
+  const zones = getFocusZones()
+  if (zones.length === 0) return
+  const activeKey = getActiveFocusZoneKey()
+  const currentZone = zones.find(z => z.key === activeKey)
+  const curRect = getFocusZoneRect(currentZone)
+  if (!curRect) return
+
+  let bestZone = null
+  let bestScore = Infinity
+  for (const zone of zones) {
+    if (zone.key === activeKey) continue
+    const candRect = getFocusZoneRect(zone)
+    if (!candRect) continue
+    const score = scoreFocusZoneByDirection(curRect, candRect, dir)
+    if (score === null) continue
+    if (score < bestScore) {
+      bestScore = score
+      bestZone = zone
+    }
+  }
+  if (bestZone) bestZone.focus()
+}
 // 移动端历史管理变量
 let historyStateCount = 0
 

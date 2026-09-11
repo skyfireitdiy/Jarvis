@@ -13,7 +13,7 @@
       <div class="session-panel-header" @mousedown="!embedded && $emit('startMove', $event)">
         <span class="session-agent-name">{{ agent.name || agent.agent_id }}</span>
         <span class="session-agent-status" :class="getStatusClass(agent)">{{ getStatusLabel(agent) }}</span>
-        <!-- 操作图标已迁移至 Ctrl+K 命令面板「当前 Agent」组 -->
+        <!-- 操作图标已迁移至 Ctrl+P 命令面板「当前 Agent」组 -->
         <div class="session-header-actions">
           <button class="session-close-panel-btn" @click.stop="$emit('detach')" :title="embedded ? '分离为浮动窗口' : '嵌入回主界面'">⧉</button>
           <button class="session-close-panel-btn" @click.stop="$emit('close-panel')" title="关闭面板">✕</button>
@@ -253,6 +253,11 @@ function canStealFocus() {
   const tagName = String(active.tagName || '').toLowerCase()
   // 用户正在其他输入控件（input/textarea/contenteditable）中操作，不抢焦点
   if (tagName === 'input' || tagName === 'textarea' || active.isContentEditable) return false
+  // 焦点在其它面板区域（会话面板/终端/编辑器/聊天室）内时，说明用户已主动把焦点放到该区域，
+  // 轮询刷新状态不应把焦点抢回输入框（否则方向键导航会被立刻打断）
+  const otherPanel = active.closest && active.closest('.session-panel, .terminal-panel, .editor-panel, .chat-panel')
+  const selfPanel = currentEl && currentEl.closest ? currentEl.closest('.session-panel') : null
+  if (otherPanel && otherPanel !== selfPanel) return false
   return true
 }
 

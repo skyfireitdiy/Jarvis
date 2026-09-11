@@ -222,6 +222,8 @@ function onInputBlur() {
 }
 
 function onInputKeydown(event) {
+  // 带 Ctrl/Alt/Meta 修饰键时交由全局快捷键处理，不做列表导航
+  if (event.ctrlKey || event.altKey || event.metaKey) return
   if (event.key === 'ArrowDown') {
     event.preventDefault()
     move(1)
