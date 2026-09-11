@@ -13,6 +13,7 @@
             autocomplete="off"
             spellcheck="false"
             @keydown="onInputKeydown"
+            @blur="onInputBlur"
           />
           <span class="cmd-esc-hint">Esc</span>
         </div>
@@ -51,7 +52,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { filterActions, groupActions } from '../actions/registry.js'
 
 const props = defineProps({
@@ -130,6 +131,33 @@ function run(action) {
 function close() {
   emit('update:visible', false)
   emit('close')
+}
+
+// 全局 Escape：无论焦点在输入框还是面板其它位置，一次 Esc 即关闭。
+// 使用 window 捕获阶段，确保先于其它 keydown 处理，且不受 overlay @keydown.stop 影响。
+function handleGlobalEscape(event) {
+  if (!props.visible) return
+  if (event.key === 'Escape' || event.code === 'Escape' || event.keyCode === 27) {
+    event.preventDefault()
+    event.stopPropagation()
+    close()
+  }
+}
+
+onMounted(() => window.addEventListener('keydown', handleGlobalEscape, true))
+onBeforeUnmount(() => window.removeEventListener('keydown', handleGlobalEscape, true))
+
+// 输入框失焦：某些输入法/浏览器在输入框聚焦时按 Esc 不会派发 keydown，
+// 只触发 blur（用户表现为“第一次 Esc 焦点消失”）。因此在焦点真正离开面板时关闭，
+// 确保一次 Esc 即关闭。延迟到事件循环末检查，避免点击面板内选项时误关。
+function onInputBlur() {
+  setTimeout(() => {
+    if (!props.visible) return
+    const overlay = document.querySelector('.cmd-overlay')
+    const active = document.activeElement
+    if (overlay && active && overlay.contains(active)) return
+    close()
+  }, 0)
 }
 
 function onInputKeydown(event) {

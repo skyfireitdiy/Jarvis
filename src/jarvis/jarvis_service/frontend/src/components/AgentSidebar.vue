@@ -192,35 +192,10 @@
           @pointermove="onPetPointerMove"
           @pointerup="onPetPointerUp"
           @pointercancel="onPetPointerUp"
-          @contextmenu.prevent="onPetContextMenu"
           @mouseenter="petHover = true"
           @mouseleave="petHover = false"
         ></div>
       </div>
-    </div>
-
-    <!-- 右键菜单 -->
-    <div
-      v-if="petVisible && petMenu.show"
-      class="pet-menu"
-      :style="{ left: petMenu.x + 'px', top: petMenu.y + 'px' }"
-      @pointerdown.stop
-      @contextmenu.prevent
-    >
-      <div class="pet-menu-item" @click="petFeed"><span class="pet-menu-ico">🍖</span>喂食</div>
-      <div class="pet-menu-item" @click="petPlayBall"><span class="pet-menu-ico">🎾</span>玩球</div>
-      <div class="pet-menu-item" @click="togglePetSleep"><span class="pet-menu-ico">{{ petSleep ? '☀️' : '💤' }}</span>{{ petSleep ? '唤醒' : '打盹' }}</div>
-      <div class="pet-menu-item" @click="petSing"><span class="pet-menu-ico">🎵</span>唱歌</div>
-      <div class="pet-menu-sep"></div>
-      <div class="pet-menu-item" :class="{ 'is-disabled': !currentAgentId }" @click="petInterrupt"><span class="pet-menu-ico">⏹</span>中断当前</div>
-      <div class="pet-menu-item" :class="{ 'is-disabled': petWaitingAgents.length === 0 }" @click="petGotoWaiting"><span class="pet-menu-ico">🚨</span>奔赴等待</div>
-      <div class="pet-menu-item" @click="petSyncStatus"><span class="pet-menu-ico">🔄</span>同步状态</div>
-      <div class="pet-menu-item" @click="petOpenTopology"><span class="pet-menu-ico">🗺️</span>网络拓扑</div>
-      <div class="pet-menu-item" @click="togglePetTopo"><span class="pet-menu-ico">{{ petTopoOn ? '👁️' : '🙈' }}</span>{{ petTopoOn ? '隐藏迷你拓扑' : '显示迷你拓扑' }}</div>
-      <div class="pet-menu-item" @click="petToggleSidebar"><span class="pet-menu-ico">📋</span>切换侧栏</div>
-      <div class="pet-menu-item" @click="petCollapseAll"><span class="pet-menu-ico">📁</span>折叠分组</div>
-      <div class="pet-menu-sep"></div>
-      <div class="pet-menu-item" @click="petHide"><span class="pet-menu-ico">👻</span>隐藏宠物</div>
     </div>
 
     <!-- 宠物旁的迷你网络拓扑 -->
@@ -439,6 +414,7 @@ const emit = defineEmits([
   'petGotoWaiting',
   'petToggleSidebar',
   'petOpenTopology',
+  'petOpenCommandPalette',
 ])
 
 // 监听 agentStatuses 变化，当 agent 状态从等待输入变为非等待输入时清除点击标记
@@ -521,7 +497,6 @@ const petPetting = ref(false)    // 摸头中
 const petHidden = ref(false)     // 已隐藏
 const petWalking = ref(false)    // 随机漫步中
 const petSpeech = ref('')        // 随机台词
-const petMenu = ref({ show: false, x: 0, y: 0 })  // 右键菜单
 const petTopoOn = ref(true)      // 是否显示迷你拓扑图
 
 // 头顶数字法环：一圈 0/1 灵符，玄幻风格，随状态联动
@@ -799,7 +774,6 @@ function onPetPointerDown(e) {
   petOriginY = petPos.value.y
   e.target.setPointerCapture?.(e.pointerId)
   e.preventDefault()
-  hidePetMenu()
   // 长按判定：600ms 未移动则触发摸头
   clearTimeout(petLongPressTimer)
   petLongPressTimer = window.setTimeout(() => {
@@ -873,7 +847,7 @@ function onPetSingleClick(x, y) {
   showPetSpeech()
 }
 
-// 双击：撒花庆祝
+// 双击：撒花庆祝，并唤起命令面板
 function onPetDoubleClick(x, y) {
   if (petSleep.value) petSleep.value = false
   petJump.value = true
@@ -884,6 +858,7 @@ function onPetDoubleClick(x, y) {
   spawnPetFx(x, y)
   petSfxCheer()
   showPetSpeech()
+  emit('petOpenCommandPalette')
 }
 
 // 随机台词气泡：显示 2s
@@ -945,42 +920,9 @@ function spawnPetHearts() {
   }
 }
 
-// ==================== 右键菜单 ====================
-function onPetContextMenu(e) {
-  const MENU_W = 148
-  const MENU_H = 330
-  const MARGIN = 8
-  // 先显示再测量，确保首次右键也能按真实尺寸做边界收敛
-  petMenu.value = { show: true, x: e.clientX, y: e.clientY }
-  requestAnimationFrame(() => {
-    const menuEl = document.querySelector('.pet-menu')
-    const menuW = menuEl ? menuEl.offsetWidth : MENU_W
-    const menuH = menuEl ? menuEl.offsetHeight : MENU_H
-    const maxX = Math.max(MARGIN, window.innerWidth - menuW - MARGIN)
-    const maxY = Math.max(MARGIN, window.innerHeight - menuH - MARGIN)
-    petMenu.value = {
-      show: true,
-      x: Math.min(Math.max(MARGIN, e.clientX), maxX),
-      y: Math.min(Math.max(MARGIN, e.clientY), maxY),
-    }
-  })
-}
-
-function hidePetMenu() {
-  if (petMenu.value.show) petMenu.value = { show: false, x: 0, y: 0 }
-}
-
-function onPetDocPointerDown(e) {
-  if (!petMenu.value.show) return
-  const menu = document.querySelector('.pet-menu')
-  if (menu && menu.contains(e.target)) return
-  hidePetMenu()
-}
-
 // ==================== 菜单动作 ====================
 // 喂食：食物落下 + 咀嚼
 function petFeed() {
-  hidePetMenu()
   if (petSleep.value) petSleep.value = false
   const el = document.querySelector('.pet-float')
   const r = el ? el.getBoundingClientRect() : { left: petPos.value.x, top: petPos.value.y, width: PET_W, height: PET_H }
@@ -1001,7 +943,6 @@ function petFeed() {
 
 // 玩球：球飞过 + 追逐
 function petPlayBall() {
-  hidePetMenu()
   if (petSleep.value) petSleep.value = false
   const el = document.querySelector('.pet-float')
   const r = el ? el.getBoundingClientRect() : { left: petPos.value.x, top: petPos.value.y, width: PET_W, height: PET_H }
@@ -1020,7 +961,6 @@ function petPlayBall() {
 
 // 打盹 / 唤醒
 function togglePetSleep() {
-  hidePetMenu()
   petSleep.value = !petSleep.value
   if (petSleep.value) {
     petSpeech.value = ''
@@ -1032,7 +972,6 @@ function togglePetSleep() {
 
 // 唱歌：音符飘出 + 音阶
 function petSing() {
-  hidePetMenu()
   if (petSleep.value) petSleep.value = false
   const el = document.querySelector('.pet-float')
   const r = el ? el.getBoundingClientRect() : { left: petPos.value.x, top: petPos.value.y, width: PET_W, height: PET_H }
@@ -1055,7 +994,6 @@ function petSing() {
 
 // 隐藏宠物（保持隐藏直到手动唤回；同时停掉相关运算以节省资源）
 function petHide() {
-  hidePetMenu()
   stopPetting()
   // 未手动拖过还原按钮时，让它出现在宠物当前位置，体验连贯
   if (!restoreUserMoved) {
@@ -1073,6 +1011,15 @@ function showPet() {
   try { localStorage.setItem(PET_HIDDEN_KEY, '0') } catch (e) {}
   startPetLoops()
   petSfxChirp()
+}
+
+// 切换宠物显示/隐藏（供命令面板等外部调用）
+function togglePet() {
+  if (petHidden.value) {
+    showPet()
+  } else {
+    petHide()
+  }
 }
 
 // 还原按钮（🐾）拖动：位置独立于宠物尺寸，可拖到屏幕任意边角
@@ -1121,7 +1068,6 @@ function onRestorePointerUp(e) {
 // ==================== 网关操作 ====================
 // 同步所有已连接 Agent 的状态
 function petSyncStatus() {
-  hidePetMenu()
   emit('petSyncStatus')
   petAction.value = 'cheer'
   setTimeout(() => { if (petAction.value === 'cheer') petAction.value = '' }, 1200)
@@ -1130,7 +1076,6 @@ function petSyncStatus() {
 
 // 中断当前 Agent（人工介入）
 function petInterrupt() {
-  hidePetMenu()
   if (!props.currentAgentId) {
     petSpeech.value = '没有选中的 Agent'
     clearTimeout(petSpeechTimer)
@@ -1145,7 +1090,6 @@ function petInterrupt() {
 
 // 奔赴等待输入的 Agent
 function petGotoWaiting() {
-  hidePetMenu()
   if (petWaitingAgents.value.length === 0) return
   emit('petGotoWaiting')
   petSfxChirp()
@@ -1153,20 +1097,17 @@ function petGotoWaiting() {
 
 // 切换侧边栏显示/隐藏
 function petToggleSidebar() {
-  hidePetMenu()
   emit('petToggleSidebar')
 }
 
 // 打开网络拓扑大图
 function petOpenTopology() {
-  hidePetMenu()
   emit('petOpenTopology')
   petSfxChirp()
 }
 
 // 折叠所有可折叠分组
 function petCollapseAll() {
-  hidePetMenu()
   const map = { ...collapsedGroupsMap.value }
   ;(props.displayGroups || []).forEach(g => {
     if (g.isCollapsible) map[g.key] = true
@@ -1306,7 +1247,6 @@ function togglePetSfx() {
 
 // 切换迷你拓扑图显示
 function togglePetTopo() {
-  hidePetMenu()
   petTopoOn.value = !petTopoOn.value
   try {
     localStorage.setItem(PET_TOPO_KEY, petTopoOn.value ? '1' : '0')
@@ -1318,16 +1258,24 @@ function togglePetTopo() {
 
 // 随机小动作
 const PET_ACTIONS = ['look', 'yawn', 'spin', 'hop', 'throw']
+// 随机趣味行为：偶尔自发喂食/玩球/唱歌/打盹（不再由菜单触发）
+const PET_FUN_ACTIONS = [petFeed, petPlayBall, petSing, togglePetSleep]
 let petActTimer = 0
 function schedulePetAction() {
   clearTimeout(petActTimer)
   petActTimer = window.setTimeout(() => {
     if (!document.hidden && !petHover.value && !petDrag.value && !petSleep.value && !petHidden.value && !petPetting.value && !petWalking.value) {
-      const act = PET_ACTIONS[Math.floor(Math.random() * PET_ACTIONS.length)]
-      petAction.value = act
-      petSfxAction(act)
-      const actDur = act === 'throw' ? 2600 : 1700
-      setTimeout(() => { petAction.value = '' }, actDur)
+      // 约四分之一概率触发趣味行为，其余为普通小动作
+      if (Math.random() < 0.25) {
+        const fun = PET_FUN_ACTIONS[Math.floor(Math.random() * PET_FUN_ACTIONS.length)]
+        fun()
+      } else {
+        const act = PET_ACTIONS[Math.floor(Math.random() * PET_ACTIONS.length)]
+        petAction.value = act
+        petSfxAction(act)
+        const actDur = act === 'throw' ? 2600 : 1700
+        setTimeout(() => { petAction.value = '' }, actDur)
+      }
     }
     schedulePetAction()
   }, 5000 + Math.random() * 7000)
@@ -1450,7 +1398,6 @@ onMounted(() => {
     petHidden.value = false
   }
   document.addEventListener('mousemove', onPetMouseMove)
-  document.addEventListener('pointerdown', onPetDocPointerDown)
   window.addEventListener('resize', onPetResize)
   startPetLoops()
 })
@@ -1460,14 +1407,12 @@ watch(() => props.isConnected, (connected) => {
   if (connected) {
     startPetLoops()
   } else {
-    petMenu.value.show = false
     stopPetLoops()
   }
 })
 
 onUnmounted(() => {
   document.removeEventListener('mousemove', onPetMouseMove)
-  document.removeEventListener('pointerdown', onPetDocPointerDown)
   window.removeEventListener('resize', onPetResize)
   clearTimeout(petActTimer)
   clearTimeout(petClickTimer)
@@ -1478,6 +1423,12 @@ onUnmounted(() => {
   clearTimeout(petWanderTimer)
   if (petRaf) cancelAnimationFrame(petRaf)
   if (petWanderRaf) cancelAnimationFrame(petWanderRaf)
+})
+
+defineExpose({
+  togglePet,
+  hidePet: petHide,
+  showPet,
 })
 
 </script>
@@ -2774,53 +2725,6 @@ onUnmounted(() => {
   margin-left: 4px;
 }
 /* ==================== 新增交互样式 ==================== */
-/* 右键菜单 */
-.pet-menu {
-  position: fixed;
-  z-index: 3200;
-  min-width: 132px;
-  padding: 6px;
-  border-radius: 12px;
-  background: rgba(15, 30, 48, 0.96);
-  border: 1px solid rgba(32, 200, 255, 0.28);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 14px rgba(32, 200, 255, 0.18);
-  backdrop-filter: blur(6px);
-  animation: pet-menu-in 0.14s ease-out;
-}
-
-.pet-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 10px;
-  border-radius: 8px;
-  font-size: 13px;
-  color: #cfe9f5;
-  cursor: pointer;
-  transition: background 0.14s ease, color 0.14s ease;
-}
-
-.pet-menu-item:hover {
-  background: rgba(32, 200, 255, 0.18);
-  color: #eafcff;
-}
-
-.pet-menu-ico {
-  font-size: 14px;
-  line-height: 1;
-}
-
-.pet-menu-sep {
-  height: 1px;
-  margin: 4px 6px;
-  background: rgba(126, 231, 255, 0.18);
-}
-
-.pet-menu-item.is-disabled {
-  opacity: 0.35;
-  pointer-events: none;
-}
-
 /* 宠物头顶状态徽标（等待/运行）*/
 .pet-badge {
   position: absolute;
@@ -2852,17 +2756,6 @@ onUnmounted(() => {
 @keyframes pet-badge-pulse {
   0%, 100% { transform: translateX(-50%) scale(1); }
   50% { transform: translateX(-50%) scale(1.12); }
-}
-
-@keyframes pet-menu-in {
-  from {
-    opacity: 0;
-    transform: translateY(-4px) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
 }
 
 /* 隐藏后的还原按钮 */

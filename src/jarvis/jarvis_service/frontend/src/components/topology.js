@@ -125,6 +125,9 @@ export function buildTopology(nodes, agents, getStatusClass) {
   }));
 
   let waiting = 0;
+  let running = 0;
+  let stopped = 0;
+  let idle = 0;
   let online = 0;
   orderedNodes.forEach((node) => {
     if (node.state === NODE_STATE.ONLINE) online++;
@@ -137,6 +140,9 @@ export function buildTopology(nodes, agents, getStatusClass) {
     node.agents.forEach((a) => {
       if (!a.stopped) agentActive++;
       if (a.state === AGENT_STATE.WAITING) waiting++;
+      else if (a.state === AGENT_STATE.RUNNING) running++;
+      else if (a.state === AGENT_STATE.STOPPED) stopped++;
+      else idle++;
     });
   });
 
@@ -152,6 +158,10 @@ export function buildTopology(nodes, agents, getStatusClass) {
       // activeAgents 为参与绘制的 agent 数（不含已停止）
       activeAgents: agentActive,
       waiting,
+      // agent 各状态计数（waiting 已在上面累计）
+      running,
+      stopped,
+      idle,
     },
   };
 }
