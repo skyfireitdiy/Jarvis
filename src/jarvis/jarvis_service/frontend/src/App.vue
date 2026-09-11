@@ -11600,6 +11600,11 @@ function handleGlobalKeydown(event) {
 
   // ESC 键关闭所有对话框
   if (event.key === 'Escape') {
+    // 补全面板打开时优先关闭它（焦点可能仍在输入框，需在此统一处理）
+    if (showCompletions.value) {
+      closeCompletionsWithoutSelect()
+      return
+    }
     // 命令面板打开时优先关闭它
     if (showCommandPalette.value) {
       showCommandPalette.value = false
