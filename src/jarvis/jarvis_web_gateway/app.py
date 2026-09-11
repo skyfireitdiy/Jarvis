@@ -3733,6 +3733,31 @@ def create_app(
                     status_code=502,
                     media_type="application/json",
                 )
+            # 权限校验：master 统一把关跨节点访问，子节点不再重复校验。
+            # 子节点本地无 auth 数据，无法独立判定，故所有权限判定集中在 master。
+            _proxy_user_info = getattr(request.state, "user_info", None)
+            _proxy_user_id = (
+                _proxy_user_info.get("user_id") if _proxy_user_info else None
+            )
+            if (
+                _proxy_user_id
+                and _proxy_user_id != "system"
+                and permission_manager
+                and not permission_manager.check_node_access(
+                    _proxy_user_id, normalized_node_id
+                )
+            ):
+                logger.warning(
+                    f"[NODE HTTP PROXY] 权限拒绝: user_id={_proxy_user_id}, node_id={normalized_node_id}"
+                )
+                return Response(
+                    content=(
+                        '{"success": false, "error": {"code": "PERMISSION_DENIED", '
+                        f'"message": "Permission denied: no access to node {normalized_node_id}"}}}}'
+                    ),
+                    status_code=403,
+                    media_type="application/json",
+                )
 
             response = await node_connection_manager.send_request_to_node(
                 normalized_node_id,
@@ -4609,8 +4634,16 @@ def create_app(
 
             resolved_target_node = target_node_id or node_runtime.local_node_id
 
-            # 节点访问校验
-            if owner_id and owner_id != "system" and permission_manager:
+            # 节点访问校验：仅在 master 上执行。
+            # 子节点本地没有 auth 数据（权限数据不同步），无法独立判定；
+            # 跨节点请求的权限已由 master 在转发前统一把关，
+            # 故子节点信任 master 的判定，不再重复校验。
+            if (
+                node_config.is_master
+                and owner_id
+                and owner_id != "system"
+                and permission_manager
+            ):
                 if not permission_manager.check_node_access(
                     owner_id, resolved_target_node
                 ):
