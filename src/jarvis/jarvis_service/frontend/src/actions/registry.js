@@ -101,6 +101,14 @@ export const ACTIONS = [
     run: (ctx) => ctx.toggleChatPanel && ctx.toggleChatPanel(),
   },
   {
+    id: "open-topology",
+    label: "查看网络拓扑",
+    group: "界面",
+    icon: "🗺",
+    keywords: ["拓扑", "网络", "节点", "topology", "network", "nodes"],
+    run: (ctx) => ctx.openTopology && ctx.openTopology(),
+  },
+  {
     id: "open-settings",
     label: "打开设置",
     group: "界面",
