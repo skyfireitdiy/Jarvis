@@ -123,7 +123,7 @@ const props = defineProps({
   historyNav: { type: Function, default: null },
 })
 
-const emit = defineEmits(['selectAgent', 'sendInput', 'complete', 'openCompletions'])
+const emit = defineEmits(['selectAgent', 'sendInput', 'complete', 'openCompletions', 'activePetChange'])
 
 // 宠物尺寸常量（与 CSS 中的 .lobby-pet 宽高保持一致）
 const PET_W = 72
@@ -558,6 +558,12 @@ onUnmounted(() => {
 
 // agents 变化时同步宠物实例
 watch(() => props.agents, () => syncPets(), { deep: false })
+
+// 选中的宠物变化时通知父组件（用于「当前 Agent」相关菜单）
+// immediate: 组件挂载时同步一次（清空父组件中可能残留的旧选中态）
+watch(activePetId, (id) => {
+  emit('activePetChange', id || null)
+}, { immediate: true })
 
 // 供父组件写回补全文本：把 @ 及后续搜索词替换为补全值，并同步 DOM 光标
 function insertCompletionText(agentId, text, cursorPos, hasAtSymbol) {

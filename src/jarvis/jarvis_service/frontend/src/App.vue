@@ -511,6 +511,7 @@
           @sendInput="sendLobbyInput"
           @complete="onLobbyComplete"
           @openCompletions="onLobbyOpenCompletions"
+          @activePetChange="lobbyActiveAgentId = $event"
         />
       </div>
     </main>
@@ -5187,10 +5188,11 @@ function getCurrentPanel() {
     || null
 }
 // 命令面板「当前 Agent」组使用的 Agent ID：
-// 优先当前激活 Panel 内的 Agent，其次 currentAgentId，最后回退到任意承载 Agent 的 Panel
+// 优先当前激活 Panel 内的 Agent；其次宠物大厅中选中的宠物对应的 Agent；最后回退到 currentAgentId
 const commandPaletteCurrentAgentId = computed(() => {
   const panel = getCurrentPanel()
   if (panel && panel.agentId) return panel.agentId
+  if (lobbyActiveAgentId.value) return lobbyActiveAgentId.value
   return currentAgentId.value || null
 })
 // 当前 Agent 对象（无选中时为 null）
@@ -5652,6 +5654,7 @@ const completionHasAtSymbol = ref(false) // 打开补全时输入框中是否已
 const completionAgentId = ref(null) // 记录打开补全列表时的 Panel agentId
 const completionSource = ref('panel') // 补全来源：'panel' 或 'lobby'（宠物大厅）
 const petLobbyRef = ref(null) // 宠物大厅组件引用（用于写回大厅输入框补全文本）
+const lobbyActiveAgentId = ref(null) // 宠物大厅中当前选中的宠物对应的 agentId
 const completions = ref([]) // 补全列表数据
 const completionSearch = ref('') // 补全搜索关键词
 const fileCompletions = ref([]) // 文件补全搜索结果
