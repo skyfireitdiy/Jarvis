@@ -46,15 +46,28 @@
       @petGotoWaiting="petGotoWaitingAgent"
       @petToggleSidebar="toggleAgentSidebar"
       @petOpenTopology="openTopologyOverlay"
-      @petOpenCommandPalette="openCommandPalette"
+      @petOpenCommandPalette="openCommandPalette()"
       :radial-actions="petRadialActions"
       @petRadialRun="onPetRadialRun"
     />
 
     <!-- 主内容区 -->
     <div class="main-content-wrapper">
+      <!-- 桌面端顶部感应区：鼠标移入唤出标题栏 -->
+      <div
+        v-if="!isMobileLayout"
+        class="top-hover-zone"
+        @mouseenter="showHeader"
+      ></div>
       <!-- 顶部栏 -->
-      <header class="app-header">
+      <header
+        ref="headerRef"
+        class="app-header"
+        :class="{ 'is-hidden': headerHidden }"
+        :style="{ '--app-header-h': headerHeight + 'px' }"
+        @mouseenter="showHeader"
+        @mouseleave="scheduleHideHeader"
+      >
         <!-- 移动端快捷按钮 -->
         <div class="mobile-header-actions">
           <button class="icon-btn" @click="toggleAgentSidebar()" title="Agent列表">
@@ -1195,6 +1208,7 @@
       :visible="showCommandPalette"
       :actions="appActions"
       :ctx="commandPaletteCtx"
+      :initial-query="commandPaletteInitialQuery"
       title="命令面板"
       @update:visible="showCommandPalette = $event"
       @run="onCommandRun"
@@ -2183,6 +2197,36 @@ const globalSearchExecuted = ref(false)
 const showEditorSidebar = ref(true)
 const editorSidebarView = ref('files')
 const windowWidth = ref(window.innerWidth)  // 窗口宽度，用于响应式检测
+// 顶部标题栏自动隐藏：桌面端鼠标移到顶部感应区唤出，移动端经宠物菜单唤出
+const isMobileLayout = computed(() => windowWidth.value <= 768)
+const headerHidden = ref(window.innerWidth <= 768)
+const headerHeight = ref(0)
+let headerHideTimer = 0
+const headerRef = ref(null)
+
+function measureHeaderHeight() {
+  if (headerRef.value) headerHeight.value = headerRef.value.offsetHeight
+}
+function showHeader() {
+  clearTimeout(headerHideTimer)
+  headerHidden.value = false
+  requestAnimationFrame(measureHeaderHeight)
+}
+function hideHeader() {
+  clearTimeout(headerHideTimer)
+  measureHeaderHeight()
+  headerHidden.value = true
+}
+function toggleHeader() {
+  if (headerHidden.value) showHeader()
+  else hideHeader()
+}
+// 鼠标移出标题栏后延时缩回（给用户移动到感应区的时间）
+function scheduleHideHeader() {
+  if (isMobileLayout.value) return
+  clearTimeout(headerHideTimer)
+  headerHideTimer = setTimeout(() => { headerHidden.value = true }, 300)
+}
 const showCreateAgentModal = ref(false) // 创建 Agent 弹窗
 const showRenameAgentModal = ref(false) // 重命名 Agent 弹窗
 const renamingAgent = ref(null)          // 正在重命名的 Agent
@@ -5049,11 +5093,14 @@ function petInterruptCurrent() {
 // 奔赴等待输入的 Agent
 function petGotoWaitingAgent() {
   const list = agentList.value || []
-  const target = list.find(a => isWaitingInput(a))
-  if (!target) {
+  const waiting = list.filter(a => isWaitingInput(a))
+  if (waiting.length === 0) {
     showToast('没有等待输入的 Agent', 'info')
     return
   }
+  // 循环切换：从当前 Agent 之后找下一个等待的，找不到则回到第一个
+  const currentIdx = waiting.findIndex(a => a.agent_id === currentAgentId.value)
+  const target = currentIdx >= 0 ? waiting[(currentIdx + 1) % waiting.length] : waiting[0]
   openAgentInPanel(target)
   showToast(`已切换到等待输入的 Agent：${target.name || target.agent_id}`, 'success')
 }
@@ -5066,11 +5113,17 @@ function openTopologyOverlay() {
 // 打开命令面板时，记录"打开前"焦点所在的面板区域
 // （命令面板会抢走焦点，导致执行关闭/分离时无法从活动元素推断目标）
 let commandPaletteFocusKey = null
-// 打开命令面板（双击宠物触发）
-function openCommandPalette() {
+// 打开命令面板（双击宠物触发）；可传入预输入内容（如 'a>' 直接进入 Agent 列表）
+function openCommandPalette(initialQuery = '') {
   if (showConnectModal.value) return
   commandPaletteFocusKey = getFocusedZoneKey()
+  commandPaletteInitialQuery.value = initialQuery
   showCommandPalette.value = true
+}
+
+// 打开命令面板并预输入 a>，直接展示 Agent 列表
+function openAgentListPalette() {
+  openCommandPalette('a>')
 }
 
 // 切换宠物显示/隐藏（命令面板触发，代理到 AgentSidebar 内部逻辑）
@@ -5205,6 +5258,8 @@ const commandPaletteCtx = computed(() => ({
   openTopology: openTopologyOverlay,
   openSettings: () => { showSettingsModal.value = true },
   togglePetVisibility,
+  toggleHeader,
+  openAgentList: openAgentListPalette,
   // 当前 Agent 组
   viewCurrentDiff: () => { const a = getCurrentAgentOrNull(); if (a) viewDiff(a) },
   viewCurrentRules: () => { const a = getCurrentAgentOrNull(); if (a) viewRules(a) },
@@ -5258,10 +5313,15 @@ const PET_RADIAL_INNER_IDS = [
   'current-rename',
   'current-delete',
 ]
+// 宠物菜单额外纳入的界面项（不属于「当前 Agent」组，但移动端也需要）
+const PET_RADIAL_EXTRA_IDS = [
+  'toggle-header',
+  'open-agent-list',
+]
 const petRadialActions = computed(() => {
   const ctx = commandPaletteCtx.value
   return actionDefs
-    .filter(a => a.group === '当前 Agent')
+    .filter(a => a.group === '当前 Agent' || PET_RADIAL_EXTRA_IDS.includes(a.id))
     .map(a => ({
       id: a.id,
       label: a.label,
@@ -5525,6 +5585,8 @@ const streamingMessages = ref(new Map()) // 按 agent_id 跟踪当前流式消�
 
 // 命令面板（Ctrl+P）
 const showCommandPalette = ref(false)
+// 命令面板打开时的预输入内容（如 'a>' 直接展示 Agent 列表）
+const commandPaletteInitialQuery = ref('')
 const showTopologyOverlay = ref(false) // 网络拓扑大图浮层
 
 // 命令面板关闭后，若没有其它弹窗接管焦点，则把焦点交还给当前 Agent 的输入框
@@ -6477,17 +6539,17 @@ async function fetchAgentStatus(agent) {
       if (executionStatus === 'waiting_single') {
         inputMode.value = 'single'
         panelInputModes.value.set(agent.agent_id, 'single')
-        // 聚焦输入框
+        // 聚焦输入框（弹窗或宠物环形菜单打开时不抢焦点）
         const targetPanel = panels.value.find(p => p.agentId === agent.agent_id)
         const sp = targetPanel ? sessionPanelRefs.get(targetPanel.id) : null
-        if (sp?.focusInput) sp.focusInput()
+        if (sp?.focusInput && !isAnyModalOpen() && !isPetMenuOpen()) sp.focusInput()
       } else if (executionStatus === 'waiting_multi') {
         inputMode.value = 'multi'
         panelInputModes.value.set(agent.agent_id, 'multi')
-        // 聚焦输入框
+        // 聚焦输入框（弹窗或宠物环形菜单打开时不抢焦点）
         const targetPanel = panels.value.find(p => p.agentId === agent.agent_id)
         const sp = targetPanel ? sessionPanelRefs.get(targetPanel.id) : null
-        if (sp?.focusInput) sp.focusInput()
+        if (sp?.focusInput && !isAnyModalOpen() && !isPetMenuOpen()) sp.focusInput()
       } else if (executionStatus === 'waiting_confirm') {
         // 从 status 响应中获取 pending_confirm 并显示对话框
         const pendingConfirm = result.pending_confirm
@@ -6504,10 +6566,10 @@ async function fetchAgentStatus(agent) {
           panelInputModes.value.set(agent.agent_id, 'single')
           inputTip.value = payload.message || '请确认 (y/n/Enter)'
           panelInputTips.value.set(agent.agent_id, payload.message || '请确认 (y/n/Enter)')
-          // 聚焦输入框
+          // 聚焦输入框（弹窗或宠物环形菜单打开时不抢焦点）
           const targetPanel = panels.value.find(p => p.agentId === agent.agent_id)
           const sp = targetPanel ? sessionPanelRefs.get(targetPanel.id) : null
-          if (sp?.focusInput) sp.focusInput()
+          if (sp?.focusInput && !isAnyModalOpen() && !isPetMenuOpen()) sp.focusInput()
           // 无 Panel 时不弹全局对话框，确认请求静默等待，用户打开 Panel 后可见 confirm 控件
         } else {
           console.warn('[AGENT STATUS] waiting_confirm but no pending_confirm payload found')
@@ -11853,6 +11915,8 @@ function handleGlobalKeydown(event) {
     if (!showCommandPalette.value) {
       // 打开前记录焦点所在区域，供"关闭/分离当前焦点面板"使用
       commandPaletteFocusKey = getFocusedZoneKey()
+      // 快捷键打开时清空预输入，避免沿用上次宠物菜单带入的查询
+      commandPaletteInitialQuery.value = ''
     }
     showCommandPalette.value = !showCommandPalette.value
     return
@@ -12345,6 +12409,9 @@ onMounted(() => {
   }
   window.visualViewport?.addEventListener('resize', visualViewportResizeHandler)
 
+  // 测量标题栏高度（用于自动隐藏时的位移量）
+  measureHeaderHeight()
+
   inputHistory.value = loadInputHistory()
   
   // 已登录时才启动 Agent 列表刷新，避免未获取 token 前向后端发送请求
@@ -12362,6 +12429,7 @@ onMounted(() => {
   handleResize = () => {
     windowWidth.value = window.innerWidth
     updateViewportHeight()
+    measureHeaderHeight()
     ensureAgentSidebarWidthInBounds()
     ensureEditorPanelInViewport()
     ensureTerminalPanelInViewport()
@@ -12433,6 +12501,9 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+
+  // 清理标题栏自动隐藏定时器
+  clearTimeout(headerHideTimer)
 
   // 清理滚动监听
   if (historyScrollListenerEl && historyScrollHandler) {
@@ -12752,6 +12823,24 @@ body::-webkit-scrollbar {
   background: var(--color-bg-secondary);
   border-bottom: 0.5px solid var(--color-border-subtle);
   flex-shrink: 0;
+  transition: margin-top 0.25s ease, opacity 0.25s ease;
+}
+
+/* 自动隐藏：向上缩回（保留过渡动画，不用 display:none） */
+.app-header.is-hidden {
+  margin-top: calc(-1 * (var(--app-header-h, 0px) + env(safe-area-inset-top, 0px)));
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 桌面端顶部感应区：鼠标移入唤出标题栏 */
+.top-hover-zone {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  z-index: 1200;
 }
 
 .mobile-header-actions {
