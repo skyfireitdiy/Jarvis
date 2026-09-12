@@ -299,6 +299,33 @@ export const ACTIONS = [
     keywords: ["宠物", "挂件", "隐藏", "显示", "pet", "hide", "show", "toggle"],
     run: (ctx) => ctx.togglePetVisibility && ctx.togglePetVisibility(),
   },
+  {
+    id: "open-agent-list",
+    label: "Agent 列表",
+    en: "Agent List",
+    group: "界面",
+    icon: "📋",
+    keywords: ["agent", "列表", "list", "切换", "switch", "选择"],
+    run: (ctx) => ctx.openAgentList && ctx.openAgentList(),
+  },
+  // ===== 标题栏 =====
+  {
+    id: "toggle-header",
+    label: "显示/隐藏标题栏",
+    en: "Toggle Header Bar",
+    group: "标题栏",
+    icon: "▤",
+    keywords: [
+      "标题栏",
+      "顶栏",
+      "顶部",
+      "header",
+      "titlebar",
+      "topbar",
+      "toggle",
+    ],
+    run: (ctx) => ctx.toggleHeader && ctx.toggleHeader(),
+  },
 ];
 
 // 大小写不敏感的子串 / 关键词模糊匹配；query 为空时返回全部

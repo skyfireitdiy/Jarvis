@@ -178,8 +178,10 @@
         <div
           v-if="petBadgeText"
           class="pet-badge"
-          :class="{ 'is-alert': petWaitingAgents.length > 0 }"
-          :title="petWaitingAgents.length > 0 ? (petWaitingAgents.length + ' 个 Agent 等待输入') : (petRunningCount + ' 个 Agent 运行中')"
+          :class="{ 'is-alert': petWaitingAgents.length > 0, 'is-clickable': petWaitingAgents.length > 0 }"
+          :title="petWaitingAgents.length > 0 ? (petWaitingAgents.length + ' 个 Agent 等待输入，点击跳转到下一个') : (petRunningCount + ' 个 Agent 运行中')"
+          @pointerdown.stop
+          @click.stop="onPetBadgeClick"
         >{{ petBadgeText }}</div>
         <div class="pet-label">✦ JARVIS ✦</div>
         <button
@@ -234,25 +236,30 @@
       v-if="petMenuOpen"
       class="pet-menu-layer"
       @pointerdown.self.prevent="closePetMenu"
-      @touchstart.prevent
+      @touchstart.self.prevent
       @contextmenu.prevent
     >
       <div
-        class="pet-menu-ring"
-        :style="{ left: petMenuOrigin.x + 'px', top: petMenuOrigin.y + 'px' }"
+        class="pet-menu-list"
+        :style="{
+          left: petMenuLayout.left + 'px',
+          top: petMenuLayout.top + 'px',
+          width: (petMenuLayout.cols * PET_MENU_COL_W + (petMenuLayout.cols - 1) * PET_MENU_GAP + PET_MENU_PAD * 2) + 'px',
+          gridTemplateColumns: `repeat(${petMenuLayout.cols}, ${PET_MENU_COL_W}px)`,
+        }"
       >
-        <div class="pet-menu-hub">✦</div>
         <button
-          v-for="item in petMenuItems"
+          v-for="(item, i) in petMenuLayout.items"
           :key="item.id"
           type="button"
           tabindex="-1"
           class="pet-menu-item"
-          :class="['ring-' + item.ring, { 'is-disabled': !item.enabled }]"
-          :style="{ transform: `translate(${item.x}px, ${item.y}px)` }"
+          :class="[{ 'is-disabled': !item.enabled, 'is-inner': item.inner }]"
           :disabled="!item.enabled"
           :title="item.label"
-          @pointerdown.prevent.stop
+          @pointerdown.stop
+          @mousedown.prevent
+          @touchstart.stop
           @click.stop="onPetMenuRun(item)"
         >
           <span class="pet-menu-ico">{{ item.icon }}</span>
@@ -522,10 +529,19 @@ const PET_TOPO_KEY = 'jarvis_pet_topo'
 const PET_RESTORE_POS_KEY = 'jarvis_pet_restore_pos'
 const PET_HIDDEN_KEY = 'jarvis_pet_hidden'
 const PET_POWER_SAVE_KEY = 'jarvis_pet_power_save'
+// 移动端宠物整体缩小一半（配合 .pet-float 的 scale(0.5)），此处返回视觉尺寸
+const PET_SCALE_MOBILE = 0.5
 const PET_W = 200
 const PET_H = 230
 const RESTORE_W = 40
 const RESTORE_H = 40
+// 宠物视觉尺寸：移动端为桌面端的一半（与 CSS 缩放保持一致）
+function petW() {
+  return isMobileView.value ? Math.round(PET_W * PET_SCALE_MOBILE) : PET_W
+}
+function petH() {
+  return isMobileView.value ? Math.round(PET_H * PET_SCALE_MOBILE) : PET_H
+}
 const petPos = ref({ x: 0, y: 0 })
 const restorePos = ref({ x: 0, y: 0 })
 const petHover = ref(false)
@@ -641,6 +657,12 @@ const petBadgeText = computed(() => {
   return ''
 })
 
+// 点击头顶徽标：跳转到下一个等待输入的 Agent（由父组件负责循环切换）
+function onPetBadgeClick() {
+  if (petWaitingAgents.value.length === 0) return
+  emit('petGotoWaiting')
+}
+
 // 当前施放法术的类别（array/throw/beam/burst/swarm），用于区分特效与状态类
 const PET_CAST_KINDS = {
   thunder: 'array', flame: 'array', frost: 'array', star: 'array',
@@ -665,6 +687,7 @@ const petClasses = computed(() => [
     // is-casting 仅用于「法阵类」法术，避免覆盖 act-throw 等其它法术的动画
     'is-casting': petCastKind.value === 'array',
     'power-save': petPowerSaveActive.value,
+    'pet-compact': isMobileView.value,
   },
   petAction.value ? 'act-' + petAction.value : '',
   petCast.value ? 'cast-' + petCast.value : '',
@@ -674,7 +697,7 @@ const petWatchingTopo = computed(() => petTopoOn.value && !petPowerSaveActive.va
 
 // 迷你图水平方向相对宠物中心的偏移：-1 左 / 0 中 / 1 右
 const petTopoDirX = computed(() => {
-  const headCx = petPos.value.x + PET_W / 2
+  const headCx = petPos.value.x + petW() / 2
   const topoCx = petMiniPos.value.x + 48
   const d = topoCx - headCx
   if (d > 8) return 1
@@ -705,17 +728,17 @@ const petMiniPos = computed(() => {
   const clampY = (y) => Math.max(4, Math.min(maxY, y))
 
   // 首选：宠物头顶上方居中（宠物抬头看向它）
-  const topX = petPos.value.x + PET_W / 2 - MINI / 2
+  const topX = petPos.value.x + petW() / 2 - MINI / 2
   const topY = petPos.value.y - MINI - 6
   if (topY >= 4) return { x: clampX(topX), y: topY }
 
   // 回退1：宠物下方居中
-  const belowY = petPos.value.y + PET_H + 6
+  const belowY = petPos.value.y + petH() + 6
   if (belowY <= maxY) return { x: clampX(topX), y: belowY }
 
   // 回退2：宠物右侧
-  const sideX = petPos.value.x + PET_W + 6
-  const sideY = petPos.value.y + PET_H / 2 - MINI / 2
+  const sideX = petPos.value.x + petW() + 6
+  const sideY = petPos.value.y + petH() / 2 - MINI / 2
   if (sideX <= maxX) return { x: sideX, y: clampY(sideY) }
 
   // 最终：宠物左侧
@@ -733,8 +756,8 @@ const petHeadStyle = computed(() => {
 })
 
 function clampPetPos(x, y) {
-  const maxX = Math.max(0, window.innerWidth - PET_W)
-  const maxY = Math.max(0, window.innerHeight - PET_H)
+  const maxX = Math.max(0, window.innerWidth - petW())
+  const maxY = Math.max(0, window.innerHeight - petH())
   return { x: Math.max(0, Math.min(maxX, x)), y: Math.max(0, Math.min(maxY, y)) }
 }
 
@@ -792,8 +815,8 @@ function initPetPos() {
   const sidebar = document.querySelector('.agent-sidebar')
   const rect = sidebar ? sidebar.getBoundingClientRect() : { left: 0, width: 320 }
   petPos.value = clampPetPos(
-    rect.left + (rect.width - PET_W) / 2,
-    window.innerHeight - PET_H - 8
+    rect.left + (rect.width - petW()) / 2,
+    window.innerHeight - petH() - 8
   )
 }
 
@@ -844,27 +867,56 @@ const petMenuOpen = ref(false)
 const petMenuOrigin = ref({ x: 0, y: 0 })   // 菜单圆心（屏幕坐标）
 let petMenuLongPressTimer = 0               // 还原按钮长按判定
 
-// 内/外圈半径与按钮尺寸
-const PET_MENU_INNER_R = 82
-const PET_MENU_OUTER_R = 152
-const PET_MENU_ITEM = 46
+// 网格菜单尺寸与间距
+const PET_MENU_COL_W = 116   // 单列宽
+const PET_MENU_ITEM_H = 36   // 单项高
+const PET_MENU_GAP = 6
+const PET_MENU_PAD = 8
+const PET_MENU_MARGIN = 8    // 距视口边缘的最小留白
+const PET_MENU_MAX_ROWS = 7  // 最多行数，超出则分两列
 
-// 计算菜单项位置：按圈层均分角度，从正上方开始
+// 菜单项顺序：内圈（常用）在前，外圈在后
 const petMenuItems = computed(() => {
   const list = Array.isArray(props.radialActions) ? props.radialActions : []
   const inner = list.filter(a => a.inner)
   const outer = list.filter(a => !a.inner)
-  const place = (arr, radius, ring) => arr.map((a, i) => {
-    const total = arr.length || 1
-    const angle = -Math.PI / 2 + (i / total) * Math.PI * 2
-    return {
-      ...a,
-      ring,
-      x: Math.cos(angle) * radius,
-      y: Math.sin(angle) * radius,
+  return [...inner, ...outer]
+})
+
+// 网格布局：以长按点为锚点，优先向右展开；右侧空间不足则向左；
+// 垂直方向整体夹取到视口内，保证任何情况下都不出屏。
+// 条目多时按「列优先」排成两列（视觉上仍是自上而下的顺序）。
+const petMenuLayout = computed(() => {
+  const items = petMenuItems.value
+  const n = items.length
+  const cols = n > PET_MENU_MAX_ROWS ? 2 : 1
+  const rows = n > 0 ? Math.ceil(n / cols) : 0
+  const listW = cols * PET_MENU_COL_W + (cols - 1) * PET_MENU_GAP + PET_MENU_PAD * 2
+  const listH = rows > 0 ? PET_MENU_PAD * 2 + rows * PET_MENU_ITEM_H + (rows - 1) * PET_MENU_GAP : 0
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const ox = petMenuOrigin.value.x
+  const oy = petMenuOrigin.value.y
+
+  // 水平：优先放锚点右侧，放不下则放左侧
+  let left = ox + 12
+  if (left + listW + PET_MENU_MARGIN > vw) left = ox - 12 - listW
+  left = Math.max(PET_MENU_MARGIN, Math.min(vw - listW - PET_MENU_MARGIN, left))
+
+  // 垂直：列表垂直居中于锚点，再夹取到视口内
+  let top = oy - listH / 2
+  top = Math.max(PET_MENU_MARGIN, Math.min(vh - listH - PET_MENU_MARGIN, top))
+
+  // 列优先重排：第 i 项落在第 (i % cols) 列、第 floor(i / cols) 行
+  const ordered = []
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const idx = c * rows + r
+      if (idx < n) ordered.push(items[idx])
     }
-  })
-  return [...place(inner, PET_MENU_INNER_R, 'inner'), ...place(outer, PET_MENU_OUTER_R, 'outer')]
+  }
+
+  return { left, top, cols, items: ordered }
 })
 
 function openPetMenu(cx, cy) {
@@ -1060,7 +1112,7 @@ function stopPetting() {
 // 冒出爱心（基于宠物当前位置）
 function spawnPetHearts() {
   const el = document.querySelector('.pet-float')
-  const r = el ? el.getBoundingClientRect() : { left: petPos.value.x, top: petPos.value.y, width: PET_W, height: PET_H }
+  const r = el ? el.getBoundingClientRect() : { left: petPos.value.x, top: petPos.value.y, width: petW(), height: petH() }
   const x = r.left + r.width / 2
   const y = r.top + r.height * 0.28
   for (let i = 0; i < 2; i++) {
@@ -1080,7 +1132,7 @@ function spawnPetHearts() {
 function petFeed() {
   wakePet()
   const el = document.querySelector('.pet-float')
-  const r = el ? el.getBoundingClientRect() : { left: petPos.value.x, top: petPos.value.y, width: PET_W, height: PET_H }
+  const r = el ? el.getBoundingClientRect() : { left: petPos.value.x, top: petPos.value.y, width: petW(), height: petH() }
   const food = document.createElement('div')
   food.className = 'pet-food'
   food.textContent = '🍖'
@@ -1100,7 +1152,7 @@ function petFeed() {
 function petPlayBall() {
   wakePet()
   const el = document.querySelector('.pet-float')
-  const r = el ? el.getBoundingClientRect() : { left: petPos.value.x, top: petPos.value.y, width: PET_W, height: PET_H }
+  const r = el ? el.getBoundingClientRect() : { left: petPos.value.x, top: petPos.value.y, width: petW(), height: petH() }
   const ball = document.createElement('div')
   ball.className = 'pet-ball'
   ball.textContent = '🎾'
@@ -1152,7 +1204,7 @@ function togglePetSleep() {
 function petSing() {
   wakePet()
   const el = document.querySelector('.pet-float')
-  const r = el ? el.getBoundingClientRect() : { left: petPos.value.x, top: petPos.value.y, width: PET_W, height: PET_H }
+  const r = el ? el.getBoundingClientRect() : { left: petPos.value.x, top: petPos.value.y, width: petW(), height: petH() }
   const notes = ['♪', '♫', '🎵', '♬']
   for (let i = 0; i < 6; i++) {
     const n = document.createElement('div')
@@ -1346,7 +1398,7 @@ function petStageRect() {
   const el = document.querySelector('.pet-float')
   return el
     ? el.getBoundingClientRect()
-    : { left: petPos.value.x, top: petPos.value.y, width: PET_W, height: PET_H }
+    : { left: petPos.value.x, top: petPos.value.y, width: petW(), height: petH() }
 }
 
 // 抛出头顶法环：复用现有的 throw 动作与 pet-rune-throw 动画
@@ -1844,8 +1896,8 @@ function schedulePetWander() {
 
 // 随机选一个附近的目的地：多数时候小范围踱步，偶尔走远一点
 function pickPetDestination() {
-  const maxX = Math.max(0, window.innerWidth - PET_W)
-  const maxY = Math.max(0, window.innerHeight - PET_H)
+  const maxX = Math.max(0, window.innerWidth - petW())
+  const maxY = Math.max(0, window.innerHeight - petH())
   const far = Math.random() < 0.15
   const rangeX = far ? window.innerWidth * 0.4 : 170
   const rangeY = far ? window.innerHeight * 0.35 : 90
@@ -1867,7 +1919,9 @@ function startPetWalk() {
   petFaceDir.value = to.x < from.x ? -1 : 1
   petWalking.value = true
   // 悄悄移动就不发声了，避免打扰
-  const dur = Math.max(1600, Math.min(6000, dist * 11))
+  // 移动端宠物更小，移动速度减半（时长翻倍）
+  const speedFactor = isMobileView.value ? 22 : 11
+  const dur = Math.max(1600, Math.min(6000, dist * speedFactor))
   const t0 = performance.now()
   const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2)
   const step = (now) => {
@@ -2160,6 +2214,15 @@ defineExpose({
   height: 230px;
   pointer-events: none;
   touch-action: none;
+}
+
+/* 移动端：宠物整体缩小一半。以左上角为缩放原点，使 petPos 仍是视觉左上角，
+   与 JS 侧的 petW()/petH()（返回缩放后尺寸）保持一致 */
+.pet-float.pet-compact {
+  transform: scale(0.5);
+  transform-origin: top left;
+  /* 跳跃/起伏高度减半 */
+  --pet-hop: 0.5;
 }
 
 .pet-inner {
@@ -2804,11 +2867,7 @@ defineExpose({
   transition: opacity 0.25s ease, transform 0.25s ease;
 }
 
-.pet-float.is-waiting .pet-bubble {
-  opacity: 1;
-  transform: translateX(-50%) scale(1);
-  animation: pet-bubble-bounce 1s ease-in-out infinite;
-}
+/* 等待输入不再常驻显示气泡（避免空条条）；气泡仅在 is-speak（有临时台词）时显示 */
 
 /* 随机小动作 */
 .pet-float.act-look .pet-head {
@@ -2843,7 +2902,7 @@ defineExpose({
     transform: translateX(-50%) scaleX(var(--pet-flip, 1)) translateY(0);
   }
   50% {
-    transform: translateX(-50%) scaleX(var(--pet-flip, 1)) translateY(-13px);
+    transform: translateX(-50%) scaleX(var(--pet-flip, 1)) translateY(calc(-13px * var(--pet-hop, 1)));
   }
 }
 
@@ -2930,7 +2989,7 @@ defineExpose({
     transform: translateX(-50%) scaleX(var(--pet-flip, 1)) translateY(0) scale(1, 1);
   }
   30% {
-    transform: translateX(-50%) scaleX(var(--pet-flip, 1)) translateY(-26px) scale(0.94, 1.08);
+    transform: translateX(-50%) scaleX(var(--pet-flip, 1)) translateY(calc(-26px * var(--pet-hop, 1))) scale(0.94, 1.08);
   }
   60% {
     transform: translateX(-50%) scaleX(var(--pet-flip, 1)) translateY(0) scale(1.06, 0.94);
@@ -3522,6 +3581,12 @@ defineExpose({
   animation: pet-badge-pulse 1.4s ease-in-out infinite;
 }
 
+/* 有等待输入的 Agent 时，徽标可点击跳转 */
+.pet-badge.is-clickable {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
 @keyframes pet-badge-pulse {
   0%, 100% { transform: translateX(-50%) scale(1); }
   50% { transform: translateX(-50%) scale(1.12); }
@@ -3563,75 +3628,61 @@ defineExpose({
   background: radial-gradient(circle at center, rgba(8, 18, 32, 0.28), rgba(4, 10, 20, 0.55));
   animation: pet-menu-fade 0.18s ease-out;
 }
-.pet-menu-ring {
+.pet-menu-list {
   position: fixed;
-  width: 0;
-  height: 0;
-  transform: translate(-50%, -50%);
-}
-.pet-menu-hub {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 40px;
-  height: 40px;
-  margin: -20px 0 0 -20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  color: #8fe6ff;
-  border: 1px solid rgba(32, 200, 255, 0.5);
-  border-radius: 50%;
-  background: rgba(10, 24, 40, 0.9);
-  box-shadow: 0 0 18px rgba(32, 200, 255, 0.45);
-  animation: pet-menu-spin 6s linear infinite;
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  box-sizing: border-box;
+  border: 1px solid rgba(32, 200, 255, 0.35);
+  border-radius: 14px;
+  background: rgba(8, 20, 34, 0.92);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.55), 0 0 18px rgba(32, 200, 255, 0.22);
+  animation: pet-menu-pop 0.18s ease-out;
 }
 .pet-menu-item {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 46px;
-  height: 46px;
-  margin: -23px 0 0 -23px;
-  padding: 0;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 1px;
-  border: 1px solid rgba(32, 200, 255, 0.42);
-  border-radius: 50%;
-  background: rgba(13, 28, 46, 0.94);
+  gap: 6px;
+  width: 100%;
+  height: 36px;
+  padding: 0 8px;
+  box-sizing: border-box;
+  border: 1px solid rgba(32, 200, 255, 0.28);
+  border-radius: 9px;
+  background: rgba(13, 28, 46, 0.9);
   color: #cfefff;
+  font-size: 12px;
+  text-align: left;
   cursor: pointer;
   user-select: none;
   touch-action: manipulation;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.5), 0 0 10px rgba(32, 200, 255, 0.25);
-  animation: pet-menu-pop 0.2s ease-out;
   transition: background 0.15s ease, box-shadow 0.15s ease;
 }
-.pet-menu-item.ring-inner {
-  border-color: rgba(120, 220, 255, 0.6);
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.5), 0 0 14px rgba(32, 200, 255, 0.45);
+.pet-menu-item.is-inner {
+  border-color: rgba(120, 220, 255, 0.55);
+  background: rgba(20, 44, 70, 0.92);
 }
 .pet-menu-item:hover:not(:disabled) {
-  background: rgba(32, 200, 255, 0.28);
-  box-shadow: 0 0 18px rgba(32, 200, 255, 0.6);
+  background: rgba(32, 200, 255, 0.26);
+  box-shadow: 0 0 14px rgba(32, 200, 255, 0.45);
 }
 .pet-menu-item.is-disabled {
   opacity: 0.35;
   cursor: not-allowed;
 }
 .pet-menu-ico {
-  font-size: 15px;
+  flex-shrink: 0;
+  width: 16px;
+  font-size: 13px;
   line-height: 1;
+  text-align: center;
 }
 .pet-menu-label {
-  max-width: 44px;
-  font-size: 9px;
-  line-height: 1.05;
-  text-align: center;
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.15;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3642,12 +3693,8 @@ defineExpose({
   to { opacity: 1; }
 }
 @keyframes pet-menu-pop {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-@keyframes pet-menu-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ZZZ 睡眠标识 */

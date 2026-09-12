@@ -66,6 +66,8 @@ const props = defineProps({
   actions: { type: Array, default: () => [] },
   ctx: { type: Object, default: () => ({}) },
   title: { type: String, default: '搜索命令…' },
+  // 打开时的预输入内容（如 'a>' 直接进入 Agent 列表）
+  initialQuery: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:visible', 'run', 'close'])
@@ -298,7 +300,7 @@ watch(
   () => props.visible,
   visible => {
     if (visible) {
-      query.value = ''
+      query.value = props.initialQuery || ''
       activeIndex.value = 0
       itemRefs.clear()
       nextTick(() => inputEl.value?.focus())
