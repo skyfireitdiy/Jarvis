@@ -503,10 +503,12 @@
         <PetLobby
           ref="petLobbyRef"
           :agents="agentList"
+          :nodes="availableNodeOptions"
           :getStatusClass="getStatusClass"
           :getInputState="getLobbyInputState"
           :getLatestOutput="getLobbyLatestOutput"
           :historyNav="onLobbyHistoryNav"
+          :getNodeDisplayName="getNodeDisplayName"
           @selectAgent="onLobbySelectAgent"
           @sendInput="sendLobbyInput"
           @complete="onLobbyComplete"
@@ -7194,8 +7196,11 @@ async function createAgent() {
       newAgentAccessAclInteract.value = []
       // 重置为默认名称（根据当前选中的 agent 类型）
       newAgentName.value = generateAgentName(newAgentType.value)
-      // 立即在 Panel 中打开新创建的 agent
-      await openAgentInPanel(agent)
+      // 若当前处于宠物大厅（无任何可见 Panel），保持在大厅，不切换到 Panel；
+      // 否则（已有 Panel 打开）按原逻辑在新 Panel 中打开该 Agent
+      if (!hasNoPanel.value) {
+        await openAgentInPanel(agent)
+      }
       // 刷新列表
       await fetchAgentList()
       // 开始定时刷新列表

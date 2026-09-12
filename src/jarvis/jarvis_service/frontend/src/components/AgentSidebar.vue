@@ -129,6 +129,7 @@
       :class="petClasses"
       :style="{ left: petPos.x + 'px', top: petPos.y + 'px' }"
       aria-hidden="true"
+      @contextmenu.prevent
     >
       <div class="pet-inner">
         <div class="pet-glow"></div>
