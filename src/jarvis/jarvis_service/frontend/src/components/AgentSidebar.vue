@@ -883,14 +883,20 @@ let petPettingFxTimer = 0      // 摸头爱心循环
 const petMenuOpen = ref(false)
 const petMenuOrigin = ref({ x: 0, y: 0 })   // 菜单圆心（屏幕坐标）
 let petMenuLongPressTimer = 0               // 还原按钮长按判定
+// 菜单刚展开的短暂窗口内忽略点击：避免触发长按/双击的那一次指针抬起
+// 被浏览器补发成 click，落在新出现的菜单项上而误执行命令
+const PET_MENU_ARM_DELAY = 260
+let petMenuArmedAt = 0
 
 // 网格菜单尺寸与间距
-const PET_MENU_COL_W = 116   // 单列宽
-const PET_MENU_ITEM_H = 36   // 单项高
-const PET_MENU_GAP = 6
-const PET_MENU_PAD = 8
+const PET_MENU_COL_W = 92    // 单列宽
+const PET_MENU_ITEM_H = 30   // 单项高
+const PET_MENU_GAP = 5
+const PET_MENU_PAD = 6
 const PET_MENU_MARGIN = 8    // 距视口边缘的最小留白
 const PET_MENU_MAX_ROWS = 7  // 最多行数，超出则分两列
+// 菜单锚点：以点击位置为基准向外偏移，避免手指/指针仍停留在菜单项上
+const PET_MENU_ANCHOR_OFFSET = 26
 
 // 菜单项顺序：内圈（常用）在前，外圈在后
 const petMenuItems = computed(() => {
@@ -915,12 +921,14 @@ const petMenuLayout = computed(() => {
   const ox = petMenuOrigin.value.x
   const oy = petMenuOrigin.value.y
 
-  // 水平：优先放锚点右侧，放不下则放左侧
-  let left = ox + 12
-  if (left + listW + PET_MENU_MARGIN > vw) left = ox - 12 - listW
+  // 水平：优先放锚点右侧；空间不足则翻到左侧，尽量仍以锚点为中心
+  let left = ox + PET_MENU_ANCHOR_OFFSET
+  if (left + listW + PET_MENU_MARGIN > vw) left = ox - PET_MENU_ANCHOR_OFFSET - listW
+  // 若左侧也放不下（锚点两侧都紧），退化为「以锚点为中心」并夹取到视口内
+  if (left < PET_MENU_MARGIN) left = ox - listW / 2
   left = Math.max(PET_MENU_MARGIN, Math.min(vw - listW - PET_MENU_MARGIN, left))
 
-  // 垂直：列表垂直居中于锚点，再夹取到视口内
+  // 垂直：以锚点为中心（点击位置落在菜单中段），再夹取到视口内
   let top = oy - listH / 2
   top = Math.max(PET_MENU_MARGIN, Math.min(vh - listH - PET_MENU_MARGIN, top))
 
@@ -942,6 +950,7 @@ function openPetMenu(cx, cy) {
   if (ae && ae !== document.body && typeof ae.blur === 'function') ae.blur()
   petMenuOrigin.value = { x: cx, y: cy }
   petMenuOpen.value = true
+  petMenuArmedAt = Date.now() + PET_MENU_ARM_DELAY
   petDragging = false
   petDrag.value = false
   clearTimeout(petLongPressTimer)
@@ -960,6 +969,8 @@ function togglePetMenu(cx, cy) {
 
 function onPetMenuRun(action) {
   if (!action) return
+  // 菜单刚展开时忽略点击（吞掉触发展开的那次指针事件补发的 click）
+  if (Date.now() < petMenuArmedAt) return
   closePetMenu()
   emit('petRadialRun', action)
 }
@@ -984,13 +995,13 @@ function onPetPointerDown(e) {
   petOriginY = petPos.value.y
   e.target.setPointerCapture?.(e.pointerId)
   e.preventDefault()
-  // 长按判定：600ms 未移动则弹出环形菜单
+  // 长按判定：600ms 未移动则撒花庆祝并唤起命令面板
   clearTimeout(petLongPressTimer)
   petLongPressTimer = window.setTimeout(() => {
     if (petDragging && !petMoved) {
       petLongPressFired = true
       const r = petStageRect()
-      togglePetMenu(r.left + r.width / 2, r.top + r.height / 2)
+      onPetDoubleClick(r.left + r.width / 2, r.top + r.height / 2)
     }
   }, 600)
 }
@@ -1029,10 +1040,10 @@ function onPetPointerUp(e) {
   }
   // 单击 / 双击判定
   if (petClickTimer) {
-    // 300ms 内第二次：双击
+    // 300ms 内第二次：双击 → 弹出环形菜单
     clearTimeout(petClickTimer)
     petClickTimer = 0
-    onPetDoubleClick(e.clientX, e.clientY)
+    togglePetMenu(e.clientX, e.clientY)
     return
   }
   const cx = e.clientX
@@ -1056,7 +1067,7 @@ function onPetSingleClick(x, y) {
   showPetSpeech()
 }
 
-// 双击：撒花庆祝，并唤起命令面板
+// 长按行为：撒花庆祝，并唤起命令面板
 function onPetDoubleClick(x, y) {
   wakePet()
   petJump.value = true
@@ -3604,6 +3615,27 @@ defineExpose({
   cursor: pointer;
 }
 
+/* 移动端：徽标放大，便于手指点击 */
+.pet-float.pet-compact .pet-badge {
+  top: 22px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 10px;
+  font-size: 19px;
+  border-radius: 17px;
+}
+
+/* 移动端：扩大徽标的可点击热区（视觉不变，热区外扩） */
+.pet-float.pet-compact .pet-badge.is-clickable::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 56px;
+  height: 56px;
+  transform: translate(-50%, -50%);
+}
+
 @keyframes pet-badge-pulse {
   0%, 100% { transform: translateX(-50%) scale(1); }
   50% { transform: translateX(-50%) scale(1.12); }
@@ -3648,11 +3680,11 @@ defineExpose({
 .pet-menu-list {
   position: fixed;
   display: grid;
-  gap: 6px;
-  padding: 8px;
+  gap: 5px;
+  padding: 6px;
   box-sizing: border-box;
   border: 1px solid rgba(32, 200, 255, 0.35);
-  border-radius: 14px;
+  border-radius: 12px;
   background: rgba(8, 20, 34, 0.92);
   box-shadow: 0 10px 32px rgba(0, 0, 0, 0.55), 0 0 18px rgba(32, 200, 255, 0.22);
   animation: pet-menu-pop 0.18s ease-out;
@@ -3660,16 +3692,16 @@ defineExpose({
 .pet-menu-item {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   width: 100%;
-  height: 36px;
-  padding: 0 8px;
+  height: 30px;
+  padding: 0 7px;
   box-sizing: border-box;
   border: 1px solid rgba(32, 200, 255, 0.28);
-  border-radius: 9px;
+  border-radius: 8px;
   background: rgba(13, 28, 46, 0.9);
   color: #cfefff;
-  font-size: 12px;
+  font-size: 11px;
   text-align: left;
   cursor: pointer;
   user-select: none;
@@ -3690,15 +3722,15 @@ defineExpose({
 }
 .pet-menu-ico {
   flex-shrink: 0;
-  width: 16px;
-  font-size: 13px;
+  width: 15px;
+  font-size: 12px;
   line-height: 1;
   text-align: center;
 }
 .pet-menu-label {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.15;
   overflow: hidden;
   text-overflow: ellipsis;

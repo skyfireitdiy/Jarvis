@@ -5399,9 +5399,19 @@ function isCurrentAgent(agentId) {
   return agentId === currentAgentId.value
 }
 
+// 弹窗刚关闭后的静默窗口：这段时间内抑制自动聚焦。
+// 弹窗关闭后，此前挂起的异步状态同步（如 fetchAgentStatus）可能才 resolve，
+// 若此时直接聚焦输入框，会把焦点从用户刚操作完的位置抢走。
+let modalAutoFocusSuppressUntil = 0
+const MODAL_AUTOFOCUS_SUPPRESS_MS = 600
+
 // 是否有任何模态弹窗/浮层处于打开状态。
 // 用于阻止 Agent 推送的 input_request/confirm/ready 抢占用户焦点：
 // 用户正在弹窗中操作（如创建 Agent）时，焦点不应被自动聚焦逻辑夺走。
+function isAutoFocusSuppressed() {
+  return isAnyModalOpen() || Date.now() < modalAutoFocusSuppressUntil
+}
+
 function isAnyModalOpen() {
   return Boolean(
     showConnectModal.value ||
@@ -6604,14 +6614,14 @@ async function fetchAgentStatus(agent) {
         // 聚焦输入框（弹窗或宠物环形菜单打开时不抢焦点）
         const targetPanel = panels.value.find(p => p.agentId === agent.agent_id)
         const sp = targetPanel ? sessionPanelRefs.get(targetPanel.id) : null
-        if (sp?.focusInput && !isAnyModalOpen() && !isPetMenuOpen()) sp.focusInput()
+        if (sp?.focusInput && !isAutoFocusSuppressed() && !isPetMenuOpen()) sp.focusInput()
       } else if (executionStatus === 'waiting_multi') {
         inputMode.value = 'multi'
         panelInputModes.value.set(agent.agent_id, 'multi')
         // 聚焦输入框（弹窗或宠物环形菜单打开时不抢焦点）
         const targetPanel = panels.value.find(p => p.agentId === agent.agent_id)
         const sp = targetPanel ? sessionPanelRefs.get(targetPanel.id) : null
-        if (sp?.focusInput && !isAnyModalOpen() && !isPetMenuOpen()) sp.focusInput()
+        if (sp?.focusInput && !isAutoFocusSuppressed() && !isPetMenuOpen()) sp.focusInput()
       } else if (executionStatus === 'waiting_confirm') {
         // 从 status 响应中获取 pending_confirm 并显示对话框
         const pendingConfirm = result.pending_confirm
@@ -6631,7 +6641,7 @@ async function fetchAgentStatus(agent) {
           // 聚焦输入框（弹窗或宠物环形菜单打开时不抢焦点）
           const targetPanel = panels.value.find(p => p.agentId === agent.agent_id)
           const sp = targetPanel ? sessionPanelRefs.get(targetPanel.id) : null
-          if (sp?.focusInput && !isAnyModalOpen() && !isPetMenuOpen()) sp.focusInput()
+          if (sp?.focusInput && !isAutoFocusSuppressed() && !isPetMenuOpen()) sp.focusInput()
           // 无 Panel 时不弹全局对话框，确认请求静默等待，用户打开 Panel 后可见 confirm 控件
         } else {
           console.warn('[AGENT STATUS] waiting_confirm but no pending_confirm payload found')
@@ -7824,6 +7834,17 @@ const showEditAccessModal = ref(false)
 const editingAccessAgent = ref(null)
 const editAccessRead = ref([])
 const editAccessInteract = ref([])
+
+// 弹窗关闭后开启自动聚焦静默窗口：
+// 避免关闭瞬间挂起的异步状态同步（fetchAgentStatus）把焦点抢回输入框。
+// 注意：必须放在所有被监听的 ref 与 modalAutoFocusSuppressUntil 声明之后，
+// 否则 watch 注册时立即求值 getter 会命中 let/const 的暂时性死区（TDZ）而报错。
+watch([showRenameAgentModal, showEditAccessModal, showCreateAgentModal, showSettingsModal], (values, prevValues) => {
+  const anyClosed = values.some((v, i) => !v && prevValues[i])
+  if (anyClosed) {
+    modalAutoFocusSuppressUntil = Date.now() + MODAL_AUTOFOCUS_SUPPRESS_MS
+  }
+})
 
 async function editAgentAccess(agent) {
   editingAccessAgent.value = agent
