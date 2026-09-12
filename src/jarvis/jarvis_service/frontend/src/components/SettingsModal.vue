@@ -78,6 +78,37 @@
       </div>
 
 
+      <!-- 隐藏工作目录 -->
+      <div class="form-group">
+        <div class="toggle-wrapper">
+          <label class="toggle-switch">
+            <input type="checkbox" v-model="localHideWorkingDir" @change="handleHideWorkingDirChange" class="toggle-input" />
+            <span class="toggle-slider"></span>
+          </label>
+          <div class="toggle-info">
+            <span class="toggle-label-text">隐藏工作目录</span>
+            <span class="form-help">启用后，界面上的 Agent 工作目录将显示为占位符，适合录屏或截图时使用（仅本机浏览器生效）。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 节点显示名映射 -->
+      <div class="form-group">
+        <label>节点显示名</label>
+        <div class="form-help" style="margin-bottom:10px">为节点自定义显示名称（仅本机浏览器生效，留空则显示原始节点 ID）。</div>
+        <div v-if="nodeList.length === 0" class="form-help">暂无可用节点。</div>
+        <div v-for="node in nodeList" :key="node.value" class="node-name-row">
+          <span class="node-name-origin" :title="node.value">{{ node.value }}</span>
+          <input
+            class="node-name-input"
+            :value="localNodeDisplayNames[node.value] || ''"
+            :placeholder="node.label && node.label !== node.value ? node.label : '自定义显示名'"
+            @input="onNodeNameInput(node.value, $event.target.value)"
+            @keydown.enter="$event.target.blur()"
+          />
+        </div>
+      </div>
+
       <!-- 连接管理 -->
       <div class="form-group">
         <label>连接管理</label>
@@ -129,7 +160,10 @@ const props = defineProps({
   fetchWithAuth: { type: Function, default: null },
   gatewayUrl: { type: String, default: '127.0.0.1:8000' },
   getHttpProtocol: { type: Function, default: () => 'http' },
-  showToast: { type: Function, default: () => {} }
+  showToast: { type: Function, default: () => {} },
+  nodeOptions: { type: Array, default: () => [] },
+  nodeDisplayNames: { type: Object, default: () => ({}) },
+  hideWorkingDir: { type: Boolean, default: false }
 })
 
 const emit = defineEmits([
@@ -140,15 +174,34 @@ const emit = defineEmits([
   'saveAutoLoginSetting',
   'update:notifyOnExit',
   'update:notifyOnInput',
-  'saveNotifySettings'
+  'saveNotifySettings',
+  'saveNodeDisplayNames',
+  'update:hideWorkingDir',
+  'saveHideWorkingDirSetting'
 ])
 
 // 本地状态
 const localAutoLoginEnabled = ref(props.autoLoginEnabled)
 const localNotifyOnExit = ref(props.notifyOnExit)
 const localNotifyOnInput = ref(props.notifyOnInput)
+const localHideWorkingDir = ref(props.hideWorkingDir)
 const changePasswordForm = ref({ old_password: '', new_password: '', confirm_password: '' })
 const loading = ref(false)
+// 节点显示名本地副本（编辑中，input 时即时更新并向上同步）
+const localNodeDisplayNames = ref({ ...(props.nodeDisplayNames || {}) })
+
+// 节点列表（去重，value 为原始 node_id）
+const nodeList = computed(() => {
+  const seen = new Set()
+  const list = []
+  for (const opt of props.nodeOptions || []) {
+    const value = opt && opt.value
+    if (!value || seen.has(value)) continue
+    seen.add(value)
+    list.push({ value, label: opt.label || value })
+  }
+  return list
+})
 
 // 计算属性
 const currentUserInfo = computed(() => props.auth?.userInfo || null)
@@ -192,6 +245,30 @@ watch(() => props.notifyOnExit, (newVal) => {
 watch(() => props.notifyOnInput, (newVal) => {
   localNotifyOnInput.value = newVal
 })
+
+watch(() => props.nodeDisplayNames, (newVal) => {
+  localNodeDisplayNames.value = { ...(newVal || {}) }
+}, { deep: true })
+
+watch(() => props.hideWorkingDir, (newVal) => {
+  localHideWorkingDir.value = newVal
+})
+
+// 隐藏工作目录开关变更
+function handleHideWorkingDirChange() {
+  emit('update:hideWorkingDir', localHideWorkingDir.value)
+  emit('saveHideWorkingDirSetting', localHideWorkingDir.value)
+}
+
+// 节点显示名输入：更新本地副本并向上同步（父组件负责持久化）
+function onNodeNameInput(nodeId, value) {
+  const next = { ...localNodeDisplayNames.value }
+  const trimmed = String(value || '').trim()
+  if (trimmed) next[nodeId] = trimmed
+  else delete next[nodeId]
+  localNodeDisplayNames.value = next
+  emit('saveNodeDisplayNames', next)
+}
 
 // 关闭弹窗
 function close() {
@@ -701,6 +778,33 @@ async function changePassword() {
   height: 16px;
   cursor: pointer;
   accent-color: var(--color-accent);
+}
+
+/* ========== 节点显示名映射样式 ========== */
+.node-name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.node-name-row:last-child {
+  margin-bottom: 0;
+}
+
+.node-name-origin {
+  flex: 0 0 40%;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node-name-input {
+  flex: 1;
+  min-width: 0;
 }
 
 /* ========== 私钥显示区域样式 ========== */
