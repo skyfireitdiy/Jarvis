@@ -498,30 +498,20 @@
         </template>
       </EditorPanel>
 
-      <!-- 空状态：无任何可见 Panel 时的欢迎背景特效 -->
+      <!-- 空状态：无任何可见 Panel 时的宠物大厅（所有 Agent 的迷你宠物自由游动） -->
       <div v-if="hasNoPanel" class="empty-stage">
-        <div class="empty-stage-grid"></div>
-        <div class="empty-stage-glow empty-stage-glow-a"></div>
-        <div class="empty-stage-glow empty-stage-glow-b"></div>
-        <div class="empty-stage-orbit">
-          <span class="empty-stage-ring"></span>
-          <span class="empty-stage-ring empty-stage-ring-2"></span>
-          <span class="empty-stage-core">
-            <img src="/icons/jarvis-pet.svg" alt="Jarvis" class="empty-stage-logo" />
-          </span>
-        </div>
-        <div class="empty-stage-text">
-          <h1 class="empty-stage-title">JARVIS</h1>
-          <p class="empty-stage-slogan">独当一面，与众共事</p>
-          <p class="empty-stage-sub">让 AI 从「独自工作」走向「与众共事」</p>
-          <div class="empty-stage-quadrants">
-            <span class="empty-stage-quadrant"><b>单人单 Agent</b>独当一面</span>
-            <span class="empty-stage-quadrant"><b>单人多 Agent</b>一人驱动一个团队</span>
-            <span class="empty-stage-quadrant"><b>多人单 Agent</b>团队共享一个 AI</span>
-            <span class="empty-stage-quadrant"><b>多人多 Agent</b>分布式协作网络</span>
-          </div>
-          <p class="empty-stage-hint">按 <kbd>Ctrl</kbd>+<kbd>P</kbd> 打开命令面板，或从侧边栏创建一个 Agent</p>
-        </div>
+        <PetLobby
+          ref="petLobbyRef"
+          :agents="agentList"
+          :getStatusClass="getStatusClass"
+          :getInputState="getLobbyInputState"
+          :getLatestOutput="getLobbyLatestOutput"
+          :historyNav="onLobbyHistoryNav"
+          @selectAgent="onLobbySelectAgent"
+          @sendInput="sendLobbyInput"
+          @complete="onLobbyComplete"
+          @openCompletions="onLobbyOpenCompletions"
+        />
       </div>
     </main>
     <template v-for="panel in panels" :key="'floating-' + panel.id">
@@ -1288,6 +1278,7 @@ import RenameAgentModal from './components/RenameAgentModal.vue'
 import AdminPanel from './components/AdminPanel.vue'
 import CommandPalette from './components/CommandPalette.vue'
 import TopologyOverlay from './components/TopologyOverlay.vue'
+import PetLobby from './components/PetLobby.vue'
 import { ACTIONS as actionDefs } from './actions/registry.js'
 
 const PLANTUML_SERVER_URL = 'https://www.plantuml.com/plantuml/svg/'
@@ -4368,6 +4359,7 @@ async function openCompletionsFromPanel(panel) {
   }
 
   completionAgentId.value = panel.agentId
+  completionSource.value = 'panel'
   // 由 @ 按钮触发时（未经过 handlePanelInputChange / handlePanelKeydown），
   // 输入框中并没有 @ 符号，需记录当前光标位置作为插入点，并标记无需删除 @
   if (completionCursorPos.value === -1) {
@@ -4384,6 +4376,50 @@ async function openCompletionsFromPanel(panel) {
     const { host, port } = getGatewayAddress()
     const targetNodeId = String(agent?.node_id || '').trim() || 'master'
     const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `completions/${agent.agent_id}`))
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      alert(`获取补全列表失败: ${result.error?.message || result.detail || '未知错误'}`)
+      return
+    }
+
+    if (result.success && result.data) {
+      completions.value = sortCompletionItems(result.data)
+    } else {
+      console.error('[COMPLETIONS] Invalid format:', result)
+      alert('获取补全列表失败：返回数据格式错误')
+    }
+  } catch (error) {
+    console.error('[COMPLETIONS] Fetch failed:', error)
+    alert(`获取补全列表失败: ${error.message}`)
+  }
+
+  // PC端聚焦搜索框，移动端不聚焦
+  if (windowWidth.value > 768) {
+    nextTick(() => {
+      completionSearchInput.value?.focus()
+    })
+  }
+}
+
+// 从宠物大厅输入框打开补全：agentId 为大厅中对应宠物，cursorPos 为 @ 符号位置
+async function onLobbyOpenCompletions(agentId, cursorPos) {
+  if (!agentId) return
+  const agent = agentList.value.find(a => a.agent_id === agentId)
+  if (!agent) return
+
+  completionAgentId.value = agentId
+  completionSource.value = 'lobby'
+  completionCursorPos.value = typeof cursorPos === 'number' ? cursorPos : -1
+  completionHasAtSymbol.value = true
+  completionSearch.value = ''
+  selectedIndex.value = -1
+  showCompletions.value = true
+  try {
+    const { host, port } = getGatewayAddress()
+    const targetNodeId = String(agent?.node_id || '').trim() || 'master'
+    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `completions/${agentId}`))
 
     const result = await response.json()
 
@@ -5614,6 +5650,8 @@ const showCompletions = ref(false) // 是否显示补全列表
 const completionCursorPos = ref(-1) // 记录打开补全列表时的光标位置
 const completionHasAtSymbol = ref(false) // 打开补全时输入框中是否已存在待替换的 @ 符号
 const completionAgentId = ref(null) // 记录打开补全列表时的 Panel agentId
+const completionSource = ref('panel') // 补全来源：'panel' 或 'lobby'（宠物大厅）
+const petLobbyRef = ref(null) // 宠物大厅组件引用（用于写回大厅输入框补全文本）
 const completions = ref([]) // 补全列表数据
 const completionSearch = ref('') // 补全搜索关键词
 const fileCompletions = ref([]) // 文件补全搜索结果
@@ -5627,9 +5665,16 @@ watch(completionSearch, async (newSearch) => {
   if (newSearch.trim()) {
     try {
       const { host, port } = getGatewayAddress()
-      const targetNodeId = String(getCurrentAgentNodeId() || 'master').trim() || 'master'
+      // 优先使用打开补全时记录的 agent（可能是宠物大厅中的 agent），否则回退到当前 agent
+      const searchAgentId = completionAgentId.value || currentAgent.value?.agent_id
+      if (!searchAgentId) {
+        fileCompletions.value = []
+        return
+      }
+      const searchAgent = agentList.value.find(a => a.agent_id === searchAgentId)
+      const targetNodeId = String(searchAgent?.node_id || getCurrentAgentNodeId() || 'master').trim() || 'master'
       const response = await fetchWithAuth(
-        buildNodeHttpUrl(host, port, targetNodeId, `completions/${currentAgent.value.agent_id}/search?query=${encodeURIComponent(newSearch)}`)
+        buildNodeHttpUrl(host, port, targetNodeId, `completions/${searchAgentId}/search?query=${encodeURIComponent(newSearch)}`)
       )
       
       const result = await response.json()
@@ -7229,7 +7274,7 @@ const filteredCompletions = computed(() => {
 
 // 关闭补全对话框（取消选择）：键盘输入 @ 触发时保留 @ 符号，按钮触发时无需插入任何字符
 function closeCompletionsWithoutSelect() {
-  if (completionHasAtSymbol.value) {
+  if (completionHasAtSymbol.value && completionSource.value !== 'lobby') {
     insertAtPosition('@', completionCursorPos.value, completionAgentId.value)
   }
   showCompletions.value = false
@@ -7237,6 +7282,7 @@ function closeCompletionsWithoutSelect() {
   completionCursorPos.value = -1
   completionHasAtSymbol.value = false
   completionAgentId.value = null
+  completionSource.value = 'panel'
 }
 
 // 处理补全对话框的键盘事件
@@ -7345,6 +7391,25 @@ function insertAtPosition(text, position, agentId = null) {
 // 插入选中的补全
 function insertCompletion(item, agentId = null) {
   const targetAgentId = agentId || currentAgentId.value
+
+  // 来自宠物大厅：写回 PetLobby 内部输入框
+  if (completionSource.value === 'lobby') {
+    recordCompletionSelection(item)
+    petLobbyRef.value?.insertCompletionText?.(
+      targetAgentId,
+      item.value,
+      completionCursorPos.value,
+      completionHasAtSymbol.value,
+    )
+    showCompletions.value = false
+    selectedIndex.value = -1
+    completionCursorPos.value = -1
+    completionHasAtSymbol.value = false
+    completionAgentId.value = null
+    completionSource.value = 'panel'
+    return
+  }
+
   const textarea = targetAgentId
     ? document.querySelector(`.input-wrapper textarea[data-agent-id="${targetAgentId}"]`) || document.querySelector('.input-wrapper textarea')
     : document.querySelector('.input-wrapper textarea')
@@ -8288,6 +8353,179 @@ async function toggleNodeExpand(agentId, node) {
     if (!node.loaded) {
       await loadFileTreeNode(agentId, node)
     }
+  }
+}
+
+// 宠物大厅：点击某只宠物，进入该 Agent 的详细视图（打开面板）
+function onLobbySelectAgent(agentId) {
+  const agent = agentList.value.find(a => a.agent_id === agentId)
+  if (!agent) return
+  openAgentInPanel(agent)
+}
+
+// 宠物大厅：获取某 Agent 的输入态（供大厅宠物输入框使用）
+// 返回 { mode: 'multi'|'single'|'confirm', tip, preset, isPassword, confirmMessage, confirmDefault }
+function getLobbyInputState(agentId) {
+  const statusData = agentStatuses.value.get(agentId)
+  const executionStatus = statusData?.execution_status || 'running'
+  const confirmData = panelConfirmData.value.get(agentId)
+  if (executionStatus === 'waiting_confirm' || confirmData) {
+    return {
+      mode: 'confirm',
+      tip: confirmData?.message || '请确认 (y/n)',
+      preset: '',
+      isPassword: false,
+      confirmMessage: confirmData?.message || '请确认',
+      confirmDefault: confirmData?.defaultConfirm !== false,
+    }
+  }
+  const request = inputRequests.value.get(agentId)
+  if (request) {
+    return {
+      mode: request.mode === 'single' ? 'single' : 'multi',
+      tip: request.tip || '',
+      preset: request.preset || '',
+      isPassword: !!request.is_password,
+      confirmMessage: '',
+      confirmDefault: true,
+    }
+  }
+  return { mode: 'multi', tip: '', preset: '', isPassword: false, confirmMessage: '', confirmDefault: true }
+}
+
+// 宠物大厅：发送输入到指定 Agent
+// mode: 'multi'|'single' 时走 input_result；'confirm' 时走 confirm_result
+// 判断逻辑与 panel 的 sendFromPanel 保持一致：依据 execution_status 决定直接发送还是写入缓冲区
+function sendLobbyInput(agentId, text, mode = 'multi') {
+  if (!agentId) return
+  if (mode === 'confirm') {
+    // 空输入视为确认（与 panel 行为一致）
+    const trimmed = String(text || '').trim().toLowerCase()
+    const confirmed = trimmed === '' || trimmed === 'y' || trimmed === 'yes' || trimmed === '确认' || trimmed === '是'
+    sendConfirmResult(confirmed, agentId)
+    return
+  }
+  const statusData = agentStatuses.value.get(agentId)
+  const executionStatus = statusData?.execution_status || 'running'
+  const hasBuffered = inputBuffers.value.has(agentId) && (inputBuffers.value.get(agentId) || '').trim()
+  // 单行输入或后端正在等待多行输入：直接发送
+  if (mode === 'single' || executionStatus === 'waiting_multi') {
+    let sendText = text
+    if (hasBuffered) {
+      const bufferedText = inputBuffers.value.get(agentId)
+      inputBuffers.value.delete(agentId)
+      sendText = text ? `${bufferedText}\n${text}` : bufferedText
+    }
+    sendInputDirectly(sendText, mode, agentId)
+    return
+  }
+  // 有缓冲区内容且后端未等待输入：先发送缓冲区内容
+  if (hasBuffered) {
+    sendBufferedInput(agentId)
+    if (text) {
+      const existingText = inputBuffers.value.get(agentId) || ''
+      const nextValue = existingText ? `${existingText}\n${text}` : text
+      inputBuffers.value.set(agentId, nextValue)
+      appendOutput({
+        output_type: 'system',
+        agent_name: 'system',
+        text: '✓ 输入已追加到缓冲区，等待后端请求',
+        lang: 'text',
+      }, agentId)
+    }
+    return
+  }
+  // 后端未在等待输入：保存到缓冲区（与 panel 行为一致）
+  const existingText = inputBuffers.value.get(agentId) || ''
+  const nextValue = existingText ? `${existingText}\n${text}` : text
+  inputBuffers.value.set(agentId, nextValue)
+  appendOutput({
+    output_type: 'system',
+    agent_name: 'system',
+    text: '✓ 输入已追加到缓冲区，等待后端请求',
+    lang: 'text',
+  }, agentId)
+}
+
+// 宠物大厅：获取某 Agent 的最新一条可显示输出（markdown 渲染后的 html）
+function getLobbyLatestOutput(agentId) {
+  const list = allOutputs.value.get(agentId)
+  if (list && list.length > 0) {
+    // 优先展示 Agent 的回复（STREAM）
+    for (let i = list.length - 1; i >= 0; i--) {
+      const item = list[i]
+      if (item.output_type !== 'STREAM') continue
+      if (!item.text) continue
+      return { html: item.html || escapeHtml(item.text), outputType: item.output_type }
+    }
+    // 没有 STREAM 时，回退到最新一条有文本的消息（连接后即可见）
+    for (let i = list.length - 1; i >= 0; i--) {
+      const item = list[i]
+      if (!item.text) continue
+      return { html: item.html || escapeHtml(item.text), outputType: item.output_type }
+    }
+  }
+  // 后台 Agent 的历史只写入 historyStorage，未同步到 allOutputs，这里回退读取
+  const history = historyStorage.getHistoryForAgent(agentId)
+  if (history && history.length > 0) {
+    for (let i = history.length - 1; i >= 0; i--) {
+      const item = history[i]
+      if (!item.text) continue
+      return { html: item.html || renderMessageHtml(item), outputType: item.output_type }
+    }
+  }
+  return null
+}
+
+// 宠物大厅：输入历史翻阅（与 Panel 行为一致，返回翻阅后的文本）
+const lobbyHistoryIndex = new Map() // agentId -> index（-1 表示回到最新）
+const lobbyHistoryTemp = new Map() // agentId -> 翻阅前暂存的内容
+function onLobbyHistoryNav(agentId, direction, currentText = '') {
+  const current = currentText || ''
+  let index = lobbyHistoryIndex.has(agentId) ? lobbyHistoryIndex.get(agentId) : -1
+  if (direction === 'up') {
+    if (index < inputHistory.value.length - 1) {
+      if (index === -1) lobbyHistoryTemp.set(agentId, current)
+      index++
+      lobbyHistoryIndex.set(agentId, index)
+      return inputHistory.value[index]
+    }
+    return current
+  } else {
+    if (index > -1) {
+      index--
+      lobbyHistoryIndex.set(agentId, index)
+      if (index === -1) return lobbyHistoryTemp.get(agentId) || ''
+      return inputHistory.value[index]
+    }
+    return current
+  }
+}
+
+// 宠物大厅：发送完成信号（与 Panel 的 completeFromPanel 行为一致）
+function onLobbyComplete(agentId) {
+  if (!agentId) return
+  const statusData = agentStatuses.value.get(agentId)
+  const executionStatus = statusData?.execution_status || 'running'
+  if (executionStatus === 'waiting_multi') {
+    const message = {
+      type: 'input_result',
+      payload: {
+        text: '__CTRL_C_PRESSED__',
+        agent_id: agentId,
+        display_name: chatName.value || username.value || '',
+        input_mode: 'single',
+      },
+    }
+    sendMessageToAgent(message, agentId)
+  } else {
+    inputBuffers.value.set(agentId, '__CTRL_C_PRESSED__')
+    appendOutput({
+      output_type: 'system',
+      agent_name: 'system',
+      text: '✅ 完成信号已保存到缓冲区，下次需要输入时自动触发',
+      lang: 'text',
+    }, agentId)
   }
 }
 
