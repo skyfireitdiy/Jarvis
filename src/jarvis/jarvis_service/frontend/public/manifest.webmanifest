@@ -4,7 +4,8 @@
   "description": "Jarvis Web Gateway PWA",
   "start_url": "/",
   "scope": "/",
-  "display": "standalone",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone", "minimal-ui"],
   "background_color": "#0d1117",
   "theme_color": "#0d1117",
   "icons": [
