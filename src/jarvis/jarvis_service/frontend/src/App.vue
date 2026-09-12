@@ -2197,9 +2197,9 @@ const globalSearchExecuted = ref(false)
 const showEditorSidebar = ref(true)
 const editorSidebarView = ref('files')
 const windowWidth = ref(window.innerWidth)  // 窗口宽度，用于响应式检测
-// 顶部标题栏自动隐藏：桌面端鼠标移到顶部感应区唤出，移动端经宠物菜单唤出
+// 顶部标题栏自动隐藏：默认隐藏，桌面端鼠标移到顶部感应区唤出，移动端经宠物菜单唤出
 const isMobileLayout = computed(() => windowWidth.value <= 768)
-const headerHidden = ref(window.innerWidth <= 768)
+const headerHidden = ref(true)
 const headerHeight = ref(0)
 let headerHideTimer = 0
 const headerRef = ref(null)

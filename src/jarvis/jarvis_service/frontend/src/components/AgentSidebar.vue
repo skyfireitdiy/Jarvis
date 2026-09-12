@@ -191,7 +191,6 @@
           @click.stop="togglePetSfx"
         >{{ petSfxOn ? '🔊' : '🔇' }}</button>
         <button
-          v-if="isMobileView"
           class="pet-power-btn"
           :class="{ 'is-on': petPowerSave }"
           :title="petPowerSave ? '关闭省电模式（恢复特效）' : '开启省电模式（关闭特效，降低耗电）'"
@@ -559,12 +558,12 @@ const petWalking = ref(false)    // 随机漫步中
 const petSpeech = ref('')        // 随机台词
 const petTopoOn = ref(true)      // 是否显示迷你拓扑图
 const petCast = ref('')          // 正在施放的法术类型（'' 表示未施法）
-const petPowerSave = ref(false)  // 省电模式：关闭一切装饰性特效与常驻运算（移动端）
+const petPowerSave = ref(false)  // 省电模式：关闭一切装饰性特效与常驻运算（移动端/桌面端均可开启）
 
-// 是否处于移动端（省电模式开关仅移动端可见）
+// 是否处于移动端（用于宠物整体缩放等，不再限制省电模式开关）
 const isMobileView = computed(() => (props.windowWidth || window.innerWidth) <= 768)
-// 省电模式生效中：仅在移动端且开关打开时生效
-const petPowerSaveActive = computed(() => isMobileView.value && petPowerSave.value)
+// 省电模式生效中：开关打开即生效（移动端与桌面端均可用）
+const petPowerSaveActive = computed(() => petPowerSave.value)
 
 // 头顶数字法环：一圈 0/1 灵符，玄幻风格，随状态联动
 const PET_RUNE_COUNT = 18
@@ -2698,11 +2697,11 @@ defineExpose({
   filter: grayscale(1);
 }
 
-/* 省电模式开关（仅移动端显示） */
+/* 省电模式开关（移动端/桌面端均显示，置于声音按钮正上方） */
 .pet-power-btn {
   position: absolute;
-  right: 36px;
-  bottom: 4px;
+  right: 8px;
+  bottom: 32px;
   width: 24px;
   height: 24px;
   padding: 0;
