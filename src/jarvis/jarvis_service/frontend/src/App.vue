@@ -11922,6 +11922,16 @@ function handleGlobalKeydown(event) {
     return
   }
 
+  // Ctrl/Cmd + L 打开命令面板并直接展示 Agent 列表（预输入 a>）
+  if (isModifierPressed && event.code === 'KeyL') {
+    if (showConnectModal.value) return
+    event.preventDefault()
+    commandPaletteFocusKey = getFocusedZoneKey()
+    commandPaletteInitialQuery.value = 'a>'
+    showCommandPalette.value = true
+    return
+  }
+
   // Ctrl/Cmd + Alt + 方向键：依据当前布局，向对应方向切换到最近的焦点区域（Session Panel / 集成终端 / 编辑器）
   // 使用 Ctrl+Alt 组合，避免与输入框/其它控件的方向键行为冲突
   if (event.ctrlKey && event.altKey && !event.shiftKey &&
