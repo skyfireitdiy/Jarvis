@@ -102,7 +102,7 @@
           <input
             class="node-name-input"
             :value="localNodeDisplayNames[node.value] || ''"
-            :placeholder="node.label && node.label !== node.value ? node.label : '自定义显示名'"
+            :placeholder="'自定义显示名'"
             @input="onNodeNameInput(node.value, $event.target.value)"
             @keydown.enter="$event.target.blur()"
           />
@@ -195,10 +195,10 @@ const nodeList = computed(() => {
   const seen = new Set()
   const list = []
   for (const opt of props.nodeOptions || []) {
-    const value = opt && opt.value
+    const value = String(opt?.node_id || opt?.value || '').trim()
     if (!value || seen.has(value)) continue
     seen.add(value)
-    list.push({ value, label: opt.label || value })
+    list.push({ value })
   }
   return list
 })
