@@ -108,7 +108,7 @@
         </div>
         
         <div class="current-agent-info desktop-only" v-if="currentAgent">
-          <span class="agent-type">{{ currentAgent.name || (currentAgent.agent_type === 'agent' ? '🤖' : currentAgent.agent_type === 'code_agent' ? '👨‍💻' : '❓') }}</span>
+          <span class="agent-type">{{ currentAgent.name || (currentAgent.agent_type === 'agent' ? '🤖' : currentAgent.agent_type === 'code_agent' ? '💻' : '❓') }}</span>
           <span class="agent-status-dot" :class="getStatusClass(currentAgent)" :title="getStatusText(currentAgent)"></span>
           <span class="agent-node" v-if="getAgentNodeLabel(currentAgent)">🧭 {{ getAgentNodeDisplayLabel(currentAgent) }}</span>
           <span class="agent-dir">{{ getWorkingDirDisplay(currentAgent.working_dir) }}</span>
@@ -306,7 +306,7 @@
                       class="tree-node-icon expand-arrow"
                       :class="{ expanded: expandedAgents.has(agent.agent_id) }"
                     >▶</span>
-                    <span class="tree-node-icon agent-icon">{{ agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'code_agent' ? '👨💻' : '🤖' }}</span>
+                    <span class="tree-node-icon agent-icon">{{ agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'code_agent' ? '💻' : '🤖' }}</span>
                     <span class="tree-node-text agent-name">{{ agent.name || agent.agent_id }}</span>
                     <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusClass(agent) === 'stopped' ? '⏹' : getStatusClass(agent) === 'running' ? '▶' : '⏸' }}</span>
                     <span class="agent-node-id">{{ getNodeDisplayName(agent.node_id) }}</span>
@@ -377,7 +377,7 @@
                             class="tree-node-icon expand-arrow"
                             :class="{ expanded: expandedAgents.has(agent.agent_id) }"
                           >▶</span>
-                          <span class="tree-node-icon agent-icon">{{ agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'code_agent' ? '👨💻' : '🤖' }}</span>
+                          <span class="tree-node-icon agent-icon">{{ agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'code_agent' ? '💻' : '🤖' }}</span>
                           <span class="tree-node-text agent-name">{{ agent.name || agent.agent_id }}</span>
                           <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusClass(agent) === 'stopped' ? '⏹' : getStatusClass(agent) === 'running' ? '▶' : '⏸' }}</span>
                           <span class="agent-node-id">{{ getNodeDisplayName(agent.node_id) }}</span>
@@ -704,7 +704,7 @@
                     class="tree-node-icon expand-arrow"
                     :class="{ expanded: expandedAgents.has(agent.agent_id) }"
                   >▶</span>
-                  <span class="tree-node-icon agent-icon">{{ agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'code_agent' ? '👨‍💻' : '🤖' }}</span>
+                  <span class="tree-node-icon agent-icon">{{ agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'code_agent' ? '💻' : '🤖' }}</span>
                   <span class="tree-node-text agent-name">{{ agent.name || agent.agent_id }}</span>
                   <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusClass(agent) === 'stopped' ? '⏹️' : '▶️' }}</span>
                   <span class="agent-node-id">{{ getNodeDisplayName(agent.node_id) }}</span>
@@ -775,7 +775,7 @@
                           class="tree-node-icon expand-arrow"
                           :class="{ expanded: expandedAgents.has(agent.agent_id) }"
                         >▶</span>
-                        <span class="tree-node-icon agent-icon">{{ agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'code_agent' ? '👨‍💻' : '🤖' }}</span>
+                        <span class="tree-node-icon agent-icon">{{ agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'code_agent' ? '💻' : '🤖' }}</span>
                         <span class="tree-node-text agent-name">{{ agent.name || agent.agent_id }}</span>
                         <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusClass(agent) === 'stopped' ? '⏹️' : '🟢' }}</span>
                         <span class="agent-node-id">{{ getNodeDisplayName(agent.node_id) }}</span>

@@ -955,7 +955,10 @@ function openPetMenu(cx, cy) {
   petDrag.value = false
   clearTimeout(petLongPressTimer)
   clearTimeout(petClickTimer)
+  clearTimeout(petMenuLongPressTimer)
+  clearTimeout(restoreClickTimer)
   petClickTimer = 0
+  restoreClickTimer = 0
 }
 
 function closePetMenu() {
@@ -1284,7 +1287,8 @@ function togglePet() {
 let restoreDragging = false
 let restoreMoved = false
 let restoreUserMoved = false  // 用户是否手动拖动过还原按钮
-let restoreLongPressFired = false  // 本次长按已弹出环形菜单
+let restoreLongPressFired = false  // 本次长按已触发（撒花 + 命令面板）
+let restoreClickTimer = 0     // 单击延迟判定（区分单击还原 / 双击环形菜单）
 let restoreStartX = 0
 let restoreStartY = 0
 let restoreOriginX = 0
@@ -1301,12 +1305,13 @@ function onRestorePointerDown(e) {
   restoreOriginY = restorePos.value.y
   e.target.setPointerCapture?.(e.pointerId)
   e.preventDefault()
-  // 长按判定：600ms 未移动则弹出环形菜单（以 🐾 为中心）
+  // 长按判定：600ms 未移动则撒花庆祝并唤起命令面板（与显示态宠物一致）
   clearTimeout(petMenuLongPressTimer)
   petMenuLongPressTimer = window.setTimeout(() => {
     if (restoreDragging && !restoreMoved) {
       restoreLongPressFired = true
-      togglePetMenu(restorePos.value.x + 20, restorePos.value.y + 20)
+      const r = restoreStageRect()
+      onPetDoubleClick(r.left + r.width / 2, r.top + r.height / 2)
     }
   }, 600)
 }
@@ -1332,11 +1337,24 @@ function onRestorePointerUp(e) {
   if (restoreMoved) {
     restoreUserMoved = true
     saveRestorePos()
-  } else if (restoreLongPressFired) {
-    restoreLongPressFired = false
-  } else {
-    showPet()
+    return
   }
+  // 长按已触发：撒花 + 命令面板已执行，不再触发单击/双击
+  if (restoreLongPressFired) {
+    restoreLongPressFired = false
+    return
+  }
+  // 单击 / 双击判定（与显示态宠物一致：双击 → 弹出环形菜单）
+  if (restoreClickTimer) {
+    clearTimeout(restoreClickTimer)
+    restoreClickTimer = 0
+    togglePetMenu(e.clientX, e.clientY)
+    return
+  }
+  restoreClickTimer = window.setTimeout(() => {
+    restoreClickTimer = 0
+    showPet()
+  }, 300)
 }
 
 // ==================== 网关操作 ====================
@@ -1427,6 +1445,14 @@ function petStageRect() {
   return el
     ? el.getBoundingClientRect()
     : { left: petPos.value.x, top: petPos.value.y, width: petW(), height: petH() }
+}
+
+// 隐藏后 🐾 还原按钮的屏幕矩形，兜底用还原按钮位置
+function restoreStageRect() {
+  const el = document.querySelector('.pet-restore')
+  return el
+    ? el.getBoundingClientRect()
+    : { left: restorePos.value.x, top: restorePos.value.y, width: 32, height: 32 }
 }
 
 // 抛出头顶法环：复用现有的 throw 动作与 pet-rune-throw 动画
@@ -2090,6 +2116,7 @@ onUnmounted(() => {
   clearTimeout(petActTimer)
   clearTimeout(petClickTimer)
   clearTimeout(petLongPressTimer)
+  clearTimeout(restoreClickTimer)
   clearTimeout(petSpeechTimer)
   clearTimeout(petHideTimer)
   clearInterval(petPettingFxTimer)

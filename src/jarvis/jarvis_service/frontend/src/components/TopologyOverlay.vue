@@ -204,7 +204,7 @@
             <ul v-if="hoverInfo.agents.length" class="topo-card-list">
               <li v-for="a in hoverInfo.agents" :key="a.id">
                 <span class="topo-dot" :style="{ background: agentColor(a.state) }"></span>
-                <span class="topo-card-type">{{ a.type === 'code_agent' ? '👨‍💻' : '🤖' }}</span>
+                <span class="topo-card-type">{{ a.type === 'code_agent' ? '💻' : '🤖' }}</span>
                 <span class="topo-card-name">{{ a.name }}</span>
                 <span class="topo-card-state" :style="{ color: agentColor(a.state) }">{{ AGENT_TEXT[a.state] || a.state }}</span>
               </li>
@@ -220,19 +220,6 @@
             <span class="topo-legend-item"><i class="topo-dot" style="background:#34d99b"></i>在线</span>
             <span class="topo-legend-item"><i class="topo-dot" style="background:#ff5d6c"></i>离线</span>
             <span class="topo-legend-item"><i class="topo-dot" style="background:#8a9bb0"></i>未知</span>
-            <span class="topo-legend-item topo-legend-shape">
-              <svg width="20" height="16" viewBox="0 0 20 16">
-                <circle cx="10" cy="9" r="6" fill="#20c8ff" />
-                <path d="M5 4 l2 -3 2.5 2.5L10 1l0.5 2.5L13 1l2 3 z" fill="#ffd75e" />
-              </svg>主节点
-            </span>
-            <span class="topo-legend-item topo-legend-shape">
-              <svg width="20" height="16" viewBox="0 0 20 16">
-                <rect x="3" y="3" width="14" height="11" rx="2" fill="rgba(8,18,30,0.95)" stroke="#34d99b" stroke-width="1.4" />
-                <line x1="6" y1="6" x2="14" y2="6" stroke="#34d99b" stroke-width="1" opacity="0.6" />
-                <circle cx="14" cy="9" r="1.4" fill="#34d99b" />
-              </svg>子节点
-            </span>
           </div>
           <div class="topo-legend-group">
             <span class="topo-legend-h">Agent</span>
