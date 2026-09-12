@@ -17,7 +17,9 @@
       :getStatusClass="getStatusClass"
       :getStatusText="getStatusText"
       :getNodeLabel="getAgentNodeLabel"
+      :getNodeDisplayLabel="getAgentNodeDisplayLabel"
       :getProxyNodeLabel="getAgentProxyNodeLabel"
+      :getWorkingDirDisplay="getWorkingDirDisplay"
       :isSelected="isAgentSelected"
       :isWaitingInput="isWaitingInput"
       :agentGroups="agentGroups"
@@ -108,8 +110,8 @@
         <div class="current-agent-info desktop-only" v-if="currentAgent">
           <span class="agent-type">{{ currentAgent.name || (currentAgent.agent_type === 'agent' ? '🤖' : currentAgent.agent_type === 'code_agent' ? '👨‍💻' : '❓') }}</span>
           <span class="agent-status-dot" :class="getStatusClass(currentAgent)" :title="getStatusText(currentAgent)"></span>
-          <span class="agent-node" v-if="getAgentNodeLabel(currentAgent)">🧭 {{ getAgentNodeLabel(currentAgent) }}</span>
-          <span class="agent-dir">{{ currentAgent.working_dir }}</span>
+          <span class="agent-node" v-if="getAgentNodeLabel(currentAgent)">🧭 {{ getAgentNodeDisplayLabel(currentAgent) }}</span>
+          <span class="agent-dir">{{ getWorkingDirDisplay(currentAgent.working_dir) }}</span>
         </div>
         
         <div class="header-actions desktop-only">
@@ -307,7 +309,7 @@
                     <span class="tree-node-icon agent-icon">{{ agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'code_agent' ? '👨💻' : '🤖' }}</span>
                     <span class="tree-node-text agent-name">{{ agent.name || agent.agent_id }}</span>
                     <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusClass(agent) === 'stopped' ? '⏹' : getStatusClass(agent) === 'running' ? '▶' : '⏸' }}</span>
-                    <span class="agent-node-id">{{ agent.node_id || 'master' }}</span>
+                    <span class="agent-node-id">{{ getNodeDisplayName(agent.node_id) }}</span>
                   </div>
                   <!-- Agent 的文件树 -->
                   <div v-if="expandedAgents.has(agent.agent_id)" class="agent-file-tree">
@@ -315,7 +317,7 @@
                       class="editor-file-tree-root"
                       @click.stop="ensureEditorSidebarFileTree(agent)"
                     >
-                      {{ agent.working_dir }}
+                      {{ getWorkingDirDisplay(agent.working_dir) }}
                     </div>
                     <div v-if="!(fileTreeState.get(agent.agent_id)?.length > 0)" class="editor-file-tree-empty">
                       当前工作目录下暂无可显示内容
@@ -358,7 +360,7 @@
                       @click="toggleStoppedNodeCollapse(nodeId)"
                     >
                       <span class="expand-arrow" :class="{ expanded: !isStoppedNodeCollapsed(nodeId) }">▶</span>
-                      <span class="stopped-agents-title">{{ nodeId }}已停止的Agent ({{ agents.length }})</span>
+                      <span class="stopped-agents-title">{{ getNodeDisplayName(nodeId) }}已停止的Agent ({{ agents.length }})</span>
                     </div>
                     <div v-if="!isStoppedNodeCollapsed(nodeId)" class="stopped-agents-list">
                       <div
@@ -378,7 +380,7 @@
                           <span class="tree-node-icon agent-icon">{{ agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'code_agent' ? '👨💻' : '🤖' }}</span>
                           <span class="tree-node-text agent-name">{{ agent.name || agent.agent_id }}</span>
                           <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusClass(agent) === 'stopped' ? '⏹' : getStatusClass(agent) === 'running' ? '▶' : '⏸' }}</span>
-                          <span class="agent-node-id">{{ agent.node_id || 'master' }}</span>
+                          <span class="agent-node-id">{{ getNodeDisplayName(agent.node_id) }}</span>
                         </div>
                         <!-- Agent 的文件树 -->
                         <div v-if="expandedAgents.has(agent.agent_id)" class="agent-file-tree">
@@ -386,7 +388,7 @@
                             class="editor-file-tree-root"
                             @click.stop="ensureEditorSidebarFileTree(agent)"
                           >
-                            {{ agent.working_dir }}
+                            {{ getWorkingDirDisplay(agent.working_dir) }}
                           </div>
                           <div v-if="!(fileTreeState.get(agent.agent_id)?.length > 0)" class="editor-file-tree-empty">
                             当前工作目录下暂无可显示内容
@@ -705,7 +707,7 @@
                   <span class="tree-node-icon agent-icon">{{ agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'code_agent' ? '👨‍💻' : '🤖' }}</span>
                   <span class="tree-node-text agent-name">{{ agent.name || agent.agent_id }}</span>
                   <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusClass(agent) === 'stopped' ? '⏹️' : '▶️' }}</span>
-                  <span class="agent-node-id">{{ agent.node_id || 'master' }}</span>
+                  <span class="agent-node-id">{{ getNodeDisplayName(agent.node_id) }}</span>
                 </div>
                 <!-- Agent 的文件树 -->
                 <div v-if="expandedAgents.has(agent.agent_id)" class="agent-file-tree">
@@ -713,7 +715,7 @@
                     class="editor-file-tree-root"
                     @click.stop="ensureEditorSidebarFileTree(agent)"
                   >
-                    {{ agent.working_dir }}
+                    {{ getWorkingDirDisplay(agent.working_dir) }}
                   </div>
                   <div v-if="!(fileTreeState.get(agent.agent_id)?.length > 0)" class="editor-file-tree-empty">
                     当前工作目录下暂无可显示内容
@@ -756,7 +758,7 @@
                     @click="toggleStoppedNodeCollapse(nodeId)"
                   >
                     <span class="expand-arrow" :class="{ expanded: !isStoppedNodeCollapsed(nodeId) }">▶</span>
-                    <span class="stopped-agents-title">{{ nodeId }}已停止的Agent ({{ agents.length }})</span>
+                    <span class="stopped-agents-title">{{ getNodeDisplayName(nodeId) }}已停止的Agent ({{ agents.length }})</span>
                   </div>
                   <div v-if="!isStoppedNodeCollapsed(nodeId)" class="stopped-agents-list">
                     <div
@@ -776,7 +778,7 @@
                         <span class="tree-node-icon agent-icon">{{ agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'code_agent' ? '👨‍💻' : '🤖' }}</span>
                         <span class="tree-node-text agent-name">{{ agent.name || agent.agent_id }}</span>
                         <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusClass(agent) === 'stopped' ? '⏹️' : '🟢' }}</span>
-                        <span class="agent-node-id">{{ agent.node_id || 'master' }}</span>
+                        <span class="agent-node-id">{{ getNodeDisplayName(agent.node_id) }}</span>
                       </div>
                       <!-- Agent 的文件树 -->
                       <div v-if="expandedAgents.has(agent.agent_id)" class="agent-file-tree">
@@ -784,7 +786,7 @@
                           class="editor-file-tree-root"
                           @click.stop="ensureEditorSidebarFileTree(agent)"
                         >
-                          {{ agent.working_dir }}
+                          {{ getWorkingDirDisplay(agent.working_dir) }}
                         </div>
                         <div v-if="!(fileTreeState.get(agent.agent_id)?.length > 0)" class="editor-file-tree-empty">
                           当前工作目录下暂无可显示内容
@@ -1050,12 +1052,18 @@
       :gatewayUrl="gatewayUrl"
       :getHttpProtocol="getHttpProtocol"
       :showToast="showToast"
+      :nodeOptions="availableNodeOptions"
+      :nodeDisplayNames="nodeDisplayNames"
+      :hideWorkingDir="hideWorkingDir"
       @update:visible="showSettingsModal = $event"
       @update:autoLoginEnabled="autoLoginEnabled = $event"
       @saveAutoLoginSetting="saveAutoLoginSetting"
       @update:notifyOnExit="notifyOnExit = $event"
       @update:notifyOnInput="notifyOnInput = $event"
       @saveNotifySettings="saveNotifySettings"
+      @saveNodeDisplayNames="saveNodeDisplayNames"
+      @update:hideWorkingDir="hideWorkingDir = $event"
+      @saveHideWorkingDirSetting="saveHideWorkingDirSetting"
       @confirmClearHistory="confirmClearHistory"
       @disconnectAll="disconnectAll"
     />
@@ -1199,6 +1207,7 @@
       :nodes="availableNodeOptions"
       :agents="agentList"
       :getStatusClass="getStatusClass"
+      :nodeDisplayNames="nodeDisplayNames"
       @update:visible="showTopologyOverlay = $event"
       @close="showTopologyOverlay = false"
     />
@@ -5463,6 +5472,59 @@ const filteredUserOptionsForAcl = computed(() => {
 })
 const availableNodeOptions = ref([])
 const userAccessibleNodes = ref(null) // null=未加载, []=无权限, ["*"]=所有, ["id1","id2"]=限定节点
+
+// 节点显示名映射（仅前端本地）：nodeId -> 自定义显示名，未设置时回退到原始 nodeId
+const NODE_DISPLAY_NAMES_STORAGE_KEY = 'jarvis_node_display_names'
+function loadNodeDisplayNames() {
+  try {
+    const savedValue = localStorage.getItem(NODE_DISPLAY_NAMES_STORAGE_KEY)
+    if (!savedValue) return {}
+    const parsedValue = JSON.parse(savedValue)
+    if (!parsedValue || typeof parsedValue !== 'object' || Array.isArray(parsedValue)) return {}
+    return Object.fromEntries(
+      Object.entries(parsedValue).filter(([, name]) => typeof name === 'string' && name.trim())
+    )
+  } catch (error) {
+    console.warn('[NODE] Failed to load node display names:', error)
+    return {}
+  }
+}
+const nodeDisplayNames = ref(loadNodeDisplayNames())
+function saveNodeDisplayNames(nextNames = nodeDisplayNames.value) {
+  nodeDisplayNames.value = nextNames
+  localStorage.setItem(NODE_DISPLAY_NAMES_STORAGE_KEY, JSON.stringify(nextNames))
+}
+// 获取节点的展示名：优先自定义名，否则回退原始 nodeId
+function getNodeDisplayName(nodeId) {
+  const normalizedNodeId = String(nodeId || '').trim() || 'master'
+  const customName = nodeDisplayNames.value[normalizedNodeId]
+  return typeof customName === 'string' && customName.trim() ? customName.trim() : normalizedNodeId
+}
+// 隐藏工作目录（录屏/截图时避免暴露目录）
+const HIDE_WORKING_DIR_STORAGE_KEY = 'jarvis_hide_working_dir'
+function loadHideWorkingDir() {
+  try {
+    return localStorage.getItem(HIDE_WORKING_DIR_STORAGE_KEY) === '1'
+  } catch (error) {
+    console.warn('[WORKDIR] Failed to load hide working dir setting:', error)
+    return false
+  }
+}
+const hideWorkingDir = ref(loadHideWorkingDir())
+function saveHideWorkingDirSetting(nextValue = hideWorkingDir.value) {
+  hideWorkingDir.value = !!nextValue
+  try {
+    localStorage.setItem(HIDE_WORKING_DIR_STORAGE_KEY, hideWorkingDir.value ? '1' : '0')
+  } catch (error) {
+    console.warn('[WORKDIR] Failed to save hide working dir setting:', error)
+  }
+}
+// 工作目录展示：开启隐藏时返回占位符，否则返回原始目录
+const WORKING_DIR_HIDDEN_PLACEHOLDER = '••••••'
+function getWorkingDirDisplay(workingDir) {
+  if (hideWorkingDir.value) return WORKING_DIR_HIDDEN_PLACEHOLDER
+  return workingDir || ''
+}
 const newAgentNodeId = ref('')
 const selectedTerminalNodeId = ref('master')
 
@@ -6955,8 +7017,9 @@ async function fetchUserList() {
 
 function formatNodeOptionLabel(node) {
   const nodeId = String(node?.node_id || '').trim()
+  const displayName = getNodeDisplayName(nodeId)
   const status = String(node?.status || node?.runtime_status || '').trim()
-  return status ? `${nodeId} (${status})` : nodeId
+  return status ? `${displayName} (${status})` : displayName
 }
 
 function getDefaultTerminalNodeId(nodes = []) {
@@ -6975,6 +7038,11 @@ watch(availableNodeOptions, (nodes) => {
 
 function getAgentNodeLabel(agent) {
   return String(agent?.node_id || '').trim() || 'master'
+}
+
+// Agent 所属节点的展示名（优先自定义显示名），仅用于界面展示
+function getAgentNodeDisplayLabel(agent) {
+  return getNodeDisplayName(getAgentNodeLabel(agent))
 }
 
 function getAgentProxyNodeLabel(agent) {

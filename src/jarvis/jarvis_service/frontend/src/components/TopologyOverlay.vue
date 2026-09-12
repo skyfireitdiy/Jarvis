@@ -274,6 +274,7 @@ const props = defineProps({
   nodes: { type: Array, default: () => [] },
   agents: { type: Array, default: () => [] },
   getStatusClass: { type: Function, default: () => 'running' },
+  nodeDisplayNames: { type: Object, default: () => ({}) },
 })
 
 const emit = defineEmits(['update:visible', 'close'])
@@ -332,7 +333,8 @@ const bodyEl = ref(null)
 const mouse = ref({ x: 0, y: 0 })
 
 function shortLabel(id) {
-  const s = String(id || '')
+  const custom = props.nodeDisplayNames && props.nodeDisplayNames[id]
+  const s = String((custom && String(custom).trim()) || id || '')
   if (s === 'master') return 'master'
   return s.length > 10 ? s.slice(0, 9) + '…' : s
 }

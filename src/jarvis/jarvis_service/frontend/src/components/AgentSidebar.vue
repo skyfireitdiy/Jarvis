@@ -48,8 +48,8 @@
                 <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
               </div>
               <div class="agent-dir-line">
-                <span class="agent-dir" :title="agent.working_dir">{{ agent.working_dir }}</span>
-                <span class="agent-meta-tag">📍 {{ getNodeLabel(agent) }}</span>
+                <span class="agent-dir" :title="workingDirDisplay(agent)">{{ workingDirDisplay(agent) }}</span>
+                <span class="agent-meta-tag">📍 {{ nodeDisplayLabel(agent) }}</span>
                 <span class="agent-meta-tag" v-if="agent.proxy_node">🔀 {{ getProxyNodeLabel(agent) }}</span>
                 <span class="agent-meta-tag" v-if="agent.llm_group">🧠 {{ agent.llm_group }}</span>
                 <span class="agent-meta-tag" v-if="agent.worktree">🌿</span>
@@ -76,8 +76,8 @@
               <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
             </div>
             <div class="agent-dir-line">
-              <span class="agent-dir" :title="agent.working_dir">{{ agent.working_dir }}</span>
-              <span class="agent-meta-tag">📍 {{ getNodeLabel(agent) }}</span>
+              <span class="agent-dir" :title="workingDirDisplay(agent)">{{ workingDirDisplay(agent) }}</span>
+              <span class="agent-meta-tag">📍 {{ nodeDisplayLabel(agent) }}</span>
               <span class="agent-meta-tag" v-if="agent.proxy_node">🔀 {{ getProxyNodeLabel(agent) }}</span>
               <span class="agent-meta-tag" v-if="agent.llm_group">🧠 {{ agent.llm_group }}</span>
               <span class="agent-meta-tag" v-if="agent.worktree">🌿</span>
@@ -347,6 +347,22 @@ function toggleGroupCollapse(groupKey) {
   }
 }
 
+// 节点展示名：优先使用父组件提供的自定义显示名，回退到原始节点标签
+function nodeDisplayLabel(agent) {
+  if (typeof props.getNodeDisplayLabel === 'function') {
+    return props.getNodeDisplayLabel(agent)
+  }
+  return props.getNodeLabel(agent)
+}
+
+// 工作目录展示：优先使用父组件提供的展示函数（可能隐藏），回退原始目录
+function workingDirDisplay(agent) {
+  if (typeof props.getWorkingDirDisplay === 'function') {
+    return props.getWorkingDirDisplay(agent.working_dir)
+  }
+  return agent.working_dir
+}
+
 // 处理Agent点击事件，记录点击状态
 function handleAgentClick(agent, event) {
   // 如果是等待输入状态，记录点击
@@ -390,7 +406,9 @@ const props = defineProps({
   getStatusClass: Function,
   getStatusText: Function,
   getNodeLabel: Function,
+  getNodeDisplayLabel: Function,
   getProxyNodeLabel: Function,
+  getWorkingDirDisplay: Function,
   isSelected: Function,
   isWaitingInput: Function,
   agentGroups: { type: Array, default: () => [] },
