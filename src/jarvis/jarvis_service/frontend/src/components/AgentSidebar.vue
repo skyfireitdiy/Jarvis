@@ -1426,8 +1426,8 @@ function castSpell(spell) {
   else if (spell.kind === 'swarm') petCastSwarm(spell)
   else                             petCastSpell(spell)
   petSfxCast(spell.kind)
-  clearTimeout(petCastTimer)
-  petCastTimer = window.setTimeout(() => { petCast.value = '' }, 2600)
+  clearTimeout(petCastClearTimer)
+  petCastClearTimer = window.setTimeout(() => { petCast.value = '' }, 2600)
 }
 
 // 随机施放一波法术
@@ -1453,6 +1453,8 @@ function installPetCastDebugHook() {
 
 // 约 30s 放一波法术（±5s 抖动，避免过于机械）
 let petCastTimer = 0
+// 施法后清除 petCast 状态的定时器（与调度定时器分开，避免互相清除）
+let petCastClearTimer = 0
 function schedulePetCast() {
   clearTimeout(petCastTimer)
   petCastTimer = window.setTimeout(() => {
@@ -1744,6 +1746,8 @@ function stopPetLoops() {
   petSleepTimer = 0
   clearTimeout(petCastTimer)
   petCastTimer = 0
+  clearTimeout(petCastClearTimer)
+  petCastClearTimer = 0
   petCast.value = ''
   stopPetWalk()
   if (petRaf) {
@@ -1806,6 +1810,7 @@ onUnmounted(() => {
   clearTimeout(petWanderTimer)
   clearTimeout(petSleepTimer)
   clearTimeout(petCastTimer)
+  clearTimeout(petCastClearTimer)
   if (petRaf) cancelAnimationFrame(petRaf)
   if (petWanderRaf) cancelAnimationFrame(petWanderRaf)
   try {
