@@ -47,6 +47,8 @@
       @petToggleSidebar="toggleAgentSidebar"
       @petOpenTopology="openTopologyOverlay"
       @petOpenCommandPalette="openCommandPalette"
+      :radial-actions="petRadialActions"
+      @petRadialRun="onPetRadialRun"
     />
 
     <!-- 主内容区 -->
@@ -5247,6 +5249,35 @@ const commandPaletteCtx = computed(() => ({
 // 命令面板动作清单（来自统一注册表）
 const appActions = computed(() => actionDefs)
 
+// 宠物环形菜单动作：取命令面板「当前 Agent」组的命令，内圈放常用项
+const PET_RADIAL_INNER_IDS = [
+  'current-view-diff',
+  'current-create-terminal',
+  'current-open-editor',
+  'current-manual-interrupt',
+  'current-rename',
+  'current-delete',
+]
+const petRadialActions = computed(() => {
+  const ctx = commandPaletteCtx.value
+  return actionDefs
+    .filter(a => a.group === '当前 Agent')
+    .map(a => ({
+      id: a.id,
+      label: a.label,
+      icon: a.icon,
+      inner: PET_RADIAL_INNER_IDS.includes(a.id),
+      enabled: typeof a.enabled === 'function' ? a.enabled(ctx) : true,
+    }))
+})
+
+// 宠物环形菜单点击：关闭菜单后按命令面板同款逻辑执行
+function onPetRadialRun(action) {
+  if (!action) return
+  const def = actionDefs.find(a => a.id === action.id)
+  if (def) onCommandRun(def)
+}
+
 // 执行命令面板中的动作
 function onCommandRun(action, openMode) {
   showCommandPalette.value = false
@@ -5318,6 +5349,11 @@ function isAnyModalOpen() {
     showTopologyOverlay.value ||
     confirmDialog.value
   )
+}
+
+// 宠物环形菜单是否展开（展开时不应自动抢占输入框焦点，避免移动端软键盘顶走页面）
+function isPetMenuOpen() {
+  return Boolean(agentSidebarRef.value?.isPetMenuOpen?.())
 }
 
 // 判断输入框是否应该禁用（没有激活的 agent 或 agent 状态不是 running）
@@ -8687,10 +8723,10 @@ function handleMessage(message, agentId = null) {
       }
       pendingInputAgentId.value = targetAgentId
 
-      // 聚焦输入框（弹窗打开时不抢焦点）
+      // 聚焦输入框（弹窗或宠物环形菜单打开时不抢焦点）
       const targetPanel = panels.value.find(p => p.agentId === targetAgentId)
       const sp = targetPanel ? sessionPanelRefs.get(targetPanel.id) : null
-      if (sp?.focusInput && !isAnyModalOpen()) sp.focusInput()
+      if (sp?.focusInput && !isAnyModalOpen() && !isPetMenuOpen()) sp.focusInput()
 
     }
     
@@ -8739,7 +8775,7 @@ function handleMessage(message, agentId = null) {
     // 聚焦输入框（仅当前 Agent 且无弹窗时，避免其他 Agent 的确认请求抢焦点）
     const targetPanel = panels.value.find(p => p.agentId === targetAgentId)
     const sp = targetPanel ? sessionPanelRefs.get(targetPanel.id) : null
-    if (sp?.focusInput && isCurrentAgent(targetAgentId) && !isAnyModalOpen()) sp.focusInput()
+    if (sp?.focusInput && isCurrentAgent(targetAgentId) && !isAnyModalOpen() && !isPetMenuOpen()) sp.focusInput()
     // 无 Panel 时不弹全局对话框，确认请求静默等待，用户打开 Panel 后可见 confirm 控件
   } else if (type === 'execution') {
     appendExecution(payload, targetAgentId)

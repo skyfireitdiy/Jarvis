@@ -188,6 +188,13 @@
           :title="petSfxOn ? '关闭宠物音效' : '开启宠物音效'"
           @click.stop="togglePetSfx"
         >{{ petSfxOn ? '🔊' : '🔇' }}</button>
+        <button
+          v-if="isMobileView"
+          class="pet-power-btn"
+          :class="{ 'is-on': petPowerSave }"
+          :title="petPowerSave ? '关闭省电模式（恢复特效）' : '开启省电模式（关闭特效，降低耗电）'"
+          @click.stop="togglePetPowerSave"
+        >{{ petPowerSave ? '🔋' : '⚡' }}</button>
         <div
           class="pet-hit"
           @pointerdown="onPetPointerDown"
@@ -202,7 +209,7 @@
 
     <!-- 宠物旁的迷你网络拓扑 -->
     <PetMiniTopology
-      v-show="petVisible && petTopoOn"
+      v-show="petVisible && petTopoOn && !petPowerSaveActive"
       :nodes="nodes"
       :agents="agentList || []"
       :getStatusClass="getStatusClass"
@@ -221,6 +228,38 @@
       @pointerup="onRestorePointerUp"
       @pointercancel="onRestorePointerUp"
     >🐾</button>
+
+    <!-- 宠物环形菜单：长按宠物 / 🐾 展开「当前 Agent」命令 -->
+    <div
+      v-if="petMenuOpen"
+      class="pet-menu-layer"
+      @pointerdown.self.prevent="closePetMenu"
+      @touchstart.prevent
+      @contextmenu.prevent
+    >
+      <div
+        class="pet-menu-ring"
+        :style="{ left: petMenuOrigin.x + 'px', top: petMenuOrigin.y + 'px' }"
+      >
+        <div class="pet-menu-hub">✦</div>
+        <button
+          v-for="item in petMenuItems"
+          :key="item.id"
+          type="button"
+          tabindex="-1"
+          class="pet-menu-item"
+          :class="['ring-' + item.ring, { 'is-disabled': !item.enabled }]"
+          :style="{ transform: `translate(${item.x}px, ${item.y}px)` }"
+          :disabled="!item.enabled"
+          :title="item.label"
+          @pointerdown.prevent.stop
+          @click.stop="onPetMenuRun(item)"
+        >
+          <span class="pet-menu-ico">{{ item.icon }}</span>
+          <span class="pet-menu-label">{{ item.label }}</span>
+        </button>
+      </div>
+    </div>
   </Teleport>
 
   <!-- 加入分组弹窗 -->
@@ -352,7 +391,8 @@ const props = defineProps({
   nodes: { type: Array, default: () => [] },
   currentUserId: { type: String, default: '' },
   currentUserName: { type: String, default: '' },
-  isConnected: { type: Boolean, default: true }
+  isConnected: { type: Boolean, default: true },
+  radialActions: { type: Array, default: () => [] }
 })
 
 // 分组弹窗状态
@@ -417,6 +457,7 @@ const emit = defineEmits([
   'petToggleSidebar',
   'petOpenTopology',
   'petOpenCommandPalette',
+  'petRadialRun',
 ])
 
 // 监听 agentStatuses 变化，当 agent 状态从等待输入变为非等待输入时清除点击标记
@@ -480,6 +521,7 @@ const PET_POS_KEY = 'jarvis_pet_pos'
 const PET_TOPO_KEY = 'jarvis_pet_topo'
 const PET_RESTORE_POS_KEY = 'jarvis_pet_restore_pos'
 const PET_HIDDEN_KEY = 'jarvis_pet_hidden'
+const PET_POWER_SAVE_KEY = 'jarvis_pet_power_save'
 const PET_W = 200
 const PET_H = 230
 const RESTORE_W = 40
@@ -501,6 +543,12 @@ const petWalking = ref(false)    // 随机漫步中
 const petSpeech = ref('')        // 随机台词
 const petTopoOn = ref(true)      // 是否显示迷你拓扑图
 const petCast = ref('')          // 正在施放的法术类型（'' 表示未施法）
+const petPowerSave = ref(false)  // 省电模式：关闭一切装饰性特效与常驻运算（移动端）
+
+// 是否处于移动端（省电模式开关仅移动端可见）
+const isMobileView = computed(() => (props.windowWidth || window.innerWidth) <= 768)
+// 省电模式生效中：仅在移动端且开关打开时生效
+const petPowerSaveActive = computed(() => isMobileView.value && petPowerSave.value)
 
 // 头顶数字法环：一圈 0/1 灵符，玄幻风格，随状态联动
 const PET_RUNE_COUNT = 18
@@ -536,6 +584,22 @@ const PET_LINES = [
   '我一直都在呢 ✦',
 ]
 
+// 鼓励语库：定时随机显示，替代原先常驻的「需要输入」提示
+const PET_ENCOURAGE_LINES = [
+  '加油，你可以的！',
+  '慢慢来，不着急~',
+  '你已经很棒啦 ✦',
+  '再坚持一下下！',
+  '喝口水休息会儿吧',
+  '有我在，别担心~',
+  '今天也辛苦啦',
+  '一切都会好起来的',
+  '深呼吸，继续加油！',
+  '你的努力我都看在眼里',
+  '别给自己太大压力哦',
+  '冲鸭！我陪着你 ✦',
+]
+
 // 宠物状态：waiting（有 Agent 等待输入）| running（有 Agent 运行中）| idle
 const petState = computed(() => {
   const list = props.agentList || []
@@ -548,9 +612,8 @@ const petState = computed(() => {
   return 'idle'
 })
 
-// 气泡文本：等待输入优先，其次随机台词
+// 气泡文本：仅显示临时台词（等待输入不再常驻显示）
 const petBubbleText = computed(() => {
-  if (petState.value === 'waiting') return '需要输入'
   return petSpeech.value
 })
 
@@ -601,12 +664,13 @@ const petClasses = computed(() => [
     'rune-sleep': petSleep.value,
     // is-casting 仅用于「法阵类」法术，避免覆盖 act-throw 等其它法术的动画
     'is-casting': petCastKind.value === 'array',
+    'power-save': petPowerSaveActive.value,
   },
   petAction.value ? 'act-' + petAction.value : '',
   petCast.value ? 'cast-' + petCast.value : '',
 ])
-// 是否正在看迷你拓扑图（开着且宠物可见/清醒）
-const petWatchingTopo = computed(() => petTopoOn.value && !petHidden.value && !petSleep.value)
+// 是否正在看迷你拓扑图（开着且宠物可见/清醒；省电模式下不显示，避免常驻渲染）
+const petWatchingTopo = computed(() => petTopoOn.value && !petPowerSaveActive.value && !petHidden.value && !petSleep.value)
 
 // 迷你图水平方向相对宠物中心的偏移：-1 左 / 0 中 / 1 右
 const petTopoDirX = computed(() => {
@@ -774,6 +838,71 @@ let petHideTimer = 0     // 隐藏定时器（兼容保留）
 let petLongPressFired = false  // 本次长按已触发
 let petPettingFxTimer = 0      // 摸头爱心循环
 
+// ==================== 宠物环形菜单 ====================
+// 长按宠物（或隐藏后的 🐾）弹出，承载「当前 Agent」命令，方便移动端操作
+const petMenuOpen = ref(false)
+const petMenuOrigin = ref({ x: 0, y: 0 })   // 菜单圆心（屏幕坐标）
+let petMenuLongPressTimer = 0               // 还原按钮长按判定
+
+// 内/外圈半径与按钮尺寸
+const PET_MENU_INNER_R = 82
+const PET_MENU_OUTER_R = 152
+const PET_MENU_ITEM = 46
+
+// 计算菜单项位置：按圈层均分角度，从正上方开始
+const petMenuItems = computed(() => {
+  const list = Array.isArray(props.radialActions) ? props.radialActions : []
+  const inner = list.filter(a => a.inner)
+  const outer = list.filter(a => !a.inner)
+  const place = (arr, radius, ring) => arr.map((a, i) => {
+    const total = arr.length || 1
+    const angle = -Math.PI / 2 + (i / total) * Math.PI * 2
+    return {
+      ...a,
+      ring,
+      x: Math.cos(angle) * radius,
+      y: Math.sin(angle) * radius,
+    }
+  })
+  return [...place(inner, PET_MENU_INNER_R, 'inner'), ...place(outer, PET_MENU_OUTER_R, 'outer')]
+})
+
+function openPetMenu(cx, cy) {
+  // 收起当前焦点（如输入框）与移动端软键盘，避免展开菜单时页面被顶走
+  const ae = document.activeElement
+  if (ae && ae !== document.body && typeof ae.blur === 'function') ae.blur()
+  petMenuOrigin.value = { x: cx, y: cy }
+  petMenuOpen.value = true
+  petDragging = false
+  petDrag.value = false
+  clearTimeout(petLongPressTimer)
+  clearTimeout(petClickTimer)
+  petClickTimer = 0
+}
+
+function closePetMenu() {
+  petMenuOpen.value = false
+}
+
+function togglePetMenu(cx, cy) {
+  if (petMenuOpen.value) closePetMenu()
+  else openPetMenu(cx, cy)
+}
+
+function onPetMenuRun(action) {
+  if (!action) return
+  closePetMenu()
+  emit('petRadialRun', action)
+}
+
+function onPetMenuGlobalKeydown(e) {
+  if (petMenuOpen.value && (e.key === 'Escape' || e.code === 'Escape')) {
+    e.preventDefault()
+    e.stopPropagation()
+    closePetMenu()
+  }
+}
+
 function onPetPointerDown(e) {
   if (e.button !== undefined && e.button !== 0) return  // 仅左键
   stopPetWalk()
@@ -786,12 +915,13 @@ function onPetPointerDown(e) {
   petOriginY = petPos.value.y
   e.target.setPointerCapture?.(e.pointerId)
   e.preventDefault()
-  // 长按判定：600ms 未移动则触发摸头
+  // 长按判定：600ms 未移动则弹出环形菜单
   clearTimeout(petLongPressTimer)
   petLongPressTimer = window.setTimeout(() => {
     if (petDragging && !petMoved) {
       petLongPressFired = true
-      startPetting()
+      const r = petStageRect()
+      togglePetMenu(r.left + r.width / 2, r.top + r.height / 2)
     }
   }, 600)
 }
@@ -823,10 +953,9 @@ function onPetPointerUp(e) {
     return
   }
   petDrag.value = false
-  // 长按已触发：结束摸头，不再触发单击/双击
+  // 长按已触发：菜单已弹出，不再触发单击/双击
   if (petLongPressFired) {
     petLongPressFired = false
-    stopPetting()
     return
   }
   // 单击 / 双击判定
@@ -877,6 +1006,21 @@ function showPetSpeech() {
   petSpeech.value = PET_LINES[Math.floor(Math.random() * PET_LINES.length)]
   clearTimeout(petSpeechTimer)
   petSpeechTimer = window.setTimeout(() => { petSpeech.value = '' }, 2000)
+}
+
+// 定时随机显示鼓励语（约 20~40s 一次，显示 4s）
+let petEncourageTimer = 0
+function schedulePetEncourage() {
+  clearTimeout(petEncourageTimer)
+  petEncourageTimer = window.setTimeout(() => {
+    if (!petPowerSaveActive.value && !document.hidden && !petHidden.value && !petSleep.value &&
+        !petHover.value && !petDrag.value && !petPetting.value && !petWalking.value) {
+      petSpeech.value = PET_ENCOURAGE_LINES[Math.floor(Math.random() * PET_ENCOURAGE_LINES.length)]
+      clearTimeout(petSpeechTimer)
+      petSpeechTimer = window.setTimeout(() => { petSpeech.value = '' }, 4000)
+    }
+    schedulePetEncourage()
+  }, 20000 + Math.random() * 20000)
 }
 
 // 撒花特效
@@ -1060,6 +1204,7 @@ function togglePet() {
 let restoreDragging = false
 let restoreMoved = false
 let restoreUserMoved = false  // 用户是否手动拖动过还原按钮
+let restoreLongPressFired = false  // 本次长按已弹出环形菜单
 let restoreStartX = 0
 let restoreStartY = 0
 let restoreOriginX = 0
@@ -1069,19 +1214,31 @@ function onRestorePointerDown(e) {
   if (e.button !== undefined && e.button !== 0) return  // 仅左键
   restoreDragging = true
   restoreMoved = false
+  restoreLongPressFired = false
   restoreStartX = e.clientX
   restoreStartY = e.clientY
   restoreOriginX = restorePos.value.x
   restoreOriginY = restorePos.value.y
   e.target.setPointerCapture?.(e.pointerId)
   e.preventDefault()
+  // 长按判定：600ms 未移动则弹出环形菜单（以 🐾 为中心）
+  clearTimeout(petMenuLongPressTimer)
+  petMenuLongPressTimer = window.setTimeout(() => {
+    if (restoreDragging && !restoreMoved) {
+      restoreLongPressFired = true
+      togglePetMenu(restorePos.value.x + 20, restorePos.value.y + 20)
+    }
+  }, 600)
 }
 
 function onRestorePointerMove(e) {
   if (!restoreDragging) return
   const dx = e.clientX - restoreStartX
   const dy = e.clientY - restoreStartY
-  if (!restoreMoved && Math.hypot(dx, dy) > 5) restoreMoved = true
+  if (!restoreMoved && Math.hypot(dx, dy) > 5) {
+    restoreMoved = true
+    clearTimeout(petMenuLongPressTimer)
+  }
   if (restoreMoved) {
     restorePos.value = clampRestorePos(restoreOriginX + dx, restoreOriginY + dy)
   }
@@ -1090,10 +1247,13 @@ function onRestorePointerMove(e) {
 function onRestorePointerUp(e) {
   if (!restoreDragging) return
   restoreDragging = false
+  clearTimeout(petMenuLongPressTimer)
   e.target.releasePointerCapture?.(e.pointerId)
   if (restoreMoved) {
     restoreUserMoved = true
     saveRestorePos()
+  } else if (restoreLongPressFired) {
+    restoreLongPressFired = false
   } else {
     showPet()
   }
@@ -1458,7 +1618,7 @@ let petCastClearTimer = 0
 function schedulePetCast() {
   clearTimeout(petCastTimer)
   petCastTimer = window.setTimeout(() => {
-    if (!document.hidden && !petHover.value && !petDrag.value && !petSleep.value &&
+    if (!petPowerSaveActive.value && !document.hidden && !petHover.value && !petDrag.value && !petSleep.value &&
         !petHidden.value && !petPetting.value && !petWalking.value) {
       castRandomSpell()
     }
@@ -1473,6 +1633,8 @@ const petSfxOn = ref(true)
 let petAudioCtx = null
 function getPetAudioCtx() {
   if (typeof window === 'undefined') return null
+  // 省电模式：不创建/复用音频上下文，静音所有音效
+  if (petPowerSaveActive.value) return null
   const AC = window.AudioContext || window.webkitAudioContext
   if (!AC) return null
   if (!petAudioCtx) petAudioCtx = new AC()
@@ -1642,7 +1804,7 @@ let petActTimer = 0
 function schedulePetAction() {
   clearTimeout(petActTimer)
   petActTimer = window.setTimeout(() => {
-    if (!document.hidden && !petHover.value && !petDrag.value && !petSleep.value && !petHidden.value && !petPetting.value && !petWalking.value) {
+    if (!petPowerSaveActive.value && !document.hidden && !petHover.value && !petDrag.value && !petSleep.value && !petHidden.value && !petPetting.value && !petWalking.value) {
       // 约四分之一概率触发趣味行为，其余为普通小动作
       if (Math.random() < 0.25) {
         const fun = PET_FUN_ACTIONS[Math.floor(Math.random() * PET_FUN_ACTIONS.length)]
@@ -1668,7 +1830,7 @@ let petWanderTimer = 0   // 下次醒来的时间
 let petWanderRaf = 0     // 漫步动画帧
 // 当前是否可自由漫步：未拖拽/悬停/睡眠/隐藏/摸头，且页面可见
 function canPetWander() {
-  return !document.hidden && !petHover.value && !petDrag.value &&
+  return !petPowerSaveActive.value && !document.hidden && !petHover.value && !petDrag.value &&
     !petSleep.value && !petHidden.value && !petPetting.value && !petWalking.value
 }
 
@@ -1749,7 +1911,10 @@ function stopPetLoops() {
   clearTimeout(petCastClearTimer)
   petCastClearTimer = 0
   petCast.value = ''
+  closePetMenu()
   stopPetWalk()
+  clearTimeout(petEncourageTimer)
+  petEncourageTimer = 0
   if (petRaf) {
     cancelAnimationFrame(petRaf)
     petRaf = 0
@@ -1759,10 +1924,32 @@ function stopPetLoops() {
 
 // 宠物重新显示时重启常驻运算（幂等：已在运行时不会重复启动）
 function startPetLoops() {
+  if (petPowerSaveActive.value) return  // 省电模式：不启动任何常驻特效与运算
   if (!petActTimer) schedulePetAction()
   if (!petWanderTimer) schedulePetWander()
   if (!petCastTimer) schedulePetCast()
+  if (!petEncourageTimer) schedulePetEncourage()
   document.addEventListener('mousemove', onPetMouseMove)
+}
+
+// 切换省电模式：开启时停掉所有常驻运算与特效，关闭时恢复
+function togglePetPowerSave() {
+  petPowerSave.value = !petPowerSave.value
+  try {
+    localStorage.setItem(PET_POWER_SAVE_KEY, petPowerSave.value ? '1' : '0')
+  } catch (e) {
+    // 忽略存储异常
+  }
+  if (petPowerSaveActive.value) {
+    stopPetLoops()
+    petAction.value = ''
+    petSpeech.value = ''
+    petCast.value = ''
+    clearTimeout(petSpeechTimer)
+    petSpeechTimer = 0
+  } else {
+    startPetLoops()
+  }
 }
 
 onMounted(() => {
@@ -1783,8 +1970,14 @@ onMounted(() => {
   } catch (e) {
     petHidden.value = false
   }
+  try {
+    petPowerSave.value = localStorage.getItem(PET_POWER_SAVE_KEY) === '1'
+  } catch (e) {
+    petPowerSave.value = false
+  }
   document.addEventListener('mousemove', onPetMouseMove)
   window.addEventListener('resize', onPetResize)
+  window.addEventListener('keydown', onPetMenuGlobalKeydown, true)
   installPetCastDebugHook()
   startPetLoops()
 })
@@ -1798,9 +1991,20 @@ watch(() => props.isConnected, (connected) => {
   }
 })
 
+// 省电模式生效状态变化（含移动端/桌面端切换）时，同步启停常驻运算
+watch(petPowerSaveActive, (active) => {
+  if (active) {
+    stopPetLoops()
+  } else if (props.isConnected) {
+    startPetLoops()
+  }
+})
+
 onUnmounted(() => {
   document.removeEventListener('mousemove', onPetMouseMove)
   window.removeEventListener('resize', onPetResize)
+  window.removeEventListener('keydown', onPetMenuGlobalKeydown, true)
+  clearTimeout(petMenuLongPressTimer)
   clearTimeout(petActTimer)
   clearTimeout(petClickTimer)
   clearTimeout(petLongPressTimer)
@@ -1811,6 +2015,7 @@ onUnmounted(() => {
   clearTimeout(petSleepTimer)
   clearTimeout(petCastTimer)
   clearTimeout(petCastClearTimer)
+  clearTimeout(petEncourageTimer)
   if (petRaf) cancelAnimationFrame(petRaf)
   if (petWanderRaf) cancelAnimationFrame(petWanderRaf)
   try {
@@ -1825,6 +2030,7 @@ defineExpose({
   togglePet,
   hidePet: petHide,
   showPet,
+  isPetMenuOpen: () => petMenuOpen.value,
 })
 
 </script>
@@ -2427,6 +2633,67 @@ defineExpose({
 .pet-sfx-btn.is-off {
   opacity: 0.35;
   filter: grayscale(1);
+}
+
+/* 省电模式开关（仅移动端显示） */
+.pet-power-btn {
+  position: absolute;
+  right: 36px;
+  bottom: 4px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  line-height: 1;
+  border: none;
+  border-radius: 50%;
+  background: rgba(32, 200, 255, 0.12);
+  cursor: pointer;
+  pointer-events: auto;
+  opacity: 0.5;
+  transition: opacity 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+.pet-power-btn:hover {
+  opacity: 1;
+  background: rgba(32, 200, 255, 0.25);
+  transform: scale(1.12);
+}
+.pet-power-btn.is-on {
+  opacity: 1;
+  background: rgba(120, 255, 170, 0.22);
+}
+
+/* ==================== 省电模式：关闭一切装饰性动画与特效 ==================== */
+.pet-float.power-save .pet-spark,
+.pet-float.power-save .pet-orbit,
+.pet-float.power-save .pet-zzz,
+.pet-float.power-save .pet-rune,
+.pet-float.power-save .pet-rune-ring,
+.pet-float.power-save .pet-rune-glyph,
+.pet-float.power-save .pet-rune-core,
+.pet-float.power-save .pet-tail,
+.pet-float.power-save .pet-eye,
+.pet-float.power-save .pet-bubble,
+.pet-float.power-save .pet-shadow {
+  animation: none !important;
+  transition: none !important;
+}
+/* 隐藏纯装饰性元素，进一步降低渲染开销 */
+.pet-float.power-save .pet-spark,
+.pet-float.power-save .pet-orbit,
+.pet-float.power-save .pet-zzz,
+.pet-float.power-save .pet-rune-ring,
+.pet-float.power-save .pet-rune-glyph,
+.pet-float.power-save .pet-rune-core {
+  display: none !important;
+}
+/* 宠物本体过渡与滤镜也一并关闭 */
+.pet-float.power-save,
+.pet-float.power-save * {
+  animation: none !important;
 }
 
 /* 悬停反应 */
@@ -3286,6 +3553,101 @@ defineExpose({
 @keyframes pet-restore-in {
   from { opacity: 0; transform: scale(0.6); }
   to { opacity: 1; transform: scale(1); }
+}
+
+/* ==================== 宠物环形菜单 ==================== */
+.pet-menu-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+  background: radial-gradient(circle at center, rgba(8, 18, 32, 0.28), rgba(4, 10, 20, 0.55));
+  animation: pet-menu-fade 0.18s ease-out;
+}
+.pet-menu-ring {
+  position: fixed;
+  width: 0;
+  height: 0;
+  transform: translate(-50%, -50%);
+}
+.pet-menu-hub {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #8fe6ff;
+  border: 1px solid rgba(32, 200, 255, 0.5);
+  border-radius: 50%;
+  background: rgba(10, 24, 40, 0.9);
+  box-shadow: 0 0 18px rgba(32, 200, 255, 0.45);
+  animation: pet-menu-spin 6s linear infinite;
+}
+.pet-menu-item {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  border: 1px solid rgba(32, 200, 255, 0.42);
+  border-radius: 50%;
+  background: rgba(13, 28, 46, 0.94);
+  color: #cfefff;
+  cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.5), 0 0 10px rgba(32, 200, 255, 0.25);
+  animation: pet-menu-pop 0.2s ease-out;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.pet-menu-item.ring-inner {
+  border-color: rgba(120, 220, 255, 0.6);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.5), 0 0 14px rgba(32, 200, 255, 0.45);
+}
+.pet-menu-item:hover:not(:disabled) {
+  background: rgba(32, 200, 255, 0.28);
+  box-shadow: 0 0 18px rgba(32, 200, 255, 0.6);
+}
+.pet-menu-item.is-disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.pet-menu-ico {
+  font-size: 15px;
+  line-height: 1;
+}
+.pet-menu-label {
+  max-width: 44px;
+  font-size: 9px;
+  line-height: 1.05;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes pet-menu-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes pet-menu-pop {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes pet-menu-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 /* ZZZ 睡眠标识 */
