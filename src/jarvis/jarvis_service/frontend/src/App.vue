@@ -8624,32 +8624,16 @@ function sendLobbyInput(agentId, text, mode = 'multi') {
     sendInputDirectly(sendText, mode, agentId)
     return
   }
-  // 有缓冲区内容且后端未等待输入：先发送缓冲区内容
+  // 有缓冲区内容且后端未等待输入：先发送缓冲区内容，本次输入也直接发送
   if (hasBuffered) {
     sendBufferedInput(agentId)
     if (text) {
-      const existingText = inputBuffers.value.get(agentId) || ''
-      const nextValue = existingText ? `${existingText}\n${text}` : text
-      inputBuffers.value.set(agentId, nextValue)
-      appendOutput({
-        output_type: 'system',
-        agent_name: 'system',
-        text: '✓ 输入已追加到缓冲区，等待后端请求',
-        lang: 'text',
-      }, agentId)
+      sendInputDirectly(text, mode, agentId)
     }
     return
   }
-  // 后端未在等待输入：保存到缓冲区（与 panel 行为一致）
-  const existingText = inputBuffers.value.get(agentId) || ''
-  const nextValue = existingText ? `${existingText}\n${text}` : text
-  inputBuffers.value.set(agentId, nextValue)
-  appendOutput({
-    output_type: 'system',
-    agent_name: 'system',
-    text: '✓ 输入已追加到缓冲区，等待后端请求',
-    lang: 'text',
-  }, agentId)
+  // 后端未在等待输入（如运行中）：直接发送，不再写入缓冲区
+  sendInputDirectly(text, mode, agentId)
 }
 
 // 宠物大厅：获取某 Agent 的最新一条可显示输出（markdown 渲染后的 html）
