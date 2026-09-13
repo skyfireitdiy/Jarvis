@@ -171,6 +171,7 @@
         v-show="showOutput || pet.active || pet.inputMode === 'confirm'"
         class="lobby-pet-stack"
         :class="{ 'stack-above': pet.panelAbove }"
+        :style="{ left: pet.stackLeft + 'px', width: pet.stackWidth + 'px', maxHeight: pet.stackMaxH + 'px' }"
         @pointerdown.stop
         @click.stop
         @dblclick.stop
@@ -285,6 +286,7 @@ const PET_SPEED = 0.55 // 像素/帧，约 33px/秒
 const MIN_DIST = 96 // 宠物之间最小间距，用于斥力避让
 const EDGE_PAD = 12
 const PANEL_H = 150 // 交互面板高度（粗略值，用于判断面板朝上/朝下）
+const STACK_GAP = 4 // 堆叠容器与宠物本体的间距（与 CSS 的 calc(100% + 4px) 一致）
 
 const stageRef = ref(null)
 const stageSize = ref({ w: 0, h: 0 })
@@ -565,8 +567,33 @@ function refreshPetData(pet) {
   }
   const latest = props.getLatestOutput ? props.getLatestOutput(pet.agentId) : null
   pet.output = latest ? latest.html : ''
-  // 堆叠容器（输出/输入/确认）默认在宠物下方；下方空间不足时改为上方
-  pet.panelAbove = pet.y + PET_H + PANEL_H > stageSize.value.h
+  layoutPetStack(pet)
+}
+
+// 计算堆叠容器（输出/输入/确认）的位置与尺寸，确保始终落在舞台可视范围内
+// 水平：以宠物中心对齐，并夹取到舞台左右边界内
+// 垂直：优先放下方，下方空间不足则放上方，并限制最大高度避免溢出
+function layoutPetStack(pet) {
+  if (!pet) return
+  const w = stageSize.value.w
+  const h = stageSize.value.h
+  if (!w || !h) return
+  // 宽度与 CSS 的 min(560px, 62vw) 对齐，且不超出舞台可用宽度
+  const width = Math.max(160, Math.min(560, w * 0.62, w - EDGE_PAD * 2))
+  pet.stackWidth = width
+  // 水平：理想居中于宠物，夹取到 [EDGE_PAD, w - width - EDGE_PAD]
+  const cx = pet.x + PET_W / 2
+  const idealLeft = cx - width / 2
+  const clampedLeft = Math.min(Math.max(idealLeft, EDGE_PAD), Math.max(w - width - EDGE_PAD, EDGE_PAD))
+  // left 相对宠物左上角（stack 为 absolute，父级是宠物）
+  pet.stackLeft = clampedLeft - pet.x
+  // 垂直：下方 / 上方可用空间
+  const belowSpace = h - (pet.y + PET_H + STACK_GAP)
+  const aboveSpace = pet.y - STACK_GAP
+  const useAbove = belowSpace < PANEL_H && aboveSpace > belowSpace
+  pet.panelAbove = useAbove
+  const avail = Math.max(useAbove ? aboveSpace : belowSpace, 120)
+  pet.stackMaxH = Math.min(avail, h - EDGE_PAD * 2)
 }
 
 // 依据 agents 同步宠物实例：新增的补位，消失的移除，已有的保留位置
@@ -603,6 +630,9 @@ function syncPets() {
         confirmDefault: true,
         output: '',
         panelAbove: false,
+        stackLeft: 0,
+        stackWidth: 0,
+        stackMaxH: 0,
         copied: false,
         copyTimer: null,
       }
@@ -700,6 +730,8 @@ function measureStage() {
   const el = stageRef.value
   if (!el) return
   stageSize.value = { w: el.clientWidth, h: el.clientHeight }
+  // 舞台尺寸变化后重算堆叠容器位置，避免输入/输出框溢出可视范围
+  for (const pet of petAgents.value) layoutPetStack(pet)
 }
 
 // 点击大厅空白处：取消所有宠物的选中/展开状态，让它们恢复飘动
@@ -817,6 +849,8 @@ function onPetPointerMove(event) {
   pet.x = clamped.x
   pet.y = clamped.y
   pet.target = { x: clamped.x, y: clamped.y }
+  // 拖动过程中同步重算堆叠容器位置，保证输入/输出框始终在可视范围内
+  layoutPetStack(pet)
   // 触摸拖动时阻止页面滚动
   if (event.cancelable && event.pointerType && event.pointerType !== 'mouse') {
     event.preventDefault()
@@ -1033,7 +1067,7 @@ function refreshLoop() {
       if (showOutput.value || pet.active) {
         refreshPetData(pet)
       } else {
-        pet.panelAbove = pet.y + PET_H + PANEL_H > stageSize.value.h
+        layoutPetStack(pet)
       }
     }
   }
@@ -1702,17 +1736,18 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden })
 }
 
 /* ===== 输出气泡 + 输入/确认控件堆叠容器 ===== */
+/* left / width / max-height 由 JS（layoutPetStack）动态计算，确保始终落在舞台可视范围内 */
 .lobby-pet-stack {
   position: absolute;
-  left: 50%;
   top: calc(100% + 4px);
-  transform: translateX(-50%);
-  width: min(560px, 62vw);
   display: flex;
   flex-direction: column;
   gap: 6px;
   cursor: default;
   z-index: 6;
+  overflow-y: auto;
+  overflow-x: hidden;
+  touch-action: pan-y;
 }
 .lobby-pet-stack.stack-above {
   top: auto;
