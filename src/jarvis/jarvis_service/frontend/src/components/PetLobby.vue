@@ -120,15 +120,35 @@
         <span class="pet-lobby-roam-label">{{ roaming ? '游走中' : '已静止' }}</span>
       </button>
 
-      <!-- 精灵显示模式开关（全部 / 仅隐藏输出 / 隐藏全部） -->
+      <!-- 全部显示 / 全部隐藏：控制所有 Agent 精灵的显示与隐藏（按钮文案为将要执行的操作） -->
       <button
         class="pet-lobby-display-toggle"
-        :class="{ off: displayMode !== 'all' }"
-        :title="displayModeMeta.title"
-        @click.stop="cycleDisplayMode()"
+        :class="{ off: petsHidden }"
+        :title="petsHidden ? '点击显示全部 Agent' : '点击隐藏全部 Agent'"
+        @click.stop="toggleAllPets()"
       >
-        <span class="pet-lobby-display-icon">{{ displayModeMeta.icon }}</span>
-        <span class="pet-lobby-display-label">{{ displayModeMeta.label }}</span>
+        <span class="pet-lobby-display-icon">{{ petsHidden ? '👁' : '🙈' }}</span>
+        <span class="pet-lobby-display-label">{{ petsHidden ? '全部显示' : '全部隐藏' }}</span>
+      </button>
+
+      <!-- 显示全部输出：遍历所有 Agent，显示其输出 -->
+      <button
+        class="pet-lobby-display-toggle"
+        title="显示所有 Agent 的输出"
+        @click.stop="showAllOutputs()"
+      >
+        <span class="pet-lobby-display-icon">💬</span>
+        <span class="pet-lobby-display-label">显示全部输出</span>
+      </button>
+
+      <!-- 隐藏全部输出：遍历所有 Agent，隐藏其输出 -->
+      <button
+        class="pet-lobby-display-toggle"
+        title="隐藏所有 Agent 的输出"
+        @click.stop="hideAllOutputs()"
+      >
+        <span class="pet-lobby-display-icon">🚫</span>
+        <span class="pet-lobby-display-label">隐藏全部输出</span>
       </button>
     </div>
 
@@ -168,7 +188,7 @@
 
       <!-- 输出气泡 + 输入/确认控件：堆叠在宠物下方 -->
       <div
-        v-show="showOutput || pet.active || pet.inputMode === 'confirm'"
+        v-show="!isOutputHidden(pet.agentId) || pet.active || pet.inputMode === 'confirm'"
         class="lobby-pet-stack"
         :class="{ 'stack-above': pet.panelAbove }"
         :style="{ left: pet.stackLeft + 'px', width: pet.stackWidth + 'px', maxHeight: pet.stackMaxH + 'px' }"
@@ -394,41 +414,45 @@ const petAgents = ref([])
 const activePetId = ref(null)
 const roaming = ref(true) // 是否允许宠物自由游走
 
-// 精灵显示模式：all=全部显示 / no-output=仅隐藏输出 / hidden=隐藏输出与精灵
-// 用于精灵过多时降低资源消耗、保持界面整洁；持久化到 localStorage
+// 精灵显示：petsHidden=是否隐藏全部精灵，持久化到 localStorage
+// 输出显隐完全由单个 Agent 的 hiddenOutputIds 控制（不再有全局输出开关）
 const DISPLAY_MODE_KEY = 'jarvis.petLobby.displayMode'
-const DISPLAY_MODES = ['all', 'no-output', 'hidden']
-function loadDisplayMode() {
+function loadPetsHidden() {
   try {
-    const saved = localStorage.getItem(DISPLAY_MODE_KEY)
-    if (DISPLAY_MODES.includes(saved)) return saved
+    // 兼容旧版三态：all / no-output / hidden
+    return localStorage.getItem(DISPLAY_MODE_KEY) === 'hidden'
   } catch (e) {
     /* localStorage 不可用时回退默认值 */
   }
-  return 'all'
+  return false
 }
-const displayMode = ref(loadDisplayMode())
-const showPets = computed(() => displayMode.value !== 'hidden')
-const showOutput = computed(() => displayMode.value === 'all')
-watch(displayMode, (mode) => {
+const petsHidden = ref(loadPetsHidden())
+const showPets = computed(() => !petsHidden.value)
+watch(petsHidden, (hidden) => {
   try {
-    localStorage.setItem(DISPLAY_MODE_KEY, mode)
+    localStorage.setItem(DISPLAY_MODE_KEY, hidden ? 'hidden' : 'all')
   } catch (e) {
     /* 忽略写入失败（隐私模式等） */
   }
 })
-// 循环切换：全部 → 仅隐藏输出 → 隐藏全部 → 全部
-function cycleDisplayMode() {
-  const idx = DISPLAY_MODES.indexOf(displayMode.value)
-  displayMode.value = DISPLAY_MODES[(idx + 1) % DISPLAY_MODES.length]
+// 全部显示 / 全部隐藏：切换所有 Agent 精灵的显示与隐藏
+function toggleAllPets() {
+  petsHidden.value = !petsHidden.value
 }
-const displayModeMeta = computed(() => {
-  if (displayMode.value === 'no-output') return { icon: '💬', label: '仅隐藏输出', title: '当前：仅隐藏输出气泡，点击切换为隐藏全部精灵' }
-  if (displayMode.value === 'hidden') return { icon: '🙈', label: '隐藏全部', title: '当前：已隐藏输出与精灵，点击切换为全部显示' }
-  return { icon: '👁', label: '全部显示', title: '当前：显示全部，点击切换为仅隐藏输出' }
-})
+// 显示全部输出：遍历所有 Agent，清除其单独隐藏标记
+function showAllOutputs() {
+  if (hiddenOutputIds.value.size) {
+    hiddenOutputIds.value = new Set()
+    saveHiddenOutputs()
+  }
+}
+// 隐藏全部输出：遍历所有 Agent，将其标记为单独隐藏
+function hideAllOutputs() {
+  hiddenOutputIds.value = new Set(petAgents.value.map(p => p.agentId))
+  saveHiddenOutputs()
+}
 
-// 单个 Agent 的输出显隐：与全局 displayMode 叠加，独立控制并持久化
+// 单个 Agent 的输出显隐：独立控制并持久化
 const HIDDEN_OUTPUTS_KEY = 'jarvis.petLobby.hiddenOutputs'
 function loadHiddenOutputs() {
   try {
@@ -1339,9 +1363,9 @@ function refreshLoop() {
     }
     // 正在输入时不覆盖输入框内容，但仍刷新输出/确认态
     if (!pet.typing) {
-      // 仅隐藏输出/隐藏全部时，跳过较重的输出（markdown）刷新；
-      // 但已激活（展开交互面板）的宠物仍需刷新，保证其输出面板实时更新
-      if (showOutput.value || pet.active) {
+      // 输出被隐藏且未展开交互面板时，跳过较重的输出（markdown）刷新；
+      // 已激活（展开交互面板）的宠物仍需刷新，保证其输出面板实时更新
+      if (!isOutputHidden(pet.agentId) || pet.active) {
         refreshPetData(pet)
       } else {
         layoutPetStack(pet)
@@ -1692,6 +1716,25 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden })
 .pet-lobby-display-icon {
   font-size: 13px;
   line-height: 1;
+}
+
+/* 移动端：顶部空间有限，开关组仅显示图标，隐藏文字 */
+@media (max-width: 768px) {
+  .pet-lobby-toggles {
+    gap: 6px;
+  }
+  .pet-lobby-roam-toggle,
+  .pet-lobby-display-toggle {
+    padding: 6px 8px;
+  }
+  .pet-lobby-roam-label,
+  .pet-lobby-display-label {
+    display: none;
+  }
+  .pet-lobby-roam-icon,
+  .pet-lobby-display-icon {
+    font-size: 15px;
+  }
 }
 
 /* ===== 迷你宠物 ===== */
