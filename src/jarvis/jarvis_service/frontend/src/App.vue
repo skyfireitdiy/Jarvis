@@ -575,14 +575,16 @@
       />
     </template>
 
-    <!-- 确认对话框（弹出式） -->
-    <ConfirmDialog
-      :visible="!!confirmDialog"
-      :message="confirmDialog?.message || ''"
-      :defaultConfirm="confirmDialog?.defaultConfirm ?? true"
-      @confirm="handleConfirmDialogConfirm"
-      @cancel="handleConfirmDialogCancel"
-    />
+    <!-- 确认对话框（弹出式）：Teleport 到 body，避免被 .app 的 isolation 层叠上下文困住，确保高于其他弹窗 -->
+    <Teleport to="body">
+      <ConfirmDialog
+        :visible="!!confirmDialog"
+        :message="confirmDialog?.message || ''"
+        :defaultConfirm="confirmDialog?.defaultConfirm ?? true"
+        @confirm="handleConfirmDialogConfirm"
+        @cancel="handleConfirmDialogCancel"
+      />
+    </Teleport>
 
 <!-- 终端面板（浮动模式） -->
     <TerminalPanel
