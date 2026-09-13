@@ -519,6 +519,7 @@
           @contextAgent="onLobbyContextAgent"
           @contextRun="onLobbyContextRun"
           @nodeContextRun="onLobbyNodeContextRun"
+          @renameNode="onLobbyRenameNode"
         />
       </div>
     </main>
@@ -5451,12 +5452,25 @@ function onLobbyContextRun(action) {
   onPetRadialRun(action)
 }
 
-// 大厅节点右键菜单点击：目前仅「创建 Agent」，后续可在此扩展更多节点操作
+// 大厅节点右键菜单点击：创建 Agent / 打开终端（后续可在此扩展更多节点操作）
 function onLobbyNodeContextRun({ action, nodeId }) {
   if (!action) return
   if (action.id === 'node-create-agent') {
     onLobbyCreateAgentOnNode(nodeId)
+  } else if (action.id === 'node-open-terminal') {
+    createTerminalForNode(nodeId)
   }
+}
+
+// 大厅节点重命名：写入节点名称映射（与设置界面同一份数据，留空则恢复为节点 ID）
+function onLobbyRenameNode({ nodeId, name }) {
+  const normalizedNodeId = String(nodeId || '').trim()
+  if (!normalizedNodeId) return
+  const next = { ...nodeDisplayNames.value }
+  const trimmed = String(name || '').trim()
+  if (trimmed) next[normalizedNodeId] = trimmed
+  else delete next[normalizedNodeId]
+  saveNodeDisplayNames(next)
 }
 
 // 执行命令面板中的动作
@@ -11097,6 +11111,26 @@ function createTerminalForSelectedNode() {
   }
   socket.value.send(JSON.stringify(message))
 
+  // 自动打开终端面板
+  showTerminalPanel.value = true
+}
+
+// 在指定节点上创建独立终端（大厅节点右键菜单）
+function createTerminalForNode(nodeId) {
+  if (!socket.value) {
+    console.warn('[independent-terminal] No socket connection')
+    return
+  }
+  const normalizedNodeId = String(nodeId || '').trim()
+  if (!normalizedNodeId) {
+    console.warn('[independent-terminal] No terminal node specified')
+    return
+  }
+  const message = {
+    type: 'terminal_create',
+    payload: { node_id: normalizedNodeId },
+  }
+  socket.value.send(JSON.stringify(message))
   // 自动打开终端面板
   showTerminalPanel.value = true
 }
