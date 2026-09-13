@@ -518,6 +518,7 @@
           @createAgentOnNode="onLobbyCreateAgentOnNode"
           @contextAgent="onLobbyContextAgent"
           @contextRun="onLobbyContextRun"
+          @nodeContextRun="onLobbyNodeContextRun"
         />
       </div>
     </main>
@@ -5448,6 +5449,14 @@ const lobbyContextActions = computed(() => {
 // 大厅宠物右键菜单点击：按命令面板同款逻辑执行
 function onLobbyContextRun(action) {
   onPetRadialRun(action)
+}
+
+// 大厅节点右键菜单点击：目前仅「创建 Agent」，后续可在此扩展更多节点操作
+function onLobbyNodeContextRun({ action, nodeId }) {
+  if (!action) return
+  if (action.id === 'node-create-agent') {
+    onLobbyCreateAgentOnNode(nodeId)
+  }
 }
 
 // 执行命令面板中的动作
