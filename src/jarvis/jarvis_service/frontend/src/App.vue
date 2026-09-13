@@ -5196,6 +5196,8 @@ function getCurrentPanel() {
 // 命令面板「当前 Agent」组使用的 Agent ID：
 // 优先当前激活 Panel 内的 Agent；其次宠物大厅中选中的宠物对应的 Agent；最后回退到 currentAgentId
 const commandPaletteCurrentAgentId = computed(() => {
+  // 宠物大厅（无嵌入面板）中，以大厅选中的宠物为准，避免被残留的分离面板干扰
+  if (hasNoPanel.value && lobbyActiveAgentId.value) return lobbyActiveAgentId.value
   const panel = getCurrentPanel()
   if (panel && panel.agentId) return panel.agentId
   if (lobbyActiveAgentId.value) return lobbyActiveAgentId.value
@@ -5430,7 +5432,6 @@ function onPetRadialRun(action) {
 function onLobbyContextAgent(agentId) {
   if (agentId) lobbyActiveAgentId.value = agentId
 }
-
 // 大厅宠物右键菜单动作：复用命令面板「当前 Agent」组
 const lobbyContextActions = computed(() => {
   const ctx = commandPaletteCtx.value

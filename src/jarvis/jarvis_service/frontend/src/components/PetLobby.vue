@@ -180,8 +180,10 @@
         <div v-if="pet.output && !isOutputHidden(pet.agentId)" class="lobby-pet-output-wrap">
           <div
             class="lobby-pet-output"
+            :data-pet-output="pet.agentId"
             v-html="pet.output"
             @click.stop="onPetClick(pet)"
+            @scroll="onOutputScroll(pet, $event)"
           ></div>
           <button
             class="lobby-pet-copy"
@@ -247,22 +249,24 @@
       @contextmenu.prevent.stop
     >
       <div class="lobby-context-title">{{ contextMenu.name }}</div>
-      <button
-        v-for="act in contextActions"
-        :key="act.id"
-        class="lobby-context-item"
-        :disabled="act.enabled === false"
-        @click="onContextAction(act)"
-      >
-        <span class="lobby-context-icon">{{ act.icon }}</span>
-        <span class="lobby-context-label">{{ act.label }}</span>
-      </button>
+      <div class="lobby-context-items">
+        <button
+          v-for="act in contextActions"
+          :key="act.id"
+          class="lobby-context-item"
+          :disabled="act.enabled === false"
+          @click="onContextAction(act)"
+        >
+          <span class="lobby-context-icon">{{ act.icon }}</span>
+          <span class="lobby-context-label">{{ act.label }}</span>
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { normalizeNodeStatus, normalizeAgentStatus } from './topology.js'
 
 const props = defineProps({
@@ -566,8 +570,30 @@ function refreshPetData(pet) {
     }
   }
   const latest = props.getLatestOutput ? props.getLatestOutput(pet.agentId) : null
-  pet.output = latest ? latest.html : ''
+  const nextOutput = latest ? latest.html : ''
+  const outputChanged = nextOutput !== pet.output
+  pet.output = nextOutput
   layoutPetStack(pet)
+  // 流式输出：内容更新后若用户未上滚，自动滚到底部
+  if (outputChanged && pet.outputAutoScroll) {
+    scrollOutputToBottom(pet.agentId)
+  }
+}
+
+// 输出滚动到底部（等待 DOM 更新后执行）
+function scrollOutputToBottom(agentId) {
+  nextTick(() => {
+    const el = stageRef.value && stageRef.value.querySelector(`[data-pet-output="${agentId}"]`)
+    if (el) el.scrollTop = el.scrollHeight
+  })
+}
+
+// 用户手动滚动输出框：接近底部时恢复自动滚动，否则暂停（避免打断用户查看历史）
+function onOutputScroll(pet, event) {
+  const el = event.target
+  if (!el) return
+  const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24
+  pet.outputAutoScroll = atBottom
 }
 
 // 计算堆叠容器（输出/输入/确认）的位置与尺寸，确保始终落在舞台可视范围内
@@ -633,6 +659,7 @@ function syncPets() {
         stackLeft: 0,
         stackWidth: 0,
         stackMaxH: 0,
+        outputAutoScroll: true,
         copied: false,
         copyTimer: null,
       }
@@ -762,15 +789,21 @@ function closeContextMenu() {
 // 在宠物上右键：通知父组件切换当前 Agent 并准备动作，再就地弹出菜单
 function onPetContextMenu(pet, event) {
   if (!pet) return
+  // 取消待执行的单击判定：避免右键后 250ms 误触发 onPetClick 而改变选中状态
+  if (clickTimer) {
+    clearTimeout(clickTimer)
+    clickTimer = null
+  }
   const stage = stageRef.value
   if (!stage) return
   const rect = stage.getBoundingClientRect()
   // 先请求父组件把「当前 Agent」切到该宠物（决定菜单动作与可用性）
   emit('contextAgent', pet.agentId)
-  // 估算菜单尺寸并做边界钳制，避免超出舞台
-  const MENU_W = 200
+  // 估算菜单尺寸并做边界钳制，避免超出舞台（两列布局，宽度与 CSS min-width 对齐）
+  const MENU_W = 320
   const itemCount = (props.contextActions || []).length
-  const MENU_H = Math.min(44 + itemCount * 33, rect.height * 0.6)
+  const rows = Math.max(1, Math.ceil(itemCount / 2))
+  const MENU_H = Math.min(44 + rows * 33, rect.height * 0.6)
   let x = event.clientX - rect.left
   let y = event.clientY - rect.top
   if (x + MENU_W > rect.width) x = Math.max(rect.width - MENU_W, 0)
@@ -903,6 +936,7 @@ function onPetPointerCancel() {
 }
 
 // 单击：延时判定，避免与双击冲突（双击时取消单击动作）
+// 语义为「总是选中并展开」；取消选中只通过点击舞台空白处（onStageClick）
 let clickTimer = null
 function onPetClick(pet) {
   if (clickTimer) {
@@ -911,11 +945,8 @@ function onPetClick(pet) {
   }
   clickTimer = setTimeout(() => {
     clickTimer = null
-    if (pet.active) {
-      closePanel(pet)
-    } else {
-      openPanel(pet)
-    }
+    if (activePetId.value === pet.agentId && pet.active) return
+    openPanel(pet)
   }, 250)
 }
 
@@ -1919,8 +1950,8 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden })
 .lobby-context-menu {
   position: absolute;
   z-index: 60;
-  min-width: 168px;
-  max-width: 240px;
+  min-width: 300px;
+  max-width: 380px;
   max-height: 60vh;
   overflow-y: auto;
   padding: 4px;
@@ -1941,6 +1972,12 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden })
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* 菜单项两列排布，避免一列过长 */
+.lobby-context-items {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
 }
 .lobby-context-item {
   display: flex;
