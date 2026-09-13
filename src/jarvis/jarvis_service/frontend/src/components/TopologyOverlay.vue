@@ -75,21 +75,6 @@
               />
             </g>
 
-            <!-- 连线：子节点之间（按圆周顺序连成环） -->
-            <g class="topo-peer-links">
-              <line
-                v-for="pl in peerLinks"
-                :key="'P' + pl.id"
-                :x1="pl.x1"
-                :y1="pl.y1"
-                :x2="pl.x2"
-                :y2="pl.y2"
-                :stroke="pl.state === 'offline' ? 'rgba(255,93,108,0.3)' : 'rgba(32,200,255,0.45)'"
-                stroke-width="1.4"
-                :stroke-dasharray="pl.state === 'offline' ? '6 5' : '2 4'"
-              />
-            </g>
-
             <!-- 连线：节点 -> 其 agent -->
             <g class="topo-agent-links">
               <line
@@ -354,23 +339,6 @@ const lines = computed(() =>
     hot: hovered.value === n.id,
   }))
 )
-
-// 节点间连线：按圆周顺序把相邻子节点连成环（子节点 ↔ 子节点）
-const peerLinks = computed(() => {
-  const pts = nodePoints.value
-  if (pts.length < 2) return []
-  return pts.map((n, i) => {
-    const next = pts[(i + 1) % pts.length]
-    return {
-      id: n.id + '-' + next.id,
-      x1: n.x,
-      y1: n.y,
-      x2: next.x,
-      y2: next.y,
-      state: n.state === 'offline' || next.state === 'offline' ? 'offline' : 'online',
-    }
-  })
-})
 
 // 节点 -> agent 连线：每个 agent 连回其所属节点（master 连到中心）
 const agentLinks = computed(() => {

@@ -44,21 +44,6 @@
           />
         </g>
 
-        <!-- 连线：子节点之间（按圆周顺序连成环） -->
-        <g class="lobby-links-peer">
-          <line
-            v-for="pl in peerLinks"
-            :key="pl.key"
-            :x1="pl.x1"
-            :y1="pl.y1"
-            :x2="pl.x2"
-            :y2="pl.y2"
-            :stroke="pl.offline ? 'rgba(255,93,108,0.3)' : 'rgba(32,200,255,0.45)'"
-            stroke-width="1.4"
-            :stroke-dasharray="pl.offline ? '6 5' : '2 4'"
-          />
-        </g>
-
         <!-- 连线：Agent 宠物 → 其所属节点（随宠物移动实时更新） -->
         <g class="lobby-links-agent">
           <line
@@ -122,16 +107,29 @@
       </svg>
     </div>
 
-    <!-- 右上角：游走开关 -->
-    <button
-      class="pet-lobby-roam-toggle"
-      :class="{ off: !roaming }"
-      :title="roaming ? '点击停止宠物游走' : '点击开启宠物游走'"
-      @click.stop="roaming = !roaming"
-    >
-      <span class="pet-lobby-roam-icon">{{ roaming ? '🔄' : '⏸' }}</span>
-      <span class="pet-lobby-roam-label">{{ roaming ? '游走中' : '已静止' }}</span>
-    </button>
+    <!-- 右上角：游走开关 + 精灵显示模式开关 -->
+    <div class="pet-lobby-toggles">
+      <button
+        class="pet-lobby-roam-toggle"
+        :class="{ off: !roaming }"
+        :title="roaming ? '点击停止宠物游走' : '点击开启宠物游走'"
+        @click.stop="roaming = !roaming"
+      >
+        <span class="pet-lobby-roam-icon">{{ roaming ? '🔄' : '⏸' }}</span>
+        <span class="pet-lobby-roam-label">{{ roaming ? '游走中' : '已静止' }}</span>
+      </button>
+
+      <!-- 精灵显示模式开关（全部 / 仅隐藏输出 / 隐藏全部） -->
+      <button
+        class="pet-lobby-display-toggle"
+        :class="{ off: displayMode !== 'all' }"
+        :title="displayModeMeta.title"
+        @click.stop="cycleDisplayMode()"
+      >
+        <span class="pet-lobby-display-icon">{{ displayModeMeta.icon }}</span>
+        <span class="pet-lobby-display-label">{{ displayModeMeta.label }}</span>
+      </button>
+    </div>
 
     <!-- 无 Agent 提示 -->
     <div v-if="petAgents.length === 0" class="pet-lobby-empty">
@@ -142,6 +140,7 @@
     <!-- 宠物群 -->
     <div
       v-for="pet in petAgents"
+      v-show="showPets"
       :key="pet.agentId"
       class="lobby-pet"
       :class="[pet.classes, { dragging: pet.dragging, dimmed: activePetId && activePetId !== pet.agentId }]"
@@ -167,6 +166,7 @@
 
       <!-- 输出气泡 + 输入/确认控件：堆叠在宠物下方 -->
       <div
+        v-show="showOutput || pet.active || pet.inputMode === 'confirm'"
         class="lobby-pet-stack"
         :class="{ 'stack-above': pet.panelAbove }"
         @pointerdown.stop
@@ -174,12 +174,19 @@
         @dblclick.stop
       >
         <!-- 输出气泡：常驻显示（markdown 渲染）；点击气泡同样激活该 Agent -->
-        <div
-          v-if="pet.output"
-          class="lobby-pet-output"
-          v-html="pet.output"
-          @click.stop="onPetClick(pet)"
-        ></div>
+        <div v-if="pet.output" class="lobby-pet-output-wrap">
+          <div
+            class="lobby-pet-output"
+            v-html="pet.output"
+            @click.stop="onPetClick(pet)"
+          ></div>
+          <button
+            class="lobby-pet-copy"
+            :class="{ copied: pet.copied }"
+            :title="pet.copied ? '已复制' : '复制输出'"
+            @click.stop="copyPetOutput(pet)"
+          >{{ pet.copied ? '✓' : '⧉' }}</button>
+        </div>
 
         <!-- 确认控件：需要确认时直接显示（无需点击） -->
         <div v-if="pet.inputMode === 'confirm'" class="lobby-pet-panel">
@@ -258,6 +265,40 @@ const stageSize = ref({ w: 0, h: 0 })
 const petAgents = ref([])
 const activePetId = ref(null)
 const roaming = ref(true) // 是否允许宠物自由游走
+
+// 精灵显示模式：all=全部显示 / no-output=仅隐藏输出 / hidden=隐藏输出与精灵
+// 用于精灵过多时降低资源消耗、保持界面整洁；持久化到 localStorage
+const DISPLAY_MODE_KEY = 'jarvis.petLobby.displayMode'
+const DISPLAY_MODES = ['all', 'no-output', 'hidden']
+function loadDisplayMode() {
+  try {
+    const saved = localStorage.getItem(DISPLAY_MODE_KEY)
+    if (DISPLAY_MODES.includes(saved)) return saved
+  } catch (e) {
+    /* localStorage 不可用时回退默认值 */
+  }
+  return 'all'
+}
+const displayMode = ref(loadDisplayMode())
+const showPets = computed(() => displayMode.value !== 'hidden')
+const showOutput = computed(() => displayMode.value === 'all')
+watch(displayMode, (mode) => {
+  try {
+    localStorage.setItem(DISPLAY_MODE_KEY, mode)
+  } catch (e) {
+    /* 忽略写入失败（隐私模式等） */
+  }
+})
+// 循环切换：全部 → 仅隐藏输出 → 隐藏全部 → 全部
+function cycleDisplayMode() {
+  const idx = DISPLAY_MODES.indexOf(displayMode.value)
+  displayMode.value = DISPLAY_MODES[(idx + 1) % DISPLAY_MODES.length]
+}
+const displayModeMeta = computed(() => {
+  if (displayMode.value === 'no-output') return { icon: '💬', label: '仅隐藏输出', title: '当前：仅隐藏输出气泡，点击切换为隐藏全部精灵' }
+  if (displayMode.value === 'hidden') return { icon: '🙈', label: '隐藏全部', title: '当前：已隐藏输出与精灵，点击切换为全部显示' }
+  return { icon: '👁', label: '全部显示', title: '当前：显示全部，点击切换为仅隐藏输出' }
+})
 
 let rafId = null
 let resizeObserver = null
@@ -371,26 +412,11 @@ const nodeLinks = computed(() => {
   return links
 })
 
-// 节点间连线：按圆周顺序把相邻子节点连成环（子节点 ↔ 子节点）
-const peerLinks = computed(() => {
-  const pts = nodeItems.value.filter(n => !n.isMaster)
-  if (pts.length < 2) return []
-  return pts.map((n, i) => {
-    const next = pts[(i + 1) % pts.length]
-    return {
-      key: `${n.node_id}-${next.node_id}`,
-      x1: n.x,
-      y1: n.y,
-      x2: next.x,
-      y2: next.y,
-      offline: n.state === 'offline' || next.state === 'offline',
-    }
-  })
-})
-
 // Agent 与所属节点的连线：宠物中心 → 节点坐标（颜色取 agent 状态色）
 const agentLinks = computed(() => {
   const links = []
+  // 精灵隐藏时不绘制 agent→节点连线
+  if (!showPets.value) return links
   for (const pet of petAgents.value) {
     const agent = (props.agents || []).find(a => a.agent_id === pet.agentId)
     const nodeId = String(agent?.node_id || '').trim() || 'master'
@@ -429,6 +455,35 @@ function pickTarget() {
     x: randBetween(EDGE_PAD, maxX),
     y: randBetween(EDGE_PAD, maxY),
   }
+}
+
+// 复制某只宠物的输出内容（取渲染后的纯文本）
+async function copyPetOutput(pet) {
+  if (!pet || !pet.output) return
+  const holder = document.createElement('div')
+  holder.innerHTML = pet.output
+  const text = (holder.textContent || '').trim()
+  if (!text) return
+  try {
+    await navigator.clipboard.writeText(text)
+  } catch (err) {
+    try {
+      const textArea = document.createElement('textarea')
+      textArea.value = text
+      textArea.style.position = 'fixed'
+      textArea.style.opacity = '0'
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+    } catch (fallbackErr) {
+      console.error('[PET-COPY] 复制失败:', fallbackErr)
+      return
+    }
+  }
+  pet.copied = true
+  if (pet.copyTimer) clearTimeout(pet.copyTimer)
+  pet.copyTimer = setTimeout(() => { pet.copied = false }, 1200)
 }
 
 // 刷新某只宠物的输入态与最新输出
@@ -485,6 +540,8 @@ function syncPets() {
         confirmDefault: true,
         output: '',
         panelAbove: false,
+        copied: false,
+        copyTimer: null,
       }
     } else {
       pet.name = agent.name || agent.agent_id
@@ -505,6 +562,11 @@ function syncPets() {
 // 单帧：所有宠物向各自目标点移动，并做斥力避让
 function step() {
   const pets = petAgents.value
+  // 精灵隐藏时不渲染也不移动，直接跳过全部计算，降低资源消耗
+  if (!showPets.value) {
+    rafId = requestAnimationFrame(step)
+    return
+  }
   const n = pets.length
   // 计算两两斥力偏移
   const pushX = new Array(n).fill(0)
@@ -824,6 +886,8 @@ function submitConfirm(pet, confirmed) {
 // 定时刷新：状态灯、输出气泡、输入态（输出/确认常驻显示，需对所有宠物刷新）
 let refreshTimer = null
 function refreshLoop() {
+  // 精灵隐藏时无需刷新任何宠物数据
+  if (!showPets.value) return
   for (const pet of petAgents.value) {
     const agent = (props.agents || []).find(a => a.agent_id === pet.agentId)
     if (agent && props.getStatusClass) {
@@ -835,7 +899,13 @@ function refreshLoop() {
     }
     // 正在输入时不覆盖输入框内容，但仍刷新输出/确认态
     if (!pet.typing) {
-      refreshPetData(pet)
+      // 仅隐藏输出/隐藏全部时，跳过较重的输出（markdown）刷新；
+      // 但已激活（展开交互面板）的宠物仍需刷新，保证其输出面板实时更新
+      if (showOutput.value || pet.active) {
+        refreshPetData(pet)
+      } else {
+        pet.panelAbove = pet.y + PET_H + PANEL_H > stageSize.value.h
+      }
     }
   }
 }
@@ -1119,12 +1189,18 @@ defineExpose({ insertCompletionText })
   margin: 0;
 }
 
-/* ===== 游走开关 ===== */
-.pet-lobby-roam-toggle {
+/* ===== 右上角开关组（游走 + 精灵显示模式） ===== */
+.pet-lobby-toggles {
   position: absolute;
   top: 12px;
   right: 12px;
   z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pet-lobby-roam-toggle,
+.pet-lobby-display-toggle {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1138,15 +1214,18 @@ defineExpose({ insertCompletionText })
   backdrop-filter: blur(6px);
   transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
-.pet-lobby-roam-toggle:hover {
+.pet-lobby-roam-toggle:hover,
+.pet-lobby-display-toggle:hover {
   background: rgba(16, 40, 60, 0.95);
   border-color: rgba(32, 200, 255, 0.75);
 }
-.pet-lobby-roam-toggle.off {
+.pet-lobby-roam-toggle.off,
+.pet-lobby-display-toggle.off {
   color: #9fb4c4;
   border-color: rgba(120, 140, 160, 0.45);
 }
-.pet-lobby-roam-icon {
+.pet-lobby-roam-icon,
+.pet-lobby-display-icon {
   font-size: 13px;
   line-height: 1;
 }
@@ -1492,6 +1571,42 @@ defineExpose({ insertCompletionText })
 }
 
 /* 输出气泡（markdown） */
+.lobby-pet-output-wrap {
+  position: relative;
+  width: 100%;
+}
+.lobby-pet-copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+  color: #9fd8ef;
+  background: rgba(10, 24, 38, 0.85);
+  border: 1px solid rgba(32, 200, 255, 0.35);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0.35;
+  transition: opacity 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.lobby-pet-output-wrap:hover .lobby-pet-copy {
+  opacity: 1;
+}
+.lobby-pet-copy:hover {
+  color: #dff1fb;
+  border-color: rgba(32, 200, 255, 0.7);
+}
+.lobby-pet-copy.copied {
+  opacity: 1;
+  color: #34d99b;
+  border-color: rgba(52, 217, 155, 0.7);
+}
 .lobby-pet-output {
   width: 100%;
   box-sizing: border-box;
@@ -1505,7 +1620,7 @@ defineExpose({ insertCompletionText })
   background: rgba(10, 24, 38, 0.94);
   border: 1px solid rgba(32, 200, 255, 0.28);
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 10px 32px 10px 12px;
   word-break: break-word;
   box-shadow: 0 8px 26px rgba(0, 0, 0, 0.5);
 }
