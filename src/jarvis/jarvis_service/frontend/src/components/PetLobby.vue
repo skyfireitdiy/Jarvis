@@ -144,7 +144,7 @@
       v-show="showPets"
       :key="pet.agentId"
       class="lobby-pet"
-      :class="[pet.classes, { dragging: pet.dragging, dimmed: activePetId && activePetId !== pet.agentId, 'is-code-agent': pet.agentType === 'code_agent' }]"
+      :class="[pet.classes, { active: pet.active, dragging: pet.dragging, dimmed: activePetId && activePetId !== pet.agentId, 'is-code-agent': pet.agentType === 'code_agent' }]"
       :style="{ left: pet.x + 'px', top: pet.y + 'px' }"
       @pointerdown="onPetPointerDown(pet, $event)"
       @dblclick="onPetDblClick(pet)"
