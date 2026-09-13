@@ -1077,6 +1077,7 @@
     <!-- 管理面板 -->
     <AdminPanel
       :visible="showAdminPanel"
+      ref="adminPanelRef"
       :auth="auth"
       :fetchWithAuth="fetchWithAuth"
       :gatewayUrl="gatewayUrl"
@@ -1753,6 +1754,7 @@ async function logout() {
     auth.value.userInfo = null
     auth.value.password = ''
     userAccessibleNodes.value = null
+    userPermissions.value = null
     localStorage.removeItem('jarvis_auth_token')
     localStorage.removeItem('jarvis_user_info')
 
@@ -1884,6 +1886,7 @@ async function fetchWithAuth(url, options = {}) {
     auth.value.token = ''
     auth.value.userInfo = null
     userAccessibleNodes.value = null
+    userPermissions.value = null
     localStorage.removeItem('jarvis_auth_token')
     localStorage.removeItem('jarvis_user_info')
     showConnectModal.value = true
@@ -2009,6 +2012,7 @@ function getGatewayAddress() {
 const showConnectModal = ref(true)  // 首次打开显示欢迎界面
 const showSettingsModal = ref(false) // 设置弹窗
 const showAdminPanel = ref(false) // 管理面板
+const adminPanelRef = ref(null) // 管理面板组件引用（用于命令面板定位到系统配置）
 const showAgentSidebar = ref(false)    // Agent 侧边栏（默认收起）
 const agentSidebarRef = ref(null)     // Agent 侧边栏组件引用（用于调用宠物显隐）
 const showTerminalPanel = ref(false)  // 终端面板
@@ -5316,6 +5320,13 @@ const commandPaletteCtx = computed(() => ({
   refreshAgentList: fetchAgentList,
   restartGateway,
   restartAllNodes,
+  // 管理类动作（需 admin 权限，registry 中通过 hasPermission 判定）
+  hasPermission,
+  confirmUpdateCodeToMain,
+  openAdminPanel: () => { showAdminPanel.value = true; pushOverlayState() },
+  openAdminRestartService: () => openAdminSystemAction('restart'),
+  openAdminSyncConfig: () => openAdminSystemAction('sync-config'),
+  openAdminNodeSecret: () => openAdminSystemAction('node-secret'),
   toggleAgentSidebar,
   toggleTerminalPanel,
   toggleChatPanel,
@@ -5617,6 +5628,7 @@ const filteredUserOptionsForAcl = computed(() => {
 })
 const availableNodeOptions = ref([])
 const userAccessibleNodes = ref(null) // null=未加载, []=无权限, ["*"]=所有, ["id1","id2"]=限定节点
+const userPermissions = ref(null) // null=未加载, {allowed:[pattern],denied:[pattern]}=已加载
 
 // 节点显示名映射（仅前端本地）：nodeId -> 自定义显示名，未设置时回退到原始 nodeId
 const NODE_DISPLAY_NAMES_STORAGE_KEY = 'jarvis_node_display_names'
@@ -5917,8 +5929,8 @@ async function connect() {
     // 保存连接信息到 localStorage
     localStorage.setItem('jarvis_gateway_url', gatewayUrl.value)
     startAgentListRefresh()
-    // 刷新用户信息（确保display_name等字段最新）
-    refreshUserInfo()
+    // 刷新用户信息（确保display_name等字段最新），随后拉取权限（依赖 userInfo.user_id）
+    refreshUserInfo().finally(() => { fetchUserPermissions() })
     // 登录成功后自动连接所有在线的 agent
     autoConnectToOnlineAgents()
     // 获取模型组列表
@@ -6045,6 +6057,15 @@ function handleSyncConfig({ sourceNodeId }) {
 // 处理 SettingsModal 组件的更新代码事件
 function handleUpdateCodeToMain() {
   updateCodeToMain()
+}
+
+// 打开管理面板并定位到系统配置，触发指定操作（供命令面板调用）
+function openAdminSystemAction(kind) {
+  showAdminPanel.value = true
+  pushOverlayState()
+  nextTick(() => {
+    adminPanelRef.value?.openSystemAction?.(kind)
+  })
 }
 
 // 确认更新代码到 main 分支
@@ -7131,6 +7152,56 @@ async function fetchUserAccessibleNodes() {
     console.error('[PERM] 获取可访问节点出错:', error)
     userAccessibleNodes.value = []
   }
+}
+
+// 获取当前用户权限（allowed/denied 为权限 pattern 列表）
+async function fetchUserPermissions() {
+  try {
+    const { host, port } = getGatewayAddress()
+    const userId = auth.value.userInfo?.user_id
+    if (!userId) { userPermissions.value = { allowed: [], denied: [] }; return }
+    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/permissions/user/${encodeURIComponent(userId)}`)
+    if (!response.ok) {
+      console.warn('[PERM] 获取用户权限失败:', response.status)
+      userPermissions.value = { allowed: [], denied: [] }
+      return
+    }
+    const result = await response.json()
+    if (result.success && result.data?.permissions) {
+      userPermissions.value = {
+        allowed: result.data.permissions.allowed || [],
+        denied: result.data.permissions.denied || []
+      }
+    } else {
+      userPermissions.value = { allowed: [], denied: [] }
+    }
+  } catch (error) {
+    console.error('[PERM] 获取用户权限出错:', error)
+    userPermissions.value = { allowed: [], denied: [] }
+  }
+}
+
+// 权限 pattern 匹配：支持 '*:*'、精确匹配、'前缀:*' 通配
+function matchPermissionPattern(pattern, permission) {
+  if (!pattern || !permission) return false
+  if (pattern === '*:*' || pattern === permission) return true
+  const parts = String(pattern).split(':')
+  if (parts.length === 2 && parts[1] === '*') {
+    return String(permission).startsWith(parts[0] + ':')
+  }
+  return false
+}
+
+// 判断当前用户是否拥有指定权限（管理员直接放行；denied 优先于 allowed）
+function hasPermission(permission) {
+  if (!permission) return false
+  if (auth.value.userInfo?.is_admin) return true
+  const perms = userPermissions.value
+  if (!perms) return false
+  const denied = Array.isArray(perms.denied) ? perms.denied : []
+  if (denied.some(p => matchPermissionPattern(p, permission))) return false
+  const allowed = Array.isArray(perms.allowed) ? perms.allowed : []
+  return allowed.some(p => matchPermissionPattern(p, permission))
 }
 
 async function fetchNodeStatus() {
