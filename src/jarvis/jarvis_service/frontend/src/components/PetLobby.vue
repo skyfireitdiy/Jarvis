@@ -262,6 +262,32 @@
         </button>
       </div>
     </div>
+
+    <!-- 节点重命名弹层：确定后同步到设置中的节点名称映射 -->
+    <div
+      v-if="renameDialog.visible"
+      class="lobby-rename-mask"
+      @pointerdown.stop
+      @click.stop="closeRenameDialog"
+    >
+      <div class="lobby-rename-dialog" @click.stop>
+        <div class="lobby-rename-title">重命名节点</div>
+        <div class="lobby-rename-sub">{{ renameDialog.nodeId }}</div>
+        <input
+          ref="renameInputRef"
+          class="lobby-rename-input"
+          type="text"
+          placeholder="输入显示名称（留空恢复为节点 ID）"
+          v-model="renameDialog.value"
+          @keydown.enter.prevent="confirmRename"
+          @keydown.esc.prevent="closeRenameDialog"
+        />
+        <div class="lobby-rename-actions">
+          <button class="lobby-rename-btn cancel" @click="closeRenameDialog">取消</button>
+          <button class="lobby-rename-btn ok" @click="confirmRename">确定</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -283,7 +309,7 @@ const props = defineProps({
   nodeActions: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['selectAgent', 'sendInput', 'complete', 'openCompletions', 'activePetChange', 'createAgentOnNode', 'contextAgent', 'contextRun', 'nodeContextRun'])
+const emit = defineEmits(['selectAgent', 'sendInput', 'complete', 'openCompletions', 'activePetChange', 'createAgentOnNode', 'contextAgent', 'contextRun', 'nodeContextRun', 'renameNode'])
 
 // 宠物尺寸常量（与 CSS 中的 .lobby-pet 宽高保持一致）
 const PET_W = 72
@@ -781,6 +807,8 @@ const contextMenu = ref({ visible: false, x: 0, y: 0, kind: 'pet', agentId: null
 // 节点菜单内置动作：在节点上创建 Agent（后续可在此追加更多节点功能）
 const NODE_MENU_ACTIONS = [
   { id: 'node-create-agent', icon: '➕', label: '创建 Agent' },
+  { id: 'node-open-terminal', icon: '⌨️', label: '打开终端' },
+  { id: 'node-rename', icon: '✏️', label: '重命名' },
 ]
 const nodeMenuActions = computed(() => {
   const extra = props.nodeActions || []
@@ -850,11 +878,48 @@ function onNodeContextMenu(node, event) {
   }
 }
 
+// ===== 节点重命名弹层 =====
+// 确定后 emit('renameNode', { nodeId, name })，由父组件写入设置中的节点名称映射
+const renameDialog = ref({ visible: false, nodeId: '', value: '' })
+const renameInputRef = ref(null)
+
+function openRenameDialog(nodeId, currentName) {
+  if (!nodeId) return
+  renameDialog.value = {
+    visible: true,
+    nodeId,
+    value: currentName && currentName !== nodeId ? currentName : '',
+  }
+  nextTick(() => {
+    const el = renameInputRef.value
+    if (el) {
+      el.focus()
+      el.select()
+    }
+  })
+}
+
+function closeRenameDialog() {
+  if (renameDialog.value.visible) renameDialog.value.visible = false
+}
+
+function confirmRename() {
+  const nodeId = renameDialog.value.nodeId
+  const name = String(renameDialog.value.value || '').trim()
+  if (nodeId) emit('renameNode', { nodeId, name })
+  closeRenameDialog()
+}
+
 // 点击菜单项：按菜单来源分派给父组件执行，然后关闭菜单
 function onContextAction(act) {
   if (!act || act.enabled === false) return
   if (contextMenu.value.kind === 'node') {
-    emit('nodeContextRun', { action: act, nodeId: contextMenu.value.nodeId })
+    if (act.id === 'node-rename') {
+      // 重命名在大厅内弹输入框，不走父组件的节点动作分发
+      openRenameDialog(contextMenu.value.nodeId, contextMenu.value.name)
+    } else {
+      emit('nodeContextRun', { action: act, nodeId: contextMenu.value.nodeId })
+    }
   } else {
     emit('contextRun', act)
   }
@@ -1155,9 +1220,12 @@ onMounted(() => {
   }
 })
 
-// 全局按键：Esc 关闭右键菜单
+// 全局按键：Esc 关闭右键菜单与重命名弹层
 function onGlobalKeydown(e) {
-  if (e.key === 'Escape') closeContextMenu()
+  if (e.key === 'Escape') {
+    closeContextMenu()
+    closeRenameDialog()
+  }
 }
 
 onUnmounted(() => {
@@ -2046,6 +2114,84 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden })
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* 节点重命名弹层 */
+.lobby-rename-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 10, 18, 0.55);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+.lobby-rename-dialog {
+  width: min(360px, 86vw);
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(12, 22, 34, 0.98);
+  border: 1px solid rgba(32, 200, 255, 0.35);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+.lobby-rename-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #9fe4ff;
+}
+.lobby-rename-sub {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #7f93a6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lobby-rename-input {
+  width: 100%;
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(32, 200, 255, 0.3);
+  background: rgba(6, 14, 24, 0.9);
+  color: #d7e8f5;
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+}
+.lobby-rename-input:focus {
+  border-color: rgba(32, 200, 255, 0.7);
+}
+.lobby-rename-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+.lobby-rename-btn {
+  padding: 6px 16px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-size: 13px;
+  cursor: pointer;
+}
+.lobby-rename-btn.cancel {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #b6c6d4;
+}
+.lobby-rename-btn.cancel:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.lobby-rename-btn.ok {
+  background: rgba(32, 200, 255, 0.9);
+  color: #04121c;
+  font-weight: 600;
+}
+.lobby-rename-btn.ok:hover {
+  background: rgba(32, 200, 255, 1);
 }
 
 </style>
