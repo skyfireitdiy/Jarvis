@@ -144,7 +144,7 @@
       v-show="showPets"
       :key="pet.agentId"
       class="lobby-pet"
-      :class="[pet.classes, { dragging: pet.dragging, dimmed: activePetId && activePetId !== pet.agentId }]"
+      :class="[pet.classes, { dragging: pet.dragging, dimmed: activePetId && activePetId !== pet.agentId, 'is-code-agent': pet.agentType === 'code_agent' }]"
       :style="{ left: pet.x + 'px', top: pet.y + 'px' }"
       @pointerdown="onPetPointerDown(pet, $event)"
       @dblclick="onPetDblClick(pet)"
@@ -163,7 +163,7 @@
         </div>
         <div class="lobby-pet-shadow"></div>
       </div>
-      <div class="lobby-pet-name">{{ pet.name }}</div>
+      <div class="lobby-pet-name"><span class="lobby-pet-type">{{ pet.agentType === 'code_agent' ? '💻' : '🤖' }}</span>{{ pet.name }}</div>
       <div class="lobby-pet-status" :class="pet.statusClass"></div>
 
       <!-- 输出气泡 + 输入/确认控件：堆叠在宠物下方 -->
@@ -585,6 +585,7 @@ function syncPets() {
       pet = {
         agentId,
         name: agent.name || agent.agent_id,
+        agentType: agent.agent_type || 'agent',
         x: start.x,
         y: start.y,
         target: pickTarget(),
@@ -607,6 +608,7 @@ function syncPets() {
       }
     } else {
       pet.name = agent.name || agent.agent_id
+      pet.agentType = agent.agent_type || 'agent'
     }
     const statusClass = props.getStatusClass ? props.getStatusClass(agent) : ''
     pet.statusClass = statusClass
@@ -1551,6 +1553,23 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden })
   color: rgba(180, 220, 245, 0.85);
   text-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
   pointer-events: none;
+}
+
+/* 类型图标：CodeAgent 💻 / 普通 Agent 🤖，与侧边栏列表保持一致 */
+.lobby-pet-type {
+  margin-right: 3px;
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.9;
+}
+
+/* CodeAgent 的轻量区分：名字偏青绿 + 头顶一圈淡光环（不喧宾夺主） */
+.lobby-pet.is-code-agent .lobby-pet-name {
+  color: rgba(150, 240, 220, 0.92);
+}
+.lobby-pet.is-code-agent .lobby-pet-head {
+  box-shadow: 0 0 10px rgba(46, 230, 200, 0.5), inset 0 -3px 6px rgba(0, 0, 0, 0.25),
+    inset 0 2px 4px rgba(255, 255, 255, 0.18);
 }
 
 /* 状态灯 */
