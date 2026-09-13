@@ -288,9 +288,73 @@
         </div>
       </div>
     </div>
+
+    <!-- 宠物「添加到分组」弹层：选择已有分组或新建分组 -->
+    <div
+      v-if="groupDialog.visible"
+      class="lobby-rename-mask"
+      @pointerdown.stop
+      @click.stop="closeGroupDialog"
+    >
+      <div class="lobby-rename-dialog" @click.stop>
+        <div class="lobby-rename-title">添加到分组</div>
+        <div class="lobby-rename-sub">{{ groupDialog.agentName }}</div>
+        <div class="lobby-group-list">
+          <button
+            v-for="g in agentGroups"
+            :key="g.id"
+            class="lobby-group-item"
+            @click="pickGroup(g.id)"
+          >
+            <span class="lobby-group-name">{{ g.name }}</span>
+            <span class="lobby-group-count">{{ (g.agentIds || []).length }}</span>
+          </button>
+          <div v-if="agentGroups.length === 0" class="lobby-group-empty">暂无分组，可在下方新建</div>
+        </div>
+        <div class="lobby-group-create">
+          <input
+            class="lobby-rename-input"
+            type="text"
+            placeholder="新建分组名称"
+            v-model="groupDialog.newGroupName"
+            @keydown.enter.prevent="createGroupAndAdd"
+            @keydown.esc.prevent="closeGroupDialog"
+          />
+          <button
+            class="lobby-rename-btn ok"
+            :disabled="!String(groupDialog.newGroupName || '').trim()"
+            @click="createGroupAndAdd"
+          >新建并加入</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 宠物「从分组移出」弹层：列出该 Agent 所在分组，点击即移出 -->
+    <div
+      v-if="removeGroupDialog.visible"
+      class="lobby-rename-mask"
+      @pointerdown.stop
+      @click.stop="closeRemoveGroupDialog"
+    >
+      <div class="lobby-rename-dialog" @click.stop>
+        <div class="lobby-rename-title">从分组移出</div>
+        <div class="lobby-rename-sub">{{ removeGroupDialog.agentName }}</div>
+        <div class="lobby-group-list">
+          <button
+            v-for="g in removeGroupOptions"
+            :key="g.id"
+            class="lobby-group-item"
+            @click="pickRemoveGroup(g.id)"
+          >
+            <span class="lobby-group-name">{{ g.name }}</span>
+            <span class="lobby-group-count">移出</span>
+          </button>
+          <div v-if="removeGroupOptions.length === 0" class="lobby-group-empty">该 Agent 当前不在任何分组中</div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
-
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { normalizeNodeStatus, normalizeAgentStatus } from './topology.js'
@@ -307,9 +371,11 @@ const props = defineProps({
   contextActions: { type: Array, default: () => [] },
   // 节点右键菜单动作，由父组件传入（便于后续扩展更多节点功能）
   nodeActions: { type: Array, default: () => [] },
+  // 现有 Agent 分组列表（用于宠物右键「添加到分组」）
+  agentGroups: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['selectAgent', 'sendInput', 'complete', 'openCompletions', 'activePetChange', 'createAgentOnNode', 'contextAgent', 'contextRun', 'nodeContextRun', 'renameNode'])
+const emit = defineEmits(['selectAgent', 'sendInput', 'complete', 'openCompletions', 'activePetChange', 'createAgentOnNode', 'contextAgent', 'contextRun', 'nodeContextRun', 'renameNode', 'addAgentToGroup', 'removeAgentFromGroup'])
 
 // 宠物尺寸常量（与 CSS 中的 .lobby-pet 宽高保持一致）
 const PET_W = 72
@@ -815,9 +881,16 @@ const nodeMenuActions = computed(() => {
   return [...NODE_MENU_ACTIONS, ...extra]
 })
 
+// 宠物菜单内置动作：添加到分组 / 从分组移出（后续可在此追加更多宠物功能）
+const PET_MENU_ACTIONS = [
+  { id: 'pet-add-to-group', icon: '📁', label: '添加到分组' },
+  { id: 'pet-remove-from-group', icon: '📂', label: '从分组移出' },
+]
+const petMenuActions = computed(() => [...(props.contextActions || []), ...PET_MENU_ACTIONS])
+
 // 当前菜单项：按 kind 取对应来源
 const contextMenuActions = computed(() =>
-  contextMenu.value.kind === 'node' ? nodeMenuActions.value : (props.contextActions || [])
+  contextMenu.value.kind === 'node' ? nodeMenuActions.value : petMenuActions.value
 )
 
 function closeContextMenu() {
@@ -849,7 +922,7 @@ function onPetContextMenu(pet, event) {
   }
   // 先请求父组件把「当前 Agent」切到该宠物（决定菜单动作与可用性）
   emit('contextAgent', pet.agentId)
-  const pos = placeContextMenu(event, (props.contextActions || []).length)
+  const pos = placeContextMenu(event, petMenuActions.value.length)
   if (!pos) return
   contextMenu.value = {
     visible: true,
@@ -910,6 +983,62 @@ function confirmRename() {
   closeRenameDialog()
 }
 
+// ===== 宠物「添加到分组」弹层 =====
+// 选择已有分组，或新建分组；确定后 emit('addAgentToGroup', { agentId, groupId } | { agentId, newGroupName })
+const groupDialog = ref({ visible: false, agentId: '', agentName: '', newGroupName: '' })
+
+function openGroupDialog(agentId, agentName) {
+  if (!agentId) return
+  groupDialog.value = { visible: true, agentId, agentName: agentName || agentId, newGroupName: '' }
+}
+
+function closeGroupDialog() {
+  if (groupDialog.value.visible) groupDialog.value.visible = false
+}
+
+// 加入已有分组
+function pickGroup(groupId) {
+  const agentId = groupDialog.value.agentId
+  if (agentId && groupId) emit('addAgentToGroup', { agentId, groupId })
+  closeGroupDialog()
+}
+
+// 新建分组并加入
+function createGroupAndAdd() {
+  const agentId = groupDialog.value.agentId
+  const name = String(groupDialog.value.newGroupName || '').trim()
+  if (!agentId || !name) return
+  emit('addAgentToGroup', { agentId, newGroupName: name })
+  closeGroupDialog()
+}
+
+// ===== 宠物「从分组移出」弹层 =====
+// 只列出该 Agent 当前所在的分组，点击即移出
+const removeGroupDialog = ref({ visible: false, agentId: '', agentName: '' })
+
+// 该 Agent 当前所在的分组列表
+const removeGroupOptions = computed(() => {
+  const agentId = removeGroupDialog.value.agentId
+  if (!agentId) return []
+  return (props.agentGroups || []).filter(g => (g.agentIds || []).includes(agentId))
+})
+
+function openRemoveGroupDialog(agentId, agentName) {
+  if (!agentId) return
+  removeGroupDialog.value = { visible: true, agentId, agentName: agentName || agentId }
+}
+
+function closeRemoveGroupDialog() {
+  if (removeGroupDialog.value.visible) removeGroupDialog.value.visible = false
+}
+
+// 从指定分组移出
+function pickRemoveGroup(groupId) {
+  const agentId = removeGroupDialog.value.agentId
+  if (agentId && groupId) emit('removeAgentFromGroup', { agentId, groupId })
+  closeRemoveGroupDialog()
+}
+
 // 点击菜单项：按菜单来源分派给父组件执行，然后关闭菜单
 function onContextAction(act) {
   if (!act || act.enabled === false) return
@@ -920,6 +1049,12 @@ function onContextAction(act) {
     } else {
       emit('nodeContextRun', { action: act, nodeId: contextMenu.value.nodeId })
     }
+  } else if (act.id === 'pet-add-to-group') {
+    // 添加到分组在大厅内弹分组选择框
+    openGroupDialog(contextMenu.value.agentId, contextMenu.value.name)
+  } else if (act.id === 'pet-remove-from-group') {
+    // 从分组移出在大厅内弹分组列表（仅该 Agent 所在分组）
+    openRemoveGroupDialog(contextMenu.value.agentId, contextMenu.value.name)
   } else {
     emit('contextRun', act)
   }
@@ -1220,11 +1355,13 @@ onMounted(() => {
   }
 })
 
-// 全局按键：Esc 关闭右键菜单与重命名弹层
+// 全局按键：Esc 关闭右键菜单与弹层
 function onGlobalKeydown(e) {
   if (e.key === 'Escape') {
     closeContextMenu()
     closeRenameDialog()
+    closeGroupDialog()
+    closeRemoveGroupDialog()
   }
 }
 
@@ -2193,5 +2330,63 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden })
 .lobby-rename-btn.ok:hover {
   background: rgba(32, 200, 255, 1);
 }
-
+.lobby-rename-btn.ok:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.lobby-group-list {
+  max-height: 220px;
+  overflow-y: auto;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lobby-group-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #d7e8f5;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+.lobby-group-item:hover {
+  background: rgba(32, 200, 255, 0.16);
+  border-color: rgba(32, 200, 255, 0.5);
+}
+.lobby-group-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lobby-group-count {
+  flex: none;
+  font-size: 12px;
+  color: #7f93a6;
+}
+.lobby-group-empty {
+  padding: 8px 2px;
+  font-size: 12px;
+  color: #7f93a6;
+}
+.lobby-group-create {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.lobby-group-create .lobby-rename-input {
+  margin-top: 0;
+  flex: 1;
+}
+.lobby-group-create .lobby-rename-btn {
+  flex: none;
+  white-space: nowrap;
+}
 </style>
