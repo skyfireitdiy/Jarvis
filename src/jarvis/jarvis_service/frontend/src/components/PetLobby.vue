@@ -199,7 +199,7 @@
         <!-- 输出气泡：常驻显示（markdown 渲染）；点击气泡同样激活该 Agent -->
         <div v-if="pet.output && !isOutputHidden(pet.agentId)" class="lobby-pet-output-wrap">
           <div
-            class="lobby-pet-output"
+            class="lobby-pet-output message-body markdown-content"
             :data-pet-output="pet.agentId"
             v-html="pet.output"
             @click.stop="onPetClick(pet)"
@@ -2139,30 +2139,15 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden })
   max-height: 60vh;
   overflow-y: auto;
   touch-action: pan-y;
-  font-size: 13px;
-  line-height: 1.6;
-  color: #dff1fb;
   background: rgba(10, 24, 38, 0.94);
   border: 1px solid rgba(32, 200, 255, 0.28);
   border-radius: 10px;
   padding: 10px 32px 10px 12px;
   word-break: break-word;
   box-shadow: 0 8px 26px rgba(0, 0, 0, 0.5);
+  font-family: 'Consolas', 'Microsoft YaHei', sans-serif;
 }
-.lobby-pet-output :deep(p) { margin: 0 0 6px; }
-.lobby-pet-output :deep(p:last-child) { margin-bottom: 0; }
-.lobby-pet-output :deep(pre) {
-  margin: 6px 0;
-  padding: 8px;
-  background: rgba(0, 0, 0, 0.45);
-  border-radius: 6px;
-  overflow-x: auto;
-  font-size: 11px;
-}
-.lobby-pet-output :deep(code) { font-family: 'Consolas', monospace; }
-.lobby-pet-output :deep(ul), .lobby-pet-output :deep(ol) { margin: 6px 0; padding-left: 20px; }
-.lobby-pet-output :deep(a) { color: #7ee7ff; }
-.lobby-pet-output :deep(h1), .lobby-pet-output :deep(h2), .lobby-pet-output :deep(h3) { margin: 6px 0; font-size: 13px; }
+/* markdown 正文排版复用全局 .message-body.markdown-content 样式，与 Panel 保持一致 */
 
 /* 输入行 */
 .lobby-pet-input-row {
