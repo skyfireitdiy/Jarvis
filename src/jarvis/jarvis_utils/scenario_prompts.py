@@ -272,14 +272,14 @@ def classify_user_request(
 所需温度档（依任务性质而非难度选择）：
 {temperature_text}
 
-依下述格式应答（仅此三行，勿杂他辞）：
+请按以下格式回答（仅此三行，不要夹杂其他内容）：
 scenario: <场景>
 difficulty: <难度>
 temperature: <档位>
 
-若难定场景，scenario 返 default。
-若难定难度，difficulty 返 medium。
-若难定温度，temperature 返 medium。
+如果难以确定场景，scenario 返回 default。
+如果难以确定难度，difficulty 返回 medium。
+如果难以确定温度，temperature 返回 medium。
 """
 
         response = platform.chat_until_success(classification_prompt)

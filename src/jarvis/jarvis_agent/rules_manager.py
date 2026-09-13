@@ -43,8 +43,7 @@ def _limit_rule_body(rule_name: str, body: str) -> str:
     if newline > _RULE_INJECT_LIMIT * 0.7:
         head = body[:newline]
     return (
-        head
-        + f"\n\n[注：规则 {rule_name} 内容较长，以上为前部摘要；"
+        head + f"\n\n[注：规则 {rule_name} 内容较长，以上为前部摘要；"
         "涉及具体执行细节前，请先用 `load_rule` 工具加载其完整文本]"
     )
 
@@ -1539,7 +1538,7 @@ class RulesManager:
         """
         try:
             # 构造生成关键词的prompt
-            prompt = f"""宜据以下任务描述，生成三至五个精准之英文搜索关键词，用于在技能库中搜索相关技能。
+            prompt = f"""请根据以下任务描述，生成三至五个精准的英文搜索关键词，用于在技能库中搜索相关技能。
 
 <task_description>
 {query}
@@ -1547,11 +1546,11 @@ class RulesManager:
 
 要求：
 一、关键词应为英文单词或短语
-二、关键词应能准确反映任务之核心需求
-三、避免过于宽泛之词（如'tool', 'helper'）
+二、关键词应能准确反映任务的核心需求
+三、避免过于宽泛的词（如'tool', 'helper'）
 四、优先使用技术术语与具体功能描述
-五、按照相关性从高至低排序
-六、只返关键词列表，每行一个，勿有其他任何输出
+五、按照相关性从高到低排序
+六、只返回关键词列表，每行一个，不要有其他任何输出
 
 示例格式：
 python file processing

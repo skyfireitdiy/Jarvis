@@ -239,7 +239,7 @@ def load_methodology(
             [f"{i}. {title}" for i, title in enumerate(methodology_titles, 1)]
         )
 
-        selection_prompt = f"""兹列所有可用之方法论标题：
+        selection_prompt = f"""以下是所有可用的方法论标题：
 
 <methodology_titles>
 {methodology_titles_text}
@@ -253,16 +253,16 @@ def load_methodology(
 {user_input}
 </user_requirement>
 
-祈析用户之需，从上述方法论中择与需求相关性较高之方法论（可选多个）。
+请分析用户的需求，从上述方法论中选择与需求相关性较高的方法论（可以选择多个）。
 
-祈严依下式返序号：
+请严格按以下格式返回序号：
 <NUM>序号1,序号2,序号3</NUM>
 
 例如：<NUM>1,3,5</NUM>
 
-若无相关方法论，祈返：<NUM>none</NUM>
+如果没有相关的方法论，请返回：<NUM>none</NUM>
 
-切记：只返<NUM>标签内之内容，勿有其他任何输出。
+切记：只返回<NUM>标签内的内容，不要有任何其他输出。
 """
 
         response = platform.chat_until_success(selection_prompt).strip()
@@ -342,27 +342,27 @@ def load_methodology(
 
         # 步骤3：将选择出来的方法论内容提供给大模型生成步骤
         # 首先构建基础提示词部分
-        base_prompt = """以下乃与用户之需相关之方法论内容：
+        base_prompt = """以下是与用户需求相关的方法论内容：
 
 """
-        suffix_prompt = f"""以下乃所有可用之工具内容：
+        suffix_prompt = f"""以下是所有可用工具的内容：
 
 {prompt}
 
-用户之需：{user_input}
+用户需求：{user_input}
 
-祈据以上方法论与可调用之工具内容，规划或撮要出执行步骤。
+请根据以上方法论与可调用的工具内容，规划或总结出执行步骤。
 
-祈依下式回复：
-### 与该任务/需求相关之方法论
+请按以下格式回复：
+### 与该任务/需求相关的方法论
 一. [方法论名字]
 二. [方法论名字]
-### 据以上方法论，规划/撮要出执行步骤
+### 根据以上方法论，规划/总结出执行步骤
 一. [步骤1]
 二. [步骤2]
 三. [步骤3]
 
-除以上要求外，勿输出任何内容
+除以上要求外，不要输出任何内容
 """
 
         # 计算基础部分的token数
@@ -411,7 +411,7 @@ def load_methodology(
         result = platform.chat_until_success(final_prompt)
 
         # 打印大模型返回的方法论执行步骤
-        PrettyOutput.print_markdown(result, title="📋 从方法论撮要之执行步骤")
+        PrettyOutput.print_markdown(result, title="📋 从方法论总结的执行步骤")
 
         return result
 

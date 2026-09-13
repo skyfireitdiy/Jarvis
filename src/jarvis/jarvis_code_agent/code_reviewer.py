@@ -699,7 +699,7 @@ class CodeReviewer:
 【问题列表】
 {issues_text}
 
-宜据上述问题修正，确保代码正确实现用户需求。"""
+请根据上述问题修正，确保代码正确实现用户需求。"""
         return prompt
 
     def run_review_with_fix(
