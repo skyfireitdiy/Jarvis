@@ -5317,6 +5317,8 @@ const commandPaletteCtx = computed(() => ({
   toggleAgentSidebar,
   toggleTerminalPanel,
   toggleChatPanel,
+  // 打开侧边栏的「管理分组」弹窗（重命名 / 删除）
+  manageGroups: () => { agentSidebarRef.value?.openManageGroups?.() },
   openTopology: openTopologyOverlay,
   openSettings: () => { showSettingsModal.value = true },
   togglePetVisibility,

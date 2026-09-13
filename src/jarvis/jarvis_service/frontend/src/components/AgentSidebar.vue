@@ -8,6 +8,7 @@
       <h3>Agent 列表</h3>
       <div class="sidebar-header-actions">
         <button class="icon-btn" :class="{ active: isBatchMode }" @click="$emit('toggleBatchMode')" title="批量选择模式">☑</button>
+        <button class="icon-btn" @click="openManageGroups" title="管理分组">📁</button>
         <button class="icon-btn" @click="$emit('createAgent')" title="创建新 Agent">➕</button>
         <button class="icon-btn" @click="$emit('close')" title="关闭侧边栏">✕</button>
       </div>
@@ -285,6 +286,36 @@
           class="agent-group-item"
           @click="selectGroup(group.id)"
         >
+          <span class="agent-group-item-name">📁 {{ group.name }}</span>
+          <span class="agent-group-item-count">({{ group.agentIds?.length || 0 }})</span>
+        </div>
+        <div class="agent-group-create">
+          <input
+            v-model="newGroupName"
+            class="agent-group-create-input"
+            placeholder="新建分组名称"
+            @keyup.enter="handleCreateGroup"
+          />
+          <button class="icon-btn-small" @click="handleCreateGroup" title="创建分组">➕</button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
+  <!-- 管理分组弹窗：重命名 / 删除（与「加入分组」解耦） -->
+  <Teleport to="body">
+    <div v-if="showManageGroupsModal" class="group-modal-overlay" @click.self="closeManageGroups">
+      <div class="group-modal">
+        <div class="group-modal-header">
+          <span>管理分组</span>
+          <button class="icon-btn-small" @click="closeManageGroups" title="关闭">✕</button>
+        </div>
+        <div v-if="agentGroups.length === 0" class="agent-group-empty">暂无分组</div>
+        <div
+          v-for="group in agentGroups"
+          :key="group.id"
+          class="agent-group-item"
+        >
           <input
             v-if="editingGroupId === group.id"
             ref="groupRenameInputRef"
@@ -303,15 +334,6 @@
             <button class="icon-btn-small" title="重命名分组" @click="startRenameGroup(group)">✏️</button>
             <button class="icon-btn-small" title="删除分组" @click="deleteGroup(group)">🗑️</button>
           </span>
-        </div>
-        <div class="agent-group-create">
-          <input
-            v-model="newGroupName"
-            class="agent-group-create-input"
-            placeholder="新建分组名称"
-            @keyup.enter="handleCreateGroup"
-          />
-          <button class="icon-btn-small" @click="handleCreateGroup" title="创建分组">➕</button>
         </div>
       </div>
     </div>
@@ -440,6 +462,8 @@ const props = defineProps({
 // 分组弹窗状态
 const showGroupModal = ref(false)
 const newGroupName = ref('')
+// 管理分组弹窗状态（重命名 / 删除）
+const showManageGroupsModal = ref(false)
 // 分组重命名状态
 const editingGroupId = ref(null)
 const editingGroupName = ref('')
@@ -452,6 +476,17 @@ function openGroupModal() {
 
 function closeGroupModal() {
   showGroupModal.value = false
+  cancelRenameGroup()
+}
+
+// 打开/关闭「管理分组」弹窗
+function openManageGroups() {
+  cancelRenameGroup()
+  showManageGroupsModal.value = true
+}
+
+function closeManageGroups() {
+  showManageGroupsModal.value = false
   cancelRenameGroup()
 }
 
@@ -2186,6 +2221,7 @@ defineExpose({
   hidePet: petHide,
   showPet,
   isPetMenuOpen: () => petMenuOpen.value,
+  openManageGroups,
 })
 
 </script>
