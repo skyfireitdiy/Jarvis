@@ -218,6 +218,7 @@
               @input="handlePetInput(pet, $event)"
               @pointerdown.stop="onInputPointerDown(pet)"
             ></textarea>
+            <button class="lobby-pet-complete" @click="completePet(pet)" title="完成（发送空消息）">完成</button>
             <button class="lobby-pet-send" @click="submitPet(pet)" title="发送 (Ctrl+Enter)">➤</button>
           </div>
 
@@ -233,6 +234,7 @@
               @input="handlePetInput(pet, $event)"
               @pointerdown.stop="onInputPointerDown(pet)"
             />
+            <button class="lobby-pet-complete" @click="completePet(pet)" title="完成（发送空消息）">完成</button>
             <button class="lobby-pet-send" @click="submitPet(pet)" title="发送 (Enter)">➤</button>
           </div>
         </div>
@@ -1309,6 +1311,13 @@ function submitPet(pet) {
   refreshPetData(pet)
 }
 
+// 完成：与 Panel 的「完成」按钮一致，发送完成信号（由父组件处理）
+function completePet(pet) {
+  if (!pet || !pet.agentId) return
+  emit('complete', pet.agentId)
+  refreshPetData(pet)
+}
+
 function submitConfirm(pet, confirmed) {
   emit('sendInput', pet.agentId, confirmed ? 'y' : 'n', 'confirm')
   refreshPetData(pet)
@@ -2152,6 +2161,21 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden })
   line-height: 1;
 }
 .lobby-pet-send:hover { background: rgba(32, 200, 255, 0.3); }
+
+.lobby-pet-complete {
+  flex: 0 0 auto;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(54, 255, 124, 0.4);
+  background: rgba(54, 255, 124, 0.15);
+  color: #a6ffcb;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+.lobby-pet-complete:hover { background: rgba(54, 255, 124, 0.3); }
 
 /* 确认气泡 */
 .lobby-pet-confirm {
