@@ -13406,6 +13406,7 @@ body::-webkit-scrollbar {
   width: 100vw;
   margin: 0;
   padding: 0;
+  padding-top: env(safe-area-inset-top, 0px);
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
   background: transparent;
@@ -13437,7 +13438,6 @@ body::-webkit-scrollbar {
   justify-content: space-between;
   align-items: center;
   padding: 10px 16px;
-  padding-top: calc(10px + env(safe-area-inset-top, 0px));
   background: var(--color-bg-secondary);
   border-bottom: 0.5px solid var(--color-border-subtle);
   flex-shrink: 0;
@@ -13446,7 +13446,7 @@ body::-webkit-scrollbar {
 
 /* 自动隐藏：向上缩回（保留过渡动画，不用 display:none） */
 .app-header.is-hidden {
-  margin-top: calc(-1 * (var(--app-header-h, 0px) + env(safe-area-inset-top, 0px)));
+  margin-top: calc(-1 * var(--app-header-h, 0px));
   opacity: 0;
   pointer-events: none;
 }
@@ -16335,7 +16335,6 @@ body::-webkit-scrollbar {
   
   .app-header {
     padding: 12px 16px;
-    padding-top: calc(12px + env(safe-area-inset-top, 0px));
     padding-left: max(16px, env(safe-area-inset-left, 0px));
     padding-right: max(16px, env(safe-area-inset-right, 0px));
     flex-direction: column;

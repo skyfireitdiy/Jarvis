@@ -6,8 +6,8 @@
   "scope": "/",
   "display": "fullscreen",
   "display_override": ["fullscreen", "standalone", "minimal-ui"],
-  "background_color": "#0d1117",
-  "theme_color": "#0d1117",
+  "background_color": "#060911",
+  "theme_color": "#060911",
   "icons": [
     {
       "src": "/icons/jarvis-pet.svg",
