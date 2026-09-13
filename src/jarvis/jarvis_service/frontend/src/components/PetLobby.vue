@@ -66,7 +66,7 @@
           :key="n.node_id"
           class="lobby-node"
           :class="['st-' + n.state, { 'is-center': n.isMaster }]"
-          @dblclick.stop="onNodeDblClick(n)"
+          @contextmenu.prevent.stop="onNodeContextMenu(n, $event)"
         >
           <!-- 机箱主体 -->
           <rect
@@ -239,7 +239,7 @@
       </div>
     </div>
 
-    <!-- Agent 右键菜单：对当前 Agent 的操作（复用命令面板「当前 Agent」组） -->
+    <!-- 右键菜单：宠物（对当前 Agent 的操作）/ 节点（节点操作） -->
     <div
       v-if="contextMenu.visible"
       class="lobby-context-menu"
@@ -251,7 +251,7 @@
       <div class="lobby-context-title">{{ contextMenu.name }}</div>
       <div class="lobby-context-items">
         <button
-          v-for="act in contextActions"
+          v-for="act in contextMenuActions"
           :key="act.id"
           class="lobby-context-item"
           :disabled="act.enabled === false"
@@ -279,9 +279,11 @@ const props = defineProps({
   getNodeDisplayName: { type: Function, default: null },
   // 右键菜单动作（复用命令面板「当前 Agent」组），由父组件按当前 Agent 计算后传入
   contextActions: { type: Array, default: () => [] },
+  // 节点右键菜单动作，由父组件传入（便于后续扩展更多节点功能）
+  nodeActions: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['selectAgent', 'sendInput', 'complete', 'openCompletions', 'activePetChange', 'createAgentOnNode', 'contextAgent', 'contextRun'])
+const emit = defineEmits(['selectAgent', 'sendInput', 'complete', 'openCompletions', 'activePetChange', 'createAgentOnNode', 'contextAgent', 'contextRun', 'nodeContextRun'])
 
 // 宠物尺寸常量（与 CSS 中的 .lobby-pet 宽高保持一致）
 const PET_W = 72
@@ -772,18 +774,41 @@ function onStageClick(event) {
   }
 }
 
-// 双击节点：在大厅打开创建 Agent 弹窗，并预选该节点
-function onNodeDblClick(node) {
-  if (!node) return
-  emit('createAgentOnNode', node.node_id)
-}
+// ===== 右键菜单（宠物 / 节点共用） =====
+// 菜单状态：坐标相对舞台左上角；kind 区分来源；name 用于标题
+const contextMenu = ref({ visible: false, x: 0, y: 0, kind: 'pet', agentId: null, nodeId: null, name: '' })
 
-// ===== Agent 右键菜单 =====
-// 菜单状态：坐标相对舞台左上角；name 用于标题
-const contextMenu = ref({ visible: false, x: 0, y: 0, agentId: null, name: '' })
+// 节点菜单内置动作：在节点上创建 Agent（后续可在此追加更多节点功能）
+const NODE_MENU_ACTIONS = [
+  { id: 'node-create-agent', icon: '➕', label: '创建 Agent' },
+]
+const nodeMenuActions = computed(() => {
+  const extra = props.nodeActions || []
+  return [...NODE_MENU_ACTIONS, ...extra]
+})
+
+// 当前菜单项：按 kind 取对应来源
+const contextMenuActions = computed(() =>
+  contextMenu.value.kind === 'node' ? nodeMenuActions.value : (props.contextActions || [])
+)
 
 function closeContextMenu() {
   if (contextMenu.value.visible) contextMenu.value.visible = false
+}
+
+// 估算菜单尺寸并做边界钳制，避免超出舞台（两列布局，宽度与 CSS min-width 对齐）
+function placeContextMenu(event, itemCount) {
+  const stage = stageRef.value
+  if (!stage) return null
+  const rect = stage.getBoundingClientRect()
+  const MENU_W = 320
+  const rows = Math.max(1, Math.ceil(itemCount / 2))
+  const MENU_H = Math.min(44 + rows * 33, rect.height * 0.6)
+  let x = event.clientX - rect.left
+  let y = event.clientY - rect.top
+  if (x + MENU_W > rect.width) x = Math.max(rect.width - MENU_W, 0)
+  if (y + MENU_H > rect.height) y = Math.max(rect.height - MENU_H, 0)
+  return { x, y }
 }
 
 // 在宠物上右键：通知父组件切换当前 Agent 并准备动作，再就地弹出菜单
@@ -794,33 +819,45 @@ function onPetContextMenu(pet, event) {
     clearTimeout(clickTimer)
     clickTimer = null
   }
-  const stage = stageRef.value
-  if (!stage) return
-  const rect = stage.getBoundingClientRect()
   // 先请求父组件把「当前 Agent」切到该宠物（决定菜单动作与可用性）
   emit('contextAgent', pet.agentId)
-  // 估算菜单尺寸并做边界钳制，避免超出舞台（两列布局，宽度与 CSS min-width 对齐）
-  const MENU_W = 320
-  const itemCount = (props.contextActions || []).length
-  const rows = Math.max(1, Math.ceil(itemCount / 2))
-  const MENU_H = Math.min(44 + rows * 33, rect.height * 0.6)
-  let x = event.clientX - rect.left
-  let y = event.clientY - rect.top
-  if (x + MENU_W > rect.width) x = Math.max(rect.width - MENU_W, 0)
-  if (y + MENU_H > rect.height) y = Math.max(rect.height - MENU_H, 0)
+  const pos = placeContextMenu(event, (props.contextActions || []).length)
+  if (!pos) return
   contextMenu.value = {
     visible: true,
-    x,
-    y,
+    x: pos.x,
+    y: pos.y,
+    kind: 'pet',
     agentId: pet.agentId,
+    nodeId: null,
     name: pet.name || pet.agentId,
   }
 }
 
-// 点击菜单项：交给父组件按命令面板同款逻辑执行，然后关闭菜单
+// 在节点上右键：弹出节点操作菜单
+function onNodeContextMenu(node, event) {
+  if (!node) return
+  const pos = placeContextMenu(event, nodeMenuActions.value.length)
+  if (!pos) return
+  contextMenu.value = {
+    visible: true,
+    x: pos.x,
+    y: pos.y,
+    kind: 'node',
+    agentId: null,
+    nodeId: node.node_id,
+    name: node.short || node.node_id,
+  }
+}
+
+// 点击菜单项：按菜单来源分派给父组件执行，然后关闭菜单
 function onContextAction(act) {
   if (!act || act.enabled === false) return
-  emit('contextRun', act)
+  if (contextMenu.value.kind === 'node') {
+    emit('nodeContextRun', { action: act, nodeId: contextMenu.value.nodeId })
+  } else {
+    emit('contextRun', act)
+  }
   closeContextMenu()
 }
 
