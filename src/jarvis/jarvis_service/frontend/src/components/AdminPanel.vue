@@ -354,6 +354,24 @@ function switchTab(tab) {
   showGroupAssign.value = false
 }
 
+// 供外部（命令面板）调用：切到系统配置并触发对应操作
+function openSystemAction(kind) {
+  switchTab('system')
+  if (kind === 'restart') {
+    confirmRestartGateway()
+  } else if (kind === 'restart-all') {
+    confirmRestartAllNodes()
+  } else if (kind === 'sync-config') {
+    syncConfig()
+  } else if (kind === 'node-secret') {
+    fetchNodeSecret()
+  } else if (kind === 'update-code') {
+    updateCodeToMain()
+  }
+}
+
+defineExpose({ openSystemAction })
+
 // 打开时加载数据
 watch(() => props.visible, (val) => {
   if (val) {

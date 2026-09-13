@@ -253,6 +253,7 @@ export const ACTIONS = [
     group: "网关",
     icon: "♻",
     keywords: ["重启", "网关", "restart", "gateway"],
+    enabled: (ctx) => !!ctx?.hasPermission && ctx.hasPermission("admin:config"),
     run: (ctx) => ctx.restartGateway && ctx.restartGateway(),
   },
   {
@@ -262,6 +263,7 @@ export const ACTIONS = [
     group: "网关",
     icon: "🔁",
     keywords: ["重启", "节点", "全部", "restart", "nodes", "all"],
+    enabled: (ctx) => !!ctx?.hasPermission && ctx.hasPermission("admin:config"),
     run: (ctx) => ctx.restartAllNodes && ctx.restartAllNodes(),
   },
   {
@@ -353,6 +355,61 @@ export const ACTIONS = [
       "toggle",
     ],
     run: (ctx) => ctx.toggleHeader && ctx.toggleHeader(),
+  },
+  // ===== 管理（需 admin 权限）=====
+  {
+    id: "admin-update-code-to-main",
+    label: "更新代码到 main 分支",
+    en: "Update Code to main",
+    group: "管理",
+    icon: "⬆",
+    keywords: ["更新", "代码", "main", "拉取", "update", "code", "pull"],
+    enabled: (ctx) => !!ctx?.hasPermission && ctx.hasPermission("admin:config"),
+    run: (ctx) => ctx.confirmUpdateCodeToMain && ctx.confirmUpdateCodeToMain(),
+  },
+  {
+    id: "admin-restart-node-service",
+    label: "重启节点服务",
+    en: "Restart Node Service",
+    group: "管理",
+    icon: "♻",
+    keywords: ["重启", "节点", "服务", "restart", "node", "service"],
+    enabled: (ctx) => !!ctx?.hasPermission && ctx.hasPermission("admin:config"),
+    run: (ctx) => ctx.openAdminRestartService && ctx.openAdminRestartService(),
+  },
+  {
+    id: "admin-sync-config",
+    label: "同步配置到其他节点",
+    en: "Sync Config to Nodes",
+    group: "管理",
+    icon: "🔃",
+    keywords: ["同步", "配置", "节点", "sync", "config"],
+    enabled: (ctx) => !!ctx?.hasPermission && ctx.hasPermission("admin:config"),
+    run: (ctx) => ctx.openAdminSyncConfig && ctx.openAdminSyncConfig(),
+  },
+  {
+    id: "admin-node-secret",
+    label: "查看节点连接私钥",
+    en: "View Node Secret",
+    group: "管理",
+    icon: "🔑",
+    keywords: ["私钥", "密钥", "节点", "secret", "key", "node"],
+    enabled: (ctx) => !!ctx?.hasPermission && ctx.hasPermission("admin:config"),
+    run: (ctx) => ctx.openAdminNodeSecret && ctx.openAdminNodeSecret(),
+  },
+  {
+    id: "admin-open-panel",
+    label: "打开管理面板",
+    en: "Open Admin Panel",
+    group: "管理",
+    icon: "🛠",
+    keywords: ["管理", "面板", "admin", "panel", "用户", "权限"],
+    enabled: (ctx) =>
+      !!ctx?.hasPermission &&
+      (ctx.hasPermission("admin:config") ||
+        ctx.hasPermission("admin:users") ||
+        ctx.hasPermission("admin:permissions")),
+    run: (ctx) => ctx.openAdminPanel && ctx.openAdminPanel(),
   },
 ];
 
