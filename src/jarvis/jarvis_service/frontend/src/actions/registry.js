@@ -274,6 +274,15 @@ export const ACTIONS = [
     run: (ctx) => ctx.toggleAgentSidebar && ctx.toggleAgentSidebar(),
   },
   {
+    id: "manage-groups",
+    label: "管理分组",
+    en: "Manage Groups",
+    group: "界面",
+    icon: "📁",
+    keywords: ["分组", "管理", "重命名", "删除", "group", "manage"],
+    run: (ctx) => ctx.manageGroups && ctx.manageGroups(),
+  },
+  {
     id: "toggle-terminal",
     label: "切换终端面板",
     en: "Toggle Terminal Panel",
