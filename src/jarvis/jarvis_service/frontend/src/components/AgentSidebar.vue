@@ -203,6 +203,7 @@
           @pointermove="onPetPointerMove"
           @pointerup="onPetPointerUp"
           @pointercancel="onPetPointerUp"
+          @contextmenu.prevent.stop="onPetContextMenu"
           @mouseenter="petHover = true"
           @mouseleave="petHover = false"
         ></div>
@@ -231,7 +232,7 @@
       @pointercancel="onRestorePointerUp"
     >🐾</button>
 
-    <!-- 宠物环形菜单：长按宠物 / 🐾 展开「当前 Agent」命令 -->
+    <!-- 宠物环形菜单：双击宠物 / 🐾 展开「当前 Agent」命令 -->
     <div
       v-if="petMenuOpen"
       class="pet-menu-layer"
@@ -873,14 +874,12 @@ let petOriginY = 0
 
 // 交互判定定时器
 let petClickTimer = 0    // 单击延迟判定
-let petLongPressTimer = 0  // 长按判定
 let petSpeechTimer = 0   // 台词气泡
 let petHideTimer = 0     // 隐藏定时器（兼容保留）
-let petLongPressFired = false  // 本次长按已触发
 let petPettingFxTimer = 0      // 摸头爱心循环
 
 // ==================== 宠物环形菜单 ====================
-// 长按宠物（或隐藏后的 🐾）弹出，承载「当前 Agent」命令，方便移动端操作
+// 双击宠物（或隐藏后的 🐾）弹出，承载「当前 Agent」命令，方便移动端操作
 const petMenuOpen = ref(false)
 const petMenuOrigin = ref({ x: 0, y: 0 })   // 菜单圆心（屏幕坐标）
 let petMenuLongPressTimer = 0               // 还原按钮长按判定
@@ -907,7 +906,7 @@ const petMenuItems = computed(() => {
   return [...inner, ...outer]
 })
 
-// 网格布局：以长按点为锚点，优先向右展开；右侧空间不足则向左；
+// 网格布局：以触发点为锚点，优先向右展开；右侧空间不足则向左；
 // 垂直方向整体夹取到视口内，保证任何情况下都不出屏。
 // 条目多时按「列优先」排成两列（视觉上仍是自上而下的顺序）。
 const petMenuLayout = computed(() => {
@@ -954,7 +953,6 @@ function openPetMenu(cx, cy) {
   petMenuArmedAt = Date.now() + PET_MENU_ARM_DELAY
   petDragging = false
   petDrag.value = false
-  clearTimeout(petLongPressTimer)
   clearTimeout(petClickTimer)
   clearTimeout(petMenuLongPressTimer)
   clearTimeout(restoreClickTimer)
@@ -992,22 +990,18 @@ function onPetPointerDown(e) {
   stopPetWalk()
   petDragging = true
   petMoved = false
-  petLongPressFired = false
   petStartX = e.clientX
   petStartY = e.clientY
   petOriginX = petPos.value.x
   petOriginY = petPos.value.y
   e.target.setPointerCapture?.(e.pointerId)
   e.preventDefault()
-  // 长按判定：600ms 未移动则撒花庆祝并唤起命令面板
-  clearTimeout(petLongPressTimer)
-  petLongPressTimer = window.setTimeout(() => {
-    if (petDragging && !petMoved) {
-      petLongPressFired = true
-      const r = petStageRect()
-      onPetDoubleClick(r.left + r.width / 2, r.top + r.height / 2)
-    }
-  }, 600)
+}
+
+// 右键：撒花庆祝并唤起命令面板（原长按行为改为右键触发）
+function onPetContextMenu(e) {
+  const r = petStageRect()
+  onPetDoubleClick(r.left + r.width / 2, r.top + r.height / 2)
 }
 
 function onPetPointerMove(e) {
@@ -1017,8 +1011,6 @@ function onPetPointerMove(e) {
   if (!petMoved && Math.hypot(dx, dy) > 5) {
     petMoved = true
     petDrag.value = true
-    // 拖拽开始则取消长按
-    clearTimeout(petLongPressTimer)
     if (petPetting.value) stopPetting()
   }
   if (petMoved) {
@@ -1029,7 +1021,6 @@ function onPetPointerMove(e) {
 function onPetPointerUp(e) {
   if (!petDragging) return
   petDragging = false
-  clearTimeout(petLongPressTimer)
   e.target.releasePointerCapture?.(e.pointerId)
   if (petMoved) {
     petDrag.value = false
@@ -1037,11 +1028,6 @@ function onPetPointerUp(e) {
     return
   }
   petDrag.value = false
-  // 长按已触发：菜单已弹出，不再触发单击/双击
-  if (petLongPressFired) {
-    petLongPressFired = false
-    return
-  }
   // 单击 / 双击判定
   if (petClickTimer) {
     // 300ms 内第二次：双击 → 弹出环形菜单
@@ -1071,7 +1057,7 @@ function onPetSingleClick(x, y) {
   showPetSpeech()
 }
 
-// 长按行为：撒花庆祝，并唤起命令面板
+// 右键行为：撒花庆祝，并唤起命令面板
 function onPetDoubleClick(x, y) {
   wakePet()
   petJump.value = true
@@ -2116,7 +2102,6 @@ onUnmounted(() => {
   clearTimeout(petMenuLongPressTimer)
   clearTimeout(petActTimer)
   clearTimeout(petClickTimer)
-  clearTimeout(petLongPressTimer)
   clearTimeout(restoreClickTimer)
   clearTimeout(petSpeechTimer)
   clearTimeout(petHideTimer)
