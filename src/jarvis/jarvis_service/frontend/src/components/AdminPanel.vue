@@ -646,14 +646,12 @@ async function fetchNodeSecret() {
   try {
     const token = props.getToken ? props.getToken() : null
     if (!token) { props.showToast('请先登录', 'error'); return }
-    const apiProtocol = window.location.protocol === 'https:' ? 'https' : 'http'
-    const apiUrl = `${apiProtocol}://${props.gatewayUrl}/api/node/secret`
-    const response = await fetch(apiUrl, { headers: { 'Authorization': `Bearer ${token}` } })
+    const response = await props.fetchWithAuth(buildApiUrl('/api/node/secret'))
     const result = await response.json()
-    if (result.success && result.data?.node_secret) {
+    if (response.ok && result.success && result.data?.node_secret) {
       nodeSecret.value = result.data.node_secret
     } else {
-      props.showToast(result.error?.message || '获取私钥失败', 'error')
+      props.showToast(result.error?.message || result.detail?.message || '获取私钥失败', 'error')
     }
   } catch (error) {
     props.showToast('获取私钥异常: ' + error.message, 'error')
