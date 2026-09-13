@@ -31,7 +31,7 @@ def build_review_task(
 {_json_review.dumps(review_batch, ensure_ascii=False, indent=2)}
 
 请仔细复核每个无效聚类的invalid_reason是否充分，是否真的考虑了所有可能的路径、调用者和边界情况。
-对于每个gid，请判无效理由是否充分（is_reason_sufficient: true/false），并予复核说明。
+对于每个gid，请判断无效理由是否充分（is_reason_sufficient: true/false），并给出复核说明。
         """.strip()
 
 

@@ -29,7 +29,7 @@ def classify_user_request(
     """用 normal_llm 对用户需求进行分类
 
     参数:
-        user_input: 用户输入之需求描述（支持纯文本或多模态内容）
+        user_input: 用户输入的需求描述（支持纯文本或多模态内容）
 
     返回:
         Tuple[str, str, float]: (场景类型, 难度等级, 推荐采样温度)

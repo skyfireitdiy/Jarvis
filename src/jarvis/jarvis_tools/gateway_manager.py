@@ -633,7 +633,7 @@ class GatewayManagerTool:
 
         sender_id = jglobals.agent_id
         # 在消息末尾添加回复提示
-        enhanced_message = f"{message}\n\n---\n回复此消息请用: gateway_manager action=send_to_agent agent_id={sender_id} message=<汝之回复>"
+        enhanced_message = f"{message}\n\n---\n回复此消息请用: gateway_manager action=send_to_agent agent_id={sender_id} message=<你的回复>"
 
         results = []
         all_success = True
@@ -2072,7 +2072,7 @@ class GatewayManagerTool:
             }
 
         # 在消息末尾添加回复提示
-        enhanced_message = f"{message}\n\n---\n回复此群组消息请用: gateway_manager action=send_group_message group_id={group_id} message=<汝之回复>"
+        enhanced_message = f"{message}\n\n---\n回复此群组消息请用: gateway_manager action=send_group_message group_id={group_id} message=<你的回复>"
 
         result = self._request_gateway(
             method="POST",

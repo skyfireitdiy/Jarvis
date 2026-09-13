@@ -391,7 +391,7 @@ def process_request(request: str) -> Optional[str]:
 
 # 规则
 1. 只输出命令
-2. 勿输出任何命令之外之内容
+2. 不要输出任何命令之外的内容
 3. 单行输出
 4. 多命令以&&连接
 
