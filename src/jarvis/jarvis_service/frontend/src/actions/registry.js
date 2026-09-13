@@ -160,6 +160,25 @@ export const ACTIONS = [
     run: (ctx) => ctx.deleteCurrentAgent && ctx.deleteCurrentAgent(),
   },
   {
+    id: "current-toggle-output",
+    label: "隐藏输出",
+    en: "Toggle Output",
+    group: "当前 Agent",
+    icon: "🙈",
+    keywords: [
+      "隐藏输出",
+      "显示输出",
+      "输出",
+      "output",
+      "hide",
+      "show",
+      "toggle",
+    ],
+    enabled: (ctx) => !!ctx?.currentAgentId,
+    run: (ctx) =>
+      ctx.toggleCurrentAgentOutput && ctx.toggleCurrentAgentOutput(),
+  },
+  {
     id: "current-detach-panel",
     label: "分离当前焦点面板",
     en: "Detach Focused Panel",
