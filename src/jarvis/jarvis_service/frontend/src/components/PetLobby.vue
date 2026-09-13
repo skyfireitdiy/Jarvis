@@ -2152,6 +2152,10 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden })
   flex: 0 0 auto;
   width: 30px;
   height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   border-radius: 6px;
   border: 1px solid rgba(32, 200, 255, 0.4);
   background: rgba(32, 200, 255, 0.15);
