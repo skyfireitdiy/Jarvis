@@ -285,8 +285,24 @@
           class="agent-group-item"
           @click="selectGroup(group.id)"
         >
-          <span class="agent-group-item-name">📁 {{ group.name }}</span>
-          <span class="agent-group-item-count">({{ group.agentIds?.length || 0 }})</span>
+          <input
+            v-if="editingGroupId === group.id"
+            ref="groupRenameInputRef"
+            v-model="editingGroupName"
+            class="agent-group-rename-input"
+            @click.stop
+            @keyup.enter="confirmRenameGroup"
+            @keyup.esc="cancelRenameGroup"
+            @blur="confirmRenameGroup"
+          />
+          <template v-else>
+            <span class="agent-group-item-name">📁 {{ group.name }}</span>
+            <span class="agent-group-item-count">({{ group.agentIds?.length || 0 }})</span>
+          </template>
+          <span class="agent-group-item-actions" @click.stop>
+            <button class="icon-btn-small" title="重命名分组" @click="startRenameGroup(group)">✏️</button>
+            <button class="icon-btn-small" title="删除分组" @click="deleteGroup(group)">🗑️</button>
+          </span>
         </div>
         <div class="agent-group-create">
           <input
@@ -303,7 +319,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, defineProps, defineEmits, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, defineProps, defineEmits, onMounted, onUnmounted } from 'vue'
 import PetMiniTopology from './PetMiniTopology.vue'
 
 // 分组折叠状态管理 - 使用对象存储，避免 Set 响应式问题
@@ -424,6 +440,10 @@ const props = defineProps({
 // 分组弹窗状态
 const showGroupModal = ref(false)
 const newGroupName = ref('')
+// 分组重命名状态
+const editingGroupId = ref(null)
+const editingGroupName = ref('')
+const groupRenameInputRef = ref(null)
 
 function openGroupModal() {
   newGroupName.value = ''
@@ -432,6 +452,7 @@ function openGroupModal() {
 
 function closeGroupModal() {
   showGroupModal.value = false
+  cancelRenameGroup()
 }
 
 function selectGroup(groupId) {
@@ -445,6 +466,43 @@ function handleCreateGroup() {
   emit('createGroupWithAgents', name)
   newGroupName.value = ''
   closeGroupModal()
+}
+
+// 开始重命名分组
+function startRenameGroup(group) {
+  if (!group) return
+  editingGroupId.value = group.id
+  editingGroupName.value = group.name || ''
+  nextTick(() => {
+    const el = groupRenameInputRef.value
+    if (el) {
+      el.focus()
+      el.select()
+    }
+  })
+}
+
+function cancelRenameGroup() {
+  editingGroupId.value = null
+  editingGroupName.value = ''
+}
+
+// 确认重命名：名称非空且与原名称不同才 emit
+function confirmRenameGroup() {
+  const groupId = editingGroupId.value
+  if (!groupId) return
+  const group = props.agentGroups.find(g => g.id === groupId)
+  const name = editingGroupName.value.trim()
+  if (group && name && name !== group.name) {
+    emit('renameGroup', { groupId, name })
+  }
+  cancelRenameGroup()
+}
+
+// 删除分组（由父组件弹出统一确认对话框）
+function deleteGroup(group) {
+  if (!group) return
+  emit('deleteGroup', group.id)
 }
 
 // 初始化时折叠所有分组 - 只在首次初始化时设置，避免后续数据更新覆盖用户操作
@@ -474,6 +532,8 @@ const emit = defineEmits([
   'batchDelete',
   'addToGroup',
   'createGroupWithAgents',
+  'renameGroup',
+  'deleteGroup',
   'startResize',
   'editAccess',
   'regenerateAgent',
@@ -3360,6 +3420,29 @@ defineExpose({
 .agent-group-item-count {
   font-size: 11px;
   color: var(--color-text-muted);
+}
+
+/* 分组操作按钮：默认隐藏，hover 时显示 */
+.agent-group-item-actions {
+  display: none;
+  gap: 2px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.agent-group-item:hover .agent-group-item-actions {
+  display: flex;
+}
+
+.agent-group-rename-input {
+  flex: 1;
+  font-size: 12px;
+  padding: 2px 6px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-active);
+  border-radius: var(--tile-radius-xs);
+  color: var(--color-text-primary);
+  outline: none;
 }
 
 .agent-group-create {

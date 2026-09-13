@@ -41,6 +41,8 @@
       @batchDelete="batchDeleteAgents"
       @addToGroup="addSelectedToGroup"
       @createGroupWithAgents="createGroupWithAgents"
+      @renameGroup="renameAgentGroup"
+      @deleteGroup="deleteAgentGroup"
       @startResize="startAgentSidebarResize"
       @editAccess="editAgentAccess"
       @petSyncStatus="petSyncAllStatus"
@@ -510,6 +512,7 @@
           :historyNav="onLobbyHistoryNav"
           :getNodeDisplayName="getNodeDisplayName"
           :contextActions="lobbyContextActions"
+          :agentGroups="agentGroups"
           @selectAgent="onLobbySelectAgent"
           @sendInput="sendLobbyInput"
           @complete="onLobbyComplete"
@@ -520,6 +523,8 @@
           @contextRun="onLobbyContextRun"
           @nodeContextRun="onLobbyNodeContextRun"
           @renameNode="onLobbyRenameNode"
+          @addAgentToGroup="onLobbyAddAgentToGroup"
+          @removeAgentFromGroup="onLobbyRemoveAgentFromGroup"
         />
       </div>
     </main>
@@ -7706,6 +7711,65 @@ async function batchCopyAgents() {
 }
 
 // Agent 分组操作
+// 来自宠物大厅右键菜单：把单个 Agent 加入指定分组或新建分组
+function onLobbyAddAgentToGroup({ agentId, groupId, newGroupName } = {}) {
+  if (!agentId) return
+  const agent = agentList.value.find(a => a.agent_id === agentId)
+  if (!agent) {
+    showToast('Agent 不存在', 'error')
+    return
+  }
+  if (isStoppedAgent(agent)) {
+    showToast('已停止的 Agent 不能加入分组', 'warning')
+    return
+  }
+
+  let group = null
+  if (groupId) {
+    group = agentGroups.value.find(g => g.id === groupId)
+    if (!group) {
+      showToast('分组不存在', 'error')
+      return
+    }
+  } else {
+    const trimmedName = String(newGroupName || '').trim()
+    if (!trimmedName) {
+      showToast('请输入分组名称', 'warning')
+      return
+    }
+    group = {
+      id: `group-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name: trimmedName,
+      agentIds: [],
+    }
+    agentGroups.value.push(group)
+  }
+
+  if (!group.agentIds) group.agentIds = []
+  if (group.agentIds.includes(agentId)) {
+    showToast(`该 Agent 已在「${group.name}」中`, 'info')
+    return
+  }
+  group.agentIds.push(agentId)
+  saveAgentGroups()
+  showToast(`已加入「${group.name}」`, 'success')
+}
+
+// 来自宠物大厅右键菜单：把单个 Agent 从指定分组移出
+function onLobbyRemoveAgentFromGroup({ agentId, groupId } = {}) {
+  if (!agentId || !groupId) return
+  const group = agentGroups.value.find(g => g.id === groupId)
+  if (!group || !Array.isArray(group.agentIds)) return
+  const index = group.agentIds.indexOf(agentId)
+  if (index === -1) {
+    showToast('该 Agent 不在此分组中', 'info')
+    return
+  }
+  group.agentIds.splice(index, 1)
+  saveAgentGroups()
+  showToast(`已从「${group.name}」移出`, 'success')
+}
+
 function addSelectedToGroup(groupId) {
   const group = agentGroups.value.find(g => g.id === groupId)
   if (!group) return
@@ -7759,6 +7823,41 @@ function createGroupWithAgents(name) {
   selectedAgents.value = new Set()
   isBatchMode.value = false
   showToast(`已创建分组「${group.name}」并加入 ${group.agentIds.length} 个 Agent`, 'success')
+}
+
+// 重命名分组
+function renameAgentGroup({ groupId, name } = {}) {
+  if (!groupId) return
+  const trimmedName = String(name || '').trim()
+  if (!trimmedName) {
+    showToast('分组名称不能为空', 'warning')
+    return
+  }
+  const group = agentGroups.value.find(g => g.id === groupId)
+  if (!group) return
+  if (group.name === trimmedName) return
+  group.name = trimmedName
+  saveAgentGroups()
+  showToast(`分组已重命名为「${trimmedName}」`, 'success')
+}
+
+// 删除分组（仅删除分组本身，不影响其中的 Agent）
+function deleteAgentGroup(groupId) {
+  if (!groupId) return
+  const group = agentGroups.value.find(g => g.id === groupId)
+  if (!group) return
+  showConfirm(
+    `确定删除分组「${group.name}」吗？`,
+    () => {
+      const index = agentGroups.value.findIndex(g => g.id === groupId)
+      if (index === -1) return
+      agentGroups.value.splice(index, 1)
+      saveAgentGroups()
+      showToast(`已删除分组「${group.name}」`, 'success')
+    },
+    null,
+    false
+  )
 }
 
 // 查看 Agent 的 Diff
@@ -12756,7 +12855,8 @@ const handleBeforeUnload = (e) => {
 // 移动端：打开浮层时推送历史状态
 const pushOverlayState = () => {
   if (windowWidth.value <= 768) {
-    history.pushState({ overlay: true }, '', '')
+    // 注意：模块内从 @codemirror/commands 导入了 history，会遮蔽全局 window.history
+    window.history.pushState({ overlay: true }, '', '')
     historyStateCount++
   }
 }
