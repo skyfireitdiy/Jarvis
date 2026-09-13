@@ -509,12 +509,15 @@
           :getLatestOutput="getLobbyLatestOutput"
           :historyNav="onLobbyHistoryNav"
           :getNodeDisplayName="getNodeDisplayName"
+          :contextActions="lobbyContextActions"
           @selectAgent="onLobbySelectAgent"
           @sendInput="sendLobbyInput"
           @complete="onLobbyComplete"
           @openCompletions="onLobbyOpenCompletions"
           @activePetChange="lobbyActiveAgentId = $event"
           @createAgentOnNode="onLobbyCreateAgentOnNode"
+          @contextAgent="onLobbyContextAgent"
+          @contextRun="onLobbyContextRun"
         />
       </div>
     </main>
@@ -5326,6 +5329,19 @@ const commandPaletteCtx = computed(() => ({
   editCurrentAgentAccess: () => { const a = getCurrentAgentOrNull(); if (a) editAgentAccess(a) },
   regenerateCurrentAgent: () => { const a = getCurrentAgentOrNull(); if (a) regenerateAgent(a) },
   deleteCurrentAgent: () => { const a = getCurrentAgentOrNull(); if (a) deleteAgent(a.agent_id) },
+  // 隐藏/显示当前 Agent 在大厅中的输出气泡（持久化在 PetLobby 内）
+  toggleCurrentAgentOutput: () => {
+    const a = getCurrentAgentOrNull()
+    const lobby = petLobbyRef.value
+    if (a && lobby && typeof lobby.toggleAgentOutput === 'function') {
+      lobby.toggleAgentOutput(a.agent_id)
+    }
+  },
+  isCurrentAgentOutputHidden: () => {
+    const a = getCurrentAgentOrNull()
+    const lobby = petLobbyRef.value
+    return !!(a && lobby && typeof lobby.isOutputHidden === 'function' && lobby.isOutputHidden(a.agent_id))
+  },
   // 当前焦点面板：分离 / 关闭（面板头部图标保留不变）
   detachFocusedPanel,
   closeFocusedPanel,
@@ -5351,8 +5367,16 @@ const commandPaletteCtx = computed(() => ({
   openedAgentIds: new Set(panels.value.filter(p => p.agentId).map(p => p.agentId)),
 }))
 
-// 命令面板动作清单（来自统一注册表）
-const appActions = computed(() => actionDefs)
+// 命令面板动作清单（来自统一注册表，个别动作按当前状态动态调整文案/图标）
+const appActions = computed(() => {
+  const ctx = commandPaletteCtx.value
+  return actionDefs.map(a => {
+    const label = resolveActionLabel(a, ctx)
+    const icon = resolveActionIcon(a, ctx)
+    if (label === a.label && icon === a.icon) return a
+    return { ...a, label, icon }
+  })
+})
 
 // 宠物环形菜单动作：取命令面板「当前 Agent」组的命令，内圈放常用项
 const PET_RADIAL_INNER_IDS = [
@@ -5368,14 +5392,28 @@ const PET_RADIAL_EXTRA_IDS = [
   'toggle-header',
   'open-agent-list',
 ]
+// 动态菜单文案/图标：默认取注册表静态值，个别动作按当前状态调整
+function resolveActionLabel(action, ctx) {
+  if (action.id === 'current-toggle-output') {
+    return ctx.isCurrentAgentOutputHidden && ctx.isCurrentAgentOutputHidden() ? '显示输出' : '隐藏输出'
+  }
+  return action.label
+}
+function resolveActionIcon(action, ctx) {
+  if (action.id === 'current-toggle-output') {
+    return ctx.isCurrentAgentOutputHidden && ctx.isCurrentAgentOutputHidden() ? '👁' : '🙈'
+  }
+  return action.icon
+}
+
 const petRadialActions = computed(() => {
   const ctx = commandPaletteCtx.value
   return actionDefs
     .filter(a => a.group === '当前 Agent' || PET_RADIAL_EXTRA_IDS.includes(a.id))
     .map(a => ({
       id: a.id,
-      label: a.label,
-      icon: a.icon,
+      label: resolveActionLabel(a, ctx),
+      icon: resolveActionIcon(a, ctx),
       inner: PET_RADIAL_INNER_IDS.includes(a.id),
       enabled: typeof a.enabled === 'function' ? a.enabled(ctx) : true,
     }))
@@ -5386,6 +5424,29 @@ function onPetRadialRun(action) {
   if (!action) return
   const def = actionDefs.find(a => a.id === action.id)
   if (def) onCommandRun(def)
+}
+
+// 大厅中在 Agent 宠物上右键：把「当前 Agent」切到该宠物，菜单动作随之刷新
+function onLobbyContextAgent(agentId) {
+  if (agentId) lobbyActiveAgentId.value = agentId
+}
+
+// 大厅宠物右键菜单动作：复用命令面板「当前 Agent」组
+const lobbyContextActions = computed(() => {
+  const ctx = commandPaletteCtx.value
+  return actionDefs
+    .filter(a => a.group === '当前 Agent')
+    .map(a => ({
+      id: a.id,
+      label: resolveActionLabel(a, ctx),
+      icon: resolveActionIcon(a, ctx),
+      enabled: typeof a.enabled === 'function' ? a.enabled(ctx) : true,
+    }))
+})
+
+// 大厅宠物右键菜单点击：按命令面板同款逻辑执行
+function onLobbyContextRun(action) {
+  onPetRadialRun(action)
 }
 
 // 执行命令面板中的动作

@@ -148,6 +148,7 @@
       :style="{ left: pet.x + 'px', top: pet.y + 'px' }"
       @pointerdown="onPetPointerDown(pet, $event)"
       @dblclick="onPetDblClick(pet)"
+      @contextmenu.prevent.stop="onPetContextMenu(pet, $event)"
     >
       <div class="lobby-pet-inner">
         <div class="lobby-pet-body">
@@ -175,7 +176,7 @@
         @dblclick.stop
       >
         <!-- 输出气泡：常驻显示（markdown 渲染）；点击气泡同样激活该 Agent -->
-        <div v-if="pet.output" class="lobby-pet-output-wrap">
+        <div v-if="pet.output && !isOutputHidden(pet.agentId)" class="lobby-pet-output-wrap">
           <div
             class="lobby-pet-output"
             v-html="pet.output"
@@ -234,6 +235,28 @@
         </div>
       </div>
     </div>
+
+    <!-- Agent 右键菜单：对当前 Agent 的操作（复用命令面板「当前 Agent」组） -->
+    <div
+      v-if="contextMenu.visible"
+      class="lobby-context-menu"
+      :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
+      @pointerdown.stop
+      @click.stop
+      @contextmenu.prevent.stop
+    >
+      <div class="lobby-context-title">{{ contextMenu.name }}</div>
+      <button
+        v-for="act in contextActions"
+        :key="act.id"
+        class="lobby-context-item"
+        :disabled="act.enabled === false"
+        @click="onContextAction(act)"
+      >
+        <span class="lobby-context-icon">{{ act.icon }}</span>
+        <span class="lobby-context-label">{{ act.label }}</span>
+      </button>
+    </div>
   </div>
 </template>
 
@@ -249,9 +272,11 @@ const props = defineProps({
   getLatestOutput: { type: Function, default: null },
   historyNav: { type: Function, default: null },
   getNodeDisplayName: { type: Function, default: null },
+  // 右键菜单动作（复用命令面板「当前 Agent」组），由父组件按当前 Agent 计算后传入
+  contextActions: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['selectAgent', 'sendInput', 'complete', 'openCompletions', 'activePetChange', 'createAgentOnNode'])
+const emit = defineEmits(['selectAgent', 'sendInput', 'complete', 'openCompletions', 'activePetChange', 'createAgentOnNode', 'contextAgent', 'contextRun'])
 
 // 宠物尺寸常量（与 CSS 中的 .lobby-pet 宽高保持一致）
 const PET_W = 72
@@ -300,6 +325,42 @@ const displayModeMeta = computed(() => {
   if (displayMode.value === 'hidden') return { icon: '🙈', label: '隐藏全部', title: '当前：已隐藏输出与精灵，点击切换为全部显示' }
   return { icon: '👁', label: '全部显示', title: '当前：显示全部，点击切换为仅隐藏输出' }
 })
+
+// 单个 Agent 的输出显隐：与全局 displayMode 叠加，独立控制并持久化
+const HIDDEN_OUTPUTS_KEY = 'jarvis.petLobby.hiddenOutputs'
+function loadHiddenOutputs() {
+  try {
+    const raw = localStorage.getItem(HIDDEN_OUTPUTS_KEY)
+    const arr = raw ? JSON.parse(raw) : []
+    if (Array.isArray(arr)) return new Set(arr.filter(id => typeof id === 'string'))
+  } catch (e) {
+    /* localStorage 不可用或数据损坏时回退空集 */
+  }
+  return new Set()
+}
+const hiddenOutputIds = ref(loadHiddenOutputs())
+// 曾经出现过的 agentId：用于判断哪些持久化项对应的 Agent 已被删除
+const seenAgentIds = new Set()
+function saveHiddenOutputs() {
+  try {
+    localStorage.setItem(HIDDEN_OUTPUTS_KEY, JSON.stringify([...hiddenOutputIds.value]))
+  } catch (e) {
+    /* 忽略写入失败（隐私模式等） */
+  }
+}
+// 某 Agent 的输出是否被单独隐藏
+function isOutputHidden(agentId) {
+  return hiddenOutputIds.value.has(agentId)
+}
+// 切换某 Agent 的输出显隐（供命令面板/右键菜单调用）
+function toggleAgentOutput(agentId) {
+  if (!agentId) return
+  const next = new Set(hiddenOutputIds.value)
+  if (next.has(agentId)) next.delete(agentId)
+  else next.add(agentId)
+  hiddenOutputIds.value = next
+  saveHiddenOutputs()
+}
 
 let rafId = null
 let resizeObserver = null
@@ -558,6 +619,23 @@ function syncPets() {
   if (activePetId.value && !next.some(p => p.agentId === activePetId.value)) {
     activePetId.value = null
   }
+  // 清理已被删除 Agent 的输出隐藏持久化数据（stopped 仍存在，不清理）
+  // 仅在拿到过非空 agent 列表后才清理，避免初始加载（列表暂为空）时误删
+  if (list.length > 0) {
+    for (const a of list) {
+      if (a && a.agent_id) seenAgentIds.add(a.agent_id)
+    }
+    let hiddenChanged = false
+    const pruned = new Set()
+    for (const id of hiddenOutputIds.value) {
+      if (seenAgentIds.has(id)) pruned.add(id)
+      else hiddenChanged = true
+    }
+    if (hiddenChanged) {
+      hiddenOutputIds.value = pruned
+      saveHiddenOutputs()
+    }
+  }
 }
 
 // 单帧：所有宠物向各自目标点移动，并做斥力避让
@@ -624,6 +702,8 @@ function measureStage() {
 
 // 点击大厅空白处：取消所有宠物的选中/展开状态，让它们恢复飘动
 function onStageClick(event) {
+  // 点击任意处都先关闭右键菜单
+  closeContextMenu()
   // 仅当点击目标是舞台本身（空白区域）时才处理；宠物及其面板已 stop 冒泡
   if (event.target !== stageRef.value) return
   for (const pet of petAgents.value) {
@@ -635,6 +715,46 @@ function onStageClick(event) {
 function onNodeDblClick(node) {
   if (!node) return
   emit('createAgentOnNode', node.node_id)
+}
+
+// ===== Agent 右键菜单 =====
+// 菜单状态：坐标相对舞台左上角；name 用于标题
+const contextMenu = ref({ visible: false, x: 0, y: 0, agentId: null, name: '' })
+
+function closeContextMenu() {
+  if (contextMenu.value.visible) contextMenu.value.visible = false
+}
+
+// 在宠物上右键：通知父组件切换当前 Agent 并准备动作，再就地弹出菜单
+function onPetContextMenu(pet, event) {
+  if (!pet) return
+  const stage = stageRef.value
+  if (!stage) return
+  const rect = stage.getBoundingClientRect()
+  // 先请求父组件把「当前 Agent」切到该宠物（决定菜单动作与可用性）
+  emit('contextAgent', pet.agentId)
+  // 估算菜单尺寸并做边界钳制，避免超出舞台
+  const MENU_W = 200
+  const itemCount = (props.contextActions || []).length
+  const MENU_H = Math.min(44 + itemCount * 33, rect.height * 0.6)
+  let x = event.clientX - rect.left
+  let y = event.clientY - rect.top
+  if (x + MENU_W > rect.width) x = Math.max(rect.width - MENU_W, 0)
+  if (y + MENU_H > rect.height) y = Math.max(rect.height - MENU_H, 0)
+  contextMenu.value = {
+    visible: true,
+    x,
+    y,
+    agentId: pet.agentId,
+    name: pet.name || pet.agentId,
+  }
+}
+
+// 点击菜单项：交给父组件按命令面板同款逻辑执行，然后关闭菜单
+function onContextAction(act) {
+  if (!act || act.enabled === false) return
+  emit('contextRun', act)
+  closeContextMenu()
 }
 
 // 拖动状态
@@ -922,17 +1042,28 @@ onMounted(() => {
   syncPets()
   rafId = requestAnimationFrame(step)
   refreshTimer = setInterval(refreshLoop, 800)
+  window.addEventListener('keydown', onGlobalKeydown)
+  window.addEventListener('resize', closeContextMenu)
+  window.addEventListener('blur', closeContextMenu)
   if (typeof ResizeObserver !== 'undefined' && stageRef.value) {
     resizeObserver = new ResizeObserver(() => measureStage())
     resizeObserver.observe(stageRef.value)
   }
 })
 
+// 全局按键：Esc 关闭右键菜单
+function onGlobalKeydown(e) {
+  if (e.key === 'Escape') closeContextMenu()
+}
+
 onUnmounted(() => {
   if (rafId) cancelAnimationFrame(rafId)
   rafId = null
   window.removeEventListener('pointermove', onPetPointerMove)
   window.removeEventListener('pointerup', onPetPointerUp)
+  window.removeEventListener('keydown', onGlobalKeydown)
+  window.removeEventListener('resize', closeContextMenu)
+  window.removeEventListener('blur', closeContextMenu)
   dragState = null
   if (clickTimer) {
     clearTimeout(clickTimer)
@@ -988,7 +1119,7 @@ function insertCompletionText(agentId, text, cursorPos, hasAtSymbol) {
   })
 }
 
-defineExpose({ insertCompletionText })
+defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden })
 </script>
 
 <style scoped>
@@ -1730,4 +1861,63 @@ defineExpose({ insertCompletionText })
   border-color: rgba(255, 90, 90, 0.45);
   color: #ffb3b3;
 }
+/* Agent 右键菜单：对当前 Agent 的操作 */
+.lobby-context-menu {
+  position: absolute;
+  z-index: 60;
+  min-width: 168px;
+  max-width: 240px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 4px;
+  border-radius: 10px;
+  background: rgba(12, 22, 34, 0.96);
+  border: 1px solid rgba(32, 200, 255, 0.35);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.lobby-context-title {
+  padding: 6px 10px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #9fe4ff;
+  border-bottom: 1px solid rgba(32, 200, 255, 0.18);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lobby-context-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: #d7e8f5;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.lobby-context-item:hover:not(:disabled) {
+  background: rgba(32, 200, 255, 0.16);
+}
+.lobby-context-item:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.lobby-context-icon {
+  width: 18px;
+  text-align: center;
+}
+.lobby-context-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 </style>
