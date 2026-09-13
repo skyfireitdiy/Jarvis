@@ -514,6 +514,7 @@
           @complete="onLobbyComplete"
           @openCompletions="onLobbyOpenCompletions"
           @activePetChange="lobbyActiveAgentId = $event"
+          @createAgentOnNode="onLobbyCreateAgentOnNode"
         />
       </div>
     </main>
@@ -6957,8 +6958,8 @@ function cancelDirDialog() {
   selectedDirIndex.value = -1
 }
 
-// 打开创建 Agent 弹窗
-async function openCreateAgentModal() {
+// 打开创建 Agent 弹窗（可指定初始节点，如从大厅双击某节点进入）
+async function openCreateAgentModal(initialNodeId = '') {
   // 先刷新模型组列表，确保获取最新的配置
   await Promise.all([
     fetchModelGroups(),
@@ -6968,11 +6969,19 @@ async function openCreateAgentModal() {
   ])
   // 加载最近使用的工作目录
   loadRecentWorkDirs()
-  newAgentNodeId.value = ''
+  const target = typeof initialNodeId === 'string' ? initialNodeId.trim() : ''
+  // 校验目标节点在可创建范围内，否则回退为空（由弹窗默认选择）
+  const allowed = filteredNodeOptionsForCreateAgent.value.some(n => n.node_id === target)
+  newAgentNodeId.value = allowed ? target : ''
   newAgentDir.value = '~'
   newAgentCreateError.value = ''
   resetDirectorySelectionState()
   showCreateAgentModal.value = true
+}
+
+// 大厅中双击节点：打开创建 Agent 弹窗并预选该节点
+function onLobbyCreateAgentOnNode(nodeId) {
+  openCreateAgentModal(nodeId)
 }
 
 // 获取模型组列表

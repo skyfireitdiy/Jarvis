@@ -66,6 +66,7 @@
           :key="n.node_id"
           class="lobby-node"
           :class="['st-' + n.state, { 'is-center': n.isMaster }]"
+          @dblclick.stop="onNodeDblClick(n)"
         >
           <!-- 机箱主体 -->
           <rect
@@ -250,7 +251,7 @@ const props = defineProps({
   getNodeDisplayName: { type: Function, default: null },
 })
 
-const emit = defineEmits(['selectAgent', 'sendInput', 'complete', 'openCompletions', 'activePetChange'])
+const emit = defineEmits(['selectAgent', 'sendInput', 'complete', 'openCompletions', 'activePetChange', 'createAgentOnNode'])
 
 // 宠物尺寸常量（与 CSS 中的 .lobby-pet 宽高保持一致）
 const PET_W = 72
@@ -628,6 +629,12 @@ function onStageClick(event) {
   for (const pet of petAgents.value) {
     if (pet.active) closePanel(pet)
   }
+}
+
+// 双击节点：在大厅打开创建 Agent 弹窗，并预选该节点
+function onNodeDblClick(node) {
+  if (!node) return
+  emit('createAgentOnNode', node.node_id)
 }
 
 // 拖动状态
@@ -1042,6 +1049,14 @@ defineExpose({ insertCompletionText })
 }
 
 /* 节点：服务器机箱造型（参考大屏拓扑，但整体弱化以突出 Agent） */
+.lobby-node {
+  /* 容器层整体 pointer-events: none（不拦截宠物交互），此处单独恢复节点可点击 */
+  pointer-events: auto;
+  cursor: pointer;
+  /* 禁用双击时的默认选中高亮 */
+  user-select: none;
+  -webkit-user-select: none;
+}
 .lobby-node-body {
   transition: filter 0.15s ease;
 }
