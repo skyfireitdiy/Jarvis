@@ -9,6 +9,29 @@
     <div class="pet-lobby-glow pet-lobby-glow-a"></div>
     <div class="pet-lobby-glow pet-lobby-glow-b"></div>
 
+    <!-- 左上角：网关信息仪表（时间 + 连接状态 + 网关地址 + 节点 + 用户），风格与节点拓扑一致，不拦截交互 -->
+    <div class="pet-lobby-dash" aria-hidden="true">
+      <div class="lobby-dash-time">{{ dashTime }}</div>
+      <div class="lobby-dash-date">{{ dashDate }}</div>
+      <div class="lobby-dash-divider"></div>
+      <div class="lobby-dash-row">
+        <span class="lobby-dash-dot" :class="'is-' + connectionStatus"></span>
+        <span class="lobby-dash-label">{{ connectionLabel || '未知' }}</span>
+      </div>
+      <div class="lobby-dash-row">
+        <span class="lobby-dash-label">网关</span>
+        <span class="lobby-dash-value">{{ gatewayAddress || '—' }}</span>
+      </div>
+      <div class="lobby-dash-row">
+        <span class="lobby-dash-label">节点</span>
+        <span class="lobby-dash-value">{{ nodeOnlineStat.online }}/{{ nodeOnlineStat.total }}</span>
+      </div>
+      <div v-if="currentUserName" class="lobby-dash-row">
+        <span class="lobby-dash-label">用户</span>
+        <span class="lobby-dash-value">{{ currentUserName }}</span>
+      </div>
+    </div>
+
     <!-- 节点与连线层：参考大屏「网络拓扑」风格（机箱造型 + 连线），位于地板之上、宠物之下 -->
     <div class="pet-lobby-topology" aria-hidden="true">
       <svg class="pet-lobby-links" :width="stageSize.w" :height="stageSize.h" :viewBox="`0 0 ${stageSize.w} ${stageSize.h}`">
@@ -120,11 +143,11 @@
         <span class="pet-lobby-roam-label">{{ roaming ? '游走中' : '已静止' }}</span>
       </button>
 
-      <!-- 全部显示 / 全部隐藏：控制所有 Agent 精灵的显示与隐藏（按钮文案为将要执行的操作） -->
+      <!-- 显示/隐藏 Agent 精灵：控制所有 Agent 精灵的显示与隐藏（按钮文案为将要执行的操作） -->
       <button
         class="pet-lobby-display-toggle"
         :class="{ off: petsHidden }"
-        :title="petsHidden ? '点击显示全部 Agent' : '点击隐藏全部 Agent'"
+        :title="petsHidden ? '点击显示 Agent 精灵' : '点击隐藏 Agent 精灵'"
         @click.stop="toggleAllPets()"
       >
         <span class="pet-lobby-display-icon">{{ petsHidden ? '👁' : '🙈' }}</span>
@@ -389,6 +412,13 @@ const props = defineProps({
   nodeActions: { type: Array, default: () => [] },
   // 现有 Agent 分组列表（用于宠物右键「添加到分组」）
   agentGroups: { type: Array, default: () => [] },
+  // 网关地址（host:port），用于左上角仪表展示
+  gatewayAddress: { type: String, default: '' },
+  // 连接状态与文案（online/connecting/reconnecting/offline + 中文标签）
+  connectionStatus: { type: String, default: '' },
+  connectionLabel: { type: String, default: '' },
+  // 当前登录用户名（优先显示名）
+  currentUserName: { type: String, default: '' },
 })
 
 const emit = defineEmits(['selectAgent', 'sendInput', 'complete', 'openCompletions', 'activePetChange', 'createAgentOnNode', 'contextAgent', 'contextRun', 'nodeContextRun', 'renameNode', 'addAgentToGroup', 'removeAgentFromGroup'])
@@ -429,7 +459,7 @@ watch(petsHidden, (hidden) => {
     /* 忽略写入失败（隐私模式等） */
   }
 })
-// 全部显示 / 全部隐藏：切换所有 Agent 精灵的显示与隐藏
+// 显示 / 隐藏 Agent 精灵：切换所有 Agent 精灵的显示与隐藏
 function toggleAllPets() {
   petsHidden.value = !petsHidden.value
 }
@@ -572,6 +602,13 @@ const nodeItems = computed(() => {
           : (isMaster ? 'url(#lobby-center-fill)' : 'rgba(8,18,30,0.7)'),
       }
     })
+})
+
+// 节点在线统计：state 由 normalizeNodeStatus 归一为 online/offline/unknown
+const nodeOnlineStat = computed(() => {
+  const list = nodeItems.value
+  const online = list.filter(n => n.state === 'online').length
+  return { online, total: list.length }
 })
 
 // 节点间连线：master → 其余节点
@@ -1226,6 +1263,14 @@ function openPanel(pet) {
   activePetId.value = pet.agentId
   pet.active = true
   pet.typing = false
+  // 激活即打开该 Agent 的输出显示：仅 pet.active 只能让 stack 容器显示，
+  // 输出气泡仍受 isOutputHidden 拦截，故需把该 Agent 移出隐藏集合（取消激活时不回滚）
+  if (hiddenOutputIds.value.has(pet.agentId)) {
+    const next = new Set(hiddenOutputIds.value)
+    next.delete(pet.agentId)
+    hiddenOutputIds.value = next
+    saveHiddenOutputs()
+  }
   refreshPetData(pet)
 }
 
@@ -1341,6 +1386,22 @@ function submitConfirm(pet, confirmed) {
   refreshPetData(pet)
 }
 
+// 仪表盘时间：独立 1s 定时器刷新（refreshLoop 在精灵隐藏时会提前返回，不能依赖它）
+const dashNow = ref(new Date())
+let dashTimer = null
+const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+function pad2(n) {
+  return String(n).padStart(2, '0')
+}
+const dashTime = computed(() => {
+  const d = dashNow.value
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`
+})
+const dashDate = computed(() => {
+  const d = dashNow.value
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${WEEKDAYS[d.getDay()]}`
+})
+
 // 定时刷新：状态灯、输出气泡、输入态（输出/确认常驻显示，需对所有宠物刷新）
 let refreshTimer = null
 function refreshLoop() {
@@ -1373,6 +1434,7 @@ onMounted(() => {
   syncPets()
   rafId = requestAnimationFrame(step)
   refreshTimer = setInterval(refreshLoop, 800)
+  dashTimer = setInterval(() => { dashNow.value = new Date() }, 1000)
   window.addEventListener('keydown', onGlobalKeydown)
   window.addEventListener('resize', closeContextMenu)
   window.addEventListener('blur', closeContextMenu)
@@ -1408,6 +1470,10 @@ onUnmounted(() => {
   if (refreshTimer) {
     clearInterval(refreshTimer)
     refreshTimer = null
+  }
+  if (dashTimer) {
+    clearInterval(dashTimer)
+    dashTimer = null
   }
   if (resizeObserver) {
     resizeObserver.disconnect()
@@ -1645,6 +1711,76 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden })
   bottom: -24%;
   right: -14%;
   background: radial-gradient(circle, rgba(54, 255, 124, 0.16) 0%, transparent 62%);
+}
+
+/* ===== 左上角仪表（当前时间 + 网关地址）：与节点拓扑同风格，弱化处理 ===== */
+.pet-lobby-dash {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(8, 18, 30, 0.55);
+  border: 1px solid rgba(32, 200, 255, 0.18);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+  user-select: none;
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+}
+.lobby-dash-time {
+  font-size: 20px;
+  line-height: 1.1;
+  letter-spacing: 1px;
+  color: rgba(180, 220, 240, 0.8);
+}
+.lobby-dash-date {
+  margin-top: 2px;
+  font-size: 10px;
+  color: rgba(150, 190, 210, 0.5);
+}
+.lobby-dash-divider {
+  height: 1px;
+  margin: 7px 0 6px;
+  background: linear-gradient(90deg, rgba(32, 200, 255, 0.28), transparent);
+}
+.lobby-dash-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  line-height: 1.6;
+  color: rgba(150, 190, 210, 0.55);
+}
+.lobby-dash-label {
+  flex: none;
+  opacity: 0.75;
+}
+.lobby-dash-value {
+  color: rgba(180, 220, 240, 0.7);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lobby-dash-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #8a9bb0;
+  opacity: 0.7;
+  flex: none;
+}
+/* 连接状态配色：与顶栏状态点语义一致 */
+.lobby-dash-dot.is-online {
+  background: #34d99b;
+}
+.lobby-dash-dot.is-connecting,
+.lobby-dash-dot.is-reconnecting {
+  background: #ffb347;
+}
+.lobby-dash-dot.is-offline {
+  background: #ff5d6c;
 }
 
 /* ===== 右上角开关组（游走 + 精灵显示模式） ===== */

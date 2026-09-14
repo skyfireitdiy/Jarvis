@@ -511,6 +511,10 @@
           :getLatestOutput="getLobbyLatestOutput"
           :historyNav="onLobbyHistoryNav"
           :getNodeDisplayName="getNodeDisplayName"
+          :gatewayAddress="gatewayAddressDisplay"
+          :connectionStatus="connectionStatus"
+          :connectionLabel="connectionLabel"
+          :currentUserName="auth.userInfo?.display_name || auth.userInfo?.username || ''"
           :contextActions="lobbyContextActions"
           :agentGroups="agentGroups"
           @selectAgent="onLobbySelectAgent"
@@ -2009,6 +2013,11 @@ function getGatewayAddress() {
     port: parsed.port || '8000'
   }
 }
+// 网关地址展示串（host:port），供大厅左上角仪表显示
+const gatewayAddressDisplay = computed(() => {
+  const { host, port } = getGatewayAddress()
+  return `${host}:${port}`
+})
 
 // 弹窗控制
 const showConnectModal = ref(true)  // 首次打开显示欢迎界面
