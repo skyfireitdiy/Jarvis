@@ -128,7 +128,7 @@
         @click.stop="toggleAllPets()"
       >
         <span class="pet-lobby-display-icon">{{ petsHidden ? '👁' : '🙈' }}</span>
-        <span class="pet-lobby-display-label">{{ petsHidden ? '全部显示' : '全部隐藏' }}</span>
+        <span class="pet-lobby-display-label">{{ petsHidden ? '显示Agent精灵' : '隐藏Agent精灵' }}</span>
       </button>
 
       <!-- 显示全部输出：遍历所有 Agent，显示其输出 -->
