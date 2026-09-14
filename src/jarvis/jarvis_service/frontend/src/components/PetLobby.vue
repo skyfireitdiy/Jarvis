@@ -253,7 +253,7 @@
         <!-- 输入面板：单击展开（多行/单行，按状态自动选择） -->
         <div v-else-if="pet.active" class="lobby-pet-panel">
           <!-- 多行输入 -->
-          <div v-if="pet.inputMode === 'multi'" class="lobby-pet-input-row">
+          <div v-if="pet.inputMode === 'multi'" class="lobby-pet-input-row lobby-pet-input-row-multi">
             <textarea
               class="lobby-pet-textarea"
               rows="3"
@@ -264,6 +264,7 @@
               @input="handlePetInput(pet, $event)"
               @pointerdown.stop="onInputPointerDown(pet)"
             ></textarea>
+            <button v-if="isMobile" class="lobby-pet-at" @click="insertAtSymbol(pet)" title="插入 @ 触发补全">@</button>
             <button class="lobby-pet-complete" @click="completePet(pet)" title="完成（发送空消息）">完成</button>
             <button class="lobby-pet-send" @click="submitPet(pet)" title="发送 (Ctrl+Enter)">➤</button>
           </div>
@@ -446,6 +447,13 @@ const stageSize = ref({ w: 0, h: 0 })
 const petAgents = ref([])
 const activePetId = ref(null)
 const roaming = ref(true) // 是否允许宠物自由游走
+
+// 移动端判断：与 CSS 断点（max-width: 768px）保持一致，用于按需显示移动端专用控件
+const MOBILE_BREAKPOINT = 768
+const isMobile = ref(typeof window !== 'undefined' && window.innerWidth <= MOBILE_BREAKPOINT)
+function updateIsMobile() {
+  isMobile.value = window.innerWidth <= MOBILE_BREAKPOINT
+}
 
 // 精灵显示：petsHidden=是否隐藏全部精灵，持久化到 localStorage
 // 输出显隐完全由单个 Agent 的 hiddenOutputIds 控制（不再有全局输出开关）
@@ -1378,6 +1386,27 @@ function handlePetInput(pet, event) {
   }
 }
 
+// 移动端「@」按钮：在光标处插入 @ 并触发补全（等价于手动输入 @）
+function insertAtSymbol(pet) {
+  if (!pet) return
+  const el = stageRef.value && stageRef.value.querySelector(`[data-pet-input="${pet.agentId}"]`)
+  const value = pet.inputText || ''
+  const start = el && typeof el.selectionStart === 'number' ? el.selectionStart : value.length
+  const end = el && typeof el.selectionEnd === 'number' ? el.selectionEnd : value.length
+  const next = value.substring(0, start) + '@' + value.substring(end)
+  pet.inputText = next
+  pet.typing = true
+  const atPos = start
+  requestAnimationFrame(() => {
+    const target = stageRef.value && stageRef.value.querySelector(`[data-pet-input="${pet.agentId}"]`)
+    if (target) {
+      try { target.setSelectionRange(atPos + 1, atPos + 1) } catch (e) { /* ignore */ }
+      target.focus()
+    }
+  })
+  emit('openCompletions', pet.agentId, atPos)
+}
+
 function isCursorAtFirstLine(textarea) {
   const pos = textarea.selectionStart
   return !textarea.value.substring(0, pos).includes('\n')
@@ -1455,11 +1484,13 @@ function refreshLoop() {
 onMounted(() => {
   measureStage()
   syncPets()
+  updateIsMobile()
   rafId = requestAnimationFrame(step)
   refreshTimer = setInterval(refreshLoop, 800)
   dashTimer = setInterval(() => { dashNow.value = new Date() }, 1000)
   window.addEventListener('keydown', onGlobalKeydown)
   window.addEventListener('resize', closeContextMenu)
+  window.addEventListener('resize', updateIsMobile)
   window.addEventListener('blur', closeContextMenu)
   if (typeof ResizeObserver !== 'undefined' && stageRef.value) {
     resizeObserver = new ResizeObserver(() => measureStage())
@@ -1484,6 +1515,7 @@ onUnmounted(() => {
   window.removeEventListener('pointerup', onPetPointerUp)
   window.removeEventListener('keydown', onGlobalKeydown)
   window.removeEventListener('resize', closeContextMenu)
+  window.removeEventListener('resize', updateIsMobile)
   window.removeEventListener('blur', closeContextMenu)
   dragState = null
   if (clickTimer) {
@@ -2306,6 +2338,24 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden })
   align-items: flex-end;
   gap: 6px;
 }
+/* 移动端：多行输入框与按钮分成两行，避免按钮挤压输入框宽度 */
+@media (max-width: 768px) {
+  .lobby-pet-input-row-multi {
+    flex-wrap: wrap;
+  }
+  .lobby-pet-input-row-multi .lobby-pet-textarea {
+    flex: 1 1 100%;
+  }
+  .lobby-pet-input-row-multi .lobby-pet-at,
+  .lobby-pet-input-row-multi .lobby-pet-complete,
+  .lobby-pet-input-row-multi .lobby-pet-send {
+    flex: 0 0 auto;
+  }
+  /* 按钮行右对齐：把换行后的首个按钮推到右侧，其余按钮紧随其后 */
+  .lobby-pet-input-row-multi > button:first-of-type {
+    margin-left: auto;
+  }
+}
 .lobby-pet-textarea,
 .lobby-pet-input {
   flex: 1;
@@ -2359,6 +2409,25 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden })
   white-space: nowrap;
 }
 .lobby-pet-complete:hover { background: rgba(54, 255, 124, 0.3); }
+
+/* 移动端「@」按钮：与完成按钮同尺寸，便于触屏点击 */
+.lobby-pet-at {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px solid rgba(32, 200, 255, 0.4);
+  background: rgba(32, 200, 255, 0.15);
+  color: #7ee7ff;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+.lobby-pet-at:hover { background: rgba(32, 200, 255, 0.3); }
 
 /* 确认气泡 */
 .lobby-pet-confirm {

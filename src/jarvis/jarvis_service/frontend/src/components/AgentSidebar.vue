@@ -233,7 +233,7 @@
       @pointercancel="onRestorePointerUp"
     >🐾</button>
 
-    <!-- 宠物环形菜单：双击宠物 / 🐾 展开「当前 Agent」命令 -->
+    <!-- 宠物环形菜单：右键宠物 / 🐾 展开「当前 Agent」命令 -->
     <div
       v-if="petMenuOpen"
       class="pet-menu-layer"
@@ -974,7 +974,7 @@ let petHideTimer = 0     // 隐藏定时器（兼容保留）
 let petPettingFxTimer = 0      // 摸头爱心循环
 
 // ==================== 宠物环形菜单 ====================
-// 双击宠物（或隐藏后的 🐾）弹出，承载「当前 Agent」命令，方便移动端操作
+// 右键宠物（或隐藏后的 🐾）弹出，承载「当前 Agent」命令，方便移动端操作
 const petMenuOpen = ref(false)
 const petMenuOrigin = ref({ x: 0, y: 0 })   // 菜单圆心（屏幕坐标）
 let petMenuLongPressTimer = 0               // 还原按钮长按判定
@@ -1095,10 +1095,9 @@ function onPetPointerDown(e) {
   e.preventDefault()
 }
 
-// 右键：撒花庆祝并唤起命令面板（原长按行为改为右键触发）
+// 右键：弹出环形技能菜单（与双击行为互换）
 function onPetContextMenu(e) {
-  const r = petStageRect()
-  onPetDoubleClick(r.left + r.width / 2, r.top + r.height / 2)
+  togglePetMenu(e.clientX, e.clientY)
 }
 
 function onPetPointerMove(e) {
@@ -1127,10 +1126,10 @@ function onPetPointerUp(e) {
   petDrag.value = false
   // 单击 / 双击判定
   if (petClickTimer) {
-    // 300ms 内第二次：双击 → 弹出环形菜单
+    // 300ms 内第二次：双击 → 撒花庆祝并唤起命令面板（与右键行为互换）
     clearTimeout(petClickTimer)
     petClickTimer = 0
-    togglePetMenu(e.clientX, e.clientY)
+    onPetDoubleClick(e.clientX, e.clientY)
     return
   }
   const cx = e.clientX
@@ -1154,7 +1153,7 @@ function onPetSingleClick(x, y) {
   showPetSpeech()
 }
 
-// 右键行为：撒花庆祝，并唤起命令面板
+// 双击行为：撒花庆祝，并唤起命令面板
 function onPetDoubleClick(x, y) {
   wakePet()
   petJump.value = true
@@ -1372,7 +1371,7 @@ let restoreDragging = false
 let restoreMoved = false
 let restoreUserMoved = false  // 用户是否手动拖动过还原按钮
 let restoreLongPressFired = false  // 本次长按已触发（撒花 + 命令面板）
-let restoreClickTimer = 0     // 单击延迟判定（区分单击还原 / 双击环形菜单）
+let restoreClickTimer = 0     // 单击延迟判定（区分单击还原 / 双击撒花+命令面板）
 let restoreStartX = 0
 let restoreStartY = 0
 let restoreOriginX = 0
@@ -1428,11 +1427,11 @@ function onRestorePointerUp(e) {
     restoreLongPressFired = false
     return
   }
-  // 单击 / 双击判定（与显示态宠物一致：双击 → 弹出环形菜单）
+  // 单击 / 双击判定（与显示态宠物一致：双击 → 撒花庆祝并唤起命令面板）
   if (restoreClickTimer) {
     clearTimeout(restoreClickTimer)
     restoreClickTimer = 0
-    togglePetMenu(e.clientX, e.clientY)
+    onPetDoubleClick(e.clientX, e.clientY)
     return
   }
   restoreClickTimer = window.setTimeout(() => {
