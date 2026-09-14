@@ -152,12 +152,6 @@
       </button>
     </div>
 
-    <!-- 无 Agent 提示 -->
-    <div v-if="petAgents.length === 0" class="pet-lobby-empty">
-      <div class="pet-lobby-empty-title">JARVIS</div>
-      <p class="pet-lobby-empty-hint">按 <kbd>Ctrl</kbd>+<kbd>P</kbd> 打开命令面板，或从侧边栏创建一个 Agent</p>
-    </div>
-
     <!-- 宠物群 -->
     <div
       v-for="pet in petAgents"
@@ -1651,30 +1645,6 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden })
   bottom: -24%;
   right: -14%;
   background: radial-gradient(circle, rgba(54, 255, 124, 0.16) 0%, transparent 62%);
-}
-
-.pet-lobby-empty {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  text-align: center;
-  padding: 0 24px;
-}
-.pet-lobby-empty-title {
-  font-size: 34px;
-  letter-spacing: 0.32em;
-  font-weight: 700;
-  color: var(--color-text-primary, #e6f6ff);
-  text-shadow: 0 0 22px rgba(32, 200, 255, 0.55);
-}
-.pet-lobby-empty-hint {
-  font-size: 13px;
-  color: var(--color-text-secondary, #8aa8bd);
-  margin: 0;
 }
 
 /* ===== 右上角开关组（游走 + 精灵显示模式） ===== */
