@@ -1760,6 +1760,7 @@ async function logout() {
 
     // 断开所有WebSocket连接
     stopAgentListRefresh()
+    stopNodeStatusRefresh()
     sockets.value.forEach((ws, agentId) => {
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.close()
@@ -1892,6 +1893,7 @@ async function fetchWithAuth(url, options = {}) {
     showConnectModal.value = true
     connectErrorMessage.value = '登录已过期，请重新登录'
     stopAgentListRefresh()
+    stopNodeStatusRefresh()
   }
   
   return response
@@ -5929,6 +5931,7 @@ async function connect() {
     // 保存连接信息到 localStorage
     localStorage.setItem('jarvis_gateway_url', gatewayUrl.value)
     startAgentListRefresh()
+    startNodeStatusRefresh()
     // 刷新用户信息（确保display_name等字段最新），随后拉取权限（依赖 userInfo.user_id）
     refreshUserInfo().finally(() => { fetchUserPermissions() })
     // 登录成功后自动连接所有在线的 agent
@@ -7229,6 +7232,26 @@ async function fetchNodeStatus() {
   } catch (error) {
     console.error('[NODE] 获取节点状态出错:', error)
     availableNodeOptions.value = []
+  }
+}
+
+// 定时刷新节点状态（节点断线后需及时反映到拓扑图）
+let nodeStatusRefreshInterval = null
+
+function startNodeStatusRefresh() {
+  if (nodeStatusRefreshInterval) {
+    clearInterval(nodeStatusRefreshInterval)
+  }
+  // 每 10 秒刷新一次（节点状态变化不频繁，间隔放宽以减少请求）
+  nodeStatusRefreshInterval = setInterval(() => {
+    fetchNodeStatus()
+  }, 10000)
+}
+
+function stopNodeStatusRefresh() {
+  if (nodeStatusRefreshInterval) {
+    clearInterval(nodeStatusRefreshInterval)
+    nodeStatusRefreshInterval = null
   }
 }
 
