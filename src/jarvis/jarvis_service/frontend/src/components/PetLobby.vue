@@ -243,7 +243,7 @@
         <div v-if="pet.inputMode === 'confirm'" class="lobby-pet-panel">
           <div class="lobby-pet-confirm">
             <div class="lobby-pet-confirm-msg">{{ pet.confirmMessage || '请确认' }}</div>
-            <div class="lobby-pet-confirm-actions">
+            <div class="lobby-pet-confirm-actions" :class="{ 'default-yes': pet.confirmDefault !== false }">
               <button class="lobby-pet-confirm-btn yes" @click="submitConfirm(pet, true)">确认</button>
               <button class="lobby-pet-confirm-btn no" @click="submitConfirm(pet, false)">取消</button>
             </div>
@@ -2377,6 +2377,11 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden })
   display: flex;
   gap: 6px;
 }
+/* 默认按钮始终置于右侧：default-yes 时「确认」在右，否则「取消」在右 */
+.lobby-pet-confirm-actions .lobby-pet-confirm-btn.yes { order: 1; }
+.lobby-pet-confirm-actions .lobby-pet-confirm-btn.no { order: 2; }
+.lobby-pet-confirm-actions.default-yes .lobby-pet-confirm-btn.yes { order: 2; }
+.lobby-pet-confirm-actions.default-yes .lobby-pet-confirm-btn.no { order: 1; }
 .lobby-pet-confirm-btn {
   flex: 1;
   padding: 5px 0;
