@@ -26,6 +26,15 @@
         <span class="lobby-dash-label">节点</span>
         <span class="lobby-dash-value">{{ nodeOnlineStat.online }}/{{ nodeOnlineStat.total }}</span>
       </div>
+      <div v-if="agentStatusStat.length" class="lobby-dash-row">
+        <span class="lobby-dash-label">Agent</span>
+        <span class="lobby-dash-agents">
+          <span v-for="s in agentStatusStat" :key="s.state" class="lobby-dash-agent-item" :title="s.label">
+            <span class="lobby-dash-agent-dot" :style="{ background: s.color }"></span>
+            <span class="lobby-dash-agent-num">{{ s.count }}</span>
+          </span>
+        </span>
+      </div>
       <div v-if="currentUserName" class="lobby-dash-row">
         <span class="lobby-dash-label">用户</span>
         <span class="lobby-dash-value">{{ currentUserName }}</span>
@@ -609,6 +618,20 @@ const nodeOnlineStat = computed(() => {
   const list = nodeItems.value
   const online = list.filter(n => n.state === 'online').length
   return { online, total: list.length }
+})
+// Agent 状态统计：按 normalizeAgentStatus 归一为 running/waiting/idle/stopped 计数
+// 注意：统计须基于 props.agents 全量（petAgents 已过滤掉 stopped 的 Agent）
+const AGENT_STAT_ORDER = ['running', 'waiting', 'idle', 'stopped']
+const AGENT_STAT_LABEL = { running: '运行', waiting: '等待', idle: '空闲', stopped: '停止' }
+const agentStatusStat = computed(() => {
+  const counts = { running: 0, waiting: 0, idle: 0, stopped: 0 }
+  for (const agent of (props.agents || [])) {
+    const state = normalizeAgentStatus(props.getStatusClass ? props.getStatusClass(agent) : '')
+    if (counts[state] !== undefined) counts[state] += 1
+  }
+  return AGENT_STAT_ORDER
+    .filter(state => counts[state] > 0)
+    .map(state => ({ state, label: AGENT_STAT_LABEL[state], count: counts[state], color: agentColor(state) }))
 })
 
 // 节点间连线：master → 其余节点
@@ -1781,6 +1804,28 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden })
 }
 .lobby-dash-dot.is-offline {
   background: #ff5d6c;
+}
+/* Agent 各状态数量：彩色圆点 + 数字，紧凑排列 */
+.lobby-dash-agents {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.lobby-dash-agent-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.lobby-dash-agent-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  opacity: 0.8;
+  flex: none;
+}
+.lobby-dash-agent-num {
+  color: rgba(180, 220, 240, 0.7);
 }
 
 /* ===== 右上角开关组（游走 + 精灵显示模式） ===== */
