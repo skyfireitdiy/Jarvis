@@ -1239,7 +1239,7 @@ function closePanel(pet) {
   if (!pet) return
   pet.active = false
   pet.typing = false
-  pet.inputText = ''
+  // 保留 pet.inputText：收起面板（如点击空白处取消激活）不应丢失用户未发送的草稿
   if (activePetId.value === pet.agentId) activePetId.value = null
 }
 
