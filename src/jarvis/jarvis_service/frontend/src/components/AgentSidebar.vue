@@ -984,7 +984,9 @@ const PET_MENU_ARM_DELAY = 260
 let petMenuArmedAt = 0
 
 // 网格菜单尺寸与间距
-const PET_MENU_COL_W = 92    // 单列宽
+// 单列宽：与大厅 Agent 右键菜单（.lobby-context-menu）的单项宽度保持一致
+// （容器 min-width 300px、padding 4px、border 1px、两列 gap 2px → (300-8-2)/2 = 145）
+const PET_MENU_COL_W = 145
 const PET_MENU_ITEM_H = 30   // 单项高
 const PET_MENU_GAP = 5
 const PET_MENU_PAD = 6

@@ -101,7 +101,7 @@ export const ACTIONS = [
   },
   {
     id: "current-manual-interrupt",
-    label: "人工介入（中断当前执行）",
+    label: "人工介入",
     en: "Manual Interrupt",
     group: "当前 Agent",
     icon: "🛑",
