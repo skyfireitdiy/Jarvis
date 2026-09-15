@@ -261,6 +261,7 @@
               :placeholder="pet.inputTip || '输入内容 (Ctrl+Enter / Ctrl+D 发送)'"
               v-model="pet.inputText"
               @keydown="handlePetKeydown(pet, $event)"
+              @keyup="handlePetCtrlKeyup($event)"
               @input="handlePetInput(pet, $event)"
               @pointerdown.stop="onInputPointerDown(pet)"
             ></textarea>
@@ -278,6 +279,7 @@
               :placeholder="pet.inputTip || '输入内容 (Enter 发送)'"
               v-model="pet.inputText"
               @keydown="handlePetSingleKeydown(pet, $event)"
+              @keyup="handlePetCtrlKeyup($event)"
               @input="handlePetInput(pet, $event)"
               @pointerdown.stop="onInputPointerDown(pet)"
             />
@@ -1320,6 +1322,7 @@ function onInputPointerDown(pet) {
 // 多行输入框快捷键，与 Agent Panel 保持一致：
 // Ctrl+Enter / Ctrl+D 发送；Enter 换行；上下箭头在首/末行时翻阅历史；Ctrl+C 空输入时发送完成信号
 function handlePetKeydown(pet, event) {
+  if (handlePetCtrlKeydown(pet, event)) return
   if (event.key === '@') {
     event.preventDefault()
     emit('openCompletions', pet.agentId, event.target.selectionStart)
@@ -1365,6 +1368,7 @@ function handlePetKeydown(pet, event) {
 
 // 单行输入框快捷键：Enter 发送；@ 打开补全
 function handlePetSingleKeydown(pet, event) {
+  if (handlePetCtrlKeydown(pet, event)) return
   if (event.key === '@') {
     event.preventDefault()
     emit('openCompletions', pet.agentId, event.target.selectionStart)
@@ -1374,6 +1378,38 @@ function handlePetSingleKeydown(pet, event) {
     event.preventDefault()
     submitPet(pet)
   }
+}
+
+// 右 Ctrl 快速双击：发送（与 Agent Panel 行为一致）
+const DOUBLE_TAP_MS = 300 // 双击判定窗口
+const QUICK_TAP_MS = 250  // 单次「快速按下」判定
+let ctrlDownTime = 0
+let lastQuickTapTime = 0
+
+function handlePetCtrlKeydown(pet, event) {
+  if (event.code !== 'ControlRight') return false
+  event.preventDefault()
+  const now = Date.now()
+  // 上一轮是快速单击，且间隔在双击窗口内 → 判定为双击发送
+  if (lastQuickTapTime && now - lastQuickTapTime < DOUBLE_TAP_MS) {
+    lastQuickTapTime = 0
+    submitPet(pet)
+    return true
+  }
+  ctrlDownTime = now
+  return true
+}
+
+function handlePetCtrlKeyup(event) {
+  if (event.code !== 'ControlRight') return
+  event.preventDefault()
+  // 按下时间很短视为「快速单击」，为下一次双击判定做记录
+  if (ctrlDownTime && Date.now() - ctrlDownTime < QUICK_TAP_MS) {
+    lastQuickTapTime = Date.now()
+  } else {
+    lastQuickTapTime = 0
+  }
+  ctrlDownTime = 0
 }
 
 // 输入变化：检测是否刚输入 @（含中文输入法），触发补全
