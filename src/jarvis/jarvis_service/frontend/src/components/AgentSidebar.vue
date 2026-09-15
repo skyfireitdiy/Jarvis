@@ -193,6 +193,12 @@
           @click.stop="togglePetSfx"
         >{{ petSfxOn ? '🔊' : '🔇' }}</button>
         <button
+          class="pet-pin-btn"
+          :class="{ 'is-on': petPinned }"
+          :title="petPinned ? '取消固定（允许随机移动）' : '固定宠物（禁止随机移动）'"
+          @click.stop="togglePetPin"
+        >{{ petPinned ? '📌' : '📍' }}</button>
+        <button
           class="pet-power-btn"
           :class="{ 'is-on': petPowerSave }"
           :title="petPowerSave ? '关闭省电模式（恢复特效）' : '开启省电模式（关闭特效，降低耗电）'"
@@ -643,6 +649,7 @@ const PET_TOPO_KEY = 'jarvis_pet_topo'
 const PET_RESTORE_POS_KEY = 'jarvis_pet_restore_pos'
 const PET_HIDDEN_KEY = 'jarvis_pet_hidden'
 const PET_POWER_SAVE_KEY = 'jarvis_pet_power_save'
+const PET_PIN_KEY = 'jarvis_pet_pinned'
 // 移动端宠物整体缩小一半（配合 .pet-float 的 scale(0.5)），此处返回视觉尺寸
 const PET_SCALE_MOBILE = 0.5
 const PET_W = 200
@@ -674,6 +681,7 @@ const petSpeech = ref('')        // 随机台词
 const petTopoOn = ref(true)      // 是否显示迷你拓扑图
 const petCast = ref('')          // 正在施放的法术类型（'' 表示未施法）
 const petPowerSave = ref(false)  // 省电模式：关闭一切装饰性特效与常驻运算（移动端/桌面端均可开启）
+const petPinned = ref(false)     // 固定宠物：禁止随机漫步（不影响其它交互）
 
 // 是否处于移动端（用于宠物整体缩放等，不再限制省电模式开关）
 const isMobileView = computed(() => (props.windowWidth || window.innerWidth) <= 768)
@@ -2017,9 +2025,9 @@ function onPetResize() {
 // ==================== 随机漫步 ====================
 let petWanderTimer = 0   // 下次醒来的时间
 let petWanderRaf = 0     // 漫步动画帧
-// 当前是否可自由漫步：未拖拽/悬停/睡眠/隐藏/摸头，且页面可见
+// 当前是否可自由漫步：未固定/拖拽/悬停/睡眠/隐藏/摸头，且页面可见
 function canPetWander() {
-  return !petPowerSaveActive.value && !document.hidden && !petHover.value && !petDrag.value &&
+  return !petPinned.value && !petPowerSaveActive.value && !document.hidden && !petHover.value && !petDrag.value &&
     !petSleep.value && !petHidden.value && !petPetting.value && !petWalking.value
 }
 
@@ -2143,6 +2151,18 @@ function togglePetPowerSave() {
   }
 }
 
+// 切换固定状态：固定时立即停止当前漫步，并禁止后续随机移动
+function togglePetPin() {
+  petPinned.value = !petPinned.value
+  try {
+    localStorage.setItem(PET_PIN_KEY, petPinned.value ? '1' : '0')
+  } catch (e) {
+    // 忽略存储异常
+  }
+  if (petPinned.value) stopPetWalk()
+  petSfxChirp()
+}
+
 onMounted(() => {
   initPetPos()
   initRestorePos()
@@ -2165,6 +2185,11 @@ onMounted(() => {
     petPowerSave.value = localStorage.getItem(PET_POWER_SAVE_KEY) === '1'
   } catch (e) {
     petPowerSave.value = false
+  }
+  try {
+    petPinned.value = localStorage.getItem(PET_PIN_KEY) === '1'
+  } catch (e) {
+    petPinned.value = false
   }
   document.addEventListener('mousemove', onPetMouseMove)
   window.addEventListener('resize', onPetResize)
@@ -2834,6 +2859,37 @@ defineExpose({
 .pet-sfx-btn.is-off {
   opacity: 0.35;
   filter: grayscale(1);
+}
+
+/* 固定宠物开关（置于省电模式按钮正上方） */
+.pet-pin-btn {
+  position: absolute;
+  right: 8px;
+  bottom: 60px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  line-height: 1;
+  border: none;
+  border-radius: 50%;
+  background: rgba(32, 200, 255, 0.12);
+  cursor: pointer;
+  pointer-events: auto;
+  opacity: 0.5;
+  transition: opacity 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+.pet-pin-btn:hover {
+  opacity: 1;
+  background: rgba(32, 200, 255, 0.25);
+  transform: scale(1.12);
+}
+.pet-pin-btn.is-on {
+  opacity: 1;
+  background: rgba(255, 209, 102, 0.22);
 }
 
 /* 省电模式开关（移动端/桌面端均显示，置于声音按钮正上方） */
