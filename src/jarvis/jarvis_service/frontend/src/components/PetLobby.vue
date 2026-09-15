@@ -448,7 +448,24 @@ const stageRef = ref(null)
 const stageSize = ref({ w: 0, h: 0 })
 const petAgents = ref([])
 const activePetId = ref(null)
-const roaming = ref(true) // 是否允许宠物自由游走
+// 是否允许宠物自由游走：持久化到 localStorage（默认开启）
+const ROAMING_KEY = 'jarvis.petLobby.roaming'
+function loadRoaming() {
+  try {
+    return localStorage.getItem(ROAMING_KEY) !== '0'
+  } catch (e) {
+    /* localStorage 不可用时回退默认值 */
+  }
+  return true
+}
+const roaming = ref(loadRoaming())
+watch(roaming, (on) => {
+  try {
+    localStorage.setItem(ROAMING_KEY, on ? '1' : '0')
+  } catch (e) {
+    /* 忽略写入失败（隐私模式等） */
+  }
+})
 
 // 移动端判断：与 CSS 断点（max-width: 768px）保持一致，用于按需显示移动端专用控件
 const MOBILE_BREAKPOINT = 768
