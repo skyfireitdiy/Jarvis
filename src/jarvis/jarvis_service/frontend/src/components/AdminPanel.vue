@@ -297,9 +297,8 @@ const showSecret = ref(false)
 const permissionSchema = {
   '*': ['*'],
   'agent': ['*', 'create', 'delete'],
-  'terminal': ['*', 'read', 'execute'],
+  'terminal': ['*'],
   'timer': ['*', 'read', 'create', 'delete'],
-  'chat': ['*', 'read', 'send'],
   'admin': ['*', 'users', 'permissions', 'config'],
   'node': ['*', 'access'],
 }
@@ -308,7 +307,6 @@ const resourceLabels = {
   'agent': 'Agent',
   'terminal': '终端',
   'timer': '定时任务',
-  'chat': '聊天',
   'admin': '管理',
   'node': '节点',
 }

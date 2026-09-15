@@ -163,9 +163,6 @@ class PermissionManager:
         self._permission_cache.clear()  # 清缓存，确保重新计算
 
     def check_permission(self, user_id: str, permission: str) -> bool:
-        # chat权限全局放行，所有用户均可使用聊天功能
-        if permission.startswith("chat:"):
-            return True
         # admin用户跳过所有权限检查
         if self._user_manager and user_id:
             user = self._user_manager.get_user(user_id)
