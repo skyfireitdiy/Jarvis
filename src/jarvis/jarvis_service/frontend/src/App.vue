@@ -136,9 +136,6 @@
           <button class="icon-btn" v-if="auth.userInfo?.is_admin" @click="showAdminPanel = true; pushOverlayState()" :disabled="!socket" title="管理">
             🛡️
           </button>
-          <button v-if="auth.token" class="icon-btn logout-btn" @click="logout()" title="登出">
-            🚪
-          </button>
         </div>
       </header>
 
@@ -1739,61 +1736,6 @@ async function loginWithPassword(password) {
   } catch (error) {
     console.error('[AUTH] Login failed:', error)
     throw error
-  }
-}
-
-// 登出函数
-async function logout() {
-  try {
-    // 尝试调用后端登出API（撤销token）
-    if (hasAuthToken()) {
-      const { host, port } = getGatewayAddress()
-      await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/auth/logout`, {
-        method: 'POST'
-      }).catch(() => {}) // 忽略网络错误
-    }
-  } finally {
-    // 无论后端是否成功，都清除本地状态
-    auth.value.token = ''
-    auth.value.userInfo = null
-    auth.value.password = ''
-    userAccessibleNodes.value = null
-    userPermissions.value = null
-    localStorage.removeItem('jarvis_auth_token')
-    localStorage.removeItem('jarvis_user_info')
-
-    // 断开所有WebSocket连接
-    stopAgentListRefresh()
-    stopNodeStatusRefresh()
-    sockets.value.forEach((ws, agentId) => {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.close()
-      }
-    })
-    sockets.value.clear()
-    if (socket.value) {
-      socket.value.close()
-      socket.value = null
-    }
-    currentAgentId.value = null
-    agentList.value = []
-    agentStatuses.value.clear()
-
-    // 清理聊天室状态
-    chatClients.value = []
-    chatRooms.value = []
-    chatRoomMembers.value = []
-    chatMessages.value = []
-    myClientId.value = ''
-    activeChatRoomId.value = ''
-    activePrivateClientId.value = ''
-    chatUnreadCount.value = 0
-    chatUnreadMap.value = {}
-    chatJoinedRooms.value = []
-    saveChatJoinedRooms()
-
-    showConnectModal.value = true
-    connectErrorMessage.value = ''
   }
 }
 
@@ -13530,10 +13472,6 @@ body::-webkit-scrollbar {
   border-right: 1px solid var(--color-border);
   margin-right: 4px;
   white-space: nowrap;
-}
-
-.logout-btn:hover {
-  color: var(--color-error) !important;
 }
 
 .editor-panel {
