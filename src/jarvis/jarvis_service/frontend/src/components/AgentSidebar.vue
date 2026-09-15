@@ -785,10 +785,10 @@ function onPetBadgeClick() {
   emit('petGotoWaiting')
 }
 
-// 当前施放法术的类别（array/throw/beam/burst/swarm），用于区分特效与状态类
+// 当前施放法术的类别（array/throw/beam/swarm），用于区分特效与状态类
 const PET_CAST_KINDS = {
   thunder: 'array', flame: 'array', frost: 'array', star: 'array',
-  rune: 'throw', bolt: 'beam', sword: 'beam', ring: 'burst', wave: 'burst', swarm: 'swarm',
+  rune: 'throw', bolt: 'beam', sword: 'beam', swarm: 'swarm',
 }
 const petCastKind = computed(() => PET_CAST_KINDS[petCast.value] || '')
 
@@ -1516,7 +1516,7 @@ function spawnPetFx(x, y) {
 }
 
 // ==================== 玄幻法术特效 ====================
-// kind: array=脚下法阵 | throw=抛出头顶法环 | beam=远程灵光 | burst=范围冲击 | swarm=万剑归宗
+// kind: array=脚下法阵 | throw=抛出头顶法环 | beam=远程灵光 | swarm=万剑归宗
 const PET_SPELLS = [
   { key: 'thunder', kind: 'array', glyphs: ['⚡', '雷', '✦'], color: '#9fd8ff', glow: '#5db2ff' },
   { key: 'flame',   kind: 'array', glyphs: ['🔥', '炎', '✷'], color: '#ffb066', glow: '#ff7a2f' },
@@ -1525,8 +1525,6 @@ const PET_SPELLS = [
   { key: 'rune',    kind: 'throw' },                          // 抛出头顶数字光环
   { key: 'bolt',    kind: 'beam', color: '#9fd8ff', glow: '#5db2ff' },  // 远程：雷光箭
   { key: 'sword',   kind: 'beam', color: '#c8e6ff', glow: '#7aa8ff' },  // 远程：御剑
-  { key: 'ring',    kind: 'burst', color: '#bff2ff', glow: '#6fe3ff' }, // 范围：冰环
-  { key: 'wave',    kind: 'burst', color: '#ffb066', glow: '#ff7a2f' }, // 范围：炎爆
   { key: 'swarm',   kind: 'swarm', color: '#cfe8ff', glow: '#6f9dff' }, // 万剑归宗：随机曲线飞散后归巢
 ]
 
@@ -1606,63 +1604,6 @@ function petCastBeam(spell) {
   document.body.appendChild(hit)
   setTimeout(() => hit.remove(), (dur + 0.9) * 1000)
 }
-
-// 范围释放：以宠物为中心，向外扩散多重符环 + 迸发灵光
-function petCastBurst(spell) {
-  const r = petStageRect()
-  const cx = r.left + r.width / 2
-  const cy = r.top + r.height * 0.55
-  // 以宠物到屏幕四角的最远距离为半径，保证冲击波能扫满全屏
-  const maxR = Math.max(
-    Math.hypot(cx, cy),
-    Math.hypot(window.innerWidth - cx, cy),
-    Math.hypot(cx, window.innerHeight - cy),
-    Math.hypot(window.innerWidth - cx, window.innerHeight - cy),
-  )
-
-  // 多层冲击环（错峰扩散）
-  for (let i = 0; i < 3; i++) {
-    const ring = document.createElement('div')
-    ring.className = 'pet-spell-burst-ring'
-    ring.style.left = cx + 'px'
-    ring.style.top = cy + 'px'
-    ring.style.setProperty('--maxr', maxR + 'px')
-    ring.style.borderColor = spell.glow
-    ring.style.boxShadow = `0 0 20px ${spell.glow}, inset 0 0 20px ${spell.glow}`
-    ring.style.animationDelay = (i * 0.22) + 's'
-    document.body.appendChild(ring)
-    setTimeout(() => ring.remove(), 2000 + i * 220)
-  }
-
-  // 中心绽放光核
-  const flash = document.createElement('div')
-  flash.className = 'pet-spell-burst-core'
-  flash.style.left = cx + 'px'
-  flash.style.top = cy + 'px'
-  flash.style.background = `radial-gradient(circle, #ffffff 0%, ${spell.color} 35%, transparent 70%)`
-  flash.style.boxShadow = `0 0 40px ${spell.glow}`
-  document.body.appendChild(flash)
-  setTimeout(() => flash.remove(), 900)
-
-  // 向外迸射的符文
-  const glyphs = ['✦', '✧', '✴', '❋', '✺', '✳']
-  for (let i = 0; i < 10; i++) {
-    const g = document.createElement('div')
-    g.className = 'pet-spell-burst-spark'
-    g.textContent = glyphs[i % glyphs.length]
-    g.style.left = cx + 'px'
-    g.style.top = cy + 'px'
-    g.style.color = spell.color
-    g.style.textShadow = `0 0 8px ${spell.glow}, 0 0 16px ${spell.glow}`
-    const a = (i / 10) * Math.PI * 2
-    g.style.setProperty('--bx', (Math.cos(a) * (maxR * 0.6)).toFixed(0) + 'px')
-    g.style.setProperty('--by', (Math.sin(a) * (maxR * 0.6)).toFixed(0) + 'px')
-    g.style.animationDelay = (Math.random() * 0.12) + 's'
-    document.body.appendChild(g)
-    setTimeout(() => g.remove(), 1400)
-  }
-}
-
 // 万剑归宗：一群飞剑沿随机曲线向外刺出，划弧后全部归拢回宠物本体
 function petCastSwarm(spell) {
   const r = petStageRect()
@@ -1779,7 +1720,6 @@ function castSpell(spell) {
   petCast.value = spell.key
   if (spell.kind === 'throw')      petCastRuneThrow()
   else if (spell.kind === 'beam')  petCastBeam(spell)
-  else if (spell.kind === 'burst') petCastBurst(spell)
   else if (spell.kind === 'swarm') petCastSwarm(spell)
   else                             petCastSpell(spell)
   petSfxCast(spell.kind)
@@ -1947,11 +1887,6 @@ function petSfxCast(type) {
     case 'beam':   // 远程：破空疾射
       petTone(1400, 0, 0.22, 'sawtooth', 0.045, 320)
       petTone(210, 0.02, 0.3, 'triangle', 0.05, 160)
-      break
-    case 'burst':  // 范围：轰鸣扩散
-      petTone(90, 0, 0.55, 'sawtooth', 0.06, 40)
-      petTone(520, 0, 0.4, 'triangle', 0.045, 1400)
-      petTone(1500, 0.1, 0.35, 'sine', 0.04, 500)
       break
     case 'throw':  // 抛出法环
       petTone(700, 0, 0.2, 'triangle', 0.05, 1400)
@@ -4348,69 +4283,6 @@ defineExpose({
   0% { opacity: 0; transform: scale(0.3); }
   30% { opacity: 1; transform: scale(1); }
   100% { opacity: 0; transform: scale(7); }
-}
-
-/* 范围冲击环：以宠物为中心向外扩散 */
-.pet-spell-burst-ring {
-  position: fixed;
-  z-index: 3099;
-  pointer-events: none;
-  width: 0;
-  height: 0;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  opacity: 0;
-  animation: pet-burst-expand 1.5s cubic-bezier(0.15, 0.7, 0.3, 1) forwards;
-}
-
-@keyframes pet-burst-expand {
-  0% { opacity: 0; width: 0; height: 0; margin: 0; }
-  15% { opacity: 0.95; }
-  100% {
-    opacity: 0;
-    width: calc(var(--maxr, 600px) * 2);
-    height: calc(var(--maxr, 600px) * 2);
-    margin: calc(var(--maxr, 600px) * -1);
-  }
-}
-
-/* 范围中心绽放光核 */
-.pet-spell-burst-core {
-  position: fixed;
-  z-index: 3100;
-  pointer-events: none;
-  width: 120px;
-  height: 120px;
-  margin: -60px 0 0 -60px;
-  border-radius: 50%;
-  animation: pet-burst-core 0.85s ease-out forwards;
-}
-
-@keyframes pet-burst-core {
-  0% { opacity: 0; transform: scale(0.2); }
-  25% { opacity: 1; transform: scale(1); }
-  100% { opacity: 0; transform: scale(2.6); }
-}
-
-/* 向外迸射的符文 */
-.pet-spell-burst-spark {
-  position: fixed;
-  z-index: 3101;
-  pointer-events: none;
-  width: 0;
-  height: 0;
-  font-size: 16px;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: pet-burst-spark 1.05s cubic-bezier(0.2, 0.7, 0.4, 1) forwards;
-}
-
-@keyframes pet-burst-spark {
-  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
-  20% { opacity: 1; }
-  100% { opacity: 0; transform: translate(calc(-50% + var(--bx, 0px)), calc(-50% + var(--by, 0px))) scale(1.3) rotate(240deg); }
 }
 
 /* ==================== 万剑归宗 ==================== */
