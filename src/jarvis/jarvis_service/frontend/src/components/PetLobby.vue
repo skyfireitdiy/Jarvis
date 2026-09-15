@@ -1498,13 +1498,53 @@ onMounted(() => {
   }
 })
 
-// 全局按键：Esc 关闭右键菜单与弹层
+// 当前应响应确认快捷键的宠物：确认面板无需展开即显示，
+// 故优先取已展开的那只，否则取第一只处于确认态的宠物
+function activeConfirmPet() {
+  const confirming = petAgents.value.filter(p => p.inputMode === 'confirm')
+  if (confirming.length === 0) return null
+  if (activePetId.value) {
+    const active = confirming.find(p => p.agentId === activePetId.value)
+    if (active) return active
+  }
+  return confirming[0]
+}
+
+// 是否正在弹层内输入（重命名/新建分组等），此时不应响应确认快捷键
+function isTypingInDialog(e) {
+  const el = e.target
+  if (!el || !el.tagName) return false
+  const tag = el.tagName.toLowerCase()
+  return tag === 'input' || tag === 'textarea' || el.isContentEditable
+}
+
+// 全局按键：Esc 关闭右键菜单与弹层；确认态下 y/n/Enter 响应确认（与 Panel 一致）
 function onGlobalKeydown(e) {
   if (e.key === 'Escape') {
     closeContextMenu()
     closeRenameDialog()
     closeGroupDialog()
     closeRemoveGroupDialog()
+    return
+  }
+  // 弹层内输入时不拦截，避免误触发确认
+  if (isTypingInDialog(e)) return
+  if (e.ctrlKey || e.altKey || e.metaKey) return
+  const pet = activeConfirmPet()
+  if (!pet) return
+  if (e.key === 'y' || e.key === 'Y') {
+    e.preventDefault()
+    submitConfirm(pet, true)
+    return
+  }
+  if (e.key === 'n' || e.key === 'N') {
+    e.preventDefault()
+    submitConfirm(pet, false)
+    return
+  }
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    submitConfirm(pet, pet.confirmDefault !== false)
   }
 }
 

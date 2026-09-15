@@ -8655,6 +8655,11 @@ function sendLobbyInput(agentId, text, mode = 'multi') {
     sendConfirmResult(confirmed, agentId)
     return
   }
+  // 记录到输入历史（与 panel 的 sendFromPanel 一致；空文本由 saveToHistory 内部跳过）
+  saveToHistory(text)
+  // 重置该 Agent 的历史翻阅游标，避免发送后仍停留在旧位置
+  lobbyHistoryIndex.set(agentId, -1)
+  lobbyHistoryTemp.delete(agentId)
   const statusData = agentStatuses.value.get(agentId)
   const executionStatus = statusData?.execution_status || 'running'
   const hasBuffered = inputBuffers.value.has(agentId) && (inputBuffers.value.get(agentId) || '').trim()
@@ -8752,6 +8757,9 @@ function onLobbyComplete(agentId) {
       },
     }
     sendMessageToAgent(message, agentId)
+  } else if (executionStatus === 'running') {
+    // 与 Panel 的 Ctrl+C 行为一致：运行中且输入为空时发送人工介入消息
+    sendMessageToAgent({ type: 'manual_interrupt', payload: {} }, agentId)
   } else {
     inputBuffers.value.set(agentId, '__CTRL_C_PRESSED__')
     appendOutput({
