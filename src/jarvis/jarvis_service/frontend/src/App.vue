@@ -4432,13 +4432,12 @@ function handlePanelInputChange(panel, event) {
   const textBeforeCursor = target.value.substring(0, cursorPosition)
 
   // 检测是否刚刚输入了@符号（包括中文输入法）
+  // 注意：此处 @ 已真实写入输入框，故 completionHasAtSymbol 置 false，
+  // 避免取消补全时 closeCompletionsWithoutSelect 再补插一个 @（导致出现两个 @）
   if (textBeforeCursor.endsWith('@')) {
-    const lastChar = textBeforeCursor.slice(-1)
-    if (lastChar === '@') {
-      completionCursorPos.value = cursorPosition - 1
-      completionHasAtSymbol.value = true
-      openCompletionsFromPanel(panel)
-    }
+    completionCursorPos.value = cursorPosition - 1
+    completionHasAtSymbol.value = false
+    openCompletionsFromPanel(panel)
   }
 }
 
