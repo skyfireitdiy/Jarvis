@@ -1,0 +1,15 @@
+{
+  "id": "20260915_125950_486500",
+  "type": "project_long_term",
+  "tags": [
+    "frontend",
+    "completion",
+    "at-symbol",
+    "PetLobby",
+    "App.vue",
+    "bugfix"
+  ],
+  "content": "Jarvis 前端 @ 补全机制（App.vue + PetLobby.vue）关键约定：\n\n1) `completionHasAtSymbol` 的语义是「输入框中尚无 @，取消补全时需补插一个 @」，不是「本次补全由 @ 触发」。\n2) `closeCompletionsWithoutSelect()`（App.vue）仅在 `completionHasAtSymbol && completionSource !== 'lobby'` 时调用 `insertAtPosition('@', completionCursorPos, completionAgentId)` 补插 @。\n3) 因此各触发路径必须自洽：\n   - Panel 键盘 @（handlePanelKeydown）：preventDefault 阻止 @ 入框 → 必须置 hasAtSymbol=true，靠取消时补插。\n   - Panel @input 事件（handlePanelInputChange，IME/粘贴）：@ 已真实入框 → 必须置 hasAtSymbol=false，否则取消时重复插入出现两个 @。\n   - 大厅（PetLobby）：键盘 @ 与 @ 按钮统一走 `insertAtSymbol(pet)`（先写入 pet.inputText 再 emit openCompletions），source='lobby' 时父组件跳过补插，@ 由输入框自身保留。\n4) 踩坑记录：大厅键盘 @ 曾直接 emit 而不写入输入框，导致取消补全后 @ 彻底丢失；Panel 的 @input 路径曾误置 hasAtSymbol=true，导致取消后出现两个 @。修改 @ 相关逻辑时务必同时核对这三处的一致性。",
+  "created_at": "2026-09-15T12:59:50.486536",
+  "updated_at": "2026-09-15T12:59:50.486543"
+}

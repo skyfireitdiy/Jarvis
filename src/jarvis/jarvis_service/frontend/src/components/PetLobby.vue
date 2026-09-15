@@ -1324,8 +1324,10 @@ function onInputPointerDown(pet) {
 function handlePetKeydown(pet, event) {
   if (handlePetCtrlKeydown(pet, event)) return
   if (event.key === '@') {
+    // 复用 @ 按钮逻辑：先把 @ 真正写入输入框，再触发补全。
+    // 这样取消补全时 @ 会保留在输入框中（父组件对 lobby 来源不会补插 @）
     event.preventDefault()
-    emit('openCompletions', pet.agentId, event.target.selectionStart)
+    insertAtSymbol(pet)
     return
   }
   if (event.ctrlKey && (event.key === 'Enter' || event.key.toLowerCase() === 'd')) {
@@ -1370,8 +1372,9 @@ function handlePetKeydown(pet, event) {
 function handlePetSingleKeydown(pet, event) {
   if (handlePetCtrlKeydown(pet, event)) return
   if (event.key === '@') {
+    // 与多行输入一致：先写入 @ 再触发补全，取消补全时 @ 得以保留
     event.preventDefault()
-    emit('openCompletions', pet.agentId, event.target.selectionStart)
+    insertAtSymbol(pet)
     return
   }
   if (event.key === 'Enter' && !event.ctrlKey && !event.altKey && !event.metaKey) {
