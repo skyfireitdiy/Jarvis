@@ -5334,6 +5334,8 @@ const commandPaletteCtx = computed(() => ({
   togglePetVisibility,
   toggleHeader,
   openAgentList: openAgentListPalette,
+  // 打开宠物大厅的「安装浏览器插件」弹层
+  openInstallExtension: () => { petLobbyRef.value?.openInstallExtensionDialog?.() },
   // 当前 Agent 组
   viewCurrentDiff: () => { const a = getCurrentAgentOrNull(); if (a) viewDiff(a) },
   viewCurrentRules: () => { const a = getCurrentAgentOrNull(); if (a) viewRules(a) },
@@ -5469,13 +5471,90 @@ function onLobbyContextRun(action) {
   onPetRadialRun(action)
 }
 
-// 大厅节点右键菜单点击：创建 Agent / 打开终端（后续可在此扩展更多节点操作）
+// 大厅节点右键菜单点击：创建 Agent / 打开终端 / 更新代码 / 重启服务（后续可在此扩展更多节点操作）
 function onLobbyNodeContextRun({ action, nodeId }) {
   if (!action) return
   if (action.id === 'node-create-agent') {
     onLobbyCreateAgentOnNode(nodeId)
   } else if (action.id === 'node-open-terminal') {
     createTerminalForNode(nodeId)
+  } else if (action.id === 'node-update-code') {
+    confirmUpdateNodeCode(nodeId)
+  } else if (action.id === 'node-restart-service') {
+    confirmRestartNodeService(nodeId)
+  }
+}
+
+// 大厅节点右键「更新代码」：二次确认后调用单节点代码更新接口
+function confirmUpdateNodeCode(nodeId) {
+  const normalizedNodeId = String(nodeId || '').trim()
+  if (!normalizedNodeId) return
+  showConfirm(
+    `确定要更新节点 "${normalizedNodeId}" 的代码吗？\n\n此操作将：\n1. 切换该节点到 main 分支\n2. 拉取最新代码\n3. 可能需要重启该节点服务`,
+    () => {
+      updateNodeCode(normalizedNodeId)
+    },
+    () => {},
+    false
+  )
+}
+
+async function updateNodeCode(nodeId) {
+  try {
+    const { host, port } = getGatewayAddress()
+    const response = await fetchWithAuth(
+      `${getHttpProtocol()}://${host}:${port}/api/nodes/${encodeURIComponent(nodeId)}/code-update`,
+      { method: 'POST' }
+    )
+    const result = await response.json().catch(() => ({}))
+    if (response.ok && result.success) {
+      showToast(result.data?.message || `已向节点 "${nodeId}" 发送更新请求`, 'success')
+    } else {
+      showToast(`节点 "${nodeId}" 更新失败：${result.error?.message || `HTTP ${response.status}`}`, 'error')
+    }
+  } catch (error) {
+    console.error(`[LOBBY] Failed to update code for node ${nodeId}:`, error)
+    showToast(`节点 "${nodeId}" 更新失败：${error.message || '未知错误'}`, 'error')
+  }
+}
+
+// 大厅节点右键「重启服务」：二次确认后调用单节点服务重启接口
+function confirmRestartNodeService(nodeId) {
+  const normalizedNodeId = String(nodeId || '').trim()
+  if (!normalizedNodeId) return
+  showConfirm(
+    `确认重启节点 "${normalizedNodeId}" 的服务吗？这将短暂中断该节点的连接。`,
+    () => {
+      restartNodeService(normalizedNodeId)
+    },
+    () => {},
+    false
+  )
+}
+
+async function restartNodeService(nodeId) {
+  try {
+    const { host, port } = getGatewayAddress()
+    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, nodeId, 'service/restart'), {
+      method: 'POST',
+      body: JSON.stringify({
+        node_id: nodeId,
+        restart_frontend: restartFrontendService.value
+      })
+    })
+    const data = await response.json().catch(() => ({}))
+    if (response.ok) {
+      if (data.success === false) {
+        showToast(data.error?.message || `节点 "${nodeId}" 重启失败`, 'error')
+      } else {
+        showToast(data.data?.message || `已向节点 "${nodeId}" 发送重启请求`, 'success')
+      }
+    } else {
+      showToast(`节点 "${nodeId}" 重启失败：HTTP ${response.status}`, 'error')
+    }
+  } catch (error) {
+    console.error(`[LOBBY] Failed to restart node ${nodeId}:`, error)
+    showToast(`节点 "${nodeId}" 重启失败：${error.message || '未知错误'}`, 'error')
   }
 }
 

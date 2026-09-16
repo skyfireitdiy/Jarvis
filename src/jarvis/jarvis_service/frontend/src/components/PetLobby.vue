@@ -1065,10 +1065,12 @@ function onStageClick(event) {
 // 菜单状态：坐标相对舞台左上角；kind 区分来源；name 用于标题
 const contextMenu = ref({ visible: false, x: 0, y: 0, kind: 'pet', agentId: null, nodeId: null, name: '' })
 
-// 节点菜单内置动作：在节点上创建 Agent（后续可在此追加更多节点功能）
+// 节点菜单内置动作：在节点上创建 Agent / 更新代码 / 重启服务（后续可在此追加更多节点功能）
 const NODE_MENU_ACTIONS = [
   { id: 'node-create-agent', icon: '➕', label: '创建 Agent' },
   { id: 'node-open-terminal', icon: '⌨️', label: '打开终端' },
+  { id: 'node-update-code', icon: '🔄', label: '更新代码' },
+  { id: 'node-restart-service', icon: '♻️', label: '重启服务' },
   { id: 'node-rename', icon: '✏️', label: '重命名' },
 ]
 const nodeMenuActions = computed(() => {
@@ -1818,7 +1820,7 @@ function insertCompletionText(agentId, text, cursorPos, hasAtSymbol) {
   })
 }
 
-defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden })
+defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden, openInstallExtensionDialog })
 </script>
 
 <style scoped>
