@@ -90,12 +90,12 @@ function broadcastState() {
 
 /** 汇总所有网关的状态。 */
 function listStatus() {
-  const all = new Set([...clients.keys(), ...tokens.keys(), ...states.keys()]);
+  const all = new Set([...clients.keys(), ...states.keys()]);
   return Array.from(all).map((gateway) => ({
     gateway,
     state: states.get(gateway) || "disconnected",
     session_id: sessions.get(gateway) || null,
-    has_token: Boolean(tokens.get(gateway)),
+    has_token: Boolean(tokens.get(gatewayKey(gateway))),
   }));
 }
 
@@ -143,11 +143,12 @@ async function connect(gateway) {
     return;
   }
   // Token 优先使用当前登录态；若尚未获取，则主动向页面请求一次
-  let token = tokens.get(g);
+  const tokenKey = gatewayKey(g);
+  let token = tokens.get(tokenKey);
   if (!token) {
     token = await requestTokenFromPages(g);
     if (token) {
-      tokens.set(g, token);
+      tokens.set(tokenKey, token);
     }
   }
   if (!token) {
@@ -196,11 +197,31 @@ function disconnect(gateway) {
 }
 
 /**
+ * 归一化为 host:port 用于比对。
+ * 前端页面声明的网关与用户填写的网关可能在协议上不一致
+ * （如页面写 http://host:443、用户写 https://host:443），
+ * 比对时忽略协议差异，只比较 host 与端口。
+ */
+function gatewayKey(gateway) {
+  const g = normalizeGateway(gateway);
+  if (!g) return "";
+  try {
+    const url = new URL(g);
+    const port = url.port || (url.protocol === "https:" ? "443" : "80");
+    return `${url.hostname}:${port}`;
+  } catch (e) {
+    return g;
+  }
+}
+
+/**
  * 主动向已打开的 Jarvis 页面请求指定网关的登录态 Token。
- * content script 收到请求后会读取页面暴露的 __jarvisAuthBridge 并回传（含 gateway）。
+ * content script 收到请求后会读取页面暴露的 __jarvisAuthBridge 并回传，
+ * 其中 gateway 由页面通过 __jarvisAuthBridge.getGateway() 声明（网关与前端可不同域名）。
  */
 async function requestTokenFromPages(gateway) {
   const g = normalizeGateway(gateway);
+  const gKey = gatewayKey(g);
   try {
     const tabs = await chrome.tabs.query({});
     for (const tab of tabs) {
@@ -209,9 +230,18 @@ async function requestTokenFromPages(gateway) {
         const resp = await chrome.tabs.sendMessage(tab.id, {
           type: "jarvis_request_token",
         });
-        if (!resp || !resp.token) continue;
-        // 只接受来源网关匹配的响应
-        if (normalizeGateway(resp.gateway) === g) {
+        if (!resp) continue;
+        console.log(
+          "[Jarvis] token probe",
+          tab.url,
+          "gateway=",
+          resp.gateway,
+          "has_token=",
+          Boolean(resp.token),
+        );
+        if (!resp.token) continue;
+        // 只接受声明网关与目标网关一致的响应（忽略协议差异）
+        if (gatewayKey(resp.gateway) === gKey) {
           return resp.token;
         }
       } catch (e) {
@@ -227,6 +257,8 @@ async function requestTokenFromPages(gateway) {
 /**
  * 处理来自 content script 的登录态 Token（按网关独立处理）。
  * Token 变化时重连该网关；Token 为空（未登录/已登出）时断开该网关。
+ * 注意：token 以 host:port 为键存储，避免前端声明与用户填写在协议上的差异
+ * （如 http://host:443 与 https://host:443）导致取不到 token。
  */
 async function handleAuthToken(gateway, token) {
   const g = normalizeGateway(gateway);
@@ -234,14 +266,15 @@ async function handleAuthToken(gateway, token) {
     console.warn("[Jarvis] auth token without gateway, ignored");
     return;
   }
+  const key = gatewayKey(g);
   const next = token || null;
-  if (next === (tokens.get(g) || null)) {
+  if (next === (tokens.get(key) || null)) {
     return; // 无变化
   }
   if (next) {
-    tokens.set(g, next);
+    tokens.set(key, next);
   } else {
-    tokens.delete(g);
+    tokens.delete(key);
   }
 
   if (!next) {
@@ -306,7 +339,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // disconnect 会重新写入 states，需在其后再清理，避免残留幽灵条目
     clients.delete(g);
     sessions.delete(g);
-    tokens.delete(g);
+    tokens.delete(gatewayKey(g));
     states.delete(g);
     loadGateways()
       .then((list) =>

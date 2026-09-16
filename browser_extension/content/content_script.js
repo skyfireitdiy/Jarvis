@@ -38,6 +38,21 @@
       return null;
     }
 
+    // 读取页面声明的网关地址（网关与前端可能不同域名），
+    // 读取不到时回退到页面 origin。
+    function readGateway() {
+      try {
+        const bridge = window.__jarvisAuthBridge;
+        if (bridge && typeof bridge.getGateway === "function") {
+          const gw = bridge.getGateway();
+          if (gw) return gw;
+        }
+      } catch (e) {
+        // 忽略读取异常
+      }
+      return location.origin;
+    }
+
     // 响应隔离世界的按需查询
     window.addEventListener("message", (event) => {
       if (event.source !== window) return;
@@ -47,7 +62,8 @@
         {
           type: "jarvis_ext_token",
           token: readToken(),
-          gateway: location.origin,
+          gateway: readGateway(),
+          page_origin: location.origin,
         },
         "*",
       );
@@ -62,7 +78,8 @@
         {
           type: "jarvis_ext_token_changed",
           token: data.token || null,
-          gateway: location.origin,
+          gateway: readGateway(),
+          page_origin: location.origin,
         },
         "*",
       );
@@ -119,11 +136,12 @@
     // background 主动索取登录态 Token（扩展冷启动时）
     if (message.type === "jarvis_request_token") {
       requestTokenFromMainWorld()
-        .then((token) =>
+        .then((info) =>
           sendResponse({
             success: true,
-            token: token || null,
-            gateway: location.origin,
+            token: (info && info.token) || null,
+            gateway: (info && info.gateway) || location.origin,
+            page_origin: location.origin,
           }),
         )
         .catch((e) =>
@@ -131,6 +149,7 @@
             success: false,
             token: null,
             gateway: location.origin,
+            page_origin: location.origin,
             error: String(e),
           }),
         );
@@ -141,8 +160,9 @@
   });
 
   /**
-   * 通过主世界桥接按需读取 Token。
+   * 通过主世界桥接按需读取 Token 与网关地址。
    * 主世界脚本收到 jarvis_ext_get_token 后会回传 jarvis_ext_token。
+   * @returns {Promise<{token: string|null, gateway: string|null}|null>}
    */
   function requestTokenFromMainWorld() {
     return new Promise((resolve) => {
@@ -162,7 +182,7 @@
         settled = true;
         clearTimeout(timer);
         window.removeEventListener("message", onMessage);
-        resolve(data.token || null);
+        resolve({ token: data.token || null, gateway: data.gateway || null });
       }
 
       window.addEventListener("message", onMessage);

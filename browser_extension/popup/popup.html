@@ -139,6 +139,41 @@
         padding: 1px 3px;
         border-radius: 3px;
       }
+      .log-box {
+        margin-top: 10px;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        padding: 6px;
+        max-height: 160px;
+        overflow-y: auto;
+        background: #fafafa;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-size: 11px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+      .log-box .log-line {
+        border-bottom: 1px dashed #eee;
+        padding: 1px 0;
+      }
+      .log-box .log-line:last-child {
+        border-bottom: none;
+      }
+      .log-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 12px;
+        font-weight: 600;
+        font-size: 12px;
+      }
+      .log-title button {
+        flex: none;
+        padding: 2px 8px;
+        font-size: 11px;
+        background: #888;
+      }
     </style>
   </head>
   <body>
@@ -173,6 +208,12 @@
       登录态自动复用浏览器中已登录的 Jarvis 网页，无需手动填写 Token。<br />
       注意：所有网关共享同一批浏览器标签页。
     </div>
+
+    <div class="log-title">
+      <span>连接诊断日志</span>
+      <button id="clearLogBtn" class="secondary">清空</button>
+    </div>
+    <div class="log-box" id="logBox"></div>
 
     <script src="popup.js"></script>
   </body>
