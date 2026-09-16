@@ -327,6 +327,33 @@ Agent 侧也可用 `script.export` 取回同样的文本内容（返回 `{ filen
    > 若不需要这些能力，可自行从 `manifest.json` 的 `permissions` 中移除对应项
    > （移除后相关 action 会返回 `NOT_SUPPORTED` 或 `unknown action`）。
 
+## 排障
+
+### 网关重启后扩展一直「断开—重连」
+
+**现象**：重启 Jarvis 主网关后，popup 里该网关状态在「连接中 / 未连接」之间反复跳动，
+控制台持续打印 `ws closed 4401 Unauthorized`。
+
+**原因**：网关未设置 `JARVIS_JWT_SECRET` 时，JWT 签名密钥在每次启动时随机生成
+（`src/jarvis/jarvis_web_gateway/jwt_utils.py`）。网关重启后密钥变化，浏览器页面
+`localStorage` 里缓存的旧 Token 立即失效，扩展用旧 Token 重连必然被拒。
+
+**扩展侧的处理**（v1.1+）：`ws_client.js` 收到 `4401`（Unauthorized）/ `4403`（Forbidden）
+关闭码时**不再指数退避重连**，而是转交 `service_worker.js` 的 `handleAuthError()`：
+
+1. 清空该网关的 Token 缓存，关闭旧连接；
+2. 重新从 Jarvis 页面探测一次 Token（`requestTokenFromPages`）；
+3. 探测到新 Token → 自动重连；探测不到 → 停止重连并提示重新登录。
+
+连续失败超过 3 次（`AUTH_ERROR_MAX_RETRIES`）后不再自动重连，避免无限空转；
+计数在握手成功、手动点「连接」或「断开」时清零。
+
+**你需要做什么**：在浏览器中**重新登录一次**该网关的 Jarvis 页面（刷新后重新登录），
+让页面拿到新 Token；然后回到 popup 点一次「连接」即可。
+
+> 根治办法是给网关设置固定的 `JARVIS_JWT_SECRET` 环境变量，使密钥在重启后保持不变。
+> 本扩展侧的自愈只是缓解，无法让已失效的 Token 起死回生。
+
 ## 安全说明
 
 - 本方案**不做权限控制**（设计决策），安全边界由插件侧承担

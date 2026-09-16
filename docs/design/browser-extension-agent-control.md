@@ -161,6 +161,10 @@ browser_extension/
   `new WebSocket(url, ['jarvis-ext', 'jarvis-token.<urlencoded-token>'])`。
 - 心跳：每 20s 发送 `{"type":"ping"}`，服务端回 `{"type":"pong"}`；连续 2 次无响应则重连。
 - 重连：指数退避（1s → 2s → 4s … 上限 30s）。
+- 鉴权失败（`onclose` 收到 `4401` Unauthorized / `4403` Forbidden）**不进入指数退避重连**：
+  当前 Token 已失效，用同一 Token 重连必然再次被拒，会形成「断开—重连」无限循环。
+  此时交由 `handleAuthError()` 处理：清空该网关的 Token 缓存、丢弃旧连接，重新从页面
+  探测一次 Token；探测到新 Token 则重连，否则停止自动重连并提示用户重新登录。
 - 断线期间指令不缓存（避免过期指令误操作），由 Agent 侧感知失败。
 
 #### 3.1.4 指令执行（command_router.js）
@@ -465,6 +469,33 @@ Agent → browser_ext_click(session_id, tab_id, "#submit")
 
 - 插件侧：指数退避重连；重连后重新 `hello`，网关按 `client_id` 复用或新建会话。
 - 网关侧：心跳超时（60s）清理会话；对未完成指令以 `NO_SESSION` 失败返回。
+
+#### 5.3.1 鉴权失败（4401/4403）自愈
+
+**背景**：网关未设置 `JARVIS_JWT_SECRET` 时，签名密钥在每次启动时随机生成
+（`src/jarvis/jarvis_web_gateway/jwt_utils.py`）。网关重启后，浏览器页面
+`localStorage` 中缓存的旧 JWT 随即失效；扩展若继续用旧 Token 重连，会被网关以
+`4401 Unauthorized` 关闭，从而陷入「断开—重连」永久循环。
+
+**扩展侧自愈流程**（不依赖网关侧改动）：
+
+```text
+ws.onclose(code=4401/4403) → 不再指数退避重连
+  → handleAuthError(gateway)
+      1. tokens.delete(gatewayKey)          # 清空失效 Token 缓存
+      2. 关闭并移除旧 WsClient               # 避免复用失效 Token
+      3. setState(disconnected)             # popup 显示未连接
+      4. requestTokenFromPages(gateway)     # 重新探测页面登录态
+         ├─ 拿到 Token → tokens.set → connect(force=true) 重连
+         └─ 未拿到     → 停止重连，提示用户重新登录 Jarvis 页面
+```
+
+**防循环**：同一网关连续鉴权失败次数超过 `AUTH_ERROR_MAX_RETRIES`（3 次）后不再自动重连；
+计数在 `hello_ack`（握手成功）、用户手动「连接」（`connect(force=true)`）或
+`disconnect()` 时清零。
+
+**已知限制**：若页面自身缓存的 Token 也已失效（用户未重新登录），扩展无法凭空获得
+有效 Token，只能停止重连并提示用户**重新登录一次** Jarvis 页面。
 
 ---
 

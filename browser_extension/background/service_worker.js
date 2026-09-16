@@ -27,6 +27,11 @@ const clients = new Map(); // gateway -> WsClient
 const tokens = new Map(); // gateway -> token
 const sessions = new Map(); // gateway -> session_id
 const states = new Map(); // gateway -> 'disconnected' | 'connecting' | 'connected'
+// gatewayKey -> 连续鉴权失败次数，用于避免无效重连空转（连接成功后清零）
+const authErrorAttempts = new Map();
+
+// 鉴权失败后最多自动重试次数：超过则停止重连，提示用户重新登录
+const AUTH_ERROR_MAX_RETRIES = 3;
 
 /** 读取已配置的网关列表。 */
 async function loadGateways() {
@@ -140,6 +145,8 @@ async function handleMessage(gateway, msg) {
     case "hello_ack":
       sessions.set(gateway, msg.session_id || null);
       console.log("[Jarvis] hello_ack", gateway, "session_id=", msg.session_id);
+      // 握手成功说明 Token 有效，清零鉴权失败计数
+      authErrorAttempts.delete(gatewayKey(gateway));
       setState(gateway, "connected");
       break;
     case "command": {
@@ -178,6 +185,78 @@ function setState(gateway, state) {
 }
 
 /**
+ * 处理网关鉴权失败（WebSocket 以 4401/4403 关闭）。
+ *
+ * 典型场景：网关重启后 JWT 签名密钥变更（未设置 JARVIS_JWT_SECRET 时每次启动随机生成），
+ * 浏览器页面 localStorage 里缓存的旧 Token 随即失效；若继续用旧 Token 重连，
+ * 会陷入「断开—重连」无限循环。
+ *
+ * 处理策略：清空该网关的 Token 缓存，重新从页面探测一次（用户若已重新登录可拿到新
+ * Token）；探测成功则重连，失败则停止自动重连并提示用户重新登录，避免空转。
+ */
+async function handleAuthError(gateway, code, reason) {
+  const g = normalizeGateway(gateway);
+  const tokenKey = gatewayKey(g);
+  console.warn(
+    "[Jarvis] auth error, clearing cached token",
+    g,
+    "code=",
+    code,
+    "reason=",
+    reason,
+  );
+  tokens.delete(tokenKey);
+  // 丢弃持有失效 Token 的旧连接，避免后续 connect 复用到它
+  const stale = clients.get(g);
+  if (stale) {
+    clients.delete(g);
+    stale.close();
+  }
+  sessions.delete(g);
+  setState(g, "disconnected");
+
+  // 连续鉴权失败计数：页面里的 Token 可能同样是失效的（用户尚未重新登录），
+  // 此时重新探测会拿到同一个旧 Token，必须限制重试次数，否则仍会形成循环。
+  const attempts = (authErrorAttempts.get(tokenKey) || 0) + 1;
+  authErrorAttempts.set(tokenKey, attempts);
+  if (attempts > AUTH_ERROR_MAX_RETRIES) {
+    console.warn(
+      "[Jarvis] auth failed repeatedly, stop reconnecting. " +
+        "请在浏览器中重新登录该网关的 Jarvis 页面后，再点击「连接」。",
+      g,
+    );
+    broadcastState();
+    return;
+  }
+
+  let token = null;
+  try {
+    token = await requestTokenFromPages(g);
+  } catch (e) {
+    console.warn("[Jarvis] token re-probe failed", g, e);
+  }
+  if (!token) {
+    console.warn(
+      "[Jarvis] no valid token after auth error, stop reconnecting:",
+      g,
+    );
+    broadcastState();
+    return;
+  }
+  tokens.set(tokenKey, token);
+  console.log(
+    "[Jarvis] reconnecting with refreshed token for",
+    g,
+    `(attempt ${attempts}/${AUTH_ERROR_MAX_RETRIES})`,
+  );
+  try {
+    await connect(g, true);
+  } catch (e) {
+    console.warn("[Jarvis] reconnect after auth error failed", g, e);
+  }
+}
+
+/**
  * 为指定网关建立连接。
  *
  * @param {string} gateway 网关地址
@@ -197,6 +276,9 @@ async function connect(gateway, force = false) {
       console.log("[Jarvis] connect: reuse existing connection for", g);
       return;
     }
+  } else {
+    // 用户显式发起的连接（force=true）：重置鉴权失败计数，允许重新尝试
+    authErrorAttempts.delete(gatewayKey(g));
   }
   // Token 优先使用当前登录态；若尚未获取，则主动向页面请求一次
   const tokenKey = gatewayKey(g);
@@ -229,6 +311,7 @@ async function connect(gateway, force = false) {
   const client = new WsClient({
     onMessage: (msg) => handleMessage(g, msg),
     onStateChange: (state) => setState(g, state),
+    onAuthError: (code, reason) => handleAuthError(g, code, reason),
   });
   client.onOpen = async () => {
     try {
@@ -251,6 +334,8 @@ function disconnect(gateway) {
     clients.delete(g);
   }
   sessions.delete(g);
+  // 主动断开视为用户意图，重置鉴权失败计数
+  authErrorAttempts.delete(gatewayKey(g));
   setState(g, "disconnected");
 }
 
