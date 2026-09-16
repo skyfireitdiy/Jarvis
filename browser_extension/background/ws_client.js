@@ -191,6 +191,22 @@ export class WsClient {
   get isConnected() {
     return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
   }
+
+  /**
+   * 连接是否仍然有效（无需重建）。
+   *
+   * 除 OPEN 外，CONNECTING 也算有效：握手进行中不应被上层重复 connect 打断。
+   * CLOSING / CLOSED 或已主动 close（manualClose）时返回 false，
+   * 交由上层重建或由内部退避重连。
+   */
+  isAlive() {
+    if (this.manualClose) return false;
+    if (!this.ws) return false;
+    return (
+      this.ws.readyState === WebSocket.OPEN ||
+      this.ws.readyState === WebSocket.CONNECTING
+    );
+  }
 }
 
 /** 规范化网关地址：去掉尾部斜杠。 */
