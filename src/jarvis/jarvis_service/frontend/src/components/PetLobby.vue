@@ -480,23 +480,29 @@
               <code>cookies</code>、<code>webRequest</code>、<code>management</code>、<code>nativeMessaging</code>、
               <code>proxy</code>、<code>privacy</code>、<code>browsingData</code>、<code>contentSettings</code>。
             </p>
-            <p>安装后，连接到本网关的 Agent 将<strong>具备以下能力</strong>：</p>
+            <p>
+              安装后，Agent 将获得<strong>对你浏览器的完整操作能力</strong>：可像你本人一样操作任意已登录网页
+              （点击、输入、上传、截图、执行脚本），读取与改写网络流量，管理扩展与站点权限，
+              并访问书签、历史、下载、Cookie、密码等<strong>全部浏览器数据</strong>。
+            </p>
+            <p>具体而言，连接到本网关的 Agent 将<strong>具备以下能力</strong>：</p>
             <ul>
-              <li>读取、修改、删除你在各网站的 <strong>Cookie（含登录凭证）</strong>；</li>
-              <li>读取并改写你的<strong>全部网络请求</strong>（可阻断或重定向）；</li>
+              <li>读取、修改、删除你在各网站的 <strong>Cookie（含登录凭证）</strong>，等同于<strong>接管你的全部登录态</strong>；</li>
+              <li>读取并改写你的<strong>全部网络请求</strong>（可阻断或重定向），可注入、篡改任意网页内容；</li>
               <li>查看、启用、禁用甚至 <strong>卸载你安装的其他扩展</strong>；</li>
-              <li>与<strong>本机应用</strong>通信，并<strong>修改系统代理设置</strong>；</li>
+              <li>与<strong>本机应用</strong>通信，并<strong>修改系统代理设置</strong>（影响全部网络流量）；</li>
               <li>修改隐私开关，以及 <strong>清除浏览历史、缓存、Cookie、保存的密码</strong>；</li>
-              <li>修改站点级权限（摄像头、麦克风、地理位置、弹窗等）。</li>
+              <li>修改站点级权限（摄像头、麦克风、地理位置、弹窗等），可<strong>静默开启摄像头/麦克风授权</strong>；</li>
+              <li>在页面主世界执行任意 JS，<strong>绕过页面 CSP 与同源策略</strong>读取页面内数据。</li>
             </ul>
             <p class="lobby-install-risk-warn">
-              上述能力等同于<strong>「完全控制你的浏览器」</strong>。其中
-              <strong>清除浏览数据、卸载扩展、删除 Cookie</strong> 等操作<strong>不可逆</strong>，一旦执行无法恢复。
+              上述能力叠加后，等同于<strong>「把你的浏览器（含全部账号与数据）完全交给 Agent」</strong>。
+              其中 <strong>清除浏览数据、卸载扩展、删除 Cookie</strong> 等操作<strong>不可逆</strong>，一旦执行无法恢复。
             </p>
             <p>
               <strong>免责声明：</strong>本插件按「现状」提供，仅用于你本人授权范围内的浏览器自动化。
               请仅在你<strong>完全信任</strong>所连接的网关与 Agent 的前提下使用。
-              因授权、误操作或第三方滥用导致的账号泄露、数据丢失、配置损坏等后果，
+              因授权、误操作或第三方滥用导致的账号泄露、资金损失、数据丢失、配置损坏等后果，
               由使用者自行承担，本项目及作者不承担任何责任。
               若不接受上述风险，请<strong>立即关闭本弹窗，不要下载或安装</strong>。
             </p>
