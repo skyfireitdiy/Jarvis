@@ -6180,7 +6180,7 @@ function confirmRestartGateway() {
 // 确认重启所有节点（依次重启子节点，最后 master）
 async function confirmRestartAllNodes() {
   showConfirm(
-    '确认要一键重启所有节点吗？\n\n操作顺序：\n1. 依次重启所有子节点\n2. 最后重启 master 节点\n\n这将短暂中断所有节点的连接。',
+    '确认要一键重启所有节点吗？\n\n操作顺序：\n1. 依次重启所有子节点\n2. 最后重启 master 节点\n\n这将短暂中断所有节点的连接，包括正在运行的 Agent。',
     () => {
       restartAllNodes()
     },
@@ -6201,18 +6201,6 @@ async function restartAllNodes() {
     for (const node of allNodes) {
       const nodeId = node.node_id
       const normalizedNodeId = nodeId || 'master'
-
-      // 再次检查该节点是否有运行中的 agent（双重保险）
-      const nodeRunningAgents = agentList.value.filter(agent => {
-        const agentNodeId = agent.node_id || 'master'
-        return agent.status === 'running' && agentNodeId === normalizedNodeId
-      })
-
-      if (nodeRunningAgents.length > 0) {
-        const agentNames = nodeRunningAgents.map(agent => agent.name || agent.agent_id).join(', ')
-        showToast(`节点 "${normalizedNodeId}" 仍有运行中的 Agent：${agentNames}，跳过该节点`, 'warning')
-        continue
-      }
 
       try {
         // 发送重启请求

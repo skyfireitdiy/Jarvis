@@ -4776,6 +4776,10 @@ def create_app(
                 }
 
             service_pid = int(service_pid_text)
+            # 重启会终止当前网关进程，若立即发送信号，HTTP 响应来不及写回客户端，
+            # 前端会收到 502/连接中断（误判为重启失败）。因此延迟一段时间再触发重启，
+            # 确保响应先返回。
+            restart_delay_seconds = 1.0
             # 根据 restart_frontend 参数选择信号
             # Linux: SIGUSR1/SIGUSR2
             # Windows: 通过 TCP 命令通道发送重启命令
@@ -4784,23 +4788,30 @@ def create_app(
                 # SIGUSR2: 只重启网关服务
                 signal_to_send = signal.SIGUSR1 if restart_frontend else signal.SIGUSR2
                 signal_name = "SIGUSR1" if restart_frontend else "SIGUSR2"
-                os.kill(service_pid, signal_to_send)
+                asyncio.get_running_loop().call_later(
+                    restart_delay_seconds, os.kill, service_pid, signal_to_send
+                )
             else:
                 # Windows: 通过 TCP 命令通道发送重启命令
                 import socket as socket_module
 
                 command = "RESTART_ALL" if restart_frontend else "RESTART_GATEWAY_ONLY"
-                try:
-                    sock = socket_module.socket(
-                        socket_module.AF_INET, socket_module.SOCK_STREAM
-                    )
-                    sock.connect(("127.0.0.1", _RESTART_COMMAND_TCP_PORT))
-                    sock.sendall(command.encode("utf-8") + b"\n")
-                    sock.close()
-                    signal_name = command
-                except Exception as e:
-                    logger.warning(f"Failed to send restart command via TCP: {e}")
-                    signal_name = f"TCP_FAILED: {e}"
+
+                def _send_restart_command() -> None:
+                    try:
+                        sock = socket_module.socket(
+                            socket_module.AF_INET, socket_module.SOCK_STREAM
+                        )
+                        sock.connect(("127.0.0.1", _RESTART_COMMAND_TCP_PORT))
+                        sock.sendall(command.encode("utf-8") + b"\n")
+                        sock.close()
+                    except Exception as e:
+                        logger.warning(f"Failed to send restart command via TCP: {e}")
+
+                asyncio.get_running_loop().call_later(
+                    restart_delay_seconds, _send_restart_command
+                )
+                signal_name = command
             message = (
                 "已请求 jarvis-service 重启所有服务"
                 if restart_frontend
