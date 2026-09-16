@@ -775,7 +775,7 @@ class WebGateway(BaseGateway):
         self,
         execution_id: str,
     ) -> Optional[Callable[[float], Optional[str]]]:
-        return self._terminal_input_registry.get_input_callback(execution_id)  # type: ignore[return-value]
+        return self._terminal_input_registry.get_input_callback(execution_id)
 
     def get_execution_resize_callback(
         self,
@@ -1944,6 +1944,17 @@ def create_app(
     app.state.agent_proxy_manager = agent_proxy_manager
     app.state.node_connection_manager = node_connection_manager
     app.state.browser_extension_manager = browser_extension_manager
+
+    # 注入扩展最新版本提供器：握手时随 hello_ack 下发给扩展，
+    # 使扩展无需打开 Jarvis 网页也能自行发现新版本并提示用户升级。
+    def _latest_extension_version() -> Optional[str]:
+        ext_dir = resolve_browser_extension_dir()
+        if not ext_dir:
+            return None
+        version = read_browser_extension_version(ext_dir)
+        return None if version == "unknown" else version
+
+    browser_extension_manager.set_latest_version_provider(_latest_extension_version)
 
     # 挂载 uploads 目录为静态文件服务，使上传的图片可通过 HTTP 访问
     from jarvis.jarvis_utils.config import get_data_dir as _get_data_dir

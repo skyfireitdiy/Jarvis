@@ -1319,7 +1319,13 @@ function isVersionOutdated(current, latest) {
 
 async function refreshExtensionVersion() {
   if (typeof props.checkExtensionVersion !== 'function') return
-  const info = await props.checkExtensionVersion()
+  let info = null
+  try {
+    info = await props.checkExtensionVersion()
+  } catch (e) {
+    // 轮询场景下异常不得中断定时器，也不应影响弹层展示
+    return
+  }
   if (!info) {
     extensionVersion.value = { latest: '', current: [], outdated: false, checked: true }
     return
@@ -1333,6 +1339,26 @@ async function refreshExtensionVersion() {
     current,
     outdated: current.some(v => isVersionOutdated(v, latest)),
     checked: true
+  }
+}
+
+// 扩展版本轮询：挂载后立即检测一次，之后每 5 分钟复查，
+// 使「安装浏览器插件」按钮上的更新红点无需打开弹层即可生效
+const EXTENSION_VERSION_POLL_MS = 5 * 60 * 1000
+let extensionVersionTimer = null
+
+function startExtensionVersionPolling() {
+  refreshExtensionVersion()
+  extensionVersionTimer = setInterval(
+    refreshExtensionVersion,
+    EXTENSION_VERSION_POLL_MS,
+  )
+}
+
+function stopExtensionVersionPolling() {
+  if (extensionVersionTimer) {
+    clearInterval(extensionVersionTimer)
+    extensionVersionTimer = null
   }
 }
 
@@ -1734,6 +1760,7 @@ onMounted(() => {
   rafId = requestAnimationFrame(step)
   refreshTimer = setInterval(refreshLoop, 800)
   dashTimer = setInterval(() => { dashNow.value = new Date() }, 1000)
+  startExtensionVersionPolling()
   window.addEventListener('keydown', onGlobalKeydown)
   window.addEventListener('resize', closeContextMenu)
   window.addEventListener('resize', updateIsMobile)
@@ -1816,6 +1843,7 @@ onUnmounted(() => {
     clearInterval(dashTimer)
     dashTimer = null
   }
+  stopExtensionVersionPolling()
   if (resizeObserver) {
     resizeObserver.disconnect()
     resizeObserver = null

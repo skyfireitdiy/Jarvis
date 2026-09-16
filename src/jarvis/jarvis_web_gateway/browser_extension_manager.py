@@ -13,7 +13,7 @@ import asyncio
 import logging
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from fastapi import WebSocket
 
@@ -24,6 +24,10 @@ HEARTBEAT_TIMEOUT = 60.0
 
 # 单条指令默认超时（秒）
 DEFAULT_COMMAND_TIMEOUT = 15.0
+
+# 网关侧最新扩展版本提供器：返回网关打包的扩展版本号（读不到时返回 None）。
+# 由 app.py 在启动时注入，避免本模块耦合扩展源码目录的定位逻辑。
+LatestVersionProvider = Callable[[], Optional[str]]
 
 
 class BrowserExtensionManager:
@@ -41,6 +45,31 @@ class BrowserExtensionManager:
         self._pending_commands: Dict[str, asyncio.Future] = {}
         # 心跳巡检任务
         self._cleanup_task: Optional[asyncio.Task] = None
+        # 网关打包的扩展最新版本提供器（未注入时返回 None，不影响握手）
+        self._latest_version_provider: Optional[LatestVersionProvider] = None
+
+    def set_latest_version_provider(
+        self, provider: Optional[LatestVersionProvider]
+    ) -> None:
+        """注入「网关打包的扩展最新版本」提供器。
+
+        握手时会把结果随 hello_ack 下发给扩展，供其自行判断是否需要升级。
+        未注入或读取失败时该字段为 None，扩展侧应忽略。
+        """
+        self._latest_version_provider = provider
+
+    def _get_latest_version(self) -> Optional[str]:
+        """读取网关打包的扩展最新版本；未注入或异常时返回 None。"""
+        provider = self._latest_version_provider
+        if provider is None:
+            return None
+        try:
+            version = provider()
+        except Exception as exc:  # pragma: no cover - 防御性
+            logger.warning("[BROWSER-EXT] latest version provider failed: %s", exc)
+            return None
+        version = str(version or "").strip()
+        return version or None
 
     # ------------------------------------------------------------------
     # 会话生命周期
@@ -130,6 +159,8 @@ class BrowserExtensionManager:
                     "type": "hello_ack",
                     "session_id": session_id,
                     "heartbeat_interval": 20,
+                    # 网关打包的扩展最新版本：扩展据此自行判断是否需要升级
+                    "latest_extension_version": self._get_latest_version(),
                 }
             )
 
