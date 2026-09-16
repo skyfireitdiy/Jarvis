@@ -190,6 +190,18 @@
         <span class="pet-lobby-display-icon">🚫</span>
         <span class="pet-lobby-display-label">隐藏全部输出</span>
       </button>
+
+      <!-- 安装浏览器插件：打开安装指引弹层（内含下载按钮）；有新版本时显示红点 -->
+      <button
+        class="pet-lobby-display-toggle pet-lobby-install-toggle"
+        :class="{ 'has-update': extensionVersion.outdated }"
+        title="安装浏览器插件"
+        @click.stop="openInstallExtensionDialog()"
+      >
+        <span class="pet-lobby-display-icon">🧩</span>
+        <span class="pet-lobby-display-label">安装浏览器插件</span>
+        <span v-if="extensionVersion.outdated" class="pet-lobby-update-dot" title="插件有新版本"></span>
+      </button>
     </div>
 
     <!-- 宠物群 -->
@@ -412,6 +424,59 @@
         </div>
       </div>
     </div>
+
+    <!-- 安装浏览器插件弹层：安装说明 + 下载插件包按钮 -->
+    <div
+      v-if="installDialog.visible"
+      class="lobby-rename-mask"
+      @pointerdown.stop
+      @click.stop="closeInstallDialog"
+    >
+      <div class="lobby-install-dialog" @click.stop>
+        <div class="lobby-rename-title">安装浏览器插件</div>
+        <div class="lobby-rename-sub">Jarvis Browser Bridge · 让 Agent 操作用你真实浏览器中的网页</div>
+        <div class="lobby-install-steps">
+          <div class="lobby-install-step">
+            <span class="lobby-install-step-no">1</span>
+            <span class="lobby-install-step-text">点击下方「下载插件包」，得到 zip 压缩包并解压到本地目录。</span>
+          </div>
+          <div class="lobby-install-step">
+            <span class="lobby-install-step-no">2</span>
+            <span class="lobby-install-step-text">打开 Chrome/Edge，访问 <code>chrome://extensions</code>，开启右上角「开发者模式」。</span>
+          </div>
+          <div class="lobby-install-step">
+            <span class="lobby-install-step-no">3</span>
+            <span class="lobby-install-step-text">点击「加载已解压的扩展程序」，选择刚才解压出来的目录。</span>
+          </div>
+          <div class="lobby-install-step">
+            <span class="lobby-install-step-no">4</span>
+            <span class="lobby-install-step-text">在浏览器中登录 Jarvis 网页（扩展会自动复用登录态，无需手填 Token）。</span>
+          </div>
+          <div class="lobby-install-step">
+            <span class="lobby-install-step-no">5</span>
+            <span class="lobby-install-step-text">点击工具栏扩展图标，在「添加网关地址」中填写网关地址（如本页地址）并连接。</span>
+          </div>
+        </div>
+        <div v-if="installDialog.error" class="lobby-install-error">{{ installDialog.error }}</div>
+
+        <div v-if="extensionVersion.outdated" class="lobby-install-update">
+          <span class="lobby-install-update-icon">⬆</span>
+          <span>检测到插件有新版本（当前 {{ extensionVersion.current.join('、') }} → 最新 {{ extensionVersion.latest }}），请重新下载并重新加载扩展。</span>
+        </div>
+        <div v-else-if="extensionVersion.latest" class="lobby-install-version">
+          <span v-if="extensionVersion.current.length">当前插件版本 {{ extensionVersion.current.join('、') }} · 最新版本 {{ extensionVersion.latest }}</span>
+          <span v-else>最新插件版本 {{ extensionVersion.latest }}（暂未检测到已连接的插件）</span>
+        </div>
+        <div class="lobby-rename-actions">
+          <button class="lobby-rename-btn cancel" @click="closeInstallDialog">关闭</button>
+          <button
+            class="lobby-rename-btn ok"
+            :disabled="installDialog.downloading"
+            @click="downloadExtension()"
+          >{{ installDialog.downloading ? '下载中…' : '下载插件包' }}</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 <script setup>
@@ -439,6 +504,10 @@ const props = defineProps({
   connectionLabel: { type: String, default: '' },
   // 当前登录用户名（优先显示名）
   currentUserName: { type: String, default: '' },
+  // 下载浏览器扩展包（异步函数，返回 { filename, blob }），由父组件注入以复用鉴权与网关地址
+  downloadExtension: { type: Function, default: null },
+  // 查询扩展版本（异步函数，返回 { latestVersion, sessions }），用于检测插件更新
+  checkExtensionVersion: { type: Function, default: null },
 })
 
 const emit = defineEmits(['selectAgent', 'sendInput', 'complete', 'openCompletions', 'activePetChange', 'createAgentOnNode', 'contextAgent', 'contextRun', 'nodeContextRun', 'renameNode', 'addAgentToGroup', 'removeAgentFromGroup'])
@@ -1163,6 +1232,64 @@ function pickRemoveGroup(groupId) {
   const agentId = removeGroupDialog.value.agentId
   if (agentId && groupId) emit('removeAgentFromGroup', { agentId, groupId })
   closeRemoveGroupDialog()
+}
+
+// ===== 安装浏览器插件弹层 =====
+// 展示安装步骤说明，并提供「下载插件包」按钮（实际下载由父组件注入的 downloadExtension 完成）
+const installDialog = ref({ visible: false, downloading: false, error: '' })
+
+function openInstallExtensionDialog() {
+  installDialog.value = { visible: true, downloading: false, error: '' }
+  refreshExtensionVersion()
+}
+
+function closeInstallDialog() {
+  if (installDialog.value.visible) installDialog.value.visible = false
+}
+
+async function downloadExtension() {
+  if (installDialog.value.downloading) return
+  if (typeof props.downloadExtension !== 'function') {
+    installDialog.value.error = '当前环境不支持下载，请从源码目录 browser_extension/ 手动加载'
+    return
+  }
+  installDialog.value.downloading = true
+  installDialog.value.error = ''
+  try {
+    await props.downloadExtension()
+  } catch (e) {
+    installDialog.value.error = (e && e.message) ? e.message : '下载失败，请稍后重试'
+  } finally {
+    installDialog.value.downloading = false
+  }
+}
+
+// ===== 扩展版本检测 =====
+// 网关打包版本与在线扩展版本比对：任一缺失时不判定为需升级
+const extensionVersion = ref({ latest: '', current: [], outdated: false, checked: false })
+
+function isVersionOutdated(current, latest) {
+  if (!current || !latest) return false
+  return String(current).trim() !== String(latest).trim()
+}
+
+async function refreshExtensionVersion() {
+  if (typeof props.checkExtensionVersion !== 'function') return
+  const info = await props.checkExtensionVersion()
+  if (!info) {
+    extensionVersion.value = { latest: '', current: [], outdated: false, checked: true }
+    return
+  }
+  const latest = info.latestVersion || ''
+  const current = (info.sessions || [])
+    .map(s => (s && s.extension_version) ? String(s.extension_version) : '')
+    .filter(Boolean)
+  extensionVersion.value = {
+    latest,
+    current,
+    outdated: current.some(v => isVersionOutdated(v, latest)),
+    checked: true
+  }
 }
 
 // 点击菜单项：按菜单来源分派给父组件执行，然后关闭菜单
@@ -2745,6 +2872,95 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden })
 .lobby-rename-btn.ok:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* 安装浏览器插件弹层：比通用弹层略宽，便于展示步骤说明 */
+.lobby-install-dialog {
+  width: min(460px, 90vw);
+  max-height: 82vh;
+  overflow-y: auto;
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(12, 22, 34, 0.98);
+  border: 1px solid rgba(32, 200, 255, 0.35);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+.lobby-install-steps {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lobby-install-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #c3d6e4;
+}
+.lobby-install-step-no {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: rgba(32, 200, 255, 0.18);
+  border: 1px solid rgba(32, 200, 255, 0.5);
+  color: #9fe4ff;
+  font-size: 11px;
+  text-align: center;
+  line-height: 16px;
+}
+.lobby-install-step-text code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(6, 14, 24, 0.9);
+  color: #9fe4ff;
+  font-size: 12px;
+}
+.lobby-install-error {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #ff8b96;
+}
+
+/* 安装插件按钮：有新版本时的红点提示（定位在按钮右上角） */
+.pet-lobby-install-toggle {
+  position: relative;
+}
+.pet-lobby-update-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff5d6c;
+  box-shadow: 0 0 0 2px rgba(10, 24, 38, 0.86);
+}
+/* 弹层内的版本信息与升级提示 */
+.lobby-install-version {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #7f93a6;
+}
+.lobby-install-update {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #ffd7a1;
+  background: rgba(255, 170, 60, 0.12);
+  border: 1px solid rgba(255, 170, 60, 0.4);
+}
+.lobby-install-update-icon {
+  flex: none;
+  color: #ffb347;
 }
 .lobby-group-list {
   max-height: 220px;
