@@ -494,6 +494,11 @@ ws.onclose(code=4401/4403) → 不再指数退避重连
 计数在 `hello_ack`（握手成功）、用户手动「连接」（`connect(force=true)`）或
 `disconnect()` 时清零。
 
+**断开时同步刷新 Token**：`disconnect()` 会先清空该网关的 Token 缓存（避免下次连接复用
+可能已失效的旧 Token），再异步从页面重新探测一次登录态并写回缓存；探测本身不建立连接，
+用户点「连接」时才真正建链。移除网关（`jarvis_remove_gateway`）时以 `disconnect(g, true)`
+跳过探测，避免为已移除的网关写回 Token。
+
 **已知限制**：若页面自身缓存的 Token 也已失效（用户未重新登录），扩展无法凭空获得
 有效 Token，只能停止重连并提示用户**重新登录一次** Jarvis 页面。
 
