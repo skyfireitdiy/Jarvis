@@ -215,8 +215,31 @@ function gatewayKey(gateway) {
 }
 
 /**
- * 主动向已打开的 Jarvis 页面请求指定网关的登录态 Token。
- * content script 收到请求后会读取页面暴露的 __jarvisAuthBridge 并回传，
+ * 在标签页主世界读取 __jarvisAuthBridge 暴露的 Token 与网关地址。
+ * 必须通过 chrome.scripting.executeScript({ world: "MAIN" }) 注入：
+ * MV3 中隔离世界（content script）动态插入的 inline script 不会在主世界执行。
+ * 该函数会被序列化后注入，禁止引用外部变量。
+ * @returns {{token: string|null, gateway: string|null}|null}
+ */
+function readAuthBridgeInMainWorld() {
+  try {
+    const bridge = window.__jarvisAuthBridge;
+    if (!bridge) return null;
+    const token =
+      typeof bridge.getToken === "function" ? bridge.getToken() || null : null;
+    let gateway = null;
+    if (typeof bridge.getGateway === "function") {
+      gateway = bridge.getGateway() || null;
+    }
+    return { token, gateway: gateway || location.origin };
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * 主动向已打开的 Jarvis 页面读取指定网关的登录态 Token。
+ * 通过主世界注入读取页面暴露的 __jarvisAuthBridge，
  * 其中 gateway 由页面通过 __jarvisAuthBridge.getGateway() 声明（网关与前端可不同域名）。
  */
 async function requestTokenFromPages(gateway) {
@@ -225,11 +248,14 @@ async function requestTokenFromPages(gateway) {
   try {
     const tabs = await chrome.tabs.query({});
     for (const tab of tabs) {
-      if (!tab.id) continue;
+      if (!tab.id || !/^https?:/i.test(tab.url || "")) continue;
       try {
-        const resp = await chrome.tabs.sendMessage(tab.id, {
-          type: "jarvis_request_token",
+        const results = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: readAuthBridgeInMainWorld,
+          world: "MAIN",
         });
+        const resp = results && results[0] ? results[0].result : null;
         if (!resp) continue;
         console.log(
           "[Jarvis] token probe",
@@ -245,7 +271,7 @@ async function requestTokenFromPages(gateway) {
           return resp.token;
         }
       } catch (e) {
-        // 该标签页无 content script（非 Jarvis 页面），跳过
+        // 该标签页无法注入（受限页面等），跳过
         console.log(
           "[Jarvis] token probe skipped",
           tab.url,
