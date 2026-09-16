@@ -117,8 +117,9 @@ globalThis.__JARVIS_SCRIPT__ = {
 - 调用 `script_run` 用的参数是 **`script_id`（脚本 id，形如 `s-xxx`）**，不是脚本名；
   另有 `script_action`（脚本内要执行的 action 名）、`script_args`（传给它的参数对象）、可选 `tab_id`。
 - 这三个 action 已作为 `browser_ext` 工具的 action 暴露：`script_list` / `script_get` / `script_run`。
-  安装/卸载/启停/导出脚本（`script.install`/`uninstall`/`set_enabled`/`export`）**未**暴露为工具 action，
-  需要时走网关 HTTP：`POST {master_url}/api/browser-ext/command`，
+  安装/卸载/启停/导出脚本同样已暴露为工具 action：`script_install` / `script_uninstall` /
+  `script_set_enabled` / `script_export`（参数名见 `browser_ext_usage.md` 的「脚本管理」表）。
+  需要更底层控制时也可走网关 HTTP：`POST {master_url}/api/browser-ext/command`，
   body `{ session_id, action:"script.install", params:{...}, timeout }`。
   ⚠️ `{master_url}` 必须是 **Agent 所在节点能访问到的 master 地址**，不要硬编码 `127.0.0.1:8000`
   （Agent 在子节点时 `127.0.0.1` 指向子节点本地，连不上 master）。

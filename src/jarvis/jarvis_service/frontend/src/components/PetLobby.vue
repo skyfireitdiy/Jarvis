@@ -467,6 +467,42 @@
           <span v-if="extensionVersion.current.length">当前插件版本 {{ extensionVersion.current.join('、') }} · 最新版本 {{ extensionVersion.latest }}</span>
           <span v-else>最新插件版本 {{ extensionVersion.latest }}（暂未检测到已连接的插件）</span>
         </div>
+
+        <!-- 风险提示与免责声明：插件申请了高敏感权限，下载前必须让用户明确知悉 -->
+        <div class="lobby-install-risk">
+          <div class="lobby-install-risk-head">
+            <span class="lobby-install-risk-icon">⚠</span>
+            <span>高风险提示 · 请务必阅读后再下载</span>
+          </div>
+          <div class="lobby-install-risk-body">
+            <p>
+              本插件申请了 <strong>28 项浏览器权限</strong>，其中 <strong>8 项为高敏感权限</strong>：
+              <code>cookies</code>、<code>webRequest</code>、<code>management</code>、<code>nativeMessaging</code>、
+              <code>proxy</code>、<code>privacy</code>、<code>browsingData</code>、<code>contentSettings</code>。
+            </p>
+            <p>安装后，连接到本网关的 Agent 将<strong>具备以下能力</strong>：</p>
+            <ul>
+              <li>读取、修改、删除你在各网站的 <strong>Cookie（含登录凭证）</strong>；</li>
+              <li>读取并改写你的<strong>全部网络请求</strong>（可阻断或重定向）；</li>
+              <li>查看、启用、禁用甚至 <strong>卸载你安装的其他扩展</strong>；</li>
+              <li>与<strong>本机应用</strong>通信，并<strong>修改系统代理设置</strong>；</li>
+              <li>修改隐私开关，以及 <strong>清除浏览历史、缓存、Cookie、保存的密码</strong>；</li>
+              <li>修改站点级权限（摄像头、麦克风、地理位置、弹窗等）。</li>
+            </ul>
+            <p class="lobby-install-risk-warn">
+              上述能力等同于<strong>「完全控制你的浏览器」</strong>。其中
+              <strong>清除浏览数据、卸载扩展、删除 Cookie</strong> 等操作<strong>不可逆</strong>，一旦执行无法恢复。
+            </p>
+            <p>
+              <strong>免责声明：</strong>本插件按「现状」提供，仅用于你本人授权范围内的浏览器自动化。
+              请仅在你<strong>完全信任</strong>所连接的网关与 Agent 的前提下使用。
+              因授权、误操作或第三方滥用导致的账号泄露、数据丢失、配置损坏等后果，
+              由使用者自行承担，本项目及作者不承担任何责任。
+              若不接受上述风险，请<strong>立即关闭本弹窗，不要下载或安装</strong>。
+            </p>
+          </div>
+        </div>
+
         <div class="lobby-rename-actions">
           <button class="lobby-rename-btn cancel" @click="closeInstallDialog">关闭</button>
           <button
@@ -2963,6 +2999,58 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden, openInst
 .lobby-install-update-icon {
   flex: none;
   color: #ffb347;
+}
+/* 下载弹窗内的风险提示与免责声明（高敏感权限） */
+.lobby-install-risk {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.65;
+  color: #ffc9cf;
+  background: rgba(255, 70, 90, 0.12);
+  border: 1px solid rgba(255, 70, 90, 0.55);
+  box-shadow: 0 0 0 1px rgba(255, 70, 90, 0.15) inset;
+}
+.lobby-install-risk-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ff8b96;
+}
+.lobby-install-risk-icon {
+  flex: none;
+  font-size: 14px;
+}
+.lobby-install-risk-body {
+  margin-top: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.lobby-install-risk-body p {
+  margin: 0 0 6px;
+}
+.lobby-install-risk-body ul {
+  margin: 0 0 6px;
+  padding-left: 18px;
+}
+.lobby-install-risk-body li {
+  margin-bottom: 2px;
+}
+.lobby-install-risk-body code {
+  padding: 0 3px;
+  border-radius: 3px;
+  font-size: 11px;
+  color: #ffd7dc;
+  background: rgba(255, 70, 90, 0.18);
+}
+.lobby-install-risk-body strong {
+  color: #ffb0b8;
+}
+.lobby-install-risk-warn {
+  color: #ff9aa5;
 }
 .lobby-group-list {
   max-height: 220px;
