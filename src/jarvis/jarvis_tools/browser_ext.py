@@ -83,7 +83,9 @@ class BrowserExtTool:
 - wait_for: 等待元素出现/消失。需 session_id、selector；可选 tab_id、state（visible/hidden/attached，默认 visible）、timeout_ms（默认 15000）
 - press_key: 按下键盘按键。需 session_id、key（如 Enter/Escape/Tab/ArrowDown）；可选 tab_id、selector（不传则作用于当前焦点元素）
 - scroll: 滚动页面。需 session_id；可选 tab_id、selector（滚动到该元素）、x/y（像素偏移，正数向右/向下）、behavior（auto/smooth）
-- execute_script: 在页面中执行任意 JS 代码（高危）。需 session_id、code；可选 tab_id、world（ISOLATED/MAIN，默认 ISOLATED）
+- execute_script: 在页面中执行任意 JS 代码（高危）。需 session_id、code；可选 tab_id、world（ISOLATED/MAIN，默认 MAIN）。
+  code 中可直接写 return 返回结果（如 "return document.title"），也支持 await；返回值需可 JSON 序列化。
+  默认在 MAIN 世界执行以复用页面自身的 JS 环境与登录态；部分站点的 CSP 会限制 ISOLATED 世界的 eval，故不推荐改回 ISOLATED。
 - upload_file: 上传本地文件到 file input。需 session_id、selector、file_path（本地绝对路径）；可选 tab_id。依赖 chrome.debugger，扩展需具备 debugger 权限
 若用户未安装扩展或扩展未连接，list_sessions 会返回空列表。"""
 
