@@ -157,7 +157,9 @@ async function connect(gateway) {
       ", waiting for Jarvis page",
     );
     setState(g, "disconnected");
-    return;
+    throw new Error(
+      `未获取到 ${g} 的登录态 Token。请先在浏览器中打开并登录该网关的 Jarvis 页面，再重试。`,
+    );
   }
 
   const existing = clients.get(g);
@@ -277,7 +279,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     addGateway(gateway)
       .then(() => connect(gateway))
       .then(() => sendResponse({ success: true }))
-      .catch((e) => sendResponse({ success: false, error: String(e) }));
+      .catch((e) =>
+        sendResponse({ success: false, error: (e && e.message) || String(e) }),
+      );
     return true; // 异步响应
   }
   if (message.type === "jarvis_disconnect") {
