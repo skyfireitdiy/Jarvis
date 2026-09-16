@@ -90,6 +90,35 @@ export class DebugExecutor {
   }
 
   /**
+   * 透传任意 CDP 命令（相当于直接使用 DevTools Protocol）。
+   * 用于 Runtime/DOM 域之外的场景，如 Page.addScriptToEvaluateOnNewDocument
+   * （在文档创建前注入脚本，可 hook 页面自身的绘制/网络行为）。
+   * @param {object} p
+   * @param {number} [p.tab_id] 目标标签页
+   * @param {string} p.method CDP 方法名，如 "Page.addScriptToEvaluateOnNewDocument"
+   * @param {object} [p.params] CDP 方法参数
+   */
+  async sendCommand({ tab_id, method, params }) {
+    const tab = await this._resolveTab(tab_id);
+    const cmd = String(method || "").trim();
+    if (!cmd) {
+      throw cmdError("EXEC_ERROR", "method is required");
+    }
+    const target = { tabId: tab.id };
+    const attachedByUs = await this._attach(target);
+    try {
+      const res = await chrome.debugger.sendCommand(
+        target,
+        cmd,
+        params && typeof params === "object" ? params : {},
+      );
+      return { ok: true, result: res === undefined ? null : res };
+    } finally {
+      if (attachedByUs) await this._detach(target);
+    }
+  }
+
+  /**
    * 采集页面网络请求（相当于 F12 Network 面板）。
    * 通过 CDP Network 域监听，采集 duration_ms 毫秒后返回。
    * @param {object} p
