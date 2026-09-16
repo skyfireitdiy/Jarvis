@@ -45,7 +45,7 @@ browser_ext(action="list_tabs", session_id="<sid>")
 
 - **必须**：接到浏览器操作任务后，**第一步**先枚举扩展里已安装的脚本，看看有没有现成能力可直接复用。
   这是获得「比裸 DOM 操作强得多」的能力的捷径：脚本跑在页面**主世界**，能访问页面自身的 JS 对象
-  （如 iCenter 的 `window.ze`），可绕过 CSP、iframe 隔离与坐标点击的脆弱性。
+  （如站点自带的编辑器实例），可绕过 CSP、iframe 隔离与坐标点击的脆弱性。
 - **必须**：用 `script_list` 拿脚本清单（含 `script_id`/`name`/`description`/`match`/`enabled`），
   再用 `script_get`（传 `script_id`）读源码，从中提取该脚本导出的 **action 名、desc 与 params**。
 - **必须**：脚本的 `match` 与目标页面 URL 匹配、且 `enabled` 为 true 时才可用；命中则优先 `script_run`，

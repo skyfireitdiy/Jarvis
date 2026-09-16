@@ -2,10 +2,10 @@
 //
 // 脚本定位：一段可在页面「主世界」执行的 JS，求值后应得到一个脚本对象：
 //   {
-//     name: "icenter",
-//     description: "iCenter wiki 文档操作",
+//     name: "mysite",
+//     description: "某站点文档操作",
 //     version: "1.0.0",
-//     match: ["i.zte.com.cn"],          // 适用域名（仅作提示，不做强制拦截）
+//     match: ["example.com"],           // 适用域名（仅作提示，不做强制拦截）
 //     actions: {
 //       getEditor: { desc: "获取编辑器实例", run: () => {...} },
 //       deleteRange: { desc: "删除文本", params: {start:"number",end:"number"},

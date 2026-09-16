@@ -3,7 +3,7 @@
 // 两类职责：
 // 1. 元数据类（list/get/install/uninstall/setEnabled）—— 直接转发给 ScriptManager；
 // 2. 执行类（run）—— 取出脚本源码，通过 chrome.scripting.executeScript({ world: "MAIN" })
-//    注入页面执行，从而能访问页面自身的 JS 对象（如 iCenter 的 window.ze）。
+//    注入页面执行，从而能访问页面自身的 JS 对象（如站点自带的编辑器实例）。
 //
 // 注意：注入函数 runScriptFn 必须自包含（不能引用本模块作用域内的任何变量）。
 

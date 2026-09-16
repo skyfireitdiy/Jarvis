@@ -68,6 +68,7 @@ browser_extension/
 │       ├── tab_executor.js        # 标签页 / 导航
 │       ├── dom_executor.js        # DOM 读写（executeScript 注入）
 │       ├── script_executor.js     # 自定义脚本执行（主世界注入）
+│       ├── clipboard_executor.js  # 读网关静态文件 / 写前端剪贴板
 │       └── capture_executor.js    # 截图
 ├── content/
 │   └── content_script.js          # 页面内脚本：登录态桥接 + 页面元信息
@@ -79,7 +80,7 @@ browser_extension/
 ## 脚本管理（类油猴）
 
 扩展内置一个**脚本仓库**：用户可安装自定义页面脚本，Agent 通过 `script.*` 指令查询并调用。
-适合把「某个站点的专用操作」封装成可复用能力（例如 iCenter wiki 的 zeditor 读写）。
+适合把「某个站点的专用操作」封装成可复用能力（例如某在线文档站点的编辑器读写）。
 
 ### 脚本格式
 
@@ -87,10 +88,10 @@ browser_extension/
 
 ```js
 globalThis.__JARVIS_SCRIPT__ = {
-  name: "icenter", // 脚本名（唯一，重名视为更新）
+  name: "mysite", // 脚本名（唯一，重名视为更新）
   version: "1.0.0",
-  description: "iCenter wiki 文档操作",
-  match: ["i.zte.com.cn"], // 适用域名（仅作提示，不做强制拦截）
+  description: "某站点文档操作",
+  match: ["example.com"], // 适用域名（仅作提示，不做强制拦截）
   actions: {
     // entry 可以是 { desc, params, run } 或直接是一个函数
     getText: { desc: "读取全文", run: () => ({ text: window.ze.getText() }) },
@@ -131,10 +132,10 @@ Agent 侧通过 `script.list` 查询已装脚本，再用 `script.run` 调用其
 
 ```js
 // ===== Jarvis 脚本导出 =====
-// name: icenter
+// name: mysite
 // version: 1.0.1
-// description: iCenter wiki(zeditor) 文档读写操作
-// match: i.zte.com.cn
+// description: 某在线文档编辑器读写操作
+// match: example.com
 // 安装方式：扩展 popup →「脚本管理」→ 粘贴本文件内容或从本地文件导入。
 // ===========================
 
@@ -147,7 +148,7 @@ Agent 侧也可用 `script.export` 取回同样的文本内容（返回 `{ filen
 ### 执行机制与安全说明
 
 `script.run` 会把脚本源码通过 `chrome.scripting.executeScript({ world: "MAIN" })` 注入到目标标签页的
-**主世界**执行，因此脚本能访问页面自身的 JS 对象（如 iCenter 的 `window.ze`）。
+**主世界**执行，因此脚本能访问页面自身的 JS 对象（如站点自带的编辑器实例 `window.editor`）。
 这等同于在页面里执行任意 JS —— 安全边界完全依赖「只安装可信脚本」。
 
 - 脚本默认**启用**；停用后 `script.run` 会返回 `SCRIPT_DISABLED`
@@ -163,7 +164,49 @@ Agent 侧也可用 `script.export` 取回同样的文本内容（返回 `{ filen
 | DOM    | `dom.query` `dom.get_text` `dom.get_html` `dom.click` `dom.type` `dom.hover` `dom.select` `dom.wait_for` `dom.press_key` `dom.scroll` `dom.upload_file` |
 | 脚本   | `script.execute`（执行任意 JS 代码，高危）                                                                                                              |
 | 脚本库 | `script.list` `script.get` `script.install` `script.uninstall` `script.export` `script.set_enabled` `script.run`（类油猴脚本管理）                      |
+| 剪贴板 | `clipboard.write_from_url`（读 URL 内容写入剪贴板）`clipboard.write`（直接写文本/base64）                                                               |
 | 捕获   | `capture.screenshot`（支持 `full_page` 整页截图）                                                                                                       |
+
+## 剪贴板（读网关静态文件 → 写前端剪贴板）
+
+把网关静态目录（`/uploads/`）中的文件内容读出来，写入**前端页面的系统剪贴板**，
+供页面内的编辑器粘贴使用（例如把图片贴进富文本编辑器）。
+
+读写分两处执行，这是浏览器的硬约束：
+
+- **读文件**：在 background（service worker）里 `fetch`，可跨域；
+- **写剪贴板**：`navigator.clipboard` 在 service worker 中不可用，必须注入**页面上下文**执行，
+  且要求文档真正获得焦点，否则报 `NotAllowedError: Document is not focused`。
+
+### `clipboard.write_from_url`
+
+| 参数     | 必填 | 说明                                                                               |
+| -------- | ---- | ---------------------------------------------------------------------------------- |
+| `url`    | 是   | 文件地址。绝对 URL（推荐）或 `/uploads/xxx.png` 相对路径（用配置的第一个网关补全） |
+| `as`     | 否   | `blob`（默认，二进制，适合图片）或 `text`（按文本写入）                            |
+| `mime`   | 否   | `as=blob` 时覆盖 MIME（默认取响应 `content-type`）                                 |
+| `tab_id` | 否   | 目标标签页，默认当前活动标签页                                                     |
+
+返回 `{ ok, url, mime, size, mode }`。
+
+> **节点拓扑**：Agent 可能运行在 master 或任意子节点上，读哪个地址由**调用方**决定。
+> 请直接传完整绝对 URL（如 `https://<node-gateway>/uploads/xxx.png`），扩展不做地址猜测。
+
+### `clipboard.write`
+
+直接写入给定内容，不经网关：`text`（文本）或 `base64` + `mime`（二进制）。
+
+### 使用前置：文档必须获得焦点
+
+`tab.activate` 只能激活标签页，**不足以**让剪贴板可写（`document.hasFocus()` 为 true 仍可能报错）。
+调用前需先派发一次真实鼠标点击（如 CDP `Input.dispatchMouseEvent` 的 `mousePressed` + `mouseReleased`）。
+
+粘贴到页面编辑器时，需用 CDP 发 `Ctrl+V`，且**必须用 `rawKeyDown` 类型**（`keyDown` 无效）：
+
+```js
+{ type: "rawKeyDown", modifiers: 2, key: "v", code: "KeyV",
+  windowsVirtualKeyCode: 86, nativeVirtualKeyCode: 86, text: "", unmodifiedText: "" }
+```
 
 ## 消息协议
 

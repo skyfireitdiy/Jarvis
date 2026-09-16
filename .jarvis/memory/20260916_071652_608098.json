@@ -1,8 +1,0 @@
-{
-  "id": "20260916_071652_608098",
-  "type": "project_long_term",
-  "tags": ["iCenter", "zeditor", "编辑操作", "踩坑"],
-  "content": "iCenter zeditor 编辑器操作踩坑（血泪教训）：\n\n【清空单元格】正确做法：点进单元格 → End → Backspace × N（N 给足，超出无副作用）。\n- ❌ 禁止用 Ctrl+A：那是「全选整个文档」，配合 Delete 会删光全文！\n- ❌ 慎用 Home+Shift+End+Delete：只作用于「当前视觉行」，单元格内容换行占多行时会残留。\n- 误删后可用 Ctrl+Z 撤销恢复。\n\n【单元格内容换行】单元格文字过长会换行占多行，ze-input 的 style.top 反映「光标所在视觉行」而非单元格顶部。例如同一单元格两行分别对应 top=1681 和 top=1716。读取 canvas 文字时按 y 容差分行会把同一单元格拆成两行，容易漏看内容（曾因此漏看多出的一个「部」字）。\n\n【canvas 抓文字流程】重装 hook（iframe contentWindow 上 hook CanvasRenderingContext2D.prototype.fillText 记录 {t,x,y}）→ 设 .one-eidtor-layout.scrollTop → 发 CDP 滚轮（Input.dispatchMouseEvent mouseWheel，只有滚轮能触发重绘）→ 读记录、按 y 分行（容差8px）、行内按 x 排序、去重。\n\n【点击】坐标有抖动，每次点击后必须校验 input.ze-input 的 style.left/top 命中目标单元格再操作。主文档 y = iframe 内 y + 48。\n\n【键盘事件】CDP Input.dispatchKeyEvent 必须给全 key/code/windowsVirtualKeyCode/nativeVirtualKeyCode，Shift 用 modifiers=8，Ctrl 用 modifiers=2，否则无效。\n\n【每列填完后列宽会变】，后续列需重新扫 x 标定。",
-  "created_at": "2026-09-16T07:16:52.608133",
-  "updated_at": "2026-09-16T07:16:52.608139"
-}

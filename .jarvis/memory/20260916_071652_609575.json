@@ -1,8 +1,0 @@
-{
-  "id": "20260916_071652_609575",
-  "type": "project_long_term",
-  "tags": ["iCenter", "接口", "文档读取"],
-  "content": "iCenter 文档读写接口与网关（本项目实测可用）：\n\n【读文档】在页面上下文 fetch（credentials:'include'）：\nGET https://icenterapi.zte.com.cn/zte-rdcloud-space-external/content/{docId}?t={ts}&spaceId={spaceId}&system=space-1920478736&environmentType=browser\n返回 {bo:{contentBody(纯文本,空格分隔), revision, updateDate, updateBy}, code}。revision 可判版本是否变化。\n\n【浏览器扩展网关】\nGET http://127.0.0.1:8000/api/browser-ext/sessions\nPOST http://127.0.0.1:8000/api/browser-ext/command  body: {session_id, action, params, timeout}\n- action 名带命名空间：tab.create/tab.list/dom.get_text/script.execute/debugger.send_command/network.get_requests\n- script.execute 返回值不透传（result:null），读值一律用 debugger.send_command + Runtime.evaluate（returnByValue:true, awaitPromise:true）\n- 认证：Authorization: Bearer $JARVIS_AUTH_TOKEN\n\n【页面结构】文档渲染在 iframe 里，iframe src=https://i.zte.com.cn/zte-km-icenter-web/?t=...&parentPath=index#/space/{spaceId}/wiki/page/{pageId}/{view|edit}，iframe 偏移 x=0,y=48。必须在 iframe.contentDocument 里查元素。",
-  "created_at": "2026-09-16T07:16:52.609624",
-  "updated_at": "2026-09-16T07:16:52.609630"
-}
