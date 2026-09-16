@@ -4145,6 +4145,29 @@ def create_app(
                     media_type="application/json",
                 )
 
+            # 服务重启接口的 admin:config 权限同样由 master 统一把关
+            # （子节点本地无 auth 数据，无法独立判定，会误判为无权限）。
+            if (
+                str(path or "").strip("/") == "service/restart"
+                and _proxy_user_id
+                and _proxy_user_id != "system"
+                and permission_manager
+                and not permission_manager.check_permission(
+                    _proxy_user_id, "admin:config"
+                )
+            ):
+                logger.warning(
+                    f"[NODE HTTP PROXY] 权限拒绝: user_id={_proxy_user_id}, permission=admin:config"
+                )
+                return Response(
+                    content=(
+                        '{"success": false, "error": {"code": "PERMISSION_DENIED", '
+                        '"message": "Permission denied: admin:config"}}'
+                    ),
+                    status_code=403,
+                    media_type="application/json",
+                )
+
             response = await node_connection_manager.send_request_to_node(
                 normalized_node_id,
                 NODE_HTTP_PROXY_REQUEST,
@@ -4690,9 +4713,13 @@ def create_app(
         from fastapi import HTTPException
 
         user_info = getattr(request.state, "user_info", None)
+        # 跨节点代理请求的 admin:config 权限已由 master 统一校验
+        # （子节点本地无 auth 数据，无法独立判定），此处不再重复校验。
+        trusted_proxy = bool(getattr(request.state, "trusted_proxy", False))
         if (
             user_info
             and user_info.get("user_id") != "system"
+            and not trusted_proxy
             and not permission_manager.check_permission(
                 user_info["user_id"], "admin:config"
             )
@@ -7045,6 +7072,7 @@ def create_app(
         headers: Dict[str, Any],
         body: str,
         user_info: Optional[Dict[str, Any]] = None,
+        trusted_proxy: bool = False,
     ) -> Dict[str, Any]:
         normalized_method = str(method or "GET").upper()
         normalized_path = "/" + str(path or "").lstrip("/")
@@ -7061,7 +7089,9 @@ def create_app(
 
         _mock_req = _MockRequest.__new__(_MockRequest)
         _mock_req.scope = {"type": "http", "state": {}}
-        _mock_req._state = _State({"user_info": user_info})
+        _mock_req._state = _State(
+            {"user_info": user_info, "trusted_proxy": trusted_proxy}
+        )
         # 若无user_info，尝试从headers解析JWT
         if user_info is None:
             auth_header = headers.get("authorization", headers.get("Authorization", ""))

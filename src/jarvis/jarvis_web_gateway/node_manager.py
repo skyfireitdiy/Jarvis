@@ -541,6 +541,7 @@ class NodeConnectionManager:
                     headers=payload.get("headers") or {},
                     body=str(payload.get("body") or ""),
                     user_info=payload.get("user_info"),
+                    trusted_proxy=True,
                 )
                 return build_node_message(
                     NODE_HTTP_PROXY_RESPONSE,
