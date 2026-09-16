@@ -11,6 +11,16 @@
   if (window.__jarvisContentScriptLoaded) return;
   window.__jarvisContentScriptLoaded = true;
 
+  // 上报 content script 已注入，便于 background 侧诊断
+  try {
+    chrome.runtime.sendMessage({
+      type: "jarvis_cs_loaded",
+      url: location.href,
+    });
+  } catch (e) {
+    // 扩展上下文失效时忽略
+  }
+
   // ---------------- 主世界桥接脚本注入 ----------------
   // content script 运行在隔离世界，无法访问页面 JS 变量，
   // 因此注入一段主世界脚本，由它调用页面暴露的 __jarvisAuthBridge。
