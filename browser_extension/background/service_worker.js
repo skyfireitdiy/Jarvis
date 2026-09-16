@@ -378,6 +378,61 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch((e) => sendResponse({ success: false, error: String(e) }));
     return true;
   }
+  // ---------------- 脚本管理（类油猴） ----------------
+  // popup 通过以下 message 管理已安装脚本，统一转发给 CommandRouter 的 script.* 路由。
+  if (message.type === "jarvis_script_list") {
+    router
+      .handle({ id: "popup", action: "script.list", params: {} })
+      .then(sendResponse)
+      .catch((e) => sendResponse({ success: false, error: String(e) }));
+    return true;
+  }
+  if (message.type === "jarvis_script_get") {
+    router
+      .handle({ id: "popup", action: "script.get", params: { id: message.id } })
+      .then(sendResponse)
+      .catch((e) => sendResponse({ success: false, error: String(e) }));
+    return true;
+  }
+  if (message.type === "jarvis_script_install") {
+    router
+      .handle({
+        id: "popup",
+        action: "script.install",
+        params: {
+          name: message.name,
+          source: message.source,
+          description: message.description,
+          match: message.match,
+          version: message.version,
+        },
+      })
+      .then(sendResponse)
+      .catch((e) => sendResponse({ success: false, error: String(e) }));
+    return true;
+  }
+  if (message.type === "jarvis_script_uninstall") {
+    router
+      .handle({
+        id: "popup",
+        action: "script.uninstall",
+        params: { id: message.id },
+      })
+      .then(sendResponse)
+      .catch((e) => sendResponse({ success: false, error: String(e) }));
+    return true;
+  }
+  if (message.type === "jarvis_script_set_enabled") {
+    router
+      .handle({
+        id: "popup",
+        action: "script.set_enabled",
+        params: { id: message.id, enabled: message.enabled },
+      })
+      .then(sendResponse)
+      .catch((e) => sendResponse({ success: false, error: String(e) }));
+    return true;
+  }
   // content script 注入上报（诊断用）
   if (message.type === "jarvis_cs_loaded") {
     console.log("[Jarvis] content script loaded:", message.url);

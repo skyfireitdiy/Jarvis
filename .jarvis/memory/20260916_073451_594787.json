@@ -1,0 +1,8 @@
+{
+  "id": "20260916_073451_594787",
+  "type": "project_long_term",
+  "tags": ["browser_extension", "脚本管理", "架构决策", "ScriptManager"],
+  "content": "Jarvis 浏览器扩展（browser_extension/）的「脚本管理」能力（类油猴）设计：\n\n【分层】\n- background/script_manager.js —— 纯数据层：存取 + 轻量静态校验，不执行脚本\n- background/executors/script_executor.js —— 执行层（待实现）：通过 chrome.scripting.executeScript({world:'MAIN'}) 注入执行\n- popup/ —— 管理 UI（待实现）\n\n【脚本格式约定】源码是一段 JS，求值后得到脚本对象：\n{name, description, version, match[], actions:{actionName:{desc, params, run(args)}}}\n兼容两种导出写法：(a) 顶层定义变量后 module.exports = {...}；(b) globalThis.__JARVIS_SCRIPT__ = {...}\n\n【存储】chrome.storage.local 的 scripts 键，结构 {id, name, description, match[], version, enabled, installed_at, updated_at, source}；id 形如 s-<随机串><时间戳>（沿用 service_worker.js 的 getClientId 写法）。\n\n【关键设计取舍】\n- list() 剔除 source、保留 source_size，避免响应过大\n- install 同名覆盖时保留原 id 与 installed_at\n- validateSource 只做语法解析（new Function 不执行）+ 关键字检查（须含 __JARVIS_SCRIPT__ 或 module.exports，须含 actions）。这是「弱保证」：挡得住语法错误，挡不住恶意代码，安全边界依赖用户只装可信脚本\n- match 字段仅作提示存储，不做强制域名拦截（有意为之）\n\n【已注册的 action 命名】script.list / script.get / script.install / script.uninstall / script.set_enabled / script.run",
+  "created_at": "2026-09-16T07:34:51.594823",
+  "updated_at": "2026-09-16T07:34:51.594828"
+}

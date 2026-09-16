@@ -1,0 +1,8 @@
+{
+  "id": "20260916_071652_606575",
+  "type": "project_long_term",
+  "tags": ["iCenter", "zeditor", "保存机制", "WebSocket", "OT"],
+  "content": "iCenter wiki 的 zeditor 编辑器保存机制（已实测确认）：\n\n【保存通道】WebSocket 协同编辑（Etherpad 风格 OT），不是 HTTP。\n- WS 地址：wss://icenterapi.zte.com.cn/zte-rdcloud-doc-ws/ws/doc?clientId=<x>&docId=<docid>&userId=<empNo>\n- 每次编辑立刻发一帧，服务端 OT 合并后自动落库、revision 递增。\n- 帧格式：{userId, clientId, docId, context:{tenantId:\"ZTE\",empNo,...}, reqId, ts, type:\"DOC_CHANGE\", subType:\"User\", baseRev:<n>, structuralChange:false, changeSet:\"Z:...\", apool:{...}}\n- changeSet 是 Etherpad OT 格式：base36 数字=保留N字符，`+`插入，`-`删除，`=`属性，`>N`换行，`$`结尾。示例：插入 Q 为 \"Z:1rk>1=1d5*0+1$Q\"。\n- 因此：没有保存按钮；点「退出编辑」不发保存请求，但内容已落库（因为编辑时已实时提交）。\n\n【抓帧方法】必须在 iframe 的 contentWindow 上 hook：\n  var P=w.WebSocket.prototype, os=P.send;\n  P.send=function(d){ w.__lastWS=this; w.__wsFull.push({d:String(d)}); return os.call(this,d); };\n注意：必须用 os.call(this,d)，用 os.apply(this,arguments) 会报 Illegal invocation。hook 构造函数只能拦新建实例（编辑态初始化时连接已建好，拦不到）。hook 会随页面重载丢失，需重装。\n\n【未解决】直接构造 DOC_CHANGE 帧（如 changeSet:\"Z:1>1775|1-1$\"）被服务端拒绝（revision 不变），绝对定位 `|` 语法或 baseRev 校验规则未逆向出来。要做纯 API 驱动还需抓真实「删除」操作的帧来对照格式。",
+  "created_at": "2026-09-16T07:16:52.606621",
+  "updated_at": "2026-09-16T07:16:52.606627"
+}

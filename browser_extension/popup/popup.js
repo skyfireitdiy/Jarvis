@@ -12,6 +12,12 @@ const els = {
   confirmNo: document.getElementById("confirmNo"),
   logBox: document.getElementById("logBox"),
   clearLogBtn: document.getElementById("clearLogBtn"),
+  // 脚本管理（类油猴）
+  scriptName: document.getElementById("scriptName"),
+  scriptSource: document.getElementById("scriptSource"),
+  scriptFile: document.getElementById("scriptFile"),
+  scriptInstallBtn: document.getElementById("scriptInstallBtn"),
+  scriptList: document.getElementById("scriptList"),
 };
 
 /** 追加一条诊断日志到 popup 面板（同时输出到 console）。 */
@@ -175,6 +181,161 @@ function hideConfirm() {
   els.confirmBox.classList.remove("show");
 }
 
+// ---------------- 脚本管理（类油猴） ----------------
+//
+// 与 background 的约定：发送 { type: "jarvis_script_*", ... }，
+// 收到结果信封 { success, data, error }，其中 data 即 ScriptManager 的返回值。
+
+/** 渲染已安装脚本列表。 */
+function renderScripts(list) {
+  const items = Array.isArray(list) ? list : [];
+  if (items.length === 0) {
+    els.scriptList.innerHTML =
+      '<div class="hint">尚未安装任何脚本。可粘贴脚本源码后点击「安装脚本」。</div>';
+    return;
+  }
+
+  els.scriptList.innerHTML = items
+    .map((s) => {
+      const enabled = s.enabled !== false;
+      const stateClass = enabled ? "connected" : "disconnected";
+      const stateText = enabled ? "已启用" : "已停用";
+      const safeName = escapeHtml(s.name || "");
+      const safeId = escapeHtml(s.id || "");
+      const safeVersion = escapeHtml(s.version || "0.0.0");
+      const safeDesc = escapeHtml(s.description || "");
+      const matchText =
+        Array.isArray(s.match) && s.match.length
+          ? escapeHtml(s.match.join(", "))
+          : "";
+      const sizeText =
+        typeof s.source_size === "number" ? `${s.source_size} 字节` : "";
+      const metaParts = [safeVersion, stateText];
+      if (matchText) metaParts.push(matchText);
+      if (sizeText) metaParts.push(sizeText);
+      return `
+        <div class="gw-item">
+          <div class="gw-head">
+            <span class="dot ${stateClass}"></span>
+            <span class="gw-url">${safeName}</span>
+          </div>
+          <div class="gw-meta hint">${metaParts.join(" · ")}</div>
+          ${safeDesc ? `<div class="gw-meta hint">${safeDesc}</div>` : ""}
+          <div class="gw-actions">
+            <button class="mini" data-script-action="${
+              enabled ? "disable" : "enable"
+            }" data-script-id="${safeId}">${enabled ? "停用" : "启用"}</button>
+            <button class="mini secondary" data-script-action="view" data-script-id="${safeId}">查看源码</button>
+            <button class="mini secondary" data-script-action="uninstall" data-script-id="${safeId}">卸载</button>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+/** 查询 background 已安装脚本并渲染。 */
+async function refreshScripts() {
+  try {
+    const resp = await chrome.runtime.sendMessage({
+      type: "jarvis_script_list",
+    });
+    if (resp && resp.success) {
+      renderScripts(resp.data);
+      const list = Array.isArray(resp.data) ? resp.data : [];
+      log(`脚本列表已刷新：${list.length} 个`);
+    } else {
+      log(`脚本列表刷新失败：${(resp && resp.error) || "background 无响应"}`);
+      renderScripts([]);
+    }
+  } catch (e) {
+    log(`脚本列表刷新异常：${(e && e.message) || String(e)}`);
+    renderScripts([]);
+  }
+}
+
+/** 安装脚本（从输入框 / 已选择的文件内容）。 */
+async function installScript() {
+  const name = els.scriptName.value.trim();
+  const source = els.scriptSource.value;
+  if (!name) {
+    alert("请填写脚本名称");
+    return;
+  }
+  if (!source || !source.trim()) {
+    alert("请粘贴脚本源码或选择本地 .js 文件");
+    return;
+  }
+  log(`请求安装脚本：${name}`);
+  try {
+    const resp = await chrome.runtime.sendMessage({
+      type: "jarvis_script_install",
+      name,
+      source,
+      description: "",
+      match: [],
+      version: "1.0.0",
+    });
+    if (resp && resp.success) {
+      log(`脚本安装成功：${name}`);
+      els.scriptName.value = "";
+      els.scriptSource.value = "";
+      els.scriptFile.value = "";
+    } else {
+      const err = (resp && resp.error) || "未知错误";
+      log(`脚本安装失败：${err}`);
+      alert("安装失败：" + err);
+    }
+  } catch (e) {
+    log(`脚本安装异常：${(e && e.message) || String(e)}`);
+  }
+  refreshScripts();
+}
+
+/** 对指定脚本执行操作：enable / disable / view / uninstall。 */
+async function scriptAction(action, id) {
+  try {
+    if (action === "enable" || action === "disable") {
+      const resp = await chrome.runtime.sendMessage({
+        type: "jarvis_script_set_enabled",
+        id,
+        enabled: action === "enable",
+      });
+      if (resp && resp.success) {
+        log(`脚本已${action === "enable" ? "启用" : "停用"}：${id}`);
+      } else {
+        log(`脚本启停失败：${(resp && resp.error) || "未知错误"}`);
+      }
+    } else if (action === "view") {
+      const resp = await chrome.runtime.sendMessage({
+        type: "jarvis_script_get",
+        id,
+      });
+      if (resp && resp.success && resp.data) {
+        els.scriptSource.value = resp.data.source || "";
+        els.scriptName.value = resp.data.name || "";
+        log(`已载入脚本源码：${resp.data.name || id}`);
+      } else {
+        log(`读取脚本源码失败：${(resp && resp.error) || "未知错误"}`);
+      }
+      return; // 查看源码不需刷新列表
+    } else if (action === "uninstall") {
+      const resp = await chrome.runtime.sendMessage({
+        type: "jarvis_script_uninstall",
+        id,
+      });
+      if (resp && resp.success) {
+        log(`脚本已卸载：${id}`);
+      } else {
+        log(`脚本卸载失败：${(resp && resp.error) || "未知错误"}`);
+      }
+    }
+  } catch (e) {
+    log(`脚本操作异常：${(e && e.message) || String(e)}`);
+  }
+  refreshScripts();
+}
+
 els.connectBtn.addEventListener("click", connect);
 els.confirmYes.addEventListener("click", () => hideConfirm());
 els.confirmNo.addEventListener("click", () => hideConfirm());
@@ -187,6 +348,33 @@ els.gwList.addEventListener("click", (event) => {
   const btn = event.target.closest("button[data-action]");
   if (!btn) return;
   gatewayAction(btn.dataset.action, btn.dataset.gateway);
+});
+
+// 脚本管理：安装按钮
+els.scriptInstallBtn.addEventListener("click", installScript);
+
+// 脚本管理：选择本地 .js 文件后把内容填入源码框
+els.scriptFile.addEventListener("change", (event) => {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    els.scriptSource.value = String(reader.result || "");
+    if (!els.scriptName.value.trim()) {
+      // 未填名称时，用文件名（去掉扩展名）作为默认脚本名
+      els.scriptName.value = file.name.replace(/\.js$/i, "");
+    }
+    log(`已读取本地脚本文件：${file.name}`);
+  };
+  reader.onerror = () => log(`读取本地脚本文件失败：${file.name}`);
+  reader.readAsText(file);
+});
+
+// 脚本列表按钮事件（事件委托）
+els.scriptList.addEventListener("click", (event) => {
+  const btn = event.target.closest("button[data-script-action]");
+  if (!btn) return;
+  scriptAction(btn.dataset.scriptAction, btn.dataset.scriptId);
 });
 
 // 监听 background 广播的状态变化
@@ -204,3 +392,4 @@ chrome.runtime.onMessage.addListener((message) => {
 // 初始化
 log("popup 已打开，开始查询状态");
 refreshStatus();
+refreshScripts();

@@ -1,0 +1,14 @@
+{
+  "id": "20260916_073956_079902",
+  "type": "project_long_term",
+  "tags": [
+    "browser_extension",
+    "脚本管理",
+    "script_executor",
+    "架构决策",
+    "action清单"
+  ],
+  "content": "Jarvis 浏览器扩展「脚本管理」（类油猴）实现要点：\n\n【文件】browser_extension/background/script_manager.js（数据层，task-30）、background/executors/script_executor.js（执行层）、command_router.js 注册 6 条路由。\n\n【存储】chrome.storage.local 的 \"scripts\" 键，结构 {id, name, description, match[], version, enabled, installed_at, updated_at, source}。list() 剔除 source 只留 source_size；install 同名覆盖时保留原 id 与 installed_at。\n\n【路由】script.list / script.get / script.install / script.uninstall / script.set_enabled / script.run（共 33 条路由，无重复键）。\n\n【执行机制】script.run → chrome.scripting.executeScript({world:\"MAIN\"}) 注入自包含函数 runScriptFn(source, actionName, args) → 内部 new Function(\"module\",\"exports\",src) 求值脚本源码 → 兼容 globalThis.__JARVIS_SCRIPT__ 与 module.exports 两种导出 → 调 actions[name].run(args)（entry 本身是函数也支持）→ safeSerialize 返回值。\n\n【错误码】SCRIPT_INVALID / SCRIPT_DISABLED / SCRIPT_NOT_FOUND / SCRIPT_RUN_ERROR / NO_TAB / PROTECTED_PAGE / EXEC_ERROR。\n\n【关键坑（已修复）】globalThis.__JARVIS_SCRIPT__ 会在同一执行上下文跨次残留：浏览器里同一页面连续 script.run 两次，若第二次脚本无导出会误用第一次的对象。修复=runScriptFn 求值前先 delete globalThis.__JARVIS_SCRIPT__。\n\n【脚本格式约定】源码必须能解析出 {name, description, version, match[], actions:{x:{run:fn}}}；validateSource 只做语法解析+关键字检查（不执行），是弱保证。match 仅作提示，不做强制域名拦截。\n\n【未完成】popup 脚本管理 UI + service_worker.js 的 5 个 jarvis_script_* message 分支；~/tmp/icenter.js 示例脚本；README 更新。",
+  "created_at": "2026-09-16T07:39:56.079935",
+  "updated_at": "2026-09-16T07:39:56.079941"
+}

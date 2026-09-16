@@ -1,0 +1,8 @@
+{
+  "id": "20260916_074758_505461",
+  "type": "project_long_term",
+  "tags": ["browser_extension", "脚本机制", "类油猴", "script.run"],
+  "content": "Jarvis 浏览器扩展「脚本管理（类油猴）」已落地（commit 范围 1b16b52..HEAD）：\n\n【文件】\nbrowser_extension/background/script_manager.js（ScriptManager：list/get/install/uninstall/setEnabled + validateSource 弱校验）\nbrowser_extension/background/executors/script_executor.js（ScriptExecutor + 导出的 runScriptFn）\nbrowser_extension/background/command_router.js（新增 6 条 script.* 路由，总 33 条）\nbrowser_extension/background/service_worker.js（新增 5 个 jarvis_script_* message 分支，转发 router.handle）\nbrowser_extension/popup/popup.html + popup.js（脚本管理 UI：安装/列表/启停/查看源码/卸载/本地文件导入）\nbrowser_extension/README.md（脚本管理章节）\n~/tmp/icenter.js（示例脚本，5 个 action：getEditor/getText/deleteRange/insertText/getServerRev）\n\n【脚本格式】源码在页面 MAIN 世界用 new Function('module','exports',src) 求值，取 module.exports 或 globalThis.__JARVIS_SCRIPT__；对象需含 name/actions，action 可为 {run(args)} 或直接函数。\n\n【关键坑（已修复）】runScriptFn 求值前必须 delete globalThis.__JARVIS_SCRIPT__，否则同页面连续 script.run 会读到上一次残留的脚本对象。\n\n【验证方法】stub chrome.storage.local/tabs/scripting + globalThis.document，直接 import CommandRouter 跑端到端（23 断言）；示例脚本 stub window.ze/fetch（23 断言）。注意：同步 throw 的 action 用 .then(ok,err) 捕获不到，测试要写 try/catch。\n\n【未做】真机验证（需用户重载扩展后手动测 UI 与 message 链路）。",
+  "created_at": "2026-09-16T07:47:58.505502",
+  "updated_at": "2026-09-16T07:47:58.505507"
+}

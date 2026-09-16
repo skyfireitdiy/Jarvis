@@ -209,6 +209,41 @@
       注意：所有网关共享同一批浏览器标签页。
     </div>
 
+    <!-- 脚本管理（类油猴）：安装 / 列表 / 启停 / 卸载自定义页面脚本 -->
+    <div class="log-title">
+      <span>脚本管理（类油猴）</span>
+    </div>
+
+    <label for="scriptName">脚本名称</label>
+    <input id="scriptName" type="text" placeholder="如 icenter" />
+
+    <label for="scriptSource">脚本源码</label>
+    <textarea
+      id="scriptSource"
+      rows="6"
+      placeholder="需导出 globalThis.__JARVIS_SCRIPT__ = { name, actions: {...} } 或 module.exports = {...}"
+      style="
+        width: 100%;
+        box-sizing: border-box;
+        padding: 6px;
+        margin-bottom: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 11px;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        resize: vertical;
+      "
+    ></textarea>
+
+    <label for="scriptFile">或从本地文件导入</label>
+    <input id="scriptFile" type="file" accept=".js,text/javascript" />
+
+    <div class="row">
+      <button id="scriptInstallBtn">安装脚本</button>
+    </div>
+
+    <div class="gw-list" id="scriptList"></div>
+
     <div class="log-title">
       <span>连接诊断日志</span>
       <button id="clearLogBtn" class="secondary">清空</button>

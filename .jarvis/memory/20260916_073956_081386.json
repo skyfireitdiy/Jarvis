@@ -1,0 +1,8 @@
+{
+  "id": "20260916_073956_081386",
+  "type": "project_long_term",
+  "tags": ["browser_extension", "验证方法", "单测", "关键约定"],
+  "content": "Jarvis 浏览器扩展（browser_extension/）的验证范式（本项目无浏览器环境、无 npm 依赖、无构建）：\n\n1) 语法：对每个 .js 跑 node --check。\n2) 清单：python3 -c \"import json;json.load(open('manifest.json'))\"。\n3) 路由完整性：用正则扫 command_router.js 的 \"key\": (p) => 提取所有路由键，检查总数与重复键。\n4) 单元/集成测试：写临时 .mjs 放 /tmp，用 globalThis.chrome = {...} stub 出 chrome.storage.local / chrome.tabs / chrome.scripting，直接 import 被测模块跑断言；测完删除临时文件。\n   - stub executeScript 时可直接调用真实注入函数模拟主世界执行：async executeScript({func,args}){ return [{result: await func(...args)}]; }\n   - 注意：stub 里不要对同一个 id 在多处抛错，否则会掩盖目标分支（曾因此测不出 PROTECTED_PAGE，实际提前报 NO_TAB）。\n5) 注入函数要 export 出来才便于单测（如 export function runScriptFn）。\n\n实测结果：runScriptFn 单元 10/10、ScriptExecutor 端到端 15/15、CommandRouter 集成 9/9 全部通过。",
+  "created_at": "2026-09-16T07:39:56.081415",
+  "updated_at": "2026-09-16T07:39:56.081420"
+}
