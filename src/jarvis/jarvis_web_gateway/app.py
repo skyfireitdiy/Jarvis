@@ -97,6 +97,7 @@ from jarvis.jarvis_web_gateway.node_protocol import (
     CONFIG_SET_REQUEST,
     CODE_UPDATE_TO_MAIN_REQUEST,
 )
+from jarvis import __version__ as JARVIS_VERSION
 from jarvis.jarvis_web_gateway.node_runtime import AgentRouteInfo, NodeRuntime
 from jarvis.jarvis_web_gateway.terminal_input_registry import TerminalInputRegistry
 from jarvis.jarvis_web_gateway.terminal_session_manager import TerminalSessionManager
@@ -4197,18 +4198,38 @@ def create_app(
 
     @app.get("/api/node/status", dependencies=[Depends(verify_token)])
     async def get_node_status() -> Dict[str, Any]:
+        # 为每个节点补充 version 字段：child 由心跳上报，master 取本机运行版本
+        nodes = []
+        has_master = False
+        for node in node_runtime.node_registry.list_all():
+            item = dict(node)
+            if item.get("node_id") == "master":
+                item["version"] = JARVIS_VERSION
+                has_master = True
+            nodes.append(item)
+        # master 自身不通过心跳注册，需确保其始终出现在节点列表中
+        if not has_master:
+            nodes.insert(
+                0,
+                {
+                    "node_id": "master",
+                    "status": "online",
+                    "version": JARVIS_VERSION,
+                },
+            )
         return {
             "success": True,
             "data": {
                 "node": node_config.to_dict(),
                 "runtime_status": node_runtime.status,
+                "version": JARVIS_VERSION,
                 "token_sync": {
                     "last_synced_at": node_runtime.token_sync_state.last_synced_at,
                     "sync_status": node_runtime.token_sync_state.sync_status,
                     "source_node_id": node_runtime.token_sync_state.source_node_id,
                     "error_message": node_runtime.token_sync_state.error_message,
                 },
-                "nodes": node_runtime.node_registry.list_all(),
+                "nodes": nodes,
                 "agent_routes": node_runtime.agent_route_registry.list_all(),
             },
         }

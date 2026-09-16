@@ -136,6 +136,14 @@
           />
           <text :x="n.x" :y="n.y + n.rh + 16" text-anchor="middle" class="lobby-node-label">{{ n.short }}</text>
           <text :x="n.x" :y="n.y + n.rh + 29" text-anchor="middle" class="lobby-node-count">{{ n.agentCount }} agent</text>
+          <text
+            v-if="n.version"
+            :x="n.x"
+            :y="n.y + n.rh + 41"
+            text-anchor="middle"
+            class="lobby-node-version"
+            :class="{ mismatch: n.versionMismatch }"
+          >{{ n.version }}</text>
         </g>
       </svg>
     </div>
@@ -597,6 +605,11 @@ const nodeLayout = computed(() => {
 const nodeItems = computed(() => {
   const list = Array.isArray(props.nodes) ? props.nodes : []
   const agentList = Array.isArray(props.agents) ? props.agents : []
+  // master 版本作为基准：与之不一致的节点视为未更新，需高亮提示
+  const masterVersion = (() => {
+    const master = list.find(n => n && n.node_id === 'master')
+    return master && master.version ? String(master.version) : ''
+  })()
   return list
     .filter(n => n && n.node_id && nodeLayout.value.has(n.node_id))
     .map(n => {
@@ -622,6 +635,10 @@ const nodeItems = computed(() => {
       // 机箱尺寸：master 略大
       const rw = isMaster ? 38 : 30
       const rh = isMaster ? 33 : 26
+      // 节点版本：child 由心跳上报，master 由网关补充；缺失时留空不显示
+      const version = n.version ? String(n.version) : ''
+      // 与 master 版本不一致（且双方都有版本）时高亮，提示该节点未更新
+      const versionMismatch = !!version && !!masterVersion && version !== masterVersion
       return {
         node_id: n.node_id,
         x: pos.x,
@@ -631,6 +648,8 @@ const nodeItems = computed(() => {
         isMaster,
         short,
         agentCount,
+        version,
+        versionMismatch,
         rw,
         rh,
         fill: state === 'offline'
@@ -1767,6 +1786,18 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden })
   pointer-events: none;
 }
 
+.lobby-node-version {
+  font-size: 9px;
+  fill: rgba(150, 190, 210, 0.4);
+  pointer-events: none;
+}
+
+/* 版本与 master 不一致：标红提示该节点未更新 */
+.lobby-node-version.mismatch {
+  fill: #ff5d6c;
+  font-weight: 600;
+}
+
 .lobby-node.is-center .lobby-node-label {
   fill: rgba(255, 232, 154, 0.7);
 }
@@ -1774,6 +1805,10 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden })
 .lobby-node.is-center .lobby-node-count {
   fill: rgba(255, 232, 154, 0.6);
   opacity: 0.9;
+}
+
+.lobby-node.is-center .lobby-node-version {
+  fill: rgba(255, 232, 154, 0.5);
 }
 
 /* 地板上的 Slogan：刻在地面、经年磨损的沧桑质感 */

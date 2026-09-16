@@ -52,6 +52,11 @@ def update_version(version_type: str) -> str:
             r'version\s*=\s*["\']([^"\']+)["\']',
             f'version = "{new_version}"',
         ),
+        # 浏览器扩展版本与主版本保持一致（扩展通过网关下载分发）
+        "browser_extension/manifest.json": (
+            r'"version"\s*:\s*"([^"]+)"',
+            f'"version": "{new_version}"',
+        ),
     }
     for file_path, (pattern, replacement) in files_to_update.items():
         path = Path(file_path)

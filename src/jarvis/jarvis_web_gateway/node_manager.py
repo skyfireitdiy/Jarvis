@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 
+from jarvis import __version__ as JARVIS_VERSION
 from jarvis.jarvis_utils.exception_utils import save_exception
 import asyncio
 import ipaddress
@@ -194,8 +195,12 @@ class NodeConnectionManager:
                     payload = next_message.get("payload") or {}
                     system_info = payload.get("system_info") or {}
                     description = payload.get("description") or ""
+                    version = payload.get("version") or None
                     self._node_runtime.node_registry.mark_heartbeat(
-                        node_id, system_info=system_info, description=description
+                        node_id,
+                        system_info=system_info,
+                        description=description,
+                        version=version,
                     )
                     continue
                 # 响应消息处理：如果有request_id，尝试匹配pending请求或流式队列
@@ -1680,6 +1685,7 @@ class ChildNodeClient:
                                 "node_id": config.effective_node_id,
                                 "system_info": system_info,
                                 "description": description,
+                                "version": JARVIS_VERSION,
                             },
                         )
                     )

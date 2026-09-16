@@ -21,6 +21,7 @@ class NodeInfo:
     metadata: Dict[str, Any] = field(default_factory=dict)
     system_info: Dict[str, Any] = field(default_factory=dict)
     description: str = ""
+    version: Optional[str] = None
 
 
 @dataclass
@@ -80,6 +81,7 @@ class NodeRegistry:
         node_id: str,
         system_info: Optional[Dict[str, Any]] = None,
         description: Optional[str] = None,
+        version: Optional[str] = None,
     ) -> None:
         node = self._nodes.get(node_id)
         if node is None:
@@ -92,6 +94,8 @@ class NodeRegistry:
             node.system_info = system_info
         if description is not None:
             node.description = description
+        if version is not None:
+            node.version = version
 
     def mark_offline(self, node_id: str) -> None:
         node = self._nodes.get(node_id)
