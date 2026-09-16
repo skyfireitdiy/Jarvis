@@ -145,6 +145,63 @@ globalThis.__JARVIS_SCRIPT__ = {
 - 坐标/偏移类操作要建立两套坐标系（如「读取文本的字符偏移」与「删除接口的偏移」）的映射，
   直接混用会删错位置；每次点击后校验焦点元素位置再继续。
 
+### 操作四：嵌入 iframe 的富文本编辑器（以 iCenter zeditor 为例）
+
+**背景（已实测）：** iCenter wiki 的文档渲染在 `iframe` 内，编辑器对象是 iframe `contentWindow.ze`。
+页面走 WebSocket 协同编辑（Etherpad 风格 OT），**编辑即实时落库、没有保存按钮**，
+因此验证写操作必须查服务端 `revision`，不能只看本地 DOM。
+
+**执行步骤：**
+
+1. 取编辑器对象：遍历 `document.querySelectorAll("iframe")`，在 `contentWindow` 上找 `ze`，
+   全程 `try/catch` 兜底（跨域 iframe 会抛错）。
+2. 注入脚本时用 **iframe 自己的 `Function` 构造器**：`new w.Function("module","exports",src)`。
+   若用外层 `new Function` 再 `fn.call(w, ...)`，`globalThis` 仍指向外层 window，
+   `w.__JARVIS_SCRIPT__` 会取不到。注入前先 `delete w.__JARVIS_SCRIPT__`。
+3. 富文本写入统一走命令层：`ze.executeCommandAndMoveCursor({ command, range:{startOffset,endOffset}, data })`。
+   **禁止**直接调 `ze.otAdaptor.applyBatchOperations(...)`，会破坏内部状态（报 `Too many closing tags`）。
+4. 写前先 `ze.focus()` 建立真实 DOM 选区，再 `ze.setSelection(offset)`。
+5. 写后用服务端接口读 `revision`/`contentBody` 校验落库。
+
+**已验证的 zeditor 能力（实测有效）：**
+
+| 能力       | 调用方式                                                                                                                                                                        |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 纯文本插入 | `addTextAndAttribs` + `data:{text}`                                                                                                                                             |
+| 富文本     | `addTextAndAttribs` + `data:{text, attribs}`；`attribs` 支持 `size`（**不带 px**，`'24'`→`24px`，传 `'24px'` 会变 `24pxpx`）、`family`、`color`、`bold:'true'`、`href`+`target` |
+| 超链接     | 同上，`attribs:{href, target}`                                                                                                                                                  |
+| 表格插入   | `ze.clipboard.inserter.insetHtmlIntoDocByDefault('<table border="1">…</table>')`，普通 HTML 表格会被解析为原生表格节点                                                          |
+| 读取       | `ze.getText()` / `ze.getHtml()` / `ze.getTextLength()`（返回 `[len, 字号]`）/ `ze.getMacroList()`（**返回 Promise**）                                                           |
+
+**未攻克 / 不稳定（不要臆断为可用）：**
+
+- **段落级属性**（行距 `lineHeight`、对齐 `textAlign`）：走 `applyBatchOperations` + `attribs:{lineHeight,textAlign,'tag-start':'p'}`，
+  仅当编辑器处于**真实交互态**（用户点击过文档、有真实 DOM 选区、range 长度为 0/1）时才生效；
+  纯脚本 `setSelection` 后调用时 `revision` 会变但段落 style 常不更新。唯一稳定成功路径是**真实点击菜单项**。
+- **宏插入**：直接插 `<div tag-start="blockMacro" macro-key="…">` 的 HTML **不被识别**（`revision` 不变），
+  需走 `ze.macroEngine.getMacroCreateUtils(key)` 注册流程（`macroNode`/`attribute`/`params`/`genNodesByHtml`，
+  核心是 `coreModelNodeToMacroNode`），尚未攻克。
+- **代码块**：本质是宏（`CodeLanguageMacro`/`MarkdownMacro`），`<pre><code>` HTML 会被过滤，尚未攻克。
+
+#### 关键坑：offset 体系不一致
+
+- 写操作的 `offset` 是 zeditor **内部 offset**，来源 `ze.otAdaptor.rep.text`；
+  它与 `ze.getText()` 的语义索引**不一致**（`getText()` 含 `\n`，内部文本用空格填充）。
+- **必须**用 `ze.otAdaptor.rep.text.indexOf(目标文本)` 求内部 offset，再 `setSelection`；
+  直接拿 `getText()` 的下标去写会插错位置。
+- offset 落在表格内部会报 `Error: pos=…, table cannot contain text`，插入点必须避开表格区间。
+
+**其他实测坑：**
+
+- 清空单元格：点进单元格 → `End` → `Backspace` × N（N 给足，超出无副作用）。
+  **严禁 `Ctrl+A`**（那是全选整个文档，配合 Delete 会删光全文）；慎用 `Home`+`Shift+End`+`Delete`
+  （只作用于当前视觉行，单元格内容换行时会有残留）。误删可用 `Ctrl+Z` 撤销。
+- 单元格文字过长会换行占多行，`input.ze-input` 的 `style.top` 反映**光标所在视觉行**而非单元格顶部。
+- 点击坐标有抖动，每次点击后必须校验 `input.ze-input` 的 `style.left/top` 命中目标单元格再继续操作。
+- 通过 CDP 发键盘事件必须给全 `key`/`code`/`windowsVirtualKeyCode`/`nativeVirtualKeyCode`，
+  `Shift` 用 `modifiers=8`、`Ctrl` 用 `modifiers=2`，否则事件无效。
+- 每列填完后列宽会变，后续列需重新扫描 x 坐标标定。
+
 ## 检查清单
 
 完成任务后，你必须确认：
