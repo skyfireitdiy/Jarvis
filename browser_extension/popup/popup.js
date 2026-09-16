@@ -226,6 +226,7 @@ function renderScripts(list) {
               enabled ? "disable" : "enable"
             }" data-script-id="${safeId}">${enabled ? "停用" : "启用"}</button>
             <button class="mini secondary" data-script-action="view" data-script-id="${safeId}">查看源码</button>
+            <button class="mini secondary" data-script-action="export" data-script-id="${safeId}">导出</button>
             <button class="mini secondary" data-script-action="uninstall" data-script-id="${safeId}">卸载</button>
           </div>
         </div>
@@ -292,7 +293,41 @@ async function installScript() {
   refreshScripts();
 }
 
-/** 对指定脚本执行操作：enable / disable / view / uninstall。 */
+/**
+ * 导出脚本为 .js 文件（浏览器下载），便于分享给他人安装。
+ * @param {string} id 脚本 ID
+ */
+async function exportScript(id) {
+  try {
+    const resp = await chrome.runtime.sendMessage({
+      type: "jarvis_script_export",
+      id,
+    });
+    if (!resp || !resp.success || !resp.data) {
+      log(`脚本导出失败：${(resp && resp.error) || "未知错误"}`);
+      alert("导出失败：" + ((resp && resp.error) || "未知错误"));
+      return;
+    }
+    const { filename, content } = resp.data;
+    // 用 Blob + a[download] 触发下载（popup 内可用，无需额外权限）
+    const blob = new Blob([content || ""], {
+      type: "text/javascript;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename || "script.js";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    log(`脚本已导出：${filename}`);
+  } catch (e) {
+    log(`脚本导出异常：${(e && e.message) || String(e)}`);
+  }
+}
+
+/** 对指定脚本执行操作：enable / disable / view / export / uninstall。 */
 async function scriptAction(action, id) {
   try {
     if (action === "enable" || action === "disable") {
@@ -319,6 +354,9 @@ async function scriptAction(action, id) {
         log(`读取脚本源码失败：${(resp && resp.error) || "未知错误"}`);
       }
       return; // 查看源码不需刷新列表
+    } else if (action === "export") {
+      await exportScript(id);
+      return; // 导出不需刷新列表
     } else if (action === "uninstall") {
       const resp = await chrome.runtime.sendMessage({
         type: "jarvis_script_uninstall",

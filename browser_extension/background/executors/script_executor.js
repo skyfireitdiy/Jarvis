@@ -35,6 +35,11 @@ export class ScriptExecutor {
     return this.manager.uninstall(id);
   }
 
+  /** 导出脚本为可分享的独立文件内容。 */
+  async exportScript({ id }) {
+    return this.manager.exportScript(id);
+  }
+
   /** 启用 / 停用脚本。 */
   async setEnabled({ id, enabled }) {
     return this.manager.setEnabled(id, enabled);

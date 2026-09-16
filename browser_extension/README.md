@@ -121,9 +121,28 @@ globalThis.__JARVIS_SCRIPT__ = {
 1. 打开扩展 popup → 「脚本管理（类油猴）」
 2. 把脚本源码粘贴到「脚本源码」框（或点「或从本地文件导入」选择 `.js` 文件）
 3. 填脚本名称 → 点「安装脚本」
-4. 列表中可对每个脚本「启用 / 停用」「查看源码」「卸载」
+4. 列表中可对每个脚本「启用 / 停用」「查看源码」「导出」「卸载」
 
 Agent 侧通过 `script.list` 查询已装脚本，再用 `script.run` 调用其某个 action。
+
+### 导出与分享
+
+列表中的「导出」按钮会把脚本导出为 `<name>.js` 文件（浏览器下载），文件顶部带一段元信息注释：
+
+```js
+// ===== Jarvis 脚本导出 =====
+// name: icenter
+// version: 1.0.1
+// description: iCenter wiki(zeditor) 文档读写操作
+// match: i.zte.com.cn
+// 安装方式：扩展 popup →「脚本管理」→ 粘贴本文件内容或从本地文件导入。
+// ===========================
+
+globalThis.__JARVIS_SCRIPT__ = { ... };
+```
+
+把该文件发给他人，对方用「从本地文件导入」或粘贴源码即可安装，无需任何格式转换。
+Agent 侧也可用 `script.export` 取回同样的文本内容（返回 `{ filename, name, version, content }`）。
 
 ### 执行机制与安全说明
 
@@ -143,7 +162,7 @@ Agent 侧通过 `script.list` 查询已装脚本，再用 `script.run` 调用其
 | 导航   | `page.navigate` `page.reload` `page.back` `page.forward`                                                                                                |
 | DOM    | `dom.query` `dom.get_text` `dom.get_html` `dom.click` `dom.type` `dom.hover` `dom.select` `dom.wait_for` `dom.press_key` `dom.scroll` `dom.upload_file` |
 | 脚本   | `script.execute`（执行任意 JS 代码，高危）                                                                                                              |
-| 脚本库 | `script.list` `script.get` `script.install` `script.uninstall` `script.set_enabled` `script.run`（类油猴脚本管理）                                      |
+| 脚本库 | `script.list` `script.get` `script.install` `script.uninstall` `script.export` `script.set_enabled` `script.run`（类油猴脚本管理）                      |
 | 捕获   | `capture.screenshot`（支持 `full_page` 整页截图）                                                                                                       |
 
 ## 消息协议
