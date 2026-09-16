@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 from collections import deque
 from contextlib import asynccontextmanager
+import io
 import json
 from queue import Empty
 from queue import Queue
@@ -22,6 +23,7 @@ import sys
 import threading
 import time
 import uuid
+import zipfile
 
 import yaml  # type: ignore[import-untyped]
 from datetime import datetime
@@ -292,6 +294,76 @@ _node_runtime: Optional["NodeRuntime"] = None
 def get_browser_extension_manager() -> "BrowserExtensionManager":
     """获取全局浏览器扩展连接管理器（供工具层使用）。"""
     return browser_extension_manager
+
+
+# 浏览器扩展源码目录名（位于仓库根目录，随网关一起分发）
+BROWSER_EXTENSION_DIR_NAME = "browser_extension"
+# 打包时需排除的目录/文件名（缓存与系统垃圾文件）
+BROWSER_EXTENSION_EXCLUDE_NAMES = {"__pycache__", ".DS_Store", ".git"}
+
+
+def resolve_browser_extension_dir() -> Optional[str]:
+    """定位浏览器扩展源码目录（含 manifest.json 的 browser_extension 目录）。
+
+    从本文件所在位置逐级向上查找，兼容源码/可编辑安装与打包安装两种布局。
+
+    Returns:
+        扩展目录绝对路径；未找到时返回 None
+    """
+    current = pathlib.Path(__file__).resolve()
+    for candidate_root in (current.parent, *current.parents):
+        candidate = candidate_root / BROWSER_EXTENSION_DIR_NAME
+        if (candidate / "manifest.json").is_file():
+            return str(candidate)
+    return None
+
+
+def read_browser_extension_version(extension_dir: str) -> str:
+    """读取浏览器扩展 manifest.json 中的版本号。
+
+    Args:
+        extension_dir: 扩展目录绝对路径
+
+    Returns:
+        版本号字符串；读取失败时回退为 "unknown"
+    """
+    try:
+        manifest_path = os.path.join(extension_dir, "manifest.json")
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+        version = str(manifest.get("version") or "").strip()
+        return version or "unknown"
+    except Exception:
+        return "unknown"
+
+
+def build_browser_extension_zip(extension_dir: str) -> bytes:
+    """把浏览器扩展源码目录打包为 zip 字节流。
+
+    zip 内条目均为相对扩展根目录的相对路径，并排除缓存/系统垃圾文件，
+    避免路径穿越与无关文件混入。
+
+    Args:
+        extension_dir: 扩展目录绝对路径
+
+    Returns:
+        zip 文件字节内容
+    """
+    root = pathlib.Path(extension_dir).resolve()
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for file_path in sorted(root.rglob("*")):
+            if not file_path.is_file():
+                continue
+            relative = file_path.relative_to(root)
+            if any(part in BROWSER_EXTENSION_EXCLUDE_NAMES for part in relative.parts):
+                continue
+            # 二次校验：确保最终路径仍在扩展根目录内（防路径穿越）
+            resolved = file_path.resolve()
+            if root != resolved and root not in resolved.parents:
+                continue
+            zf.write(resolved, arcname=relative.as_posix())
+    return buffer.getvalue()
 
 
 MAX_FILE_SIZE_BYTES = 1024 * 1024
@@ -2160,6 +2232,65 @@ def create_app(
         except Exception as exc:
             return {"success": False, "error": str(exc)}
         return {"success": True, "result": result}
+        return {"success": True, "result": result}
+
+    @app.get("/api/browser-ext/download", dependencies=[Depends(verify_token)])
+    async def api_browser_ext_download() -> Response:
+        """动态打包浏览器扩展源码并作为 zip 附件下载。
+
+        扩展源码位于仓库根目录 browser_extension/，此处按需打包，
+        保证下载到的扩展版本与当前网关版本一致。
+        """
+        extension_dir = resolve_browser_extension_dir()
+        if not extension_dir:
+            return Response(
+                content=json.dumps(
+                    {"success": False, "error": "browser extension not found"}
+                ),
+                media_type="application/json",
+                status_code=404,
+            )
+        try:
+            # 打包为 CPU 密集型操作，放入线程池避免阻塞事件循环
+            payload = await asyncio.to_thread(
+                build_browser_extension_zip, extension_dir
+            )
+        except Exception as exc:
+            return Response(
+                content=json.dumps({"success": False, "error": str(exc)}),
+                media_type="application/json",
+                status_code=500,
+            )
+        version = read_browser_extension_version(extension_dir)
+        filename = f"jarvis-browser-bridge-{version}.zip"
+        return Response(
+            content=payload,
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(len(payload)),
+            },
+        )
+
+    @app.get("/api/browser-ext/version", dependencies=[Depends(verify_token)])
+    async def api_browser_ext_version() -> Dict[str, Any]:
+        """返回网关打包的扩展最新版本与在线扩展版本，供前端检测更新。"""
+        extension_dir = resolve_browser_extension_dir()
+        latest_version = (
+            read_browser_extension_version(extension_dir) if extension_dir else None
+        )
+        sessions = [
+            {
+                "session_id": s.get("session_id"),
+                "extension_version": s.get("extension_version"),
+            }
+            for s in browser_extension_manager.list_sessions()
+        ]
+        return {
+            "success": True,
+            "latest_version": latest_version,
+            "sessions": sessions,
+        }
 
     @app.get("/api/chat/room-members", dependencies=[Depends(verify_token)])
     async def api_chat_get_room_members(request: Request) -> Dict[str, Any]:

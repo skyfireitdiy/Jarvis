@@ -512,6 +512,8 @@
           :connectionStatus="connectionStatus"
           :connectionLabel="connectionLabel"
           :currentUserName="auth.userInfo?.display_name || auth.userInfo?.username || ''"
+          :downloadExtension="downloadBrowserExtension"
+          :checkExtensionVersion="fetchBrowserExtensionVersion"
           :contextActions="lobbyContextActions"
           :agentGroups="agentGroups"
           @selectAgent="onLobbySelectAgent"
@@ -1960,6 +1962,49 @@ const gatewayAddressDisplay = computed(() => {
   const { host, port } = getGatewayAddress()
   return `${host}:${port}`
 })
+
+// 下载浏览器扩展 zip 包：请求网关动态打包接口，触发浏览器下载
+async function downloadBrowserExtension() {
+  const { host, port } = getGatewayAddress()
+  const url = `${getHttpProtocol()}://${host}:${port}/api/browser-ext/download`
+  const response = await fetchWithAuth(url)
+  if (!response.ok) {
+    throw new Error(`下载失败（HTTP ${response.status}）`)
+  }
+  // 优先使用后端 Content-Disposition 中的文件名
+  let filename = 'jarvis-browser-bridge.zip'
+  const disposition = response.headers.get('Content-Disposition') || ''
+  const matched = disposition.match(/filename="?([^";]+)"?/i)
+  if (matched && matched[1]) filename = matched[1]
+  const blob = await response.blob()
+  const objectUrl = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = objectUrl
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.URL.revokeObjectURL(objectUrl)
+}
+
+// 查询浏览器扩展版本信息：返回网关打包版本与在线扩展版本，供前端提示升级
+async function fetchBrowserExtensionVersion() {
+  try {
+    const { host, port } = getGatewayAddress()
+    const url = `${getHttpProtocol()}://${host}:${port}/api/browser-ext/version`
+    const response = await fetchWithAuth(url)
+    if (!response.ok) return null
+    const result = await response.json()
+    if (!result || !result.success) return null
+    return {
+      latestVersion: result.latest_version || '',
+      sessions: Array.isArray(result.sessions) ? result.sessions : []
+    }
+  } catch (e) {
+    // 版本查询失败不应影响弹层展示
+    return null
+  }
+}
 
 // 弹窗控制
 const showConnectModal = ref(true)  // 首次打开显示欢迎界面
