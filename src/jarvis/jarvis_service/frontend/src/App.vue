@@ -12987,9 +12987,20 @@ function sendHeartbeat() {
 // ========== 浏览器扩展登录态桥接 ==========
 // 供 Jarvis 浏览器扩展读取当前登录态，避免用户重复登录或手填 Token。
 // 扩展通过主世界脚本调用 window.__jarvisAuthBridge.getToken() 获取 Token，
-// 并在 Token 变化时收到 jarvis_token_changed 广播。
+// 并通过 getGateway() 获取当前配置的网关地址（网关与前端可能不同域名），
+// 以便扩展把 Token 关联到正确的网关。
 window.__jarvisAuthBridge = {
   getToken: () => auth.value.token || null,
+  getGateway: () => {
+    const parsed = parseGatewayAddress(gatewayUrl.value)
+    if (!parsed) return null
+    const scheme = parsed.protocol === 'ws' || parsed.protocol === 'wss'
+      ? 'http'
+      : parsed.protocol || 'http'
+    const host = parsed.host || window.location.hostname || '127.0.0.1'
+    const port = parsed.port || '8000'
+    return `${scheme}://${host}:${port}`
+  },
 }
 
 watch(

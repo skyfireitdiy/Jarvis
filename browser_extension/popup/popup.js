@@ -10,7 +10,22 @@ const els = {
   confirmDesc: document.getElementById("confirmDesc"),
   confirmYes: document.getElementById("confirmYes"),
   confirmNo: document.getElementById("confirmNo"),
+  logBox: document.getElementById("logBox"),
+  clearLogBtn: document.getElementById("clearLogBtn"),
 };
+
+/** 追加一条诊断日志到 popup 面板（同时输出到 console）。 */
+function log(message) {
+  const time = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+  const line = `[${time}] ${message}`;
+  console.log("[Jarvis popup]", message);
+  if (!els.logBox) return;
+  const div = document.createElement("div");
+  div.className = "log-line";
+  div.textContent = line;
+  els.logBox.appendChild(div);
+  els.logBox.scrollTop = els.logBox.scrollHeight;
+}
 
 const STATE_TEXT = {
   connected: "已连接",
@@ -78,8 +93,21 @@ async function refreshStatus() {
     });
     if (resp && resp.success) {
       renderGateways(resp.gateways);
+      const list = Array.isArray(resp.gateways) ? resp.gateways : [];
+      if (list.length === 0) {
+        log("状态刷新：无网关");
+      } else {
+        for (const gw of list) {
+          log(
+            `状态刷新：${gw.gateway} state=${gw.state} has_token=${gw.has_token}`,
+          );
+        }
+      }
+    } else {
+      log("状态刷新失败：background 无响应");
     }
   } catch (e) {
+    log(`状态刷新异常：${(e && e.message) || String(e)}`);
     renderGateways([]);
   }
 }
@@ -91,15 +119,20 @@ async function connect() {
     alert("请填写网关地址");
     return;
   }
+  log(`请求连接：${gateway}`);
   try {
     const resp = await chrome.runtime.sendMessage({
       type: "jarvis_connect",
       gateway,
     });
     if (resp && !resp.success) {
+      log(`连接失败：${resp.error || "未知错误"}`);
       alert("连接失败：" + (resp.error || "未知错误"));
+    } else {
+      log("已向 background 发出连接请求");
     }
   } catch (e) {
+    log(`发送消息异常：${(e && e.message) || String(e)}`);
     console.error("[Jarvis] connect failed", e);
   }
   els.gateway.value = "";
@@ -145,6 +178,9 @@ function hideConfirm() {
 els.connectBtn.addEventListener("click", connect);
 els.confirmYes.addEventListener("click", () => hideConfirm());
 els.confirmNo.addEventListener("click", () => hideConfirm());
+els.clearLogBtn.addEventListener("click", () => {
+  if (els.logBox) els.logBox.innerHTML = "";
+});
 
 // 网关列表按钮事件（事件委托）
 els.gwList.addEventListener("click", (event) => {
@@ -156,6 +192,7 @@ els.gwList.addEventListener("click", (event) => {
 // 监听 background 广播的状态变化
 chrome.runtime.onMessage.addListener((message) => {
   if (message && message.type === "jarvis_state") {
+    log("收到状态广播");
     renderGateways(message.gateways);
   }
   if (message && message.type === "jarvis_confirm") {
@@ -165,4 +202,5 @@ chrome.runtime.onMessage.addListener((message) => {
 });
 
 // 初始化
+log("popup 已打开，开始查询状态");
 refreshStatus();
