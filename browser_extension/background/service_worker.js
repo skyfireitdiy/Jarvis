@@ -231,7 +231,7 @@ async function handleAuthError(gateway, code, reason) {
 
   let token = null;
   try {
-    token = await requestTokenFromPages(g);
+    token = await refreshTokenFromPages(g);
   } catch (e) {
     console.warn("[Jarvis] token re-probe failed", g, e);
   }
@@ -243,7 +243,6 @@ async function handleAuthError(gateway, code, reason) {
     broadcastState();
     return;
   }
-  tokens.set(tokenKey, token);
   console.log(
     "[Jarvis] reconnecting with refreshed token for",
     g,
@@ -325,8 +324,17 @@ async function connect(gateway, force = false) {
   client.connect(g, token);
 }
 
-/** 断开指定网关连接。 */
-function disconnect(gateway) {
+/**
+ * 断开指定网关连接。
+ *
+ * 断开后立即清空该网关的 Token 缓存，避免下次连接复用可能已失效的旧 Token；
+ * 随后异步从页面重新探测一次登录态，探测到则写回缓存，供下次 connect 直接使用
+ * （探测结果不触发连接，用户点「连接」时才真正建立 WebSocket）。
+ *
+ * @param {string} gateway 网关地址
+ * @param {boolean} skipProbe 为 true 时不重新探测 Token（用于移除网关等场景）
+ */
+function disconnect(gateway, skipProbe = false) {
   const g = normalizeGateway(gateway);
   const client = clients.get(g);
   if (client) {
@@ -334,9 +342,40 @@ function disconnect(gateway) {
     clients.delete(g);
   }
   sessions.delete(g);
+  const tokenKey = gatewayKey(g);
+  // 清空 Token 缓存，避免复用失效 Token
+  tokens.delete(tokenKey);
   // 主动断开视为用户意图，重置鉴权失败计数
-  authErrorAttempts.delete(gatewayKey(g));
+  authErrorAttempts.delete(tokenKey);
   setState(g, "disconnected");
+  if (skipProbe) return;
+  // 异步重新探测页面登录态，不阻塞断开流程
+  refreshTokenFromPages(g).catch((e) =>
+    console.warn("[Jarvis] refresh token after disconnect failed", g, e),
+  );
+}
+
+/**
+ * 从页面重新探测 Token 并写回缓存（不建立连接）。
+ * 探测不到时不写入，保持缓存为空，由后续 connect 决定如何提示。
+ */
+async function refreshTokenFromPages(gateway) {
+  const g = normalizeGateway(gateway);
+  if (!g) return null;
+  let token = null;
+  try {
+    token = await requestTokenFromPages(g);
+  } catch (e) {
+    console.warn("[Jarvis] token probe failed", g, e);
+    return null;
+  }
+  if (token) {
+    tokens.set(gatewayKey(g), token);
+    console.log("[Jarvis] token refreshed from page for", g);
+  } else {
+    console.log("[Jarvis] no token available from page for", g);
+  }
+  return token;
 }
 
 /**
@@ -500,7 +539,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   if (message.type === "jarvis_remove_gateway") {
     const g = normalizeGateway(message.gateway);
-    disconnect(g);
+    // 网关已被移除，无需再探测 Token
+    disconnect(g, true);
     // disconnect 会重新写入 states，需在其后再清理，避免残留幽灵条目
     clients.delete(g);
     sessions.delete(g);
