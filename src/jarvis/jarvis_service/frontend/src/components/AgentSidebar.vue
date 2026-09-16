@@ -237,6 +237,7 @@
       @pointermove="onRestorePointerMove"
       @pointerup="onRestorePointerUp"
       @pointercancel="onRestorePointerUp"
+      @contextmenu.prevent.stop="onRestoreContextMenu"
     >🐾</button>
 
     <!-- 宠物环形菜单：右键宠物 / 🐾 展开「当前 Agent」命令 -->
@@ -1105,6 +1106,9 @@ function onPetPointerDown(e) {
 
 // 右键：弹出环形技能菜单（与双击行为互换）
 function onPetContextMenu(e) {
+  // 右键会先触发 pointerdown/up：清掉待执行的单击判定，避免右键后误触发单击动作
+  clearTimeout(petClickTimer)
+  petClickTimer = 0
   togglePetMenu(e.clientX, e.clientY)
 }
 
@@ -1405,6 +1409,14 @@ function onRestorePointerDown(e) {
       onPetDoubleClick(r.left + r.width / 2, r.top + r.height / 2)
     }
   }, 600)
+}
+
+// 隐藏态还原按钮（🐾）右键：与显示态宠物一致，弹出环形技能菜单
+function onRestoreContextMenu(e) {
+  // 右键会先触发 pointerdown/up：清掉待执行的单击（唤回）判定，避免右键后误唤回宠物
+  clearTimeout(restoreClickTimer)
+  restoreClickTimer = 0
+  togglePetMenu(e.clientX, e.clientY)
 }
 
 function onRestorePointerMove(e) {
