@@ -163,19 +163,40 @@ async function handleMessage(gateway, msg) {
   }
 }
 
-/** 更新某网关状态并广播。 */
+/**
+ * 更新某网关状态并广播。
+ *
+ * 状态未变化时直接返回：MV3 的 service worker 每次被唤醒都会重跑模块顶层代码
+ * （含 connectAll），会为每个网关新建 WsClient 并重新走 connecting → connected
+ * → hello_ack，若不去重则每次唤醒都向 popup 连发多次广播，形成广播风暴。
+ */
 function setState(gateway, state) {
+  if (states.get(gateway) === state) return;
   states.set(gateway, state);
   updateActionIcon();
   broadcastState();
 }
 
-/** 为指定网关建立连接（若已连接则先关闭）。 */
-async function connect(gateway) {
+/**
+ * 为指定网关建立连接。
+ *
+ * @param {string} gateway 网关地址
+ * @param {boolean} force 为 true 时强制重建连接（用户显式点击「连接」用于重试）；
+ *   为 false 时若已有处于 connecting/connected 的连接则直接复用，
+ *   避免 service worker 被唤醒重跑 connectAll 时把健康连接掐断重建。
+ */
+async function connect(gateway, force = false) {
   const g = normalizeGateway(gateway);
   if (!g) {
     console.warn("[Jarvis] empty gateway, skip connect");
     return;
+  }
+  if (!force) {
+    const current = clients.get(g);
+    if (current && current.isAlive()) {
+      console.log("[Jarvis] connect: reuse existing connection for", g);
+      return;
+    }
   }
   // Token 优先使用当前登录态；若尚未获取，则主动向页面请求一次
   const tokenKey = gatewayKey(g);
@@ -369,7 +390,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
     }
     addGateway(gateway)
-      .then(() => connect(gateway))
+      .then(() => connect(gateway, true))
       .then(() => sendResponse({ success: true }))
       .catch((e) =>
         sendResponse({ success: false, error: (e && e.message) || String(e) }),
