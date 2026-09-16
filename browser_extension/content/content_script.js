@@ -11,6 +11,14 @@
   if (window.__jarvisContentScriptLoaded) return;
   window.__jarvisContentScriptLoaded = true;
 
+  // 在 DOM 上留标记：隔离世界与页面主世界共享 DOM，
+  // 主世界可通过 document.documentElement.dataset.jarvisCsLoaded 诊断注入状态。
+  try {
+    document.documentElement.dataset.jarvisCsLoaded = String(Date.now());
+  } catch (e) {
+    // DOM 尚不可用时忽略
+  }
+
   // 上报 content script 已注入，便于 background 侧诊断
   try {
     chrome.runtime.sendMessage({
