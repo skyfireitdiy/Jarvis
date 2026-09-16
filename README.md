@@ -1,15 +1,23 @@
-# 🤖 Jarvis AI 助手
+# Jarvis AI 助手
 
 ![Jarvis Logo](docs/images/jarvis-logo.svg)
 
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+> ## 🏆 第三届开放原子大赛总冠军
+>
+> **「智锻代码·开源鸿蒙全球 AI Agent 代码生成挑战赛」总冠军**（99 支报名团队）
+>
+> - 🤖 **超 1 万次 Agent 自举提交**：2025 年 5795 次 + 2026 年 4524 次，**99% 以上由 CodeAgent 自主完成**
+> - 🏢 **中兴通讯内部深度使用验证**：约 20 人研发协作单元，累计代码开发超 5 万行，超 5 个内部工具以 SDK 方式集成
+> - 📦 **项目规模**：319 个 Python 文件、158181 行代码、84 个测试文件、1064 个测试用例（v5.0.1）
+
 ## 让 Agent 从「独自工作」走向「与众共事」 🚀
 
 **一句话**：本地运行、开箱即用、可深度定制的**协作式 AI 开发平台**——完整覆盖「单人单 Agent、单人多 Agent、多人单 Agent、多人多 Agent」四种协作模式，写代码、做审查、跑自动化、做安全分析、搞 C→Rust 迁移，一个命令行搞定。
 
-[为什么选 Jarvis](#-为什么选-jarvis) · [协作模式](#协作模式四象限) · [访问方式](#-访问方式) · [核心能力](#-核心能力) · [快速开始](#-快速开始) · [常用命令](#-常用命令) · [文档导航](#-文档导航) · [Python SDK](#-python-sdk-集成) · [系统架构](#-系统架构) · [配置说明](#-配置说明) · [扩展能力](#-扩展能力) · [贡献指南](#-贡献指南)
+[为什么选 Jarvis](#-为什么选-jarvis) · [协作模式](#协作模式四象限) · [访问方式](#-访问方式) · [核心能力](#-核心能力) · [快速开始](#-快速开始) · [常用命令](#-常用命令) · [Python SDK](#-python-sdk-集成) · [配置说明](#-配置说明) · [扩展能力](#-扩展能力) · [贡献指南](#-贡献指南)
 
 ---
 
@@ -45,9 +53,10 @@ Jarvis 是一个面向开发者的 **协作式 AI 开发平台**。它不只是�
 
 ### 核心亮点
 
-- 🏆 **第三届开放原子大赛「智锻代码·开源鸿蒙全球 AI Agent 代码生成挑战赛」总冠军**（99 支报名团队）
-- 🤖 **超 1 万次 Agent 自举提交**（2025 年 5795 次 + 2026 年 4524 次，99% 以上由 CodeAgent 自主完成）
-- 🏢 **中兴通讯内部深度使用验证**（约 20 人研发协作单元，累计代码开发超 5 万行，超 5 个内部工具以 SDK 方式集成）
+- 🏆 **第三届开放原子大赛总冠军**：从 99 支报名团队中脱颖而出
+- 🤖 **超 1 万次 Agent 自举提交**：99% 以上由 CodeAgent 自主完成
+- 🏢 **中兴通讯内部深度使用验证**：约 20 人研发协作单元，累计代码开发超 5 万行
+- 🧩 **完整覆盖四种协作模式**：从单人单 Agent 到多人多 Agent 的分布式协作网络
 
 详细论述见 [协作模式文档](docs/competition/collaboration_modes.md)。
 
@@ -290,49 +299,34 @@ jgc
 
 ## 💡 常用命令
 
-| 命令                      | 快捷方式 | 功能                         |
-| ------------------------- | -------- | ---------------------------- |
-| `jarvis`                  | `jvs`    | 通用 AI 代理                 |
-| `jarvis-code-agent`       | `jca`    | 代码代理（分析、修改、生成） |
-| `jarvis-sec`              | `jsec`   | 安全分析套件                 |
-| `jarvis-c2rust`           | `jc2r`   | C→Rust 迁移套件              |
-| `jarvis-git-commit`       | `jgc`    | 自动生成 Git 提交信息        |
-| `jarvis-platform-manager` | `jpm`    | 管理大语言模型平台           |
-| `jarvis-quick-config`     | `jqc`    | 快速配置工具                 |
+Jarvis 安装后提供以下命令，短命令为对应长命令的快捷方式：
 
-完整命令列表见 [使用指南](docs/jarvis_book/4.使用指南.md)。
+| 命令                           | 快捷方式   | 功能                           |
+| ------------------------------ | ---------- | ------------------------------ |
+| `jarvis`                       | `jvs`      | 通用 AI 代理                   |
+| `jarvis-agent`                 | `ja`       | 通用 Agent 命令行入口          |
+| `jarvis-agent-dispatcher`      | `jvsd`     | 通用 Agent 任务派发            |
+| `jarvis-code-agent`            | `jca`      | 代码代理（分析、修改、生成）   |
+| `jarvis-code-agent-dispatcher` | `jcad`     | 代码 Agent 任务派发            |
+| `jarvis-smart-shell`           | `jss`      | 自然语言转 Shell 命令          |
+| `jarvis-sec`                   | `jsec`     | 安全分析套件                   |
+| `jarvis-c2rust`                | `jc2r`     | C→Rust 迁移套件                |
+| `jarvis-git-commit`            | `jgc`      | 自动生成 Git 提交信息          |
+| `jarvis-git-squash`            | `jgs`      | Git 提交压缩工具               |
+| `jarvis-platform-manager`      | `jpm`      | 管理大语言模型平台             |
+| `jarvis-config`                | `jcfg`     | 配置管理工具                   |
+| `jarvis-quick-config`          | `jqc`      | 快速配置工具                   |
+| `jarvis-memory-organizer`      | `jmo`      | 记忆整理（合并相似标签的记忆） |
+| `jarvis-methodology`           | `jm`       | 方法论导入 / 导出              |
+| `jarvis-tool`                  | `jt`       | 工具系统命令行界面             |
+| `jarvis-lsp`                   | `jlsp`     | LSP 语言服务客户端             |
+| `jarvis-browser`               | `jb`       | 浏览器自动化工具               |
+| `jarvis-windows`               | `jw`       | Windows 应用自动化工具         |
+| `jarvis-web-gateway`           | `jwg`      | Web 网关                       |
+| `jarvis-service`               | `jservice` | Web 服务（含多用户与协作）     |
+| `jarvis-rules-index`           | `jri`      | 规则索引                       |
 
----
-
-## 📚 文档导航
-
-### 新用户推荐阅读路径
-
-1. **先看 README**：快速判断 Jarvis 是否适合你的场景
-2. **再看用户手册**：按任务直接上手 CLI、CodeAgent、平台配置和专项能力
-3. **需要系统性理解时再看 Jarvis Book**：了解架构、概念与扩展设计
-
-### 用户手册（推荐新用户优先阅读）
-
-`docs/用户手册` 是更偏“怎么用”的任务型文档，适合首次接触项目的用户快速入门。
-
-- [通用 Agent 手册](docs/用户手册/01_通用_agent/)
-- [CodeAgent 手册](docs/用户手册/02_codeagent/)
-- [平台与配置](docs/用户手册/03_平台与配置/)
-- [Web 界面与网关](docs/用户手册/04_web_界面与网关/)
-- [工具与效率](docs/用户手册/05_工具与效率/)
-- [专项能力](docs/用户手册/06_专项能力/)
-
-### Jarvis Book（适合系统性阅读）
-
-- [项目介绍](docs/jarvis_book/1.项目介绍.md)
-- [快速开始](docs/jarvis_book/2.快速开始.md)
-- [核心概念与架构](docs/jarvis_book/3.核心概念与架构.md)
-- [使用指南](docs/jarvis_book/4.使用指南.md)
-- [功能扩展](docs/jarvis_book/5.功能扩展.md)
-- [高级主题](docs/jarvis_book/6.高级主题.md)
-- [参与贡献](docs/jarvis_book/7.参与贡献.md)
-- [常见问题](docs/jarvis_book/8.常见问题.md)
+> 💡 运行任意命令加 `--help` 可查看详细参数，例如 `jca --help`。
 
 ---
 
@@ -351,77 +345,6 @@ from jarvis.jarvis_agent import Agent
 agent = Agent(system_prompt="你是一个专业的文档维护助手。", name="DocGenerator")
 agent.run('分析 README.md，补充用户群体信息')
 ```
-
----
-
-## 🏗 系统架构
-
-Jarvis 采用 **分层 + 分布式架构**：单机内以通用 Agent 为核心，通过继承构建 CodeAgent 增强层，再实现专业应用（安全分析、C→Rust 迁移等）；跨机则由多节点多网关组成 Agent 网络，支持跨节点协作。
-
-```mermaid
-flowchart TB
-    subgraph 专业应用层["专业应用层"]
-        jsec["jarvis-sec (jsec) 安全分析"]
-        jc2r["jarvis-c2rust (jc2r) C→Rust 迁移"]
-    end
-
-    subgraph 功能增强层["功能增强层 CodeAgent"]
-        code["代码结构分析 | 文件编辑 | 变更影响分析"]
-    end
-
-    subgraph 核心基础层["核心基础层 Agent"]
-        agent["对话与工具执行 | 会话管理 | 工具注册 | 平台适配 | 事件总线"]
-    end
-
-    专业应用层 -->|使用| 功能增强层
-    功能增强层 -->|继承| 核心基础层
-```
-
-### 分布式部署
-
-多个节点通过网关互联，形成可横向扩展的 Agent 网络：
-
-```mermaid
-flowchart TB
-    subgraph 网关层["网关层"]
-        gw["jarvis-service 网关<br/>JWT 认证 | 权限管理 | 路由"]
-    end
-
-    subgraph 节点A["节点 A"]
-        a1["Agent 1"]
-        a2["Agent 2"]
-    end
-
-    subgraph 节点B["节点 B"]
-        b1["Agent 3"]
-    end
-
-    网关层 -->|调度| 节点A
-    网关层 -->|调度| 节点B
-    节点A <-->|跨节点 Agent 通信| 节点B
-```
-
-### 专业应用
-
-| 应用              | 命令   | 说明                                                                               |
-| ----------------- | ------ | ---------------------------------------------------------------------------------- |
-| **jarvis-sec**    | `jsec` | 安全分析套件：启发式扫描 → 聚类 → Agent 验证 → 报告聚合，支持 C/C++ 与 Rust        |
-| **jarvis-c2rust** | `jc2r` | C→Rust 迁移套件：scan → lib-replace → prepare → transpile → optimize，支持断点续跑 |
-
-### 关键组件
-
-| 组件                                | 用途                                                        |
-| ----------------------------------- | ----------------------------------------------------------- |
-| **AgentRunLoop**                    | 主运行循环，驱动“模型思考 → 工具执行 → 结果拼接”迭代        |
-| **SessionManager**                  | 会话状态管理，支持保存、恢复、清理历史                      |
-| **PromptManager**                   | 构建系统提示与附加提示（工具规范、记忆引导等）              |
-| **EventBus**                        | 事件总线，关键节点广播，支持旁路扩展                        |
-| **ToolRegistry**                    | 工具注册表，发现、加载、执行工具（内置、外部、MCP）         |
-| **MemoryManager**                   | 记忆管理，短期 / 项目 / 全局三层架构                        |
-| **TaskAnalyzer**                    | 任务分析，满意度收集与方法论沉淀                            |
-| **PlatformRegistry / BasePlatform** | 平台适配层，屏蔽不同 LLM 服务商差异                         |
-| **RulesManager**                    | 规则管理，多来源加载与激活，与 Skills 标准兼容              |
-| **输入处理器链**                    | 内置、Shell、文件上下文处理器，处理特殊标记、命令、文件引用 |
 
 ---
 
