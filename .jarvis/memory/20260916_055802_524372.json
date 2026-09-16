@@ -1,0 +1,8 @@
+{
+  "id": "20260916_055802_524372",
+  "type": "project_long_term",
+  "tags": ["browser_extension", "调试能力", "action清单"],
+  "content": "Jarvis 浏览器扩展 action 路由表在 browser_extension/background/command_router.js。原 21 个 action 分四类：tab.*(4)、page.*(4)、dom.*(11)、script.execute、capture.screenshot。命名格式为「命名空间.动作」。每个 executor 类方法接收单个对象参数（如 async click({tab_id, selector})），错误用 cmdError(code, message) 构造。",
+  "created_at": "2026-09-16T05:58:02.524392",
+  "updated_at": "2026-09-16T05:58:02.524396"
+}

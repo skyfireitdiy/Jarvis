@@ -1,0 +1,8 @@
+{
+  "id": "20260916_060751_704778",
+  "type": "project_long_term",
+  "tags": ["browser_extension", "调试能力", "CDP", "已实现"],
+  "content": "Jarvis 浏览器扩展的 F12 对标调试能力已全部实现（5 个 action，代码完成+静态/逻辑验证通过，待用户重载扩展实测）：\n\n1. console.get_logs（debug_executor.js）→ 工具层 get_console_logs。MAIN 世界 hook console.* + window.onerror + unhandledrejection，幂等标记 window.__jarvisConsoleHooked，环形缓冲 500 条存 window.__jarvisConsoleLogs。参数 {tab_id?, limit?(默认100), clear?}，返回 {logs, count}。\n2. dom.get_computed_style（dom_executor.js）→ get_computed_style。getComputedStyle().getPropertyValue()，props 不传时返回 DEFAULT_STYLE_PROPS 共 22 个常用属性（kebab-case）。返回 {selector, styles}，元素不存在抛 ELEMENT_NOT_FOUND。\n3. page.get_info（tab_executor.js）→ get_page_info。返回 {url, title, ready_state, viewport{w,h}, scroll{x,y}, document{w,h}}。\n4. debugger.evaluate（debug_executor.js）→ evaluate。CDP Runtime.evaluate + returnByValue + allowUnsafeEvalBlockedByCSP + userGesture，完全绕过页面 CSP。参数 {tab_id?, expression, await_promise?(默认true)}。\n5. network.get_requests（debug_executor.js）→ get_network_requests。CDP Network 域监听 requestWillBeSent/responseReceived/loadingFinished/loadingFailed，采集 duration_ms（默认3000）后返回 {requests, count, duration_ms}。每条含 request_id/url/method/type/status/status_text/mime_type/encoded_data_length/duration_ms/failed。\n\n扩展 action 总数 21 → 26。工具层 browser_ext.py 需同步 6 处：description、parameters.enum、execute 签名参数、dict 解包分支、known_actions 集合、分发 if 分支。",
+  "created_at": "2026-09-16T06:07:51.704812",
+  "updated_at": "2026-09-16T06:07:51.704817"
+}

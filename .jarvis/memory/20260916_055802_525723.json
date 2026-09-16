@@ -1,0 +1,8 @@
+{
+  "id": "20260916_055802_525723",
+  "type": "project_long_term",
+  "tags": ["browser_extension", "console.get_logs", "已实现"],
+  "content": "已新增 console.get_logs action（browser_extension/background/executors/debug_executor.js，DebugExecutor 类）。MAIN 世界注入 hook，幂等标记 window.__jarvisConsoleHooked，日志存 window.__jarvisConsoleLogs 环形缓冲 500 条。hook console.log/info/warn/error/debug + window.onerror + unhandledrejection。参数 {tab_id?, limit?(默认100), clear?}，返回 {logs, count}。仅通过 node --check，未运行验证。",
+  "created_at": "2026-09-16T05:58:02.525741",
+  "updated_at": "2026-09-16T05:58:02.525745"
+}

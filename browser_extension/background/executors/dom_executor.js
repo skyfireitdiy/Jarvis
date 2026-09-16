@@ -4,6 +4,32 @@
 
 import { cmdError } from "../command_router.js";
 
+// get_computed_style 未显式传 props 时返回的常用属性集合。
+const DEFAULT_STYLE_PROPS = [
+  "display",
+  "position",
+  "width",
+  "height",
+  "color",
+  "background-color",
+  "font-size",
+  "font-family",
+  "font-weight",
+  "margin",
+  "padding",
+  "border",
+  "z-index",
+  "opacity",
+  "visibility",
+  "overflow",
+  "flex-direction",
+  "justify-content",
+  "align-items",
+  "box-sizing",
+  "line-height",
+  "text-align",
+];
+
 export class DomExecutor {
   /** 查询元素信息。 */
   async query({ tab_id, selector, all }) {
@@ -163,6 +189,27 @@ export class DomExecutor {
       throw cmdError("EXEC_ERROR", reason);
     }
     return { ok: true, result: result.value };
+  }
+
+  /**
+   * 读取元素的计算样式（相当于 F12 的 Computed 面板）。
+   * 不传 props 时返回一组常用属性，传 props 时只返回指定属性。
+   */
+  async getComputedStyle({ tab_id, selector, props }) {
+    const tab = await this._resolveTab(tab_id);
+    this._requireSelector(selector);
+    const wanted =
+      Array.isArray(props) && props.length
+        ? props.map((p) => String(p))
+        : DEFAULT_STYLE_PROPS;
+    const result = await this._exec(tab.id, getComputedStyleFn, [
+      selector,
+      wanted,
+    ]);
+    if (result == null) {
+      throw cmdError("ELEMENT_NOT_FOUND", `element not found: ${selector}`);
+    }
+    return { selector, styles: result };
   }
 
   /**
@@ -466,6 +513,17 @@ function scrollFn(selector, x, y, behavior) {
     page_height: document.documentElement.scrollHeight,
     viewport_height: window.innerHeight,
   };
+}
+
+function getComputedStyleFn(selector, props) {
+  const el = document.querySelector(selector);
+  if (!el) return null;
+  const cs = window.getComputedStyle(el);
+  const out = {};
+  for (const prop of props) {
+    out[prop] = cs.getPropertyValue(prop);
+  }
+  return out;
 }
 
 function executeFn(code) {

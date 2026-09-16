@@ -1,0 +1,8 @@
+{
+  "id": "20260916_055802_527515",
+  "type": "project_long_term",
+  "tags": ["browser_extension", "阻塞问题", "browser_ext工具"],
+  "content": "关键阻塞：browser_ext 工具未出现在 Agent 工具列表中，只能用 curl 调网关 HTTP 接口验证。推测原因：BrowserExtTool.check() 要求 jglobals.agent_id is not None 不满足，或被工具组过滤。这是让 Agent 通过工具（而非 curl）操作浏览器的关键待排查点。",
+  "created_at": "2026-09-16T05:58:02.527535",
+  "updated_at": "2026-09-16T05:58:02.527540"
+}

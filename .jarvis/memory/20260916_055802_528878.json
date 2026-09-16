@@ -1,0 +1,8 @@
+{
+  "id": "20260916_055802_528878",
+  "type": "project_long_term",
+  "tags": ["browser_extension", "关键约定", "注入函数"],
+  "content": "Jarvis 扩展中 chrome.scripting.executeScript 注入的函数必须自包含，不能闭包引用外部变量（会被序列化）。ESM 导入路径必须带 .js 后缀。扩展保持纯 JS 无构建。dom_executor.js:173-229 uploadFile 是 chrome.debugger.attach+sendCommand+detach 的完整 CDP 范例，实现 CDP 类功能可参考。",
+  "created_at": "2026-09-16T05:58:02.528908",
+  "updated_at": "2026-09-16T05:58:02.528912"
+}

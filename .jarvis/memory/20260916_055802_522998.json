@@ -1,0 +1,8 @@
+{
+  "id": "20260916_055802_522998",
+  "type": "project_long_term",
+  "tags": ["browser_extension", "图标", "已实现"],
+  "content": "Jarvis 浏览器扩展已配置图标：browser_extension/icons/icon{16,32,48,128}.png，源图为 src/jarvis/jarvis_service/frontend/public/icons/jarvis-pet.svg（与 docs/images/jarvis-logo.svg 同源，青色机器人吉祥物）。manifest.json 的 icons 与 action.default_icon 均已声明。",
+  "created_at": "2026-09-16T05:58:02.523021",
+  "updated_at": "2026-09-16T05:58:02.523025"
+}
