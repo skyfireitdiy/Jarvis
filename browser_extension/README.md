@@ -60,19 +60,77 @@ service_worker.js
 browser_extension/
 ├── manifest.json                  # Manifest V3 配置
 ├── background/
-│   ├── service_worker.js          # 入口：连接管理 + 指令分发 + 登录态接收
+│   ├── service_worker.js          # 入口：连接管理 + 指令分发 + 登录态接收 + 脚本管理转发
 │   ├── ws_client.js               # WebSocket 连接、心跳、重连
 │   ├── command_router.js          # action → executor 映射
+│   ├── script_manager.js          # 脚本仓库（类油猴）：安装 / 列表 / 启停 / 卸载
 │   └── executors/
 │       ├── tab_executor.js        # 标签页 / 导航
 │       ├── dom_executor.js        # DOM 读写（executeScript 注入）
+│       ├── script_executor.js     # 自定义脚本执行（主世界注入）
 │       └── capture_executor.js    # 截图
 ├── content/
 │   └── content_script.js          # 页面内脚本：登录态桥接 + 页面元信息
 └── popup/
-    ├── popup.html                 # 连接配置 / 状态 / 高危确认 UI
+    ├── popup.html                 # 连接配置 / 状态 / 高危确认 / 脚本管理 UI
     └── popup.js
 ```
+
+## 脚本管理（类油猴）
+
+扩展内置一个**脚本仓库**：用户可安装自定义页面脚本，Agent 通过 `script.*` 指令查询并调用。
+适合把「某个站点的专用操作」封装成可复用能力（例如 iCenter wiki 的 zeditor 读写）。
+
+### 脚本格式
+
+脚本是一段 JS，在**页面主世界**被求值，应导出如下对象：
+
+```js
+globalThis.__JARVIS_SCRIPT__ = {
+  name: "icenter", // 脚本名（唯一，重名视为更新）
+  version: "1.0.0",
+  description: "iCenter wiki 文档操作",
+  match: ["i.zte.com.cn"], // 适用域名（仅作提示，不做强制拦截）
+  actions: {
+    // entry 可以是 { desc, params, run } 或直接是一个函数
+    getText: { desc: "读取全文", run: () => ({ text: window.ze.getText() }) },
+    insertText: {
+      desc: "在指定偏移插入文本（写操作）",
+      params: { offset: "number", text: "string" },
+      run: ({ offset, text }) => {
+        window.ze.executeCommandAndMoveCursor({
+          command: "addText",
+          range: { startOffset: offset, endOffset: offset },
+          data: text,
+        });
+        return { ok: true };
+      },
+    },
+  },
+};
+```
+
+也兼容 `module.exports = {...}` 写法。安装时会做**轻量静态校验**（语法解析 + 关键字检查），
+不执行脚本，因此校验是「弱保证」——**请只安装你自己信任的脚本**。
+
+### 安装与使用
+
+1. 打开扩展 popup → 「脚本管理（类油猴）」
+2. 把脚本源码粘贴到「脚本源码」框（或点「或从本地文件导入」选择 `.js` 文件）
+3. 填脚本名称 → 点「安装脚本」
+4. 列表中可对每个脚本「启用 / 停用」「查看源码」「卸载」
+
+Agent 侧通过 `script.list` 查询已装脚本，再用 `script.run` 调用其某个 action。
+
+### 执行机制与安全说明
+
+`script.run` 会把脚本源码通过 `chrome.scripting.executeScript({ world: "MAIN" })` 注入到目标标签页的
+**主世界**执行，因此脚本能访问页面自身的 JS 对象（如 iCenter 的 `window.ze`）。
+这等同于在页面里执行任意 JS —— 安全边界完全依赖「只安装可信脚本」。
+
+- 脚本默认**启用**；停用后 `script.run` 会返回 `SCRIPT_DISABLED`
+- 脚本在页面主世界求值，可读写该页面的 DOM 与 JS 对象，也可能发起网络请求
+- 扩展**不做**远程脚本下载，脚本只能由用户手动粘贴/导入
 
 ## 支持的指令（action）
 
@@ -81,7 +139,8 @@ browser_extension/
 | 标签页 | `tab.list` `tab.activate` `tab.close` `tab.create`                                                                                                      |
 | 导航   | `page.navigate` `page.reload` `page.back` `page.forward`                                                                                                |
 | DOM    | `dom.query` `dom.get_text` `dom.get_html` `dom.click` `dom.type` `dom.hover` `dom.select` `dom.wait_for` `dom.press_key` `dom.scroll` `dom.upload_file` |
-| 脚本   | `script.execute`                                                                                                                                        |
+| 脚本   | `script.execute`（执行任意 JS 代码，高危）                                                                                                              |
+| 脚本库 | `script.list` `script.get` `script.install` `script.uninstall` `script.set_enabled` `script.run`（类油猴脚本管理）                                      |
 | 捕获   | `capture.screenshot`（支持 `full_page` 整页截图）                                                                                                       |
 
 ## 消息协议
