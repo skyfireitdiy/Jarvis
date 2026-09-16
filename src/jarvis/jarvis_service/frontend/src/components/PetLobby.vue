@@ -2912,12 +2912,12 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden, openInst
   cursor: not-allowed;
 }
 
-/* 安装浏览器插件弹层：比通用弹层略宽，便于展示步骤说明 */
+/* 安装浏览器插件弹层：比通用弹层更大，保证高风险提示无需翻页即可读完 */
 .lobby-install-dialog {
-  width: min(460px, 90vw);
-  max-height: 82vh;
+  width: min(760px, 94vw);
+  max-height: 92vh;
   overflow-y: auto;
-  padding: 16px;
+  padding: 20px 24px;
   border-radius: 12px;
   background: rgba(12, 22, 34, 0.98);
   border: 1px solid rgba(32, 200, 255, 0.35);
@@ -3026,8 +3026,6 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden, openInst
 }
 .lobby-install-risk-body {
   margin-top: 8px;
-  max-height: 240px;
-  overflow-y: auto;
 }
 .lobby-install-risk-body p {
   margin: 0 0 6px;
