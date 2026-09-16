@@ -303,6 +303,14 @@ async def browser_ext_websocket_endpoint(websocket: WebSocket) -> None:
 
 - `script.execute` `{tab_id, code, world}` → 返回值（`world`: `MAIN` | `ISOLATED`）
 
+#### 调试类（对标 F12）
+
+- `console.get_logs` `{tab_id, limit, clear}` → `{logs, count}`；MAIN 世界 hook `console.*` / `window.onerror` / `unhandledrejection`，环形缓冲 500 条
+- `dom.get_computed_style` `{tab_id, selector, props}` → `{selector, styles}`；`props` 不传时返回 22 个常用属性
+- `page.get_info` `{tab_id}` → `{url, title, ready_state, viewport, scroll, document}`
+- `debugger.evaluate` `{tab_id, expression, await_promise}` → `{ok, result, type}`；走 CDP `Runtime.evaluate`，**不受页面 CSP 限制**
+- `network.get_requests` `{tab_id, duration_ms, limit, filter}` → `{requests, count, duration_ms}`；走 CDP `Network` 域，采集窗口内记录请求/响应/耗时
+
 #### 捕获类
 
 - `capture.screenshot` `{tab_id, full_page}` → base64 PNG
@@ -457,18 +465,19 @@ Agent → browser_ext_click(session_id, tab_id, "#submit")
 
 #### 扩展侧（Chrome MV3）
 
-| 文件                                                         | 说明                                      |
-| ------------------------------------------------------------ | ----------------------------------------- |
-| `browser_extension/manifest.json`                            | MV3 配置，`background.type: module`       |
-| `browser_extension/background/ws_client.js`                  | WebSocket 连接、心跳（20s）、指数退避重连 |
-| `browser_extension/background/command_router.js`             | `action` → executor 映射表                |
-| `browser_extension/background/service_worker.js`             | 入口：连接编排、hello 握手、状态广播      |
-| `browser_extension/background/executors/tab_executor.js`     | 标签页 / 导航                             |
-| `browser_extension/background/executors/dom_executor.js`     | DOM 读写                                  |
-| `browser_extension/background/executors/capture_executor.js` | 截图                                      |
-| `browser_extension/content/content_script.js`                | 页面内补充脚本                            |
-| `browser_extension/popup/popup.html` / `popup.js`            | 连接配置 / 状态 / 高危确认 UI 占位        |
-| `browser_extension/README.md`                                | 安装与使用说明                            |
+| 文件                                                         | 说明                                       |
+| ------------------------------------------------------------ | ------------------------------------------ |
+| `browser_extension/manifest.json`                            | MV3 配置，`background.type: module`        |
+| `browser_extension/background/ws_client.js`                  | WebSocket 连接、心跳（20s）、指数退避重连  |
+| `browser_extension/background/command_router.js`             | `action` → executor 映射表                 |
+| `browser_extension/background/service_worker.js`             | 入口：连接编排、hello 握手、状态广播       |
+| `browser_extension/background/executors/tab_executor.js`     | 标签页 / 导航                              |
+| `browser_extension/background/executors/dom_executor.js`     | DOM 读写                                   |
+| `browser_extension/background/executors/capture_executor.js` | 截图                                       |
+| `browser_extension/background/executors/debug_executor.js`   | 调试：console 日志、CDP 求值、网络请求采集 |
+| `browser_extension/content/content_script.js`                | 页面内补充脚本                             |
+| `browser_extension/popup/popup.html` / `popup.js`            | 连接配置 / 状态 / 高危确认 UI 占位         |
+| `browser_extension/README.md`                                | 安装与使用说明                             |
 
 ### 11.2 网关接口
 
@@ -492,36 +501,68 @@ Agent → browser_ext_click(session_id, tab_id, "#submit")
 - 工具运行在 Agent 子进程中，**通过 HTTP 访问网关**，不直接接触网关内存对象
 - 支持的 action 与扩展 action 的映射：
 
-| 工具 action      | 扩展 action          | 必填参数                                 |
-| ---------------- | -------------------- | ---------------------------------------- |
-| `list_sessions`  | （HTTP 直查）        | 无                                       |
-| `list_tabs`      | `tab.list`           | `session_id`                             |
-| `navigate`       | `page.navigate`      | `session_id`, `url`                      |
-| `get_text`       | `dom.get_text`       | `session_id`, `selector`                 |
-| `click`          | `dom.click`          | `session_id`, `selector`                 |
-| `type`           | `dom.type`           | `session_id`, `selector`, `text`         |
-| `screenshot`     | `capture.screenshot` | `session_id`                             |
-| `activate_tab`   | `tab.activate`       | `session_id`, `tab_id`                   |
-| `close_tab`      | `tab.close`          | `session_id`, `tab_id`                   |
-| `new_tab`        | `tab.create`         | `session_id`                             |
-| `reload`         | `page.reload`        | `session_id`                             |
-| `back`           | `page.back`          | `session_id`                             |
-| `forward`        | `page.forward`       | `session_id`                             |
-| `query`          | `dom.query`          | `session_id`, `selector`                 |
-| `get_html`       | `dom.get_html`       | `session_id`, `selector`                 |
-| `hover`          | `dom.hover`          | `session_id`, `selector`                 |
-| `select`         | `dom.select`         | `session_id`, `selector`, `value`        |
-| `wait_for`       | `dom.wait_for`       | `session_id`, `selector`                 |
-| `press_key`      | `dom.press_key`      | `session_id`, `key`                      |
-| `scroll`         | `dom.scroll`         | `session_id`（selector 或 x/y 至少一个） |
-| `execute_script` | `script.execute`     | `session_id`, `code`                     |
-| `upload_file`    | `dom.upload_file`    | `session_id`, `selector`, `file_path`    |
+| 工具 action            | 扩展 action              | 必填参数                                 |
+| ---------------------- | ------------------------ | ---------------------------------------- |
+| `list_sessions`        | （HTTP 直查）            | 无                                       |
+| `list_tabs`            | `tab.list`               | `session_id`                             |
+| `navigate`             | `page.navigate`          | `session_id`, `url`                      |
+| `get_text`             | `dom.get_text`           | `session_id`, `selector`                 |
+| `click`                | `dom.click`              | `session_id`, `selector`                 |
+| `type`                 | `dom.type`               | `session_id`, `selector`, `text`         |
+| `screenshot`           | `capture.screenshot`     | `session_id`                             |
+| `activate_tab`         | `tab.activate`           | `session_id`, `tab_id`                   |
+| `close_tab`            | `tab.close`              | `session_id`, `tab_id`                   |
+| `new_tab`              | `tab.create`             | `session_id`                             |
+| `reload`               | `page.reload`            | `session_id`                             |
+| `back`                 | `page.back`              | `session_id`                             |
+| `forward`              | `page.forward`           | `session_id`                             |
+| `query`                | `dom.query`              | `session_id`, `selector`                 |
+| `get_html`             | `dom.get_html`           | `session_id`, `selector`                 |
+| `hover`                | `dom.hover`              | `session_id`, `selector`                 |
+| `select`               | `dom.select`             | `session_id`, `selector`, `value`        |
+| `wait_for`             | `dom.wait_for`           | `session_id`, `selector`                 |
+| `press_key`            | `dom.press_key`          | `session_id`, `key`                      |
+| `scroll`               | `dom.scroll`             | `session_id`（selector 或 x/y 至少一个） |
+| `execute_script`       | `script.execute`         | `session_id`, `code`                     |
+| `upload_file`          | `dom.upload_file`        | `session_id`, `selector`, `file_path`    |
+| `get_computed_style`   | `dom.get_computed_style` | `session_id`, `selector`                 |
+| `get_page_info`        | `page.get_info`          | `session_id`                             |
+| `get_console_logs`     | `console.get_logs`       | `session_id`                             |
+| `evaluate`             | `debugger.evaluate`      | `session_id`, `expression`               |
+| `get_network_requests` | `network.get_requests`   | `session_id`                             |
 
 - 返回统一信封：`{"success": bool, "stdout": str, "stderr": str}`
 - `screenshot` 的 base64 由工具侧落盘为临时 PNG（`/tmp/jarvis_browser_ext_<ts>.png`），
   `stdout` 只返回 `{path, width, height, full_page, bytes}`，避免超长 base64 撑爆上下文
 
-### 11.4 安装与使用步骤
+### 11.4 前端调试能力（对标 F12）
+
+阶段二新增 5 个调试类 action，覆盖 F12 的主要面板：
+
+| F12 面板     | 对应 action              | 实现方式                                                                                                   |
+| ------------ | ------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| Console      | `console.get_logs`       | MAIN 世界 hook `console.*` + `window.onerror` + `unhandledrejection`，环形缓冲 500 条                      |
+| Computed     | `dom.get_computed_style` | `getComputedStyle(el).getPropertyValue(prop)`，默认 22 个常用属性                                          |
+| 概览         | `page.get_info`          | 注入读取 `location` / `document` / `innerWidth` / `scrollX` 等                                             |
+| Console 求值 | `debugger.evaluate`      | CDP `Runtime.evaluate`（`allowUnsafeEvalBlockedByCSP: true`），**不受页面 CSP 限制**                       |
+| Network      | `network.get_requests`   | CDP `Network` 域事件采集（`requestWillBeSent` / `responseReceived` / `loadingFinished` / `loadingFailed`） |
+
+**关键技术点**：
+
+1. **console hook 必须注入 MAIN 世界**——ISOLATED 世界看到的是另一份 `console` 对象，hook 不到页面自身的调用。
+2. **hook 幂等**——用 `window.__jarvisConsoleHooked` 标记，重复注入不重复包裹；`console.get_logs` 每次调用都会尝试安装 hook。
+3. **CDP 不受页面 CSP 限制**——`script.execute`（`new Function`）在强 CSP 站点仍可能失败，而 `debugger.evaluate` 走 CDP 完全绕过。
+4. **debugger 附加复用**——`_attach()` 先查 `chrome.debugger.getTargets()`，若已附加则复用（不 detach），避免抢占用户已打开的 DevTools 连接。
+5. **网络采集是异步窗口**——`network.get_requests` 会阻塞 `duration_ms`（默认 3000ms）采集，工具层会自动放宽 HTTP 超时（`duration_ms/1000 + 5s`）。
+6. **`debugger` 权限已在 manifest 声明**，无需新增权限。
+
+**已知限制**：
+
+- 若用户已打开 DevTools 调试同一标签页，`chrome.debugger.attach` 会失败（返回 `EXEC_ERROR`）。
+- `network.get_requests` 只能采集调用期间发生的请求，历史请求不可回溯。
+- `console.get_logs` 只能采集 hook 安装之后的日志，页面早期日志不可回溯。
+
+### 11.5 安装与使用步骤
 
 1. **启动网关**（需带 `--master-url` 供 Agent 工具访问）
 2. **安装扩展**：`chrome://extensions` → 开启「开发者模式」→「加载已解压的扩展程序」→ 选择仓库中的 `browser_extension/` 目录

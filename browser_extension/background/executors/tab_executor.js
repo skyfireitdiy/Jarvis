@@ -87,6 +87,40 @@ export class TabExecutor {
     return { ok: true, tab_id: tab.id };
   }
 
+  /**
+   * 读取页面基础信息（URL、标题、就绪状态、视口/滚动/文档尺寸）。
+   */
+  async getInfo({ tab_id }) {
+    const tab = await this._resolveTab(tab_id);
+    let info = null;
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        world: "ISOLATED",
+        func: pageInfoFn,
+      });
+      info = results && results.length ? results[0].result : null;
+    } catch (e) {
+      const msg = e && e.message ? e.message : String(e);
+      if (/Cannot access|chrome:\/\/|extension/i.test(msg)) {
+        throw cmdError("PROTECTED_PAGE", msg);
+      }
+      throw cmdError("EXEC_ERROR", msg);
+    }
+    if (!info) {
+      throw cmdError("EXEC_ERROR", "failed to read page info");
+    }
+    return {
+      tab_id: tab.id,
+      url: info.url,
+      title: info.title,
+      ready_state: info.ready_state,
+      viewport: info.viewport,
+      scroll: info.scroll,
+      document: info.document,
+    };
+  }
+
   // ---------------- 内部工具 ----------------
 
   async _getTab(tabId) {
@@ -126,4 +160,26 @@ export class TabExecutor {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// 注入到页面的函数（必须自包含，不能引用外部变量）
+function pageInfoFn() {
+  const doc = document.documentElement;
+  return {
+    url: location.href,
+    title: document.title,
+    ready_state: document.readyState,
+    viewport: {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    },
+    scroll: {
+      x: window.scrollX,
+      y: window.scrollY,
+    },
+    document: {
+      width: doc ? doc.scrollWidth : 0,
+      height: doc ? doc.scrollHeight : 0,
+    },
+  };
 }

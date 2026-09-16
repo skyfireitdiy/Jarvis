@@ -87,6 +87,13 @@ class BrowserExtTool:
   code 中可直接写 return 返回结果（如 "return document.title"），也支持 await；返回值需可 JSON 序列化。
   默认在 MAIN 世界执行以复用页面自身的 JS 环境与登录态；部分站点的 CSP 会限制 ISOLATED 世界的 eval，故不推荐改回 ISOLATED。
 - upload_file: 上传本地文件到 file input。需 session_id、selector、file_path（本地绝对路径）；可选 tab_id。依赖 chrome.debugger，扩展需具备 debugger 权限
+- get_computed_style: 读取元素的计算样式（相当于 F12 Computed 面板）。需 session_id、selector；可选 tab_id、props（CSS 属性名数组，如 ["display","color"]，不传则返回常用属性集合）
+- get_page_info: 读取页面基础信息（相当于 F12 概览）。需 session_id；可选 tab_id。返回 url/title/ready_state/viewport/scroll/document
+- get_console_logs: 读取页面 console 日志（相当于 F12 Console 面板）。需 session_id；可选 tab_id、limit（默认 100）、clear（读取后是否清空缓存）。
+  首次调用会安装 hook，之后需页面产生新的日志才会被采集
+- evaluate: 通过 CDP 在页面中求值任意表达式（不受页面 CSP 限制，相当于 F12 Console 直接敲表达式）。需 session_id、expression；可选 tab_id、await_promise（默认 true）
+- get_network_requests: 采集页面网络请求（相当于 F12 Network 面板）。需 session_id；可选 tab_id、duration_ms（采集时长，默认 3000）、limit（默认 100）、filter（URL 子串过滤）。
+  注意：会阻塞 duration_ms 毫秒进行采集，建议先触发页面动作再调用
 若用户未安装扩展或扩展未连接，list_sessions 会返回空列表。"""
 
     parameters = {
@@ -117,6 +124,11 @@ class BrowserExtTool:
                     "scroll",
                     "execute_script",
                     "upload_file",
+                    "get_computed_style",
+                    "get_page_info",
+                    "get_console_logs",
+                    "evaluate",
+                    "get_network_requests",
                 ],
                 "description": "要执行的操作类型，每次只能选一个",
             },
@@ -186,6 +198,35 @@ class BrowserExtTool:
             "full_page": {
                 "type": "boolean",
                 "description": "是否整页截图（screenshot 可选，默认 false 仅当前视口）",
+            },
+            "props": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "要读取的 CSS 属性名数组，kebab-case（get_computed_style 可选，不传则返回常用属性集合）",
+            },
+            "expression": {
+                "type": "string",
+                "description": "要通过 CDP 求值的 JavaScript 表达式（evaluate 必填）",
+            },
+            "await_promise": {
+                "type": "boolean",
+                "description": "是否等待 Promise 结果（evaluate 可选，默认 true）",
+            },
+            "limit": {
+                "type": "integer",
+                "description": "最多返回多少条（get_console_logs/get_network_requests 可选，默认 100）",
+            },
+            "clear": {
+                "type": "boolean",
+                "description": "读取后是否清空缓存（get_console_logs 可选，默认 false）",
+            },
+            "duration_ms": {
+                "type": "integer",
+                "description": "网络请求采集时长毫秒（get_network_requests 可选，默认 3000）",
+            },
+            "filter": {
+                "type": "string",
+                "description": "按 URL 子串过滤请求（get_network_requests 可选）",
             },
             "timeout": {
                 "type": "number",
@@ -418,6 +459,13 @@ class BrowserExtTool:
         world: str = "",
         file_path: str = "",
         full_page: bool = False,
+        props: Optional[List[str]] = None,
+        expression: str = "",
+        await_promise: bool = True,
+        limit: Optional[int] = None,
+        clear: bool = False,
+        duration_ms: Optional[int] = None,
+        filter: str = "",
         timeout: float = 15.0,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -459,6 +507,13 @@ class BrowserExtTool:
             world = args.get("world", "")
             file_path = args.get("file_path", "")
             full_page = args.get("full_page", False)
+            props = args.get("props")
+            expression = args.get("expression", "")
+            await_promise = args.get("await_promise", True)
+            limit = args.get("limit")
+            clear = args.get("clear", False)
+            duration_ms = args.get("duration_ms")
+            filter = args.get("filter", "")
             timeout = args.get("timeout", 15.0)
 
         action = str(action or "").strip()
@@ -529,6 +584,11 @@ class BrowserExtTool:
             "scroll",
             "execute_script",
             "upload_file",
+            "get_computed_style",
+            "get_page_info",
+            "get_console_logs",
+            "evaluate",
+            "get_network_requests",
         }
         if action not in known_actions:
             return {
@@ -772,6 +832,60 @@ class BrowserExtTool:
             params["selector"] = selector
             params["file_path"] = file_path
             return self._send_command(session_id, "dom.upload_file", params, timeout)
+
+        # ---------------- get_computed_style ----------------
+        if action == "get_computed_style":
+            if not selector:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "selector is required for action 'get_computed_style'",
+                }
+            params["selector"] = selector
+            if props:
+                params["props"] = list(props)
+            return self._send_command(
+                session_id, "dom.get_computed_style", params, timeout
+            )
+
+        # ---------------- get_page_info ----------------
+        if action == "get_page_info":
+            return self._send_command(session_id, "page.get_info", params, timeout)
+
+        # ---------------- get_console_logs ----------------
+        if action == "get_console_logs":
+            if limit is not None:
+                params["limit"] = int(limit)
+            if clear:
+                params["clear"] = True
+            return self._send_command(session_id, "console.get_logs", params, timeout)
+
+        # ---------------- evaluate ----------------
+        if action == "evaluate":
+            if not expression:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "expression is required for action 'evaluate'",
+                }
+            params["expression"] = expression
+            params["await_promise"] = bool(await_promise)
+            return self._send_command(session_id, "debugger.evaluate", params, timeout)
+
+        # ---------------- get_network_requests ----------------
+        if action == "get_network_requests":
+            if duration_ms is not None:
+                params["duration_ms"] = int(duration_ms)
+            if limit is not None:
+                params["limit"] = int(limit)
+            if filter:
+                params["filter"] = filter
+            # 采集时长可能超过默认 timeout，自动放宽
+            collect_ms = int(duration_ms) if duration_ms else 3000
+            net_timeout = max(timeout, collect_ms / 1000.0 + 5.0)
+            return self._send_command(
+                session_id, "network.get_requests", params, net_timeout
+            )
 
         return {
             "success": False,

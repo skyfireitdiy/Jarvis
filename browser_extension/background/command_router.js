@@ -8,12 +8,14 @@
 import { TabExecutor } from "./executors/tab_executor.js";
 import { DomExecutor } from "./executors/dom_executor.js";
 import { CaptureExecutor } from "./executors/capture_executor.js";
+import { DebugExecutor } from "./executors/debug_executor.js";
 
 export class CommandRouter {
   constructor() {
     this.tabExecutor = new TabExecutor();
     this.domExecutor = new DomExecutor();
     this.captureExecutor = new CaptureExecutor();
+    this.debugExecutor = new DebugExecutor();
 
     // action -> handler(params) => Promise<data>
     this.routes = {
@@ -27,10 +29,12 @@ export class CommandRouter {
       "page.reload": (p) => this.tabExecutor.reload(p),
       "page.back": (p) => this.tabExecutor.back(p),
       "page.forward": (p) => this.tabExecutor.forward(p),
+      "page.get_info": (p) => this.tabExecutor.getInfo(p),
       // DOM 类
       "dom.query": (p) => this.domExecutor.query(p),
       "dom.get_text": (p) => this.domExecutor.getText(p),
       "dom.get_html": (p) => this.domExecutor.getHtml(p),
+      "dom.get_computed_style": (p) => this.domExecutor.getComputedStyle(p),
       "dom.click": (p) => this.domExecutor.click(p),
       "dom.type": (p) => this.domExecutor.type(p),
       "dom.hover": (p) => this.domExecutor.hover(p),
@@ -40,6 +44,10 @@ export class CommandRouter {
       "dom.scroll": (p) => this.domExecutor.scroll(p),
       "dom.upload_file": (p) => this.domExecutor.uploadFile(p),
       "script.execute": (p) => this.domExecutor.execute(p),
+      // 调试类
+      "console.get_logs": (p) => this.debugExecutor.getLogs(p),
+      "debugger.evaluate": (p) => this.debugExecutor.evaluate(p),
+      "network.get_requests": (p) => this.debugExecutor.getRequests(p),
       // 捕获类
       "capture.screenshot": (p) => this.captureExecutor.screenshot(p),
     };
