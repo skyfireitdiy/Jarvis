@@ -155,27 +155,113 @@ export class ScriptManager {
 
 /**
  * 轻量静态校验脚本源码。
- * 只做语法解析（不执行）与关键字检查，避免在安装阶段运行不可信代码。
+ *
+ * 注意：这里**不能**用 `new Function(src)` 做语法解析。
+ * MV3 扩展页面（popup / service worker）的 CSP 为 `script-src 'self'`，
+ * 不允许 `unsafe-eval`，`new Function` 会直接抛 CSP 错误，
+ * 导致所有合法脚本都被误判为「syntax error」而无法安装。
+ * 因此只做纯字符串层面的静态检查；真正的语法错误会在 `script.run`
+ * 于页面主世界求值时暴露（runScriptFn 有 try/catch 兜底）。
+ *
  * @param {string} source 脚本源码
  * @returns {string|null} 错误原因；通过时返回 null
  */
 export function validateSource(source) {
   const src = String(source);
-  // 1) 语法解析：仅解析不执行，语法错误会抛异常
-  try {
-    // eslint-disable-next-line no-new-func
-    new Function(src);
-  } catch (e) {
-    const msg = e && e.message ? e.message : String(e);
-    return `syntax error: ${msg}`;
-  }
-  // 2) 必须导出脚本对象
+  // 1) 必须导出脚本对象
   if (!src.includes("__JARVIS_SCRIPT__") && !src.includes("module.exports")) {
     return "script must export an object via globalThis.__JARVIS_SCRIPT__ or module.exports";
   }
-  // 3) 必须定义 actions
+  // 2) 必须定义 actions
   if (!/\bactions\b/.test(src)) {
     return "script must define an 'actions' map";
+  }
+  // 3) 基础括号配平检查（廉价地拦截明显的截断/残缺源码）
+  const reason = checkBalanced(src);
+  if (reason) return reason;
+  return null;
+}
+
+/**
+ * 括号配平检查：忽略字符串、模板串、注释与正则字面量中的括号。
+ * 只做粗粒度判断，用于拦截明显残缺的源码，不追求完备的语法分析。
+ * @param {string} src 源码
+ * @returns {string|null} 错误原因；通过时返回 null
+ */
+function checkBalanced(src) {
+  const pairs = { ")": "(", "]": "[", "}": "{" };
+  const stack = [];
+  let i = 0;
+  let prevSignificant = ""; // 上一个有效字符，用于区分除号与正则字面量
+  while (i < src.length) {
+    const c = src[i];
+    // 行注释
+    if (c === "/" && src[i + 1] === "/") {
+      const nl = src.indexOf("\n", i);
+      i = nl === -1 ? src.length : nl + 1;
+      continue;
+    }
+    // 块注释
+    if (c === "/" && src[i + 1] === "*") {
+      const end = src.indexOf("*/", i + 2);
+      i = end === -1 ? src.length : end + 2;
+      continue;
+    }
+    // 字符串 / 模板串
+    if (c === '"' || c === "'" || c === "`") {
+      const quote = c;
+      i++;
+      while (i < src.length) {
+        if (src[i] === "\\") {
+          i += 2;
+          continue;
+        }
+        if (src[i] === quote) break;
+        i++;
+      }
+      if (i >= src.length) return "unterminated string literal";
+      i++;
+      prevSignificant = quote;
+      continue;
+    }
+    // 正则字面量（粗判：前面是运算符/开头时视为正则）
+    if (c === "/" && /(^|[=(,:[!&|?{};+\-*%<>~^])\s*$/.test(src.slice(0, i))) {
+      i++;
+      let inClass = false;
+      while (i < src.length) {
+        if (src[i] === "\\") {
+          i += 2;
+          continue;
+        }
+        if (src[i] === "[") inClass = true;
+        else if (src[i] === "]") inClass = false;
+        else if (src[i] === "/" && !inClass) break;
+        else if (src[i] === "\n") return "unterminated regular expression";
+        i++;
+      }
+      i++;
+      prevSignificant = "/";
+      continue;
+    }
+    if (c === "(" || c === "[" || c === "{") {
+      stack.push(c);
+      prevSignificant = c;
+      i++;
+      continue;
+    }
+    if (c === ")" || c === "]" || c === "}") {
+      if (stack.pop() !== pairs[c]) {
+        return `unbalanced '${c}' in script source`;
+      }
+      prevSignificant = c;
+      i++;
+      continue;
+    }
+    if (!/\s/.test(c)) prevSignificant = c;
+    i++;
+  }
+  if (stack.length) {
+    return `unclosed '${stack[stack.length - 1]}' in script source`;
   }
   return null;
 }
