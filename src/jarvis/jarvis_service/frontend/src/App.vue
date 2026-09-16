@@ -8730,7 +8730,9 @@ function getLobbyInputState(agentId) {
   const statusData = agentStatuses.value.get(agentId)
   const executionStatus = statusData?.execution_status || 'running'
   const confirmData = panelConfirmData.value.get(agentId)
-  if (executionStatus === 'waiting_confirm' || confirmData) {
+  // 仅以 execution_status 判定确认态：panelConfirmData 只用于补充提示文案，
+  // 不作为独立触发条件，避免残留数据让大厅显示默认的「请确认」
+  if (executionStatus === 'waiting_confirm') {
     return {
       mode: 'confirm',
       tip: confirmData?.message || '请确认 (y/n)',
@@ -10793,6 +10795,12 @@ function sendConfirmResult(confirmed, agentId = null) {
     }
     // 清除 Panel 内嵌确认数据
     panelConfirmData.value.delete(targetAgentId)
+    // 乐观降级执行状态：避免后端 status_update 到达前，
+    // 大厅/面板仍按 waiting_confirm 渲染出无消息的默认「请确认」
+    const confirmStatus = agentStatuses.value.get(targetAgentId)?.execution_status
+    if (confirmStatus === 'waiting_confirm') {
+      agentStatuses.value.set(targetAgentId, {execution_status: 'running'})
+    }
     // 恢复输入模式为多行
     inputMode.value = 'multi'
     panelInputModes.value.set(targetAgentId, 'multi')
