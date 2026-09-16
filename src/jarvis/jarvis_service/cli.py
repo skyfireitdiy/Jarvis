@@ -1285,6 +1285,18 @@ def build_service_config(
 
     if resolved_gateway_host is None:
         resolved_gateway_host = DEFAULT_GATEWAY_HOST
+    # 子节点网关只允许监听回环地址：子节点本地无 auth 数据、不独立做权限判定，
+    # 若绑定到非回环地址会把节点暴露为无认证入口。
+    if resolved_node_mode == "child" and resolved_gateway_host not in (
+        "127.0.0.1",
+        "localhost",
+        "::1",
+    ):
+        PrettyOutput.auto_print(
+            f"⚠️ 子节点网关仅允许监听回环地址，已忽略 gateway-host={resolved_gateway_host}，"
+            f"强制使用 {DEFAULT_GATEWAY_HOST}"
+        )
+        resolved_gateway_host = DEFAULT_GATEWAY_HOST
     if resolved_frontend_host is None:
         resolved_frontend_host = DEFAULT_FRONTEND_HOST
     if resolved_node_mode is None:
