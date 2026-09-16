@@ -7,15 +7,23 @@ const HEARTBEAT_INTERVAL_MS = 20000; // 20s 发送一次 ping
 const RECONNECT_BASE_MS = 1000; // 首次重连 1s
 const RECONNECT_MAX_MS = 30000; // 上限 30s
 
+// 网关鉴权失败时使用的关闭码（见 jarvis_web_gateway/app.py 的扩展 WS 端点）。
+// 收到该关闭码意味着当前 Token 已失效（如网关重启导致 JWT 签名密钥变更、
+// 或 Token 过期），继续用同一个 Token 重连只会无限失败，必须交由上层
+// 清理 Token 缓存并重新获取。
+const CLOSE_AUTH_FAILED = 4401;
+const CLOSE_FORBIDDEN = 4403;
+
 export class WsClient {
   /**
    * @param {object} opts
    * @param {(msg: object) => void} opts.onMessage 收到消息回调
    * @param {(state: string) => void} opts.onStateChange 连接状态变化回调
    */
-  constructor({ onMessage, onStateChange }) {
+  constructor({ onMessage, onStateChange, onAuthError }) {
     this.onMessage = onMessage;
     this.onStateChange = onStateChange;
+    this.onAuthError = onAuthError;
     this.ws = null;
     this.state = "disconnected"; // disconnected | connecting | connected
     this.reconnectAttempts = 0;
@@ -105,9 +113,26 @@ export class WsClient {
       console.log("[Jarvis] ws closed", event.code, event.reason);
       this._stopHeartbeat();
       this.setState("disconnected");
-      if (!this.manualClose) {
-        this._scheduleReconnect();
+      if (this.manualClose) {
+        return;
       }
+      // 鉴权失败：当前 Token 已失效，用同一个 Token 重连必然再次被拒。
+      // 交由上层清理 Token 缓存并重新获取，避免无限「断开—重连」循环。
+      if (event.code === CLOSE_AUTH_FAILED || event.code === CLOSE_FORBIDDEN) {
+        console.warn(
+          "[Jarvis] ws auth failed, code=",
+          event.code,
+          "reason=",
+          event.reason,
+        );
+        try {
+          this.onAuthError?.(event.code, event.reason);
+        } catch (e) {
+          console.warn("[Jarvis] onAuthError error", e);
+        }
+        return;
+      }
+      this._scheduleReconnect();
     };
 
     ws.onerror = (event) => {
