@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Jarvis Browser Bridge</title>
+    <style>
+      body {
+        width: 340px;
+        margin: 0;
+        padding: 12px;
+        font-family:
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+        font-size: 13px;
+        color: #222;
+      }
+      h1 {
+        font-size: 14px;
+        margin: 0 0 10px;
+      }
+      label {
+        display: block;
+        margin-bottom: 4px;
+        color: #555;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 6px;
+        margin-bottom: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 12px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      button {
+        flex: 1;
+        padding: 7px;
+        border: none;
+        border-radius: 4px;
+        background: #2f6fed;
+        color: #fff;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      button.secondary {
+        background: #888;
+      }
+      button.mini {
+        flex: none;
+        padding: 3px 8px;
+        font-size: 11px;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      .status {
+        padding: 8px;
+        border-radius: 4px;
+        background: #f2f2f2;
+        margin-bottom: 10px;
+        line-height: 1.5;
+      }
+      .dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #bbb;
+        margin-right: 6px;
+      }
+      .dot.connected {
+        background: #2bb673;
+      }
+      .dot.connecting {
+        background: #e8a33d;
+      }
+      .dot.disconnected {
+        background: #cc4444;
+      }
+      .hint {
+        color: #888;
+        font-size: 11px;
+        line-height: 1.5;
+      }
+      .gw-list {
+        margin-bottom: 10px;
+      }
+      .gw-item {
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        padding: 8px;
+        margin-bottom: 6px;
+      }
+      .gw-item .gw-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+      }
+      .gw-item .gw-url {
+        font-weight: 600;
+        word-break: break-all;
+        flex: 1;
+      }
+      .gw-item .gw-meta {
+        margin-top: 4px;
+      }
+      .gw-item .gw-actions {
+        display: flex;
+        gap: 6px;
+        margin-top: 6px;
+      }
+      .confirm-box {
+        display: none;
+        border: 1px solid #e8a33d;
+        background: #fff8ec;
+        border-radius: 4px;
+        padding: 8px;
+        margin-bottom: 10px;
+      }
+      .confirm-box.show {
+        display: block;
+      }
+      .confirm-box .title {
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      code {
+        background: #f2f2f2;
+        padding: 1px 3px;
+        border-radius: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Jarvis Browser Bridge</h1>
+
+    <label for="gateway">添加网关地址</label>
+    <input
+      id="gateway"
+      type="text"
+      placeholder="https://jvs-ai.cn 或 http://127.0.0.1:8000"
+    />
+    <div class="row">
+      <button id="connectBtn">添加并连接</button>
+    </div>
+
+    <div class="gw-list" id="gwList"></div>
+
+    <!-- 高危动作二次确认（占位：后续由 background 触发显示） -->
+    <div class="confirm-box" id="confirmBox">
+      <div class="title">⚠️ 高危操作确认</div>
+      <div id="confirmDesc" class="hint">
+        Agent 请求执行可能造成不可逆后果的操作。
+      </div>
+      <div class="row" style="margin-top: 8px">
+        <button id="confirmYes">允许</button>
+        <button id="confirmNo" class="secondary">拒绝</button>
+      </div>
+    </div>
+
+    <div class="hint">
+      可同时连接多个 Jarvis 网关，各自独立连接。<br />
+      登录态自动复用浏览器中已登录的 Jarvis 网页，无需手动填写 Token。<br />
+      注意：所有网关共享同一批浏览器标签页。
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

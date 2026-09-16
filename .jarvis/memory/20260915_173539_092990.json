@@ -1,0 +1,8 @@
+{
+  "id": "20260915_173539_092990",
+  "type": "project_long_term",
+  "tags": ["工具注册", "registry", "关键约定", "jarvis_tools"],
+  "content": "Jarvis 工具注册机制（registry.py:679-736 register_tool_by_file）：自动扫描 jarvis_tools/*.py，要求类满足 hasattr(name/description/parameters/execute) 且 item.name == 文件名（不含 .py）。因此新增工具必须让文件名与 name 属性一致，无需修改 registry.py。\n\n重要约束：工具运行在 Agent 子进程中，通过 HTTP 访问网关（jglobals.master_url），无法直接访问网关内存对象，因此需要网关能力时必须走 HTTP API。\n\n范式参考：单工具 + action 参数（参考 gateway_manager.py、browser_ext.py）。",
+  "created_at": "2026-09-15T17:35:39.093009",
+  "updated_at": "2026-09-15T17:35:39.093014"
+}

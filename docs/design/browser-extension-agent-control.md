@@ -434,7 +434,285 @@ Agent → browser_ext_click(session_id, tab_id, "#submit")
 | `src/jarvis/jarvis_web_gateway/browser_extension_manager.py` | **新增**：连接管理、指令路由、结果回传                                  |
 | `src/jarvis/jarvis_web_gateway/app.py`                       | **新增** `/api/browser-ext/ws` 端点；初始化 `browser_extension_manager` |
 | `src/jarvis/jarvis_tools/browser_ext.py`                     | **新增**：Agent 工具集                                                  |
-| `src/jarvis/jarvis_tools/registry.py`                        | **修改**：注册新工具                                                    |
+| `src/jarvis/jarvis_tools/registry.py`                        | **无需修改**：`register_tool_by_file` 自动扫描 `jarvis_tools/*.py`      |
 | `browser_extension/`（新目录）                               | **新增**：Chrome 扩展工程（开发者模式加载）                             |
 
 > 权限相关文件（`permission_manager.py`、`AdminPanel.vue`）**不改动**——本方案不做权限控制。
+
+---
+
+## 11. 阶段一实现说明（MVP）
+
+> 本章节记录阶段一 MVP 的**实际落地情况**，与上文设计如有差异以此为准。
+
+### 11.1 交付物清单
+
+#### 网关侧（Python）
+
+| 文件                                                         | 说明                                                                 |
+| ------------------------------------------------------------ | -------------------------------------------------------------------- |
+| `src/jarvis/jarvis_web_gateway/browser_extension_manager.py` | 新增：`BrowserExtensionManager` 单例，连接管理 / 指令路由 / 结果回传 |
+| `src/jarvis/jarvis_web_gateway/app.py`                       | 新增：WS 端点 `/api/browser-ext/ws`；HTTP API `/api/browser-ext/*`   |
+| `src/jarvis/jarvis_tools/browser_ext.py`                     | 新增：Agent 工具 `browser_ext`（单工具 + action 参数范式）           |
+
+#### 扩展侧（Chrome MV3）
+
+| 文件                                                         | 说明                                      |
+| ------------------------------------------------------------ | ----------------------------------------- |
+| `browser_extension/manifest.json`                            | MV3 配置，`background.type: module`       |
+| `browser_extension/background/ws_client.js`                  | WebSocket 连接、心跳（20s）、指数退避重连 |
+| `browser_extension/background/command_router.js`             | `action` → executor 映射表                |
+| `browser_extension/background/service_worker.js`             | 入口：连接编排、hello 握手、状态广播      |
+| `browser_extension/background/executors/tab_executor.js`     | 标签页 / 导航                             |
+| `browser_extension/background/executors/dom_executor.js`     | DOM 读写                                  |
+| `browser_extension/background/executors/capture_executor.js` | 截图                                      |
+| `browser_extension/content/content_script.js`                | 页面内补充脚本                            |
+| `browser_extension/popup/popup.html` / `popup.js`            | 连接配置 / 状态 / 高危确认 UI 占位        |
+| `browser_extension/README.md`                                | 安装与使用说明                            |
+
+### 11.2 网关接口
+
+#### WebSocket
+
+- 路径：`/api/browser-ext/ws`
+- 鉴权：复用 `_extract_auth_from_headers`，从 `sec-websocket-protocol` 中提取 `jarvis-token.<token>`，再经 `gateway._check_auth` 校验
+- 鉴权失败：`accept(subprotocol="jarvis-ext")` 后发送错误帧并 `close(4401)`
+
+**HTTP API**（均需 `Depends(verify_token)`）
+
+| 方法   | 路径                        | 说明                         |
+| ------ | --------------------------- | ---------------------------- |
+| `GET`  | `/api/browser-ext/sessions` | 列出当前在线会话             |
+| `POST` | `/api/browser-ext/command`  | 向指定会话下发指令并等待结果 |
+
+### 11.3 Agent 工具 `browser_ext`
+
+- 类名 `BrowserExtTool`，`name = "browser_ext"`（与文件名一致，满足 `register_tool_by_file` 要求）
+- `check()`：`jglobals.agent_id is not None` 时可用
+- 工具运行在 Agent 子进程中，**通过 HTTP 访问网关**，不直接接触网关内存对象
+- 支持的 action 与扩展 action 的映射：
+
+| 工具 action      | 扩展 action          | 必填参数                                 |
+| ---------------- | -------------------- | ---------------------------------------- |
+| `list_sessions`  | （HTTP 直查）        | 无                                       |
+| `list_tabs`      | `tab.list`           | `session_id`                             |
+| `navigate`       | `page.navigate`      | `session_id`, `url`                      |
+| `get_text`       | `dom.get_text`       | `session_id`, `selector`                 |
+| `click`          | `dom.click`          | `session_id`, `selector`                 |
+| `type`           | `dom.type`           | `session_id`, `selector`, `text`         |
+| `screenshot`     | `capture.screenshot` | `session_id`                             |
+| `activate_tab`   | `tab.activate`       | `session_id`, `tab_id`                   |
+| `close_tab`      | `tab.close`          | `session_id`, `tab_id`                   |
+| `new_tab`        | `tab.create`         | `session_id`                             |
+| `reload`         | `page.reload`        | `session_id`                             |
+| `back`           | `page.back`          | `session_id`                             |
+| `forward`        | `page.forward`       | `session_id`                             |
+| `query`          | `dom.query`          | `session_id`, `selector`                 |
+| `get_html`       | `dom.get_html`       | `session_id`, `selector`                 |
+| `hover`          | `dom.hover`          | `session_id`, `selector`                 |
+| `select`         | `dom.select`         | `session_id`, `selector`, `value`        |
+| `wait_for`       | `dom.wait_for`       | `session_id`, `selector`                 |
+| `press_key`      | `dom.press_key`      | `session_id`, `key`                      |
+| `scroll`         | `dom.scroll`         | `session_id`（selector 或 x/y 至少一个） |
+| `execute_script` | `script.execute`     | `session_id`, `code`                     |
+| `upload_file`    | `dom.upload_file`    | `session_id`, `selector`, `file_path`    |
+
+- 返回统一信封：`{"success": bool, "stdout": str, "stderr": str}`
+- `screenshot` 的 base64 由工具侧落盘为临时 PNG（`/tmp/jarvis_browser_ext_<ts>.png`），
+  `stdout` 只返回 `{path, width, height, full_page, bytes}`，避免超长 base64 撑爆上下文
+
+### 11.4 安装与使用步骤
+
+1. **启动网关**（需带 `--master-url` 供 Agent 工具访问）
+2. **安装扩展**：`chrome://extensions` → 开启「开发者模式」→「加载已解压的扩展程序」→ 选择仓库中的 `browser_extension/` 目录
+3. **登录 Jarvis 网页**：扩展会自动复用网页登录态（无需手动填写 Token，详见 11.8）
+4. **配置连接**：点击扩展图标，填写网关地址（如 `https://jvs-ai.cn`），点击「连接」
+5. **验证连通**：状态显示「已连接」后，在 Agent 会话中调用 `browser_ext` 的 `list_sessions`，应返回该会话的 `session_id`
+6. **执行操作**：`list_tabs` 拿到 `tab_id` 后，即可执行 `navigate` / `get_text` / `click` / `type` / `screenshot`
+
+### 11.5 阶段一验证结论
+
+已完成的静态与 mock 验证：
+
+- Python：`ast.parse` 全部通过，`ruff check` 全通过
+- JavaScript：8 个 `.js` 文件全部通过 `node --check`（ESM 模式）
+- `manifest.json`：`python -m json.tool` 校验合法
+- 工具注册：`BrowserExtTool` 具备 `name`/`description`/`parameters`/`execute`，且 `name` 与文件名一致
+- 端点存在：`/api/browser-ext/ws`、`/api/browser-ext/sessions`、`/api/browser-ext/command` 均已定义
+- Mock 端到端：7 个 action 全部返回成功，4 条错误路径（未知 action、缺 `session_id`、缺 `url`、空 action）均正确报错
+- 文档：`markdownlint` 通过
+
+**尚未验证（受「禁止重启网关」约束，需用户自行操作）**：
+
+- 网关与扩展的真实 WS 握手
+- 真实浏览器中的指令往返与结果回传
+
+### 11.6 阶段一已知简化
+
+1. popup 中的高危动作二次确认仅为 UI 占位，background 尚未发起真实确认请求（设计上属阶段二）
+2. `browser_extension/icons/` 目录未创建，`manifest.json` 中 `icons` 为空对象，不影响开发者模式加载
+3. `content_scripts` 的 `all_frames: false`，暂不支持 iframe 内元素操作
+
+### 11.7 阶段二待办
+
+- 暴露 `script.execute` 工具
+- `dom.wait_for` / `dom.hover` / `dom.select` 工具化
+- 真实高危动作拦截（popup 二次确认接入 background）
+- 操作审计日志
+
+### 11.8 登录态复用（方案 B2）
+
+#### 11.8.1 问题
+
+阶段一最初要求用户在 popup 中手填网关 Token（`JARVIS_AUTH_TOKEN`）。但该 Token 用户无法自行获取：
+
+- 网关 Token 存于网关进程的环境变量，用户不可见
+- JWT Token 存于前端 `localStorage['jarvis_auth_token']`，且**仅当用户开启「免登录」开关时才写入**（否则只存在于 Vue 内存）
+
+因此「手填 Token」对普通用户不可行。
+
+#### 11.8.2 方案选型
+
+| 方案                         | 说明                                                 | 结论                                                      |
+| ---------------------------- | ---------------------------------------------------- | --------------------------------------------------------- |
+| A. 扩展内独立登录            | popup 填账号密码，扩展自行调 `/api/auth/login`       | 否决：用户需登录两次，且扩展与网页登录态可能不一致        |
+| B1. `externally_connectable` | 网页通过 `chrome.runtime.sendMessage` 直接投递给扩展 | 需固定扩展 ID（manifest 写 `key`），改动较大              |
+| **B2. content script 桥接**  | content script 注入主世界脚本，读取网页暴露的 Token  | **采用**：用户零操作，无需固定扩展 ID，无需改前端登录逻辑 |
+
+#### 11.8.3 实现
+
+**前端（`App.vue`）**：暴露只读接口 + Token 变化广播
+
+```js
+window.__jarvisAuthBridge = {
+  getToken: () => auth.value.token || null,
+};
+watch(
+  () => auth.value.token,
+  (newToken) => {
+    window.postMessage(
+      { type: "jarvis_token_changed", token: newToken || null },
+      "*",
+    );
+  },
+);
+```
+
+用 `watch` 统一覆盖所有 Token 变化点（登录成功、免登录恢复、401 失效、登出），无需逐个修改。
+
+**content script（`content_script.js`）**：主世界注入桥接
+
+content script 运行在隔离世界，无法访问页面 JS 变量，故注入一段主世界脚本：
+
+- 主世界脚本调用 `window.__jarvisAuthBridge.getToken()` 读取 Token
+- 通过 `window.postMessage` 与隔离世界通信（双向均校验 `event.source === window`）
+- 隔离世界将 Token 转发给 background（`chrome.runtime.sendMessage`）
+- 支持两种触发：页面主动广播 `jarvis_token_changed`；background 主动索取 `jarvis_request_token`
+
+**background（`service_worker.js`）**：Token 驱动连接
+
+- 收到 `jarvis_ext_token` / `jarvis_ext_token_changed` → 调 `handleAuthToken`
+- Token 变化 → 重连；Token 为空 → 断开
+- 冷启动时若尚无 Token，主动向所有标签页发 `jarvis_request_token` 索取
+- `jarvis_get_status` 新增 `has_token` 字段供 popup 显示登录态
+
+**popup**：移除 Token 输入框，改为显示登录态（已获取 / 未获取）
+
+#### 11.8.4 关键收益
+
+- **身份天然一致**：扩展使用的 Token 即网页登录用户的 Token，不存在「扩展登录账号与网页账号不一致」的问题
+- **零配置**：用户只需登录 Jarvis 网页，扩展自动跟随
+- **自动跟随变化**：切换账号 / 登出 / Token 过期，扩展自动重连或断开
+
+#### 11.8.5 已知取舍
+
+前端通过 `window.__jarvisAuthBridge` 暴露 Token，**同页面脚本理论上可读取**。当前版本接受此风险以换取零配置体验。若后续需强隔离，可升级为 B1（`externally_connectable` + 固定扩展 ID），届时仅指定扩展可获取 Token。
+
+### 11.9 多网关并行连接（方案 B）
+
+#### 11.9.1 问题
+
+阶段一扩展只支持单个网关（`chrome.storage.local` 中扁平存 `gateway` / `token` / `session_id`）。但实际场景中用户常需同时接入多个 Jarvis 网关（如本机开发网关 + 线上网关），单网关模型下切换网关需反复改配置并重连。
+
+#### 11.9.2 方案选型
+
+| 方案                 | 说明                                     | 结论                                       |
+| -------------------- | ---------------------------------------- | ------------------------------------------ |
+| A. 扩展内独立登录    | 扩展自己维护账号密码登录，与网页登录解耦 | 否决：用户需登录两次，与 B2 零配置目标冲突 |
+| B. 多网关并行连接    | 同一扩展同时维护多个网关连接，各自独立   | **采纳**                                   |
+| C. 单网关 + 快速切换 | 保留单连接，popup 提供切换               | 否决：无法并行，Agent 侧需反复切换         |
+
+选 B。核心判断：**网关侧无需任何改动**——每个网关是独立进程，各自维护 `browser_extension_manager._sessions`，扩展连 A 就注册到 A，连 B 就注册到 B，天然隔离。
+
+#### 11.9.3 实现
+
+**service_worker.js**：单例状态改为按网关索引的四个 `Map`：
+
+```js
+const clients = new Map(); // gateway -> WsClient
+const tokens = new Map(); // gateway -> token
+const sessions = new Map(); // gateway -> session_id
+const states = new Map(); // gateway -> 'disconnected' | 'connecting' | 'connected'
+```
+
+- `normalizeGateway()`：统一网关地址（无协议补 `http://`，去尾部斜杠），作为 Map 的 key
+- `connect(gateway)`：为每个网关创建独立 `WsClient` 实例，`onMessage` 闭包绑定该网关
+- `handleMessage(gateway, msg)`：指令结果只回传给 `clients.get(gateway)`，不会串网关
+- `requestTokenFromPages(gateway)`：只接受 `resp.gateway` 与目标网关匹配的响应
+- `handleAuthToken(gateway, token)`：按网关独立重连 / 断开
+- `listStatus()`：汇总所有网关状态，`jarvis_get_status` 返回 `{ gateways: [...] }`
+- 新增消息类型 `jarvis_remove_gateway`；`jarvis_connect` / `jarvis_disconnect` 支持 `gateway` 参数（disconnect 不传则断开全部）
+- `connectAll()`：冷启动遍历 `chrome.storage.local.gateways` 逐个连接
+
+**content_script.js**：主世界回传与隔离世界转发均携带 `gateway: location.origin`，使 Token 能归属到正确的网关。
+
+**popup**：改为网关列表 UI——顶部输入框用于新增网关，列表区展示每个网关的地址 / 连接状态 / 登录态 / `session_id`，每项提供「连接 / 断开 / 移除」按钮。
+
+**storage 结构变更**：`gateway` / `token` / `session_id` 扁平 key → `gateways: string[]`（仅存地址列表；Token 改存内存 `Map`，不再落 storage，安全性反而提升）。
+
+**CommandRouter 复用**：executor 无状态、操作全局 `chrome.tabs`，与网关无关，因此多网关共享同一个 router 实例。
+
+#### 11.9.4 关键取舍
+
+**所有网关共享同一批浏览器标签页。** `chrome.tabs` 是浏览器全局的，扩展架构上无法按网关隔离标签页；如需隔离只能让用户手动使用不同浏览器窗口 / 配置文件，不现实。因此多个 Agent 并发操作时可能互相影响同一页面，使用时应避免并发操作同一标签页。
+
+#### 11.9.5 兼容性
+
+单网关场景行为不变：只添加一个网关时，表现与阶段一完全一致（连接、状态显示、登录态复用均相同），仅 UI 从「状态区」变为「单条列表项」。
+
+### 11.10 能力补齐（第二轮）
+
+在阶段一 17 个 action 基础上，补齐 5 项能力缺口，扩展 action 增至 21 个，与工具映射一一对应。
+
+#### 11.10.1 新增 action
+
+| 扩展 action                         | 工具 action                 | 说明                                                                                                  |
+| ----------------------------------- | --------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `dom.press_key`                     | `press_key`                 | 派发 `keydown`/`keypress`/`keyup`，含 `keyCode`/`which` 兼容表；`Enter` 时尝试 `form.requestSubmit()` |
+| `dom.scroll`                        | `scroll`                    | 指定 `selector` 则 `scrollIntoView`，否则 `window.scrollBy(x, y)`；返回滚动位置与页面尺寸             |
+| `script.execute`                    | `execute_script`            | `new Function` 先按表达式求值，失败退化为语句执行；结果经 `safeSerialize`                             |
+| `dom.upload_file`                   | `upload_file`               | 通过 `chrome.debugger` 的 `DOM.setFileInputFiles` 设置真实本地文件路径                                |
+| `capture.screenshot`（`full_page`） | `screenshot`（`full_page`） | 逐屏滚动截图 + `OffscreenCanvas` 拼接，实现真整页截图                                                 |
+
+#### 11.10.2 截图落盘改造
+
+原实现把 base64 直接塞进 `stdout`，Agent 实际无法使用。现改为：
+
+- 扩展返回 `{image, width, height, full_page}`（整页）或 base64 字符串（视口）
+- 工具侧 `_screenshot_to_file()` 解码 base64 并写入 `/tmp/jarvis_browser_ext_<ts>.png`
+- `stdout` 只返回 `{path, width, height, full_page, bytes}`
+
+#### 11.10.3 文件上传的技术约束
+
+扩展运行在沙箱中，**无法直接读取本地文件内容**。唯一能真实上传本地文件的方式是
+`chrome.debugger` + `DOM.setFileInputFiles`（传入文件路径，由浏览器进程读取）。
+因此 `manifest.json` 新增 `debugger` 权限。代价：附加调试器时浏览器显示「正在调试此浏览器」提示条；
+若标签页已被 DevTools 占用，附加会失败。
+
+#### 11.10.4 验证结论
+
+- 扩展 action 注册集合（21）与工具 `_send_command` 映射集合（21）**零差异**
+- 全部 `.js` 通过 `node --check`；`manifest.json` JSON 合法
+- Python `ast.parse` + `ruff check` 通过
+- Mock 实测：4 个新 action 的正常路径与错误路径（缺必填参数）全部符合预期；截图落盘路径与尺寸正确
+- 回归：原有 15 个 action 映射行为不变

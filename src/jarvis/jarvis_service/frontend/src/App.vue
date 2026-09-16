@@ -12984,6 +12984,25 @@ function sendHeartbeat() {
   checkHeartbeatTimeout()
 }
 
+// ========== 浏览器扩展登录态桥接 ==========
+// 供 Jarvis 浏览器扩展读取当前登录态，避免用户重复登录或手填 Token。
+// 扩展通过主世界脚本调用 window.__jarvisAuthBridge.getToken() 获取 Token，
+// 并在 Token 变化时收到 jarvis_token_changed 广播。
+window.__jarvisAuthBridge = {
+  getToken: () => auth.value.token || null,
+}
+
+watch(
+  () => auth.value.token,
+  (newToken) => {
+    try {
+      window.postMessage({ type: 'jarvis_token_changed', token: newToken || null }, '*')
+    } catch (e) {
+      console.warn('[AUTH] broadcast token change failed:', e)
+    }
+  }
+)
+
 onMounted(() => {
   // 不再在页面加载时创建终端，改为动态创建
 

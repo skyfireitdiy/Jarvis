@@ -49,6 +49,10 @@ from jarvis.jarvis_gateway.input_bridge import InputSessionRegistry
 from jarvis.jarvis_gateway.manager import set_current_gateway
 from jarvis.jarvis_gateway.output_bridge import SessionOutputRouter
 from jarvis.jarvis_web_gateway.agent_manager import AgentManager
+from jarvis.jarvis_web_gateway.browser_extension_manager import (
+    BrowserExtensionManager,
+    browser_extension_manager,
+)
 from jarvis.jarvis_web_gateway.chat_manager import ChatManager
 from jarvis.jarvis_web_gateway.agent_proxy_manager import (
     AgentProxyManager,
@@ -282,6 +286,12 @@ _router: Optional[SessionOutputRouter] = None
 _terminal_session_manager: Optional[TerminalSessionManager] = None
 _node_connection_manager: Optional["NodeConnectionManager"] = None
 _node_runtime: Optional["NodeRuntime"] = None
+
+
+def get_browser_extension_manager() -> "BrowserExtensionManager":
+    """获取全局浏览器扩展连接管理器（供工具层使用）。"""
+    return browser_extension_manager
+
 
 MAX_FILE_SIZE_BYTES = 1024 * 1024
 BINARY_FILE_SAMPLE_SIZE = 4096
@@ -1860,6 +1870,7 @@ def create_app(
     app.state.agent_manager = agent_manager
     app.state.agent_proxy_manager = agent_proxy_manager
     app.state.node_connection_manager = node_connection_manager
+    app.state.browser_extension_manager = browser_extension_manager
 
     # 挂载 uploads 目录为静态文件服务，使上传的图片可通过 HTTP 访问
     from jarvis.jarvis_utils.config import get_data_dir as _get_data_dir
@@ -2104,6 +2115,50 @@ def create_app(
             str(target),
         )
         return result
+
+    # ------------------------------------------------------------------
+    # 浏览器扩展 API：供 Agent 工具层（子进程）通过 HTTP 调用
+    # ------------------------------------------------------------------
+    @app.get("/api/browser-ext/sessions", dependencies=[Depends(verify_token)])
+    async def api_browser_ext_list_sessions(request: Request) -> Dict[str, Any]:
+        """列出当前在线的浏览器扩展会话。
+
+        可选 query 参数：user_id（仅返回该用户的会话）
+        """
+        user_id = request.query_params.get("user_id") or None
+        sessions = browser_extension_manager.list_sessions(user_id=user_id)
+        return {"success": True, "sessions": sessions}
+
+    @app.post("/api/browser-ext/command", dependencies=[Depends(verify_token)])
+    async def api_browser_ext_command(request: Request) -> Dict[str, Any]:
+        """向指定浏览器扩展会话下发指令并等待结果。
+
+        请求体：{"session_id": str, "action": str, "params": dict, "timeout": float}
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return {"success": False, "error": "invalid json body"}
+        session_id = str(body.get("session_id") or "").strip()
+        action = str(body.get("action") or "").strip()
+        if not session_id:
+            return {"success": False, "error": "session_id is required"}
+        if not action:
+            return {"success": False, "error": "action is required"}
+        params = body.get("params") or {}
+        if not isinstance(params, dict):
+            return {"success": False, "error": "params must be an object"}
+        try:
+            timeout = float(body.get("timeout", 15.0))
+        except (TypeError, ValueError):
+            timeout = 15.0
+        try:
+            result = await browser_extension_manager.send_command(
+                session_id, action, params, timeout=timeout
+            )
+        except Exception as exc:
+            return {"success": False, "error": str(exc)}
+        return {"success": True, "result": result}
 
     @app.get("/api/chat/room-members", dependencies=[Depends(verify_token)])
     async def api_chat_get_room_members(request: Request) -> Dict[str, Any]:
@@ -2911,6 +2966,27 @@ def create_app(
             await websocket.close(code=4404)
             return
         await node_connection_manager.handle_node_websocket(websocket)
+
+    # 浏览器扩展 WebSocket：用户浏览器内的插件主动连出到网关
+    @app.websocket("/api/browser-ext/ws")
+    async def browser_ext_websocket_endpoint(websocket: WebSocket) -> None:
+        """浏览器扩展连接端点。
+
+        鉴权复用 _extract_auth_from_headers + gateway._check_auth，
+        连接建立后交由 browser_extension_manager 处理（不做权限校验）。
+        """
+        auth_payload = _extract_auth_from_headers(websocket)
+        if auth_payload is not None:
+            authorized, reason = gateway._check_auth(auth_payload)
+        else:
+            authorized = any(auth is not None for auth in manager._auth_store.values())
+            reason = "Authentication required"
+        if not authorized:
+            await websocket.accept(subprotocol="jarvis-ext")
+            await _send_error(websocket, "AUTH_FAILED", reason or "Invalid token")
+            await websocket.close(code=4401, reason="Unauthorized")
+            return
+        await browser_extension_manager.handle_extension_websocket(websocket)
 
     # WebSocket 代理：代理到 Agent WebSocket
     @app.websocket("/api/agent/{agent_id}/ws")

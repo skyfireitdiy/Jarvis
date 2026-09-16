@@ -1,0 +1,8 @@
+{
+  "id": "20260915_173539_091526",
+  "type": "project_long_term",
+  "tags": ["browser_extension", "架构决策", "设计决策", "阶段一"],
+  "content": "Jarvis 浏览器扩展方案（阶段一 MVP，已完成）：让 Agent 操作用户真实浏览器中的网页（复用登录态/Cookie），区别于 jb/Playwright 在服务端启动独立浏览器。\n\n5 项设计决策（用户确认，不可跑偏）：\n1) 不做权限控制（不改 permission_manager.py / AdminPanel.vue）\n2) script.execute 默认开放\n3) 高危动作二次确认放插件 popup\n4) 同一用户允许多会话并存\n5) 扩展以开发者模式加载，不上架商店\n\n架构：扩展通过 WebSocket 主动连出到网关（无需公网 IP/开放端口）。\n\n交付物：\n- src/jarvis/jarvis_web_gateway/browser_extension_manager.py（340 行，BrowserExtensionManager 单例，会话表 + Future 匹配 + 60s 心跳超时巡检）\n- src/jarvis/jarvis_web_gateway/app.py：WS 端点 /api/browser-ext/ws（2970 行）+ HTTP API GET /api/browser-ext/sessions（2121 行）、POST /api/browser-ext/command（2131 行）\n- src/jarvis/jarvis_tools/browser_ext.py（399 行，BrowserExtTool，7 个 action）\n- browser_extension/（11 个文件，Chrome MV3）\n- docs/design/browser-extension-agent-control.md（543 行，第 11 章为阶段一实现说明）\n\n工具 action 到扩展 action 映射：list_sessions→HTTP 直查；list_tabs→tab.list；navigate→page.navigate；get_text→dom.get_text；click→dom.click；type→dom.type；screenshot→capture.screenshot。\n\n已知简化（阶段二）：full_page 截图未真正实现；popup 高危确认仅 UI 占位；icons/ 未创建。\n阶段二待办：script.execute 工具化、dom.wait_for/hover/select 工具化、真实高危动作拦截、审计日志。",
+  "created_at": "2026-09-15T17:35:39.091558",
+  "updated_at": "2026-09-15T17:35:39.091570"
+}
