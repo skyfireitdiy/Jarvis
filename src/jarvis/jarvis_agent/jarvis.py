@@ -117,6 +117,10 @@ class AgentStateManager:
         """设置为等待单行输入状态。"""
         self.set_status(AgentStatus.WAITING_SINGLE)
 
+    def set_waiting_confirm(self) -> None:
+        """设置为等待用户确认状态。"""
+        self.set_status(AgentStatus.WAITING_CONFIRM)
+
 
 # 全局状态管理器实例
 _agent_status_manager: Optional[AgentStateManager] = None
@@ -1254,6 +1258,8 @@ def run_cli(
                     status_manager.set_waiting_multi()
                 elif status_str == "waiting_single":
                     status_manager.set_waiting_single()
+                elif status_str == "waiting_confirm":
+                    status_manager.set_waiting_confirm()
 
             # 注册回调
             set_status_update_callback(on_status_update)
