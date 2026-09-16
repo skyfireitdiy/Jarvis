@@ -17,7 +17,8 @@
 import { WsClient } from "./ws_client.js";
 import { CommandRouter } from "./command_router.js";
 
-const EXTENSION_VERSION = "0.1.0";
+// 扩展版本：从 manifest 动态读取，避免与 manifest.json 中的版本号漂移
+const EXTENSION_VERSION = chrome.runtime.getManifest().version;
 
 const router = new CommandRouter();
 
