@@ -91,6 +91,49 @@ export class ScriptManager {
   }
 
   /**
+   * 导出脚本为可分享的独立文件内容。
+   *
+   * 产出的文本可直接保存为 `.js` 文件分发给他人，对方用「从本地文件导入」
+   * 或粘贴到源码框即可安装（与安装入口的格式完全一致）。
+   *
+   * 文件结构：顶部为元信息注释块（供人阅读），其后是原始脚本源码。
+   * 注释块使用 `//` 行注释，不影响脚本求值。
+   *
+   * @param {string} id 脚本 ID
+   * @returns {Promise<object>} { filename, name, version, content }
+   */
+  async exportScript(id) {
+    const script = await this.get(id);
+    const name = String(script.name || "script").trim() || "script";
+    const version = String(script.version || "0.0.0").trim();
+    const description = String(script.description || "").trim();
+    const match = Array.isArray(script.match) ? script.match : [];
+
+    const headerLines = [
+      "// ===== Jarvis 脚本导出 =====",
+      `// name: ${name}`,
+      `// version: ${version}`,
+    ];
+    if (description) headerLines.push(`// description: ${description}`);
+    if (match.length) headerLines.push(`// match: ${match.join(", ")}`);
+    if (script.updated_at)
+      headerLines.push(`// exported_at: ${new Date().toISOString()}`);
+    headerLines.push(
+      "// 安装方式：扩展 popup →「脚本管理」→ 粘贴本文件内容或从本地文件导入。",
+    );
+    headerLines.push("// ===========================");
+
+    const content =
+      headerLines.join("\n") + "\n\n" + String(script.source || "");
+    return {
+      filename: `${name}.js`,
+      name,
+      version,
+      content,
+    };
+  }
+
+  /**
    * 卸载脚本。
    * @param {string} id 脚本 ID
    * @returns {Promise<object>} { ok: true, id }

@@ -51,6 +51,7 @@ export class CommandRouter {
       "script.get": (p) => this.scriptExecutor.get(p),
       "script.install": (p) => this.scriptExecutor.install(p),
       "script.uninstall": (p) => this.scriptExecutor.uninstall(p),
+      "script.export": (p) => this.scriptExecutor.exportScript(p),
       "script.set_enabled": (p) => this.scriptExecutor.setEnabled(p),
       "script.run": (p) => this.scriptExecutor.run(p),
       // 调试类

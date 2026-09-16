@@ -90,6 +90,37 @@ function broadcastState() {
     });
 }
 
+/**
+ * 根据连接状态切换扩展工具栏图标。
+ *
+ * - 任一网关处于 connected：使用原色图标（青色高亮，表示在线）
+ * - 否则（无网关 / 全部断开或连接中）：使用灰暗图标（表示离线）
+ *
+ * setIcon 在 service worker 被回收后不会自动恢复，因此每次状态变化都重新设置；
+ * 失败时仅告警，不影响连接逻辑。
+ */
+function updateActionIcon() {
+  const connected = Array.from(states.values()).some((s) => s === "connected");
+  const suffix = connected ? "" : "_off";
+  const path = {
+    16: `icons/icon16${suffix}.png`,
+    32: `icons/icon32${suffix}.png`,
+    48: `icons/icon48${suffix}.png`,
+    128: `icons/icon128${suffix}.png`,
+  };
+  const title = connected
+    ? "Jarvis Browser Bridge（已连接）"
+    : "Jarvis Browser Bridge（未连接）";
+  try {
+    chrome.action
+      .setIcon({ path })
+      .catch((e) => console.warn("[Jarvis] setIcon failed", e));
+    chrome.action.setTitle({ title }).catch(() => {});
+  } catch (e) {
+    console.warn("[Jarvis] updateActionIcon error", e);
+  }
+}
+
 /** 汇总所有网关的状态。 */
 function listStatus() {
   const all = new Set([...clients.keys(), ...states.keys()]);
@@ -134,6 +165,7 @@ async function handleMessage(gateway, msg) {
 /** 更新某网关状态并广播。 */
 function setState(gateway, state) {
   states.set(gateway, state);
+  updateActionIcon();
   broadcastState();
 }
 
@@ -422,6 +454,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch((e) => sendResponse({ success: false, error: String(e) }));
     return true;
   }
+  if (message.type === "jarvis_script_export") {
+    router
+      .handle({
+        id: "popup",
+        action: "script.export",
+        params: { id: message.id },
+      })
+      .then(sendResponse)
+      .catch((e) => sendResponse({ success: false, error: String(e) }));
+    return true;
+  }
   if (message.type === "jarvis_script_set_enabled") {
     router
       .handle({
@@ -459,4 +502,5 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 // service worker 冷启动时也尝试连接
+updateActionIcon(); // 冷启动先把图标置为离线态，连接成功后再由 setState 切换
 connectAll();
