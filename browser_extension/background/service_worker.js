@@ -6,8 +6,10 @@
 // 3. 收到 command 后交给 CommandRouter 执行，并回传 result
 // 4. 向 popup 广播各网关的连接状态
 //
-// Token 来源：content script 桥接 Jarvis 网页暴露的登录态，
-// 通过 jarvis_ext_token / jarvis_ext_token_changed 消息推送至此（携带来源网关地址）。
+// Token 来源：通过 chrome.scripting.executeScript({ world: "MAIN" }) 在页面主世界
+// 读取 Jarvis 网页暴露的 window.__jarvisAuthBridge（getToken / getGateway），
+// 从而复用浏览器登录态自动连接网关，无需用户手填 Token。
+// 注意：不可用 content script 注入 inline script 的方式桥接主世界，MV3 下会被页面 CSP 拦截。
 //
 // 多网关说明：同一浏览器可同时连接多个 Jarvis 网关，各自独立连接、独立会话、独立 Token。
 // 注意：所有网关共享同一批浏览器标签页（浏览器扩展架构的固有特性）。
@@ -146,7 +148,9 @@ async function connect(gateway) {
   const tokenKey = gatewayKey(g);
   let token = tokens.get(tokenKey);
   if (!token) {
+    console.log("[Jarvis] connect: no cached token, probing pages for", g);
     token = await requestTokenFromPages(g);
+    console.log("[Jarvis] connect: probe done, has_token=", Boolean(token));
     if (token) {
       tokens.set(tokenKey, token);
     }
@@ -247,14 +251,19 @@ async function requestTokenFromPages(gateway) {
   const gKey = gatewayKey(g);
   try {
     const tabs = await chrome.tabs.query({});
+    console.log("[Jarvis] token probe start, tabs=", tabs.length);
     for (const tab of tabs) {
       if (!tab.id || !/^https?:/i.test(tab.url || "")) continue;
       try {
-        const results = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: readAuthBridgeInMainWorld,
-          world: "MAIN",
-        });
+        const results = await withTimeout(
+          chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: readAuthBridgeInMainWorld,
+            world: "MAIN",
+          }),
+          3000,
+          `executeScript timeout: ${tab.url}`,
+        );
         const resp = results && results[0] ? results[0].result : null;
         if (!resp) continue;
         console.log(
@@ -286,36 +295,21 @@ async function requestTokenFromPages(gateway) {
   return null;
 }
 
-/**
- * 处理来自 content script 的登录态 Token（按网关独立处理）。
- * Token 变化时重连该网关；Token 为空（未登录/已登出）时断开该网关。
- * 注意：token 以 host:port 为键存储，避免前端声明与用户填写在协议上的差异
- * （如 http://host:443 与 https://host:443）导致取不到 token。
- */
-async function handleAuthToken(gateway, token) {
-  const g = normalizeGateway(gateway);
-  if (!g) {
-    console.warn("[Jarvis] auth token without gateway, ignored");
-    return;
-  }
-  const key = gatewayKey(g);
-  const next = token || null;
-  if (next === (tokens.get(key) || null)) {
-    return; // 无变化
-  }
-  if (next) {
-    tokens.set(key, next);
-  } else {
-    tokens.delete(key);
-  }
-
-  if (!next) {
-    console.log("[Jarvis] auth token cleared, disconnecting", g);
-    disconnect(g);
-    return;
-  }
-  console.log("[Jarvis] auth token updated, reconnecting", g);
-  await connect(g);
+/** 为 Promise 添加超时保护，避免个别标签页注入挂起拖垮整体流程。 */
+function withTimeout(promise, ms, message) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
 }
 
 /** 添加网关到配置列表（去重）。 */
@@ -388,17 +382,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "jarvis_cs_loaded") {
     console.log("[Jarvis] content script loaded:", message.url);
     return false;
-  }
-  // 来自 content script 的登录态 Token（首次获取或发生变化）
-  if (
-    message.type === "jarvis_ext_token" ||
-    message.type === "jarvis_ext_token_changed"
-  ) {
-    handleAuthToken(message.gateway, message.token).catch((e) => {
-      console.error("[Jarvis] handleAuthToken failed", e);
-    });
-    sendResponse({ success: true });
-    return true;
   }
   return false;
 });
