@@ -38,23 +38,52 @@ export class TabExecutor {
     return { ok: true, tab_id };
   }
 
-  /** 新建标签页。 */
-  async create({ url, active }) {
+  /**
+   * 新建标签页。
+   * new_window 为 true（默认）时用新窗口打开并聚焦，保证新页面处于前台、可正常渲染与重绘；
+   * 为 false 时退回在当前窗口新建标签页。
+   */
+  async create({ url, active, new_window }) {
+    const target = url || "about:blank";
+    if (new_window !== false) {
+      const win = await chrome.windows.create({
+        url: target,
+        focused: active !== false,
+      });
+      const tab = win && win.tabs && win.tabs.length ? win.tabs[0] : null;
+      return {
+        ok: true,
+        tab_id: tab ? tab.id : null,
+        window_id: win ? win.id : null,
+        url: tab ? tab.url : target,
+        new_window: true,
+      };
+    }
     const tab = await chrome.tabs.create({
-      url: url || "about:blank",
+      url: target,
       active: active !== false,
     });
-    return { ok: true, tab_id: tab.id, url: tab.url };
+    return {
+      ok: true,
+      tab_id: tab.id,
+      window_id: tab.windowId,
+      url: tab.url,
+      new_window: false,
+    };
   }
 
   /** 导航到指定 URL。 */
-  async navigate({ tab_id, url, wait_until }) {
+  async navigate({ tab_id, url, wait_until, new_window }) {
     if (!url) throw cmdError("EXEC_ERROR", "url is required");
     let tabId = tab_id;
     if (tabId == null) {
-      // 未指定 tab_id 时新建标签页
-      const tab = await chrome.tabs.create({ url, active: true });
-      return { ok: true, tab_id: tab.id, url };
+      // 未指定 tab_id 时复用 create 的逻辑（默认在新窗口打开）
+      const created = await this.create({ url, new_window });
+      tabId = created.tab_id;
+      if (tabId != null && wait_until !== "none") {
+        await this._waitForComplete(tabId);
+      }
+      return { ok: true, tab_id: tabId, url, new_window: created.new_window };
     }
     await this._getTab(tabId);
     await chrome.tabs.update(tabId, { url });

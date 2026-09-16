@@ -31,7 +31,7 @@ class BrowserExtTool:
     7. **screenshot**: 截图
     8. **activate_tab**: 激活（切换到）指定标签页
     9. **close_tab**: 关闭指定标签页
-    10. **new_tab**: 新建标签页
+    10. **new_tab**: 新建标签页（默认在新窗口打开）
     11. **reload**: 重新加载标签页
     12. **back**: 页面前进后退中的「后退」
     13. **forward**: 页面前进后退中的「前进」
@@ -65,14 +65,14 @@ class BrowserExtTool:
 每次调用只能执行一个 action：
 - list_sessions: 列出当前在线的浏览器会话（返回 session_id 列表）。**应先调用此操作获取 session_id**
 - list_tabs: 列出指定会话的标签页（返回 tab_id/url/title）。需 session_id
-- navigate: 导航到指定 URL。需 session_id、url；可选 tab_id（不传则新建标签页）
+- navigate: 导航到指定 URL。需 session_id、url；可选 tab_id（不传则新建页面，默认在新窗口打开，可用 new_window=false 改为新建标签页）
 - get_text: 读取元素文本。需 session_id、selector；可选 tab_id
 - click: 点击元素。需 session_id、selector；可选 tab_id
 - type: 向输入框输入文本。需 session_id、selector、text；可选 tab_id
 - screenshot: 截图。需 session_id；可选 tab_id
 - activate_tab: 激活（切换到）指定标签页。需 session_id、tab_id
 - close_tab: 关闭指定标签页。需 session_id、tab_id
-- new_tab: 新建标签页。需 session_id；可选 url（不传则 about:blank）
+- new_tab: 新建标签页。需 session_id；可选 url（不传则 about:blank）、new_window（默认 true，在新窗口打开并聚焦，保证页面在前台正常渲染；false 则在当前窗口新建标签页）
 - reload: 重新加载标签页。需 session_id；可选 tab_id（不传则当前活动页）
 - back: 后退。需 session_id；可选 tab_id（不传则当前活动页）
 - forward: 前进。需 session_id；可选 tab_id（不传则当前活动页）
@@ -238,6 +238,12 @@ class BrowserExtTool:
             "filter": {
                 "type": "string",
                 "description": "按 URL 子串过滤请求（get_network_requests 可选）",
+            },
+            "new_window": {
+                "type": "boolean",
+                "description": "是否在新窗口打开（new_tab 可选，默认 true）。"
+                "新窗口会置于前台并聚焦，可保证页面正常渲染与重绘；"
+                "设为 false 则在当前窗口新建标签页",
             },
             "timeout": {
                 "type": "number",
@@ -479,6 +485,7 @@ class BrowserExtTool:
         clear: bool = False,
         duration_ms: Optional[int] = None,
         filter: str = "",
+        new_window: bool = True,
         timeout: float = 15.0,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -639,6 +646,9 @@ class BrowserExtTool:
                     "stderr": "url is required for action 'navigate'",
                 }
             params["url"] = url
+            if tab_id is None:
+                # 未指定 tab_id 时会新建页面，透传 new_window 决定是否新窗口打开
+                params["new_window"] = new_window
             return self._send_command(session_id, "page.navigate", params, timeout)
 
         # ---------------- get_text ----------------
@@ -705,6 +715,7 @@ class BrowserExtTool:
         if action == "new_tab":
             if url:
                 params["url"] = url
+            params["new_window"] = new_window
             return self._send_command(session_id, "tab.create", params, timeout)
 
         # ---------------- reload ----------------
