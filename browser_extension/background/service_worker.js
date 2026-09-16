@@ -246,6 +246,12 @@ async function requestTokenFromPages(gateway) {
         }
       } catch (e) {
         // 该标签页无 content script（非 Jarvis 页面），跳过
+        console.log(
+          "[Jarvis] token probe skipped",
+          tab.url,
+          "reason=",
+          (e && e.message) || String(e),
+        );
       }
     }
   } catch (e) {
@@ -351,6 +357,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       })
       .catch((e) => sendResponse({ success: false, error: String(e) }));
     return true;
+  }
+  // content script 注入上报（诊断用）
+  if (message.type === "jarvis_cs_loaded") {
+    console.log("[Jarvis] content script loaded:", message.url);
+    return false;
   }
   // 来自 content script 的登录态 Token（首次获取或发生变化）
   if (
