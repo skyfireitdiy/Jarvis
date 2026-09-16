@@ -21,6 +21,8 @@ Jarvis 是一个面向开发者的 **协作式 AI 开发平台**。它不只是�
 
 如果你希望 AI 不只是“给建议”，而是能在你的本地环境里 **帮助分析、执行、验证和沉淀经验**，Jarvis 就是为这种场景设计的。
 
+![Jarvis 多 Agent 界面](docs/competition/images/多Agent界面.png)
+
 ### 适合谁使用？
 
 - 想把 AI 引入日常开发流程的个人开发者
@@ -38,6 +40,8 @@ Jarvis 是一个面向开发者的 **协作式 AI 开发平台**。它不只是�
 | **多人多 Agent** | 分布式协作网络   | 多节点多网关、跨节点通信、节点级运维、权限控制                   |
 
 四种模式层层递进：**单人单 Agent 是基础，单人多 Agent 是扩展，多人单 Agent 是共享，多人多 Agent 是终极形态**。主流工具（Claude Code、CodeX、CodeBuddy）聚焦「单人单 Agent」场景，Jarvis 则完整覆盖人 × Agent 两个维度的四种协作模式。
+
+![宠物大厅：多 Agent 同屏协作](docs/competition/images/多Agent界面2.png)
 
 ### 核心亮点
 
@@ -151,6 +155,8 @@ jarvis-service --node-mode child \
 
 > 💡 **获取节点密钥**：启动 Master 节点后，可通过前端管理页面的"设置"→"节点连接私钥"获取。Child 节点启动时需要使用相同的密钥。
 
+![节点与 Agent 拓扑视图](docs/competition/images/节点Agent拓扑.png)
+
 详细部署说明见 [分布式网关部署方法](docs/用户手册/04_web_界面与网关/分布式网关部署方法.md)。
 
 #### 多用户与协作
@@ -190,7 +196,9 @@ Jarvis 支持完整的多用户认证、权限管理与团队协作能力，适�
 | **智能提示**      | 根据任务优化系统提示词，使 Agent 更贴合当前场景                                                                   |
 | **Windows 支持**  | 支持 Windows，可自动化操作 Windows GUI 程序                                                                       |
 
----
+![变更影响分析](docs/competition/images/变更影响.png)
+
+![多 Agent 编排](docs/competition/images/编排.png)
 
 ---
 
