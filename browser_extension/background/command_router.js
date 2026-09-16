@@ -10,6 +10,7 @@ import { DomExecutor } from "./executors/dom_executor.js";
 import { CaptureExecutor } from "./executors/capture_executor.js";
 import { DebugExecutor } from "./executors/debug_executor.js";
 import { ScriptExecutor } from "./executors/script_executor.js";
+import { ClipboardExecutor } from "./executors/clipboard_executor.js";
 
 export class CommandRouter {
   constructor() {
@@ -18,6 +19,7 @@ export class CommandRouter {
     this.captureExecutor = new CaptureExecutor();
     this.debugExecutor = new DebugExecutor();
     this.scriptExecutor = new ScriptExecutor();
+    this.clipboardExecutor = new ClipboardExecutor();
 
     // action -> handler(params) => Promise<data>
     this.routes = {
@@ -54,6 +56,9 @@ export class CommandRouter {
       "script.export": (p) => this.scriptExecutor.exportScript(p),
       "script.set_enabled": (p) => this.scriptExecutor.setEnabled(p),
       "script.run": (p) => this.scriptExecutor.run(p),
+      // 剪贴板类（把网关静态文件或给定内容写入前端剪贴板）
+      "clipboard.write_from_url": (p) => this.clipboardExecutor.writeFromUrl(p),
+      "clipboard.write": (p) => this.clipboardExecutor.write(p),
       // 调试类
       "console.get_logs": (p) => this.debugExecutor.getLogs(p),
       "debugger.evaluate": (p) => this.debugExecutor.evaluate(p),
