@@ -303,22 +303,128 @@ async def browser_ext_websocket_endpoint(websocket: WebSocket) -> None:
 
 - `script.execute` `{tab_id, code, world}` → 返回值（`world`: `MAIN` | `ISOLATED`）
 
+#### 脚本库类（类油猴脚本管理）
+
+- `script.list` → 已安装脚本列表
+- `script.get` `{script_id}` → 单个脚本内容
+- `script.install` `{name, code, ...}` → 安装脚本（默认启用）
+- `script.uninstall` `{script_id}` → 卸载脚本（**不可逆**）
+- `script.export` `{script_id}` → 导出脚本文本，便于备份
+- `script.set_enabled` `{script_id, enabled}` → 启用/停用；停用后 `script.run` 返回 `SCRIPT_DISABLED`
+- `script.run` `{script_id, tab_id}` → 在指定标签页执行已安装脚本
+
+#### 剪贴板类
+
+- `clipboard.write` `{text}` → 把文本/base64 写入**前端页面**的系统剪贴板（需页面获得焦点）
+- `clipboard.write_from_url` `{url, ...}` → 先由 background `fetch` 读取网关静态目录文件，再注入页面写入剪贴板
+
 #### 调试类（对标 F12）
 
 - `console.get_logs` `{tab_id, limit, clear}` → `{logs, count}`；MAIN 世界 hook `console.*` / `window.onerror` / `unhandledrejection`，环形缓冲 500 条
 - `dom.get_computed_style` `{tab_id, selector, props}` → `{selector, styles}`；`props` 不传时返回 22 个常用属性
 - `page.get_info` `{tab_id}` → `{url, title, ready_state, viewport, scroll, document}`
 - `debugger.evaluate` `{tab_id, expression, await_promise}` → `{ok, result, type}`；走 CDP `Runtime.evaluate`，**不受页面 CSP 限制**
+- `debugger.send_command` `{tab_id, method, cdp_params}` → 透传任意 CDP 命令（如 `Page.addScriptToEvaluateOnNewDocument`）
 - `network.get_requests` `{tab_id, duration_ms, limit, filter}` → `{requests, count, duration_ms}`；走 CDP `Network` 域，采集窗口内记录请求/响应/耗时
 
 #### 捕获类
 
-- `capture.screenshot` `{tab_id, full_page}` → base64 PNG
-- `capture.pdf` `{tab_id}`
+- `capture.screenshot` `{tab_id, full_page}` → base64 PNG；`full_page` 通过逐屏滚动截图 + `OffscreenCanvas` 拼接实现
+
+#### 书签类（需 `bookmarks` 权限）
+
+- `bookmark.list` `{parent_id}` → 书签树或指定文件夹的子节点；`parent_id` 不传返回整棵树
+- `bookmark.search` `{query, max_results}` → 匹配标题或 URL 的书签列表
+- `bookmark.create` `{title, url, parent_id}` → `{ok, bookmark}`；`parent_id` 不传则放入「其他书签」
+- `bookmark.remove` `{id}` → `{ok}`（**不可逆**）
+- `bookmark.remove_tree` `{id}` → `{ok}`，删除文件夹及其全部子节点（**不可逆**）
+
+#### 历史记录类（需 `history` 权限）
+
+- `history.search` `{query, start_time, end_time, max_results}` → 历史记录列表（时间为毫秒时间戳）
+- `history.recent` `{max_results}` → 按访问时间倒序的最近记录
+- `history.remove` `{url}` → 删除该 URL 的全部历史（**不可逆**）
+- `history.remove_range` `{start_time, end_time}` → 删除时间区间内的历史（**不可逆**）；不传时间会清空全部历史
 
 #### 会话类
 
-- `session.info` → 扩展与浏览器信息
+- `session.recent` `{max_results}` → 最近关闭的标签页/窗口会话
+- `session.restore` `{session_id}` → 恢复指定会话
+
+#### 下载类（需 `downloads` 权限）
+
+- `download.list` `{query, limit}` → 下载记录列表
+- `download.search` `{query, limit}` → 按文件名/URL 搜索下载记录
+- `download.start` `{url, filename, save_as}` → 新建下载任务
+- `download.pause` / `download.resume` / `download.cancel` `{download_id}` → 控制下载
+- `download.erase` `{download_id, delete_file}` → 从下载列表移除记录（**不可逆**，`delete_file=true` 同时删除磁盘文件）
+- `download.open` `{download_id}` → 用系统默认程序打开已下载文件
+
+#### 常用站点 / 阅读列表类（需 `topSites` / `readingList` 权限）
+
+- `topsite.list` → 最常访问的站点
+- `readinglist.list` / `readinglist.add` `{url, title, has_been_read}` / `readinglist.remove` `{url}` / `readinglist.update` `{url, has_been_read, title}`
+
+#### 右键菜单 / 定时器 / 通知类（需 `contextMenus` / `alarms` / `notifications` 权限）
+
+- `contextmenu.create` `{menu_id, title, contexts, url_patterns}` / `contextmenu.remove` `{menu_id}` / `contextmenu.remove_all` / `contextmenu.list`
+- `alarm.create` `{name, delay_minutes, period_minutes}` / `alarm.list` / `alarm.clear` `{name}` / `alarm.clear_all`
+- `notification.create` `{notification_id, title, message, icon_url}` / `notification.clear` `{notification_id}` / `notification.clear_all` / `notification.list`
+
+#### 搜索 / 空闲状态 / 图标 / 页面框架 / 标签组类
+
+- `search.query` `{query, tab_id, disposition}` → 用浏览器默认搜索引擎检索（需 `search` 权限）
+- `idle.query_state` `{detection_interval_seconds}` / `idle.set_interval` `{detection_interval_seconds}` / `idle.get_interval`（需 `idle` 权限）
+- `favicon.get_url` `{page_url, size}` → 站点图标 URL（需 `favicon` 权限）
+- `webnav.get_all_frames` `{tab_id}` / `webnav.get_frame` `{tab_id, frame_id}`（需 `webNavigation` 权限）
+- `tabgroup.list` / `tabgroup.get` `{group_id}` / `tabgroup.query` `{title, color, window_id}` / `tabgroup.update` `{group_id, title, color, collapsed}`（需 `tabGroups` 权限）
+
+#### 高敏感类（需对应高敏感权限，调用前必须向用户确认）
+
+**Cookie 类（需 `cookies` 权限）**
+
+- `cookie.get` `{url, name}` / `cookie.get_all` `{url, domain}` → 读取 Cookie（**含登录凭证**）
+- `cookie.set` `{url, name, value, domain, path, secure, http_only, same_site, expiration_date}` → 写入/修改 Cookie
+- `cookie.remove` `{url, name}` → 删除 Cookie
+
+**网络请求规则类（需 `webRequest` 权限，基于 `declarativeNetRequest` 实现）**
+
+- `netrule.list` → 列出已注册规则
+- `netrule.register` `{rule_id, url_filter, action_type, redirect_url, priority}` → 注册规则，可阻断/重定向请求
+- `netrule.unregister` `{rule_id}` → 注销规则
+
+> MV3 下 `chrome.webRequest` 仅能观察、不能阻断；因此阻断/重定向能力通过
+> `declarativeNetRequest` 实现，`webRequest` 权限保留用于观察与兼容。
+
+**扩展与应用管理类（需 `management` 权限）**
+
+- `extmgr.list` / `extmgr.get` `{extension_id}` → 列出/查询已安装扩展与应用
+- `extmgr.launch_app` `{extension_id}` → 启动已安装应用
+- `extmgr.set_enabled` `{extension_id, enabled}` → 启用/禁用扩展
+- `extmgr.uninstall` `{extension_id}` → 卸载扩展（**不可逆**）
+
+**本机通信类（需 `nativeMessaging` 权限）**
+
+- `native.send` `{native_host, message}` → 向已注册的 native messaging host 发送消息
+
+**代理类（需 `proxy` 权限）**
+
+- `proxy.get_settings` → 读取代理配置
+- `proxy.set_settings` `{mode, pac_url, rules}` → 设置代理（**影响全部网络流量**）
+- `proxy.clear_settings` → 清除代理配置
+
+**隐私设置类（需 `privacy` 权限）**
+
+- `privacy.get` `{area, name}` / `privacy.set` `{area, name, value}`（`area` ∈ network/services/websites）
+
+**浏览数据类（需 `browsingData` 权限）**
+
+- `browsingdata.settings` → 查询可清理的数据类型
+- `browsingdata.remove` `{data_types, since}` → 清除浏览数据（**不可逆**，可含历史/Cookie/缓存/密码）
+
+**内容设置类（需 `contentSettings` 权限）**
+
+- `contentsettings.get` `{content_type, primary_url, secondary_url}` / `contentsettings.set` `{content_type, setting, primary_pattern, secondary_pattern}` / `contentsettings.clear` `{content_type}`
 
 ### 4.4 错误码
 
@@ -330,6 +436,7 @@ async def browser_ext_websocket_endpoint(websocket: WebSocket) -> None:
 | `TIMEOUT`           | 执行超时                   |
 | `PROTECTED_PAGE`    | 目标为受保护页面，无法操作 |
 | `EXEC_ERROR`        | 页面脚本执行异常           |
+| `NOT_SUPPORTED`     | 当前浏览器不支持该 API     |
 
 ---
 

@@ -47,6 +47,82 @@ class BrowserExtTool:
     23. **script_list**: 列出扩展里已安装的页面脚本（类油猴）
     24. **script_get**: 读取某个已安装脚本的源码（含 action 清单）
     25. **script_run**: 在目标页主世界执行已安装脚本的某个 action
+    26. **script_install**: 安装（或更新）页面脚本（类油猴），需提供名称与源码
+    27. **script_uninstall**: 卸载页面脚本（不可逆）
+    28. **script_export**: 导出页面脚本源码为可分享文本
+    29. **script_set_enabled**: 启用/停用页面脚本
+    30. **clipboard_write**: 把文本或 base64 二进制写入前端页面剪贴板
+    31. **clipboard_write_from_url**: 读取网关静态文件并写入前端页面剪贴板
+    32. **bookmark_list**: 列出书签（整棵树或指定文件夹）
+    33. **bookmark_search**: 按标题/URL 关键字搜索书签
+    34. **bookmark_create**: 新增书签
+    35. **bookmark_remove**: 删除单个书签（不可逆）
+    36. **bookmark_remove_tree**: 删除书签文件夹（不可逆）
+    37. **history_search**: 按关键字/时间范围查询历史记录
+    38. **history_recent**: 取最近若干条历史记录
+    39. **history_remove**: 按 URL 删除历史记录（不可逆）
+    40. **history_remove_range**: 按时间范围删除历史记录（不可逆）
+    41. **download_list**: 列出下载记录
+    42. **download_search**: 按文件名/URL 搜索下载记录
+    43. **download_start**: 新建下载任务
+    44. **download_pause**: 暂停下载
+    45. **download_resume**: 继续下载
+    46. **download_cancel**: 取消下载
+    47. **download_erase**: 从下载列表移除记录（不可逆）
+    48. **download_open**: 用系统默认程序打开已下载文件
+    49. **session_recent**: 列出最近关闭的标签页/窗口会话
+    50. **session_restore**: 恢复指定会话
+    51. **topsite_list**: 列出最常访问的站点
+    52. **readinglist_list**: 列出阅读列表
+    53. **readinglist_add**: 添加阅读列表条目
+    54. **readinglist_remove**: 移除阅读列表条目
+    55. **readinglist_update**: 更新阅读列表条目（已读状态/标题）
+    56. **contextmenu_create**: 创建扩展右键菜单
+    57. **contextmenu_remove**: 移除右键菜单
+    58. **contextmenu_remove_all**: 移除全部扩展右键菜单
+    59. **contextmenu_list**: 列出扩展右键菜单
+    60. **alarm_create**: 创建定时器
+    61. **alarm_list**: 列出定时器
+    62. **alarm_clear**: 清除定时器
+    63. **alarm_clear_all**: 清除全部定时器
+    64. **notification_create**: 弹出系统通知
+    65. **notification_clear**: 关闭指定通知
+    66. **notification_clear_all**: 关闭全部通知
+    67. **notification_list**: 列出当前通知
+    68. **search_query**: 用浏览器默认搜索引擎检索
+    69. **idle_query_state**: 查询浏览器空闲状态
+    70. **idle_set_interval**: 设置空闲检测间隔
+    71. **idle_get_interval**: 读取空闲检测间隔
+    72. **favicon_get_url**: 获取站点图标 URL
+    73. **webnav_get_all_frames**: 列出页面全部框架
+    74. **webnav_get_frame**: 获取指定框架信息
+    75. **tabgroup_list**: 列出标签组
+    76. **tabgroup_get**: 获取标签组详情
+    77. **tabgroup_query**: 按标题/颜色/窗口查询标签组
+    78. **tabgroup_update**: 更新标签组（标题/颜色/折叠）
+    79. **cookie_get**（高敏感）: 读取单个 Cookie
+    80. **cookie_get_all**（高敏感）: 读取站点 Cookie 列表
+    81. **cookie_set**（高敏感）: 写入/修改 Cookie
+    82. **cookie_remove**（高敏感）: 删除 Cookie
+    83. **netrule_list**（高敏感）: 列出网络请求规则
+    84. **netrule_register**（高敏感）: 注册网络请求规则（可改写/阻断请求）
+    85. **netrule_unregister**（高敏感）: 注销网络请求规则
+    86. **extmgr_list**（高敏感）: 列出已安装扩展与应用
+    87. **extmgr_get**（高敏感）: 获取扩展详情
+    88. **extmgr_launch_app**（高敏感）: 启动已安装应用
+    89. **extmgr_set_enabled**（高敏感）: 启用/禁用扩展
+    90. **extmgr_uninstall**（高敏感，不可逆）: 卸载扩展
+    91. **native_send**（高敏感）: 向本机应用发送消息（需已注册 native host）
+    92. **proxy_get_settings**（高敏感）: 读取浏览器代理配置
+    93. **proxy_set_settings**（高敏感）: 设置浏览器代理（影响全部网络流量）
+    94. **proxy_clear_settings**（高敏感）: 清除代理配置
+    95. **privacy_get**（高敏感）: 读取隐私设置
+    96. **privacy_set**（高敏感）: 修改隐私设置
+    97. **browsingdata_settings**（高敏感）: 查询可清理的浏览数据类型
+    98. **browsingdata_remove**（高敏感，不可逆）: 清除浏览数据（历史/Cookie/缓存/密码等）
+    99. **contentsettings_get**（高敏感）: 读取站点内容设置
+    100. **contentsettings_set**（高敏感）: 修改站点内容设置
+    101. **contentsettings_clear**（高敏感）: 清除站点内容设置
 
     典型流程：先 list_sessions 拿到 session_id，再 list_tabs 拿到 tab_id，
     然后执行 navigate/get_text/click/type/screenshot 等操作。
@@ -105,6 +181,90 @@ class BrowserExtTool:
 - script_get: 读取某个已安装脚本的完整信息（含 source 源码，据此得知它导出哪些 action、参数与行为）。需 session_id、script_id
 - script_run: 在目标页主世界执行已安装脚本的某个 action。需 session_id、script_id、script_action；可选 script_args（传给该 action 的参数对象）、tab_id（默认当前活动页）。
   脚本须 enabled 且目标页 URL 命中其 match；写操作类 action 会真实改动数据，调用前先向用户说明
+- script_install: 安装（或更新）页面脚本。需 session_id、script_name、script_source；可选 script_description、script_match（URL 匹配模式数组）、script_version。
+  源码需导出 actions 映射（可写 globalThis.__JARVIS_SCRIPT__ 或 module.exports）；安装后默认启用
+- script_uninstall: 卸载页面脚本（**不可逆**）。需 session_id、script_id
+- script_export: 导出页面脚本源码为可分享文本。需 session_id、script_id。用于备份或迁移脚本
+- script_set_enabled: 启用/停用页面脚本。需 session_id、script_id、script_enabled（布尔）。停用后 script_run 会返回 SCRIPT_DISABLED
+- clipboard_write: 把文本或 base64 二进制写入**前端页面**的系统剪贴板。需 session_id；
+  文本用 clipboard_text，二进制用 clipboard_base64（配合 clipboard_mime，默认 image/png）；
+  可选 clipboard_as（text/blob，不传时有 clipboard_text 则用 text）、tab_id。
+  要求目标页真正获得焦点，否则报 CLIPBOARD_WRITE_FAILED
+- clipboard_write_from_url: 读取文件内容并写入前端页面剪贴板。需 session_id、clipboard_url；可选 clipboard_as、clipboard_mime、tab_id。
+  推荐传完整绝对 URL；相对路径仅支持 /uploads/ 前缀（用已连接网关补全）
+- bookmark_list: 列出书签。需 session_id；可选 parent_id（指定文件夹 ID，不传则返回整棵书签树）
+- bookmark_search: 按标题或 URL 关键字搜索书签。需 session_id、bookmark_query；可选 max_results
+- bookmark_create: 新增书签。需 session_id、url；可选 title、parent_id（不传则放入「其他书签」）
+- bookmark_remove: 删除单个书签（**不可逆**）。需 session_id、bookmark_id
+- bookmark_remove_tree: 删除书签文件夹及其全部子节点（**不可逆**）。需 session_id、bookmark_id
+- history_search: 查询历史记录。需 session_id；可选 history_query（关键字）、start_time/end_time（毫秒时间戳）、max_results（默认 100）
+- history_recent: 取最近若干条历史记录（按访问时间倒序）。需 session_id；可选 max_results（默认 50）
+- history_remove: 删除指定 URL 的全部历史记录（**不可逆**）。需 session_id、history_url
+- history_remove_range: 删除时间区间内的历史记录（**不可逆**）。需 session_id；可选 start_time/end_time（毫秒时间戳）。
+  **不传时间参数会清空全部历史记录**，调用前务必向用户确认
+- download_list: 列出下载记录。需 session_id；可选 download_query（关键字）、max_results（默认 50）
+- download_search: 按文件名/URL 搜索下载记录。需 session_id、download_query；可选 max_results
+- download_start: 新建下载任务。需 session_id、url；可选 filename、save_as（默认 true）
+- download_pause: 暂停下载。需 session_id、download_id
+- download_resume: 继续下载。需 session_id、download_id
+- download_cancel: 取消下载。需 session_id、download_id
+- download_erase: 从下载列表移除记录（**不可逆**）。需 session_id、download_id；可选 delete_file（默认 false，true 会同时删除磁盘文件）
+- download_open: 用系统默认程序打开已下载文件。需 session_id、download_id
+- session_recent: 列出最近关闭的标签页/窗口会话。需 session_id；可选 max_results（默认 25）
+- session_restore: 恢复指定会话。需 session_id、session_key（由 session_recent 获取）
+- topsite_list: 列出最常访问的站点。需 session_id
+- readinglist_list: 列出阅读列表。需 session_id
+- readinglist_add: 添加阅读列表条目。需 session_id、url；可选 title、has_been_read
+- readinglist_remove: 移除阅读列表条目。需 session_id、url
+- readinglist_update: 更新阅读列表条目。需 session_id、url；可选 has_been_read、title
+- contextmenu_create: 创建扩展右键菜单。需 session_id、menu_id、title；可选 contexts、url_patterns
+- contextmenu_remove: 移除右键菜单。需 session_id、menu_id
+- contextmenu_remove_all: 移除全部扩展右键菜单。需 session_id
+- contextmenu_list: 列出扩展右键菜单。需 session_id
+- alarm_create: 创建定时器。需 session_id、alarm_name；可选 delay_minutes、period_minutes
+- alarm_list: 列出定时器。需 session_id
+- alarm_clear: 清除定时器。需 session_id、alarm_name
+- alarm_clear_all: 清除全部定时器。需 session_id
+- notification_create: 弹出系统通知。需 session_id、title；可选 notification_id、message、icon_url
+- notification_clear: 关闭指定通知。需 session_id、notification_id
+- notification_clear_all: 关闭全部通知。需 session_id
+- notification_list: 列出当前通知。需 session_id
+- search_query: 用浏览器默认搜索引擎检索。需 session_id、search_query；可选 tab_id、disposition
+- idle_query_state: 查询浏览器空闲状态。需 session_id；可选 detection_interval_seconds
+- idle_set_interval: 设置空闲检测间隔。需 session_id、detection_interval_seconds
+- idle_get_interval: 读取空闲检测间隔。需 session_id
+- favicon_get_url: 获取站点图标 URL。需 session_id、page_url；可选 size
+- webnav_get_all_frames: 列出页面全部框架。需 session_id、tab_id
+- webnav_get_frame: 获取指定框架信息。需 session_id、tab_id、frame_id
+- tabgroup_list: 列出标签组。需 session_id
+- tabgroup_get: 获取标签组详情。需 session_id、group_id
+- tabgroup_query: 按标题/颜色/窗口查询标签组。需 session_id；可选 group_title、color、window_id
+- tabgroup_update: 更新标签组。需 session_id、group_id；可选 group_title、color、collapsed
+
+**以下为高敏感操作，会真实改动用户浏览器配置或数据，调用前必须向用户确认：**
+- cookie_get: 读取单个 Cookie（**高敏感**，涉及登录凭证）。需 session_id、url、cookie_name
+- cookie_get_all: 读取站点 Cookie 列表（**高敏感**）。需 session_id；可选 url、domain
+- cookie_set: 写入/修改 Cookie（**高敏感**）。需 session_id、url、cookie_name、value；可选 domain、path、secure、http_only、same_site、expiration_date
+- cookie_remove: 删除 Cookie（**高敏感**）。需 session_id、url、cookie_name
+- netrule_list: 列出网络请求规则（**高敏感**）。需 session_id
+- netrule_register: 注册网络请求规则（**高敏感**，可阻断/重定向请求）。需 session_id、rule_id、url_filter；可选 action_type（block/redirect/allow，默认 block）、redirect_url、priority
+- netrule_unregister: 注销网络请求规则（**高敏感**）。需 session_id、rule_id
+- extmgr_list: 列出已安装扩展与应用（**高敏感**）。需 session_id
+- extmgr_get: 获取扩展详情（**高敏感**）。需 session_id、extension_id
+- extmgr_launch_app: 启动已安装应用（**高敏感**）。需 session_id、extension_id
+- extmgr_set_enabled: 启用/禁用扩展（**高敏感**）。需 session_id、extension_id、enabled
+- extmgr_uninstall: 卸载扩展（**高敏感，不可逆**）。需 session_id、extension_id
+- native_send: 向本机应用发送消息（**高敏感**，需已注册 native host）。需 session_id、native_host、message
+- proxy_get_settings: 读取浏览器代理配置（**高敏感**）。需 session_id
+- proxy_set_settings: 设置浏览器代理（**高敏感**，影响全部网络流量）。需 session_id、proxy_mode（direct/auto_detect/pac_script/system/fixed_servers）；pac_script 需 pac_url，fixed_servers 需 proxy_rules
+- proxy_clear_settings: 清除代理配置（**高敏感**）。需 session_id
+- privacy_get: 读取隐私设置（**高敏感**）。需 session_id、privacy_area（network/services/websites）、privacy_name
+- privacy_set: 修改隐私设置（**高敏感**）。需 session_id、privacy_area、privacy_name、privacy_value
+- browsingdata_settings: 查询可清理的浏览数据类型（**高敏感**）。需 session_id
+- browsingdata_remove: 清除浏览数据（**高敏感，不可逆**）。需 session_id、data_types（数组，如 ["cache","cookies","history","downloads","formData","passwords"]）；可选 since（毫秒时间戳，不传清除全部）
+- contentsettings_get: 读取站点内容设置（**高敏感**）。需 session_id、content_type；可选 primary_url、secondary_url
+- contentsettings_set: 修改站点内容设置（**高敏感**）。需 session_id、content_type、content_setting；可选 primary_pattern、secondary_pattern
+- contentsettings_clear: 清除站点内容设置（**高敏感**）。需 session_id、content_type
 若用户未安装扩展或扩展未连接，list_sessions 会返回空列表。"""
 
     parameters = {
@@ -144,6 +304,82 @@ class BrowserExtTool:
                     "script_list",
                     "script_get",
                     "script_run",
+                    "script_install",
+                    "script_uninstall",
+                    "script_export",
+                    "script_set_enabled",
+                    "clipboard_write",
+                    "clipboard_write_from_url",
+                    "bookmark_list",
+                    "bookmark_search",
+                    "bookmark_create",
+                    "bookmark_remove",
+                    "bookmark_remove_tree",
+                    "history_search",
+                    "history_recent",
+                    "history_remove",
+                    "history_remove_range",
+                    "download_list",
+                    "download_search",
+                    "download_start",
+                    "download_pause",
+                    "download_resume",
+                    "download_cancel",
+                    "download_erase",
+                    "download_open",
+                    "session_recent",
+                    "session_restore",
+                    "topsite_list",
+                    "readinglist_list",
+                    "readinglist_add",
+                    "readinglist_remove",
+                    "readinglist_update",
+                    "contextmenu_create",
+                    "contextmenu_remove",
+                    "contextmenu_remove_all",
+                    "contextmenu_list",
+                    "alarm_create",
+                    "alarm_list",
+                    "alarm_clear",
+                    "alarm_clear_all",
+                    "notification_create",
+                    "notification_clear",
+                    "notification_clear_all",
+                    "notification_list",
+                    "search_query",
+                    "idle_query_state",
+                    "idle_set_interval",
+                    "idle_get_interval",
+                    "favicon_get_url",
+                    "webnav_get_all_frames",
+                    "webnav_get_frame",
+                    "tabgroup_list",
+                    "tabgroup_get",
+                    "tabgroup_query",
+                    "tabgroup_update",
+                    "cookie_get",
+                    "cookie_get_all",
+                    "cookie_set",
+                    "cookie_remove",
+                    "netrule_list",
+                    "netrule_register",
+                    "netrule_unregister",
+                    "extmgr_list",
+                    "extmgr_get",
+                    "extmgr_launch_app",
+                    "extmgr_set_enabled",
+                    "extmgr_uninstall",
+                    "native_send",
+                    "proxy_get_settings",
+                    "proxy_set_settings",
+                    "proxy_clear_settings",
+                    "privacy_get",
+                    "privacy_set",
+                    "browsingdata_settings",
+                    "browsingdata_remove",
+                    "contentsettings_get",
+                    "contentsettings_set",
+                    "contentsettings_clear",
                 ],
                 "description": "要执行的操作类型，每次只能选一个",
             },
@@ -259,7 +495,8 @@ class BrowserExtTool:
             },
             "script_id": {
                 "type": "string",
-                "description": "已安装脚本的 ID（由 script_list 获取，形如 s-xxxxxxxx；script_get/script_run 必填）",
+                "description": "已安装脚本的 ID（由 script_list 获取，形如 s-xxxxxxxx；"
+                "script_get/script_run/script_uninstall/script_export/script_set_enabled 必填）",
             },
             "script_action": {
                 "type": "string",
@@ -268,6 +505,321 @@ class BrowserExtTool:
             "script_args": {
                 "type": "object",
                 "description": "传给脚本 action 的参数对象（script_run 可选，默认空对象）",
+            },
+            "script_name": {
+                "type": "string",
+                "description": "脚本名称（script_install 必填）",
+            },
+            "script_source": {
+                "type": "string",
+                "description": "脚本源码（script_install 必填；需导出 actions 映射，"
+                "可写 globalThis.__JARVIS_SCRIPT__ 或 module.exports）",
+            },
+            "script_description": {
+                "type": "string",
+                "description": "脚本描述（script_install 可选）",
+            },
+            "script_match": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "脚本适用的 URL 匹配模式数组（script_install 可选）",
+            },
+            "script_version": {
+                "type": "string",
+                "description": "脚本版本号（script_install 可选）",
+            },
+            "script_enabled": {
+                "type": "boolean",
+                "description": "是否启用脚本（script_set_enabled 必填）",
+            },
+            "clipboard_text": {
+                "type": "string",
+                "description": "要写入剪贴板的文本（clipboard_write 在 as='text' 时必填）",
+            },
+            "clipboard_base64": {
+                "type": "string",
+                "description": "要写入剪贴板的二进制内容（base64，clipboard_write 在 as='blob' 时必填）",
+            },
+            "clipboard_mime": {
+                "type": "string",
+                "description": "MIME 类型（clipboard_write 可选，as='blob' 时默认 image/png）",
+            },
+            "clipboard_as": {
+                "type": "string",
+                "enum": ["text", "blob"],
+                "description": "写入模式（clipboard_write 可选；不传时有 clipboard_text 则用 text，否则 blob）",
+            },
+            "clipboard_url": {
+                "type": "string",
+                "description": "要读取并写入剪贴板的文件地址（clipboard_write_from_url 必填）；"
+                "推荐传完整绝对 URL，相对路径仅支持 /uploads/ 前缀",
+            },
+            "bookmark_query": {
+                "type": "string",
+                "description": "书签搜索关键字，匹配标题或 URL（bookmark_search 必填）",
+            },
+            "bookmark_id": {
+                "type": "string",
+                "description": "书签节点 ID（bookmark_remove/bookmark_remove_tree 必填）",
+            },
+            "parent_id": {
+                "type": "string",
+                "description": "书签文件夹 ID（bookmark_list 可选，不传返回整棵树；bookmark_create 可选，不传放入「其他书签」）",
+            },
+            "history_query": {
+                "type": "string",
+                "description": "历史记录搜索关键字（history_search 可选，不传则返回时间范围内全部）",
+            },
+            "history_url": {
+                "type": "string",
+                "description": "要删除历史记录的 URL（history_remove 必填）",
+            },
+            "start_time": {
+                "type": "integer",
+                "description": "起始时间，毫秒时间戳（history_search/history_remove_range 可选，不传则为 0）",
+            },
+            "end_time": {
+                "type": "integer",
+                "description": "结束时间，毫秒时间戳（history_search/history_remove_range 可选，不传则为当前时间）",
+            },
+            "max_results": {
+                "type": "integer",
+                "description": "最多返回多少条（bookmark_search/history_search/history_recent 可选）",
+            },
+            "download_query": {
+                "type": "string",
+                "description": "下载记录搜索关键字，匹配文件名或 URL（download_search 必填；download_list 可选）",
+            },
+            "download_id": {
+                "type": "integer",
+                "description": "下载项 ID（download_pause/download_resume/download_cancel/download_erase/download_open 必填）",
+            },
+            "filename": {
+                "type": "string",
+                "description": "保存的文件名（download_start 可选）",
+            },
+            "save_as": {
+                "type": "boolean",
+                "description": "是否弹出另存为对话框（download_start 可选，默认 true）",
+            },
+            "delete_file": {
+                "type": "boolean",
+                "description": "是否同时删除磁盘文件（download_erase 可选，默认 false）",
+            },
+            "session_key": {
+                "type": "string",
+                "description": "会话标识（session_restore 必填，由 session_recent 返回）",
+            },
+            "has_been_read": {
+                "type": "boolean",
+                "description": "是否已读（readinglist_add/readinglist_update 可选）",
+            },
+            "menu_id": {
+                "type": "string",
+                "description": "右键菜单 ID（contextmenu_create/contextmenu_remove 必填）",
+            },
+            "contexts": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "菜单显示上下文，如 [\"page\",\"selection\"]（contextmenu_create 可选，默认 [\"page\"]）",
+            },
+            "url_patterns": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "菜单显示匹配的 URL 模式（contextmenu_create 可选）",
+            },
+            "alarm_name": {
+                "type": "string",
+                "description": "定时器名称（alarm_create/alarm_clear 必填）",
+            },
+            "delay_minutes": {
+                "type": "number",
+                "description": "首次触发延迟分钟数（alarm_create 可选）",
+            },
+            "period_minutes": {
+                "type": "number",
+                "description": "重复周期分钟数（alarm_create 可选，不传则只触发一次）",
+            },
+            "notification_id": {
+                "type": "string",
+                "description": "通知 ID（notification_create 可选；notification_clear 必填）",
+            },
+            "message": {
+                "type": "string",
+                "description": "通知正文（notification_create 可选）或发给本机应用的消息（native_send 必填）",
+            },
+            "icon_url": {
+                "type": "string",
+                "description": "通知图标 URL（notification_create 可选）",
+            },
+            "search_query": {
+                "type": "string",
+                "description": "搜索关键词（search_query 必填）",
+            },
+            "disposition": {
+                "type": "string",
+                "enum": ["CURRENT_TAB", "NEW_TAB", "NEW_WINDOW"],
+                "description": "搜索结果打开方式（search_query 可选，默认 CURRENT_TAB）",
+            },
+            "detection_interval_seconds": {
+                "type": "integer",
+                "description": "空闲检测间隔秒数（idle_query_state/idle_set_interval 可选，最小 15）",
+            },
+            "page_url": {
+                "type": "string",
+                "description": "页面 URL（favicon_get_url 必填）",
+            },
+            "size": {
+                "type": "integer",
+                "description": "图标尺寸像素（favicon_get_url 可选，默认 32）",
+            },
+            "frame_id": {
+                "type": "integer",
+                "description": "框架 ID（webnav_get_frame 必填，由 webnav_get_all_frames 获取）",
+            },
+            "group_id": {
+                "type": "integer",
+                "description": "标签组 ID（tabgroup_get/tabgroup_update 必填）",
+            },
+            "group_title": {
+                "type": "string",
+                "description": "标签组标题（tabgroup_query 可选；tabgroup_update 可选，用于重命名）",
+            },
+            "color": {
+                "type": "string",
+                "description": "标签组颜色，如 blue/red/green（tabgroup_query/tabgroup_update 可选）",
+            },
+            "collapsed": {
+                "type": "boolean",
+                "description": "标签组是否折叠（tabgroup_update 可选）",
+            },
+            "window_id": {
+                "type": "integer",
+                "description": "窗口 ID（tabgroup_query 可选）",
+            },
+            "cookie_name": {
+                "type": "string",
+                "description": "Cookie 名（cookie_get/cookie_set/cookie_remove 必填）",
+            },
+            "domain": {
+                "type": "string",
+                "description": "Cookie 域（cookie_get_all 可选；cookie_set 可选）",
+            },
+            "path": {
+                "type": "string",
+                "description": "Cookie 路径（cookie_set 可选）",
+            },
+            "secure": {
+                "type": "boolean",
+                "description": "Cookie 是否仅 HTTPS 传输（cookie_set 可选）",
+            },
+            "http_only": {
+                "type": "boolean",
+                "description": "Cookie 是否禁止 JS 访问（cookie_set 可选）",
+            },
+            "same_site": {
+                "type": "string",
+                "enum": ["no_restriction", "lax", "strict", "unspecified"],
+                "description": "Cookie SameSite 策略（cookie_set 可选）",
+            },
+            "expiration_date": {
+                "type": "number",
+                "description": "Cookie 过期时间，秒级时间戳（cookie_set 可选，不传为会话 Cookie）",
+            },
+            "rule_id": {
+                "type": "integer",
+                "description": "网络请求规则 ID（netrule_register/netrule_unregister 必填）",
+            },
+            "url_filter": {
+                "type": "string",
+                "description": "规则匹配的 URL 过滤串（netrule_register 必填）",
+            },
+            "action_type": {
+                "type": "string",
+                "enum": ["block", "redirect", "allow"],
+                "description": "规则动作（netrule_register 可选，默认 block）",
+            },
+            "redirect_url": {
+                "type": "string",
+                "description": "重定向目标 URL（netrule_register 在 action_type=redirect 时必填）",
+            },
+            "priority": {
+                "type": "integer",
+                "description": "规则优先级，越大越优先（netrule_register 可选，默认 1）",
+            },
+            "extension_id": {
+                "type": "string",
+                "description": "扩展或应用 ID（extmgr_get/extmgr_launch_app/extmgr_set_enabled/extmgr_uninstall 必填）",
+            },
+            "enabled": {
+                "type": "boolean",
+                "description": "是否启用（extmgr_set_enabled 必填）",
+            },
+            "native_host": {
+                "type": "string",
+                "description": "本机应用（native messaging host）名称（native_send 必填）",
+            },
+            "proxy_mode": {
+                "type": "string",
+                "enum": ["direct", "auto_detect", "pac_script", "system", "fixed_servers"],
+                "description": "代理模式（proxy_set_settings 必填）",
+            },
+            "pac_url": {
+                "type": "string",
+                "description": "PAC 脚本 URL（proxy_set_settings 在 proxy_mode=pac_script 时必填）",
+            },
+            "proxy_rules": {
+                "type": "object",
+                "description": "代理规则对象（proxy_set_settings 在 proxy_mode=fixed_servers 时必填）",
+            },
+            "privacy_area": {
+                "type": "string",
+                "enum": ["network", "services", "websites"],
+                "description": "隐私设置分组（privacy_get/privacy_set 必填）",
+            },
+            "privacy_name": {
+                "type": "string",
+                "description": "隐私设置项名，如 networkPredictionEnabled（privacy_get/privacy_set 必填）",
+            },
+            "privacy_value": {
+                "type": "boolean",
+                "description": "隐私设置的目标值（privacy_set 必填）",
+            },
+            "data_types": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "要清除的数据类型数组，如 [\"cache\",\"cookies\",\"history\",\"downloads\",\"formData\",\"passwords\"]"
+                "（browsingdata_remove 必填）。**清除不可逆**",
+            },
+            "since": {
+                "type": "integer",
+                "description": "清除起始时间，毫秒时间戳（browsingdata_remove 可选，不传则清除全部）",
+            },
+            "content_type": {
+                "type": "string",
+                "description": "内容设置类型，如 cookies/javascript/images/popups/geolocation"
+                "（contentsettings_get/contentsettings_set/contentsettings_clear 必填）",
+            },
+            "content_setting": {
+                "type": "string",
+                "enum": ["allow", "block", "ask", "session_only"],
+                "description": "内容设置值（contentsettings_set 必填）",
+            },
+            "primary_pattern": {
+                "type": "string",
+                "description": "内容设置主匹配模式，如 https://example.com/*（contentsettings_set 可选）",
+            },
+            "secondary_pattern": {
+                "type": "string",
+                "description": "内容设置次匹配模式（contentsettings_set 可选）",
+            },
+            "primary_url": {
+                "type": "string",
+                "description": "主 URL（contentsettings_get 可选，不传返回全局默认值）",
+            },
+            "secondary_url": {
+                "type": "string",
+                "description": "次 URL（contentsettings_get 可选）",
             },
             "timeout": {
                 "type": "number",
@@ -513,6 +1065,81 @@ class BrowserExtTool:
         script_id: str = "",
         script_action: str = "",
         script_args: Optional[Dict[str, Any]] = None,
+        script_name: str = "",
+        script_source: str = "",
+        script_description: str = "",
+        script_match: Optional[List[str]] = None,
+        script_version: str = "",
+        script_enabled: Optional[bool] = None,
+        clipboard_text: str = "",
+        clipboard_base64: str = "",
+        clipboard_mime: str = "",
+        clipboard_as: str = "",
+        clipboard_url: str = "",
+        bookmark_query: str = "",
+        bookmark_id: str = "",
+        parent_id: str = "",
+        history_query: str = "",
+        history_url: str = "",
+        start_time: Optional[int] = None,
+        end_time: Optional[int] = None,
+        max_results: Optional[int] = None,
+        download_query: str = "",
+        download_id: Optional[int] = None,
+        filename: str = "",
+        save_as: bool = True,
+        delete_file: bool = False,
+        session_key: str = "",
+        has_been_read: Optional[bool] = None,
+        menu_id: str = "",
+        contexts: Optional[List[str]] = None,
+        url_patterns: Optional[List[str]] = None,
+        alarm_name: str = "",
+        delay_minutes: Optional[float] = None,
+        period_minutes: Optional[float] = None,
+        notification_id: str = "",
+        message: str = "",
+        icon_url: str = "",
+        search_query: str = "",
+        disposition: str = "",
+        detection_interval_seconds: Optional[int] = None,
+        page_url: str = "",
+        size: Optional[int] = None,
+        frame_id: Optional[int] = None,
+        group_id: Optional[int] = None,
+        group_title: str = "",
+        color: str = "",
+        collapsed: Optional[bool] = None,
+        window_id: Optional[int] = None,
+        cookie_name: str = "",
+        domain: str = "",
+        path: str = "",
+        secure: Optional[bool] = None,
+        http_only: Optional[bool] = None,
+        same_site: str = "",
+        expiration_date: Optional[float] = None,
+        rule_id: Optional[int] = None,
+        url_filter: str = "",
+        action_type: str = "",
+        redirect_url: str = "",
+        priority: Optional[int] = None,
+        extension_id: str = "",
+        enabled: Optional[bool] = None,
+        native_host: str = "",
+        proxy_mode: str = "",
+        pac_url: str = "",
+        proxy_rules: Optional[Dict[str, Any]] = None,
+        privacy_area: str = "",
+        privacy_name: str = "",
+        privacy_value: Optional[bool] = None,
+        data_types: Optional[List[str]] = None,
+        since: Optional[int] = None,
+        content_type: str = "",
+        content_setting: str = "",
+        primary_pattern: str = "",
+        secondary_pattern: str = "",
+        primary_url: str = "",
+        secondary_url: str = "",
         timeout: float = 15.0,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -566,6 +1193,81 @@ class BrowserExtTool:
             script_id = args.get("script_id", "")
             script_action = args.get("script_action", "")
             script_args = args.get("script_args")
+            script_name = args.get("script_name", "")
+            script_source = args.get("script_source", "")
+            script_description = args.get("script_description", "")
+            script_match = args.get("script_match")
+            script_version = args.get("script_version", "")
+            script_enabled = args.get("script_enabled")
+            clipboard_text = args.get("clipboard_text", "")
+            clipboard_base64 = args.get("clipboard_base64", "")
+            clipboard_mime = args.get("clipboard_mime", "")
+            clipboard_as = args.get("clipboard_as", "")
+            clipboard_url = args.get("clipboard_url", "")
+            bookmark_query = args.get("bookmark_query", "")
+            bookmark_id = args.get("bookmark_id", "")
+            parent_id = args.get("parent_id", "")
+            history_query = args.get("history_query", "")
+            history_url = args.get("history_url", "")
+            start_time = args.get("start_time")
+            end_time = args.get("end_time")
+            max_results = args.get("max_results")
+            download_query = args.get("download_query", "")
+            download_id = args.get("download_id")
+            filename = args.get("filename", "")
+            save_as = args.get("save_as", True)
+            delete_file = args.get("delete_file", False)
+            session_key = args.get("session_key", "")
+            has_been_read = args.get("has_been_read")
+            menu_id = args.get("menu_id", "")
+            contexts = args.get("contexts")
+            url_patterns = args.get("url_patterns")
+            alarm_name = args.get("alarm_name", "")
+            delay_minutes = args.get("delay_minutes")
+            period_minutes = args.get("period_minutes")
+            notification_id = args.get("notification_id", "")
+            message = args.get("message", "")
+            icon_url = args.get("icon_url", "")
+            search_query = args.get("search_query", "")
+            disposition = args.get("disposition", "")
+            detection_interval_seconds = args.get("detection_interval_seconds")
+            page_url = args.get("page_url", "")
+            size = args.get("size")
+            frame_id = args.get("frame_id")
+            group_id = args.get("group_id")
+            group_title = args.get("group_title", "")
+            color = args.get("color", "")
+            collapsed = args.get("collapsed")
+            window_id = args.get("window_id")
+            cookie_name = args.get("cookie_name", "")
+            domain = args.get("domain", "")
+            path = args.get("path", "")
+            secure = args.get("secure")
+            http_only = args.get("http_only")
+            same_site = args.get("same_site", "")
+            expiration_date = args.get("expiration_date")
+            rule_id = args.get("rule_id")
+            url_filter = args.get("url_filter", "")
+            action_type = args.get("action_type", "")
+            redirect_url = args.get("redirect_url", "")
+            priority = args.get("priority")
+            extension_id = args.get("extension_id", "")
+            enabled = args.get("enabled")
+            native_host = args.get("native_host", "")
+            proxy_mode = args.get("proxy_mode", "")
+            pac_url = args.get("pac_url", "")
+            proxy_rules = args.get("proxy_rules")
+            privacy_area = args.get("privacy_area", "")
+            privacy_name = args.get("privacy_name", "")
+            privacy_value = args.get("privacy_value")
+            data_types = args.get("data_types")
+            since = args.get("since")
+            content_type = args.get("content_type", "")
+            content_setting = args.get("content_setting", "")
+            primary_pattern = args.get("primary_pattern", "")
+            secondary_pattern = args.get("secondary_pattern", "")
+            primary_url = args.get("primary_url", "")
+            secondary_url = args.get("secondary_url", "")
             timeout = args.get("timeout", 15.0)
 
         action = str(action or "").strip()
@@ -645,6 +1347,82 @@ class BrowserExtTool:
             "script_list",
             "script_get",
             "script_run",
+            "script_install",
+            "script_uninstall",
+            "script_export",
+            "script_set_enabled",
+            "clipboard_write",
+            "clipboard_write_from_url",
+            "bookmark_list",
+            "bookmark_search",
+            "bookmark_create",
+            "bookmark_remove",
+            "bookmark_remove_tree",
+            "history_search",
+            "history_recent",
+            "history_remove",
+            "history_remove_range",
+            "download_list",
+            "download_search",
+            "download_start",
+            "download_pause",
+            "download_resume",
+            "download_cancel",
+            "download_erase",
+            "download_open",
+            "session_recent",
+            "session_restore",
+            "topsite_list",
+            "readinglist_list",
+            "readinglist_add",
+            "readinglist_remove",
+            "readinglist_update",
+            "contextmenu_create",
+            "contextmenu_remove",
+            "contextmenu_remove_all",
+            "contextmenu_list",
+            "alarm_create",
+            "alarm_list",
+            "alarm_clear",
+            "alarm_clear_all",
+            "notification_create",
+            "notification_clear",
+            "notification_clear_all",
+            "notification_list",
+            "search_query",
+            "idle_query_state",
+            "idle_set_interval",
+            "idle_get_interval",
+            "favicon_get_url",
+            "webnav_get_all_frames",
+            "webnav_get_frame",
+            "tabgroup_list",
+            "tabgroup_get",
+            "tabgroup_query",
+            "tabgroup_update",
+            "cookie_get",
+            "cookie_get_all",
+            "cookie_set",
+            "cookie_remove",
+            "netrule_list",
+            "netrule_register",
+            "netrule_unregister",
+            "extmgr_list",
+            "extmgr_get",
+            "extmgr_launch_app",
+            "extmgr_set_enabled",
+            "extmgr_uninstall",
+            "native_send",
+            "proxy_get_settings",
+            "proxy_set_settings",
+            "proxy_clear_settings",
+            "privacy_get",
+            "privacy_set",
+            "browsingdata_settings",
+            "browsingdata_remove",
+            "contentsettings_get",
+            "contentsettings_set",
+            "contentsettings_clear",
         }
         if action not in known_actions:
             return {
@@ -996,6 +1774,872 @@ class BrowserExtTool:
             params["action"] = script_action
             params["args"] = dict(script_args) if script_args else {}
             return self._send_command(session_id, "script.run", params, timeout)
+
+        # ---------------- script_install ----------------
+        if action == "script_install":
+            if not script_name:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "script_name is required for action 'script_install'",
+                }
+            if not script_source:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "script_source is required for action 'script_install'",
+                }
+            # 扩展侧 script.install 的 params 为 { name, source, description, match, version }
+            params["name"] = script_name
+            params["source"] = script_source
+            if script_description:
+                params["description"] = script_description
+            if script_match:
+                params["match"] = list(script_match)
+            if script_version:
+                params["version"] = script_version
+            return self._send_command(session_id, "script.install", params, timeout)
+
+        # ---------------- script_uninstall ----------------
+        if action == "script_uninstall":
+            if not script_id:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "script_id is required for action 'script_uninstall'",
+                }
+            params["id"] = script_id
+            return self._send_command(session_id, "script.uninstall", params, timeout)
+
+        # ---------------- script_export ----------------
+        if action == "script_export":
+            if not script_id:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "script_id is required for action 'script_export'",
+                }
+            params["id"] = script_id
+            return self._send_command(session_id, "script.export", params, timeout)
+
+        # ---------------- script_set_enabled ----------------
+        if action == "script_set_enabled":
+            if not script_id:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "script_id is required for action 'script_set_enabled'",
+                }
+            if script_enabled is None:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "script_enabled is required for action 'script_set_enabled'",
+                }
+            params["id"] = script_id
+            params["enabled"] = bool(script_enabled)
+            return self._send_command(session_id, "script.set_enabled", params, timeout)
+
+        # ---------------- clipboard_write ----------------
+        if action == "clipboard_write":
+            # 扩展侧 clipboard.write 的 params 为 { text, base64, mime, as, tab_id }
+            if clipboard_as:
+                params["as"] = clipboard_as
+            if clipboard_text:
+                params["text"] = clipboard_text
+            if clipboard_base64:
+                params["base64"] = clipboard_base64
+            if clipboard_mime:
+                params["mime"] = clipboard_mime
+            if not clipboard_text and not clipboard_base64:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "clipboard_text or clipboard_base64 is required "
+                    "for action 'clipboard_write'",
+                }
+            return self._send_command(session_id, "clipboard.write", params, timeout)
+
+        # ---------------- clipboard_write_from_url ----------------
+        if action == "clipboard_write_from_url":
+            if not clipboard_url:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "clipboard_url is required for action 'clipboard_write_from_url'",
+                }
+            # 扩展侧 clipboard.writeFromUrl 的 params 为 { url, as, mime, tab_id }
+            params["url"] = clipboard_url
+            if clipboard_as:
+                params["as"] = clipboard_as
+            if clipboard_mime:
+                params["mime"] = clipboard_mime
+            return self._send_command(session_id, "clipboard.write_from_url", params, timeout)
+
+        # ---------------- bookmark_list ----------------
+        if action == "bookmark_list":
+            if parent_id:
+                params["parent_id"] = parent_id
+            return self._send_command(session_id, "bookmark.list", params, timeout)
+
+        # ---------------- bookmark_search ----------------
+        if action == "bookmark_search":
+            if not bookmark_query:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "bookmark_query is required for action 'bookmark_search'",
+                }
+            params["query"] = bookmark_query
+            if max_results is not None:
+                params["max_results"] = max_results
+            return self._send_command(session_id, "bookmark.search", params, timeout)
+
+        # ---------------- bookmark_create ----------------
+        if action == "bookmark_create":
+            if not url:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "url is required for action 'bookmark_create'",
+                }
+            params["url"] = url
+            if text:
+                params["title"] = text
+            if parent_id:
+                params["parent_id"] = parent_id
+            return self._send_command(session_id, "bookmark.create", params, timeout)
+
+        # ---------------- bookmark_remove ----------------
+        if action == "bookmark_remove":
+            if not bookmark_id:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "bookmark_id is required for action 'bookmark_remove'",
+                }
+            params["id"] = bookmark_id
+            return self._send_command(session_id, "bookmark.remove", params, timeout)
+
+        # ---------------- bookmark_remove_tree ----------------
+        if action == "bookmark_remove_tree":
+            if not bookmark_id:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "bookmark_id is required for action 'bookmark_remove_tree'",
+                }
+            params["id"] = bookmark_id
+            return self._send_command(
+                session_id, "bookmark.remove_tree", params, timeout
+            )
+
+        # ---------------- history_search ----------------
+        if action == "history_search":
+            if history_query:
+                params["query"] = history_query
+            if start_time is not None:
+                params["start_time"] = start_time
+            if end_time is not None:
+                params["end_time"] = end_time
+            if max_results is not None:
+                params["max_results"] = max_results
+            return self._send_command(session_id, "history.search", params, timeout)
+
+        # ---------------- history_recent ----------------
+        if action == "history_recent":
+            if max_results is not None:
+                params["max_results"] = max_results
+            return self._send_command(session_id, "history.recent", params, timeout)
+
+        # ---------------- history_remove ----------------
+        if action == "history_remove":
+            if not history_url:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "history_url is required for action 'history_remove'",
+                }
+            params["url"] = history_url
+            return self._send_command(session_id, "history.remove", params, timeout)
+
+        # ---------------- history_remove_range ----------------
+        if action == "history_remove_range":
+            if start_time is not None:
+                params["start_time"] = start_time
+            if end_time is not None:
+                params["end_time"] = end_time
+            return self._send_command(
+                session_id, "history.remove_range", params, timeout
+            )
+
+        # ---------------- download_list ----------------
+        if action == "download_list":
+            if download_query:
+                params["query"] = download_query
+            if max_results is not None:
+                params["limit"] = int(max_results)
+            return self._send_command(session_id, "download.list", params, timeout)
+
+        # ---------------- download_search ----------------
+        if action == "download_search":
+            if not download_query:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "download_query is required for action 'download_search'",
+                }
+            params["query"] = download_query
+            if max_results is not None:
+                params["limit"] = int(max_results)
+            return self._send_command(session_id, "download.search", params, timeout)
+
+        # ---------------- download_start ----------------
+        if action == "download_start":
+            if not url:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "url is required for action 'download_start'",
+                }
+            params["url"] = url
+            if filename:
+                params["filename"] = filename
+            params["save_as"] = bool(save_as)
+            return self._send_command(session_id, "download.start", params, timeout)
+
+        # ---------------- download_pause/resume/cancel/erase/open ----------------
+        if action in (
+            "download_pause",
+            "download_resume",
+            "download_cancel",
+            "download_erase",
+            "download_open",
+        ):
+            if download_id is None:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"download_id is required for action '{action}'",
+                }
+            params["download_id"] = int(download_id)
+            if action == "download_erase" and delete_file:
+                params["delete_file"] = True
+            ext_action = {
+                "download_pause": "download.pause",
+                "download_resume": "download.resume",
+                "download_cancel": "download.cancel",
+                "download_erase": "download.erase",
+                "download_open": "download.open",
+            }[action]
+            return self._send_command(session_id, ext_action, params, timeout)
+
+        # ---------------- session_recent ----------------
+        if action == "session_recent":
+            if max_results is not None:
+                params["max_results"] = int(max_results)
+            return self._send_command(session_id, "session.recent", params, timeout)
+
+        # ---------------- session_restore ----------------
+        if action == "session_restore":
+            if not session_key:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "session_key is required for action 'session_restore'",
+                }
+            params["session_id"] = session_key
+            return self._send_command(session_id, "session.restore", params, timeout)
+
+        # ---------------- topsite_list ----------------
+        if action == "topsite_list":
+            return self._send_command(session_id, "topsite.list", params, timeout)
+
+        # ---------------- readinglist_list ----------------
+        if action == "readinglist_list":
+            return self._send_command(session_id, "readinglist.list", params, timeout)
+
+        # ---------------- readinglist_add ----------------
+        if action == "readinglist_add":
+            if not url:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "url is required for action 'readinglist_add'",
+                }
+            params["url"] = url
+            if text:
+                params["title"] = text
+            if has_been_read is not None:
+                params["has_been_read"] = bool(has_been_read)
+            return self._send_command(session_id, "readinglist.add", params, timeout)
+
+        # ---------------- readinglist_remove ----------------
+        if action == "readinglist_remove":
+            if not url:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "url is required for action 'readinglist_remove'",
+                }
+            params["url"] = url
+            return self._send_command(session_id, "readinglist.remove", params, timeout)
+
+        # ---------------- readinglist_update ----------------
+        if action == "readinglist_update":
+            if not url:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "url is required for action 'readinglist_update'",
+                }
+            params["url"] = url
+            if has_been_read is not None:
+                params["has_been_read"] = bool(has_been_read)
+            if text:
+                params["title"] = text
+            return self._send_command(session_id, "readinglist.update", params, timeout)
+
+        # ---------------- contextmenu_create ----------------
+        if action == "contextmenu_create":
+            if not menu_id:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "menu_id is required for action 'contextmenu_create'",
+                }
+            if not text:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "text is required as menu title for action 'contextmenu_create'",
+                }
+            params["menu_id"] = menu_id
+            params["title"] = text
+            if contexts:
+                params["contexts"] = list(contexts)
+            if url_patterns:
+                params["url_patterns"] = list(url_patterns)
+            return self._send_command(session_id, "contextmenu.create", params, timeout)
+
+        # ---------------- contextmenu_remove ----------------
+        if action == "contextmenu_remove":
+            if not menu_id:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "menu_id is required for action 'contextmenu_remove'",
+                }
+            params["menu_id"] = menu_id
+            return self._send_command(session_id, "contextmenu.remove", params, timeout)
+
+        # ---------------- contextmenu_remove_all ----------------
+        if action == "contextmenu_remove_all":
+            return self._send_command(session_id, "contextmenu.remove_all", params, timeout)
+
+        # ---------------- contextmenu_list ----------------
+        if action == "contextmenu_list":
+            return self._send_command(session_id, "contextmenu.list", params, timeout)
+
+        # ---------------- alarm_create ----------------
+        if action == "alarm_create":
+            if not alarm_name:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "alarm_name is required for action 'alarm_create'",
+                }
+            params["name"] = alarm_name
+            if delay_minutes is not None:
+                params["delay_minutes"] = float(delay_minutes)
+            if period_minutes is not None:
+                params["period_minutes"] = float(period_minutes)
+            return self._send_command(session_id, "alarm.create", params, timeout)
+
+        # ---------------- alarm_list ----------------
+        if action == "alarm_list":
+            return self._send_command(session_id, "alarm.list", params, timeout)
+
+        # ---------------- alarm_clear ----------------
+        if action == "alarm_clear":
+            if not alarm_name:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "alarm_name is required for action 'alarm_clear'",
+                }
+            params["name"] = alarm_name
+            return self._send_command(session_id, "alarm.clear", params, timeout)
+
+        # ---------------- alarm_clear_all ----------------
+        if action == "alarm_clear_all":
+            return self._send_command(session_id, "alarm.clear_all", params, timeout)
+
+        # ---------------- notification_create ----------------
+        if action == "notification_create":
+            if not text:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "text is required as notification title for action 'notification_create'",
+                }
+            params["title"] = text
+            if notification_id:
+                params["notification_id"] = notification_id
+            if message:
+                params["message"] = message
+            if icon_url:
+                params["icon_url"] = icon_url
+            return self._send_command(session_id, "notification.create", params, timeout)
+
+        # ---------------- notification_clear ----------------
+        if action == "notification_clear":
+            if not notification_id:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "notification_id is required for action 'notification_clear'",
+                }
+            params["notification_id"] = notification_id
+            return self._send_command(session_id, "notification.clear", params, timeout)
+
+        # ---------------- notification_clear_all ----------------
+        if action == "notification_clear_all":
+            return self._send_command(session_id, "notification.clear_all", params, timeout)
+
+        # ---------------- notification_list ----------------
+        if action == "notification_list":
+            return self._send_command(session_id, "notification.list", params, timeout)
+
+        # ---------------- search_query ----------------
+        if action == "search_query":
+            if not search_query:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "search_query is required for action 'search_query'",
+                }
+            params["query"] = search_query
+            if disposition:
+                params["disposition"] = disposition
+            return self._send_command(session_id, "search.query", params, timeout)
+
+        # ---------------- idle_query_state ----------------
+        if action == "idle_query_state":
+            if detection_interval_seconds is not None:
+                params["detection_interval_seconds"] = int(detection_interval_seconds)
+            return self._send_command(session_id, "idle.query_state", params, timeout)
+
+        # ---------------- idle_set_interval ----------------
+        if action == "idle_set_interval":
+            if detection_interval_seconds is None:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "detection_interval_seconds is required for action 'idle_set_interval'",
+                }
+            params["detection_interval_seconds"] = int(detection_interval_seconds)
+            return self._send_command(session_id, "idle.set_interval", params, timeout)
+
+        # ---------------- idle_get_interval ----------------
+        if action == "idle_get_interval":
+            return self._send_command(session_id, "idle.get_interval", params, timeout)
+
+        # ---------------- favicon_get_url ----------------
+        if action == "favicon_get_url":
+            if not page_url:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "page_url is required for action 'favicon_get_url'",
+                }
+            params["page_url"] = page_url
+            if size is not None:
+                params["size"] = int(size)
+            return self._send_command(session_id, "favicon.get_url", params, timeout)
+
+        # ---------------- webnav_get_all_frames ----------------
+        if action == "webnav_get_all_frames":
+            if tab_id is None:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "tab_id is required for action 'webnav_get_all_frames'",
+                }
+            return self._send_command(session_id, "webnav.get_all_frames", params, timeout)
+
+        # ---------------- webnav_get_frame ----------------
+        if action == "webnav_get_frame":
+            if tab_id is None:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "tab_id is required for action 'webnav_get_frame'",
+                }
+            if frame_id is None:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "frame_id is required for action 'webnav_get_frame'",
+                }
+            params["frame_id"] = int(frame_id)
+            return self._send_command(session_id, "webnav.get_frame", params, timeout)
+
+        # ---------------- tabgroup_list ----------------
+        if action == "tabgroup_list":
+            return self._send_command(session_id, "tabgroup.list", params, timeout)
+
+        # ---------------- tabgroup_get ----------------
+        if action == "tabgroup_get":
+            if group_id is None:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "group_id is required for action 'tabgroup_get'",
+                }
+            params["group_id"] = int(group_id)
+            return self._send_command(session_id, "tabgroup.get", params, timeout)
+
+        # ---------------- tabgroup_query ----------------
+        if action == "tabgroup_query":
+            if group_title:
+                params["title"] = group_title
+            if color:
+                params["color"] = color
+            if window_id is not None:
+                params["window_id"] = int(window_id)
+            return self._send_command(session_id, "tabgroup.query", params, timeout)
+
+        # ---------------- tabgroup_update ----------------
+        if action == "tabgroup_update":
+            if group_id is None:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "group_id is required for action 'tabgroup_update'",
+                }
+            params["group_id"] = int(group_id)
+            if group_title:
+                params["title"] = group_title
+            if color:
+                params["color"] = color
+            if collapsed is not None:
+                params["collapsed"] = bool(collapsed)
+            return self._send_command(session_id, "tabgroup.update", params, timeout)
+
+        # ================= 以下为高敏感操作，调用前必须向用户确认 =================
+
+        # ---------------- cookie_get ----------------
+        if action == "cookie_get":
+            if not url:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "url is required for action 'cookie_get'",
+                }
+            if not cookie_name:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "cookie_name is required for action 'cookie_get'",
+                }
+            params["url"] = url
+            params["name"] = cookie_name
+            return self._send_command(session_id, "cookie.get", params, timeout)
+
+        # ---------------- cookie_get_all ----------------
+        if action == "cookie_get_all":
+            if url:
+                params["url"] = url
+            if domain:
+                params["domain"] = domain
+            return self._send_command(session_id, "cookie.get_all", params, timeout)
+
+        # ---------------- cookie_set ----------------
+        if action == "cookie_set":
+            if not url:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "url is required for action 'cookie_set'",
+                }
+            if not cookie_name:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "cookie_name is required for action 'cookie_set'",
+                }
+            params["url"] = url
+            params["name"] = cookie_name
+            params["value"] = value
+            if domain:
+                params["domain"] = domain
+            if path:
+                params["path"] = path
+            if secure is not None:
+                params["secure"] = bool(secure)
+            if http_only is not None:
+                params["http_only"] = bool(http_only)
+            if same_site:
+                params["same_site"] = same_site
+            if expiration_date is not None:
+                params["expiration_date"] = float(expiration_date)
+            return self._send_command(session_id, "cookie.set", params, timeout)
+
+        # ---------------- cookie_remove ----------------
+        if action == "cookie_remove":
+            if not url:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "url is required for action 'cookie_remove'",
+                }
+            if not cookie_name:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "cookie_name is required for action 'cookie_remove'",
+                }
+            params["url"] = url
+            params["name"] = cookie_name
+            return self._send_command(session_id, "cookie.remove", params, timeout)
+
+        # ---------------- netrule_list ----------------
+        if action == "netrule_list":
+            return self._send_command(session_id, "netrule.list", params, timeout)
+
+        # ---------------- netrule_register ----------------
+        if action == "netrule_register":
+            if rule_id is None:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "rule_id is required for action 'netrule_register'",
+                }
+            if not url_filter:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "url_filter is required for action 'netrule_register'",
+                }
+            params["rule_id"] = int(rule_id)
+            params["url_filter"] = url_filter
+            if action_type:
+                params["action_type"] = action_type
+            if redirect_url:
+                params["redirect_url"] = redirect_url
+            if priority is not None:
+                params["priority"] = int(priority)
+            return self._send_command(session_id, "netrule.register", params, timeout)
+
+        # ---------------- netrule_unregister ----------------
+        if action == "netrule_unregister":
+            if rule_id is None:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "rule_id is required for action 'netrule_unregister'",
+                }
+            params["rule_id"] = int(rule_id)
+            return self._send_command(session_id, "netrule.unregister", params, timeout)
+
+        # ---------------- extmgr_list ----------------
+        if action == "extmgr_list":
+            return self._send_command(session_id, "extmgr.list", params, timeout)
+
+        # ---------------- extmgr_get ----------------
+        if action == "extmgr_get":
+            if not extension_id:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "extension_id is required for action 'extmgr_get'",
+                }
+            params["extension_id"] = extension_id
+            return self._send_command(session_id, "extmgr.get", params, timeout)
+
+        # ---------------- extmgr_launch_app ----------------
+        if action == "extmgr_launch_app":
+            if not extension_id:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "extension_id is required for action 'extmgr_launch_app'",
+                }
+            params["extension_id"] = extension_id
+            return self._send_command(session_id, "extmgr.launch_app", params, timeout)
+
+        # ---------------- extmgr_set_enabled ----------------
+        if action == "extmgr_set_enabled":
+            if not extension_id:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "extension_id is required for action 'extmgr_set_enabled'",
+                }
+            if enabled is None:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "enabled is required for action 'extmgr_set_enabled'",
+                }
+            params["extension_id"] = extension_id
+            params["enabled"] = bool(enabled)
+            return self._send_command(session_id, "extmgr.set_enabled", params, timeout)
+
+        # ---------------- extmgr_uninstall ----------------
+        if action == "extmgr_uninstall":
+            if not extension_id:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "extension_id is required for action 'extmgr_uninstall'",
+                }
+            params["extension_id"] = extension_id
+            return self._send_command(session_id, "extmgr.uninstall", params, timeout)
+
+        # ---------------- native_send ----------------
+        if action == "native_send":
+            if not native_host:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "native_host is required for action 'native_send'",
+                }
+            params["native_host"] = native_host
+            params["message"] = message
+            return self._send_command(session_id, "native.send", params, timeout)
+
+        # ---------------- proxy_get_settings ----------------
+        if action == "proxy_get_settings":
+            return self._send_command(session_id, "proxy.get_settings", params, timeout)
+
+        # ---------------- proxy_set_settings ----------------
+        if action == "proxy_set_settings":
+            if not proxy_mode:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "proxy_mode is required for action 'proxy_set_settings'",
+                }
+            params["mode"] = proxy_mode
+            if pac_url:
+                params["pac_url"] = pac_url
+            if proxy_rules:
+                params["rules"] = dict(proxy_rules)
+            return self._send_command(session_id, "proxy.set_settings", params, timeout)
+
+        # ---------------- proxy_clear_settings ----------------
+        if action == "proxy_clear_settings":
+            return self._send_command(session_id, "proxy.clear_settings", params, timeout)
+
+        # ---------------- privacy_get ----------------
+        if action == "privacy_get":
+            if not privacy_area:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "privacy_area is required for action 'privacy_get'",
+                }
+            if not privacy_name:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "privacy_name is required for action 'privacy_get'",
+                }
+            params["area"] = privacy_area
+            params["name"] = privacy_name
+            return self._send_command(session_id, "privacy.get", params, timeout)
+
+        # ---------------- privacy_set ----------------
+        if action == "privacy_set":
+            if not privacy_area:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "privacy_area is required for action 'privacy_set'",
+                }
+            if not privacy_name:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "privacy_name is required for action 'privacy_set'",
+                }
+            if privacy_value is None:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "privacy_value is required for action 'privacy_set'",
+                }
+            params["area"] = privacy_area
+            params["name"] = privacy_name
+            params["value"] = bool(privacy_value)
+            return self._send_command(session_id, "privacy.set", params, timeout)
+
+        # ---------------- browsingdata_settings ----------------
+        if action == "browsingdata_settings":
+            return self._send_command(session_id, "browsingdata.settings", params, timeout)
+
+        # ---------------- browsingdata_remove ----------------
+        if action == "browsingdata_remove":
+            if not data_types:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "data_types is required for action 'browsingdata_remove'",
+                }
+            params["data_types"] = list(data_types)
+            if since is not None:
+                params["since"] = int(since)
+            return self._send_command(session_id, "browsingdata.remove", params, timeout)
+
+        # ---------------- contentsettings_get ----------------
+        if action == "contentsettings_get":
+            if not content_type:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "content_type is required for action 'contentsettings_get'",
+                }
+            params["content_type"] = content_type
+            if primary_url:
+                params["primary_url"] = primary_url
+            if secondary_url:
+                params["secondary_url"] = secondary_url
+            return self._send_command(session_id, "contentsettings.get", params, timeout)
+
+        # ---------------- contentsettings_set ----------------
+        if action == "contentsettings_set":
+            if not content_type:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "content_type is required for action 'contentsettings_set'",
+                }
+            if not content_setting:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "content_setting is required for action 'contentsettings_set'",
+                }
+            params["content_type"] = content_type
+            params["setting"] = content_setting
+            if primary_pattern:
+                params["primary_pattern"] = primary_pattern
+            if secondary_pattern:
+                params["secondary_pattern"] = secondary_pattern
+            return self._send_command(session_id, "contentsettings.set", params, timeout)
+
+        # ---------------- contentsettings_clear ----------------
+        if action == "contentsettings_clear":
+            if not content_type:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "content_type is required for action 'contentsettings_clear'",
+                }
+            params["content_type"] = content_type
+            return self._send_command(session_id, "contentsettings.clear", params, timeout)
 
         return {
             "success": False,

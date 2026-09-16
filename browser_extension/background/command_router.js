@@ -11,6 +11,28 @@ import { CaptureExecutor } from "./executors/capture_executor.js";
 import { DebugExecutor } from "./executors/debug_executor.js";
 import { ScriptExecutor } from "./executors/script_executor.js";
 import { ClipboardExecutor } from "./executors/clipboard_executor.js";
+import { BookmarksExecutor } from "./executors/bookmarks_executor.js";
+import { HistoryExecutor } from "./executors/history_executor.js";
+import { DownloadsExecutor } from "./executors/downloads_executor.js";
+import { SessionsExecutor } from "./executors/sessions_executor.js";
+import { TopSitesExecutor } from "./executors/top_sites_executor.js";
+import { ReadingListExecutor } from "./executors/reading_list_executor.js";
+import { ContextMenusExecutor } from "./executors/context_menus_executor.js";
+import { AlarmsExecutor } from "./executors/alarms_executor.js";
+import { NotificationsExecutor } from "./executors/notifications_executor.js";
+import { SearchExecutor } from "./executors/search_executor.js";
+import { IdleExecutor } from "./executors/idle_executor.js";
+import { FaviconExecutor } from "./executors/favicon_executor.js";
+import { WebNavigationExecutor } from "./executors/web_navigation_executor.js";
+import { TabGroupsExecutor } from "./executors/tab_groups_executor.js";
+import { CookiesExecutor } from "./executors/cookies_executor.js";
+import { WebRequestExecutor } from "./executors/web_request_executor.js";
+import { ManagementExecutor } from "./executors/management_executor.js";
+import { NativeMessagingExecutor } from "./executors/native_messaging_executor.js";
+import { ProxyExecutor } from "./executors/proxy_executor.js";
+import { PrivacyExecutor } from "./executors/privacy_executor.js";
+import { BrowsingDataExecutor } from "./executors/browsing_data_executor.js";
+import { ContentSettingsExecutor } from "./executors/content_settings_executor.js";
 
 export class CommandRouter {
   constructor() {
@@ -20,6 +42,28 @@ export class CommandRouter {
     this.debugExecutor = new DebugExecutor();
     this.scriptExecutor = new ScriptExecutor();
     this.clipboardExecutor = new ClipboardExecutor();
+    this.bookmarksExecutor = new BookmarksExecutor();
+    this.historyExecutor = new HistoryExecutor();
+    this.downloadsExecutor = new DownloadsExecutor();
+    this.sessionsExecutor = new SessionsExecutor();
+    this.topSitesExecutor = new TopSitesExecutor();
+    this.readingListExecutor = new ReadingListExecutor();
+    this.contextMenusExecutor = new ContextMenusExecutor();
+    this.alarmsExecutor = new AlarmsExecutor();
+    this.notificationsExecutor = new NotificationsExecutor();
+    this.searchExecutor = new SearchExecutor();
+    this.idleExecutor = new IdleExecutor();
+    this.faviconExecutor = new FaviconExecutor();
+    this.webNavigationExecutor = new WebNavigationExecutor();
+    this.tabGroupsExecutor = new TabGroupsExecutor();
+    this.cookiesExecutor = new CookiesExecutor();
+    this.webRequestExecutor = new WebRequestExecutor();
+    this.managementExecutor = new ManagementExecutor();
+    this.nativeMessagingExecutor = new NativeMessagingExecutor();
+    this.proxyExecutor = new ProxyExecutor();
+    this.privacyExecutor = new PrivacyExecutor();
+    this.browsingDataExecutor = new BrowsingDataExecutor();
+    this.contentSettingsExecutor = new ContentSettingsExecutor();
 
     // action -> handler(params) => Promise<data>
     this.routes = {
@@ -66,6 +110,100 @@ export class CommandRouter {
       "network.get_requests": (p) => this.debugExecutor.getRequests(p),
       // 捕获类
       "capture.screenshot": (p) => this.captureExecutor.screenshot(p),
+      // 书签类
+      "bookmark.list": (p) => this.bookmarksExecutor.list(p),
+      "bookmark.search": (p) => this.bookmarksExecutor.search(p),
+      "bookmark.create": (p) => this.bookmarksExecutor.create(p),
+      "bookmark.remove": (p) => this.bookmarksExecutor.remove(p),
+      "bookmark.remove_tree": (p) => this.bookmarksExecutor.removeTree(p),
+      // 历史记录类
+      "history.search": (p) => this.historyExecutor.search(p),
+      "history.recent": (p) => this.historyExecutor.recent(p),
+      "history.remove": (p) => this.historyExecutor.remove(p),
+      "history.remove_range": (p) => this.historyExecutor.removeRange(p),
+      // 下载类
+      "download.list": (p) => this.downloadsExecutor.list(p),
+      "download.search": (p) => this.downloadsExecutor.search(p),
+      "download.start": (p) => this.downloadsExecutor.download(p),
+      "download.pause": (p) => this.downloadsExecutor.pause(p),
+      "download.resume": (p) => this.downloadsExecutor.resume(p),
+      "download.cancel": (p) => this.downloadsExecutor.cancel(p),
+      "download.erase": (p) => this.downloadsExecutor.erase(p),
+      "download.open": (p) => this.downloadsExecutor.open(p),
+      // 会话类
+      "session.recent": (p) => this.sessionsExecutor.recent(p),
+      "session.restore": (p) => this.sessionsExecutor.restore(p),
+      // 常访问站点类
+      "topsite.list": (p) => this.topSitesExecutor.list(p),
+      // 阅读列表类
+      "readinglist.list": (p) => this.readingListExecutor.list(p),
+      "readinglist.add": (p) => this.readingListExecutor.add(p),
+      "readinglist.remove": (p) => this.readingListExecutor.remove(p),
+      "readinglist.update": (p) => this.readingListExecutor.update(p),
+      // 右键菜单类
+      "contextmenu.create": (p) => this.contextMenusExecutor.create(p),
+      "contextmenu.remove": (p) => this.contextMenusExecutor.remove(p),
+      "contextmenu.remove_all": (p) => this.contextMenusExecutor.removeAll(p),
+      "contextmenu.list": (p) => this.contextMenusExecutor.list(p),
+      // 定时器类
+      "alarm.create": (p) => this.alarmsExecutor.create(p),
+      "alarm.list": (p) => this.alarmsExecutor.list(p),
+      "alarm.clear": (p) => this.alarmsExecutor.clear(p),
+      "alarm.clear_all": (p) => this.alarmsExecutor.clearAll(p),
+      // 通知类
+      "notification.create": (p) => this.notificationsExecutor.create(p),
+      "notification.clear": (p) => this.notificationsExecutor.clear(p),
+      "notification.clear_all": (p) => this.notificationsExecutor.clearAll(p),
+      "notification.list": (p) => this.notificationsExecutor.getAll(p),
+      // 搜索类
+      "search.query": (p) => this.searchExecutor.query(p),
+      // 空闲状态类
+      "idle.query_state": (p) => this.idleExecutor.queryState(p),
+      "idle.set_interval": (p) => this.idleExecutor.setInterval(p),
+      "idle.get_interval": (p) => this.idleExecutor.getInterval(p),
+      // 站点图标类
+      "favicon.get_url": (p) => this.faviconExecutor.getUrl(p),
+      // 页面导航事件类
+      "webnav.get_all_frames": (p) =>
+        this.webNavigationExecutor.getAllFrames(p),
+      "webnav.get_frame": (p) => this.webNavigationExecutor.getFrame(p),
+      // 标签组类
+      "tabgroup.list": (p) => this.tabGroupsExecutor.list(p),
+      "tabgroup.get": (p) => this.tabGroupsExecutor.get(p),
+      "tabgroup.query": (p) => this.tabGroupsExecutor.query(p),
+      "tabgroup.update": (p) => this.tabGroupsExecutor.update(p),
+      // ===== 以下为高敏感能力，调用前必须向用户确认 =====
+      // Cookie 类（高敏感）
+      "cookie.get": (p) => this.cookiesExecutor.get(p),
+      "cookie.get_all": (p) => this.cookiesExecutor.getAll(p),
+      "cookie.set": (p) => this.cookiesExecutor.set(p),
+      "cookie.remove": (p) => this.cookiesExecutor.remove(p),
+      // 网络请求规则类（高敏感，基于 declarativeNetRequest）
+      "netrule.list": (p) => this.webRequestExecutor.listRules(p),
+      "netrule.register": (p) => this.webRequestExecutor.registerRule(p),
+      "netrule.unregister": (p) => this.webRequestExecutor.unregisterRule(p),
+      // 扩展与应用管理类（高敏感，卸载/禁用不可逆）
+      "extmgr.list": (p) => this.managementExecutor.list(p),
+      "extmgr.get": (p) => this.managementExecutor.get(p),
+      "extmgr.launch_app": (p) => this.managementExecutor.launchApp(p),
+      "extmgr.set_enabled": (p) => this.managementExecutor.setEnabled(p),
+      "extmgr.uninstall": (p) => this.managementExecutor.uninstall(p),
+      // 本机消息类（高敏感，需已注册 native host）
+      "native.send": (p) => this.nativeMessagingExecutor.send(p),
+      // 代理类（高敏感，影响全部网络流量）
+      "proxy.get_settings": (p) => this.proxyExecutor.getSettings(p),
+      "proxy.set_settings": (p) => this.proxyExecutor.setSettings(p),
+      "proxy.clear_settings": (p) => this.proxyExecutor.clearSettings(p),
+      // 隐私设置类（高敏感）
+      "privacy.get": (p) => this.privacyExecutor.get(p),
+      "privacy.set": (p) => this.privacyExecutor.set(p),
+      // 浏览数据类（高敏感，remove 不可逆）
+      "browsingdata.settings": (p) => this.browsingDataExecutor.settings(p),
+      "browsingdata.remove": (p) => this.browsingDataExecutor.remove(p),
+      // 内容设置类（高敏感）
+      "contentsettings.get": (p) => this.contentSettingsExecutor.get(p),
+      "contentsettings.set": (p) => this.contentSettingsExecutor.set(p),
+      "contentsettings.clear": (p) => this.contentSettingsExecutor.clear(p),
     };
   }
 

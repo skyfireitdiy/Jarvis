@@ -69,7 +69,29 @@ browser_extension/
 │       ├── dom_executor.js        # DOM 读写（executeScript 注入）
 │       ├── script_executor.js     # 自定义脚本执行（主世界注入）
 │       ├── clipboard_executor.js  # 读网关静态文件 / 写前端剪贴板
-│       └── capture_executor.js    # 截图
+│       ├── capture_executor.js    # 截图
+│       ├── bookmarks_executor.js  # 书签（读 / 搜索 / 增删）
+│       ├── history_executor.js    # 历史记录（查询 / 删除）
+│       ├── downloads_executor.js  # 下载记录（列表 / 搜索 / 控制）
+│       ├── sessions_executor.js   # 最近关闭的会话（查询 / 恢复）
+│       ├── top_sites_executor.js  # 常访问站点
+│       ├── reading_list_executor.js  # 阅读列表
+│       ├── context_menus_executor.js # 扩展右键菜单
+│       ├── alarms_executor.js     # 定时器
+│       ├── notifications_executor.js # 系统通知
+│       ├── search_executor.js     # 默认搜索引擎检索
+│       ├── idle_executor.js       # 空闲状态检测
+│       ├── favicon_executor.js    # 站点图标 URL
+│       ├── web_navigation_executor.js # 页面框架信息
+│       ├── tab_groups_executor.js # 标签组
+│       ├── cookies_executor.js    # Cookie（高敏感）
+│       ├── web_request_executor.js # 网络请求规则（高敏感，declarativeNetRequest）
+│       ├── management_executor.js # 扩展与应用管理（高敏感）
+│       ├── native_messaging_executor.js # 本机应用通信（高敏感）
+│       ├── proxy_executor.js      # 代理设置（高敏感）
+│       ├── privacy_executor.js    # 隐私设置（高敏感）
+│       ├── browsing_data_executor.js # 浏览数据清除（高敏感，不可逆）
+│       └── content_settings_executor.js # 站点内容设置（高敏感）
 ├── content/
 │   └── content_script.js          # 页面内脚本：登录态桥接 + 页面元信息
 └── popup/
@@ -157,15 +179,43 @@ Agent 侧也可用 `script.export` 取回同样的文本内容（返回 `{ filen
 
 ## 支持的指令（action）
 
-| 类别   | action                                                                                                                                                  |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 标签页 | `tab.list` `tab.activate` `tab.close` `tab.create`                                                                                                      |
-| 导航   | `page.navigate` `page.reload` `page.back` `page.forward`                                                                                                |
-| DOM    | `dom.query` `dom.get_text` `dom.get_html` `dom.click` `dom.type` `dom.hover` `dom.select` `dom.wait_for` `dom.press_key` `dom.scroll` `dom.upload_file` |
-| 脚本   | `script.execute`（执行任意 JS 代码，高危）                                                                                                              |
-| 脚本库 | `script.list` `script.get` `script.install` `script.uninstall` `script.export` `script.set_enabled` `script.run`（类油猴脚本管理）                      |
-| 剪贴板 | `clipboard.write_from_url`（读 URL 内容写入剪贴板）`clipboard.write`（直接写文本/base64）                                                               |
-| 捕获   | `capture.screenshot`（支持 `full_page` 整页截图）                                                                                                       |
+| 类别     | action                                                                                                                                                                           |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 标签页   | `tab.list` `tab.activate` `tab.close` `tab.create`                                                                                                                               |
+| 导航     | `page.navigate` `page.reload` `page.back` `page.forward` `page.get_info`                                                                                                         |
+| DOM      | `dom.query` `dom.get_text` `dom.get_html` `dom.click` `dom.type` `dom.hover` `dom.select` `dom.wait_for` `dom.press_key` `dom.scroll` `dom.upload_file` `dom.get_computed_style` |
+| 调试     | `debugger.evaluate` `debugger.send_command` `console.get_logs` `network.get_requests`（走 CDP，不受页面 CSP 限制）                                                               |
+| 脚本     | `script.execute`（执行任意 JS 代码，高危）                                                                                                                                       |
+| 脚本库   | `script.list` `script.get` `script.install` `script.uninstall` `script.export` `script.set_enabled` `script.run`（类油猴脚本管理）                                               |
+| 剪贴板   | `clipboard.write_from_url`（读 URL 内容写入剪贴板）`clipboard.write`（直接写文本/base64）                                                                                        |
+| 书签     | `bookmark.list` `bookmark.search` `bookmark.create` `bookmark.remove` `bookmark.remove_tree`                                                                                     |
+| 历史     | `history.search` `history.recent` `history.remove` `history.remove_range`                                                                                                        |
+| 下载     | `download.list` `download.search` `download.start` `download.pause` `download.resume` `download.cancel` `download.erase` `download.open`                                         |
+| 会话     | `session.recent` `session.restore`（最近关闭的标签页/窗口）                                                                                                                      |
+| 常用站点 | `topsite.list`                                                                                                                                                                   |
+| 阅读列表 | `readinglist.list` `readinglist.add` `readinglist.remove` `readinglist.update`                                                                                                   |
+| 右键菜单 | `contextmenu.create` `contextmenu.remove` `contextmenu.remove_all` `contextmenu.list`                                                                                            |
+| 定时器   | `alarm.create` `alarm.list` `alarm.clear` `alarm.clear_all`                                                                                                                      |
+| 通知     | `notification.create` `notification.clear` `notification.clear_all` `notification.list`                                                                                          |
+| 搜索     | `search.query`（用浏览器默认搜索引擎检索）                                                                                                                                       |
+| 空闲状态 | `idle.query_state` `idle.set_interval` `idle.get_interval`                                                                                                                       |
+| 站点图标 | `favicon.get_url`                                                                                                                                                                |
+| 页面框架 | `webnav.get_all_frames` `webnav.get_frame`                                                                                                                                       |
+| 标签组   | `tabgroup.list` `tabgroup.get` `tabgroup.query` `tabgroup.update`                                                                                                                |
+| 捕获     | `capture.screenshot`（支持 `full_page` 整页截图）                                                                                                                                |
+
+### 高敏感指令（调用前必须向用户确认）
+
+| 类别     | action                                                                                                           |
+| -------- | ---------------------------------------------------------------------------------------------------------------- |
+| Cookie   | `cookie.get` `cookie.get_all` `cookie.set` `cookie.remove`（涉及登录凭证）                                       |
+| 网络规则 | `netrule.list` `netrule.register` `netrule.unregister`（可阻断/重定向请求，基于 `declarativeNetRequest`）        |
+| 扩展管理 | `extmgr.list` `extmgr.get` `extmgr.launch_app` `extmgr.set_enabled` `extmgr.uninstall`（`uninstall` **不可逆**） |
+| 本机通信 | `native.send`（需已注册 native messaging host）                                                                  |
+| 代理     | `proxy.get_settings` `proxy.set_settings` `proxy.clear_settings`（影响全部网络流量）                             |
+| 隐私设置 | `privacy.get` `privacy.set`                                                                                      |
+| 浏览数据 | `browsingdata.settings` `browsingdata.remove`（`remove` **不可逆**，可清空历史/Cookie/缓存/密码等）              |
+| 内容设置 | `contentsettings.get` `contentsettings.set` `contentsettings.clear`（站点级 Cookie/JS/弹窗/摄像头等权限）        |
 
 ## 剪贴板（读网关静态文件 → 写前端剪贴板）
 
@@ -253,6 +303,29 @@ Agent 侧也可用 `script.export` 取回同样的文本内容（返回 `{ filen
    会短暂滚动，结束后恢复原位置。
 7. **`script.execute` 受页面 CSP 限制**：部分站点禁止 `eval`/`new Function`，
    此时执行会失败。
+8. **书签与历史为新增权限**：`bookmark.*` / `history.*` 需要 `bookmarks`、`history`
+   权限，安装或更新扩展后浏览器会再次提示授权。`bookmark.remove` /
+   `bookmark.remove_tree` / `history.remove` / `history.remove_range` 为**不可逆**
+   删除操作；`history.remove_range` 不传时间参数时会清空全部历史记录，调用前请确认。
+9. **扩展已申请较多权限（含高敏感权限）**：为支持完整的浏览器自动化能力，
+   `manifest.json` 申请了 28 项权限，其中 8 项为高敏感权限：
+   `cookies`、`webRequest`、`management`、`nativeMessaging`、`proxy`、
+   `privacy`、`browsingData`、`contentSettings`。安装或更新扩展时浏览器会
+   明确提示「读取和更改您在所访问网站上的所有数据」等警告，请确认后再授权。
+   高敏感权限对应的能力如下：
+   - `cookies`：读写/删除站点 Cookie（**含登录凭证**）
+   - `webRequest`：注册网络请求规则，可阻断或重定向请求
+   - `management`：列出/启用/禁用/卸载其他扩展（`uninstall` **不可逆**）
+   - `nativeMessaging`：与已注册的本机应用通信
+   - `proxy`：修改浏览器全局代理设置（**影响全部网络流量**）
+   - `privacy`：修改隐私相关开关
+   - `browsingData`：清除浏览数据（**不可逆**，含历史/Cookie/缓存/密码）
+   - `contentSettings`：修改站点级内容权限（Cookie/JS/弹窗/摄像头等）
+
+   > ⚠️ **风险提示**：这些权限使扩展具备等同于「完全控制浏览器」的能力。
+   > 请仅在信任运行本扩展的网关与 Agent 的前提下使用；删除/清空类操作不可恢复。
+   > 若不需要这些能力，可自行从 `manifest.json` 的 `permissions` 中移除对应项
+   > （移除后相关 action 会返回 `NOT_SUPPORTED` 或 `unknown action`）。
 
 ## 安全说明
 
@@ -263,3 +336,11 @@ Agent 侧也可用 `script.export` 取回同样的文本内容（返回 `{ filen
   后续可升级为 `externally_connectable` + 固定扩展 ID 的强隔离方案
 - Token 仅缓存在 service worker 内存中，不写入 `chrome.storage`
 - 建议使用 `wss://` 加密连接
+- **高敏感权限风险**：`cookies` / `webRequest` / `management` / `nativeMessaging` /
+  `proxy` / `privacy` / `browsingData` / `contentSettings` 能力已超出「操作网页」范畴，
+  可读取登录凭证、改写网络流量、卸载其他扩展、清除浏览数据。本方案**不做权限控制**
+  （设计决策），因此这些能力对已连接的 Agent 完全开放。请确保：
+  1. 只连接你信任的网关（Token 泄露等同于浏览器被完全接管）；
+  2. 高敏感 action（尤其是 `browsingdata.remove`、`extmgr.uninstall`、`cookie.remove`、
+     `proxy.set_settings`）在调用前由 Agent 向你明确说明并征得同意；
+  3. 不需要时从 `manifest.json` 移除对应权限并重新加载扩展。
