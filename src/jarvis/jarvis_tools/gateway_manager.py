@@ -54,7 +54,7 @@ class GatewayManagerTool:
 
 每次调用只能执行一个 operation（见 operation 参数），其余参数随 operation 而异。操作大致分几类：
 - Agent：send_to_agent 向 Agent 发消息；list_agents 列出 Agent；create_agent 创建 Agent；delete_agent 删除 Agent；regenerate_agent 无损重生 Agent；get_node_secret 取节点连接密钥
-- 节点/网关：list_nodes 节点信息；list_model_groups 模型组列表；list_directory 目录浏览；exec_command 在指定节点执行 shell 命令（需 command，可选 node_id/working_dir/timeout）；update_nodes_code 更新所有节点代码；restart_nodes 一键重启节点服务
+- 节点/网关：list_nodes 节点信息；get_master_url 查当前节点使用的 master 网关地址；list_model_groups 模型组列表；list_directory 目录浏览；exec_command 在指定节点执行 shell 命令（需 command，可选 node_id/working_dir/timeout）；update_nodes_code 更新所有节点代码；restart_nodes 一键重启节点服务
 - 定时任务：create_timer / list_timers / get_timer / delete_timer
 - 群组：create_group / list_groups / get_group / join_group / leave_group / send_group_message
 - 聊天：chat_list_rooms / chat_get_online_clients / list_sessions / chat_get_room_members / chat_send_room_message / chat_send_private_message（消息会自动加 [Agent名字] 前缀，并以 owner 身份发送）；list_sessions 返回每个活跃连接（会话）及其对应用户
@@ -71,6 +71,7 @@ class GatewayManagerTool:
                     "send_to_agent",
                     "list_agents",
                     "list_nodes",
+                    "get_master_url",
                     "list_model_groups",
                     "create_agent",
                     "list_directory",
@@ -98,7 +99,7 @@ class GatewayManagerTool:
                     "chat_send_private_message",
                     "eval_js",
                 ],
-                "description": "要执行的操作类型，一次只能选一个；其余参数随操作而定（见各参数说明）。常用：send_to_agent 发消息给 Agent、list_agents 列 Agent、create_agent 新建 Agent、restart_nodes 重启所有节点、create_timer 建定时任务。其余操作按名称即可理解，完整清单见上方 enum。",
+                "description": "要执行的操作类型，一次只能选一个；其余参数随操作而定（见各参数说明）。常用：send_to_agent 发消息给 Agent、list_agents 列 Agent、create_agent 新建 Agent、restart_nodes 重启所有节点、create_timer 建定时任务。其余操作按名称即可理解，完整清单见上方 enum。get_master_url 返回当前节点使用的 master 网关地址。",
             },
             # send_to_agent 操作的参数
             "agent_id": {
@@ -345,6 +346,8 @@ class GatewayManagerTool:
                 return self._list_agents()
             elif action == "list_nodes":
                 return self._list_nodes()
+            elif action == "get_master_url":
+                return self._get_master_url_info()
             elif action == "list_model_groups":
                 return self._list_model_groups(node_id)
             elif action == "create_agent":
@@ -847,6 +850,37 @@ class GatewayManagerTool:
             }
         else:
             return {"success": False, "stdout": "", "stderr": result["error"]}
+
+    def _get_master_url_info(self) -> Dict[str, Any]:
+        """获取当前节点使用的 master 网关地址。
+
+        直接读取本进程内的 jglobals.master_url（由 --master-url 启动参数或
+        JARVIS_MASTER_URL 环境变量注入），无需发起 HTTP 请求。
+        子节点 Agent 可用它拿到正确的 master 地址，避免误用 127.0.0.1。
+
+        返回:
+            Dict[str, Any]: 包含 master_url 等信息的结果
+        """
+        master_url = jglobals.master_url
+        info = {
+            "master_url": master_url,
+            "env_master_url": os.environ.get("JARVIS_MASTER_URL", ""),
+            "proxy_node": jglobals.proxy_node,
+            "current_agent_id": jglobals.agent_id,
+        }
+        if not master_url:
+            return {
+                "success": False,
+                "stdout": json.dumps(info, ensure_ascii=False, indent=2),
+                "stderr": "master_url is not set. "
+                "Please ensure the agent is started with --master-url option "
+                "or JARVIS_MASTER_URL env var.",
+            }
+        return {
+            "success": True,
+            "stdout": json.dumps(info, ensure_ascii=False, indent=2),
+            "stderr": "",
+        }
 
     def _list_model_groups(self, node_id: Optional[str] = None) -> Dict[str, Any]:
         """获取指定节点的模型组列表。

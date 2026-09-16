@@ -44,9 +44,13 @@ class BrowserExtTool:
     20. **scroll**: 滚动页面或滚动到指定元素
     21. **execute_script**: 在页面中执行任意 JS 代码（高危）
     22. **upload_file**: 上传本地文件到 file input（需 debugger 权限）
+    23. **script_list**: 列出扩展里已安装的页面脚本（类油猴）
+    24. **script_get**: 读取某个已安装脚本的源码（含 action 清单）
+    25. **script_run**: 在目标页主世界执行已安装脚本的某个 action
 
     典型流程：先 list_sessions 拿到 session_id，再 list_tabs 拿到 tab_id，
     然后执行 navigate/get_text/click/type/screenshot 等操作。
+    若目标站点已安装对应脚本，应优先 script_list/script_get/script_run 复用其能力。
 
     **重要提示**：
     - 每次调用只能执行一种操作
@@ -96,6 +100,11 @@ class BrowserExtTool:
   用于 Runtime/DOM 域之外的场景，如 method="Page.addScriptToEvaluateOnNewDocument" 在文档创建前注入脚本
 - get_network_requests: 采集页面网络请求（相当于 F12 Network 面板）。需 session_id；可选 tab_id、duration_ms（采集时长，默认 3000）、limit（默认 100）、filter（URL 子串过滤）。
   注意：会阻塞 duration_ms 毫秒进行采集，建议先触发页面动作再调用
+- script_list: 列出扩展里已安装的页面脚本（类油猴脚本）的元数据（id/name/description/match/enabled/version）。需 session_id。
+  **接到浏览器任务时应先调用它盘点有无现成脚本可复用**——脚本在页面主世界执行，能力远强于裸 DOM 操作
+- script_get: 读取某个已安装脚本的完整信息（含 source 源码，据此得知它导出哪些 action、参数与行为）。需 session_id、script_id
+- script_run: 在目标页主世界执行已安装脚本的某个 action。需 session_id、script_id、script_action；可选 script_args（传给该 action 的参数对象）、tab_id（默认当前活动页）。
+  脚本须 enabled 且目标页 URL 命中其 match；写操作类 action 会真实改动数据，调用前先向用户说明
 若用户未安装扩展或扩展未连接，list_sessions 会返回空列表。"""
 
     parameters = {
@@ -132,6 +141,9 @@ class BrowserExtTool:
                     "evaluate",
                     "send_cdp_command",
                     "get_network_requests",
+                    "script_list",
+                    "script_get",
+                    "script_run",
                 ],
                 "description": "要执行的操作类型，每次只能选一个",
             },
@@ -244,6 +256,18 @@ class BrowserExtTool:
                 "description": "是否在新窗口打开（new_tab 可选，默认 true）。"
                 "新窗口会置于前台并聚焦，可保证页面正常渲染与重绘；"
                 "设为 false 则在当前窗口新建标签页",
+            },
+            "script_id": {
+                "type": "string",
+                "description": "已安装脚本的 ID（由 script_list 获取，形如 s-xxxxxxxx；script_get/script_run 必填）",
+            },
+            "script_action": {
+                "type": "string",
+                "description": "要执行的脚本内 action 名（script_run 必填；取自 script_get 返回的源码）",
+            },
+            "script_args": {
+                "type": "object",
+                "description": "传给脚本 action 的参数对象（script_run 可选，默认空对象）",
             },
             "timeout": {
                 "type": "number",
@@ -486,6 +510,9 @@ class BrowserExtTool:
         duration_ms: Optional[int] = None,
         filter: str = "",
         new_window: bool = True,
+        script_id: str = "",
+        script_action: str = "",
+        script_args: Optional[Dict[str, Any]] = None,
         timeout: float = 15.0,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -536,6 +563,9 @@ class BrowserExtTool:
             clear = args.get("clear", False)
             duration_ms = args.get("duration_ms")
             filter = args.get("filter", "")
+            script_id = args.get("script_id", "")
+            script_action = args.get("script_action", "")
+            script_args = args.get("script_args")
             timeout = args.get("timeout", 15.0)
 
         action = str(action or "").strip()
@@ -612,6 +642,9 @@ class BrowserExtTool:
             "evaluate",
             "send_cdp_command",
             "get_network_requests",
+            "script_list",
+            "script_get",
+            "script_run",
         }
         if action not in known_actions:
             return {
@@ -928,6 +961,41 @@ class BrowserExtTool:
             return self._send_command(
                 session_id, "network.get_requests", params, net_timeout
             )
+
+        # ---------------- script_list ----------------
+        if action == "script_list":
+            return self._send_command(session_id, "script.list", params, timeout)
+
+        # ---------------- script_get ----------------
+        if action == "script_get":
+            if not script_id:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "script_id is required for action 'script_get'",
+                }
+            params["id"] = script_id
+            return self._send_command(session_id, "script.get", params, timeout)
+
+        # ---------------- script_run ----------------
+        if action == "script_run":
+            if not script_id:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "script_id is required for action 'script_run'",
+                }
+            if not script_action:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "script_action is required for action 'script_run'",
+                }
+            # 扩展侧 script.run 的 params 为 { id, action, args, tab_id }
+            params["id"] = script_id
+            params["action"] = script_action
+            params["args"] = dict(script_args) if script_args else {}
+            return self._send_command(session_id, "script.run", params, timeout)
 
         return {
             "success": False,
