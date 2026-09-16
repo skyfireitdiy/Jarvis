@@ -148,7 +148,10 @@ export class DomExecutor {
     if (!code || !String(code).trim()) {
       throw cmdError("EXEC_ERROR", "code is required");
     }
-    const targetWorld = world === "MAIN" ? "MAIN" : "ISOLATED";
+    // 默认在 MAIN 世界执行：ISOLATED 世界里的 new Function 会被页面 CSP
+    // 的 unsafe-eval 拦截（多数站点均有该限制），导致执行必然失败。
+    // 显式传 world: "ISOLATED" 时仍按用户要求执行。
+    const targetWorld = world === "ISOLATED" ? "ISOLATED" : "MAIN";
     const result = await this._execInWorld(
       tab.id,
       executeFn,
@@ -467,17 +470,25 @@ function scrollFn(selector, x, y, behavior) {
 
 function executeFn(code) {
   try {
-    // 注意：受页面 CSP 限制，部分站点可能禁止 eval/new Function
-    const fn = new Function('"use strict";return (' + code + ");");
+    // 说明：new Function 在页面上下文受页面 CSP 的 unsafe-eval 限制，
+    // 因此 script.execute 默认以 MAIN 世界执行（见 execute()）。
+    // 支持三种写法：表达式（如 "1+1"）、语句块（如 "const x=1; return x;"）、
+    // 以及带 return 的语句块——统一用 async 函数包裹，允许 await。
+    const src = String(code);
+    const fn = new Function(
+      '"use strict";return (async () => {' + src + "\n})();",
+    );
     let value;
     try {
       value = fn();
     } catch (e) {
-      // 若按表达式解析失败，退化为按语句执行
-      const stmtFn = new Function('"use strict";' + code);
-      value = stmtFn();
+      // 语句块解析失败时，退化为按表达式求值
+      const exprFn = new Function('"use strict";return (' + src + ");");
+      value = exprFn();
     }
-    return { ok: true, value: safeSerialize(value) };
+    return Promise.resolve(value)
+      .then((v) => ({ ok: true, value: safeSerialize(v) }))
+      .catch((e) => ({ ok: false, error: (e && e.message) || String(e) }));
   } catch (e) {
     return { ok: false, error: (e && e.message) || String(e) };
   }
