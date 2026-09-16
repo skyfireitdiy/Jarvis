@@ -47,6 +47,7 @@ export class CommandRouter {
       // 调试类
       "console.get_logs": (p) => this.debugExecutor.getLogs(p),
       "debugger.evaluate": (p) => this.debugExecutor.evaluate(p),
+      "debugger.send_command": (p) => this.debugExecutor.sendCommand(p),
       "network.get_requests": (p) => this.debugExecutor.getRequests(p),
       // 捕获类
       "capture.screenshot": (p) => this.captureExecutor.screenshot(p),

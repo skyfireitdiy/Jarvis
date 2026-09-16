@@ -92,6 +92,8 @@ class BrowserExtTool:
 - get_console_logs: 读取页面 console 日志（相当于 F12 Console 面板）。需 session_id；可选 tab_id、limit（默认 100）、clear（读取后是否清空缓存）。
   首次调用会安装 hook，之后需页面产生新的日志才会被采集
 - evaluate: 通过 CDP 在页面中求值任意表达式（不受页面 CSP 限制，相当于 F12 Console 直接敲表达式）。需 session_id、expression；可选 tab_id、await_promise（默认 true）
+- send_cdp_command: 透传任意 CDP 命令（相当于直接使用 DevTools Protocol）。需 session_id、method（CDP 方法名）；可选 tab_id、cdp_params（方法参数对象）。
+  用于 Runtime/DOM 域之外的场景，如 method="Page.addScriptToEvaluateOnNewDocument" 在文档创建前注入脚本
 - get_network_requests: 采集页面网络请求（相当于 F12 Network 面板）。需 session_id；可选 tab_id、duration_ms（采集时长，默认 3000）、limit（默认 100）、filter（URL 子串过滤）。
   注意：会阻塞 duration_ms 毫秒进行采集，建议先触发页面动作再调用
 若用户未安装扩展或扩展未连接，list_sessions 会返回空列表。"""
@@ -128,6 +130,7 @@ class BrowserExtTool:
                     "get_page_info",
                     "get_console_logs",
                     "evaluate",
+                    "send_cdp_command",
                     "get_network_requests",
                 ],
                 "description": "要执行的操作类型，每次只能选一个",
@@ -211,6 +214,14 @@ class BrowserExtTool:
             "await_promise": {
                 "type": "boolean",
                 "description": "是否等待 Promise 结果（evaluate 可选，默认 true）",
+            },
+            "method": {
+                "type": "string",
+                "description": "CDP 方法名，如 Page.addScriptToEvaluateOnNewDocument（send_cdp_command 必填）",
+            },
+            "cdp_params": {
+                "type": "object",
+                "description": "CDP 方法参数对象（send_cdp_command 可选）",
             },
             "limit": {
                 "type": "integer",
@@ -462,6 +473,8 @@ class BrowserExtTool:
         props: Optional[List[str]] = None,
         expression: str = "",
         await_promise: bool = True,
+        method: str = "",
+        cdp_params: Optional[Dict[str, Any]] = None,
         limit: Optional[int] = None,
         clear: bool = False,
         duration_ms: Optional[int] = None,
@@ -510,6 +523,8 @@ class BrowserExtTool:
             props = args.get("props")
             expression = args.get("expression", "")
             await_promise = args.get("await_promise", True)
+            method = args.get("method", "")
+            cdp_params = args.get("cdp_params")
             limit = args.get("limit")
             clear = args.get("clear", False)
             duration_ms = args.get("duration_ms")
@@ -588,6 +603,7 @@ class BrowserExtTool:
             "get_page_info",
             "get_console_logs",
             "evaluate",
+            "send_cdp_command",
             "get_network_requests",
         }
         if action not in known_actions:
@@ -871,6 +887,21 @@ class BrowserExtTool:
             params["expression"] = expression
             params["await_promise"] = bool(await_promise)
             return self._send_command(session_id, "debugger.evaluate", params, timeout)
+
+        # ---------------- send_cdp_command ----------------
+        if action == "send_cdp_command":
+            if not method:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "method is required for action 'send_cdp_command'",
+                }
+            params["method"] = method
+            if cdp_params:
+                params["params"] = dict(cdp_params)
+            return self._send_command(
+                session_id, "debugger.send_command", params, timeout
+            )
 
         # ---------------- get_network_requests ----------------
         if action == "get_network_requests":
