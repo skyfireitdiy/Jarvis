@@ -338,6 +338,24 @@ export const ACTIONS = [
     keywords: ["agent", "列表", "list", "切换", "switch", "选择"],
     run: (ctx) => ctx.openAgentList && ctx.openAgentList(),
   },
+  {
+    id: "install-browser-extension",
+    label: "安装浏览器插件",
+    en: "Install Browser Extension",
+    group: "界面",
+    icon: "🧩",
+    keywords: [
+      "插件",
+      "扩展",
+      "浏览器",
+      "安装",
+      "extension",
+      "browser",
+      "install",
+      "plugin",
+    ],
+    run: (ctx) => ctx.openInstallExtension && ctx.openInstallExtension(),
+  },
   // ===== 标题栏 =====
   {
     id: "toggle-header",
