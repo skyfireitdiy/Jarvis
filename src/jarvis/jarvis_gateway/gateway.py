@@ -46,7 +46,7 @@ class IGateway(ABC):
     def get_execution_input_callback(
         self,
         execution_id: str,
-    ) -> Optional[Callable[[Optional[float]], Optional[str]]]:
+    ) -> Optional[Callable[[float], Optional[str]]]:
         """获取执行输入回调（用于交互式终端）。"""
 
     @abstractmethod
@@ -116,7 +116,7 @@ class BaseGateway(IGateway):
     def get_execution_input_callback(
         self,
         execution_id: str,
-    ) -> Optional[Callable[[Optional[float]], Optional[str]]]:
+    ) -> Optional[Callable[[float], Optional[str]]]:
         del execution_id
         return None
 

@@ -33,6 +33,13 @@ const authErrorAttempts = new Map();
 // 鉴权失败后最多自动重试次数：超过则停止重连，提示用户重新登录
 const AUTH_ERROR_MAX_RETRIES = 3;
 
+// 扩展有新版本时的通知 ID（同一 ID 重复创建会自动替换，避免堆叠）
+const UPDATE_NOTIFICATION_ID = "jarvis-extension-update";
+
+// chrome.storage.local 中记录「已提示过的新版本号」的键。
+// 同一版本只提示一次，避免每次重连/唤醒都弹通知。
+const NOTIFIED_VERSION_KEY = "notified_extension_version";
+
 /** 读取已配置的网关列表。 */
 async function loadGateways() {
   const cfg = await chrome.storage.local.get(["gateways"]);
@@ -138,6 +145,54 @@ function listStatus() {
   }));
 }
 
+/**
+ * 比对网关打包版本与本地版本，落后时弹系统通知提示用户升级。
+ *
+ * 同一新版本只提示一次（记录在 chrome.storage.local），避免每次重连或
+ * service worker 唤醒都重复弹出。通知创建失败（如用户关闭了通知权限）时
+ * 仅告警，不影响连接流程。
+ *
+ * @param {string} gateway 网关地址，用于通知文案定位
+ * @param {string} latest 网关打包的扩展最新版本
+ */
+async function maybeNotifyUpdate(gateway, latest) {
+  const latestVersion = String(latest || "").trim();
+  if (!latestVersion) return;
+  if (latestVersion === String(EXTENSION_VERSION).trim()) return;
+
+  let notified = null;
+  try {
+    const cfg = await chrome.storage.local.get([NOTIFIED_VERSION_KEY]);
+    notified = cfg[NOTIFIED_VERSION_KEY] || null;
+  } catch (e) {
+    console.warn("[Jarvis] read notified version failed", e);
+  }
+  if (notified === latestVersion) return;
+
+  try {
+    await chrome.notifications.create(UPDATE_NOTIFICATION_ID, {
+      type: "basic",
+      iconUrl: "icons/icon128.png",
+      title: "Jarvis 浏览器插件有新版本",
+      message:
+        `当前 v${EXTENSION_VERSION} → 最新 v${latestVersion}。` +
+        `请打开 Jarvis 网页，在「安装浏览器插件」中重新下载并重新加载扩展。`,
+      priority: 1,
+    });
+  } catch (e) {
+    console.warn("[Jarvis] create update notification failed", e);
+    return;
+  }
+  console.log("[Jarvis] update notification shown", gateway, latestVersion);
+
+  // 记录已提示版本，避免重复打扰；写入失败不影响主流程
+  try {
+    await chrome.storage.local.set({ [NOTIFIED_VERSION_KEY]: latestVersion });
+  } catch (e) {
+    console.warn("[Jarvis] save notified version failed", e);
+  }
+}
+
 /** 处理某个网关下发的消息。 */
 async function handleMessage(gateway, msg) {
   if (!msg || typeof msg !== "object") return;
@@ -148,6 +203,10 @@ async function handleMessage(gateway, msg) {
       // 握手成功说明 Token 有效，清零鉴权失败计数
       authErrorAttempts.delete(gatewayKey(gateway));
       setState(gateway, "connected");
+      // 网关随握手下发最新版本：无需打开 Jarvis 网页也能发现新版本
+      maybeNotifyUpdate(gateway, msg.latest_extension_version).catch((e) =>
+        console.warn("[Jarvis] maybeNotifyUpdate error", e),
+      );
       break;
     case "command": {
       const result = await router.handle(msg);
