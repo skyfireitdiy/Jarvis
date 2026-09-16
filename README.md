@@ -469,6 +469,23 @@ llms:
 > 若不接受上述风险，请**不要下载或安装**本扩展；不需要相关能力时，可从
 > `browser_extension/manifest.json` 的 `permissions` 中移除对应项并重新加载扩展。
 
+安装前，前端会弹出风险提示与免责声明，需用户确认后才会开始下载插件包：
+
+![浏览器插件风险提示与免责声明](docs/competition/images/浏览器插件风险提示与免责声明.png)
+
+### 风险操作示例：列出与卸载扩展
+
+高敏感能力并非停留在纸面。以下示例中，Agent 通过 `extmgr_list` 列出用户浏览器中已安装的全部扩展，
+再通过 `extmgr_uninstall` 卸载指定扩展——整个过程无需用户手动打开扩展管理页：
+
+![Agent 列出浏览器中已安装的扩展](docs/competition/images/风险操作示例-插件列表.png)
+
+_Agent 调用 `extmgr_list`，列出浏览器中已安装的扩展及其启用状态。_
+
+![Agent 卸载指定浏览器扩展](docs/competition/images/风险操作示例-插件卸载.png)
+
+_Agent 调用 `extmgr_uninstall` 卸载指定扩展；此类操作**不可逆**，请谨慎授权。_
+
 完整指令列表、脚本格式、消息协议与排障说明见
 [浏览器扩展 README](browser_extension/README.md)，
 设计细节见 [浏览器插件方案](docs/design/browser-extension-agent-control.md)。
