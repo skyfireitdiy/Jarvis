@@ -51,8 +51,6 @@
       @petToggleSidebar="toggleAgentSidebar"
       @petOpenTopology="openTopologyOverlay"
       @petOpenCommandPalette="openCommandPalette()"
-      :radial-actions="petRadialActions"
-      @petRadialRun="onPetRadialRun"
     />
 
     <!-- 主内容区 -->
@@ -5563,20 +5561,6 @@ const appActions = computed(() => {
   })
 })
 
-// 宠物环形菜单动作：取命令面板「当前 Agent」组的命令，内圈放常用项
-const PET_RADIAL_INNER_IDS = [
-  'current-view-diff',
-  'current-create-terminal',
-  'current-open-editor',
-  'current-manual-interrupt',
-  'current-rename',
-  'current-delete',
-]
-// 宠物菜单额外纳入的界面项（不属于「当前 Agent」组，但移动端也需要）
-const PET_RADIAL_EXTRA_IDS = [
-  'toggle-header',
-  'open-agent-list',
-]
 // 动态菜单文案/图标：默认取注册表静态值，个别动作按当前状态调整
 function resolveActionLabel(action, ctx) {
   if (action.id === 'current-toggle-output') {
@@ -5590,27 +5574,6 @@ function resolveActionIcon(action, ctx) {
   }
   return action.icon
 }
-
-const petRadialActions = computed(() => {
-  const ctx = commandPaletteCtx.value
-  return actionDefs
-    .filter(a => a.group === '当前 Agent' || PET_RADIAL_EXTRA_IDS.includes(a.id))
-    .map(a => ({
-      id: a.id,
-      label: resolveActionLabel(a, ctx),
-      icon: resolveActionIcon(a, ctx),
-      inner: PET_RADIAL_INNER_IDS.includes(a.id),
-      enabled: typeof a.enabled === 'function' ? a.enabled(ctx) : true,
-    }))
-})
-
-// 宠物环形菜单点击：关闭菜单后按命令面板同款逻辑执行
-function onPetRadialRun(action) {
-  if (!action) return
-  const def = actionDefs.find(a => a.id === action.id)
-  if (def) onCommandRun(def)
-}
-
 // 大厅中在 Agent 宠物上右键：把「当前 Agent」切到该宠物，菜单动作随之刷新
 function onLobbyContextAgent(agentId) {
   if (agentId) lobbyActiveAgentId.value = agentId
@@ -5630,7 +5593,9 @@ const lobbyContextActions = computed(() => {
 
 // 大厅宠物右键菜单点击：按命令面板同款逻辑执行
 function onLobbyContextRun(action) {
-  onPetRadialRun(action)
+  if (!action) return
+  const def = actionDefs.find(a => a.id === action.id)
+  if (def) onCommandRun(def)
 }
 
 // ===== Panel 右键菜单（与宠物右键同款动作） =====
@@ -5847,11 +5812,6 @@ function isAnyModalOpen() {
     showTopologyOverlay.value ||
     confirmDialog.value
   )
-}
-
-// 宠物环形菜单是否展开（展开时不应自动抢占输入框焦点，避免移动端软键盘顶走页面）
-function isPetMenuOpen() {
-  return Boolean(agentSidebarRef.value?.isPetMenuOpen?.())
 }
 
 // 判断输入框是否应该禁用（没有激活的 agent 或 agent 状态不是 running）
@@ -7042,14 +7002,14 @@ async function fetchAgentStatus(agent) {
         // 聚焦输入框（弹窗或宠物环形菜单打开时不抢焦点）
         const targetPanel = panels.value.find(p => p.agentId === agent.agent_id)
         const sp = targetPanel ? sessionPanelRefs.get(targetPanel.id) : null
-        if (sp?.focusInput && !isAutoFocusSuppressed() && !isPetMenuOpen()) sp.focusInput()
+        if (sp?.focusInput && !isAutoFocusSuppressed()) sp.focusInput()
       } else if (executionStatus === 'waiting_multi') {
         inputMode.value = 'multi'
         panelInputModes.value.set(agent.agent_id, 'multi')
         // 聚焦输入框（弹窗或宠物环形菜单打开时不抢焦点）
         const targetPanel = panels.value.find(p => p.agentId === agent.agent_id)
         const sp = targetPanel ? sessionPanelRefs.get(targetPanel.id) : null
-        if (sp?.focusInput && !isAutoFocusSuppressed() && !isPetMenuOpen()) sp.focusInput()
+        if (sp?.focusInput && !isAutoFocusSuppressed()) sp.focusInput()
       } else if (executionStatus === 'waiting_confirm') {
         // 从 status 响应中获取 pending_confirm 并显示对话框
         const pendingConfirm = result.pending_confirm
@@ -7069,7 +7029,7 @@ async function fetchAgentStatus(agent) {
           // 聚焦输入框（弹窗或宠物环形菜单打开时不抢焦点）
           const targetPanel = panels.value.find(p => p.agentId === agent.agent_id)
           const sp = targetPanel ? sessionPanelRefs.get(targetPanel.id) : null
-          if (sp?.focusInput && !isAutoFocusSuppressed() && !isPetMenuOpen()) sp.focusInput()
+          if (sp?.focusInput && !isAutoFocusSuppressed()) sp.focusInput()
           // 无 Panel 时不弹全局对话框，确认请求静默等待，用户打开 Panel 后可见 confirm 控件
         } else {
           console.warn('[AGENT STATUS] waiting_confirm but no pending_confirm payload found')
@@ -9670,7 +9630,7 @@ function handleMessage(message, agentId = null) {
       // 聚焦输入框（弹窗或宠物环形菜单打开时不抢焦点）
       const targetPanel = panels.value.find(p => p.agentId === targetAgentId)
       const sp = targetPanel ? sessionPanelRefs.get(targetPanel.id) : null
-      if (sp?.focusInput && !isAnyModalOpen() && !isPetMenuOpen()) sp.focusInput()
+      if (sp?.focusInput && !isAnyModalOpen()) sp.focusInput()
 
     }
     
@@ -9719,7 +9679,7 @@ function handleMessage(message, agentId = null) {
     // 聚焦输入框（仅当前 Agent 且无弹窗时，避免其他 Agent 的确认请求抢焦点）
     const targetPanel = panels.value.find(p => p.agentId === targetAgentId)
     const sp = targetPanel ? sessionPanelRefs.get(targetPanel.id) : null
-    if (sp?.focusInput && isCurrentAgent(targetAgentId) && !isAnyModalOpen() && !isPetMenuOpen()) sp.focusInput()
+    if (sp?.focusInput && isCurrentAgent(targetAgentId) && !isAnyModalOpen()) sp.focusInput()
     // 无 Panel 时不弹全局对话框，确认请求静默等待，用户打开 Panel 后可见 confirm 控件
   } else if (type === 'execution') {
     appendExecution(payload, targetAgentId)
