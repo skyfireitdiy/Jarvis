@@ -11,12 +11,12 @@ description: 当需要为 Jarvis 浏览器扩展编写、安装或调试页面�
 这类脚本通过扩展在目标标签页的 **MAIN 世界**执行，可访问页面自身的 JS 对象（如 `window.ze`），
 从而完成 `browser_ext` 内置 action 覆盖不到的操作。适用于把某个站点的复杂交互封装成可复用 action。
 
-相关源码位置（以 `{{ git_root_dir }}` 为仓库根）：
+相关源码位置（以 `{{ jarvis_src_dir }}` 为 Jarvis 源码根）：
 
-- 脚本仓库：`{{ git_root_dir }}/browser_extension/background/script_manager.js`
-- 脚本执行器：`{{ git_root_dir }}/browser_extension/background/executors/script_executor.js`
-- 路由表：`{{ git_root_dir }}/browser_extension/background/command_router.js`
-- 示例脚本：`{{ git_root_dir }}/browser_extension/README.md`（含脚本格式与完整示例）
+- 脚本仓库：`{{ jarvis_src_dir }}/browser_extension/background/script_manager.js`
+- 脚本执行器：`{{ jarvis_src_dir }}/browser_extension/background/executors/script_executor.js`
+- 路由表：`{{ jarvis_src_dir }}/browser_extension/background/command_router.js`
+- 示例脚本：`{{ jarvis_src_dir }}/browser_extension/README.md`（含脚本格式与完整示例）
 
 ## 你必须遵守的原则
 
@@ -223,4 +223,4 @@ globalThis.__JARVIS_SCRIPT__ = {
 - 工具使用：`{{ rule_file_dir }}/jarvis_tool_usage.md`
 - 浏览器自动化（服务端 Playwright）：`{{ rule_file_dir }}/jarvis_browser_cli.md`
 - 脚本生成通用规范：`{{ rule_file_dir }}/script-generation.md`
-- 扩展说明：`{{ git_root_dir }}/browser_extension/README.md`
+- 扩展说明：`{{ jarvis_src_dir }}/browser_extension/README.md`

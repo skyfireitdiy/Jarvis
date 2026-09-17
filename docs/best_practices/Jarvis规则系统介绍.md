@@ -80,7 +80,7 @@ Jarvis 规则系统是一套基于 Markdown 的规范化指令集合，用于指
 
 3. **分享**：选中的规则会被复制到中心规则仓库，保持原有的目录结构
 
-4. **索引更新**：共享的规则不会自动更新索引。如果需要更新全局规则的索引文件（`~/.jarvis/rule.md`），可以在交互式会话中请求 Jarvis 扫描规则目录并更新索引文件
+4. **索引更新**：共享的规则不会自动更新索引。如果需要更新全局规则的索引文件（`~/.jarvis/rules/rule.md`），可以在交互式会话中请求 Jarvis 扫描规则目录并更新索引文件
 
 #### 规则加载目录优先级
 
@@ -98,13 +98,13 @@ Jarvis 规则系统支持以下类型的规则：
 
 #### 全局规则
 
-- **位置**：`~/.jarvis/rule.md`
+- **位置**：`~/.jarvis/rules/rule.md`
 - **作用范围**：所有项目
 - **用途**：个人通用编码规范、全局最佳实践
 
 #### 项目规则
 
-- **位置**：`<项目根目录>/.jarvis/rule.md`
+- **位置**：`<项目根目录>/.jarvis/rules/rule.md`
 - **作用范围**：当前项目
 - **用途**：项目特定的编码规范、业务逻辑约束
 
@@ -184,8 +184,8 @@ jca --rule-names clean_code,project:api_standard
 
 当指定多个规则来源时，系统按以下顺序合并规则：
 
-1. **全局规则文件**（`~/.jarvis/rule.md`）
-2. **项目规则文件**（`.jarvis/rule.md`）
+1. **全局规则文件**（`~/.jarvis/rules/rule.md`）
+2. **项目规则文件**（`.jarvis/rules/rule.md`）
 3. **通过 `--rule-names` 指定的规则**
 
 查找指定规则时（无前缀时），按以下顺序查找：
@@ -207,88 +207,88 @@ Jarvis 内置了丰富的规则集，涵盖架构设计、开发流程、代码�
 
 ### 3.1 架构设计规则
 
-| 规则文件 | 用途 | 适用场景 |
-|---------|------|---------|
-| `solid.md` | SOLID 设计原则 | 面向对象设计 |
-| `clean_architecture.md` | 整洁架构 | 架构设计 |
-| `clean_code.md` | 整洁代码规范 | 代码生成、重构 |
-| `code-reverse-design.md` | 代码反向设计规则 | 代码重构 |
-| `architecture-diagram-generation.md` | 架构图生成规则 | 架构文档生成 |
+| 规则文件                             | 用途             | 适用场景       |
+| ------------------------------------ | ---------------- | -------------- |
+| `solid.md`                           | SOLID 设计原则   | 面向对象设计   |
+| `clean_architecture.md`              | 整洁架构         | 架构设计       |
+| `clean_code.md`                      | 整洁代码规范     | 代码生成、重构 |
+| `code-reverse-design.md`             | 代码反向设计规则 | 代码重构       |
+| `architecture-diagram-generation.md` | 架构图生成规则   | 架构文档生成   |
 
 ### 3.2 开发流程规则
 
-| 规则文件 | 用途 | 适用场景 |
-|---------|------|---------|
-| `sdd.md` | Spec 驱动开发 | 设计文档编写 |
-| `tdd.md` | 测试驱动开发 | 测试代码生成 |
-| `refactoring.md` | 重构指南 | 代码重构任务 |
-| `c2rust_transpiler.md` | C2Rust 转译 | C 代码转 Rust |
-| `go2rust_transpiler.md` | Go2Rust 转译 | Go 代码转 Rust |
+| 规则文件                | 用途          | 适用场景       |
+| ----------------------- | ------------- | -------------- |
+| `sdd.md`                | Spec 驱动开发 | 设计文档编写   |
+| `tdd.md`                | 测试驱动开发  | 测试代码生成   |
+| `refactoring.md`        | 重构指南      | 代码重构任务   |
+| `c2rust_transpiler.md`  | C2Rust 转译   | C 代码转 Rust  |
+| `go2rust_transpiler.md` | Go2Rust 转译  | Go 代码转 Rust |
 
 ### 3.3 代码质量规则
 
-| 规则文件 | 用途 | 适用场景 |
-|---------|------|---------|
-| `code_review.md` | 代码审查标准 | 代码审查任务 |
-| `documentation.md` | 文档编写规范 | 文档生成 |
+| 规则文件              | 用途         | 适用场景     |
+| --------------------- | ------------ | ------------ |
+| `code_review.md`      | 代码审查标准 | 代码审查任务 |
+| `documentation.md`    | 文档编写规范 | 文档生成     |
 | `refactor-checker.md` | 重构检查专家 | 重构质量检查 |
 
 ### 3.4 安全规范规则
 
-| 规则文件 | 用途 | 适用场景 |
-|---------|------|---------|
-| `security.md` | 安全编码标准 | 安全相关代码 |
-| `vulnerability-analysis.md` | 安全漏洞分析规则 | 安全审计 |
+| 规则文件                    | 用途             | 适用场景     |
+| --------------------------- | ---------------- | ------------ |
+| `security.md`               | 安全编码标准     | 安全相关代码 |
+| `vulnerability-analysis.md` | 安全漏洞分析规则 | 安全审计     |
 
 ### 3.5 性能优化规则
 
-| 规则文件 | 用途 | 适用场景 |
-|---------|------|---------|
-| `performance.md` | 性能优化指南 | 性能敏感代码 |
+| 规则文件              | 用途          | 适用场景      |
+| --------------------- | ------------- | ------------- |
+| `performance.md`      | 性能优化指南  | 性能敏感代码  |
 | `rust_performance.md` | Rust 性能优化 | Rust 代码优化 |
 
 ### 3.6 UI 设计规则
 
-| 规则文件 | 用途 | 适用场景 |
-|---------|------|---------|
-| `dark-theme-design.md` | 暗色主题设计规则 | 前端界面开发 |
-| `light-theme-design.md` | 亮色主题设计规则 | 前端界面开发 |
-| `macos-web-design.md` | macOS Web 设计规范 | Web 界面开发 |
+| 规则文件                | 用途               | 适用场景     |
+| ----------------------- | ------------------ | ------------ |
+| `dark-theme-design.md`  | 暗色主题设计规则   | 前端界面开发 |
+| `light-theme-design.md` | 亮色主题设计规则   | 前端界面开发 |
+| `macos-web-design.md`   | macOS Web 设计规范 | Web 界面开发 |
 
 ### 3.7 开发工具规则
 
-| 规则文件 | 用途 | 适用场景 |
-|---------|------|---------|
+| 规则文件               | 用途         | 适用场景     |
+| ---------------------- | ------------ | ------------ |
 | `script-generation.md` | 脚本生成规则 | 脚本代码生成 |
-| `skill-development.md` | 技能开发规则 | 技能开发 |
-| `mcp-integration.md` | MCP 集成规则 | MCP 工具集成 |
+| `skill-development.md` | 技能开发规则 | 技能开发     |
+| `mcp-integration.md`   | MCP 集成规则 | MCP 工具集成 |
 
 ### 3.8 测试规范规则
 
-| 规则文件 | 用途 | 适用场景 |
-|---------|------|---------|
-| `cpp_test.md` | C/C++ 测试指南 | C/C++ 代码测试 |
-| `go_test.md` | Go 测试指南 | Go 代码测试 |
-| `javascript_test.md` | JavaScript/TypeScript 测试指南 | JS/TS 代码测试 |
-| `java_test.md` | Java 测试指南 | Java 代码测试 |
-| `php_test.md` | PHP 测试指南 | PHP 代码测试 |
-| `python_test.md` | Python 测试指南 | Python 代码测试 |
-| `ruby_test.md` | Ruby 测试指南 | Ruby 代码测试 |
-| `rust_test.md` | Rust 测试指南 | Rust 代码测试 |
+| 规则文件             | 用途                           | 适用场景        |
+| -------------------- | ------------------------------ | --------------- |
+| `cpp_test.md`        | C/C++ 测试指南                 | C/C++ 代码测试  |
+| `go_test.md`         | Go 测试指南                    | Go 代码测试     |
+| `javascript_test.md` | JavaScript/TypeScript 测试指南 | JS/TS 代码测试  |
+| `java_test.md`       | Java 测试指南                  | Java 代码测试   |
+| `php_test.md`        | PHP 测试指南                   | PHP 代码测试    |
+| `python_test.md`     | Python 测试指南                | Python 代码测试 |
+| `ruby_test.md`       | Ruby 测试指南                  | Ruby 代码测试   |
+| `rust_test.md`       | Rust 测试指南                  | Rust 代码测试   |
 
 ### 3.9 工具配置规则
 
-| 规则文件 | 用途 | 适用场景 |
-|---------|------|---------|
-| `add_rule.md` | 新增规则规范 | 创建新规则时 |
-| `alert-management.md` | 告警管理规则 | 告警处理 |
-| `self_config.md` | 自助配置规则 | 配置文件修改 |
+| 规则文件              | 用途             | 适用场景     |
+| --------------------- | ---------------- | ------------ |
+| `add_rule.md`         | 新增规则规范     | 创建新规则时 |
+| `alert-management.md` | 告警管理规则     | 告警处理     |
+| `self_config.md`      | 自助配置规则     | 配置文件修改 |
 | `add_builtin_rule.md` | 新增内置规则规范 | 添加内置规则 |
 
 ### 3.10 部署规范规则
 
-| 规则文件 | 用途 | 适用场景 |
-|---------|------|---------|
+| 规则文件                   | 用途         | 适用场景     |
+| -------------------------- | ------------ | ------------ |
 | `opensource-deployment.md` | 开源部署规则 | 开源项目部署 |
 
 ---
@@ -312,10 +312,10 @@ jca --rule-names my_project_rule,clean_code "创建功能"
 
 ### 4.2 通过项目规则文件
 
-创建 `.jarvis/rule.md` 文件，内容将自动加载：
+创建 `.jarvis/rules/rule.md` 文件，内容将自动加载：
 
 ```markdown
-# .jarvis/rule.md
+# .jarvis/rules/rule.md
 
 # 这是一个全局规则，对所有任务生效
 
@@ -328,10 +328,10 @@ jca --rule-names my_project_rule,clean_code "创建功能"
 
 ### 4.3 通过全局规则文件
 
-创建 `~/.jarvis/rule.md` 文件，对所有项目生效：
+创建 `~/.jarvis/rules/rule.md` 文件，对所有项目生效：
 
 ```markdown
-# ~/.jarvis/rule.md
+# ~/.jarvis/rules/rule.md
 
 # 全局默认规则
 
@@ -407,7 +407,7 @@ jca --rule-names my_project_rule,clean_code "创建功能"
 
 规则文件采用 Markdown 格式，推荐以下结构：
 
-```markdown
+````markdown
 # 规则标题
 
 ## 引言/背景
@@ -439,6 +439,7 @@ jca --rule-names my_project_rule,clean_code "创建功能"
 ```python
 # 错误示例代码
 ```
+````
 
 ### ✅ 好的实践
 
@@ -453,7 +454,7 @@ jca --rule-names my_project_rule,clean_code "创建功能"
 - [ ] 检查项 1
 - [ ] 检查项 2
 
-```
+````
 
 ### 6.2 格式要求
 
@@ -495,7 +496,7 @@ jca --rule-names my_project_rule,clean_code "创建功能"
 
 - 所有源代码文件必须放在 `{{ git_root_dir }}/src/` 目录下
 - 测试文件必须放在 `{{ git_root_dir }}/tests/` 目录下
-```
+````
 
 ---
 

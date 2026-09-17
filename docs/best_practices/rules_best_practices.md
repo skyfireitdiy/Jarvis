@@ -30,8 +30,8 @@ JARVIS 内置了以下规则，位于 `builtin/rules/` 和 `builtin/rules/testin
 
 ### 开发流程
 
-| 规则文件            | 用途         | 适用场景     |
-| ------------------- | ------------ | ------------ |
+| 规则文件         | 用途         | 适用场景     |
+| ---------------- | ------------ | ------------ |
 | `sdd.md`         | Spec驱动开发 | 设计文档编写 |
 | `tdd.md`         | 测试驱动开发 | 测试代码生成 |
 | `refactoring.md` | 重构指南     | 代码重构任务 |
@@ -132,10 +132,10 @@ jarvis code --rule-names my_project_rule,clean_code
 
 #### 方式 2：通过项目规则文件
 
-创建 `.jarvis/rule.md` 文件，内容将自动加载：
+创建 `.jarvis/rules/rule.md` 文件，内容将自动加载：
 
 ```markdown
-# .jarvis/rule
+# .jarvis/rules/rule.md
 
 # 这是一个全局规则，对所有任务生效
 
@@ -148,10 +148,10 @@ jarvis code --rule-names my_project_rule,clean_code
 
 #### 方式 3：通过全局规则文件
 
-创建 `~/.jarvis/rule.md` 文件，对所有项目生效：
+创建 `~/.jarvis/rules/rule.md` 文件，对所有项目生效：
 
 ```markdown
-# ~/.jarvis/rule
+# ~/.jarvis/rules/rule.md
 
 # 全局默认规则
 
@@ -252,8 +252,8 @@ jarvis code --rule-names python_best_practices
 
 当指定多个规则来源时，系统按以下顺序合并规则：
 
-1. **全局规则文件**（`~/.jarvis/rule.md`）
-2. **项目规则文件**（`.jarvis/rule.md`）
+1. **全局规则文件**（`~/.jarvis/rules/rule.md`）
+2. **项目规则文件**（`.jarvis/rules/rule.md`）
 3. **通过 `--rule-names` 指定的规则**
 
 查找指定规则时，按以下顺序查找：

@@ -98,5 +98,5 @@ jarvis-tool list --detailed
 
 ## 相关资源
 
-- CLI实现位置：`{{ git_root_dir }}/src/jarvis/jarvis_tools/cli/main.py`
-- 工具注册表：`{{ git_root_dir }}/src/jarvis/jarvis_tools/registry.py`
+- CLI实现位置：`{{ jarvis_src_dir }}/src/jarvis/jarvis_tools/cli/main.py`
+- 工具注册表：`{{ jarvis_src_dir }}/src/jarvis/jarvis_tools/registry.py`
