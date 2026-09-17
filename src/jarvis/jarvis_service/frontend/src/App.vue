@@ -4886,14 +4886,16 @@ async function loadHistoryMessages(prepend = false, agentId = null) {
       allOutputs.value.set(targetAgentId, [...processedMessages, ...currentOutputs])
     } else {
       // 合并历史消息与现有消息，去重（避免重复）
-      // 现有消息（可能来自 WebSocket 推送）优先级更高，历史消息补充缺失的
-      let merged = [...currentOutputs]
+      // 历史记录是持久化的完整序列且为正序，故以它为主干；现有消息中历史没有的部分
+      // （如刚收到、尚未落盘的推送）追加到末尾。这样 execution（Xterm）等无 seq 的消息
+      // 也能落在正确位置，不会被排到列表末尾。
       const existingIds = new Set()
-      for (const msg of currentOutputs) {
+      for (const msg of processedMessages) {
         if (msg.execution_id) existingIds.add('exec_' + msg.execution_id)
         if (typeof msg.seq === 'number') existingIds.add('seq_' + msg.seq)
       }
-      for (const msg of processedMessages) {
+      let merged = [...processedMessages]
+      for (const msg of currentOutputs) {
         const execKey = msg.execution_id ? 'exec_' + msg.execution_id : null
         const seqKey = typeof msg.seq === 'number' ? 'seq_' + msg.seq : null
         if ((execKey && existingIds.has(execKey)) || (seqKey && existingIds.has(seqKey))) continue
@@ -4901,20 +4903,22 @@ async function loadHistoryMessages(prepend = false, agentId = null) {
         if (execKey) existingIds.add(execKey)
         if (seqKey) existingIds.add(seqKey)
       }
-      // 按 seq 稳定排序：现有消息（WebSocket 推送）与历史消息可能交错，
-      // 直接拼接会导致旧消息排到末尾。带 seq 的按 seq 升序；
-      // 无 seq 的多为本地即时系统提示（如"缓冲区已清空"），语义上属于最新，排在末尾并保持相对顺序。
-      const hasSeq = merged.some(msg => typeof msg.seq === 'number')
-      if (hasSeq) {
+      // 兜底排序：若现有消息带有比历史更小的 seq（历史存储被截断等异常情况），
+      // 仅对带 seq 的消息按 seq 归位；无 seq 的消息保持其在原序列中的相对位置。
+      if (merged.some(msg => typeof msg.seq === 'number')) {
+        let lastSeq = null
         merged = merged
-          .map((msg, idx) => ({ msg, idx }))
+          .map((msg, idx) => {
+            if (typeof msg.seq === 'number') {
+              lastSeq = msg.seq
+              return { msg, idx, key: msg.seq, sub: 0 }
+            }
+            return { msg, idx, key: lastSeq === null ? -Infinity : lastSeq, sub: 1 }
+          })
           .sort((a, b) => {
-            const seqA = typeof a.msg.seq === 'number' ? a.msg.seq : null
-            const seqB = typeof b.msg.seq === 'number' ? b.msg.seq : null
-            if (seqA === null && seqB === null) return a.idx - b.idx
-            if (seqA === null) return 1
-            if (seqB === null) return -1
-            return seqA - seqB
+            if (a.key !== b.key) return a.key - b.key
+            if (a.sub !== b.sub) return a.sub - b.sub
+            return a.idx - b.idx
           })
           .map(item => item.msg)
       }
