@@ -916,12 +916,17 @@ def example():
 
 4. Jinja2 变量使用：
    - `{{ rule_file_dir }}`：当前规则文档所在目录
-   - `{{ git_root_dir }}`：Git 仓库的根目录
+   - `{{ git_root_dir }}`：Git 仓库的根目录（由 git rev-parse 求得，取"当前工作目录所在仓库"的根；在仓库外运行时回退为当前工作目录）
    - `{{ current_dir }}`：当前工作目录
-   - `{{ jarvis_src_dir }}`：Jarvis 源代码目录
+   - `{{ jarvis_src_dir }}`：Jarvis 源代码目录（由源码位置上溯求得，与运行目录无关，是 Jarvis 自身资源唯一稳定的定位变量）
    - `{{ jarvis_data_dir }}`：Jarvis 数据目录
    - 必须：尽量使用 jinja2 变量替代绝对路径
    - 禁止：在规则文档中硬编码绝对路径
+   - 禁止：用 `{{ git_root_dir }}` 指向 Jarvis 自身资源（browser_extension/、docs/、builtin/rules/、ReleaseNote.md、.jarvis/ 等）——
+     用户常在仓库外运行，此时 git_root_dir 会退化为当前目录，这类路径全部失效；指向 Jarvis 自身资源一律用 `{{ jarvis_src_dir }}`。
+     `{{ git_root_dir }}` 只用于指向用户自己项目内的位置（如 `{{ git_root_dir }}/.jarvis/rules/...`、`{{ git_root_dir }}/project_info/...`）。
+   - 必须：用 `{{ jarvis_src_dir }}` 时区分仓库根下资源（直接拼，如 `{{ jarvis_src_dir }}/browser_extension/...`）
+     与 Python 包内源码（须含 src/jarvis，如 `{{ jarvis_src_dir }}/src/jarvis/jarvis_tools/...`）。
 
 第四步：保存规则文档
 
