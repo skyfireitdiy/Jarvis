@@ -15,6 +15,7 @@ description: 若需新增规则、管理现有规则或配置规则体系时触�
   - 存放位置：`{% raw %}{{ git_root_dir }}{% endraw %}/.jarvis/rules/<category>/<rule_name>.md`。
 
 **选择原则**：
+
 1. 多个项目都通用 → 建为全局规则；
 2. 只针对当前项目 → 建为项目规则；
 3. 维护成本：全局规则改动影响所有项目，需谨慎；
@@ -28,22 +29,29 @@ description: 若需新增规则、管理现有规则或配置规则体系时触�
 # 规则标题
 
 ## 规则简介
+
 （可选）一句话说明本规则做什么、何时用、预期效果。
 
 ## 你必须遵守的原则
+
 （必需）本规则要求的核心原则。每条用一段说明：
+
 - **必须**：具体要做的要求
 - **禁止**：明确禁止的事项
-可以分多个小节给出多条原则。
+  可以分多个小节给出多条原则。
 
 ## 你必须执行的操作
+
 （必需）本规则要求的具体操作步骤或流程。按阶段/步骤分节，步骤要可执行、可验证。
 
 ## 实践指导
+
 （可选）最佳实践、常见错误、注意事项。
 
 ## 自检清单
+
 （可选）完成后逐项验证用的清单：
+
 - [ ] 检查项 1
 - [ ] 检查项 2
 ```
@@ -56,9 +64,9 @@ description: 若需新增规则、管理现有规则或配置规则体系时触�
 
 ```yaml
 ---
-name: code_review        # 必填：规则名，须等于文件名（不含 .md），英文或拼音、小写
-description: 触发说明    # 必填：用于索引与自动匹配
-license: MIT             # 可选：开源许可标识
+name: code_review # 必填：规则名，须等于文件名（不含 .md），英文或拼音、小写
+description: 触发说明 # 必填：用于索引与自动匹配
+license: MIT # 可选：开源许可标识
 ---
 ```
 
@@ -86,17 +94,17 @@ license: MIT             # 可选：开源许可标识
 
 规则放在按主题命名的子目录里。常见类别（非强制，可按需新建）：
 
-| 类别目录 | 覆盖内容 |
-| --- | --- |
-| `architecture_design` | 架构/设计模式/代码组织 |
-| `code_quality` | 代码规范/审查/文档/构建校验 |
-| `deployment` | 部署/发布/环境/CI-CD |
-| `development_tools` | 工具使用/脚本生成/工具配置 |
+| 类别目录               | 覆盖内容                                  |
+| ---------------------- | ----------------------------------------- |
+| `architecture_design`  | 架构/设计模式/代码组织                    |
+| `code_quality`         | 代码规范/审查/文档/构建校验               |
+| `deployment`           | 部署/发布/环境/CI-CD                      |
+| `development_tools`    | 工具使用/脚本生成/工具配置                |
 | `development_workflow` | 方法论/开发流程/协作（如 TDD、SDD、重构） |
-| `performance` | 性能分析/优化/资源管理 |
-| `security` | 安全编码/漏洞分析/安全测试 |
-| `tool_config` | 工具与规则体系配置（如本文件） |
-| `ui_design` | 界面规范/主题设计 |
+| `performance`          | 性能分析/优化/资源管理                    |
+| `security`             | 安全编码/漏洞分析/安全测试                |
+| `tool_config`          | 工具与规则体系配置（如本文件）            |
+| `ui_design`            | 界面规范/主题设计                         |
 
 选择类别：每个规则只归一类，按它最核心的主题归类；拿不准就参照同类内置规则所在的目录。
 
@@ -104,18 +112,26 @@ license: MIT             # 可选：开源许可标识
 
 规则文件支持 Jinja2，可用下列变量写出相对路径，**不要硬编码绝对路径**：
 
-| 变量 | 含义 |
-| --- | --- |
-| `{% raw %}{{ rule_file_dir }}{% endraw %}` | 本规则文件所在目录（绝对路径） |
-| `{% raw %}{{ git_root_dir }}{% endraw %}` | Git 仓库根目录 |
-| `{% raw %}{{ current_dir }}{% endraw %}` | 当前工作目录 |
-| `{% raw %}{{ jarvis_src_dir }}{% endraw %}` | Jarvis 源码目录 |
+| 变量                                         | 含义                                |
+| -------------------------------------------- | ----------------------------------- |
+| `{% raw %}{{ rule_file_dir }}{% endraw %}`   | 本规则文件所在目录（绝对路径）      |
+| `{% raw %}{{ git_root_dir }}{% endraw %}`    | Git 仓库根目录                      |
+| `{% raw %}{{ current_dir }}{% endraw %}`     | 当前工作目录                        |
+| `{% raw %}{{ jarvis_src_dir }}{% endraw %}`  | Jarvis 源码目录                     |
 | `{% raw %}{{ jarvis_data_dir }}{% endraw %}` | Jarvis 数据目录（通常 `~/.jarvis`） |
 
 使用要点：
+
 - 引用同目录下的子规则：直接写 `{% raw %}{{ rule_file_dir }}{% endraw %}/sub_rule.md`，**不要**再加一层重复的类别前缀；
 - 指定项目内位置用 `{% raw %}{{ git_root_dir }}{% endraw %}`，数据位置用 `{% raw %}{{ jarvis_data_dir }}{% endraw %}`；
 - 在规则正文里引用这些变量即可；需要展示"字面量 {{ ... }}"时用 `{% raw %}...{% endraw %}` 包裹，避免被当模板解析。
+
+**⚠️ 关键：`git_root_dir` 与 `jarvis_src_dir` 不可混用**
+
+- `{% raw %}{{ git_root_dir }}{% endraw %}` 由 `git rev-parse` 求得，**取的是"当前工作目录所在仓库"的根**；在仓库外运行时会回退成当前工作目录，路径直接失效。它只适合指**用户自己项目**里的位置（如 `{% raw %}{{ git_root_dir }}{% endraw %}/.jarvis/rules/...`、`{% raw %}{{ git_root_dir }}{% endraw %}/project_info/...`）。
+- `{% raw %}{{ jarvis_src_dir }}{% endraw %}` 由源码位置上溯求得，**与运行目录无关**，是 Jarvis 自身资源唯一稳定的定位变量。
+- **禁止**：用 `{% raw %}{{ git_root_dir }}{% endraw %}` 指向 Jarvis 自身资源（`browser_extension/`、`docs/`、`builtin/rules/`、`ReleaseNote.md`、`.jarvis/` 等）。用户常在仓库外运行，此时 `git_root_dir` 会退化为当前目录，所有此类路径全部失效。
+- 正确用法：指向 Jarvis 自身资源一律用 `{% raw %}{{ jarvis_src_dir }}{% endraw %}`，且注意区分仓库根下资源（直接拼，如 `{% raw %}{{ jarvis_src_dir }}{% endraw %}/browser_extension/...`）与 Python 包内源码（须含 `src/jarvis`，如 `{% raw %}{{ jarvis_src_dir }}{% endraw %}/src/jarvis/jarvis_tools/...`）。
 
 ## 7. 配套脚本（按需）
 
@@ -128,18 +144,21 @@ license: MIT             # 可选：开源许可标识
 ## 8. 最佳实践与维护
 
 **设计规则时**
+
 - 单一职责：一条规则只关注一个主题；
 - 可操作：写得具体能执行，避免空话（对比：❌"代码要写好" vs ✅"函数体不超过 50 行"）；
 - 可验证：给出明确验收/检查项；
 - 相互一致：相邻规则不要互相冲突。
 
 **常见错误**
+
 - 规则写得过于抽象、没有示例；
 - 缺少 YAML 头或 description 没写成触发/不触发形式；
 - 规则间冲突；
 - 硬编码绝对路径。
 
 **维护**
+
 - 定期复查规则的适用性，随项目演进更新；
 - 删除过时或不再使用的规则；
 - 需要时记录规则变更。
