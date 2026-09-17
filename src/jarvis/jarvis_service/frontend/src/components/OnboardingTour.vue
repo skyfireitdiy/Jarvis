@@ -204,23 +204,34 @@ const cardStyle = computed(() => {
   }
 })
 
+// 判断某个步骤当前是否可展示（无 target 视为可展示，有 target 则要求元素可见）
+function isStepVisible(step) {
+  if (!step?.target) return true
+  let el = null
+  try {
+    el = document.querySelector(step.target)
+  } catch (err) {
+    el = null
+  }
+  if (!el) return false
+  const rect = el.getBoundingClientRect()
+  return Boolean(rect.width && rect.height)
+}
+
 // 跳过当前步骤中不可见的目标：连续向前查找第一个可展示的步骤
 function findVisibleStepIndex(from) {
   for (let i = from; i < props.steps.length; i++) {
-    const step = props.steps[i]
-    if (!step?.target) return i
-    let el = null
-    try {
-      el = document.querySelector(step.target)
-    } catch (err) {
-      el = null
-    }
-    if (el) {
-      const rect = el.getBoundingClientRect()
-      if (rect.width && rect.height) return i
-    }
+    if (isStepVisible(props.steps[i])) return i
   }
   return props.steps.length - 1
+}
+
+// 跳过当前步骤中不可见的目标：连续向后查找第一个可展示的步骤
+function findVisibleStepIndexBackward(from) {
+  for (let i = from; i >= 0; i--) {
+    if (isStepVisible(props.steps[i])) return i
+  }
+  return 0
 }
 
 function next() {
@@ -234,7 +245,7 @@ function next() {
 
 function prev() {
   if (stepIndex.value === 0) return
-  stepIndex.value = findVisibleStepIndex(stepIndex.value - 1)
+  stepIndex.value = findVisibleStepIndexBackward(stepIndex.value - 1)
   nextTick(refreshLayout)
 }
 
