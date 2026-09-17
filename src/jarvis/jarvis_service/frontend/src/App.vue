@@ -8740,6 +8740,8 @@ function getLobbyInputState(agentId) {
       isPassword: false,
       confirmMessage: confirmData?.message || '请确认',
       confirmDefault: confirmData?.defaultConfirm !== false,
+      // 是否有待处理的输入/确认请求：大厅据此决定展开宠物时是否自动聚焦输入框
+      hasRequest: true,
     }
   }
   const request = inputRequests.value.get(agentId)
@@ -8751,9 +8753,10 @@ function getLobbyInputState(agentId) {
       isPassword: !!request.is_password,
       confirmMessage: '',
       confirmDefault: true,
+      hasRequest: true,
     }
   }
-  return { mode: 'multi', tip: '', preset: '', isPassword: false, confirmMessage: '', confirmDefault: true }
+  return { mode: 'multi', tip: '', preset: '', isPassword: false, confirmMessage: '', confirmDefault: true, hasRequest: false }
 }
 
 // 宠物大厅：发送输入到指定 Agent
