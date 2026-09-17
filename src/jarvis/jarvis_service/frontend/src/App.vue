@@ -176,6 +176,7 @@
         @set-terminal-ref="(executionId, el, agentId) => setPanelTerminalRef(panel, executionId, el, agentId)"
         @show-toast="showToast"
         @detach="detachPanel('session', panel.id)"
+        @context-menu="onPanelContextMenu(panel, $event)"
       />
 
       <!-- 内嵌终端面板 -->
@@ -575,6 +576,7 @@
         @viewTools="viewTools(getPanelAgent(panel))"
         @createTerminal="createTerminalForAgent(getPanelAgent(panel))"
         @openEditor="createEditorForAgent(getPanelAgent(panel))"
+        @context-menu="onPanelContextMenu(panel, $event)"
       />
     </template>
 
@@ -1233,6 +1235,30 @@
       @run="onCommandRun"
       @close="showCommandPalette = false"
     />
+
+    <!-- Panel 右键菜单：与宠物右键一致，列出「当前 Agent」操作 -->
+    <div
+      v-if="panelContextMenu.visible"
+      class="panel-context-menu"
+      :style="{ left: panelContextMenu.x + 'px', top: panelContextMenu.y + 'px' }"
+      @pointerdown.stop
+      @click.stop
+      @contextmenu.prevent.stop
+    >
+      <div class="panel-context-title">{{ panelContextMenu.name }}</div>
+      <div class="panel-context-items">
+        <button
+          v-for="act in lobbyContextActions"
+          :key="act.id"
+          class="panel-context-item"
+          :disabled="act.enabled === false"
+          @click="onPanelContextAction(act)"
+        >
+          <span class="panel-context-icon">{{ act.icon }}</span>
+          <span class="panel-context-label">{{ act.label }}</span>
+        </button>
+      </div>
+    </div>
 
     <!-- Toast 提示 -->
     <transition name="toast-fade">
@@ -5486,6 +5512,41 @@ const lobbyContextActions = computed(() => {
 // 大厅宠物右键菜单点击：按命令面板同款逻辑执行
 function onLobbyContextRun(action) {
   onPetRadialRun(action)
+}
+
+// ===== Panel 右键菜单（与宠物右键同款动作） =====
+// 菜单坐标使用视口坐标（position: fixed），name 用作标题
+const panelContextMenu = ref({ visible: false, x: 0, y: 0, name: '' })
+
+function closePanelContextMenu() {
+  if (panelContextMenu.value.visible) panelContextMenu.value.visible = false
+}
+
+// 在 Panel 内右键（未选中文字）：先激活该 Panel 使「当前 Agent」指向它，再就地弹出菜单
+function onPanelContextMenu(panel, event) {
+  if (!panel || !panel.agentId) return
+  activatePanel(panel.id)
+  const agent = agentList.value.find(a => a.agent_id === panel.agentId)
+  const MENU_W = 320
+  const rows = Math.max(1, Math.ceil(lobbyContextActions.value.length / 2))
+  const MENU_H = Math.min(44 + rows * 33, window.innerHeight * 0.6)
+  let x = event.clientX
+  let y = event.clientY
+  if (x + MENU_W > window.innerWidth) x = Math.max(window.innerWidth - MENU_W, 0)
+  if (y + MENU_H > window.innerHeight) y = Math.max(window.innerHeight - MENU_H, 0)
+  panelContextMenu.value = {
+    visible: true,
+    x,
+    y,
+    name: (agent && (agent.name || agent.agent_id)) || panel.agentId,
+  }
+}
+
+// 点击菜单项：复用宠物右键的执行链路，然后关闭菜单
+function onPanelContextAction(action) {
+  if (!action || action.enabled === false) return
+  closePanelContextMenu()
+  onLobbyContextRun(action)
 }
 
 // 大厅节点右键菜单点击：创建 Agent / 打开终端 / 更新代码 / 重启服务（后续可在此扩展更多节点操作）
@@ -12701,6 +12762,17 @@ function handleGlobalKeydown(event) {
     return
   }
 
+  // Ctrl/Cmd + N 打开创建 Agent 弹窗（拦截浏览器新建窗口）
+  if (isModifierPressed && !event.altKey && !event.shiftKey && event.code === 'KeyN') {
+    // 登录界面不响应
+    if (showConnectModal.value) return
+    // 输入框内保留默认行为（避免打断输入）
+    if (isEditableElement(event.target)) return
+    event.preventDefault()
+    openCreateAgentModal()
+    return
+  }
+
   // Ctrl + A 打开/隐藏 Agent 侧边栏
   if (event.ctrlKey && event.key === 'a') {
     // 如果在输入框中，不触发快捷键（允许默认的全选行为）
@@ -12773,6 +12845,11 @@ function handleGlobalKeydown(event) {
 
   // ESC 键关闭所有对话框
   if (event.key === 'Escape') {
+    // Panel 右键菜单打开时优先关闭它
+    if (panelContextMenu.value.visible) {
+      closePanelContextMenu()
+      return
+    }
     // 补全面板打开时优先关闭它（焦点可能仍在输入框，需在此统一处理）
     if (showCompletions.value) {
       closeCompletionsWithoutSelect()
@@ -13244,6 +13321,9 @@ onMounted(() => {
   
   // 添加全局键盘事件监听（在捕获阶段处理 Ctrl+T 等快捷键）
   document.addEventListener('keydown', handleGlobalKeydown, { capture: true })
+
+  // 点击菜单外任意处关闭 Panel 右键菜单（菜单自身已 stop 冒泡）
+  document.addEventListener('pointerdown', closePanelContextMenu)
   
   // 监听窗口resize事件
   handleResize = () => {
@@ -13355,6 +13435,9 @@ onUnmounted(() => {
 
   // 移除全局键盘事件监听
   document.removeEventListener('keydown', handleGlobalKeydown, { capture: true })
+
+  // 移除 Panel 右键菜单的全局关闭监听
+  document.removeEventListener('pointerdown', closePanelContextMenu)
   
   // 移除窗口resize监听
   window.removeEventListener('resize', handleResize)
@@ -16787,6 +16870,70 @@ body::-webkit-scrollbar {
 .copy-message-btn:hover {
   background: var(--color-bg-tertiary);
   color: #e6edf3;
+}
+
+/* Panel 右键菜单：与宠物右键菜单同款外观（两列排布） */
+.panel-context-menu {
+  position: fixed;
+  z-index: 9999;
+  min-width: 300px;
+  max-width: 380px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 4px;
+  border-radius: 10px;
+  background: rgba(12, 22, 34, 0.96);
+  border: 1px solid rgba(32, 200, 255, 0.35);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.panel-context-title {
+  padding: 6px 10px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #9fe4ff;
+  border-bottom: 1px solid rgba(32, 200, 255, 0.18);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.panel-context-items {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+}
+.panel-context-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: #d7e8f5;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.panel-context-item:hover:not(:disabled) {
+  background: rgba(32, 200, 255, 0.16);
+}
+.panel-context-item:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.panel-context-icon {
+  width: 18px;
+  text-align: center;
+}
+.panel-context-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Toast 提示 */

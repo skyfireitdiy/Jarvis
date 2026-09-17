@@ -1,5 +1,5 @@
 <template>
-  <div class="session-panel" :class="{ 'active': active, 'session-panel-embedded': embedded, 'session-panel-dragging': interaction?.active }" :style="panelStyle" @click="handlePanelClick">
+  <div class="session-panel" :class="{ 'active': active, 'session-panel-embedded': embedded, 'session-panel-dragging': interaction?.active }" :style="panelStyle" @click="handlePanelClick" @contextmenu="handlePanelContextMenu">
     <!-- 空白占位 -->
     <div v-if="!agent" class="session-panel-empty">
       <div class="empty-icon">▦</div>
@@ -217,6 +217,7 @@ const emit = defineEmits([
   'show-toast',
   'confirm', 'cancel-confirm',
   'startMove', 'startResize',
+  'context-menu',
 ])
 
 function handlePanelClick() {
@@ -234,6 +235,18 @@ function handlePanelClick() {
     return
   }
   emit('activate')
+}
+
+// 面板内右键：选中文字时保留浏览器默认菜单（便于复制），否则交给父组件弹出 Agent 操作菜单
+function handlePanelContextMenu(event) {
+  // 无 Agent 的空面板不提供操作菜单
+  if (!props.agent) return
+  const selection = window.getSelection()
+  if (selection && selection.toString().trim()) {
+    return
+  }
+  event.preventDefault()
+  emit('context-menu', event)
 }
 
 const outputListRef = ref(null)
