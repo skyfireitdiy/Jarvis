@@ -1586,6 +1586,34 @@ function closePanel(pet) {
   if (activePetId.value === pet.agentId) activePetId.value = null
 }
 
+// 退出当前宠物选中状态（供父组件 ESC 快捷键调用）：
+// 无选中时返回 false，便于父组件判断 ESC 是否已被消费
+function closeActivePanel() {
+  closeContextMenu()
+  if (!activePetId.value) return false
+  const pet = petAgents.value.find(p => p.agentId === activePetId.value)
+  if (pet) closePanel(pet)
+  else activePetId.value = null
+  return true
+}
+
+// 激活状态下「隐藏该 Agent 输出并取消选中」（供父组件 Ctrl+W 调用）：
+// 与 toggleAgentOutput 不同，这里是幂等置为隐藏，重复按下不会把输出重新显示出来
+function hideActiveOutputAndClose() {
+  const agentId = activePetId.value
+  if (!agentId) return false
+  if (!hiddenOutputIds.value.has(agentId)) {
+    const next = new Set(hiddenOutputIds.value)
+    next.add(agentId)
+    hiddenOutputIds.value = next
+    saveHiddenOutputs()
+  }
+  const pet = petAgents.value.find(p => p.agentId === agentId)
+  if (pet) closePanel(pet)
+  else activePetId.value = null
+  return true
+}
+
 function onInputPointerDown(pet) {
   pet.typing = true
 }
@@ -1928,7 +1956,7 @@ function insertCompletionText(agentId, text, cursorPos, hasAtSymbol) {
   })
 }
 
-defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden, openInstallExtensionDialog })
+defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden, openInstallExtensionDialog, closeActivePanel, hideActiveOutputAndClose })
 </script>
 
 <style scoped>

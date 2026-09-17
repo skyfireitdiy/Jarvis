@@ -12708,6 +12708,29 @@ function handleGlobalKeydown(event) {
     }
   }
 
+  // F2 重命名当前 Agent（已打开重命名弹窗时不重复触发）
+  if (event.key === 'F2') {
+    if (showRenameAgentModal.value) return
+    const agent = getCurrentAgentOrNull()
+    if (agent) {
+      event.preventDefault()
+      renameAgent(agent)
+    }
+    return
+  }
+
+  // Ctrl/Cmd + W 关闭当前焦点所在的面板（需拦截浏览器原生关闭标签页行为）
+  // 宠物大厅中有激活的宠物时，改为「隐藏该 Agent 输出并取消选中」
+  if (isModifierPressed && event.code === 'KeyW') {
+    event.preventDefault()
+    const lobby = petLobbyRef.value
+    if (lobby && typeof lobby.hideActiveOutputAndClose === 'function' && lobby.hideActiveOutputAndClose()) {
+      return
+    }
+    closeFocusedPanel()
+    return
+  }
+
   // ESC 键关闭所有对话框
   if (event.key === 'Escape') {
     // 补全面板打开时优先关闭它（焦点可能仍在输入框，需在此统一处理）
@@ -12772,6 +12795,11 @@ function handleGlobalKeydown(event) {
     }
     if (showTerminalPanel.value && windowWidth.value <= 768) {
       showTerminalPanel.value = false
+    }
+
+    // 最低优先级：退出宠物大厅中已选中的宠物（无选中时不做任何事）
+    if (petLobbyRef.value && typeof petLobbyRef.value.closeActivePanel === 'function') {
+      petLobbyRef.value.closeActivePanel()
     }
   }
 }
