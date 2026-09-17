@@ -284,11 +284,11 @@ async def browser_ext_websocket_endpoint(websocket: WebSocket) -> None:
 - `tab.list` → `[{tab_id, url, title, active, window_id}]`
 - `tab.activate` `{tab_id}`
 - `tab.close` `{tab_id}`
-- `tab.create` `{url, active}`
+- `tab.create` `{url, active, new_window}`（`new_window` 默认 `true`：优先在「不含 Jarvis 前端页面」的窗口新建标签页，全部窗口都含 Jarvis 时才新开窗口；传 `false` 则在当前窗口新建）
 
 #### 导航类
 
-- `page.navigate` `{tab_id, url, wait_until}`
+- `page.navigate` `{tab_id, url, wait_until, new_window}`（不传 `tab_id` 时复用 `tab.create` 的开窗策略）
 - `page.reload` `{tab_id}`
 - `page.back` / `page.forward` `{tab_id}`
 

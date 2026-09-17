@@ -40,12 +40,29 @@ export class TabExecutor {
 
   /**
    * 新建标签页。
-   * new_window 为 true（默认）时用新窗口打开并聚焦，保证新页面处于前台、可正常渲染与重绘；
-   * 为 false 时退回在当前窗口新建标签页。
+   * new_window 为 true（默认）时优先在「不含 Jarvis 前端页面」的窗口中新建标签页，
+   * 避免把自动化打开的页面混进用户查看 Jarvis 的那个窗口；
+   * 仅当所有窗口都含 Jarvis 前端页面（无处可放）时才新开窗口。
+   * new_window 为 false 时退回在当前窗口新建标签页。
    */
   async create({ url, active, new_window }) {
     const target = url || "about:blank";
     if (new_window !== false) {
+      const windowId = await this._pickTargetWindowId();
+      if (windowId != null) {
+        const tab = await chrome.tabs.create({
+          url: target,
+          active: active !== false,
+          windowId,
+        });
+        return {
+          ok: true,
+          tab_id: tab.id,
+          window_id: tab.windowId,
+          url: tab.url,
+          new_window: false,
+        };
+      }
       const win = await chrome.windows.create({
         url: target,
         focused: active !== false,
@@ -77,7 +94,7 @@ export class TabExecutor {
     if (!url) throw cmdError("EXEC_ERROR", "url is required");
     let tabId = tab_id;
     if (tabId == null) {
-      // 未指定 tab_id 时复用 create 的逻辑（默认在新窗口打开）
+      // 未指定 tab_id 时复用 create 的逻辑（优先在非 Jarvis 窗口新建标签页）
       const created = await this.create({ url, new_window });
       tabId = created.tab_id;
       if (tabId != null && wait_until !== "none") {
@@ -152,6 +169,61 @@ export class TabExecutor {
 
   // ---------------- 内部工具 ----------------
 
+  /**
+   * 挑选「新建标签页」应放入的窗口，返回 window_id；返回 null 表示无处可放（需新开窗口）。
+   *
+   * 规则：排除所有含 Jarvis 前端页面的窗口（这些窗口留给用户查看 Jarvis，不掺入自动化页面），
+   * 在剩余窗口里优先选最后聚焦的那个；若所有窗口都含 Jarvis 前端页面，则返回 null。
+   */
+  async _pickTargetWindowId() {
+    const windows = await chrome.windows.getAll({ populate: true });
+    if (!windows.length) return null;
+    // 并行探测各窗口是否含 Jarvis 前端页面（串行会随标签页数量线性变慢）
+    const jarvisFlags = await Promise.all(
+      windows.map((win) => this._windowHasJarvisPage(win)),
+    );
+    const candidates = windows.filter((_, i) => !jarvisFlags[i]);
+    if (!candidates.length) return null;
+    // 优先用最后聚焦的候选窗口，符合用户直觉
+    try {
+      const lastFocused = await chrome.windows.getLastFocused();
+      if (lastFocused && candidates.some((w) => w.id === lastFocused.id)) {
+        return lastFocused.id;
+      }
+    } catch (e) {
+      // 某些环境下无法获取最后聚焦窗口，退回到第一个候选窗口
+    }
+    return candidates[0].id;
+  }
+
+  /** 判定某窗口内是否存在 Jarvis 前端页面（窗口内任一标签页命中即可）。 */
+  async _windowHasJarvisPage(win) {
+    const tabs = (win && win.tabs) || [];
+    const flags = await Promise.all(tabs.map((tab) => this._isJarvisPage(tab)));
+    return flags.some(Boolean);
+  }
+
+  /**
+   * 判定标签页是否为 Jarvis 前端页面。
+   * 依据页面主世界暴露的 window.__jarvisAuthBridge（与 service_worker 探测登录态的方式一致），
+   * 而非 URL 特征——Jarvis 前端与网关可能不同域名，URL 无法可靠识别。
+   */
+  async _isJarvisPage(tab) {
+    if (!tab || tab.id == null) return false;
+    if (!/^https?:/i.test(tab.url || "")) return false;
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: hasJarvisAuthBridgeFn,
+        world: "MAIN",
+      });
+      return Boolean(results && results[0] && results[0].result);
+    } catch (e) {
+      // 受限页面（chrome://、扩展页等）无法注入，视为非 Jarvis 页面
+      return false;
+    }
+  }
+
   async _getTab(tabId) {
     try {
       return await chrome.tabs.get(tabId);
@@ -189,6 +261,15 @@ export class TabExecutor {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// 注入到页面的函数（必须自包含，不能引用外部变量）
+function hasJarvisAuthBridgeFn() {
+  try {
+    return Boolean(window.__jarvisAuthBridge);
+  } catch (e) {
+    return false;
+  }
 }
 
 // 注入到页面的函数（必须自包含，不能引用外部变量）
