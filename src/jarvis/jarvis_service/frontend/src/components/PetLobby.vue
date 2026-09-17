@@ -586,6 +586,51 @@ watch(roaming, (on) => {
   }
 })
 
+// 宠物位置持久化：按 agentId 记录 { x, y }
+// 大厅组件在打开/关闭 Panel 时会被 v-if 卸载重建（App.vue 的 hasNoPanel），
+// 若无持久化，重建后每只宠物都会重新随机取位，导致位置跳变。
+const POSITIONS_KEY = 'jarvis.petLobby.positions'
+function loadPositions() {
+  try {
+    const raw = localStorage.getItem(POSITIONS_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    const result = {}
+    for (const [agentId, pos] of Object.entries(parsed)) {
+      if (!pos || typeof pos !== 'object') continue
+      const x = Number(pos.x)
+      const y = Number(pos.y)
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue
+      result[agentId] = { x, y }
+    }
+    return result
+  } catch (e) {
+    /* localStorage 不可用或数据损坏时回退为空 */
+  }
+  return {}
+}
+const petPositions = loadPositions()
+// 位置只在组件卸载时（即离开大厅、被 App.vue 的 v-if 卸载）统一落盘一次：
+// 游走过程中每帧都在移动，逐帧或定时写 localStorage 都是不必要的磁盘开销。
+function savePositions() {
+  try {
+    localStorage.setItem(POSITIONS_KEY, JSON.stringify(petPositions))
+  } catch (e) {
+    /* 忽略写入失败（隐私模式等） */
+  }
+}
+function rememberPosition(pet) {
+  if (!pet || !pet.agentId) return
+  petPositions[pet.agentId] = { x: pet.x, y: pet.y }
+}
+// 清理已不存在 Agent 的位置记录，避免 localStorage 无限增长
+function prunePositions(validIds) {
+  for (const agentId of Object.keys(petPositions)) {
+    if (!validIds.has(agentId)) delete petPositions[agentId]
+  }
+}
+
 // 移动端判断：与 CSS 断点（max-width: 768px）保持一致，用于按需显示移动端专用控件
 const MOBILE_BREAKPOINT = 768
 const isMobile = ref(typeof window !== 'undefined' && window.innerWidth <= MOBILE_BREAKPOINT)
@@ -999,7 +1044,10 @@ function syncPets() {
     if (agent.status === 'stopped') continue
     let pet = existing.get(agentId)
     if (!pet) {
-      const start = pickTarget()
+      // 优先复用上次记录的位置（组件因打开/关闭 Panel 被卸载重建时保持位置不变），
+      // 无记录或记录越界时才随机取位
+      const saved = petPositions[agentId]
+      const start = saved ? clampPos(saved.x, saved.y) : pickTarget()
       pet = {
         agentId,
         name: agent.name || agent.agent_id,
@@ -1043,6 +1091,11 @@ function syncPets() {
   // 若当前展开的宠物已消失，重置 activePetId
   if (activePetId.value && !next.some(p => p.agentId === activePetId.value)) {
     activePetId.value = null
+  }
+  // 清理已被删除 Agent 的位置记录（stopped 仍存在，不清理）
+  // 仅在拿到过非空 agent 列表后才清理，避免初始加载（列表暂为空）时误删
+  if (list.length > 0) {
+    prunePositions(new Set(next.map(p => p.agentId)))
   }
   // 清理已被删除 Agent 的输出隐藏持久化数据（stopped 仍存在，不清理）
   // 仅在拿到过非空 agent 列表后才清理，避免初始加载（列表暂为空）时误删
@@ -1109,6 +1162,8 @@ function step() {
     const clamped = clampPos(pet.x, pet.y)
     pet.x = clamped.x
     pet.y = clamped.y
+    // 位置变化后按节流写回持久化记录
+    rememberPosition(pet)
     const faceLeft = dx < -1
     if (faceLeft !== pet.faceLeft) {
       pet.faceLeft = faceLeft
@@ -1507,6 +1562,8 @@ function onPetPointerUp() {
   dragState = null
   if (pet.dragging) {
     pet.dragging = false
+    // 拖动结束时记录落点，避免下次挂载回到旧位置
+    rememberPosition(pet)
     // 松开后从当前位置继续飘动
     pet.target = pickTarget()
     return
@@ -1526,6 +1583,7 @@ function onPetPointerCancel() {
   dragState = null
   if (pet.dragging) {
     pet.dragging = false
+    rememberPosition(pet)
     pet.target = pickTarget()
   }
 }
@@ -1890,6 +1948,8 @@ function onGlobalKeydown(e) {
 onUnmounted(() => {
   if (rafId) cancelAnimationFrame(rafId)
   rafId = null
+  // 离开大厅（组件卸载）时统一落盘一次宠物位置
+  savePositions()
   window.removeEventListener('pointermove', onPetPointerMove)
   window.removeEventListener('pointerup', onPetPointerUp)
   window.removeEventListener('keydown', onGlobalKeydown)
