@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Jarvis Browser Bridge",
-  "version": "5.0.2",
+  "version": "5.0.3",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAr0CsKiXoXNUeCb0uRRwZddnwzt5EUnYSNUb9j9AOKnoWZKqed+CS9Zg248i4wiN/dzCPHvCZ9E+aLELIY+sj9cxt2JEVkF91rvMWFFJZyW51KanJO7GXSK3w997MkBMggCUnTZXxvShzuaooD3g26hA7ZfLd6xwS3F1HdPrLzrAwpIE7INqCKw87orUrB143gmZ/5pSpneEXhoPEx7xsnCjzKEIfNlTfxuAC6s4yaUITB6QPoBlRUVyF23Y9FchvVKF6MBYPe3lqPMtODDTc12p+FbDC/MkBnNnx4JCpNJbGkh0KbtIcU4ZHOrxolnNReb/YberQeyR2dIQ49H1y7wIDAQAB",
   "description": "让 Jarvis Agent 操作用户真实浏览器中的网页（连接网关，复用登录态）",
   "permissions": [
