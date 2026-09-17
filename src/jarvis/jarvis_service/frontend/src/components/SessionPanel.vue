@@ -62,10 +62,10 @@
           <div v-if="item.output_type === 'execution' && item.execution_id && !item.is_finished && !item.terminal_content" class="terminal-wrapper">
             <div :ref="el => setTerminalRef(item.execution_id, el, item.agent_id)" class="terminal-host"></div>
           </div>
-          <!-- 终端内容（历史记录）：terminal_content 缺失时回退用 execution_chunks 拼接，
-               避免刷新后落盘数据不完整导致整块不渲染；未结束但有内容时也走文本，
-               与上方 xterm 分支（要求无内容）互斥 -->
-          <div v-if="item.output_type === 'execution' && getTerminalHistoryText(item)" class="terminal-history" :style="getTerminalStyle(getTerminalHistoryText(item))">
+          <!-- 终端内容（历史记录）：仅在没有 xterm 实例时渲染（已结束，或运行中但 terminal_content 已落盘），
+               避免与上方 xterm 分支同时显示；terminal_content 缺失时回退用 execution_chunks 拼接，
+               避免刷新后落盘数据不完整导致整块不渲染 -->
+          <div v-if="item.output_type === 'execution' && showTerminalHistory(item)" class="terminal-history" :style="getTerminalStyle(getTerminalHistoryText(item))">
             <div class="terminal-history-header">Terminal Output ({{ item.execution_id }})</div>
             <pre class="terminal-history-content">{{ getTerminalHistoryText(item) }}</pre>
           </div>
@@ -655,6 +655,15 @@ function getTerminalHistoryText(item) {
     return chunks.join('')
   }
   return ''
+}
+
+// 是否展示 Terminal Output 文本块：必须与上方 xterm 分支条件严格互补，
+// 否则执行中 execution_chunks 已有内容时会与 xterm 同时显示
+function showTerminalHistory(item) {
+  if (!item || item.output_type !== 'execution') return false
+  const hasXterm = Boolean(item.execution_id) && !item.is_finished && !item.terminal_content
+  if (hasXterm) return false
+  return Boolean(getTerminalHistoryText(item))
 }
 
 function getTerminalStyle(terminalContent) {
