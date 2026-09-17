@@ -4852,8 +4852,8 @@ async function loadHistoryMessages(prepend = false, agentId = null) {
           if (!isLast && !msg.is_finished) {
             // 非最后一条execution：强制标记为已完成
             msg.is_finished = true
-            // 如果没有terminal_content，添加占位文本，避免显示空白区域
-            if (!msg.terminal_content) {
+            // 如果没有terminal_content（且无execution_chunks可回退），添加占位文本，避免显示空白区域
+            if (!msg.terminal_content && !(msg.execution_chunks?.length > 0)) {
               msg.terminal_content = '(终端输出未保存或执行被中断)'
             }
           }
@@ -10268,7 +10268,9 @@ function _debouncedSaveExecHistory(executionId, targetAgentId) {
           execution_id: msg.execution_id,
           context: msg.context,
           is_finished: msg.is_finished || false,
-          terminal_content: msg.terminal_content || '',
+          // terminal_content 尚未生成时用 execution_chunks 兜底，
+          // 避免刷新后落盘数据 is_finished 但无内容可显示
+          terminal_content: msg.terminal_content || (msg.execution_chunks || []).join(''),
           execution_chunks: msg.execution_chunks || [],
           seq: msg.seq,
         })
@@ -10440,7 +10442,7 @@ function appendExecution(payload, agentId = null) {
             execution_id: executionId,
             context: currentOutputs[execIndex].context,
             is_finished: true,
-            terminal_content: terminalContent,
+            terminal_content: terminalContent || (currentOutputs[execIndex].execution_chunks || []).join(''),
             execution_chunks: currentOutputs[execIndex].execution_chunks || [],
           }
           historyStorage.saveMessage(updatedMessage)
