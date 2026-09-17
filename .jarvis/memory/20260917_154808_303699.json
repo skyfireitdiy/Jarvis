@@ -1,0 +1,15 @@
+{
+  "id": "20260917_154808_303699",
+  "type": "project_long_term",
+  "tags": [
+    "PetLobby",
+    "Vue",
+    "localStorage",
+    "卸载重建",
+    "位置持久化",
+    "jarvis_service"
+  ],
+  "content": "宠物大厅位置跳变根因与修复（2026-09）\n\n现象：双击宠物进入 Agent panel，关闭 panel 回到大厅后所有宠物位置都变了。\n\n根因：App.vue:502 用 `<div v-if=\"hasNoPanel\" class=\"empty-stage\">` 渲染 PetLobby，hasNoPanel = embeddedPanelCount===0（App.vue:4182）。双击 → emit selectAgent → openAgentInPanel 创建 panel → embeddedPanelCount=1 → hasNoPanel=false → PetLobby 被 v-if 卸载（onUnmounted 清 raf/timer，petAgents 销毁）。关闭 panel → 重新挂载 → onMounted → syncPets()，此时 petAgents 为空、existing Map 为空，每只宠物走 pickTarget() 随机取位 → 位置全变。\n\n修复（仅改 src/jarvis/jarvis_service/frontend/src/components/PetLobby.vue，+79/-1）：\n1) 新增 POSITIONS_KEY='jarvis.petLobby.positions'，loadPositions() 读 JSON 并校验 x/y 为有限数（异常/数组/非数值回退 {}）；\n2) syncPets() 新建分支（约 1064-1068）：命中 petPositions[agentId] 则用 clampPos(saved.x,saved.y) 夹取后作为初始位置，未命中才 pickTarget()；\n3) rememberPosition(pet) 在 step() 每帧移动后、onPetPointerUp、onPetPointerCancel 调用；scheduleSavePositions() 800ms 节流，flushPositions() 落盘；\n4) syncPets() 末尾在 list.length>0 时 prunePositions(new Set(next.map(p=>p.agentId))) 清理已消失 Agent 记录（stopped 仍存在不清理）；\n5) onUnmounted 中 flushPositions()，避免节流窗口内最后位置丢失。\n\n未改动 App.vue 渲染逻辑（未引入 keep-alive）、未改游走/拖动/斥力行为、未引入依赖。\n\n验证：npm run build 成功（✓ built in 6.35s）；Node 模拟测试 10/10 通过（复用、clampPos 夹取、清理失效 id、损坏 JSON 回退、节流只写一次等）。\n\n经验：Vue 中 v-if 卸载重建的组件，任何需跨挂载保持的运行时状态都必须外置（localStorage / 父组件 / store）；高频写 localStorage 必须节流，并在 onUnmounted flush。",
+  "created_at": "2026-09-17T15:48:08.303731",
+  "updated_at": "2026-09-17T15:48:08.303737"
+}
