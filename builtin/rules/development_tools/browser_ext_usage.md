@@ -124,7 +124,8 @@ browser_ext(action="script_run", session_id="<sid>", script_id="s-xxxxxxxx", scr
 
 **注意事项：**
 
-- `navigate` 不传 `tab_id` 会**新建页面**，默认在新窗口打开（`new_window` 默认 `true`，可保证前台渲染）；
+- `navigate` 不传 `tab_id` 会**新建页面**。默认（`new_window` 为 `true`）会**优先在「不含 Jarvis 前端页面」的窗口中新建标签页**，
+  以免把自动化打开的页面混进用户查看 Jarvis 的窗口；仅当所有窗口都含 Jarvis 前端页面时才新开窗口。
   想在当前窗口新开标签页则传 `new_window=false`。
 - 页面渲染在 iframe 内时，`selector` 作用于顶层文档；需用 `evaluate` 进入 iframe 的 `contentDocument` 操作。
 - 扩展改动后需在 `edge://extensions/` 重载扩展才生效。
