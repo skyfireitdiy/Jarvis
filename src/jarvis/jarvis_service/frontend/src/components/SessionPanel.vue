@@ -62,10 +62,12 @@
           <div v-if="item.output_type === 'execution' && item.execution_id && !item.is_finished && !item.terminal_content" class="terminal-wrapper">
             <div :ref="el => setTerminalRef(item.execution_id, el, item.agent_id)" class="terminal-host"></div>
           </div>
-          <!-- 终端内容（历史记录） -->
-          <div v-if="item.output_type === 'execution' && item.is_finished && item.terminal_content" class="terminal-history" :style="getTerminalStyle(item.terminal_content)">
+          <!-- 终端内容（历史记录）：terminal_content 缺失时回退用 execution_chunks 拼接，
+               避免刷新后落盘数据不完整导致整块不渲染；未结束但有内容时也走文本，
+               与上方 xterm 分支（要求无内容）互斥 -->
+          <div v-if="item.output_type === 'execution' && getTerminalHistoryText(item)" class="terminal-history" :style="getTerminalStyle(getTerminalHistoryText(item))">
             <div class="terminal-history-header">Terminal Output ({{ item.execution_id }})</div>
-            <pre class="terminal-history-content">{{ item.terminal_content || '' }}</pre>
+            <pre class="terminal-history-content">{{ getTerminalHistoryText(item) }}</pre>
           </div>
         </article>
       </div>
@@ -641,6 +643,18 @@ function getStatusLabel(agent) {
     waiting_confirm: '等待确认',
   }
   return statusMap[agent.status] || agent.status || ''
+}
+
+// 终端历史文本：优先用 terminal_content；缺失时回退用 execution_chunks 拼接
+// （刷新页面时 terminal_content 可能尚未落盘，只有 chunks 落盘）
+function getTerminalHistoryText(item) {
+  if (!item) return ''
+  if (item.terminal_content) return item.terminal_content
+  const chunks = item.execution_chunks
+  if (Array.isArray(chunks) && chunks.length > 0) {
+    return chunks.join('')
+  }
+  return ''
 }
 
 function getTerminalStyle(terminalContent) {
