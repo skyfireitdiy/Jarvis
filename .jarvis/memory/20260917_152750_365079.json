@@ -1,0 +1,14 @@
+{
+  "id": "20260917_152750_365079",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_web_gateway",
+    "master_url",
+    "node_mode",
+    "gateway_manager",
+    "bugfix"
+  ],
+  "content": "Jarvis master_url 根因与修复（2026-09）：\n\n现象：gateway_manager 的 get_master_url 总是返回 http://127.0.0.1:<port>。\n\n根因：src/jarvis/jarvis_web_gateway/app.py 的 create_app() 中，master 节点分支硬编码 jglobals.master_url = f\"http://127.0.0.1:{port}\"，完全忽略网关实际监听 host；且 create_app() 原本拿不到 host（run() 只把 host 传给 uvicorn.run）。该 master_url 会：1) 被 _get_master_url_info() 直接返回；2) 经 agent_manager._build_command() 以 --master-url 注入所有 Agent 子进程，导致子节点/远程 Agent 拿到 127.0.0.1 无法回连 master。\n\n修复（最小改动，3 处）：\n1) create_app() 增加 host: str = \"127.0.0.1\" 参数；\n2) master 分支改为：优先取 JARVIS_MASTER_URL 环境变量；否则用 host 拼接 http://{host}:{port}，当 host 为空或为通配地址（0.0.0.0 / :: / [::]）时回退 127.0.0.1；\n3) run() 调用 create_app 时传入 host=host。\n\n兼容性：jarvis.py / code_agent.py 内嵌调用 create_app(custom_app) 时 host 默认 127.0.0.1，行为不变。\n\n验证：tests/jarvis_web_gateway/ 18 项测试全通过；host 取值矩阵（127.0.0.1/0.0.0.0/::/内网IP/域名 + 环境变量覆盖）逻辑单测全通过。\n\n注意：child 节点分支不受影响，仍由 node_config.master_url 转 http 协议。",
+  "created_at": "2026-09-17T15:27:50.365108",
+  "updated_at": "2026-09-17T15:27:50.365115"
+}

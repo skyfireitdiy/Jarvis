@@ -1761,6 +1761,7 @@ def create_app(
     custom_app: Optional[FastAPI] = None,
     node_config: Optional[NodeRuntimeConfig] = None,
     port: int = 8000,
+    host: str = "127.0.0.1",
 ) -> FastAPI:
     """创建 FastAPI 应用。
 
@@ -1814,8 +1815,16 @@ def create_app(
                     "ws://", "http://"
                 ).replace("wss://", "https://")
         elif node_config.is_master:
-            # Master 节点：拼接本地 gateway URL
-            jglobals.master_url = f"http://127.0.0.1:{port}"
+            # Master 节点：优先使用 JARVIS_MASTER_URL 环境变量，
+            # 否则根据监听地址拼接 gateway URL（通配地址回退到 127.0.0.1）
+            env_master_url = os.environ.get("JARVIS_MASTER_URL", "").strip()
+            if env_master_url:
+                jglobals.master_url = env_master_url
+            else:
+                effective_host = host.strip() if host else ""
+                if not effective_host or effective_host in ("0.0.0.0", "::", "[::]"):
+                    effective_host = "127.0.0.1"
+                jglobals.master_url = f"http://{effective_host}:{port}"
 
     # 因为 uvicorn.run() 启动子进程会导致 GLOBAL_CONFIG_DATA 被重置，需要重新加载配置
     from jarvis.jarvis_utils.utils import init_env
@@ -7965,7 +7974,11 @@ def run(
     # 初始化环境并加载配置文件
     init_env(welcome_str="", config_file=None)
 
-    uvicorn.run(create_app(node_config=node_config, port=port), host=host, port=port)
+    uvicorn.run(
+        create_app(node_config=node_config, port=port, host=host),
+        host=host,
+        port=port,
+    )
 
 
 def _normalize_auth_payload(payload: Any) -> Optional[Dict[str, Any]]:
