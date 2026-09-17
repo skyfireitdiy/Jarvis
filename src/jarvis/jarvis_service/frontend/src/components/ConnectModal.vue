@@ -50,7 +50,6 @@
         <div class="form-group">
           <label>网关地址</label>
           <input :value="gatewayUrl" @input="$emit('update:gatewayUrl', $event.target.value)" placeholder="127.0.0.1:8000 或 ws://example.com:8080/ws" />
-          <div class="form-help">默认本机网关为 127.0.0.1:8000，直接使用当前页面地址时留空即可。</div>
         </div>
         <button class="primary-btn" @click="$emit('connect')" :disabled="connecting">
           {{ connecting ? '连接中...' : '连接' }}
@@ -486,13 +485,6 @@ const showQuickStart = ref(false)
 }
 
 .form-group input::placeholder {
-  color: var(--color-text-secondary);
-}
-
-.form-help {
-  margin-top: 6px;
-  font-size: 12px;
-  line-height: 1.6;
   color: var(--color-text-secondary);
 }
 
