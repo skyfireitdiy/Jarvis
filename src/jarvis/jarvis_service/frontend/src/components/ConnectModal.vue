@@ -45,10 +45,7 @@
         </div>
         <div class="form-group">
           <label>密码</label>
-          <input :value="password" @input="$emit('update:password', $event.target.value)" type="password" placeholder="admin 初始密码见服务日志" @keydown.enter="$emit('connect')" />
-          <div class="form-help">
-            首次安装的随机密码打印在服务日志中：<code>journalctl --user -u jarvis-master -f</code>
-          </div>
+          <input :value="password" @input="$emit('update:password', $event.target.value)" type="password" placeholder="请输入密码" @keydown.enter="$emit('connect')" />
         </div>
         <div class="form-group">
           <label>网关地址</label>
@@ -58,7 +55,6 @@
         <button class="primary-btn" @click="$emit('connect')" :disabled="connecting">
           {{ connecting ? '连接中...' : '连接' }}
         </button>
-        <div class="form-footnote">登录后会自动展示一次新手引导，帮助你快速上手。</div>
       </div>
       <div class="quickstart">
           <button class="quickstart-toggle" type="button" @click="showQuickStart = !showQuickStart">
@@ -497,23 +493,6 @@ const showQuickStart = ref(false)
   margin-top: 6px;
   font-size: 12px;
   line-height: 1.6;
-  color: var(--color-text-secondary);
-}
-
-.form-help code {
-  padding: 1px 5px;
-  font-family: 'Consolas', 'Microsoft YaHei', monospace;
-  font-size: 11px;
-  color: var(--color-success);
-  background: rgba(0, 0, 0, 0.4);
-  border-radius: 4px;
-}
-
-.form-footnote {
-  margin-top: 12px;
-  font-size: 12px;
-  line-height: 1.6;
-  text-align: center;
   color: var(--color-text-secondary);
 }
 
