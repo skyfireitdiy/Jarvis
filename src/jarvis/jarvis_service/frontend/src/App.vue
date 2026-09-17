@@ -5496,6 +5496,8 @@ const commandPaletteCtx = computed(() => ({
   startOnboarding,
   // 打开宠物大厅的「安装浏览器插件」弹层
   openInstallExtension: () => { petLobbyRef.value?.openInstallExtensionDialog?.() },
+  // 退出登录：断开所有连接并清除认证信息（复用设置面板的断开逻辑）
+  logout: disconnectAll,
   // 当前 Agent 组
   viewCurrentDiff: () => { const a = getCurrentAgentOrNull(); if (a) viewDiff(a) },
   viewCurrentRules: () => { const a = getCurrentAgentOrNull(); if (a) viewRules(a) },
