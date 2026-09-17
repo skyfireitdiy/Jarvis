@@ -107,7 +107,7 @@ globalThis.__JARVIS_SCRIPT__ = {
 
 **执行步骤：**
 
-1. 通过扩展 popup →「脚本管理」粘贴源码安装，或用「从本地文件导入」。
+1. 通过扩展 popup →「脚本管理」粘贴源码安装，或用「从本地文件导入」，或用「从 URL 安装」。
 2. 也可由 Agent 走网关调用 `script.install`，参数 `{ name, source, description, match, version }`；
    同名脚本会被覆盖，且保留原 `id`。
 3. 安装后用 `script_list` 确认 `script_id`、`enabled`、`source_size`。
@@ -127,6 +127,34 @@ globalThis.__JARVIS_SCRIPT__ = {
 - 网关调用：`POST {master_url}/api/browser-ext/command`，
   body `{ session_id, action, params, timeout }`，header `Authorization: Bearer $JARVIS_AUTH_TOKEN`。
 - 扩展改动后需在 `edge://extensions/` 重载扩展才生效。
+
+#### 安装方式的选择：避免脚本原文进入上下文
+
+脚本源码往往很长，**不要把源码直接写进对话**。按场景选择：
+
+| 场景                             | 推荐方式                                                                            |
+| -------------------------------- | ----------------------------------------------------------------------------------- |
+| 脚本已托管在可公网访问的静态目录 | `browser_ext(action="script_install_from_url", script_url=...)`，源码由扩展后台下载 |
+| 脚本要长期留在网关、可反复部署   | `script_save`（扩展 → 网关目录）+ `script_load_from_file`（网关目录 → 扩展）        |
+| 一次性小脚本                     | `script_install` 直接传 `script_source`                                             |
+
+**`script_install_from_url` 的安全边界（务必知悉）：**
+
+- 扩展侧对 URL 做 SSRF 防护：只允许 `http`/`https`，并**拒绝回环与内网地址**
+  （`127.0.0.1`、`localhost`、`10.x`、`172.16-31.x`、`192.168.x`、`169.254.x`、`::1`、`fe80::` 等）。
+- 因此**本机/内网网关不能走 URL 安装**。若 Jarvis 网关跑在 `127.0.0.1` 或内网，
+  请改用 `script_save` / `script_load_from_file`（走带 Token 的网关 API，不受该限制）。
+- 网关的 `/uploads/` 目录是静态挂载的（`{data_dir}/uploads` → `{master_url}/uploads/<file>`），
+  **公网可达**的网关可把 `.js` 放进去，再用该 URL 安装。
+- 脚本名可由 URL 末段推导（`.../my-script.js` → `my-script`）；推导不出时须显式传 `script_name`。
+- 下载到的内容只当**源码字符串**存储，扩展侧绝不在 background 求值（求值只发生在 `script_run` 的页面主世界）。
+
+**`script_save` / `script_load_from_file` 目录约定：**
+
+- 存放目录：`{data_dir}/browser_scripts/`（默认 `~/.jarvis/browser_scripts/`，可用 `JARVIS_DATA_DIR` 覆盖）。
+- 脚本名只允许 `[A-Za-z0-9_.-]`，禁止 `/`、`\`、`..`、以 `.` 开头，防止目录穿越。
+- 这两个 action **只回传路径/元数据，不回传源码**，是备份与迁移脚本的首选。
+  相比之下 `script_export` 会把源码原文返回给 Agent，仅适合小脚本或确需查看源码时使用。
 
 ### 操作三：调试与验证
 

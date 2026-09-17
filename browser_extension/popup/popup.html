@@ -242,6 +242,20 @@
       <button id="scriptInstallBtn">安装脚本</button>
     </div>
 
+    <label for="scriptUrl">或从 URL 安装</label>
+    <input
+      id="scriptUrl"
+      type="text"
+      placeholder="https://example.com/my-script.js"
+    />
+    <div class="row">
+      <button id="scriptInstallUrlBtn">从 URL 安装</button>
+    </div>
+    <div class="hint">
+      仅支持 http/https，且拒绝内网 /
+      本机地址。源码由扩展后台下载，不会显示在此处。
+    </div>
+
     <div class="gw-list" id="scriptList"></div>
 
     <div class="log-title">

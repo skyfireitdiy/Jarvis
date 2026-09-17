@@ -30,6 +30,17 @@ export class ScriptExecutor {
     return this.manager.install({ name, source, description, match, version });
   }
 
+  /** 从 URL 下载脚本源码并安装。 */
+  async installFromUrl({ url, name, description, match, version }) {
+    return this.manager.installFromUrl({
+      url,
+      name,
+      description,
+      match,
+      version,
+    });
+  }
+
   /** 卸载脚本。 */
   async uninstall({ id }) {
     return this.manager.uninstall(id);

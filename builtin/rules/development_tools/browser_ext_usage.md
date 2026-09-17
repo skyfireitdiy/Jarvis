@@ -198,14 +198,32 @@ browser_ext(action="script_run", session_id="<sid>", script_id="s-xxxxxxxx", scr
   同样地，`{master_url}` 要用 Agent 所在节点能访问到的 master 地址，不要硬编码 `127.0.0.1:8000`，
   可用 `gateway_manager(action="get_master_url")` 查询。
 
-#### 脚本管理（安装/卸载/启停/导出）
+#### 脚本管理（安装/卸载/启停/导出/网关目录中转）
 
-| action               | 必填参数                                   | 说明                                                                                       |
-| -------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| `script_install`     | `session_id`,`script_name`,`script_source` | 安装脚本；可选 `script_description`/`script_match`/`script_version`。同名覆盖并保留原 `id` |
-| `script_uninstall`   | `session_id`,`script_id`                   | 卸载脚本（**不可逆**，源码一并丢失，卸载前建议先 `script_export` 备份）                    |
-| `script_set_enabled` | `session_id`,`script_id`,`script_enabled`  | 启用/停用脚本                                                                              |
-| `script_export`      | `session_id`,`script_id`                   | 导出脚本源码，用于备份或迁移                                                               |
+| action                    | 必填参数                                   | 说明                                                                                                                     |
+| ------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `script_install`          | `session_id`,`script_name`,`script_source` | 安装脚本；可选 `script_description`/`script_match`/`script_version`。同名覆盖并保留原 `id`                               |
+| `script_install_from_url` | `session_id`,`script_url`                  | 从 URL 下载并安装脚本；可选 `script_name`/`script_description`/`script_match`/`script_version`。**源码不经对话传输**     |
+| `script_uninstall`        | `session_id`,`script_id`                   | 卸载脚本（**不可逆**，源码一并丢失，卸载前建议先 `script_export` 或 `script_save` 备份）                                 |
+| `script_set_enabled`      | `session_id`,`script_id`,`script_enabled`  | 启用/停用脚本                                                                                                            |
+| `script_export`           | `session_id`,`script_id`                   | 导出脚本源码，用于备份或迁移（**会把源码原文返回给 Agent**，大脚本慎用）                                                 |
+| `script_save`             | `session_id`,`script_id`                   | 把扩展里的脚本保存到网关数据目录 `{data_dir}/browser_scripts/`；可选 `script_name`（保存文件名）。**只回传路径与字节数** |
+| `script_load_from_file`   | `session_id`,`script_name`                 | 从网关数据目录读取脚本并安装到扩展；可选 `script_description`/`script_match`/`script_version`。**只回传安装元数据**      |
+
+**避免把脚本原文带进上下文（重要）**：
+`script_export` 会把脚本源码原样返回给 Agent，大脚本会迅速吃满上下文。**备份/迁移脚本时优先用
+`script_save` + `script_load_from_file` 这一对**：前者把源码落盘到网关目录，后者从目录读回并安装，
+两者都只回传路径/元数据，源码始终不进入对话。
+
+**从 URL 安装（`script_install_from_url`）**：
+
+- 源码由扩展后台 `fetch` 下载，**不经过对话上下文**，适合把脚本托管在任意 HTTP 静态目录后按 URL 分发。
+- 网关的 `/uploads/` 目录已挂载为静态服务（`{data_dir}/uploads` → `{master_url}/uploads/<file>`），
+  把 `.js` 放到该目录即可用 URL 直接安装（**仅限公网可达的网关**，原因见下）。
+- **安全限制（SSRF 防护）**：扩展侧会拒绝 `file:`/`data:` 等非 http(s) 协议，
+  并拒绝回环与内网地址（`127.0.0.1`、`localhost`、`10.x`、`172.16-31.x`、`192.168.x`、`169.254.x`、`::1`、`fe80::` 等）。
+  因此**本机/内网网关不能用 URL 安装**，此时请改用 `script_save`/`script_load_from_file`（走带 Token 的网关 API，不经过该限制）。
+- 脚本名可由 URL 末段自动推导（`.../my-script.js` → `my-script`），推导不出时必须显式传 `script_name`。
 
 #### 剪贴板
 

@@ -7,6 +7,7 @@
 依赖用户浏览器安装 Jarvis Browser Bridge 扩展并连接到网关。
 """
 
+import json
 import logging
 import os
 from typing import Any, Dict, List, Optional
@@ -48,81 +49,84 @@ class BrowserExtTool:
     24. **script_get**: 读取某个已安装脚本的源码（含 action 清单）
     25. **script_run**: 在目标页主世界执行已安装脚本的某个 action
     26. **script_install**: 安装（或更新）页面脚本（类油猴），需提供名称与源码
-    27. **script_uninstall**: 卸载页面脚本（不可逆）
-    28. **script_export**: 导出页面脚本源码为可分享文本
-    29. **script_set_enabled**: 启用/停用页面脚本
-    30. **clipboard_write**: 把文本或 base64 二进制写入前端页面剪贴板
-    31. **clipboard_write_from_url**: 读取网关静态文件并写入前端页面剪贴板
-    32. **bookmark_list**: 列出书签（整棵树或指定文件夹）
-    33. **bookmark_search**: 按标题/URL 关键字搜索书签
-    34. **bookmark_create**: 新增书签
-    35. **bookmark_remove**: 删除单个书签（不可逆）
-    36. **bookmark_remove_tree**: 删除书签文件夹（不可逆）
-    37. **history_search**: 按关键字/时间范围查询历史记录
-    38. **history_recent**: 取最近若干条历史记录
-    39. **history_remove**: 按 URL 删除历史记录（不可逆）
-    40. **history_remove_range**: 按时间范围删除历史记录（不可逆）
-    41. **download_list**: 列出下载记录
-    42. **download_search**: 按文件名/URL 搜索下载记录
-    43. **download_start**: 新建下载任务
-    44. **download_pause**: 暂停下载
-    45. **download_resume**: 继续下载
-    46. **download_cancel**: 取消下载
-    47. **download_erase**: 从下载列表移除记录（不可逆）
-    48. **download_open**: 用系统默认程序打开已下载文件
-    49. **session_recent**: 列出最近关闭的标签页/窗口会话
-    50. **session_restore**: 恢复指定会话
-    51. **topsite_list**: 列出最常访问的站点
-    52. **readinglist_list**: 列出阅读列表
-    53. **readinglist_add**: 添加阅读列表条目
-    54. **readinglist_remove**: 移除阅读列表条目
-    55. **readinglist_update**: 更新阅读列表条目（已读状态/标题）
-    56. **contextmenu_create**: 创建扩展右键菜单
-    57. **contextmenu_remove**: 移除右键菜单
-    58. **contextmenu_remove_all**: 移除全部扩展右键菜单
-    59. **contextmenu_list**: 列出扩展右键菜单
-    60. **alarm_create**: 创建定时器
-    61. **alarm_list**: 列出定时器
-    62. **alarm_clear**: 清除定时器
-    63. **alarm_clear_all**: 清除全部定时器
-    64. **notification_create**: 弹出系统通知
-    65. **notification_clear**: 关闭指定通知
-    66. **notification_clear_all**: 关闭全部通知
-    67. **notification_list**: 列出当前通知
-    68. **search_query**: 用浏览器默认搜索引擎检索
-    69. **idle_query_state**: 查询浏览器空闲状态
-    70. **idle_set_interval**: 设置空闲检测间隔
-    71. **idle_get_interval**: 读取空闲检测间隔
-    72. **favicon_get_url**: 获取站点图标 URL
-    73. **webnav_get_all_frames**: 列出页面全部框架
-    74. **webnav_get_frame**: 获取指定框架信息
-    75. **tabgroup_list**: 列出标签组
-    76. **tabgroup_get**: 获取标签组详情
-    77. **tabgroup_query**: 按标题/颜色/窗口查询标签组
-    78. **tabgroup_update**: 更新标签组（标题/颜色/折叠）
-    79. **cookie_get**（高敏感）: 读取单个 Cookie
-    80. **cookie_get_all**（高敏感）: 读取站点 Cookie 列表
-    81. **cookie_set**（高敏感）: 写入/修改 Cookie
-    82. **cookie_remove**（高敏感）: 删除 Cookie
-    83. **netrule_list**（高敏感）: 列出网络请求规则
-    84. **netrule_register**（高敏感）: 注册网络请求规则（可改写/阻断请求）
-    85. **netrule_unregister**（高敏感）: 注销网络请求规则
-    86. **extmgr_list**（高敏感）: 列出已安装扩展与应用
-    87. **extmgr_get**（高敏感）: 获取扩展详情
-    88. **extmgr_launch_app**（高敏感）: 启动已安装应用
-    89. **extmgr_set_enabled**（高敏感）: 启用/禁用扩展
-    90. **extmgr_uninstall**（高敏感，不可逆）: 卸载扩展
-    91. **native_send**（高敏感）: 向本机应用发送消息（需已注册 native host）
-    92. **proxy_get_settings**（高敏感）: 读取浏览器代理配置
-    93. **proxy_set_settings**（高敏感）: 设置浏览器代理（影响全部网络流量）
-    94. **proxy_clear_settings**（高敏感）: 清除代理配置
-    95. **privacy_get**（高敏感）: 读取隐私设置
-    96. **privacy_set**（高敏感）: 修改隐私设置
-    97. **browsingdata_settings**（高敏感）: 查询可清理的浏览数据类型
-    98. **browsingdata_remove**（高敏感，不可逆）: 清除浏览数据（历史/Cookie/缓存/密码等）
-    99. **contentsettings_get**（高敏感）: 读取站点内容设置
-    100. **contentsettings_set**（高敏感）: 修改站点内容设置
-    101. **contentsettings_clear**（高敏感）: 清除站点内容设置
+    27. **script_install_from_url**: 从 URL 下载并安装页面脚本（源码不经对话传输）
+    28. **script_uninstall**: 卸载页面脚本（不可逆）
+    29. **script_export**: 导出页面脚本源码为可分享文本
+    30. **script_set_enabled**: 启用/停用页面脚本
+    31. **script_save**: 把扩展里已安装的脚本保存到网关数据目录（只回传路径与大小，不回传源码）
+    32. **script_load_from_file**: 从网关数据目录读取脚本并安装到扩展（只回传元数据，不回传源码）
+    32. **clipboard_write**: 把文本或 base64 二进制写入前端页面剪贴板
+    33. **clipboard_write_from_url**: 读取网关静态文件并写入前端页面剪贴板
+    34. **bookmark_list**: 列出书签（整棵树或指定文件夹）
+    35. **bookmark_search**: 按标题/URL 关键字搜索书签
+    36. **bookmark_create**: 新增书签
+    37. **bookmark_remove**: 删除单个书签（不可逆）
+    38. **bookmark_remove_tree**: 删除书签文件夹（不可逆）
+    39. **history_search**: 按关键字/时间范围查询历史记录
+    40. **history_recent**: 取最近若干条历史记录
+    41. **history_remove**: 按 URL 删除历史记录（不可逆）
+    42. **history_remove_range**: 按时间范围删除历史记录（不可逆）
+    43. **download_list**: 列出下载记录
+    44. **download_search**: 按文件名/URL 搜索下载记录
+    45. **download_start**: 新建下载任务
+    46. **download_pause**: 暂停下载
+    47. **download_resume**: 继续下载
+    48. **download_cancel**: 取消下载
+    49. **download_erase**: 从下载列表移除记录（不可逆）
+    50. **download_open**: 用系统默认程序打开已下载文件
+    51. **session_recent**: 列出最近关闭的标签页/窗口会话
+    52. **session_restore**: 恢复指定会话
+    53. **topsite_list**: 列出最常访问的站点
+    54. **readinglist_list**: 列出阅读列表
+    55. **readinglist_add**: 添加阅读列表条目
+    56. **readinglist_remove**: 移除阅读列表条目
+    57. **readinglist_update**: 更新阅读列表条目（已读状态/标题）
+    58. **contextmenu_create**: 创建扩展右键菜单
+    59. **contextmenu_remove**: 移除右键菜单
+    60. **contextmenu_remove_all**: 移除全部扩展右键菜单
+    61. **contextmenu_list**: 列出扩展右键菜单
+    62. **alarm_create**: 创建定时器
+    63. **alarm_list**: 列出定时器
+    64. **alarm_clear**: 清除定时器
+    65. **alarm_clear_all**: 清除全部定时器
+    66. **notification_create**: 弹出系统通知
+    67. **notification_clear**: 关闭指定通知
+    68. **notification_clear_all**: 关闭全部通知
+    69. **notification_list**: 列出当前通知
+    70. **search_query**: 用浏览器默认搜索引擎检索
+    71. **idle_query_state**: 查询浏览器空闲状态
+    72. **idle_set_interval**: 设置空闲检测间隔
+    73. **idle_get_interval**: 读取空闲检测间隔
+    74. **favicon_get_url**: 获取站点图标 URL
+    75. **webnav_get_all_frames**: 列出页面全部框架
+    76. **webnav_get_frame**: 获取指定框架信息
+    77. **tabgroup_list**: 列出标签组
+    78. **tabgroup_get**: 获取标签组详情
+    79. **tabgroup_query**: 按标题/颜色/窗口查询标签组
+    80. **tabgroup_update**: 更新标签组（标题/颜色/折叠）
+    81. **cookie_get**（高敏感）: 读取单个 Cookie
+    82. **cookie_get_all**（高敏感）: 读取站点 Cookie 列表
+    83. **cookie_set**（高敏感）: 写入/修改 Cookie
+    84. **cookie_remove**（高敏感）: 删除 Cookie
+    85. **netrule_list**（高敏感）: 列出网络请求规则
+    86. **netrule_register**（高敏感）: 注册网络请求规则（可改写/阻断请求）
+    87. **netrule_unregister**（高敏感）: 注销网络请求规则
+    88. **extmgr_list**（高敏感）: 列出已安装扩展与应用
+    89. **extmgr_get**（高敏感）: 获取扩展详情
+    90. **extmgr_launch_app**（高敏感）: 启动已安装应用
+    91. **extmgr_set_enabled**（高敏感）: 启用/禁用扩展
+    92. **extmgr_uninstall**（高敏感，不可逆）: 卸载扩展
+    93. **native_send**（高敏感）: 向本机应用发送消息（需已注册 native host）
+    94. **proxy_get_settings**（高敏感）: 读取浏览器代理配置
+    95. **proxy_set_settings**（高敏感）: 设置浏览器代理（影响全部网络流量）
+    96. **proxy_clear_settings**（高敏感）: 清除代理配置
+    97. **privacy_get**（高敏感）: 读取隐私设置
+    98. **privacy_set**（高敏感）: 修改隐私设置
+    99. **browsingdata_settings**（高敏感）: 查询可清理的浏览数据类型
+    100. **browsingdata_remove**（高敏感，不可逆）: 清除浏览数据（历史/Cookie/缓存/密码等）
+    101. **contentsettings_get**（高敏感）: 读取站点内容设置
+    102. **contentsettings_set**（高敏感）: 修改站点内容设置
+    103. **contentsettings_clear**（高敏感）: 清除站点内容设置
 
     典型流程：先 list_sessions 拿到 session_id，再 list_tabs 拿到 tab_id，
     然后执行 navigate/get_text/click/type/screenshot 等操作。
@@ -183,9 +187,15 @@ class BrowserExtTool:
   脚本须 enabled 且目标页 URL 命中其 match；写操作类 action 会真实改动数据，调用前先向用户说明
 - script_install: 安装（或更新）页面脚本。需 session_id、script_name、script_source；可选 script_description、script_match（URL 匹配模式数组）、script_version。
   源码需导出 actions 映射（可写 globalThis.__JARVIS_SCRIPT__ 或 module.exports）；安装后默认启用
+- script_install_from_url: 从 URL 下载并安装页面脚本。需 session_id、script_url；可选 script_name、script_description、script_match、script_version。
+  仅支持 http/https 且拒绝内网/回环地址（防 SSRF）；源码由扩展后台下载，**不进入对话上下文**，适合脚本体量较大的场景
 - script_uninstall: 卸载页面脚本（**不可逆**）。需 session_id、script_id
 - script_export: 导出页面脚本源码为可分享文本。需 session_id、script_id。用于备份或迁移脚本
 - script_set_enabled: 启用/停用页面脚本。需 session_id、script_id、script_enabled（布尔）。停用后 script_run 会返回 SCRIPT_DISABLED
+- script_save: 把扩展里已安装的脚本保存到网关数据目录（`{数据目录}/browser_scripts/`）。需 session_id、script_id；可选 script_name（保存用的文件名，不传则用脚本自身名称）。
+  **只返回保存路径与字节数，不回传脚本原文**。适合把脚本备份到网关，或为「从文件安装」做中转，避免大段源码占用上下文
+- script_load_from_file: 从网关数据目录读取脚本并安装到扩展。需 session_id、script_name（文件名/脚本名）；可选 script_description、script_match、script_version。
+  **只返回安装结果元数据，不回传脚本原文**。与 script_save 配对使用，可在不传输源码的情况下迁移/部署脚本
 - clipboard_write: 把文本或 base64 二进制写入**前端页面**的系统剪贴板。需 session_id；
   文本用 clipboard_text，二进制用 clipboard_base64（配合 clipboard_mime，默认 image/png）；
   可选 clipboard_as（text/blob，不传时有 clipboard_text 则用 text）、tab_id。
@@ -305,9 +315,12 @@ class BrowserExtTool:
                     "script_get",
                     "script_run",
                     "script_install",
+                    "script_install_from_url",
                     "script_uninstall",
                     "script_export",
                     "script_set_enabled",
+                    "script_save",
+                    "script_load_from_file",
                     "clipboard_write",
                     "clipboard_write_from_url",
                     "bookmark_list",
@@ -496,7 +509,7 @@ class BrowserExtTool:
             "script_id": {
                 "type": "string",
                 "description": "已安装脚本的 ID（由 script_list 获取，形如 s-xxxxxxxx；"
-                "script_get/script_run/script_uninstall/script_export/script_set_enabled 必填）",
+                "script_get/script_run/script_uninstall/script_export/script_set_enabled/script_save 必填）",
             },
             "script_action": {
                 "type": "string",
@@ -508,25 +521,33 @@ class BrowserExtTool:
             },
             "script_name": {
                 "type": "string",
-                "description": "脚本名称（script_install 必填）",
+                "description": "脚本名称。script_install 必填（安装后的脚本名）；"
+                "script_save 可选（保存到网关的文件名，不传则用脚本自身名称）；"
+                "script_load_from_file 必填（网关目录中的文件名/脚本名）",
             },
             "script_source": {
                 "type": "string",
                 "description": "脚本源码（script_install 必填；需导出 actions 映射，"
                 "可写 globalThis.__JARVIS_SCRIPT__ 或 module.exports）",
             },
+            "script_url": {
+                "type": "string",
+                "description": "脚本下载 URL（script_install_from_url 必填）。"
+                "仅支持 http/https，且拒绝内网/回环地址（防 SSRF）；"
+                "源码由扩展后台下载，不进入对话上下文",
+            },
             "script_description": {
                 "type": "string",
-                "description": "脚本描述（script_install 可选）",
+                "description": "脚本描述（script_install/script_install_from_url/script_load_from_file 可选）",
             },
             "script_match": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "脚本适用的 URL 匹配模式数组（script_install 可选）",
+                "description": "脚本适用的 URL 匹配模式数组（script_install/script_install_from_url/script_load_from_file 可选）",
             },
             "script_version": {
                 "type": "string",
-                "description": "脚本版本号（script_install 可选）",
+                "description": "脚本版本号（script_install/script_install_from_url/script_load_from_file 可选）",
             },
             "script_enabled": {
                 "type": "boolean",
@@ -621,7 +642,7 @@ class BrowserExtTool:
             "contexts": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "菜单显示上下文，如 [\"page\",\"selection\"]（contextmenu_create 可选，默认 [\"page\"]）",
+                "description": '菜单显示上下文，如 ["page","selection"]（contextmenu_create 可选，默认 ["page"]）',
             },
             "url_patterns": {
                 "type": "array",
@@ -761,7 +782,13 @@ class BrowserExtTool:
             },
             "proxy_mode": {
                 "type": "string",
-                "enum": ["direct", "auto_detect", "pac_script", "system", "fixed_servers"],
+                "enum": [
+                    "direct",
+                    "auto_detect",
+                    "pac_script",
+                    "system",
+                    "fixed_servers",
+                ],
                 "description": "代理模式（proxy_set_settings 必填）",
             },
             "pac_url": {
@@ -788,7 +815,7 @@ class BrowserExtTool:
             "data_types": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "要清除的数据类型数组，如 [\"cache\",\"cookies\",\"history\",\"downloads\",\"formData\",\"passwords\"]"
+                "description": '要清除的数据类型数组，如 ["cache","cookies","history","downloads","formData","passwords"]'
                 "（browsingdata_remove 必填）。**清除不可逆**",
             },
             "since": {
@@ -957,6 +984,52 @@ class BrowserExtTool:
         except Exception:
             return str(data)
 
+    def _send_command_raw(
+        self,
+        session_id: str,
+        action: str,
+        params: Dict[str, Any],
+        timeout: float = 15.0,
+    ) -> Dict[str, Any]:
+        """通过网关向扩展下发指令，并返回**原始 data**（不做文本格式化）。
+
+        与 `_send_command` 的区别：`_send_command` 会把扩展返回的 data 序列化成
+        stdout 文本（对含大段源码的 action 会把源码原文带进上下文），
+        本方法保留原始 dict，供需要读取结构化字段（如脚本 source）的调用方使用。
+
+        Returns:
+            Dict[str, Any]: 成功时 ``{"success": True, "data": <原始 data>}``；
+                失败时 ``{"success": False, "error": str}``
+        """
+        result = self._request_gateway(
+            "POST",
+            "/api/browser-ext/command",
+            json_data={
+                "session_id": session_id,
+                "action": action,
+                "params": params,
+                "timeout": timeout,
+            },
+            error_prefix=f"Failed to send {action}",
+            timeout=timeout + 5.0,
+        )
+        if not result.get("success"):
+            return {
+                "success": False,
+                "error": result.get("error") or "unknown error",
+            }
+        data = result.get("data") or {}
+        if not data.get("success"):
+            return {"success": False, "error": data.get("error") or "command failed"}
+        # 扩展返回的结果信封：{id, type:"result", success, data, error}
+        envelope = data.get("result") or {}
+        if not envelope.get("success", False):
+            return {
+                "success": False,
+                "error": envelope.get("error") or "extension reported failure",
+            }
+        return {"success": True, "data": envelope.get("data")}
+
     def _screenshot_to_file(
         self,
         session_id: str,
@@ -1067,6 +1140,7 @@ class BrowserExtTool:
         script_args: Optional[Dict[str, Any]] = None,
         script_name: str = "",
         script_source: str = "",
+        script_url: str = "",
         script_description: str = "",
         script_match: Optional[List[str]] = None,
         script_version: str = "",
@@ -1195,6 +1269,7 @@ class BrowserExtTool:
             script_args = args.get("script_args")
             script_name = args.get("script_name", "")
             script_source = args.get("script_source", "")
+            script_url = args.get("script_url", "")
             script_description = args.get("script_description", "")
             script_match = args.get("script_match")
             script_version = args.get("script_version", "")
@@ -1348,9 +1423,12 @@ class BrowserExtTool:
             "script_get",
             "script_run",
             "script_install",
+            "script_install_from_url",
             "script_uninstall",
             "script_export",
             "script_set_enabled",
+            "script_save",
+            "script_load_from_file",
             "clipboard_write",
             "clipboard_write_from_url",
             "bookmark_list",
@@ -1800,6 +1878,29 @@ class BrowserExtTool:
                 params["version"] = script_version
             return self._send_command(session_id, "script.install", params, timeout)
 
+        # ---------------- script_install_from_url ----------------
+        if action == "script_install_from_url":
+            if not script_url:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "script_url is required for action 'script_install_from_url'",
+                }
+            # 扩展侧 script.install_from_url 的 params 为
+            # { url, name, description, match, version }，源码由扩展后台 fetch
+            params["url"] = script_url
+            if script_name:
+                params["name"] = script_name
+            if script_description:
+                params["description"] = script_description
+            if script_match:
+                params["match"] = list(script_match)
+            if script_version:
+                params["version"] = script_version
+            return self._send_command(
+                session_id, "script.install_from_url", params, timeout
+            )
+
         # ---------------- script_uninstall ----------------
         if action == "script_uninstall":
             if not script_id:
@@ -1840,6 +1941,137 @@ class BrowserExtTool:
             params["enabled"] = bool(script_enabled)
             return self._send_command(session_id, "script.set_enabled", params, timeout)
 
+        # ---------------- script_save ----------------
+        if action == "script_save":
+            if not script_id:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "script_id is required for action 'script_save'",
+                }
+            # 1) 从扩展导出脚本（取原始 data，避免源码进入 stdout）
+            exported = self._send_command_raw(
+                session_id, "script.export", {"id": script_id}, timeout
+            )
+            if not exported.get("success"):
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": exported.get("error") or "failed to export script",
+                }
+            exp_data = exported.get("data") or {}
+            content = exp_data.get("content") or ""
+            if not content:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "exported script has empty content",
+                }
+            save_name = (script_name or exp_data.get("name") or "").strip()
+            if not save_name:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "script name is required (pass script_name or ensure the "
+                    "installed script has a name)",
+                }
+            # 2) 落到网关数据目录
+            saved = self._request_gateway(
+                "POST",
+                "/api/browser-ext/scripts/save",
+                json_data={"name": save_name, "content": content},
+                error_prefix="Failed to save script file",
+            )
+            if not saved.get("success"):
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": saved.get("error") or "failed to save script file",
+                }
+            saved_data = saved.get("data") or {}
+            if not saved_data.get("success"):
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": saved_data.get("error") or "failed to save script file",
+                }
+            # 只回传路径与大小，不回传脚本原文
+            info = {
+                "name": saved_data.get("name") or save_name,
+                "path": saved_data.get("path"),
+                "size": saved_data.get("size"),
+            }
+            return {
+                "success": True,
+                "stdout": "已保存脚本到网关目录："
+                + json.dumps(info, ensure_ascii=False, indent=2),
+                "stderr": "",
+            }
+
+        # ---------------- script_load_from_file ----------------
+        if action == "script_load_from_file":
+            if not script_name:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "script_name is required for action 'script_load_from_file'",
+                }
+            # 1) 从网关目录读取脚本
+            loaded = self._request_gateway(
+                "GET",
+                "/api/browser-ext/scripts/load",
+                params={"name": script_name},
+                error_prefix="Failed to load script file",
+            )
+            if not loaded.get("success"):
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": loaded.get("error") or "failed to load script file",
+                }
+            loaded_data = loaded.get("data") or {}
+            if not loaded_data.get("success"):
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": loaded_data.get("error") or "failed to load script file",
+                }
+            content = loaded_data.get("content") or ""
+            if not content:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"script file '{script_name}' is empty",
+                }
+            # 2) 安装到扩展
+            install_params: Dict[str, Any] = {
+                "name": script_name,
+                "source": content,
+            }
+            if script_description:
+                install_params["description"] = script_description
+            if script_match:
+                install_params["match"] = list(script_match)
+            if script_version:
+                install_params["version"] = script_version
+            installed = self._send_command_raw(
+                session_id, "script.install", install_params, timeout
+            )
+            if not installed.get("success"):
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": installed.get("error") or "failed to install script",
+                }
+            # 只回传元数据，不回传脚本原文
+            meta = installed.get("data") or {}
+            return {
+                "success": True,
+                "stdout": "已从网关目录安装脚本："
+                + json.dumps(meta, ensure_ascii=False, indent=2),
+                "stderr": "",
+            }
+
         # ---------------- clipboard_write ----------------
         if action == "clipboard_write":
             # 扩展侧 clipboard.write 的 params 为 { text, base64, mime, as, tab_id }
@@ -1874,7 +2106,9 @@ class BrowserExtTool:
                 params["as"] = clipboard_as
             if clipboard_mime:
                 params["mime"] = clipboard_mime
-            return self._send_command(session_id, "clipboard.write_from_url", params, timeout)
+            return self._send_command(
+                session_id, "clipboard.write_from_url", params, timeout
+            )
 
         # ---------------- bookmark_list ----------------
         if action == "bookmark_list":
@@ -2135,7 +2369,9 @@ class BrowserExtTool:
 
         # ---------------- contextmenu_remove_all ----------------
         if action == "contextmenu_remove_all":
-            return self._send_command(session_id, "contextmenu.remove_all", params, timeout)
+            return self._send_command(
+                session_id, "contextmenu.remove_all", params, timeout
+            )
 
         # ---------------- contextmenu_list ----------------
         if action == "contextmenu_list":
@@ -2190,7 +2426,9 @@ class BrowserExtTool:
                 params["message"] = message
             if icon_url:
                 params["icon_url"] = icon_url
-            return self._send_command(session_id, "notification.create", params, timeout)
+            return self._send_command(
+                session_id, "notification.create", params, timeout
+            )
 
         # ---------------- notification_clear ----------------
         if action == "notification_clear":
@@ -2205,7 +2443,9 @@ class BrowserExtTool:
 
         # ---------------- notification_clear_all ----------------
         if action == "notification_clear_all":
-            return self._send_command(session_id, "notification.clear_all", params, timeout)
+            return self._send_command(
+                session_id, "notification.clear_all", params, timeout
+            )
 
         # ---------------- notification_list ----------------
         if action == "notification_list":
@@ -2266,7 +2506,9 @@ class BrowserExtTool:
                     "stdout": "",
                     "stderr": "tab_id is required for action 'webnav_get_all_frames'",
                 }
-            return self._send_command(session_id, "webnav.get_all_frames", params, timeout)
+            return self._send_command(
+                session_id, "webnav.get_all_frames", params, timeout
+            )
 
         # ---------------- webnav_get_frame ----------------
         if action == "webnav_get_frame":
@@ -2531,7 +2773,9 @@ class BrowserExtTool:
 
         # ---------------- proxy_clear_settings ----------------
         if action == "proxy_clear_settings":
-            return self._send_command(session_id, "proxy.clear_settings", params, timeout)
+            return self._send_command(
+                session_id, "proxy.clear_settings", params, timeout
+            )
 
         # ---------------- privacy_get ----------------
         if action == "privacy_get":
@@ -2578,7 +2822,9 @@ class BrowserExtTool:
 
         # ---------------- browsingdata_settings ----------------
         if action == "browsingdata_settings":
-            return self._send_command(session_id, "browsingdata.settings", params, timeout)
+            return self._send_command(
+                session_id, "browsingdata.settings", params, timeout
+            )
 
         # ---------------- browsingdata_remove ----------------
         if action == "browsingdata_remove":
@@ -2591,7 +2837,9 @@ class BrowserExtTool:
             params["data_types"] = list(data_types)
             if since is not None:
                 params["since"] = int(since)
-            return self._send_command(session_id, "browsingdata.remove", params, timeout)
+            return self._send_command(
+                session_id, "browsingdata.remove", params, timeout
+            )
 
         # ---------------- contentsettings_get ----------------
         if action == "contentsettings_get":
@@ -2606,7 +2854,9 @@ class BrowserExtTool:
                 params["primary_url"] = primary_url
             if secondary_url:
                 params["secondary_url"] = secondary_url
-            return self._send_command(session_id, "contentsettings.get", params, timeout)
+            return self._send_command(
+                session_id, "contentsettings.get", params, timeout
+            )
 
         # ---------------- contentsettings_set ----------------
         if action == "contentsettings_set":
@@ -2628,7 +2878,9 @@ class BrowserExtTool:
                 params["primary_pattern"] = primary_pattern
             if secondary_pattern:
                 params["secondary_pattern"] = secondary_pattern
-            return self._send_command(session_id, "contentsettings.set", params, timeout)
+            return self._send_command(
+                session_id, "contentsettings.set", params, timeout
+            )
 
         # ---------------- contentsettings_clear ----------------
         if action == "contentsettings_clear":
@@ -2639,7 +2891,9 @@ class BrowserExtTool:
                     "stderr": "content_type is required for action 'contentsettings_clear'",
                 }
             params["content_type"] = content_type
-            return self._send_command(session_id, "contentsettings.clear", params, timeout)
+            return self._send_command(
+                session_id, "contentsettings.clear", params, timeout
+            )
 
         return {
             "success": False,

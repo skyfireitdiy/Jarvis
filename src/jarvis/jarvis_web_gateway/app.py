@@ -2245,6 +2245,64 @@ def create_app(
         return {"success": True, "result": result}
         return {"success": True, "result": result}
 
+    @app.post("/api/browser-ext/scripts/save", dependencies=[Depends(verify_token)])
+    async def api_browser_ext_script_save(request: Request) -> Dict[str, Any]:
+        """把脚本源码保存到网关数据目录下的 browser_scripts/。
+
+        请求体：{"name": str, "content": str}
+        同名脚本会被覆盖。用于让 Agent 把扩展里的脚本落盘，
+        避免在对话中传输大段脚本原文。
+        """
+        from jarvis.jarvis_web_gateway.script_store import (
+            ScriptStoreError,
+            save_script,
+        )
+
+        try:
+            body = await request.json()
+        except Exception:
+            return {"success": False, "error": "invalid json body"}
+        name = body.get("name")
+        content = body.get("content")
+        try:
+            result = await asyncio.to_thread(save_script, name, content)
+        except ScriptStoreError as exc:
+            return {"success": False, "error": str(exc)}
+        except Exception as exc:
+            return {"success": False, "error": f"failed to save script: {exc}"}
+        return {"success": True, **result}
+
+    @app.get("/api/browser-ext/scripts/load", dependencies=[Depends(verify_token)])
+    async def api_browser_ext_script_load(request: Request) -> Dict[str, Any]:
+        """从网关数据目录读取脚本源码。
+
+        query 参数：name（脚本名，可带 .js 后缀）
+        """
+        from jarvis.jarvis_web_gateway.script_store import (
+            ScriptStoreError,
+            load_script,
+        )
+
+        name = request.query_params.get("name") or ""
+        try:
+            result = await asyncio.to_thread(load_script, name)
+        except ScriptStoreError as exc:
+            return {"success": False, "error": str(exc)}
+        except Exception as exc:
+            return {"success": False, "error": f"failed to load script: {exc}"}
+        return {"success": True, **result}
+
+    @app.get("/api/browser-ext/scripts/list", dependencies=[Depends(verify_token)])
+    async def api_browser_ext_script_list() -> Dict[str, Any]:
+        """列出网关数据目录下已保存的脚本（不含源码，避免响应过大）。"""
+        from jarvis.jarvis_web_gateway.script_store import list_scripts
+
+        try:
+            scripts = await asyncio.to_thread(list_scripts)
+        except Exception as exc:
+            return {"success": False, "error": f"failed to list scripts: {exc}"}
+        return {"success": True, "scripts": scripts}
+
     @app.get("/api/browser-ext/download", dependencies=[Depends(verify_token)])
     async def api_browser_ext_download() -> Response:
         """动态打包浏览器扩展源码并作为 zip 附件下载。

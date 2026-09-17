@@ -17,6 +17,8 @@ const els = {
   scriptSource: document.getElementById("scriptSource"),
   scriptFile: document.getElementById("scriptFile"),
   scriptInstallBtn: document.getElementById("scriptInstallBtn"),
+  scriptUrl: document.getElementById("scriptUrl"),
+  scriptInstallUrlBtn: document.getElementById("scriptInstallUrlBtn"),
   scriptList: document.getElementById("scriptList"),
 };
 
@@ -294,6 +296,47 @@ async function installScript() {
 }
 
 /**
+ * 从 URL 安装脚本。
+ *
+ * 源码由 background 侧 fetch，popup 不接触源码；
+ * URL 合法性（协议、内网地址）由 background 的 url_guard 校验。
+ */
+async function installScriptFromUrl() {
+  const url = els.scriptUrl.value.trim();
+  if (!url) {
+    alert("请填写脚本 URL");
+    return;
+  }
+  const name = els.scriptName.value.trim();
+  log(`请求从 URL 安装脚本：${url}`);
+  try {
+    const resp = await chrome.runtime.sendMessage({
+      type: "jarvis_script_install_from_url",
+      url,
+      name,
+      description: "",
+      match: [],
+      version: "1.0.0",
+    });
+    if (resp && resp.success) {
+      const installed = (resp.data && resp.data.name) || name || url;
+      log(`脚本已从 URL 安装：${installed}`);
+      els.scriptUrl.value = "";
+      els.scriptName.value = "";
+      els.scriptSource.value = "";
+      els.scriptFile.value = "";
+    } else {
+      const err = (resp && resp.error) || "未知错误";
+      log(`从 URL 安装失败：${err}`);
+      alert("从 URL 安装失败：" + err);
+    }
+  } catch (e) {
+    log(`从 URL 安装异常：${(e && e.message) || String(e)}`);
+  }
+  refreshScripts();
+}
+
+/**
  * 导出脚本为 .js 文件（浏览器下载），便于分享给他人安装。
  * @param {string} id 脚本 ID
  */
@@ -390,6 +433,9 @@ els.gwList.addEventListener("click", (event) => {
 
 // 脚本管理：安装按钮
 els.scriptInstallBtn.addEventListener("click", installScript);
+
+// 脚本管理：从 URL 安装按钮
+els.scriptInstallUrlBtn.addEventListener("click", installScriptFromUrl);
 
 // 脚本管理：选择本地 .js 文件后把内容填入源码框
 els.scriptFile.addEventListener("change", (event) => {
