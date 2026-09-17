@@ -885,12 +885,46 @@ async function copyPetOutput(pet) {
   pet.copyTimer = setTimeout(() => { pet.copied = false }, 1200)
 }
 
+// 判断当前焦点是否允许被宠物输入框接管：
+// 有模态弹窗打开、或用户正在其它输入控件（input/textarea/contenteditable）中操作时不抢焦点。
+function canStealPetFocus() {
+  const overlays = document.querySelectorAll('.el-overlay, .modal-overlay, .dialog-overlay, .diff-modal-overlay')
+  for (const el of overlays) {
+    const style = window.getComputedStyle(el)
+    if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') return false
+  }
+  const active = document.activeElement
+  if (!active || active === document.body) return true
+  const tagName = String(active.tagName || '').toLowerCase()
+  if (tagName === 'input' || tagName === 'textarea' || active.isContentEditable) return false
+  return true
+}
+
+// 聚焦某只宠物的输入框（多行/单行按当前 inputMode 自动匹配）
+// force=true 用于显式切换焦点（如刚激活宠物），跳过「用户正在其它输入框」的保护
+function focusPetInput(agentId, force = false) {
+  if (!agentId) return
+  if (!force && !canStealPetFocus()) return
+  // 等待 DOM 更新后聚焦：inputMode 切换会替换 textarea/input 元素
+  nextTick(() => {
+    if (!force && !canStealPetFocus()) return
+    const el = stageRef.value && stageRef.value.querySelector(`[data-pet-input="${agentId}"]`)
+    if (el && document.activeElement !== el) el.focus()
+  })
+}
+
 // 刷新某只宠物的输入态与最新输出
 function refreshPetData(pet) {
   if (!pet) return
   const state = props.getInputState ? props.getInputState(pet.agentId) : null
   if (state) {
+    // 输入模式变化会替换输入控件（textarea ↔ input），原焦点元素被销毁，
+    // 需在渲染后把焦点交还给输入框，否则等待单行输入时焦点丢失
+    const modeChanged = pet.inputMode !== state.mode
     pet.inputMode = state.mode
+    if (modeChanged && pet.active) focusPetInput(pet.agentId)
+    // 是否有待处理的输入请求：展开宠物时据此决定是否自动聚焦输入框
+    pet.hasInputRequest = !!state.hasRequest
     pet.inputTip = state.tip
     pet.isPassword = state.isPassword
     pet.confirmMessage = state.confirmMessage
@@ -980,6 +1014,7 @@ function syncPets() {
         typing: false,
         dragging: false,
         inputMode: 'multi',
+        hasInputRequest: false,
         inputText: '',
         inputTip: '',
         isPassword: false,
@@ -1538,6 +1573,9 @@ function openPanel(pet) {
     saveHiddenOutputs()
   }
   refreshPetData(pet)
+  // 仅当该 Agent 有待处理的输入请求时才自动聚焦输入框：
+  // 用户点开宠物可能只是想看输出，无请求时不打断其当前焦点
+  if (pet.hasInputRequest && pet.inputMode !== 'confirm') focusPetInput(pet.agentId, true)
 }
 
 function closePanel(pet) {
