@@ -523,6 +523,7 @@
           @openCompletions="onLobbyOpenCompletions"
           @activePetChange="lobbyActiveAgentId = $event"
           @createAgentOnNode="onLobbyCreateAgentOnNode"
+          @openOnboarding="startOnboarding"
           @contextAgent="onLobbyContextAgent"
           @contextRun="onLobbyContextRun"
           @nodeContextRun="onLobbyNodeContextRun"
@@ -1260,6 +1261,14 @@
       </div>
     </div>
 
+    <!-- 新手引导（首次登录后自动展示，可随时从命令面板重新打开） -->
+    <OnboardingTour
+      v-model:visible="showOnboarding"
+      :steps="onboardingSteps"
+      :storageKey="ONBOARDING_STORAGE_KEY"
+      @close="onOnboardingClose"
+      @finish="onOnboardingFinish"
+    />
     <!-- Toast 提示 -->
     <transition name="toast-fade">
       <div v-if="toast.show" class="toast" :class="`toast-${toast.type}`">
@@ -1325,6 +1334,7 @@ import AdminPanel from './components/AdminPanel.vue'
 import CommandPalette from './components/CommandPalette.vue'
 import TopologyOverlay from './components/TopologyOverlay.vue'
 import PetLobby from './components/PetLobby.vue'
+import OnboardingTour from './components/OnboardingTour.vue'
 import { ACTIONS as actionDefs } from './actions/registry.js'
 
 const PLANTUML_SERVER_URL = 'https://www.plantuml.com/plantuml/svg/'
@@ -5351,6 +5361,109 @@ function detachFocusedPanel() {
     detachPanel('session', key.slice('session:'.length))
   }
 }
+// ===== 新手引导 =====
+// 首次登录后自动展示一次；完成后写入 localStorage 标记，之后可通过命令面板手动重看
+const ONBOARDING_STORAGE_KEY = 'jarvis_onboarding_done_v1'
+const ONBOARDING_AUTO_DELAY = 800
+const showOnboarding = ref(false)
+let onboardingTimer = null
+// 引导步骤：target 命中不到元素时组件会自动退化为居中卡片
+const onboardingSteps = computed(() => [
+  {
+    id: 'welcome',
+    icon: '👋',
+    title: '欢迎使用 Jarvis',
+    desc: 'Jarvis 让 AI 从「独自工作」走向「与众共事」：你可以同时驱动多个 Agent，让它们各司其职、互相协作。',
+    hint: '这份引导大约 1 分钟，随时可以跳过，之后也能在命令面板（Ctrl+P）里重新打开。',
+  },
+  {
+    id: 'lobby',
+    icon: '🐾',
+    title: '宠物大厅：你的 Agent 都在这里',
+    desc: '没有打开任何面板时，这里是宠物大厅。每个 Agent 都是一只可以拖动的宠物，双击即可打开它的对话面板。',
+    hint: '宠物上方会实时显示它的最新输出；需要你确认或输入时，宠物会高亮提醒。',
+    target: '.empty-stage',
+    placement: 'bottom',
+  },
+  {
+    id: 'create-agent',
+    icon: '➕',
+    title: '创建第一个 Agent',
+    desc: '点击这里的「创建 Agent」按钮，选择节点与 Agent 类型（通用 Agent 或代码 Agent）即可创建。',
+    hint: '代码 Agent（jca）擅长读代码、改代码、跑验证；通用 Agent（jvs）适合分析、规划与执行。',
+    target: isMobileLayout.value ? '.mobile-header-actions' : '.header-actions',
+    placement: 'bottom',
+  },
+  {
+    id: 'chat',
+    icon: '💬',
+    title: '在面板中与 Agent 对话',
+    desc: '打开 Agent 后，在底部输入框输入需求并回车发送；Agent 的输出会实时流式显示在面板中。',
+    hint: 'Agent 需要确认时会弹出确认卡片；Ctrl+Enter 可在多行输入中发送。',
+    target: panels.value.length > 0 ? '.session-panel' : '.empty-stage',
+    placement: 'top',
+  },
+  {
+    id: 'command-palette',
+    icon: '⌘',
+    title: '命令面板：所有操作一搜即达',
+    desc: '按 Ctrl+P（Mac 为 ⌘+P）或点击顶栏的 ⌘ 按钮打开命令面板，可以搜索并执行几乎所有操作。',
+    hint: '输入 a> 可切换到 Agent 列表，回车在当前面板打开、Tab 在新面板打开。',
+    target: isMobileLayout.value ? '.mobile-header-actions' : '.header-actions',
+    placement: 'bottom',
+  },
+  {
+    id: 'sidebar-settings',
+    icon: '⚙',
+    title: '侧边栏与设置',
+    desc: '顶栏的 📋 打开 Agent 侧边栏，可以批量管理、分组、重命名 Agent；⚙ 打开设置。',
+    hint: '首次使用请务必在「设置 → 修改密码」中修改 admin 初始密码。',
+    target: isMobileLayout.value ? '.mobile-header-actions' : '.header-actions',
+    placement: 'bottom',
+  },
+])
+function hasSeenOnboarding() {
+  try {
+    return localStorage.getItem(ONBOARDING_STORAGE_KEY) === '1'
+  } catch (err) {
+    return true
+  }
+}
+// 登录成功（连接弹窗关闭）后，若从未看过引导则延迟自动展示
+function scheduleOnboardingIfNeeded() {
+  if (onboardingTimer) {
+    clearTimeout(onboardingTimer)
+    onboardingTimer = null
+  }
+  if (hasSeenOnboarding()) return
+  onboardingTimer = setTimeout(() => {
+    onboardingTimer = null
+    if (showConnectModal.value) return
+    showOnboarding.value = true
+  }, ONBOARDING_AUTO_DELAY)
+}
+function startOnboarding() {
+  if (onboardingTimer) {
+    clearTimeout(onboardingTimer)
+    onboardingTimer = null
+  }
+  showOnboarding.value = true
+}
+// 跳过/关闭：同样记录标记，避免每次登录都弹出
+function onOnboardingClose() {
+  try {
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, '1')
+  } catch (err) {
+    /* 隐私模式下写入失败可忽略 */
+  }
+}
+function onOnboardingFinish() {
+  onOnboardingClose()
+  showToast('引导完成，开始使用 Jarvis 吧', 'success')
+}
+watch(showConnectModal, (visible, previous) => {
+  if (previous && !visible) scheduleOnboardingIfNeeded()
+})
 // 命令面板上下文：统一暴露宠物菜单与命令面板共用的动作回调
 const commandPaletteCtx = computed(() => ({
   currentAgentId: commandPaletteCurrentAgentId.value,
@@ -5381,6 +5494,8 @@ const commandPaletteCtx = computed(() => ({
   togglePetVisibility,
   toggleHeader,
   openAgentList: openAgentListPalette,
+  // 重新打开新手引导（首次登录后自动展示过一次，可随时重看）
+  startOnboarding,
   // 打开宠物大厅的「安装浏览器插件」弹层
   openInstallExtension: () => { petLobbyRef.value?.openInstallExtensionDialog?.() },
   // 当前 Agent 组
@@ -13410,6 +13525,12 @@ onUnmounted(() => {
 
   // 清理标题栏自动隐藏定时器
   clearTimeout(headerHideTimer)
+
+  // 清理新手引导延迟展示定时器
+  if (onboardingTimer) {
+    clearTimeout(onboardingTimer)
+    onboardingTimer = null
+  }
 
   // 清理滚动监听
   if (historyScrollListenerEl && historyScrollHandler) {
