@@ -350,8 +350,8 @@ browser_ext(action="script_run", session_id="<sid>", script_id="s-xxxxxxxx", scr
 
 ## 相关资源
 
-- 工具源码：`{{ jarvis_src_dir }}/jarvis_tools/browser_ext.py`
-- 扩展说明：`{{ git_root_dir }}/browser_extension/README.md`
+- 工具源码：`{{ jarvis_src_dir }}/src/jarvis/jarvis_tools/browser_ext.py`
+- 扩展说明：`{{ jarvis_src_dir }}/browser_extension/README.md`
 - 扩展脚本编写：`{{ rule_file_dir }}/browser_ext_script.md`
 - 服务端浏览器自动化：`{{ rule_file_dir }}/jarvis_browser_cli.md`
 - 查看工具列表：`{{ rule_file_dir }}/jarvis_tool_usage.md`
