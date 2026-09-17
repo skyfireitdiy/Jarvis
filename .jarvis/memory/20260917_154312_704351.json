@@ -1,0 +1,15 @@
+{
+  "id": "20260917_154312_704351",
+  "type": "project_long_term",
+  "tags": [
+    "docker",
+    "dockerfile",
+    "start.sh",
+    "jarvis-service",
+    "构建失败",
+    "bugfix"
+  ],
+  "content": "Jarvis Dockerfile 构建失败根因与修复（2026-09）：\n\n现象：docker build 在 COPY 步骤失败（start.sh 不存在）。\n\n根因：commit 94023cc78「移除过时的启动脚本」删除了根目录 start.sh / start.ps1 / start_in_tmux.sh，但 Dockerfile 仍引用 start.sh（原 Dockerfile:104-106 `COPY start.sh /app/start.sh` + chmod，原第 179 行 `CMD [\"/app/start.sh\"]`）。\n\n修复（仅改 Dockerfile）：\n1) 删除 COPY start.sh 与 chmod 两行；\n2) CMD 改为 exec 形式：CMD [\"jarvis-service\", \"run\", \"--gateway-host\", \"0.0.0.0\", \"--gateway-port\", \"8000\", \"--frontend-host\", \"0.0.0.0\", \"--frontend-port\", \"5173\"]（容器内必须用 run，不能用 start——start 是 systemd 用户服务方式，容器内不可用；且默认监听 127.0.0.1，容器需显式 0.0.0.0）。\n\n关键事实：\n- 原 start.sh 内容：trap '' SIGUSR1 SIGUSR2; exec jarvis-service start。\n- 正确入口 `jarvis-service run`（src/jarvis/jarvis_service/cli.py:1495 run_command → run_service），会自行 npm install/build/preview 启动前端，并处理 SIGUSR1/SIGUSR2 重启信号。\n- `jarvis-service run` 没有 --gateway-password 选项，网关密码只能通过环境变量 JARVIS_GATEWAY_PASSWORD 设置（多处文档曾错误写成 --gateway-password，已修正）。\n- 环境变量：JARVIS_GATEWAY_HOST/PORT、JARVIS_FRONTEND_HOST/PORT、JARVIS_NODE_MODE/ID/MASTER_URL/NODE_SECRET、JARVIS_DEV_MODE。\n- docker-compose.yml 未指定 command，依赖镜像 CMD。\n\n同步修复的文档：docs/WEB_STARTUP.md（整篇原基于 start.sh/start.ps1，已改写为 jarvis-service run 指南）、docs/jarvis_book/2.快速开始.md:271-283,309。\n\n验证：全仓 grep 无 start.sh/start.ps1/start_in_tmux 残留；CMD 行 json.loads 解析通过；`jarvis-service --help` 确认 install/run/start/stop/switch 子命令与各选项真实存在；tests/jarvis_web_gateway 18 项 + tests/jarvis_service 8 项全通过。环境无 docker，未做真实构建。",
+  "created_at": "2026-09-17T15:43:12.704387",
+  "updated_at": "2026-09-17T15:43:12.704394"
+}

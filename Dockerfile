@@ -101,10 +101,6 @@ ENV PATH="/app/.venv/bin:/usr/local/bin:/usr/bin:/bin" \
 # 复制项目文件到应用目录
 COPY . /app
 
-# 复制启动脚本并设置执行权限
-COPY start.sh /app/start.sh
-RUN chmod +x /app/start.sh
-
 # 升级 pip 并安装 Jarvis（使用 -e 参数以可编辑模式安装，便于自动更新生效）
 # 同时安装 clang 依赖（用于 C/C++ 代码分析）
 RUN pip install --upgrade pip setuptools wheel \
@@ -175,6 +171,6 @@ USER jarvis
 # 设置默认工作目录为 /workspace（用户工作目录）
 WORKDIR /workspace
 
-# 设置默认命令为启动脚本（启动网关和前端）
-CMD ["/app/start.sh"]
+# 设置默认命令：启动网关与前端服务（监听 0.0.0.0 以便容器外访问）
+CMD ["jarvis-service", "run", "--gateway-host", "0.0.0.0", "--gateway-port", "8000", "--frontend-host", "0.0.0.0", "--frontend-port", "5173"]
 
