@@ -4861,7 +4861,7 @@ async function loadHistoryMessages(prepend = false, agentId = null) {
     } else {
       // 合并历史消息与现有消息，去重（避免重复）
       // 现有消息（可能来自 WebSocket 推送）优先级更高，历史消息补充缺失的
-      const merged = [...currentOutputs]
+      let merged = [...currentOutputs]
       const existingIds = new Set()
       for (const msg of currentOutputs) {
         if (msg.execution_id) existingIds.add('exec_' + msg.execution_id)
@@ -4874,6 +4874,23 @@ async function loadHistoryMessages(prepend = false, agentId = null) {
         merged.push(msg)
         if (execKey) existingIds.add(execKey)
         if (seqKey) existingIds.add(seqKey)
+      }
+      // 按 seq 稳定排序：现有消息（WebSocket 推送）与历史消息可能交错，
+      // 直接拼接会导致旧消息排到末尾。带 seq 的按 seq 升序；
+      // 无 seq 的多为本地即时系统提示（如"缓冲区已清空"），语义上属于最新，排在末尾并保持相对顺序。
+      const hasSeq = merged.some(msg => typeof msg.seq === 'number')
+      if (hasSeq) {
+        merged = merged
+          .map((msg, idx) => ({ msg, idx }))
+          .sort((a, b) => {
+            const seqA = typeof a.msg.seq === 'number' ? a.msg.seq : null
+            const seqB = typeof b.msg.seq === 'number' ? b.msg.seq : null
+            if (seqA === null && seqB === null) return a.idx - b.idx
+            if (seqA === null) return 1
+            if (seqB === null) return -1
+            return seqA - seqB
+          })
+          .map(item => item.msg)
       }
       allOutputs.value.set(targetAgentId, merged)
     }
