@@ -162,10 +162,11 @@
               @
             </button>
             <button
-              v-if="asrSupported"
+              v-if="asrSupported && !isMobileDevice"
               class="action-btn asr-btn"
               :class="{ 'recording': isRecording }"
               @click="toggleRecord"
+              @contextmenu.prevent
               :disabled="isInputDisabled"
               :title="isRecording ? '停止语音输入' : '语音输入'"
             >
@@ -426,6 +427,9 @@ onBeforeUnmount(() => {
   if (ttsSupported) {
     window.speechSynthesis.cancel()
   }
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', handleAsrResize)
+  }
   stopRecord()
 })
 
@@ -446,9 +450,29 @@ let recognizer = null
 let recordPrefix = ''
 // 标记本次结束是否由用户主动停止（用于区分浏览器自动结束）
 let userStopped = false
+// 自动重启定时器（移动端 continuous 不生效，需在 onend 后延迟重启）
+let restartTimer = null
+
+// 移动端判定：与 PetLobby 一致，用视口宽度判断。
+// 移动端浏览器不支持真正的 continuous，识别会自动结束，需要特殊处理。
+const isMobileDevice = ref(typeof window !== 'undefined' && window.innerWidth <= 768)
+function handleAsrResize() {
+  isMobileDevice.value = window.innerWidth <= 768
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('resize', handleAsrResize)
+}
+
+function clearRestartTimer() {
+  if (restartTimer) {
+    clearTimeout(restartTimer)
+    restartTimer = null
+  }
+}
 
 function stopRecord() {
   userStopped = true
+  clearRestartTimer()
   if (recognizer) {
     try {
       recognizer.stop()
@@ -459,6 +483,8 @@ function stopRecord() {
   isRecording.value = false
 }
 
+// 🎤 按钮：点击开始录音，再次点击停止。
+// 不用长按：移动端长按会触发原生文本选择/右键菜单，导致录音被中断。
 function toggleRecord() {
   if (!asrSupported) return
   if (isRecording.value) {
@@ -472,9 +498,12 @@ function startRecord() {
   if (!asrSupported || isRecording.value) return
   recordPrefix = props.inputText || ''
   userStopped = false
+  clearRestartTimer()
   recognizer = new SpeechRecognitionImpl()
   recognizer.lang = 'zh-CN'
-  recognizer.continuous = true
+  // 桌面端支持真正的 continuous；移动端该属性无效，识别会自动结束，
+  // 由 onend 延迟重启来模拟连续识别。
+  recognizer.continuous = !isMobileDevice.value
   recognizer.interimResults = true
 
   recognizer.onresult = (event) => {
@@ -493,26 +522,47 @@ function startRecord() {
   }
 
   recognizer.onerror = (event) => {
-    if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+    const err = event.error
+    if (err === 'not-allowed' || err === 'service-not-allowed') {
+      // 未授权/服务不可用：无法继续，直接停止
       emit('show-toast', '麦克风未授权，请在浏览器中允许麦克风访问', 'error')
-    } else if (event.error !== 'aborted') {
-      emit('show-toast', `语音识别失败：${event.error}`, 'error')
+      userStopped = true
+      clearRestartTimer()
+      isRecording.value = false
+      return
     }
+    if (err === 'aborted' || err === 'no-speech') {
+      // aborted：识别被中断（如自动重启时的正常现象）
+      // no-speech：静音超时，移动端很常见
+      // 两者都不视为致命错误，交给 onend 的重启逻辑继续
+      return
+    }
+    // 其它错误（network / audio-capture / language-not-supported 等）
+    emit('show-toast', `语音识别失败：${err}`, 'error')
+    userStopped = true
+    clearRestartTimer()
     isRecording.value = false
   }
 
   recognizer.onend = () => {
-    // 移动端浏览器不支持真正的 continuous，会自动结束识别。
-    // 若非用户主动停止，则自动重启，保持“连续”体验。
-    if (!userStopped && isRecording.value) {
+    // 用户已主动停止，或已因错误终止，直接结束
+    if (userStopped || !isRecording.value) {
+      isRecording.value = false
+      return
+    }
+    // 移动端 continuous 不生效，识别会自动结束；延迟重启以模拟连续识别。
+    // 立即重启在移动端容易抛 InvalidStateError，故加一点延迟。
+    clearRestartTimer()
+    restartTimer = setTimeout(() => {
+      restartTimer = null
+      if (userStopped || !isRecording.value) return
       try {
         recognizer.start()
-        return
       } catch (e) {
-        // 重启失败则回落到停止状态
+        // 重启失败（如识别器已失效）：回落到停止状态
+        isRecording.value = false
       }
-    }
-    isRecording.value = false
+    }, 250)
   }
 
   try {
@@ -1210,6 +1260,13 @@ function getTerminalStyle(terminalContent) {
 .action-btn:hover:not(:disabled) {
   background: var(--color-bg-hover);
   color: var(--color-text-primary);
+}
+
+.asr-btn {
+  /* 防止长按选中按钮文字（录音改为点击切换，不依赖长按手势） */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .asr-btn.recording {
