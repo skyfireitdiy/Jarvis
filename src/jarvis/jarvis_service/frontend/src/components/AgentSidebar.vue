@@ -210,7 +210,7 @@
           @pointermove="onPetPointerMove"
           @pointerup="onPetPointerUp"
           @pointercancel="onPetPointerUp"
-          @contextmenu.prevent.stop="onPetContextMenu"
+          @contextmenu.prevent.stop
           @mouseenter="petHover = true"
           @mouseleave="petHover = false"
         ></div>
@@ -237,45 +237,8 @@
       @pointermove="onRestorePointerMove"
       @pointerup="onRestorePointerUp"
       @pointercancel="onRestorePointerUp"
-      @contextmenu.prevent.stop="onRestoreContextMenu"
+      @contextmenu.prevent.stop
     >🐾</button>
-
-    <!-- 宠物环形菜单：右键宠物 / 🐾 展开「当前 Agent」命令 -->
-    <div
-      v-if="petMenuOpen"
-      class="pet-menu-layer"
-      @pointerdown.self.prevent="closePetMenu"
-      @touchstart.self.prevent
-      @contextmenu.prevent
-    >
-      <div
-        class="pet-menu-list"
-        :style="{
-          left: petMenuLayout.left + 'px',
-          top: petMenuLayout.top + 'px',
-          width: (petMenuLayout.cols * PET_MENU_COL_W + (petMenuLayout.cols - 1) * PET_MENU_GAP + PET_MENU_PAD * 2) + 'px',
-          gridTemplateColumns: `repeat(${petMenuLayout.cols}, ${PET_MENU_COL_W}px)`,
-        }"
-      >
-        <button
-          v-for="(item, i) in petMenuLayout.items"
-          :key="item.id"
-          type="button"
-          tabindex="-1"
-          class="pet-menu-item"
-          :class="[{ 'is-disabled': !item.enabled, 'is-inner': item.inner }]"
-          :disabled="!item.enabled"
-          :title="item.label"
-          @pointerdown.stop
-          @mousedown.prevent
-          @touchstart.stop
-          @click.stop="onPetMenuRun(item)"
-        >
-          <span class="pet-menu-ico">{{ item.icon }}</span>
-          <span class="pet-menu-label">{{ item.label }}</span>
-        </button>
-      </div>
-    </div>
   </Teleport>
 
   <!-- 加入分组弹窗 -->
@@ -462,8 +425,7 @@ const props = defineProps({
   nodes: { type: Array, default: () => [] },
   currentUserId: { type: String, default: '' },
   currentUserName: { type: String, default: '' },
-  isConnected: { type: Boolean, default: true },
-  radialActions: { type: Array, default: () => [] }
+  isConnected: { type: Boolean, default: true }
 })
 
 // 分组弹窗状态
@@ -585,7 +547,6 @@ const emit = defineEmits([
   'petToggleSidebar',
   'petOpenTopology',
   'petOpenCommandPalette',
-  'petRadialRun',
 ])
 
 // 监听 agentStatuses 变化，当 agent 状态从等待输入变为非等待输入时清除点击标记
@@ -983,113 +944,7 @@ let petHideTimer = 0     // 隐藏定时器（兼容保留）
 let petPettingFxTimer = 0      // 摸头爱心循环
 
 // ==================== 宠物环形菜单 ====================
-// 右键宠物（或隐藏后的 🐾）弹出，承载「当前 Agent」命令，方便移动端操作
-const petMenuOpen = ref(false)
-const petMenuOrigin = ref({ x: 0, y: 0 })   // 菜单圆心（屏幕坐标）
 let petMenuLongPressTimer = 0               // 还原按钮长按判定
-// 菜单刚展开的短暂窗口内忽略点击：避免触发长按/双击的那一次指针抬起
-// 被浏览器补发成 click，落在新出现的菜单项上而误执行命令
-const PET_MENU_ARM_DELAY = 260
-let petMenuArmedAt = 0
-
-// 网格菜单尺寸与间距
-// 单列宽：与大厅 Agent 右键菜单（.lobby-context-menu）的单项宽度保持一致
-// （容器 min-width 300px、padding 4px、border 1px、两列 gap 2px → (300-8-2)/2 = 145）
-const PET_MENU_COL_W = 145
-const PET_MENU_ITEM_H = 30   // 单项高
-const PET_MENU_GAP = 5
-const PET_MENU_PAD = 6
-const PET_MENU_MARGIN = 8    // 距视口边缘的最小留白
-const PET_MENU_MAX_ROWS = 7  // 最多行数，超出则分两列
-// 菜单锚点：以点击位置为基准向外偏移，避免手指/指针仍停留在菜单项上
-const PET_MENU_ANCHOR_OFFSET = 26
-
-// 菜单项顺序：内圈（常用）在前，外圈在后
-const petMenuItems = computed(() => {
-  const list = Array.isArray(props.radialActions) ? props.radialActions : []
-  const inner = list.filter(a => a.inner)
-  const outer = list.filter(a => !a.inner)
-  return [...inner, ...outer]
-})
-
-// 网格布局：以触发点为锚点，优先向右展开；右侧空间不足则向左；
-// 垂直方向整体夹取到视口内，保证任何情况下都不出屏。
-// 条目多时按「列优先」排成两列（视觉上仍是自上而下的顺序）。
-const petMenuLayout = computed(() => {
-  const items = petMenuItems.value
-  const n = items.length
-  const cols = n > PET_MENU_MAX_ROWS ? 2 : 1
-  const rows = n > 0 ? Math.ceil(n / cols) : 0
-  const listW = cols * PET_MENU_COL_W + (cols - 1) * PET_MENU_GAP + PET_MENU_PAD * 2
-  const listH = rows > 0 ? PET_MENU_PAD * 2 + rows * PET_MENU_ITEM_H + (rows - 1) * PET_MENU_GAP : 0
-  const vw = window.innerWidth
-  const vh = window.innerHeight
-  const ox = petMenuOrigin.value.x
-  const oy = petMenuOrigin.value.y
-
-  // 水平：优先放锚点右侧；空间不足则翻到左侧，尽量仍以锚点为中心
-  let left = ox + PET_MENU_ANCHOR_OFFSET
-  if (left + listW + PET_MENU_MARGIN > vw) left = ox - PET_MENU_ANCHOR_OFFSET - listW
-  // 若左侧也放不下（锚点两侧都紧），退化为「以锚点为中心」并夹取到视口内
-  if (left < PET_MENU_MARGIN) left = ox - listW / 2
-  left = Math.max(PET_MENU_MARGIN, Math.min(vw - listW - PET_MENU_MARGIN, left))
-
-  // 垂直：以锚点为中心（点击位置落在菜单中段），再夹取到视口内
-  let top = oy - listH / 2
-  top = Math.max(PET_MENU_MARGIN, Math.min(vh - listH - PET_MENU_MARGIN, top))
-
-  // 列优先重排：第 i 项落在第 (i % cols) 列、第 floor(i / cols) 行
-  const ordered = []
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const idx = c * rows + r
-      if (idx < n) ordered.push(items[idx])
-    }
-  }
-
-  return { left, top, cols, items: ordered }
-})
-
-function openPetMenu(cx, cy) {
-  // 收起当前焦点（如输入框）与移动端软键盘，避免展开菜单时页面被顶走
-  const ae = document.activeElement
-  if (ae && ae !== document.body && typeof ae.blur === 'function') ae.blur()
-  petMenuOrigin.value = { x: cx, y: cy }
-  petMenuOpen.value = true
-  petMenuArmedAt = Date.now() + PET_MENU_ARM_DELAY
-  petDragging = false
-  petDrag.value = false
-  clearTimeout(petClickTimer)
-  clearTimeout(petMenuLongPressTimer)
-  clearTimeout(restoreClickTimer)
-  petClickTimer = 0
-  restoreClickTimer = 0
-}
-
-function closePetMenu() {
-  petMenuOpen.value = false
-}
-
-function togglePetMenu(cx, cy) {
-  if (petMenuOpen.value) closePetMenu()
-  else openPetMenu(cx, cy)
-}
-
-function onPetMenuRun(action) {
-  if (!action) return
-  // 菜单刚展开时忽略点击（吞掉触发展开的那次指针事件补发的 click）
-  if (Date.now() < petMenuArmedAt) return
-  closePetMenu()
-  emit('petRadialRun', action)
-}
-
-function onPetMenuGlobalKeydown(e) {
-  if (petMenuOpen.value && (e.key === 'Escape' || e.code === 'Escape')) {
-    e.preventDefault()
-    e.stopPropagation()
-    closePetMenu()
-  }
-}
 
 function onPetPointerDown(e) {
   if (e.button !== undefined && e.button !== 0) return  // 仅左键
@@ -1104,13 +959,7 @@ function onPetPointerDown(e) {
   e.preventDefault()
 }
 
-// 右键：弹出环形技能菜单（与双击行为互换）
-function onPetContextMenu(e) {
-  // 右键会先触发 pointerdown/up：清掉待执行的单击判定，避免右键后误触发单击动作
-  clearTimeout(petClickTimer)
-  petClickTimer = 0
-  togglePetMenu(e.clientX, e.clientY)
-}
+// 右键：拦截浏览器默认菜单，不做任何响应（技能菜单不再由右键触发）
 
 function onPetPointerMove(e) {
   if (!petDragging) return
@@ -1411,13 +1260,7 @@ function onRestorePointerDown(e) {
   }, 600)
 }
 
-// 隐藏态还原按钮（🐾）右键：与显示态宠物一致，弹出环形技能菜单
-function onRestoreContextMenu(e) {
-  // 右键会先触发 pointerdown/up：清掉待执行的单击（唤回）判定，避免右键后误唤回宠物
-  clearTimeout(restoreClickTimer)
-  restoreClickTimer = 0
-  togglePetMenu(e.clientX, e.clientY)
-}
+// 隐藏态还原按钮（🐾）右键：拦截浏览器默认菜单，不做任何响应
 
 function onRestorePointerMove(e) {
   if (!restoreDragging) return
@@ -2057,7 +1900,6 @@ function stopPetLoops() {
   clearTimeout(petCastClearTimer)
   petCastClearTimer = 0
   petCast.value = ''
-  closePetMenu()
   stopPetWalk()
   clearTimeout(petEncourageTimer)
   petEncourageTimer = 0
@@ -2140,7 +1982,6 @@ onMounted(() => {
   }
   document.addEventListener('mousemove', onPetMouseMove)
   window.addEventListener('resize', onPetResize)
-  window.addEventListener('keydown', onPetMenuGlobalKeydown, true)
   installPetCastDebugHook()
   startPetLoops()
 })
@@ -2166,7 +2007,6 @@ watch(petPowerSaveActive, (active) => {
 onUnmounted(() => {
   document.removeEventListener('mousemove', onPetMouseMove)
   window.removeEventListener('resize', onPetResize)
-  window.removeEventListener('keydown', onPetMenuGlobalKeydown, true)
   clearTimeout(petMenuLongPressTimer)
   clearTimeout(petActTimer)
   clearTimeout(petClickTimer)
@@ -2193,7 +2033,6 @@ defineExpose({
   togglePet,
   hidePet: petHide,
   showPet,
-  isPetMenuOpen: () => petMenuOpen.value,
   openManageGroups,
 })
 
@@ -3803,83 +3642,6 @@ defineExpose({
 @keyframes pet-restore-in {
   from { opacity: 0; transform: scale(0.6); }
   to { opacity: 1; transform: scale(1); }
-}
-
-/* ==================== 宠物环形菜单 ==================== */
-.pet-menu-layer {
-  position: fixed;
-  inset: 0;
-  z-index: 950;
-  background: radial-gradient(circle at center, rgba(8, 18, 32, 0.28), rgba(4, 10, 20, 0.55));
-  animation: pet-menu-fade 0.18s ease-out;
-}
-.pet-menu-list {
-  position: fixed;
-  display: grid;
-  gap: 5px;
-  padding: 6px;
-  box-sizing: border-box;
-  border: 1px solid rgba(32, 200, 255, 0.35);
-  border-radius: 12px;
-  background: rgba(8, 20, 34, 0.92);
-  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.55), 0 0 18px rgba(32, 200, 255, 0.22);
-  animation: pet-menu-pop 0.18s ease-out;
-}
-.pet-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  width: 100%;
-  height: 30px;
-  padding: 0 7px;
-  box-sizing: border-box;
-  border: 1px solid rgba(32, 200, 255, 0.28);
-  border-radius: 8px;
-  background: rgba(13, 28, 46, 0.9);
-  color: #cfefff;
-  font-size: 11px;
-  text-align: left;
-  cursor: pointer;
-  user-select: none;
-  touch-action: manipulation;
-  transition: background 0.15s ease, box-shadow 0.15s ease;
-}
-.pet-menu-item.is-inner {
-  border-color: rgba(120, 220, 255, 0.55);
-  background: rgba(20, 44, 70, 0.92);
-}
-.pet-menu-item:hover:not(:disabled) {
-  background: rgba(32, 200, 255, 0.26);
-  box-shadow: 0 0 14px rgba(32, 200, 255, 0.45);
-}
-.pet-menu-item.is-disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-.pet-menu-ico {
-  flex-shrink: 0;
-  width: 15px;
-  font-size: 12px;
-  line-height: 1;
-  text-align: center;
-}
-.pet-menu-label {
-  flex: 1;
-  min-width: 0;
-  font-size: 11px;
-  line-height: 1.15;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-@keyframes pet-menu-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-@keyframes pet-menu-pop {
-  from { opacity: 0; transform: translateY(-6px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ZZZ 睡眠标识 */
