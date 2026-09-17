@@ -204,6 +204,25 @@
       </button>
     </div>
 
+    <!-- 无 Agent 时的空状态引导：新用户第一次进入大厅时给出明确的下一步 -->
+    <div v-if="!hasAnyAgent" class="pet-lobby-empty">
+      <div class="pet-lobby-empty-title">还没有 Agent</div>
+      <div class="pet-lobby-empty-desc">
+        Agent 是 Jarvis 里的 AI 助手，每个 Agent 都是一只可以对话的宠物。<br />
+        创建第一个 Agent 后，它就会出现在这片大厅里。
+      </div>
+      <div class="pet-lobby-empty-actions">
+        <button class="pet-lobby-empty-btn primary" type="button" @click="createFirstAgent">
+          ➕ 创建第一个 Agent
+        </button>
+        <button class="pet-lobby-empty-btn" type="button" @click="emit('openOnboarding')">
+          🎓 查看新手引导
+        </button>
+      </div>
+      <div class="pet-lobby-empty-hint">
+        提示：按 <b>Ctrl+P</b> 打开命令面板，可以搜索并执行几乎所有操作。
+      </div>
+    </div>
     <!-- 宠物群 -->
     <div
       v-for="pet in petAgents"
@@ -552,7 +571,7 @@ const props = defineProps({
   checkExtensionVersion: { type: Function, default: null },
 })
 
-const emit = defineEmits(['selectAgent', 'sendInput', 'complete', 'openCompletions', 'activePetChange', 'createAgentOnNode', 'contextAgent', 'contextRun', 'nodeContextRun', 'renameNode', 'addAgentToGroup', 'removeAgentFromGroup'])
+const emit = defineEmits(['selectAgent', 'sendInput', 'complete', 'openCompletions', 'activePetChange', 'createAgentOnNode', 'contextAgent', 'contextRun', 'nodeContextRun', 'renameNode', 'addAgentToGroup', 'removeAgentFromGroup', 'openOnboarding'])
 
 // 宠物尺寸常量（与 CSS 中的 .lobby-pet 宽高保持一致）
 const PET_W = 72
@@ -835,6 +854,16 @@ const agentStatusStat = computed(() => {
     .filter(state => counts[state] > 0)
     .map(state => ({ state, label: AGENT_STAT_LABEL[state], count: counts[state], color: agentColor(state) }))
 })
+
+// 是否已有任意 Agent：为 false 时在大厅展示空状态引导
+const hasAnyAgent = computed(() => (props.agents || []).length > 0)
+
+// 空状态「创建第一个 Agent」：在第一个在线节点上创建（无节点时交由父组件兜底）
+function createFirstAgent() {
+  const nodes = nodeItems.value || []
+  const target = nodes.find(n => n.state === 'online') || nodes[0]
+  emit('createAgentOnNode', target ? target.node_id : '')
+}
 
 // 节点间连线：master → 其余节点
 const nodeLinks = computed(() => {
@@ -2376,6 +2405,74 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden, openInst
   }
 }
 
+/* ===== 无 Agent 时的空状态引导 ===== */
+.pet-lobby-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 30;
+  width: min(420px, 86vw);
+  padding: 22px 24px;
+  text-align: center;
+  background: rgba(9, 16, 28, 0.86);
+  border: 1px solid rgba(32, 200, 255, 0.28);
+  border-radius: var(--tile-radius, 10px);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.pet-lobby-empty-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-accent, #20c8ff);
+  letter-spacing: 0.02em;
+}
+.pet-lobby-empty-desc {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #b9cddd;
+}
+.pet-lobby-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+.pet-lobby-empty-btn {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-family: inherit;
+  color: #d6f2ff;
+  background: rgba(10, 24, 38, 0.9);
+  border: 1px solid rgba(32, 200, 255, 0.4);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, filter 0.2s ease;
+}
+.pet-lobby-empty-btn:hover {
+  background: rgba(16, 40, 60, 0.95);
+  border-color: rgba(32, 200, 255, 0.8);
+}
+.pet-lobby-empty-btn.primary {
+  color: #060911;
+  font-weight: 700;
+  background: var(--gradient-accent, linear-gradient(135deg, #20c8ff 0%, #36ff7c 100%));
+  border-color: transparent;
+}
+.pet-lobby-empty-btn.primary:hover {
+  filter: brightness(1.08);
+}
+.pet-lobby-empty-hint {
+  margin-top: 14px;
+  font-size: 12px;
+  color: #8ba3b8;
+}
+.pet-lobby-empty-hint b {
+  color: var(--color-accent, #20c8ff);
+}
 /* ===== 迷你宠物 ===== */
 .lobby-pet {
   position: absolute;
