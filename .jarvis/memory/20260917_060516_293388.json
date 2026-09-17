@@ -1,0 +1,8 @@
+{
+  "id": "20260917_060516_293388",
+  "type": "project_long_term",
+  "tags": ["browser_extension", "网关", "API契约"],
+  "content": "Jarvis 网关浏览器扩展 API（src/jarvis/jarvis_web_gateway/app.py，均需 verify_token）：\n- GET  /api/browser-ext/sessions ：列出在线扩展会话\n- POST /api/browser-ext/command ：透传指令给扩展会话，body {session_id, action, params, timeout}，返回 {success, result}\n- GET  /api/browser-ext/download ：动态打包 browser_extension/ 为 zip\n- GET  /api/browser-ext/version ：返回网关打包版本与在线扩展版本\n\n工具侧 src/jarvis/jarvis_tools/browser_ext.py 的 BrowserExtTool.execute() 是大 if 链；_send_command(session_id, action, params, timeout) 走网关下发到扩展；_request_gateway(method, path, ...) 走 HTTP 到网关；_get_master_url() 校验 jglobals.master_url（禁止硬编码 127.0.0.1:8000，Agent 在子节点时 127.0.0.1 指向子节点本地）。\n\npopup 侧 browser_extension/popup/popup.html + popup.js，通过 chrome.runtime.sendMessage({type:\"jarvis_script_*\"}) 与 background 通信；新增 action 需同时在 service_worker.js 注册消息类型。",
+  "created_at": "2026-09-17T06:05:16.293412",
+  "updated_at": "2026-09-17T06:05:16.293418"
+}

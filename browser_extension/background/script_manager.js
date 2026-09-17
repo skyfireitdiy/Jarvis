@@ -20,9 +20,16 @@
 // 本模块只负责「存取 + 轻量静态校验」，不执行任何脚本（执行见 script_executor.js）。
 
 import { cmdError } from "./command_router.js";
+import { isAllowedScriptUrl, deriveNameFromUrl } from "./url_guard.js";
 
 /** chrome.storage.local 中存放脚本列表的键名。 */
 const STORAGE_KEY = "scripts";
+
+/** 从 URL 拉取脚本源码的大小上限（字节）。 */
+const MAX_SOURCE_BYTES = 1024 * 1024;
+
+/** 从 URL 拉取脚本源码的超时（毫秒）。 */
+const FETCH_TIMEOUT_MS = 15000;
 
 export class ScriptManager {
   /**
@@ -88,6 +95,98 @@ export class ScriptManager {
     }
     await this._save(scripts);
     return this._toMeta(record);
+  }
+
+  /**
+   * 从 URL 下载脚本源码并安装。
+   *
+   * 流程：校验 URL（防 SSRF）→ fetch 文本（带超时与大小上限）→ 复用 validateSource 弱校验
+   * → 复用 install() 落库。下载到的内容只当「源码字符串」存储，绝不在此求值。
+   *
+   * @param {object} payload { url, name, description, match, version }
+   * @returns {Promise<object>} 安装后的脚本元数据
+   */
+  async installFromUrl({ url, name, description, match, version }) {
+    const raw = String(url || "").trim();
+    if (!raw) {
+      throw cmdError("SCRIPT_INVALID", "url is required");
+    }
+
+    const check = isAllowedScriptUrl(raw);
+    if (!check.ok) {
+      throw cmdError("SCRIPT_INVALID", check.reason);
+    }
+
+    const scriptName = String(name || "").trim() || deriveNameFromUrl(raw);
+    if (!scriptName) {
+      throw cmdError(
+        "SCRIPT_INVALID",
+        "cannot derive script name from url, please provide 'name'",
+      );
+    }
+
+    const src = await this._fetchSource(raw);
+    const reason = validateSource(src);
+    if (reason) {
+      throw cmdError("SCRIPT_INVALID", reason);
+    }
+
+    return this.install({
+      name: scriptName,
+      source: src,
+      description,
+      match,
+      version,
+    });
+  }
+
+  /**
+   * 拉取脚本源码文本，带超时与大小上限。
+   * @param {string} url 已通过安全校验的 URL
+   * @returns {Promise<string>} 源码文本
+   */
+  async _fetchSource(url) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    let resp;
+    try {
+      resp = await fetch(url, {
+        credentials: "omit",
+        redirect: "follow",
+        signal: controller.signal,
+      });
+    } catch (e) {
+      const msg =
+        e && e.name === "AbortError" ? "request timeout" : e && e.message;
+      throw cmdError("SCRIPT_FETCH_ERROR", msg || String(e));
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (!resp.ok) {
+      throw cmdError("SCRIPT_FETCH_ERROR", `HTTP ${resp.status} for ${url}`);
+    }
+
+    // 先按 Content-Length 预检，避免下载超大响应体
+    const declared = Number(resp.headers.get("content-length") || 0);
+    if (declared > MAX_SOURCE_BYTES) {
+      throw cmdError(
+        "SCRIPT_TOO_LARGE",
+        `script source too large: ${declared} bytes (limit ${MAX_SOURCE_BYTES})`,
+      );
+    }
+
+    const text = await resp.text();
+    if (text.length > MAX_SOURCE_BYTES) {
+      throw cmdError(
+        "SCRIPT_TOO_LARGE",
+        `script source too large: ${text.length} bytes (limit ${MAX_SOURCE_BYTES})`,
+      );
+    }
+    if (!text.trim()) {
+      throw cmdError("SCRIPT_FETCH_ERROR", `empty response body from ${url}`);
+    }
+    return text;
   }
 
   /**

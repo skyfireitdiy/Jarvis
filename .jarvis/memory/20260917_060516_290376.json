@@ -1,0 +1,8 @@
+{
+  "id": "20260917_060516_290376",
+  "type": "project_long_term",
+  "tags": ["browser_extension", "架构", "脚本管理", "action契约"],
+  "content": "Jarvis 浏览器扩展（browser_extension/，MV3）脚本管理 action 契约：\n\n【扩展侧 action（command_router.js 路由表）】\n- script.list / script.get / script.install / script.uninstall / script.export / script.set_enabled / script.run\n- script.install_from_url（新增）：params { url, name?, description?, match?, version? }，从 URL 下载源码安装。url 仅允许 http/https 且非内网/回环；name 缺省从 URL 末段文件名推导（去 .js）；大小上限 1MB、超时 15s。错误码 SCRIPT_INVALID / SCRIPT_FETCH_ERROR / SCRIPT_TOO_LARGE。\n\n【关键文件职责】\n- background/script_manager.js：脚本存取 + 弱校验（validateSource/checkBalanced），不执行脚本。\n- background/url_guard.js（新增）：无依赖纯模块，导出 isAllowedScriptUrl(url) 与 deriveNameFromUrl(url)，刻意不引用 chrome API 以便 node 直接 import 测试。\n- background/executors/script_executor.js：薄转发 + 主世界执行（runScriptFn，用 chrome.scripting.executeScript world:MAIN）。\n- background/command_router.js：action 路由表；cmdError(code, message) 构造带 code 的异常。\n\n【重要约束】MV3 扩展页 CSP 为 script-src 'self'，禁用 unsafe-eval，因此**不能**用 new Function/eval 做语法校验，只能字符串层检查；真正的语法错误在 script.run 于页面主世界求值时才暴露。",
+  "created_at": "2026-09-17T06:05:16.290406",
+  "updated_at": "2026-09-17T06:05:16.290412"
+}

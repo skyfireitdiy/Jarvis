@@ -142,11 +142,37 @@ globalThis.__JARVIS_SCRIPT__ = {
 ### 安装与使用
 
 1. 打开扩展 popup → 「脚本管理（类油猴）」
-2. 把脚本源码粘贴到「脚本源码」框（或点「或从本地文件导入」选择 `.js` 文件）
-3. 填脚本名称 → 点「安装脚本」
-4. 列表中可对每个脚本「启用 / 停用」「查看源码」「导出」「卸载」
+2. 三种安装方式任选其一：
+   - 把脚本源码粘贴到「脚本源码」框 → 填脚本名称 → 点「安装脚本」
+   - 点「或从本地文件导入」选择 `.js` 文件
+   - 在「或从 URL 安装」填入脚本 URL → 点「从 URL 安装」（源码由后台下载，不显示在界面）
+3. 列表中可对每个脚本「启用 / 停用」「查看源码」「导出」「卸载」
 
 Agent 侧通过 `script.list` 查询已装脚本，再用 `script.run` 调用其某个 action。
+
+### 从 URL 安装
+
+「从 URL 安装」由 **background 侧 `fetch`** 下载脚本源码，popup 不接触源码内容。
+适合把脚本托管在任意 HTTP 静态目录（如网关的 `/uploads/`）后按 URL 分发，避免在对话里传输大段源码。
+
+URL 校验由 `background/url_guard.js` 完成（防 SSRF）：
+
+- 只允许 `http` / `https`；拒绝 `file:`、`data:`、`ftp:` 等
+- 拒绝回环与内网地址：`127.0.0.1`、`localhost`、`10.x`、`172.16-31.x`、`192.168.x`、`169.254.x`、`::1`、`fe80::` 等
+- 因此**本机/内网网关不能用 URL 安装**，请改用下面的「网关目录中转」
+
+脚本名可由 URL 末段推导（`.../my-script.js` → `my-script`），推导不出时须显式填写脚本名称。
+下载内容只作为**源码字符串**存储，扩展绝不在 background 求值。
+
+### 网关目录中转
+
+Agent 可把扩展里的脚本保存到网关数据目录（`{data_dir}/browser_scripts/`），
+再从该目录读回安装，全程**不回传脚本原文**：
+
+- `script_save`：扩展 → 网关目录，只回传路径与字节数
+- `script_load_from_file`：网关目录 → 扩展，只回传安装元数据
+
+脚本名只允许 `[A-Za-z0-9_.-]`，禁止 `/`、`\`、`..` 与以 `.` 开头，防止目录穿越。
 
 ### 导出与分享
 
@@ -175,7 +201,8 @@ Agent 侧也可用 `script.export` 取回同样的文本内容（返回 `{ filen
 
 - 脚本默认**启用**；停用后 `script.run` 会返回 `SCRIPT_DISABLED`
 - 脚本在页面主世界求值，可读写该页面的 DOM 与 JS 对象，也可能发起网络请求
-- 扩展**不做**远程脚本下载，脚本只能由用户手动粘贴/导入
+- 脚本可来自手动粘贴/本地导入，也可由 `script.install_from_url` 从 URL 下载；
+  远程下载仅限 http(s) 且拒绝内网地址，**请只安装你自己信任的脚本**
 
 ## 支持的指令（action）
 
@@ -186,7 +213,7 @@ Agent 侧也可用 `script.export` 取回同样的文本内容（返回 `{ filen
 | DOM      | `dom.query` `dom.get_text` `dom.get_html` `dom.click` `dom.type` `dom.hover` `dom.select` `dom.wait_for` `dom.press_key` `dom.scroll` `dom.upload_file` `dom.get_computed_style` |
 | 调试     | `debugger.evaluate` `debugger.send_command` `console.get_logs` `network.get_requests`（走 CDP，不受页面 CSP 限制）                                                               |
 | 脚本     | `script.execute`（执行任意 JS 代码，高危）                                                                                                                                       |
-| 脚本库   | `script.list` `script.get` `script.install` `script.uninstall` `script.export` `script.set_enabled` `script.run`（类油猴脚本管理）                                               |
+| 脚本库   | `script.list` `script.get` `script.install` `script.install_from_url` `script.uninstall` `script.export` `script.set_enabled` `script.run`（类油猴脚本管理）                     |
 | 剪贴板   | `clipboard.write_from_url`（读 URL 内容写入剪贴板）`clipboard.write`（直接写文本/base64）                                                                                        |
 | 书签     | `bookmark.list` `bookmark.search` `bookmark.create` `bookmark.remove` `bookmark.remove_tree`                                                                                     |
 | 历史     | `history.search` `history.recent` `history.remove` `history.remove_range`                                                                                                        |

@@ -1,0 +1,8 @@
+{
+  "id": "20260917_062608_454058",
+  "type": "project_long_term",
+  "tags": ["browser_ext", "测试", "环境"],
+  "content": "写 browser_ext 工具测试时，必须先设 jglobals.master_url（如 'http://gateway.local:8000'），否则 _get_master_url（browser_ext.py:853）会提前返回 'master_url is not set' 错误，导致测试全挂且看不到真实分支逻辑。测试脚本须 sys.path.insert(0, '/home/skyfire/code/Jarvis/src')。",
+  "created_at": "2026-09-17T06:26:08.454078",
+  "updated_at": "2026-09-17T06:26:08.454083"
+}

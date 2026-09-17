@@ -1,0 +1,8 @@
+{
+  "id": "20260917_062608_451224",
+  "type": "project_long_term",
+  "tags": ["browser_ext", "脚本管理", "SSRF", "架构约定"],
+  "content": "Jarvis browser_ext 脚本管理有两条独立路径，互不互通：(1) 扩展侧 script.install_from_url —— 源码由扩展后台 fetch，不进对话上下文，但有 SSRF 防护（url_guard.js 拒绝回环/内网：127.0.0.1、localhost、10.x、172.16-31.x、192.168.x、169.254.x、::1、fe80::），因此本机/内网网关不能用；(2) 工具侧 script_save + script_load_from_file —— 走带 Token 的网关 API，落盘到 {data_dir}/browser_scripts/，不受 SSRF 限制，只回传路径/元数据。网关 /uploads/ 是静态挂载（{data_dir}/uploads），browser_scripts/ 不在其下，无法 URL 访问。",
+  "created_at": "2026-09-17T06:26:08.451256",
+  "updated_at": "2026-09-17T06:26:08.451261"
+}

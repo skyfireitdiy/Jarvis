@@ -649,6 +649,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch((e) => sendResponse({ success: false, error: String(e) }));
     return true;
   }
+  // 从 URL 下载并安装脚本（source 由 background 侧 fetch，popup 不接触源码）
+  if (message.type === "jarvis_script_install_from_url") {
+    router
+      .handle({
+        id: "popup",
+        action: "script.install_from_url",
+        params: {
+          url: message.url,
+          name: message.name,
+          description: message.description,
+          match: message.match,
+          version: message.version,
+        },
+      })
+      .then(sendResponse)
+      .catch((e) => sendResponse({ success: false, error: String(e) }));
+    return true;
+  }
   if (message.type === "jarvis_script_uninstall") {
     router
       .handle({

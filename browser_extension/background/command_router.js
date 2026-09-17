@@ -96,6 +96,7 @@ export class CommandRouter {
       "script.list": (p) => this.scriptExecutor.list(p),
       "script.get": (p) => this.scriptExecutor.get(p),
       "script.install": (p) => this.scriptExecutor.install(p),
+      "script.install_from_url": (p) => this.scriptExecutor.installFromUrl(p),
       "script.uninstall": (p) => this.scriptExecutor.uninstall(p),
       "script.export": (p) => this.scriptExecutor.exportScript(p),
       "script.set_enabled": (p) => this.scriptExecutor.setEnabled(p),

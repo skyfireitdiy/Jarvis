@@ -1,0 +1,8 @@
+{
+  "id": "20260917_062608_452706",
+  "type": "project_long_term",
+  "tags": ["browser_ext", "上下文控制", "关键实现"],
+  "content": "browser_ext.py 中凡涉及脚本原文的路径必须用 _send_command_raw（第 969 行，返回原始 data dict），不能用 _send_command —— 后者走 _format_result，对 dict 会 json.dumps，会把大段源码带进 stdout 即对话上下文。这是本轮「避免 Agent 输出脚本原文」需求的核心实现约束。",
+  "created_at": "2026-09-17T06:26:08.452728",
+  "updated_at": "2026-09-17T06:26:08.452733"
+}

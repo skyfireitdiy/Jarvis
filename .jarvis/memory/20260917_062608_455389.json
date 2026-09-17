@@ -1,0 +1,8 @@
+{
+  "id": "20260917_062608_455389",
+  "type": "project_long_term",
+  "tags": ["browser_ext", "扩展", "存储"],
+  "content": "browser_extension/background/script_manager.js 的 storage key 是 \"scripts\"（常量 STORAGE_KEY，第 26 行），不是 jarvis_scripts。扩展侧 installFromUrl 流程：isAllowedScriptUrl → 名称推导（URL 末段去 .js）→ _fetchSource（会读 resp.headers.get('content-length')，mock 时必须提供 headers）→ validateSource 弱校验 → install()。错误码 SCRIPT_INVALID / SCRIPT_FETCH_ERROR。扩展 background 为 type=module，manifest 已有 host_permissions: ['<all_urls>']。",
+  "created_at": "2026-09-17T06:26:08.455407",
+  "updated_at": "2026-09-17T06:26:08.455412"
+}
