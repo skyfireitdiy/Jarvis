@@ -12632,6 +12632,16 @@ function sendTerminalResize(terminalId, rows, cols) {
   socket.value.send(JSON.stringify(message))
 }
 
+// 判断事件目标是否是可编辑元素（输入框 / 文本域 / contentEditable）
+// 用于全局快捷键避让：在可编辑元素中按键应保留原生行为
+function isEditableElement(target) {
+  if (!target || typeof target !== 'object') return false
+  const tagName = String(target.tagName || '').toLowerCase()
+  if (tagName === 'input' || tagName === 'textarea' || tagName === 'select') return true
+  if (target.isContentEditable) return true
+  return false
+}
+
 // 全局键盘事件处理
 function handleGlobalKeydown(event) {
   const isModifierPressed = event.ctrlKey || event.metaKey
@@ -12734,6 +12744,19 @@ function handleGlobalKeydown(event) {
       renameAgent(agent)
     }
     return
+  }
+
+  // Delete 删除宠物大厅中选中的 Agent（需二次确认）
+  // 仅在宠物大厅有选中宠物、且焦点不在可编辑元素时生效，避免影响正常的删除字符操作
+  if (event.key === 'Delete' && !isModifierPressed && !event.altKey && !event.shiftKey) {
+    if (!isEditableElement(event.target) && lobbyActiveAgentId.value) {
+      const agent = agentList.value.find(a => a.agent_id === lobbyActiveAgentId.value)
+      if (agent) {
+        event.preventDefault()
+        deleteAgent(agent.agent_id)
+        return
+      }
+    }
   }
 
   // Ctrl/Cmd + W 关闭当前焦点所在的面板（需拦截浏览器原生关闭标签页行为）
