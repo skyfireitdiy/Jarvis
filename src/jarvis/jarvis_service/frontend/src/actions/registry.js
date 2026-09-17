@@ -375,6 +375,25 @@ export const ACTIONS = [
     ],
     run: (ctx) => ctx.openInstallExtension && ctx.openInstallExtension(),
   },
+  // ===== 账号 =====
+  {
+    id: "logout",
+    label: "退出登录",
+    en: "Log Out",
+    group: "账号",
+    icon: "🚪",
+    keywords: [
+      "退出",
+      "登出",
+      "注销",
+      "断开",
+      "logout",
+      "signout",
+      "disconnect",
+      "account",
+    ],
+    run: (ctx) => ctx.logout && ctx.logout(),
+  },
   // ===== 标题栏 =====
   {
     id: "toggle-header",
