@@ -31,6 +31,7 @@
       @toggleBatchMode="toggleBatchMode"
       @createAgent="openCreateAgentModal"
       @agentClick="handleAgentItemClick"
+      @agentContextMenu="onSidebarAgentContextMenu"
       @toggleSelectAgent="toggleSelectAgent"
       @renameAgent="renameAgent"
       @copyAgent="copyAgent"
@@ -4193,6 +4194,11 @@ watch(hasNoPanel, (noPanel) => {
   if (noPanel) maybeStartTour('lobby')
 }, { immediate: true })
 
+// 首次打开 Agent 侧边栏时展示侧边栏场景引导
+watch(showAgentSidebar, (visible) => {
+  if (visible) maybeStartTour('sidebar')
+})
+
 // 获取 Panel 的布局样式
 function getPanelLayout() {
   const count = embeddedPanelCount.value
@@ -5263,8 +5269,10 @@ function getCurrentPanel() {
     || null
 }
 // 命令面板「当前 Agent」组使用的 Agent ID：
-// 优先当前激活 Panel 内的 Agent；其次宠物大厅中选中的宠物对应的 Agent；最后回退到 currentAgentId
+// 优先右键菜单锁定的 Agent；其次当前激活 Panel 内的 Agent；再次宠物大厅中选中的宠物对应的 Agent；最后回退到 currentAgentId
 const commandPaletteCurrentAgentId = computed(() => {
+  // 右键菜单打开时，菜单动作一律作用于被右键的那个 Agent（不改动面板与当前 Agent）
+  if (panelContextMenu.value.visible && contextMenuAgentId.value) return contextMenuAgentId.value
   // 宠物大厅（无嵌入面板）中，以大厅选中的宠物为准，避免被残留的分离面板干扰
   if (hasNoPanel.value && lobbyActiveAgentId.value) return lobbyActiveAgentId.value
   const panel = getCurrentPanel()
@@ -5421,6 +5429,7 @@ function getTourSteps(tourId) {
   if (tourId === 'lobby') return LOBBY_TOUR_STEPS()
   if (tourId === 'agent') return AGENT_TOUR_STEPS()
   if (tourId === 'panel') return PANEL_TOUR_STEPS()
+  if (tourId === 'sidebar') return SIDEBAR_TOUR_STEPS()
   return []
 }
 
@@ -5593,6 +5602,49 @@ function PANEL_TOUR_STEPS() {
   ]
 }
 
+// 侧边栏场景：首次打开 Agent 侧边栏后展示
+function SIDEBAR_TOUR_STEPS() {
+  return [
+    {
+      id: 'sidebar-list',
+      icon: '📋',
+      title: 'Agent 列表',
+      desc: '侧边栏按节点与自定义分组列出全部 Agent，每项显示类型、名称、状态与工作目录；点击即可在面板中打开它。',
+      hint: '等待输入的 Agent 会高亮闪烁，提醒你及时处理。',
+      target: '.agent-sidebar',
+      placement: 'right',
+    },
+    {
+      id: 'sidebar-context-menu',
+      icon: '🖱',
+      title: 'Agent 右键菜单',
+      desc: '在任一 Agent 项上右键，可就地执行查看变更、创建终端、打开编辑器、重命名、复制、权限管理、无损重生、删除等操作，无需先打开面板。',
+      hint: '菜单内容与命令面板（Ctrl+P）的「当前 Agent」组一致，作用于被右键的那个 Agent。',
+      target: '.agent-item',
+      placement: 'right',
+    },
+    {
+      id: 'sidebar-batch',
+      icon: '☑',
+      title: '批量操作',
+      desc: '点击侧边栏顶部的「☑」进入批量选择模式，可勾选多个 Agent 后批量复制、加入分组或删除。',
+      hint: '批量删除不可恢复，操作前请确认选中的 Agent。',
+      target: '.agent-sidebar',
+      placement: 'right',
+    },
+    {
+      id: 'sidebar-groups',
+      icon: '📁',
+      title: '管理分组',
+      desc: '点击侧边栏顶部的「📁」可重命名或删除自定义分组；分组可折叠，便于按项目或用途归类 Agent。',
+      hint: 'Agent 停止后会自动从分组中移除，避免分组里堆积无效条目。',
+      target: '.agent-sidebar',
+      placement: 'right',
+    },
+  ]
+}
+
+// 清除全部引导标记（命令面板「重置新手引导」），下次进入对应场景会重新触发
 // 清除全部引导标记（命令面板「重置新手引导」），下次进入对应场景会重新触发
 function resetOnboardingMarks() {
   try {
@@ -5634,6 +5686,8 @@ function finishTour() {
 function startOnboarding(tourId = 'welcome') {
   clearOnboardingTimer()
   activeTourId.value = tourId
+  // 侧边栏场景需先展开侧边栏，否则引导目标不可见
+  if (tourId === 'sidebar') showAgentSidebar.value = true
 }
 // 命令面板上下文：统一暴露宠物菜单与命令面板共用的动作回调
 const commandPaletteCtx = computed(() => ({
@@ -5782,15 +5836,19 @@ function onLobbyContextRun(action) {
 // ===== Panel 右键菜单（与宠物右键同款动作） =====
 // 菜单坐标使用视口坐标（position: fixed），name 用作标题
 const panelContextMenu = ref({ visible: false, x: 0, y: 0, name: '' })
+// 右键菜单锁定的 Agent：菜单打开期间，「当前 Agent」组动作作用于它，而非当前激活面板
+const contextMenuAgentId = ref(null)
 
 function closePanelContextMenu() {
   if (panelContextMenu.value.visible) panelContextMenu.value.visible = false
+  contextMenuAgentId.value = null
 }
 
 // 在 Panel 内右键（未选中文字）：先激活该 Panel 使「当前 Agent」指向它，再就地弹出菜单
 function onPanelContextMenu(panel, event) {
   if (!panel || !panel.agentId) return
   activatePanel(panel.id)
+  contextMenuAgentId.value = panel.agentId
   const agent = agentList.value.find(a => a.agent_id === panel.agentId)
   const MENU_W = 320
   const rows = Math.max(1, Math.ceil(lobbyContextActions.value.length / 2))
@@ -5812,6 +5870,25 @@ function onPanelContextAction(action) {
   if (!action || action.enabled === false) return
   closePanelContextMenu()
   onLobbyContextRun(action)
+}
+
+// 侧边栏 Agent 项右键：锁定该 Agent 为菜单作用对象，就地弹出操作菜单（不改变当前面板布局）
+function onSidebarAgentContextMenu(agent, event) {
+  if (!agent || !event) return
+  contextMenuAgentId.value = agent.agent_id
+  const MENU_W = 320
+  const rows = Math.max(1, Math.ceil(lobbyContextActions.value.length / 2))
+  const MENU_H = Math.min(44 + rows * 33, window.innerHeight * 0.6)
+  let x = event.clientX
+  let y = event.clientY
+  if (x + MENU_W > window.innerWidth) x = Math.max(window.innerWidth - MENU_W, 0)
+  if (y + MENU_H > window.innerHeight) y = Math.max(window.innerHeight - MENU_H, 0)
+  panelContextMenu.value = {
+    visible: true,
+    x,
+    y,
+    name: agent.name || agent.agent_id,
+  }
 }
 
 // 大厅节点右键菜单点击：创建 Agent / 打开终端 / 更新代码 / 重启服务（后续可在此扩展更多节点操作）
