@@ -20,6 +20,8 @@ export const ACTIONS = [
   {
     id: "current-view-diff",
     label: "查看变更",
+    shortcut: "Ctrl+Alt+D",
+    condition: "需选中当前 Agent",
     en: "View Diff",
     group: "当前 Agent",
     icon: "🔀",
@@ -30,6 +32,8 @@ export const ACTIONS = [
   {
     id: "current-view-rules",
     label: "查看规则",
+    shortcut: "Ctrl+Alt+R",
+    condition: "需选中当前 Agent",
     en: "View Rules",
     group: "当前 Agent",
     icon: "📜",
@@ -40,6 +44,8 @@ export const ACTIONS = [
   {
     id: "current-view-tools",
     label: "查看工具",
+    shortcut: "Ctrl+Alt+T",
+    condition: "需选中当前 Agent",
     en: "View Tools",
     group: "当前 Agent",
     icon: "🔧",
@@ -50,6 +56,8 @@ export const ACTIONS = [
   {
     id: "current-create-terminal",
     label: "创建终端",
+    shortcut: "Ctrl+Alt+`",
+    condition: "需选中当前 Agent",
     en: "Create Terminal",
     group: "当前 Agent",
     icon: "💻",
@@ -61,6 +69,8 @@ export const ACTIONS = [
   {
     id: "current-open-editor",
     label: "打开编辑器",
+    shortcut: "Ctrl+Alt+E",
+    condition: "需选中当前 Agent",
     en: "Open Editor",
     group: "当前 Agent",
     icon: "📝",
@@ -71,6 +81,8 @@ export const ACTIONS = [
   {
     id: "current-toggle-auto-scroll",
     label: "切换自动滚动",
+    shortcut: "Ctrl+Alt+S",
+    condition: "需选中当前 Agent",
     en: "Toggle Auto Scroll",
     group: "当前 Agent",
     icon: "⤓",
@@ -81,6 +93,8 @@ export const ACTIONS = [
   {
     id: "current-toggle-auto-read",
     label: "切换自动朗读",
+    shortcut: "Ctrl+Alt+V",
+    condition: "需选中当前 Agent",
     en: "Toggle Auto Read",
     group: "当前 Agent",
     icon: "🔊",
@@ -91,6 +105,8 @@ export const ACTIONS = [
   {
     id: "current-exit-non-interactive",
     label: "退出非交互模式",
+    shortcut: "Ctrl+Alt+X",
+    condition: "需选中当前 Agent",
     en: "Exit Non-Interactive Mode",
     group: "当前 Agent",
     icon: "🔓",
@@ -102,6 +118,8 @@ export const ACTIONS = [
   {
     id: "current-manual-interrupt",
     label: "人工介入",
+    shortcut: "Ctrl+Alt+I",
+    condition: "需选中当前 Agent",
     en: "Manual Interrupt",
     group: "当前 Agent",
     icon: "🛑",
@@ -112,6 +130,8 @@ export const ACTIONS = [
   {
     id: "current-rename",
     label: "重命名",
+    shortcut: "F2",
+    condition: "需选中当前 Agent",
     en: "Rename",
     group: "当前 Agent",
     icon: "✏",
@@ -122,6 +142,8 @@ export const ACTIONS = [
   {
     id: "current-copy",
     label: "复制",
+    shortcut: "Ctrl+Alt+C",
+    condition: "需选中当前 Agent",
     en: "Copy",
     group: "当前 Agent",
     icon: "📋",
@@ -132,6 +154,8 @@ export const ACTIONS = [
   {
     id: "current-edit-access",
     label: "权限管理",
+    shortcut: "Ctrl+Alt+P",
+    condition: "需选中当前 Agent 且为属主",
     en: "Access Control",
     group: "当前 Agent",
     icon: "🔒",
@@ -142,6 +166,8 @@ export const ACTIONS = [
   {
     id: "current-regenerate",
     label: "无损重生",
+    shortcut: "Ctrl+Alt+G",
+    condition: "需选中当前 Agent 且为属主",
     en: "Regenerate",
     group: "当前 Agent",
     icon: "🔄",
@@ -152,6 +178,8 @@ export const ACTIONS = [
   {
     id: "current-delete",
     label: "删除",
+    shortcut: "Ctrl+Alt+Shift+D",
+    condition: "需选中当前 Agent",
     en: "Delete",
     group: "当前 Agent",
     icon: "🗑",
@@ -162,6 +190,8 @@ export const ACTIONS = [
   {
     id: "current-toggle-output",
     label: "隐藏输出",
+    shortcut: "Ctrl+Alt+O",
+    condition: "需选中当前 Agent",
     en: "Toggle Output",
     group: "当前 Agent",
     icon: "🙈",
@@ -181,6 +211,8 @@ export const ACTIONS = [
   {
     id: "current-detach-panel",
     label: "分离当前焦点面板",
+    shortcut: "Ctrl+Alt+F",
+    condition: "需存在当前焦点面板",
     en: "Detach Focused Panel",
     group: "界面",
     icon: "⧉",
@@ -190,6 +222,8 @@ export const ACTIONS = [
   {
     id: "current-close-panel",
     label: "关闭当前焦点面板",
+    shortcut: "Ctrl+Alt+W",
+    condition: "需存在当前焦点面板",
     en: "Close Focused Panel",
     group: "界面",
     icon: "✕",
@@ -199,6 +233,8 @@ export const ACTIONS = [
   {
     id: "interrupt-current",
     label: "中断当前 Agent",
+    shortcut: "Ctrl+Alt+K",
+    condition: "需选中当前 Agent",
     en: "Interrupt Current Agent",
     group: "执行",
     icon: "⏹",
@@ -209,6 +245,8 @@ export const ACTIONS = [
   {
     id: "goto-waiting",
     label: "奔赴等待输入的 Agent",
+    shortcut: "Ctrl+Alt+J",
+    condition: "需存在等待输入的 Agent",
     en: "Go to Waiting Agent",
     group: "执行",
     icon: "🚨",
@@ -222,6 +260,8 @@ export const ACTIONS = [
   {
     id: "sync-status",
     label: "同步 Agent 状态",
+    shortcut: "Ctrl+Alt+Y",
+    condition: "无特殊条件（全局可用）",
     en: "Sync Agent Status",
     group: "执行",
     icon: "🔄",
@@ -231,6 +271,8 @@ export const ACTIONS = [
   {
     id: "create-agent",
     label: "新建 Agent",
+    shortcut: "Ctrl+N",
+    condition: "已登录且不在输入框内",
     en: "New Agent",
     group: "Agent",
     icon: "➕",
@@ -240,6 +282,8 @@ export const ACTIONS = [
   {
     id: "refresh-agents",
     label: "刷新 Agent 列表",
+    shortcut: "Ctrl+Alt+L",
+    condition: "已登录",
     en: "Refresh Agent List",
     group: "Agent",
     icon: "🔃",
@@ -249,6 +293,8 @@ export const ACTIONS = [
   {
     id: "restart-gateway",
     label: "重启网关",
+    shortcut: "Ctrl+Alt+Shift+R",
+    condition: "需 admin:config 权限",
     en: "Restart Gateway",
     group: "网关",
     icon: "♻",
@@ -259,6 +305,8 @@ export const ACTIONS = [
   {
     id: "restart-all-nodes",
     label: "重启所有节点",
+    shortcut: "Ctrl+Alt+Shift+N",
+    condition: "需 admin:config 权限",
     en: "Restart All Nodes",
     group: "网关",
     icon: "🔁",
@@ -269,6 +317,8 @@ export const ACTIONS = [
   {
     id: "toggle-sidebar",
     label: "切换 Agent 侧边栏",
+    shortcut: "Ctrl+A",
+    condition: "不在输入框内",
     en: "Toggle Agent Sidebar",
     group: "界面",
     icon: "📋",
@@ -278,6 +328,8 @@ export const ACTIONS = [
   {
     id: "manage-groups",
     label: "管理分组",
+    shortcut: "Ctrl+Alt+M",
+    condition: "已登录",
     en: "Manage Groups",
     group: "界面",
     icon: "📁",
@@ -287,6 +339,8 @@ export const ACTIONS = [
   {
     id: "toggle-terminal",
     label: "切换终端面板",
+    shortcut: "Ctrl+`",
+    condition: "不在输入框内",
     en: "Toggle Terminal Panel",
     group: "界面",
     icon: "🖥",
@@ -296,6 +350,8 @@ export const ACTIONS = [
   {
     id: "toggle-chat",
     label: "切换聊天面板",
+    shortcut: "Ctrl+Alt+H",
+    condition: "已登录",
     en: "Toggle Chat Panel",
     group: "界面",
     icon: "💬",
@@ -305,6 +361,8 @@ export const ACTIONS = [
   {
     id: "open-topology",
     label: "查看网络拓扑",
+    shortcut: "Ctrl+Alt+U",
+    condition: "已登录",
     en: "View Network Topology",
     group: "界面",
     icon: "🗺",
@@ -314,6 +372,8 @@ export const ACTIONS = [
   {
     id: "open-settings",
     label: "打开设置",
+    shortcut: "Ctrl+Alt+,",
+    condition: "已登录",
     en: "Open Settings",
     group: "界面",
     icon: "⚙",
@@ -323,6 +383,8 @@ export const ACTIONS = [
   {
     id: "toggle-pet",
     label: "隐藏/显示宠物",
+    shortcut: "Ctrl+Alt+B",
+    condition: "已登录",
     en: "Toggle Pet",
     group: "界面",
     icon: "🐾",
@@ -332,6 +394,8 @@ export const ACTIONS = [
   {
     id: "open-agent-list",
     label: "Agent 列表",
+    shortcut: "Ctrl+L",
+    condition: "已登录",
     en: "Agent List",
     group: "界面",
     icon: "📋",
@@ -341,6 +405,8 @@ export const ACTIONS = [
   {
     id: "open-onboarding",
     label: "查看 Jarvis 介绍",
+    shortcut: "Ctrl+Alt+Shift+/",
+    condition: "已登录",
     en: "About Jarvis",
     group: "界面",
     icon: "🎓",
@@ -362,6 +428,8 @@ export const ACTIONS = [
   {
     id: "open-sidebar-onboarding",
     label: "查看侧边栏引导",
+    shortcut: "Ctrl+Alt+Shift+S",
+    condition: "已登录",
     en: "Sidebar Guide",
     group: "界面",
     icon: "📋",
@@ -381,6 +449,8 @@ export const ACTIONS = [
   {
     id: "reset-onboarding",
     label: "重置新手引导",
+    shortcut: "Ctrl+Alt+Shift+O",
+    condition: "已登录",
     en: "Reset Onboarding",
     group: "界面",
     icon: "♻️",
@@ -401,6 +471,8 @@ export const ACTIONS = [
   {
     id: "install-browser-extension",
     label: "安装浏览器插件",
+    shortcut: "Ctrl+Alt+Shift+E",
+    condition: "已登录",
     en: "Install Browser Extension",
     group: "界面",
     icon: "🧩",
@@ -416,10 +488,32 @@ export const ACTIONS = [
     ],
     run: (ctx) => ctx.openInstallExtension && ctx.openInstallExtension(),
   },
+  {
+    id: "open-shortcut-help",
+    label: "查看快捷键一览",
+    shortcut: "Ctrl+Alt+/",
+    condition: "已登录",
+    en: "Keyboard Shortcuts",
+    group: "界面",
+    icon: "⌨️",
+    keywords: [
+      "快捷键",
+      "键盘",
+      "帮助",
+      "一览",
+      "shortcut",
+      "keyboard",
+      "help",
+      "keys",
+    ],
+    run: (ctx) => ctx.openShortcutHelp && ctx.openShortcutHelp(),
+  },
   // ===== 账号 =====
   {
     id: "logout",
     label: "退出登录",
+    shortcut: "Ctrl+Alt+Shift+Q",
+    condition: "已登录",
     en: "Log Out",
     group: "账号",
     icon: "🚪",
@@ -439,6 +533,8 @@ export const ACTIONS = [
   {
     id: "toggle-header",
     label: "显示/隐藏标题栏",
+    shortcut: "Ctrl+Alt+Shift+H",
+    condition: "已登录",
     en: "Toggle Header Bar",
     group: "标题栏",
     icon: "▤",
@@ -457,6 +553,8 @@ export const ACTIONS = [
   {
     id: "admin-update-code-to-main",
     label: "更新代码到 main 分支",
+    shortcut: "Ctrl+Alt+Shift+U",
+    condition: "需 admin:config 权限",
     en: "Update Code to main",
     group: "管理",
     icon: "⬆",
@@ -467,6 +565,8 @@ export const ACTIONS = [
   {
     id: "admin-restart-node-service",
     label: "重启节点服务",
+    shortcut: "Ctrl+Alt+Shift+T",
+    condition: "需 admin:config 权限",
     en: "Restart Node Service",
     group: "管理",
     icon: "♻",
@@ -477,6 +577,8 @@ export const ACTIONS = [
   {
     id: "admin-sync-config",
     label: "同步配置到其他节点",
+    shortcut: "Ctrl+Alt+Shift+Y",
+    condition: "需 admin:config 权限",
     en: "Sync Config to Nodes",
     group: "管理",
     icon: "🔃",
@@ -487,6 +589,8 @@ export const ACTIONS = [
   {
     id: "admin-node-secret",
     label: "查看节点连接私钥",
+    shortcut: "Ctrl+Alt+Shift+K",
+    condition: "需 admin:config 权限",
     en: "View Node Secret",
     group: "管理",
     icon: "🔑",
@@ -497,6 +601,8 @@ export const ACTIONS = [
   {
     id: "admin-open-panel",
     label: "打开管理面板",
+    shortcut: "Ctrl+Alt+Shift+A",
+    condition: "需 admin 权限（config/users/permissions 任一）",
     en: "Open Admin Panel",
     group: "管理",
     icon: "🛠",

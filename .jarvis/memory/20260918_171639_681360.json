@@ -1,0 +1,8 @@
+{
+  "id": "20260918_171639_681360",
+  "type": "project_long_term",
+  "tags": ["jarvis", "frontend", "shortcut", "registry", "App.vue"],
+  "content": "Jarvis 前端快捷键体系：单一数据源为 src/jarvis/jarvis_service/frontend/src/actions/registry.js，每个动作含 id/label/shortcut/condition/en/group/icon/keywords/enabled/run。App.vue 的 handleGlobalKeydown 通过 parseShortcut/matchShortcut（基于 event.code）统一分发 Ctrl+Alt 系列；既有 Ctrl+P/L/S/E/A/`/W 分支已加 !event.altKey 守卫避免抢占。快捷键一览界面为 components/ShortcutHelpModal.vue（动作 open-shortcut-help，Ctrl+Alt+/）。新增快捷键时只需在 registry 填 shortcut+condition 即可自动生效并展示。",
+  "created_at": "2026-09-18T17:16:39.681394",
+  "updated_at": "2026-09-18T17:16:39.681400"
+}
