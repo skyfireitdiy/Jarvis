@@ -143,16 +143,50 @@ function computeCardPosition(rect) {
   }
 }
 
-function refreshLayout() {
-  if (!props.visible || !currentStep.value) {
-    highlightRect.value = null
-    return
+// 目标就绪等待：目标元素可能因数据/异步渲染尚未挂载，短暂轮询等待其出现，
+// 避免引导弹出瞬间因目标缺失而静默跳过或退化为居中卡片。
+const TARGET_WAIT_TIMEOUT = 1200 // 最长等待时长（毫秒）
+let targetWaitRaf = null
+let targetWaitStart = 0
+let targetWaitToken = 0
+
+function cancelTargetWait() {
+  if (targetWaitRaf !== null) {
+    cancelAnimationFrame(targetWaitRaf)
+    targetWaitRaf = null
   }
-  const el = resolveTargetElement()
-  if (!el) {
-    highlightRect.value = null
-    return
+  targetWaitToken += 1
+}
+
+// 等待目标元素出现：命中即定位；超时仍缺失则退化为居中卡片
+function waitForTarget() {
+  cancelTargetWait()
+  const token = targetWaitToken
+  targetWaitStart = performance.now()
+  const tick = () => {
+    // 引导已关闭或步骤已切换，放弃本轮等待
+    if (token !== targetWaitToken || !props.visible || !currentStep.value) {
+      targetWaitRaf = null
+      return
+    }
+    const el = resolveTargetElement()
+    if (el) {
+      targetWaitRaf = null
+      applyHighlight(el)
+      return
+    }
+    if (performance.now() - targetWaitStart >= TARGET_WAIT_TIMEOUT) {
+      targetWaitRaf = null
+      highlightRect.value = null
+      return
+    }
+    targetWaitRaf = requestAnimationFrame(tick)
   }
+  targetWaitRaf = requestAnimationFrame(tick)
+}
+
+// 依据目标元素计算高亮区域与卡片位置
+function applyHighlight(el) {
   const rect = el.getBoundingClientRect()
   highlightRect.value = {
     top: rect.top,
@@ -163,6 +197,23 @@ function refreshLayout() {
     right: rect.right,
   }
   cardPosition.value = computeCardPosition(rect)
+}
+
+function refreshLayout() {
+  if (!props.visible || !currentStep.value) {
+    cancelTargetWait()
+    highlightRect.value = null
+    return
+  }
+  const el = resolveTargetElement()
+  if (!el) {
+    // 目标暂未就绪：先保持居中卡片，同时等待其出现后自动定位
+    highlightRect.value = null
+    waitForTarget()
+    return
+  }
+  cancelTargetWait()
+  applyHighlight(el)
 }
 
 const maskStyle = (side) => {
@@ -293,9 +344,12 @@ watch(
   () => props.visible,
   (visible) => {
     if (visible) {
-      stepIndex.value = findVisibleStepIndex(0)
+      // 从第 0 步开始：目标可能因异步渲染尚未挂载，交由 refreshLayout 的等待机制
+      // 处理（就绪后自动高亮；超时仍缺失才退化为居中卡片），避免误判为不可见而跳过。
+      stepIndex.value = 0
       nextTick(refreshLayout)
     } else {
+      cancelTargetWait()
       highlightRect.value = null
     }
   },
@@ -313,6 +367,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  cancelTargetWait()
   window.removeEventListener('keydown', onKeydown, true)
   window.removeEventListener('resize', onViewportChange)
   window.removeEventListener('scroll', onViewportChange, true)
