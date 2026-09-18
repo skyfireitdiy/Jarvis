@@ -502,6 +502,7 @@
         <PetLobby
           ref="petLobbyRef"
           :agents="agentList"
+          :agentsLoaded="agentListLoaded"
           :nodes="availableNodeOptions"
           :getStatusClass="getStatusClass"
           :getInputState="getLobbyInputState"
@@ -4976,6 +4977,7 @@ async function loadHistoryMessages(prepend = false, agentId = null) {
 
 // Agent 管理
 const agentList = ref([])        // Agent 列表
+const agentListLoaded = ref(false) // 是否已完成首次 Agent 列表拉取（无论成功失败）
 const currentAgentId = ref(null) // 当前连接的 Agent ID
 const agentStatuses = ref(new Map()) // Agent 状态映射 (agent_id -> {execution_status, agent_status})
 function isStoppedAgent(agent) {
@@ -8179,6 +8181,9 @@ async function fetchAgentList() {
     }
   } catch (error) {
     console.error('[AGENT] Fetch list failed:', error)
+  } finally {
+    // 首次拉取结束（无论成功失败）后放行大厅空状态引导，避免有 Agent 时闪现
+    agentListLoaded.value = true
   }
 }
 
