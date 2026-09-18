@@ -1,0 +1,8 @@
+{
+  "id": "20260918_124444_198889",
+  "type": "project_long_term",
+  "tags": ["search_web", "多源聚合", "架构决策", "Jarvis"],
+  "content": "Jarvis search_web 工具（src/jarvis/jarvis_tools/search_web.py）采用多源聚合方案（方案A）：降级链为 ddgr → 多源聚合 → Bing(兜底)。各源方法统一返回 list[Dict[str,str]]，含 title/url/abstract 三个 key。聚合策略：ThreadPoolExecutor 并行调用，总超时 25s，每源上限 5 条，按 URL 归一化去重（去 query 参数、去尾斜杠、小写域名），优先级 StackOverflow > GitHub > 360 > Bing。已完成 _search_stackoverflow（行69-119）与 _search_github（行121-166）。",
+  "created_at": "2026-09-18T12:44:44.198928",
+  "updated_at": "2026-09-18T12:44:44.198934"
+}

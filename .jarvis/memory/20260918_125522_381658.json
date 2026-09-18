@@ -1,0 +1,8 @@
+{
+  "id": "20260918_125522_381658",
+  "type": "project_long_term",
+  "tags": ["Jarvis", "search_web", "可用源", "实测数据", "网络环境"],
+  "content": "Jarvis 云主机（154.40.44.163，香港机房）实测搜索源可用性：稳定可用=StackOverflow API(api.stackexchange.com/2.3/search/advanced)、GitHub API(api.github.com/search/repositories)；不可用=ddgr/DDG系/Google/Brave/Yahoo/Mojeek/Ecosia（被墙）、百度（IP封禁，返回1438字节验证页）、360（IP封禁，返回\"访问异常页面\"，60s未恢复）、搜狗（antispider跳转）、CSDN API（ReadTimeout）、Yandex/Swisscows/Marginalia/searx公共实例（需JS渲染）；质量差=Bing（0/12命中）、掘金（2/4命中词）。结论：通用网页搜索（非技术类）无可靠源，垂直API稳定。",
+  "created_at": "2026-09-18T12:55:22.381673",
+  "updated_at": "2026-09-18T12:55:22.381677"
+}

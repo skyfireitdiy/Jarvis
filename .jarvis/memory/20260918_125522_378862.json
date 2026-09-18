@@ -1,0 +1,8 @@
+{
+  "id": "20260918_125522_378862",
+  "type": "project_long_term",
+  "tags": ["Jarvis", "search_web", "架构决策", "多源聚合", "降级链"],
+  "content": "Jarvis search_web 工具已改造为多源聚合（src/jarvis/jarvis_tools/search_web.py，689 行）。降级链：ddgr → _search_multi_source（StackOverflow + GitHub + 360 并行）→ Bing 兜底。核心方法：_search_stackoverflow/_search_github/_search_360（各返回 list[Dict[str,str]]，含 title/url/abstract）、_search_multi_source（ThreadPoolExecutor 并行 + _normalize_url 去重）、_fallback_search（降级入口）、_is_anti_spider_page（反爬页识别）。测试在 tests/jarvis_tools/test_search_web.py（19 项）。",
+  "created_at": "2026-09-18T12:55:22.378892",
+  "updated_at": "2026-09-18T12:55:22.378898"
+}

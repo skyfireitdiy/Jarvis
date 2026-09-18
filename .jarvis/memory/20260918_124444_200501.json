@@ -1,0 +1,8 @@
+{
+  "id": "20260918_124444_200501",
+  "type": "project_long_term",
+  "tags": ["search_web", "可用源", "实测数据", "网络环境"],
+  "content": "Jarvis 云主机（154.40.44.163 香港机房）大陆免代理搜索源实测结论：可用——StackOverflow API（api.stackexchange.com/2.3/search/advanced，263ms，质量5星，有配额）、GitHub API（api.github.com/search/repositories，561ms，质量5星）、360（www.so.com/s?q=，h3 a 解析，质量4星但偶超时达22s）。不可用——百度（易触发反爬，连续请求后返回1438字节验证页，30s未恢复）、搜狗（antispider跳转）、CSDN API（ReadTimeout不稳定）、Bing（云主机上被降级，实测0/12命中）、DDG系/Brave/Yahoo/Google/Mojeek/Ecosia（被墙）、Yandex/Swisscows/Marginalia/searx公共实例（需JS渲染或验证）。",
+  "created_at": "2026-09-18T12:44:44.200530",
+  "updated_at": "2026-09-18T12:44:44.200535"
+}

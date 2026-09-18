@@ -1,0 +1,8 @@
+{
+  "id": "20260918_125522_380317",
+  "type": "project_long_term",
+  "tags": ["Jarvis", "search_web", "依赖约定", "约束"],
+  "content": "Jarvis 项目依赖约定：pyproject.toml 已声明 requests==2.32.3、httpx、beautifulsoup4、playwright、ddgr。新增代码必须用已声明依赖，禁止引入 curl_cffi（虽装在 .venv 但未声明）。search_web 各源方法统一返回 list[Dict[str,str]]（title/url/abstract），异常处理统一用 save_exception(e, module=\"jarvis_tools.search_web\", function=\"<方法名>\") + 返回空列表。",
+  "created_at": "2026-09-18T12:55:22.380335",
+  "updated_at": "2026-09-18T12:55:22.380339"
+}
