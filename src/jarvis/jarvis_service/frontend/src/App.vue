@@ -7257,7 +7257,12 @@ async function fetchAgentStatus(agent) {
     const executionStatus = result.execution_status || 'running'
     
     // 更新状态映射（存储对象格式）
-    agentStatuses.value.set(agent.agent_id, {execution_status: executionStatus, non_interactive: !!result.non_interactive})
+    // 本地确认条仍在时（如 completeFromPanel 已在本地进入确认态），后端 execution_status
+    // 可能仍停留在 waiting_multi，此时不能覆盖本地状态，否则 y/n/Enter 键会失效。
+    const hasLocalConfirm = panelConfirmData.value.has(agent.agent_id)
+    if (!hasLocalConfirm) {
+      agentStatuses.value.set(agent.agent_id, {execution_status: executionStatus, non_interactive: !!result.non_interactive})
+    }
 
     // 当前 Agent 连接后根据 execution_status 恢复输入 UI
     if (agent.agent_id === currentAgentId.value) {
@@ -7269,6 +7274,13 @@ async function fetchAgentStatus(agent) {
         const sp = targetPanel ? sessionPanelRefs.get(targetPanel.id) : null
         if (sp?.focusInput && !isAutoFocusSuppressed()) sp.focusInput()
       } else if (executionStatus === 'waiting_multi') {
+        // 本地确认条仍在时（如 completeFromPanel 已在本地进入确认态），
+        // 后端 execution_status 可能仍停留在 waiting_multi，
+        // 此时不能把输入框重置为多行，否则确认条还在、输入框却已变回多行。
+        // 用户确认/取消后 panelConfirmData 会被清除，下一次轮询再正常同步。
+        if (hasLocalConfirm) {
+          return executionStatus
+        }
         inputMode.value = 'multi'
         panelInputModes.value.set(agent.agent_id, 'multi')
         // 聚焦输入框（弹窗或宠物环形菜单打开时不抢焦点）
