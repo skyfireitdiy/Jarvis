@@ -215,7 +215,7 @@
         <button class="pet-lobby-empty-btn primary" type="button" @click="createFirstAgent">
           ➕ 创建第一个 Agent
         </button>
-        <button class="pet-lobby-empty-btn" type="button" @click="emit('openOnboarding')">
+        <button class="pet-lobby-empty-btn" type="button" @click="emit('openOnboarding', 'welcome')">
           🎓 查看新手引导
         </button>
       </div>
