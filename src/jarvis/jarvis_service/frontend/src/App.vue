@@ -1701,7 +1701,12 @@ const auth = ref({
   userInfo: null
 })
 const username = ref(localStorage.getItem('jarvis_username') || '')
-const gatewayUrl = ref(localStorage.getItem('jarvis_gateway_url') || '127.0.0.1:8000')
+// 默认网关地址：协议跟随当前页面（https → wss），域名为当前前端域名，端口固定 8000
+function buildDefaultGatewayUrl() {
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+  return `${wsProtocol}://${window.location.hostname}:8000`
+}
+const gatewayUrl = ref(localStorage.getItem('jarvis_gateway_url') || buildDefaultGatewayUrl())
 const socket = ref(null) // Gateway 连接
 const sockets = ref(new Map()) // 多 Agent 连接存储：agent_id -> WebSocket
 
