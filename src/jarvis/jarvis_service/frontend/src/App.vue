@@ -3969,6 +3969,8 @@ function openAgentInPanel(agent, panelId = null) {
   activePanelId.value = targetPanel.id
   // 切换当前 Agent
   switchAgent(agent)
+  // 首次打开对话面板时展示 Panel 场景引导（等 Panel 挂载后再触发，确保高亮目标存在）
+  nextTick(() => maybeStartTour('panel'))
 }
 
 // 「在当前 Panel 中打开 Agent」：命令面板按 Enter 时使用
@@ -4195,9 +4197,15 @@ const embeddedPanelCount = computed(() => {
 // 当前是否没有任何可见的内嵌 Panel（用于展示空状态欢迎背景）
 const hasNoPanel = computed(() => embeddedPanelCount.value === 0)
 
+// 是否已完成首次 Agent 列表拉取（无论成功失败）。
+// 声明位置需早于下方 immediate watch（否则 watch 立即求值会命中 TDZ）。
+const agentListLoaded = ref(false)
+
 // 首次进入宠物大厅（无任何可见 Panel）时展示大厅场景引导
-watch(hasNoPanel, (noPanel) => {
-  if (noPanel) maybeStartTour('lobby')
+// 需等 Agent 列表首次拉取完成（agentListLoaded）后再触发：未登录时列表尚未拉取，
+// 登录弹窗正遮住大厅，此时弹引导既看不到、又会被误标记为已看过。
+watch([hasNoPanel, agentListLoaded], ([noPanel, loaded]) => {
+  if (noPanel && loaded) maybeStartTour('lobby')
 }, { immediate: true })
 
 // 首次打开 Agent 侧边栏时展示侧边栏场景引导
@@ -4982,7 +4990,6 @@ async function loadHistoryMessages(prepend = false, agentId = null) {
 
 // Agent 管理
 const agentList = ref([])        // Agent 列表
-const agentListLoaded = ref(false) // 是否已完成首次 Agent 列表拉取（无论成功失败）
 const currentAgentId = ref(null) // 当前连接的 Agent ID
 const agentStatuses = ref(new Map()) // Agent 状态映射 (agent_id -> {execution_status, agent_status})
 function isStoppedAgent(agent) {
@@ -5651,7 +5658,6 @@ function SIDEBAR_TOUR_STEPS() {
   ]
 }
 
-// 清除全部引导标记（命令面板「重置新手引导」），下次进入对应场景会重新触发
 // 清除全部引导标记（命令面板「重置新手引导」），下次进入对应场景会重新触发
 function resetOnboardingMarks() {
   try {
@@ -7898,8 +7904,11 @@ async function createAgent() {
       await fetchAgentList()
       // 开始定时刷新列表
       startAgentListRefresh()
-      // 首次创建出 Agent 后展示 Agent 场景引导
-      maybeStartTour('agent')
+      // 首次创建出 Agent 后展示 Agent 场景引导。
+      // openAgentInPanel 会在 nextTick 中调度 Panel 场景引导；此处再注册一个 nextTick
+      // （注册更晚，回调更晚执行），使 Agent 引导清除 Panel 引导的定时器并优先展示，
+      // 避免「创建 Agent」这一更强场景的引导被 Panel 引导吞掉。
+      nextTick(() => maybeStartTour('agent'))
     } else {
       alert('创建失败：返回数据格式错误')
     }
@@ -9332,9 +9341,6 @@ function onLobbyComplete(agentId) {
 async function switchAgent(agent) {
   // 递增切换代数，使旧的switchAgent操作失效
   const thisGeneration = ++switchGeneration.value
-
-  // 首次打开对话面板时展示 Panel 场景引导
-  maybeStartTour('panel')
 
   // 移动端：切换 agent 后自动隐藏侧边栏（放在最前面，确保无论什么情况都执行）
   if (windowWidth.value <= 768) {
