@@ -8858,15 +8858,17 @@ async function regenerateAgent(agent) {
           return
         }
 
+        // 记录重生前该 Agent 是否已在某个 Panel 中，用于重生后恢复原状态
+        const originalPanelId = panels.value.find(p => p.agentId === agent.agent_id)?.id || null
+
         // 清除本地状态
         historyStorage.clearHistoryForAgent(agent.agent_id)
         fileTreeState.value.delete(agent.agent_id)
         fileTreeExpanded.value.delete(agent.agent_id)
         fileTreeLoading.value.delete(agent.agent_id)
-        for (const panel of [...panels.value]) {
-          if (panel.agentId === agent.agent_id) {
-            closePanel(panel.id)
-          }
+        // 仅解绑 Panel 与 Agent 的关联，保留 Panel 本身，便于重生后原位恢复
+        if (originalPanelId) {
+          closeAgentInPanel(originalPanelId)
         }
         if (currentAgentId.value === agent.agent_id) {
           currentAgentId.value = null
@@ -8905,13 +8907,13 @@ async function regenerateAgent(agent) {
         showToast('Agent 无损重生成功', 'success')
         // 刷新列表
         await fetchAgentList()
-        // 打开新 Agent
-        if (createResult.data) {
+        // 仅当重生前该 Agent 已在 Panel 中时，才在原 Panel 位置恢复打开
+        if (createResult.data && originalPanelId) {
           const newAgent = {
             ...createResult.data,
             node_id: String(createResult.data?.node_id || '').trim() || 'master',
           }
-          await openAgentInPanel(newAgent)
+          await openAgentInPanel(newAgent, originalPanelId)
         }
       } catch (error) {
         console.error('[REGENERATE] Failed:', error)
