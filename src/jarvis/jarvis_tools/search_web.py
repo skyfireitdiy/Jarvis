@@ -1,16 +1,22 @@
 """网络搜索工具。"""
 
 from typing import Any
+from typing import Callable
 from typing import Dict
 from typing import Optional
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
 
+import html
 import json
 import re
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import quote_plus
+from urllib.parse import urlparse
+
+import requests
 
 try:
     from bs4 import BeautifulSoup
@@ -43,6 +49,30 @@ def _contains_chinese(text: str) -> bool:
     return bool(_CHINESE_PATTERN.search(text))
 
 
+_ANTI_SPIDER_MARKERS = (
+    "访问异常页面",
+    "请输入验证码",
+    "安全验证",
+    "antispider",
+)
+
+
+def _is_anti_spider_page(html_content: str) -> bool:
+    """判断响应内容是否为搜索引擎的反爬验证页。"""
+    return any(marker in html_content for marker in _ANTI_SPIDER_MARKERS)
+
+
+def _normalize_url(url: str) -> str:
+    """归一化 URL 用于去重：去查询串、去尾斜杠、域名小写。"""
+    if not url:
+        return ""
+    parsed = urlparse(url)
+    if not parsed.netloc:
+        return url.rstrip("/").lower()
+    path = parsed.path.rstrip("/")
+    return f"{parsed.netloc.lower()}{path}".lower()
+
+
 class SearchWebTool:
     """处理网络搜索的类。"""
 
@@ -62,6 +92,287 @@ class SearchWebTool:
         },
         "required": ["query"],
     }
+
+    def _search_stackoverflow(self, query: str, limit: int = 5) -> list[Dict[str, str]]:
+        """通过 StackExchange API 搜索 StackOverflow 技术问答。
+
+        参数:
+            query: 搜索关键词
+            limit: 返回结果条数上限
+
+        返回:
+            list[Dict[str, str]]: 每项含 title/url/abstract，失败时返回空列表
+        """
+        try:
+            response = requests.get(
+                "https://api.stackexchange.com/2.3/search/advanced",
+                params={
+                    "order": "desc",
+                    "sort": "relevance",
+                    "q": query,
+                    "site": "stackoverflow",
+                    "pagesize": limit,
+                },
+                headers={
+                    "User-Agent": _BROWSER_USER_AGENT,
+                    "Accept": "application/json",
+                },
+                timeout=15,
+            )
+            response.raise_for_status()
+            items = response.json().get("items", [])
+            results: list[Dict[str, str]] = []
+            for item in items[:limit]:
+                title = html.unescape(str(item.get("title", "")))
+                url = str(item.get("link", ""))
+                if not title or not url:
+                    continue
+                tags = ",".join(item.get("tags", []) or [])
+                score = item.get("score", 0)
+                results.append(
+                    {
+                        "title": title,
+                        "url": url,
+                        "abstract": f"score={score}, tags={tags}",
+                    }
+                )
+            return results
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_tools.search_web",
+                function="_search_stackoverflow",
+            )
+            return []
+
+    def _search_github(self, query: str, limit: int = 5) -> list[Dict[str, str]]:
+        """通过 GitHub Search API 搜索代码仓库。
+
+        参数:
+            query: 搜索关键词
+            limit: 返回结果条数上限
+
+        返回:
+            list[Dict[str, str]]: 每项含 title/url/abstract，失败时返回空列表
+        """
+        try:
+            response = requests.get(
+                "https://api.github.com/search/repositories",
+                params={"q": query, "per_page": limit},
+                headers={
+                    "User-Agent": _BROWSER_USER_AGENT,
+                    "Accept": "application/vnd.github+json",
+                },
+                timeout=15,
+            )
+            response.raise_for_status()
+            items = response.json().get("items", [])
+            results: list[Dict[str, str]] = []
+            for item in items[:limit]:
+                title = str(item.get("full_name", ""))
+                url = str(item.get("html_url", ""))
+                if not title or not url:
+                    continue
+                description = str(item.get("description") or "")
+                stars = item.get("stargazers_count", 0)
+                abstract = f"⭐{stars} {description}".strip()
+                results.append(
+                    {
+                        "title": title,
+                        "url": url,
+                        "abstract": abstract,
+                    }
+                )
+            return results
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_tools.search_web",
+                function="_search_github",
+            )
+            return []
+
+    def _search_360(self, query: str, limit: int = 5) -> list[Dict[str, str]]:
+        """通过 360 搜索抓取通用网页结果。
+
+        参数:
+            query: 搜索关键词
+            limit: 返回结果条数上限
+
+        返回:
+            list[Dict[str, str]]: 每项含 title/url/abstract，失败时返回空列表
+        """
+        try:
+            response = requests.get(
+                "https://www.so.com/s",
+                params={"q": query},
+                headers={
+                    "User-Agent": _BROWSER_USER_AGENT,
+                    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                },
+                timeout=20,
+            )
+            response.raise_for_status()
+            if _is_anti_spider_page(response.text):
+                PrettyOutput.auto_print("⚠️ 360 搜索触发反爬验证，跳过该源")
+                return []
+            soup = BeautifulSoup(response.text, "lxml")
+            results: list[Dict[str, str]] = []
+            for anchor in soup.select("h3 a"):
+                title = anchor.get_text(strip=True)
+                url = self._resolve_360_url(str(anchor.get("href", "")))
+                if not title or not url:
+                    continue
+                abstract = self._extract_360_abstract(anchor)
+                results.append({"title": title, "url": url, "abstract": abstract})
+                if len(results) >= limit:
+                    break
+            return results
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_tools.search_web",
+                function="_search_360",
+            )
+            return []
+
+    @staticmethod
+    def _resolve_360_url(url: str) -> str:
+        """将 360 跳转链接还原为真实 URL，非跳转链接原样返回。"""
+        if "so.com/link" not in url:
+            return url
+        try:
+            response = requests.get(
+                url,
+                headers={"User-Agent": _BROWSER_USER_AGENT},
+                timeout=10,
+                allow_redirects=True,
+            )
+            final_url = str(response.url)
+            return final_url if "so.com/link" not in final_url else url
+        except Exception:
+            return url
+
+    @staticmethod
+    def _extract_360_abstract(anchor: Any) -> str:
+        """从 360 搜索结果条目的标题节点提取摘要文本。"""
+        parent = anchor.find_parent(["li", "div"])
+        if parent is None:
+            return ""
+        for node in parent.select("p, div.res-desc, span.res-desc"):
+            text = node.get_text(strip=True)
+            if text and text != anchor.get_text(strip=True):
+                return text
+        return ""
+
+    def _fallback_search(
+        self,
+        query: str,
+        agent: Agent,
+        site: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """ddgr 失败时的降级入口：先多源聚合，失败再退回 Bing。
+
+        参数:
+            query: 搜索关键词
+            agent: 当前 Agent（供 Bing/Playwright 兜底使用）
+            site: 站点过滤（可选）
+
+        返回:
+            Dict[str, Any]: 与 execute 一致的输出结构
+        """
+        PrettyOutput.auto_print("⚠️ ddgr 不可用，降级到多源聚合搜索...")
+        try:
+            aggregated = self._search_multi_source(query=query, site=site)
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_tools.search_web",
+                function="_fallback_search",
+            )
+            aggregated = {"success": False}
+
+        if aggregated.get("success"):
+            return aggregated
+
+        PrettyOutput.auto_print("⚠️ 多源聚合无结果，回退到 Bing 搜索...")
+        return self._search_with_playwright(query=query, agent=agent, site=site)
+
+    def _search_multi_source(
+        self, query: str, site: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """并行聚合多个搜索源，合并去重后返回结果。
+
+        参数:
+            query: 搜索关键词
+            site: 站点过滤（可选）
+
+        返回:
+            Dict[str, Any]: 与 _format_search_results 一致的输出结构
+        """
+        source_funcs = self._build_source_functions(query, site)
+        merged: list[Dict[str, str]] = []
+        succeeded: list[str] = []
+
+        with ThreadPoolExecutor(max_workers=len(source_funcs)) as executor:
+            futures = {
+                name: executor.submit(func) for name, func in source_funcs.items()
+            }
+            # 按源优先级顺序收集结果，保证输出顺序稳定（不随完成先后变化）
+            for name, future in futures.items():
+                try:
+                    items = future.result()
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_tools.search_web",
+                        function="_search_multi_source",
+                    )
+                    continue
+                if items:
+                    succeeded.append(name)
+                    for item in items:
+                        merged.append({**item, "source": name})
+
+        if not merged:
+            return {
+                "stdout": "未找到搜索结果。",
+                "stderr": "未找到搜索结果。",
+                "success": False,
+            }
+
+        deduped = self._dedupe_results(merged)
+        backend = " + ".join(succeeded) if succeeded else "无"
+        PrettyOutput.auto_print(f"🔍 多源聚合搜索（生效源: {backend}）")
+        return self._format_search_results(deduped, query, site, backend=backend)
+
+    def _build_source_functions(
+        self, query: str, site: Optional[str]
+    ) -> Dict[str, Callable[[], list[Dict[str, str]]]]:
+        """按查询特征构建参与聚合的搜索源函数表。"""
+        funcs: Dict[str, Callable[[], list[Dict[str, str]]]] = {}
+        # 站点过滤仅适用于通用网页搜索，垂直 API 不支持
+        if not site:
+            funcs["StackOverflow"] = lambda: self._search_stackoverflow(query)
+            funcs["GitHub"] = lambda: self._search_github(query)
+            funcs["360"] = lambda: self._search_360(query)
+        else:
+            funcs["360"] = lambda: self._search_360(f"{query} site:{site}")
+        return funcs
+
+    @staticmethod
+    def _dedupe_results(results: list[Dict[str, str]]) -> list[Dict[str, str]]:
+        """按归一化 URL 去重，并保持原有优先级顺序。"""
+        seen: set[str] = set()
+        deduped: list[Dict[str, str]] = []
+        for item in results:
+            key = _normalize_url(item.get("url", ""))
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            deduped.append(item)
+        return deduped
 
     def _get_ddgr_command(self) -> list[str]:
         """获取 ddgr 命令，支持多种调用方式
@@ -124,19 +435,19 @@ class SearchWebTool:
             if result.returncode != 0:
                 PrettyOutput.auto_print(f"⚠️ ddgr 命令执行失败: {result.stderr}")
                 # 降级到 Playwright 方案
-                return self._search_with_playwright(query=query, agent=agent, site=site)
+                return self._fallback_search(query=query, agent=agent, site=site)
 
             try:
                 results = json.loads(result.stdout)
             except json.JSONDecodeError as e:
                 PrettyOutput.auto_print(f"⚠️ 解析ddgr JSON输出失败: {e}")
                 # 降级到 Playwright 方案
-                return self._search_with_playwright(query=query, agent=agent, site=site)
+                return self._fallback_search(query=query, agent=agent, site=site)
 
             if not results:
                 PrettyOutput.auto_print("⚠️ ddgr 未找到搜索结果")
                 # 降级到 Playwright 方案
-                return self._search_with_playwright(query=query, agent=agent, site=site)
+                return self._fallback_search(query=query, agent=agent, site=site)
 
             # 先打印搜索结果
             PrettyOutput.auto_print("🔍 网络搜索结果")
@@ -185,11 +496,11 @@ class SearchWebTool:
         except subprocess.TimeoutExpired:
             PrettyOutput.auto_print("⚠️ ddgr 命令执行超时")
             # 降级到 Playwright 方案
-            return self._search_with_playwright(query=query, agent=agent, site=site)
+            return self._fallback_search(query=query, agent=agent, site=site)
         except Exception as e:
             PrettyOutput.auto_print(f"❌ 网页搜索过程中发生错误: {e}")
             # 降级到 Playwright 方案
-            return self._search_with_playwright(query=query, agent=agent, site=site)
+            return self._fallback_search(query=query, agent=agent, site=site)
 
     def _build_bing_url(self, query: str, site: Optional[str] = None) -> str:
         """构建 Bing 搜索 URL。
@@ -250,9 +561,10 @@ class SearchWebTool:
         results: list[Dict[str, str]],
         query: str,
         site: Optional[str],
+        backend: str = "Bing",
     ) -> Dict[str, Any]:
         """格式化搜索结果输出（与 ddgr 保持一致）。"""
-        PrettyOutput.auto_print("🔍 网络搜索结果（降级方案: Bing）")
+        PrettyOutput.auto_print(f"🔍 网络搜索结果（来源: {backend}）")
         PrettyOutput.auto_print(f"📝 查询关键词: {query}")
         if site:
             PrettyOutput.auto_print(f"🌐 站点过滤: {site}")
