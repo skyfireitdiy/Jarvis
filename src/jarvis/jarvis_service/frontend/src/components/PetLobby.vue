@@ -205,7 +205,8 @@
     </div>
 
     <!-- 无 Agent 时的空状态引导：新用户第一次进入大厅时给出明确的下一步 -->
-    <div v-if="!hasAnyAgent" class="pet-lobby-empty">
+    <!-- 需等首次列表拉取完成再判断，否则有 Agent 时会先闪现再消失 -->
+    <div v-if="agentsLoaded && !hasAnyAgent" class="pet-lobby-empty">
       <div class="pet-lobby-empty-title">还没有 Agent</div>
       <div class="pet-lobby-empty-desc">
         Agent 是 Jarvis 里的 AI 助手，每个 Agent 都是一只可以对话的宠物。<br />
@@ -546,6 +547,7 @@ import { normalizeNodeStatus, normalizeAgentStatus } from './topology.js'
 
 const props = defineProps({
   agents: { type: Array, default: () => [] },
+  agentsLoaded: { type: Boolean, default: false },
   nodes: { type: Array, default: () => [] },
   getStatusClass: { type: Function, default: null },
   getInputState: { type: Function, default: null },
