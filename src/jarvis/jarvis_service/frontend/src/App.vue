@@ -1225,6 +1225,13 @@
       @close="showTopologyOverlay = false"
     />
 
+    <!-- 快捷键一览 -->
+    <ShortcutHelpModal
+      :visible="showShortcutHelp"
+      @update:visible="showShortcutHelp = $event"
+      @close="showShortcutHelp = false"
+    />
+
     <!-- 命令面板（Ctrl+P） -->
     <CommandPalette
       :visible="showCommandPalette"
@@ -1332,6 +1339,7 @@ import RenameAgentModal from './components/RenameAgentModal.vue'
 import AdminPanel from './components/AdminPanel.vue'
 import CommandPalette from './components/CommandPalette.vue'
 import TopologyOverlay from './components/TopologyOverlay.vue'
+import ShortcutHelpModal from './components/ShortcutHelpModal.vue'
 import PetLobby from './components/PetLobby.vue'
 import OnboardingTour from './components/OnboardingTour.vue'
 import { ACTIONS as actionDefs } from './actions/registry.js'
@@ -2050,6 +2058,7 @@ async function fetchBrowserExtensionVersion() {
 const showConnectModal = ref(true)  // 首次打开显示欢迎界面
 const showSettingsModal = ref(false) // 设置弹窗
 const showAdminPanel = ref(false) // 管理面板
+const showShortcutHelp = ref(false) // 快捷键一览弹窗
 const adminPanelRef = ref(null) // 管理面板组件引用（用于命令面板定位到系统配置）
 const showAgentSidebar = ref(false)    // Agent 侧边栏（默认收起）
 const agentSidebarRef = ref(null)     // Agent 侧边栏组件引用（用于调用宠物显隐）
@@ -5742,6 +5751,8 @@ const commandPaletteCtx = computed(() => ({
   },
   // 打开宠物大厅的「安装浏览器插件」弹层
   openInstallExtension: () => { petLobbyRef.value?.openInstallExtensionDialog?.() },
+  // 打开快捷键一览弹窗
+  openShortcutHelp: () => { showShortcutHelp.value = true; pushOverlayState() },
   // 退出登录：断开所有连接并清除认证信息（复用设置面板的断开逻辑）
   logout: disconnectAll,
   // 当前 Agent 组
@@ -6081,6 +6092,7 @@ function isAnyModalOpen() {
     showToolsModal.value ||
     showEditAccessModal.value ||
     showTopologyOverlay.value ||
+    showShortcutHelp.value ||
     confirmDialog.value
   )
 }
@@ -13067,6 +13079,41 @@ function sendTerminalResize(terminalId, rows, cols) {
   socket.value.send(JSON.stringify(message))
 }
 
+// 把注册表中的快捷键字符串（如 "Ctrl+Alt+Shift+D" / "F2"）解析为匹配条件
+function parseShortcut(shortcut) {
+  if (!shortcut || typeof shortcut !== 'string') return null
+  const parts = shortcut.split('+').map(p => p.trim()).filter(Boolean)
+  if (!parts.length) return null
+  const cond = { ctrl: false, alt: false, shift: false, key: '' }
+  for (const part of parts) {
+    const lower = part.toLowerCase()
+    if (lower === 'ctrl' || lower === 'cmd' || lower === 'meta') cond.ctrl = true
+    else if (lower === 'alt' || lower === 'option') cond.alt = true
+    else if (lower === 'shift') cond.shift = true
+    else cond.key = part
+  }
+  return cond.key ? cond : null
+}
+
+// 判断键盘事件是否命中某个快捷键（基于 event.code，避免受输入法/键盘布局影响）
+function matchShortcut(shortcut, event) {
+  const cond = parseShortcut(shortcut)
+  if (!cond) return false
+  const ctrlPressed = event.ctrlKey || event.metaKey
+  if (ctrlPressed !== cond.ctrl) return false
+  if (event.altKey !== cond.alt) return false
+  if (event.shiftKey !== cond.shift) return false
+  const key = cond.key
+  if (/^[a-z]$/i.test(key)) return event.code === 'Key' + key.toUpperCase()
+  if (/^[0-9]$/.test(key)) return event.code === 'Digit' + key
+  if (key === '`') return event.code === 'Backquote'
+  if (key === ',') return event.code === 'Comma'
+  if (key === '/') return event.code === 'Slash'
+  if (key === 'Backspace') return event.code === 'Backspace'
+  if (/^F[0-9]{1,2}$/i.test(key)) return event.code === key.toUpperCase()
+  return event.key === key
+}
+
 // 判断事件目标是否是可编辑元素（输入框 / 文本域 / contentEditable）
 // 用于全局快捷键避让：在可编辑元素中按键应保留原生行为
 function isEditableElement(target) {
@@ -13082,7 +13129,7 @@ function handleGlobalKeydown(event) {
   const isModifierPressed = event.ctrlKey || event.metaKey
 
   // Ctrl/Cmd + P 打开/关闭命令面板（登录界面不响应）
-  if (isModifierPressed && event.code === 'KeyP') {
+  if (isModifierPressed && !event.altKey && event.code === 'KeyP') {
     if (showConnectModal.value) return
     event.preventDefault()
     if (!showCommandPalette.value) {
@@ -13096,7 +13143,7 @@ function handleGlobalKeydown(event) {
   }
 
   // Ctrl/Cmd + L 打开命令面板并直接展示 Agent 列表（预输入 a>）
-  if (isModifierPressed && event.code === 'KeyL') {
+  if (isModifierPressed && !event.altKey && event.code === 'KeyL') {
     if (showConnectModal.value) return
     event.preventDefault()
     commandPaletteFocusKey = getFocusedZoneKey()
@@ -13117,7 +13164,7 @@ function handleGlobalKeydown(event) {
   }
 
   // Ctrl/Cmd + S 保存当前编辑器标签
-  if (isModifierPressed && event.key === 's') {
+  if (isModifierPressed && !event.altKey && event.key === 's') {
     if (showEditorPanel.value && activeEditorTab.value && !activeEditorTab.value.loading) {
       event.preventDefault()
       saveActiveEditorTab()
@@ -13126,7 +13173,7 @@ function handleGlobalKeydown(event) {
   }
 
   // Ctrl/Cmd + E 打开/隐藏编辑器面板
-  if (isModifierPressed && event.code === 'KeyE') {
+  if (isModifierPressed && !event.altKey && event.code === 'KeyE') {
     event.preventDefault()
     if (showEditorPanel.value) {
       closeEditorPanel()
@@ -13148,7 +13195,7 @@ function handleGlobalKeydown(event) {
   }
 
   // Ctrl + A 打开/隐藏 Agent 侧边栏
-  if (event.ctrlKey && event.key === 'a') {
+  if (event.ctrlKey && !event.altKey && event.key === 'a') {
     // 如果在输入框中，不触发快捷键（允许默认的全选行为）
     const tagName = event.target.tagName.toLowerCase()
     if (tagName === 'textarea' || tagName === 'input') {
@@ -13162,7 +13209,7 @@ function handleGlobalKeydown(event) {
   }
   
   // Ctrl + ` 打开/隐藏终端面板
-  if (event.ctrlKey && event.key === '`') {
+  if (event.ctrlKey && !event.altKey && event.key === '`') {
     event.preventDefault()
     
     // 切换终端面板显示状态
@@ -13207,7 +13254,7 @@ function handleGlobalKeydown(event) {
 
   // Ctrl/Cmd + W 关闭当前焦点所在的面板（需拦截浏览器原生关闭标签页行为）
   // 宠物大厅中有激活的宠物时，改为「隐藏该 Agent 输出并取消选中」
-  if (isModifierPressed && event.code === 'KeyW') {
+  if (isModifierPressed && !event.altKey && event.code === 'KeyW') {
     event.preventDefault()
     const lobby = petLobbyRef.value
     if (lobby && typeof lobby.hideActiveOutputAndClose === 'function' && lobby.hideActiveOutputAndClose()) {
@@ -13237,6 +13284,11 @@ function handleGlobalKeydown(event) {
     // 网络拓扑大图打开时优先关闭它
     if (showTopologyOverlay.value) {
       showTopologyOverlay.value = false
+      return
+    }
+    // 快捷键一览弹窗打开时优先关闭它
+    if (showShortcutHelp.value) {
+      showShortcutHelp.value = false
       return
     }
     // 弹出面板（diff/rules/tools/缓存/重命名/权限管理）：Esc 关闭
@@ -13291,6 +13343,23 @@ function handleGlobalKeydown(event) {
     // 最低优先级：退出宠物大厅中已选中的宠物（无选中时不做任何事）
     if (petLobbyRef.value && typeof petLobbyRef.value.closeActivePanel === 'function') {
       petLobbyRef.value.closeActivePanel()
+    }
+  }
+
+  // 注册表快捷键统一分发：命中 registry 中带 shortcut 的动作则执行
+  // 登录界面不响应；输入框/文本域/contentEditable 内保留原生行为
+  if ((event.ctrlKey || event.metaKey) && event.altKey) {
+    if (showConnectModal.value) return
+    if (isEditableElement(event.target)) return
+    const matched = actionDefs.find(a => a.shortcut && matchShortcut(a.shortcut, event))
+    if (matched) {
+      const ctx = commandPaletteCtx.value
+      const isEnabled = typeof matched.enabled === 'function' ? matched.enabled(ctx) : true
+      if (isEnabled) {
+        event.preventDefault()
+        onCommandRun(matched)
+      }
+      return
     }
   }
 }
