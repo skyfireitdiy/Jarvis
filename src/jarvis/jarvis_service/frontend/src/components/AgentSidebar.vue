@@ -39,6 +39,7 @@
               class="agent-item"
               :class="{ active: currentAgentId === agent.agent_id, selected: isSelected(agent.agent_id), 'waiting-input': isWaitingInput(agent), 'waiting-input-unread': isWaitingInput(agent) && !clickedWaitingAgents.has(agent.agent_id) }"
               @click="handleAgentClick(agent, $event)"
+              @contextmenu.prevent="handleAgentContextMenu(agent, $event)"
             >
               <div v-if="isBatchMode" class="agent-checkbox" @click.stop>
                 <input type="checkbox" :checked="isSelected(agent.agent_id)" @change="$emit('toggleSelectAgent', agent.agent_id)">
@@ -67,6 +68,7 @@
             class="agent-item"
             :class="{ active: currentAgentId === agent.agent_id, selected: isSelected(agent.agent_id), 'waiting-input': isWaitingInput(agent), 'waiting-input-unread': isWaitingInput(agent) && !clickedWaitingAgents.has(agent.agent_id) }"
             @click="handleAgentClick(agent, $event)"
+            @contextmenu.prevent="handleAgentContextMenu(agent, $event)"
           >
             <div v-if="isBatchMode" class="agent-checkbox" @click.stop>
               <input type="checkbox" :checked="isSelected(agent.agent_id)" @change="$emit('toggleSelectAgent', agent.agent_id)">
@@ -387,6 +389,11 @@ function handleAgentClick(agent, event) {
   emit('agentClick', agent, event)
 }
 
+// 右键 Agent 项：交给父组件弹出该 Agent 的操作菜单
+function handleAgentContextMenu(agent, event) {
+  emit('agentContextMenu', agent, event)
+}
+
 // 判断组内是否有未点击的等待输入Agent（闪烁）
 function hasUnreadWaitingAgent(agents) {
   return agents.some(agent =>
@@ -527,6 +534,7 @@ const emit = defineEmits([
   'toggleBatchMode',
   'createAgent',
   'agentClick',
+  'agentContextMenu',
   'toggleSelectAgent',
   'renameAgent',
   'copyAgent',
