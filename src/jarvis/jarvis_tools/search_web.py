@@ -8,7 +8,9 @@ from jarvis.jarvis_utils.output import PrettyOutput
 # -*- coding: utf-8 -*-
 
 import json
-from urllib.parse import quote
+import re
+import urllib.request
+from urllib.parse import quote_plus
 
 try:
     from bs4 import BeautifulSoup
@@ -27,6 +29,18 @@ from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_utils.exception_utils import save_exception
 
 # fmt: on
+
+_BROWSER_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+)
+
+_CHINESE_PATTERN = re.compile(r"[\u4e00-\u9fff]")
+
+
+def _contains_chinese(text: str) -> bool:
+    """判断文本是否包含中文字符。"""
+    return bool(_CHINESE_PATTERN.search(text))
 
 
 class SearchWebTool:
@@ -177,6 +191,104 @@ class SearchWebTool:
             # 降级到 Playwright 方案
             return self._search_with_playwright(query=query, agent=agent, site=site)
 
+    def _build_bing_url(self, query: str, site: Optional[str] = None) -> str:
+        """构建 Bing 搜索 URL。
+
+        Bing 对无登录态访问会按查询语言降级，故按语言选择对应市场：
+        中文查询走默认 zh-CN 市场，其他查询强制 en-US 市场，避免只匹配首个实体词。
+        """
+        full_query = f"{query} site:{site}" if site else query
+        encoded_query = quote_plus(full_query)
+        if _contains_chinese(query):
+            return f"https://cn.bing.com/search?q={encoded_query}"
+        return f"https://cn.bing.com/search?q={encoded_query}&mkt=en-US&setlang=en"
+
+    def _fetch_bing_html(self, url: str, query: str) -> str:
+        """用 urllib 抓取 Bing 搜索页 HTML，避免启动无头浏览器。"""
+        accept_language = (
+            "zh-CN,zh;q=0.9,en;q=0.8" if _contains_chinese(query) else "en-US,en;q=0.9"
+        )
+        request = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": _BROWSER_USER_AGENT,
+                "Accept-Language": accept_language,
+                "Accept": (
+                    "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+                ),
+            },
+        )
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return response.read().decode("utf-8", "ignore")
+
+    @staticmethod
+    def _parse_bing_results(html_content: str) -> list[Dict[str, str]]:
+        """从 Bing 搜索页 HTML 中解析搜索结果。"""
+        soup = BeautifulSoup(html_content, "lxml")
+        results: list[Dict[str, str]] = []
+        for item in soup.select("li.b_algo")[:10]:
+            title_elem = item.select_one("h2 a")
+            if not title_elem:
+                continue
+            title = title_elem.get_text(strip=True)
+            url = title_elem.get("href", "")
+            if not title or not url:
+                continue
+            abstract_elem = item.select_one("p")
+            abstract = abstract_elem.get_text(strip=True) if abstract_elem else ""
+            results.append(
+                {
+                    "title": str(title),
+                    "url": str(url),
+                    "abstract": str(abstract),
+                }
+            )
+        return results
+
+    def _format_search_results(
+        self,
+        results: list[Dict[str, str]],
+        query: str,
+        site: Optional[str],
+    ) -> Dict[str, Any]:
+        """格式化搜索结果输出（与 ddgr 保持一致）。"""
+        PrettyOutput.auto_print("🔍 网络搜索结果（降级方案: Bing）")
+        PrettyOutput.auto_print(f"📝 查询关键词: {query}")
+        if site:
+            PrettyOutput.auto_print(f"🌐 站点过滤: {site}")
+        PrettyOutput.auto_print(f"📊 搜索结果数: {len(results)}")
+        PrettyOutput.auto_print("📄 搜索摘要:")
+
+        results_text = ""
+        for idx, r in enumerate(results, 1):
+            title = r.get("title", "")
+            url = r.get("url", "")
+            abstract = r.get("abstract", "")
+
+            PrettyOutput.auto_print(f"  {idx}. {title}")
+            if url:
+                PrettyOutput.auto_print(f"     URL: {url}")
+            if abstract:
+                PrettyOutput.auto_print(
+                    f"     摘要: {abstract[:150]}..."
+                    if len(abstract) > 150
+                    else f"     摘要: {abstract}"
+                )
+
+            results_text += f"{idx}. {title}\n"
+            if url:
+                results_text += f"   URL: {url}\n"
+            if abstract:
+                results_text += f"   摘要: {abstract}\n"
+            results_text += "\n"
+
+        results_text += "💡 提示：如果想要获取详细信息，可以调用read_webpage工具\n"
+        return {
+            "stdout": results_text,
+            "stderr": "",
+            "success": True,
+        }
+
     def _search_with_playwright(
         self,
         query: str,
@@ -184,138 +296,54 @@ class SearchWebTool:
         site: Optional[str] = None,
     ) -> Dict[str, Any]:
         # pylint: disable=too-many-locals, broad-except
-        """使用 Playwright 访问 Bing 搜索。"""
-        if not PLAYWRIGHT_AVAILABLE:
+        """使用 Bing 搜索作为 ddgr 的降级方案。"""
+        search_url = self._build_bing_url(query, site)
+        PrettyOutput.auto_print("⚠️ ddgr 搜索失败，正在降级使用 Bing 搜索...")
+        PrettyOutput.auto_print(f"🌐 访问搜索页面: {search_url}")
+
+        try:
+            html_content = self._fetch_bing_html(search_url, query)
+            results = self._parse_bing_results(html_content)
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_tools.search_web",
+                function="_search_with_playwright",
+            )
+            PrettyOutput.auto_print(f"⚠️ 直接抓取失败，回退到 Playwright: {e}")
+            results = self._search_bing_with_playwright(search_url)
+
+        if not results:
             return {
-                "stdout": "",
-                "stderr": "Playwright 不可用，无法使用降级搜索方案。请安装: pip install playwright playwright beautifulsoup4",
+                "stdout": "未找到搜索结果。",
+                "stderr": "未找到搜索结果。",
                 "success": False,
             }
 
+        return self._format_search_results(results, query, site)
+
+    def _search_bing_with_playwright(self, search_url: str) -> list[Dict[str, str]]:
+        """用无头浏览器访问 Bing 并解析结果，作为直接抓取失败时的兜底。"""
+        if not PLAYWRIGHT_AVAILABLE:
+            return []
         try:
-            # 构建搜索 URL
-            search_url = (
-                f"https://cn.bing.com/search?q={quote(query)}&FORM=BESBTB&ensearch=1"
-            )
-            if site:
-                search_url += f"+site%3A{quote(site)}"
-
-            PrettyOutput.auto_print(
-                "⚠️ ddgr 搜索失败，正在降级使用 Playwright + Bing 搜索..."
-            )
-            PrettyOutput.auto_print(f"🌐 访问搜索页面: {search_url}")
-
             with sync_playwright() as p:
-                # 启动无头浏览器
                 browser = p.chromium.launch(headless=True)
                 page = browser.new_page()
                 page.set_default_timeout(30000)
-
-                # 访问搜索页面
                 page.goto(search_url, wait_until="networkidle")
-
-                # 等待搜索结果加载
                 page.wait_for_selector("li.b_algo", timeout=10000)
-
-                # 获取 HTML 内容
                 html_content = page.content()
                 browser.close()
-
-            # 解析搜索结果
-            soup = BeautifulSoup(html_content, "lxml")
-            results = []
-
-            # Bing 搜索结果通常在 li.b_algo 中
-            for item in soup.select("li.b_algo")[:10]:
-                try:
-                    # 提取标题和 URL
-                    title_elem = item.select_one("h2 a")
-                    if not title_elem:
-                        continue
-
-                    title = title_elem.get_text(strip=True)
-                    url = title_elem.get("href", "")
-
-                    # 提取摘要
-                    abstract_elem = item.select_one("p")
-                    abstract = (
-                        abstract_elem.get_text(strip=True) if abstract_elem else ""
-                    )
-
-                    if title and url:
-                        results.append(
-                            {
-                                "title": str(title),
-                                "url": str(url),
-                                "abstract": str(abstract),
-                            }
-                        )
-                except Exception as e:
-                    save_exception(
-                        e,
-                        module="jarvis_tools.search_web",
-                        function="_search_with_playwright",
-                    )
-                    continue
-
-            if not results:
-                return {
-                    "stdout": "未找到搜索结果。",
-                    "stderr": "未找到搜索结果。",
-                    "success": False,
-                }
-
-            # 格式化输出（与 ddgr 保持一致）
-            PrettyOutput.auto_print("🔍 网络搜索结果（降级方案: Playwright + Bing）")
-            PrettyOutput.auto_print(f"📝 查询关键词: {query}")
-            if site:
-                PrettyOutput.auto_print(f"🌐 站点过滤: {site}")
-            PrettyOutput.auto_print(f"📊 搜索结果数: {len(results)}")
-            PrettyOutput.auto_print("📄 搜索摘要:")
-
-            results_text = ""
-            visited_urls = []
-
-            for idx, r in enumerate(results, 1):
-                title = r.get("title", "")
-                url = r.get("url", "")
-                abstract = r.get("abstract", "")
-
-                PrettyOutput.auto_print(f"  {idx}. {title}")
-                if url:
-                    PrettyOutput.auto_print(f"     URL: {url}")
-                    visited_urls.append(url)
-                if abstract:
-                    PrettyOutput.auto_print(
-                        f"     摘要: {abstract[:150]}..."
-                        if len(abstract) > 150
-                        else f"     摘要: {abstract}"
-                    )
-
-                # 添加到返回文本
-                results_text += f"{idx}. {title}\n"
-                if url:
-                    results_text += f"   URL: {url}\n"
-                if abstract:
-                    results_text += f"   摘要: {abstract}\n"
-                results_text += "\n"
-
-            # 添加提示信息
-            results_text += "💡 提示：如果想要获取详细信息，可以调用read_webpage工具\n"
-
-            return {
-                "stdout": results_text,
-                "stderr": "",
-                "success": True,
-            }
-
+            return self._parse_bing_results(html_content)
         except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_tools.search_web",
+                function="_search_bing_with_playwright",
+            )
             PrettyOutput.auto_print(f"❌ Playwright 搜索失败: {e}")
-            return {
-                "stdout": "",
-                "stderr": f"Playwright 搜索失败: {e}",
-                "success": False,
-            }
+            return []
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """
