@@ -49,7 +49,7 @@
         </div>
         <div class="form-group">
           <label>网关地址</label>
-          <input :value="gatewayUrl" @input="$emit('update:gatewayUrl', $event.target.value)" placeholder="127.0.0.1:8000 或 ws://example.com:8080/ws" />
+          <input :value="gatewayUrl" @input="$emit('update:gatewayUrl', $event.target.value)" placeholder="ws://当前域名:8000 或 wss://example.com:8000" />
         </div>
         <button class="primary-btn" @click="$emit('connect')" :disabled="connecting">
           {{ connecting ? '连接中...' : '连接' }}
