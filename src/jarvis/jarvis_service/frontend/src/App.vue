@@ -6554,7 +6554,7 @@ function getWorkingDirDisplay(workingDir) {
   if (hideWorkingDir.value) return WORKING_DIR_HIDDEN_PLACEHOLDER
   return workingDir || ''
 }
-const newAgentNodeId = ref('')
+const newAgentNodeId = ref('master')
 const selectedTerminalNodeId = ref('master')
 
 // 创建Agent弹窗：按用户可访问节点过滤节点选项
@@ -6567,6 +6567,13 @@ const filteredNodeOptionsForCreateAgent = computed(() => {
   // 限定节点列表：只显示有权限的节点
   return availableNodeOptions.value.filter(node => accessible.includes(node.node_id))
 })
+
+// 创建 Agent 的默认节点：优先 master，其次第一个可用节点
+function getDefaultCreateAgentNodeId() {
+  const options = filteredNodeOptionsForCreateAgent.value
+  if (options.some(node => node.node_id === 'master')) return 'master'
+  return options[0]?.node_id || ''
+}
 
 // 生成 Agent 名称：Agent类型-创建时间（如：代码Agent-20261213-140013）
 function generateAgentName(agentType) {
@@ -7959,9 +7966,9 @@ async function openCreateAgentModal(initialNodeId = '') {
   // 加载最近使用的工作目录
   loadRecentWorkDirs()
   const target = typeof initialNodeId === 'string' ? initialNodeId.trim() : ''
-  // 校验目标节点在可创建范围内，否则回退为空（由弹窗默认选择）
+  // 校验目标节点在可创建范围内，否则回退到默认节点（master）
   const allowed = filteredNodeOptionsForCreateAgent.value.some(n => n.node_id === target)
-  newAgentNodeId.value = allowed ? target : ''
+  newAgentNodeId.value = allowed ? target : getDefaultCreateAgentNodeId()
   newAgentDir.value = '~'
   newAgentCreateError.value = ''
   resetDirectorySelectionState()
@@ -8342,7 +8349,7 @@ async function createAgent() {
   newAgentRestoreSession.value = false
   newAgentNoInteractionMode.value = false
   newAgentTaskDescription.value = ''
-  newAgentNodeId.value = ''
+  newAgentNodeId.value = getDefaultCreateAgentNodeId()
   newAgentAccessAclRead.value = []
   newAgentAccessAclInteract.value = []
   // 重置为默认名称（根据当前选中的 agent 类型）
@@ -8726,7 +8733,7 @@ async function copyAgent(agent) {
   newAgentTaskDescription.value = agent.task || ''
   newAgentProxyNode.value = agent.proxy_node || ''
   // 先设置 node_id（会触发 watch 重置目录），再设置正确的目录
-  newAgentNodeId.value = String(agent?.node_id || '').trim()
+  newAgentNodeId.value = String(agent?.node_id || '').trim() || getDefaultCreateAgentNodeId()
   newAgentDir.value = agent.working_dir || '~'
   // 设置正确的名称（Agent类型-创建时间格式）
   newAgentName.value = generateAgentName(agent.agent_type || 'code_agent')

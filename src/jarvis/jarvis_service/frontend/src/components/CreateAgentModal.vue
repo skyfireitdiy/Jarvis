@@ -7,12 +7,11 @@
           <div class="form-group" v-if="nodeOptions.length > 0">
             <label>目标节点</label>
             <select :value="nodeId" @change="$emit('update:nodeId', $event.target.value)" class="form-control">
-              <option value="">默认节点（当前网关决定）</option>
               <option v-for="node in nodeOptions" :key="node.node_id" :value="node.node_id">
                 {{ formatNodeLabel(node) }}
               </option>
             </select>
-            <div class="form-help">未选择时使用默认节点；复制 Agent 时默认继承源节点。</div>
+            <div class="form-help">默认选择 master 节点；复制 Agent 时默认继承源节点。</div>
           </div>
           <div class="form-group" v-if="noNodeAccess">
             <div class="error-message">当前用户无任何节点访问权限，无法创建 Agent。请联系管理员分配节点权限。</div>
