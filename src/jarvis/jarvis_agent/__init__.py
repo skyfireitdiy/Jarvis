@@ -3732,9 +3732,13 @@ class Agent:
                 for rule_name in selected_rules:
                     # 使用 load_rule 方法加载规则（内部会检查重复并自动合并）
                     if self.rules_manager.load_rule(rule_name):
-                        PrettyOutput.auto_print(
-                            f"✅ 已根据任务自动选择规则: {rule_name}"
+                        # 打印时给出规则文件全路径，避免 Agent 误把「作用域:相对路径」
+                        # 当作 load_rule 的 file_path 直接使用
+                        rule_path = self.rules_manager.get_rule_file_path(rule_name)
+                        display = (
+                            rule_path if rule_path and rule_path != "--" else rule_name
                         )
+                        PrettyOutput.auto_print(f"✅ 已根据任务自动选择规则: {display}")
                     else:
                         PrettyOutput.auto_print(f"ℹ️  规则已存在或激活失败: {rule_name}")
         except Exception as e:

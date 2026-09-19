@@ -864,7 +864,7 @@ class RulesManager:
             if description:
                 parts.append(
                     f"**规则描述**: {description}\n\n"
-                    f"[注：规则 {rule_name} 已载入但正文未注入；"
+                    f"[注：规则 {rule_path} 已载入但正文未注入；"
                     "若与本任务相关，请先用 `load_rule` 工具加载其完整文本]"
                 )
             else:

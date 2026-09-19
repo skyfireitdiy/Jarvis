@@ -84,13 +84,24 @@ class AutoSelectRuleTool:
                     # 从缓存中获取已加载的规则内容
                     rule_content = rules_manager._loaded_rules.get(rule_name)
                     if rule_content:
+                        # 同时给出规则文件全路径，便于后续用 load_rule 工具按路径加载
+                        rule_path = rules_manager.get_rule_file_path(rule_name)
                         rule_contents.append(
-                            {"name": rule_name, "content": rule_content}
+                            {
+                                "name": rule_name,
+                                "path": (
+                                    rule_path
+                                    if rule_path and rule_path != "--"
+                                    else rule_name
+                                ),
+                                "content": rule_content,
+                            }
                         )
 
             output_lines = [f"已为任务选择 {len(rule_contents)} 个规则：", ""]
             for rule_info in rule_contents:
                 output_lines.append(f"## 规则：{rule_info['name']}")
+                output_lines.append(f"规则文件路径：{rule_info['path']}")
                 output_lines.append("")
                 output_lines.append(rule_info["content"])
                 output_lines.append("")
@@ -102,6 +113,7 @@ class AutoSelectRuleTool:
                 "stdout": "\n".join(output_lines),
                 "stderr": "",
                 "selected_rules": [r["name"] for r in rule_contents],
+                "rule_paths": [r["path"] for r in rule_contents],
                 "rule_contents": rule_contents,
             }
 
