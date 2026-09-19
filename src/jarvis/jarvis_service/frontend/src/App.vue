@@ -5818,6 +5818,9 @@ const commandPaletteCtx = computed(() => ({
   // 大厅方向选中（Ctrl+Alt+方向键）：仅在大厅有 Agent 时可用
   hasLobbyAgents: (agentList.value || []).some(a => a && a.status !== 'stopped'),
   selectLobbyAgentInDirection: (dir) => { petLobbyRef.value?.selectAgentInDirection?.(dir) },
+  // 大厅节点方向选中（Ctrl+Shift+方向键）：仅在大厅有节点时可用
+  hasLobbyNodes: (availableNodeOptions.value || []).length > 0,
+  selectLobbyNodeInDirection: (dir) => { petLobbyRef.value?.selectNodeInDirection?.(dir) },
 }))
 
 // 命令面板动作清单（来自统一注册表，个别动作按当前状态动态调整文案/图标）
@@ -13162,6 +13165,21 @@ function handleGlobalKeydown(event) {
     commandPaletteFocusKey = getFocusedZoneKey()
     commandPaletteInitialQuery.value = 'a>'
     showCommandPalette.value = true
+    return
+  }
+
+  // Ctrl/Cmd + Alt + Shift + 方向键：在大厅中按方向选中节点（相对当前选中节点的位置，
+  // 无选中时从该方向的反向边缘开始，如 → 取最左侧的第一个节点）。
+  // 与节点操作快捷键（Ctrl+Alt+Shift+字母）保持一致的「加 Shift 即作用于节点」约定。
+  if (event.ctrlKey && event.altKey && event.shiftKey &&
+      (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+    event.preventDefault()
+    showCommandPalette.value = false
+    const dirMap = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' }
+    const lobby = petLobbyRef.value
+    if (lobby && typeof lobby.selectNodeInDirection === 'function' && lobby.selectNodeInDirection(dirMap[event.key])) {
+      return
+    }
     return
   }
 

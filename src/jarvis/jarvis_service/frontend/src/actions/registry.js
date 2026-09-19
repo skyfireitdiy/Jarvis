@@ -745,6 +745,102 @@ export const ACTIONS = [
       ctx.selectLobbyAgentInDirection &&
       ctx.selectLobbyAgentInDirection("down"),
   },
+
+  // ===== 大厅节点方向选中（Ctrl+Shift+方向键）=====
+  // 与 Agent 方向选中（Ctrl+Alt+方向键）区分：Shift 作用于节点，Alt 作用于 Agent。
+  // 同样仅用于命令面板/快捷键一览的展示与执行，不参与 handleGlobalKeydown 的统一分发。
+  {
+    id: "lobby-node-select-left",
+    label: "选中左侧节点",
+    shortcut: "Ctrl+Alt+Shift+ArrowLeft",
+    condition: "宠物大厅中有节点",
+    en: "Select Node to the Left",
+    group: "大厅",
+    icon: "⬅️",
+    keywords: [
+      "大厅",
+      "节点",
+      "选中",
+      "方向",
+      "左",
+      "lobby",
+      "node",
+      "select",
+      "left",
+    ],
+    enabled: (ctx) => !!ctx?.hasLobbyNodes,
+    run: (ctx) =>
+      ctx.selectLobbyNodeInDirection && ctx.selectLobbyNodeInDirection("left"),
+  },
+  {
+    id: "lobby-node-select-right",
+    label: "选中右侧节点",
+    shortcut: "Ctrl+Alt+Shift+ArrowRight",
+    condition: "宠物大厅中有节点",
+    en: "Select Node to the Right",
+    group: "大厅",
+    icon: "➡️",
+    keywords: [
+      "大厅",
+      "节点",
+      "选中",
+      "方向",
+      "右",
+      "lobby",
+      "node",
+      "select",
+      "right",
+    ],
+    enabled: (ctx) => !!ctx?.hasLobbyNodes,
+    run: (ctx) =>
+      ctx.selectLobbyNodeInDirection && ctx.selectLobbyNodeInDirection("right"),
+  },
+  {
+    id: "lobby-node-select-up",
+    label: "选中上方节点",
+    shortcut: "Ctrl+Alt+Shift+ArrowUp",
+    condition: "宠物大厅中有节点",
+    en: "Select Node Above",
+    group: "大厅",
+    icon: "⬆️",
+    keywords: [
+      "大厅",
+      "节点",
+      "选中",
+      "方向",
+      "上",
+      "lobby",
+      "node",
+      "select",
+      "up",
+    ],
+    enabled: (ctx) => !!ctx?.hasLobbyNodes,
+    run: (ctx) =>
+      ctx.selectLobbyNodeInDirection && ctx.selectLobbyNodeInDirection("up"),
+  },
+  {
+    id: "lobby-node-select-down",
+    label: "选中下方节点",
+    shortcut: "Ctrl+Alt+Shift+ArrowDown",
+    condition: "宠物大厅中有节点",
+    en: "Select Node Below",
+    group: "大厅",
+    icon: "⬇️",
+    keywords: [
+      "大厅",
+      "节点",
+      "选中",
+      "方向",
+      "下",
+      "lobby",
+      "node",
+      "select",
+      "down",
+    ],
+    enabled: (ctx) => !!ctx?.hasLobbyNodes,
+    run: (ctx) =>
+      ctx.selectLobbyNodeInDirection && ctx.selectLobbyNodeInDirection("down"),
+  },
 ];
 
 // 大小写不敏感的子串 / 关键词模糊匹配；query 为空时返回全部
