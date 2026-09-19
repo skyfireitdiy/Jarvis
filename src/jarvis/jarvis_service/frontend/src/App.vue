@@ -97,6 +97,8 @@
       :class="toolbarEdge === 'left' ? 'edge-left' : 'edge-right'"
       :style="globalToolbarTabStyle"
       title="展开工具条"
+      @pointerenter="onToolbarPointerEnter"
+      @pointerleave="onToolbarPointerLeave"
       @pointerdown.stop.prevent="expandToolbar()"
     >
       <span class="global-toolbar-tab-grip"></span>
@@ -1576,11 +1578,13 @@ function getTerminalStyle(terminalContent) {
 // 全局工具条拖拽 + 贴边隐藏：位置持久化到 localStorage，null 表示使用默认（右上角）
 const GLOBAL_TOOLBAR_STORAGE_KEY = 'jarvis_global_toolbar_pos'
 const GLOBAL_TOOLBAR_EDGE_SNAP = 24 // 距屏幕边缘多少像素内视为贴边
+// 注意：toolbarEdge / toolbarCollapsed 必须在 loadGlobalToolbarPos() 调用前声明，
+// 否则其内部恢复贴边态时会因 TDZ 抛 ReferenceError，导致位置持久化失效
+const toolbarEdge = ref(null) // 'left' | 'right' | null，贴边方向
+const toolbarCollapsed = ref(false) // 贴边后是否已收起
 const globalToolbarPos = ref(loadGlobalToolbarPos())
 const isDraggingToolbar = ref(false)
 const toolbarDragOffset = ref({ x: 0, y: 0 })
-const toolbarEdge = ref(null) // 'left' | 'right' | null，贴边方向
-const toolbarCollapsed = ref(false) // 贴边后是否已收起
 let toolbarCollapseTimer = null
 
 function loadGlobalToolbarPos() {
