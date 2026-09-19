@@ -13716,12 +13716,15 @@ function handleGlobalKeydown(event) {
   }
 
   // Ctrl/Cmd + W 关闭当前焦点所在的面板（需拦截浏览器原生关闭标签页行为）
-  // 宠物大厅中有激活的宠物时，改为「隐藏该 Agent 输出并取消选中」
+  // 焦点在面板内（终端/编辑器/聊天/会话面板）时优先关闭该面板；
+  // 焦点不在任何面板内（即处于宠物大厅）且有激活宠物时，改为「隐藏该 Agent 输出并取消选中」
   if (isModifierPressed && !event.altKey && event.code === 'KeyW') {
     event.preventDefault()
-    const lobby = petLobbyRef.value
-    if (lobby && typeof lobby.hideActiveOutputAndClose === 'function' && lobby.hideActiveOutputAndClose()) {
-      return
+    if (!getFocusedZoneKey()) {
+      const lobby = petLobbyRef.value
+      if (lobby && typeof lobby.hideActiveOutputAndClose === 'function' && lobby.hideActiveOutputAndClose()) {
+        return
+      }
     }
     closeFocusedPanel()
     return
