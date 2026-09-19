@@ -46,10 +46,6 @@
                 <feGaussianBlur stdDeviation="3" result="b" />
                 <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
               </filter>
-              <linearGradient id="topo-line" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#20c8ff" stop-opacity="0.9" />
-                <stop offset="100%" stop-color="#20c8ff" stop-opacity="0.25" />
-              </linearGradient>
               <linearGradient id="topo-center-fill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stop-color="#ffe89a" />
                 <stop offset="100%" stop-color="#f0b429" />
@@ -67,7 +63,8 @@
                 :y1="layout.center.y"
                 :x2="l.x"
                 :y2="l.y"
-                :stroke="l.state === 'offline' ? 'rgba(255,93,108,0.35)' : 'url(#topo-line)'"
+                :stroke="l.state === 'offline' ? 'rgba(255,93,108,0.35)' : '#20c8ff'"
+                :stroke-opacity="l.state === 'offline' ? 1 : 0.55"
                 :stroke-width="l.hot ? 2.4 : 1.6"
                 :stroke-dasharray="l.state === 'offline' ? '6 5' : ''"
                 class="topo-link"
@@ -266,7 +263,13 @@ const CENTER_AGENT_RING = 70
 const AGENT_EDGE_PAD = AGENT_R + 24
 
 const model = computed(() => buildTopology(props.nodes, props.agents, props.getStatusClass))
-const layout = computed(() => layoutTopology(model.value, W, H))
+// 传入机箱尺寸：保证圆周半径足够大，节点机箱不与中心机箱相贴
+// （否则正上方那条 master→节点连线会被两个机箱完全盖住）
+const layout = computed(() => layoutTopology(model.value, W, H, {
+  centerHalfH: CENTER_H / 2,
+  nodeHalfH: NODE_R * 0.86,
+  minGap: 14,
+}))
 const counts = computed(() => model.value.counts)
 // 参与绘制的 agent（已停止的不绘制，仅作数据显示）
 const agentLayout = computed(() =>

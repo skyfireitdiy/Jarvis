@@ -83,7 +83,13 @@ const W = 96
 const H = 96
 
 const model = computed(() => buildTopology(props.nodes, props.agents, props.getStatusClass))
-const layout = computed(() => layoutTopology(model.value, W, H))
+// 传入节点圆尺寸：保证圆周半径足够大，节点圆不与中心圆相贴
+// （否则正上方那条 master→节点连线会被两个圆完全盖住）
+const layout = computed(() => layoutTopology(model.value, W, H, {
+  centerHalfH: 7.5,
+  nodeHalfH: 5.5,
+  minGap: 3,
+}))
 
 const NODE_COLORS = {
   online: '#34d99b',

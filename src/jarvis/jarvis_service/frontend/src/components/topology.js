@@ -167,12 +167,19 @@ export function buildTopology(nodes, agents, getStatusClass) {
 }
 
 // 环形布局：master 居中，其余节点均匀分布圆周（首个在正上方）
-export function layoutTopology(model, width, height) {
+// 半径上限：保证圆周上的节点机箱不与中心机箱相贴/重叠——否则「正上方」那条
+// master→节点连线会整段被两个机箱盖住，看起来像没画（其余方向因有斜向空白段仍可见）。
+// 取「中心机箱半高 + 节点机箱半高 + 间隙」为下限，再与画布自适应半径取较大者。
+export function layoutTopology(model, width, height, options = {}) {
   const w = Number(width) || 240;
   const h = Number(height) || 240;
   const cx = w / 2;
   const cy = h / 2;
-  const radius = Math.min(w, h) * 0.34;
+  const centerHalfH = Number(options.centerHalfH) || 0;
+  const nodeHalfH = Number(options.nodeHalfH) || 0;
+  const minGap = Number(options.minGap) || 0;
+  const minRadius = centerHalfH + nodeHalfH + minGap;
+  const radius = Math.max(Math.min(w, h) * 0.34, minRadius);
   const nodes = (model && model.nodes) || [];
   const count = nodes.length;
   const positioned = nodes.map((node, index) => {

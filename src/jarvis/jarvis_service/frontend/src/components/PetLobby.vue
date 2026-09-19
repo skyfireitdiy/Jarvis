@@ -45,10 +45,6 @@
     <div class="pet-lobby-topology" aria-hidden="true">
       <svg class="pet-lobby-links" :width="stageSize.w" :height="stageSize.h" :viewBox="`0 0 ${stageSize.w} ${stageSize.h}`">
         <defs>
-          <linearGradient id="lobby-line" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#20c8ff" stop-opacity="0.9" />
-            <stop offset="100%" stop-color="#20c8ff" stop-opacity="0.25" />
-          </linearGradient>
           <linearGradient id="lobby-center-fill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stop-color="#e8d089" />
             <stop offset="100%" stop-color="#c99a34" />
@@ -68,7 +64,8 @@
             :y1="link.y1"
             :x2="link.x2"
             :y2="link.y2"
-            :stroke="link.offline ? 'rgba(255,93,108,0.35)' : 'url(#lobby-line)'"
+            :stroke="link.offline ? 'rgba(255,93,108,0.35)' : '#20c8ff'"
+            :stroke-opacity="link.offline ? 1 : 0.55"
             :stroke-width="1.6"
             :stroke-dasharray="link.offline ? '6 5' : ''"
             class="lobby-link"
@@ -574,6 +571,9 @@ const MIN_DIST = 96 // 宠物之间最小间距，用于斥力避让
 const EDGE_PAD = 12
 const PANEL_H = 150 // 交互面板高度（粗略值，用于判断面板朝上/朝下）
 const STACK_GAP = 4 // 堆叠容器与宠物本体的间距（与 CSS 的 calc(100% + 4px) 一致）
+// 节点机箱半高：master 略大（与 nodeItems 中的 rw/rh 保持一致）
+const MASTER_RH = 33
+const NODE_RH = 26
 
 const stageRef = ref(null)
 const stageSize = ref({ w: 0, h: 0 })
@@ -751,14 +751,17 @@ function agentColor(state) {
 }
 
 // 节点在大厅中的坐标：master 居中，其余节点均匀分布在圆周上
+// 圆周半径下限：保证圆周上的节点机箱不与 master 机箱相贴/重叠——否则「正上方」
+// 那条 master→节点连线会整段被两个机箱盖住，看起来像没画（其余方向有斜向空白段仍可见）。
 const nodeLayout = computed(() => {
   const list = Array.isArray(props.nodes) ? props.nodes : []
   const w = stageSize.value.w
   const h = stageSize.value.h
   const cx = w / 2
   const cy = h / 2
-  // 圆周半径：随舞台尺寸自适应，留出边距
-  const radius = Math.max(Math.min(w, h) * 0.32, 120)
+  // 圆周半径：随舞台尺寸自适应，留出边距；同时不小于「master 半高 + 节点半高 + 间隙」
+  const minRadius = MASTER_RH + NODE_RH + 14
+  const radius = Math.max(Math.min(w, h) * 0.32, 120, minRadius)
   const result = new Map()
   const master = list.find(n => n && n.node_id === 'master')
   if (master) {
@@ -811,7 +814,7 @@ const nodeItems = computed(() => {
       }).length
       // 机箱尺寸：master 略大
       const rw = isMaster ? 38 : 30
-      const rh = isMaster ? 33 : 26
+      const rh = isMaster ? MASTER_RH : NODE_RH
       // 节点版本：child 由心跳上报，master 由网关补充；缺失时留空不显示
       const version = n.version ? String(n.version) : ''
       // 与 master 版本不一致（且双方都有版本）时高亮，提示该节点未更新
