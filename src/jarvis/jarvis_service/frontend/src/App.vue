@@ -98,8 +98,8 @@
       :style="globalToolbarTabStyle"
       title="展开工具条"
       @pointerenter="onToolbarPointerEnter"
-      @pointerleave="onToolbarPointerLeave"
       @pointerdown.stop.prevent="expandToolbar()"
+      @click.stop.prevent="expandToolbar()"
     >
       <span class="global-toolbar-tab-grip"></span>
     </div>
@@ -1194,20 +1194,12 @@
       @close="showTopologyOverlay = false"
     />
 
-    <!-- 快捷键一览 -->
-    <ShortcutHelpModal
-      :visible="showShortcutHelp"
-      @update:visible="showShortcutHelp = $event"
-      @close="showShortcutHelp = false"
-    />
-
     <!-- 命令面板（Ctrl+P） -->
     <CommandPalette
       :visible="showCommandPalette"
       :actions="appActions"
       :ctx="commandPaletteCtx"
       :initial-query="commandPaletteInitialQuery"
-      title="命令面板"
       @update:visible="showCommandPalette = $event"
       @run="onCommandRun"
       @close="showCommandPalette = false"
@@ -1308,7 +1300,6 @@ import RenameAgentModal from './components/RenameAgentModal.vue'
 import AdminPanel from './components/AdminPanel.vue'
 import CommandPalette from './components/CommandPalette.vue'
 import TopologyOverlay from './components/TopologyOverlay.vue'
-import ShortcutHelpModal from './components/ShortcutHelpModal.vue'
 import PetLobby from './components/PetLobby.vue'
 import OnboardingTour from './components/OnboardingTour.vue'
 import { ACTIONS as actionDefs } from './actions/registry.js'
@@ -1629,11 +1620,19 @@ const globalToolbarStyle = computed(() => {
 // 工具条实际宽度（用于贴边吸附与拖动边界计算）
 const toolbarElRef = ref(null)
 const toolbarWidth = ref(0)
+// 工具条实际高度（移动端为纵向布局，纵向拖动边界需按实测高度计算）
+const toolbarHeight = ref(0)
 
 function measureToolbarWidth() {
   const width = toolbarElRef.value?.offsetWidth || 0
   if (width > 0) toolbarWidth.value = width
   return width
+}
+
+function measureToolbarHeight() {
+  const height = toolbarElRef.value?.offsetHeight || 0
+  if (height > 0) toolbarHeight.value = height
+  return height
 }
 
 // 收起后露出的窄边条位置：与工具条同高，贴在被吸附的那一侧
@@ -1646,12 +1645,23 @@ const globalToolbarTabStyle = computed(() => {
 })
 
 // 点击/触摸窄边条：展开工具条
+// 触摸设备没有 hover，展开后手指抬起会立即触发 pointerleave 导致刚展开就收起，
+// 因此点击唤出后进入一段锁定期，期间忽略 pointerleave 的自动收起。
+const TOOLBAR_EXPAND_LOCK_MS = 2500
+let toolbarExpandLockUntil = 0
+
 function expandToolbar() {
   if (toolbarCollapseTimer) {
     clearTimeout(toolbarCollapseTimer)
     toolbarCollapseTimer = null
   }
+  toolbarExpandLockUntil = Date.now() + TOOLBAR_EXPAND_LOCK_MS
   toolbarCollapsed.value = false
+  // 触摸/点击唤出后重新测量尺寸，保证后续拖动边界正确
+  nextTick(() => {
+    measureToolbarWidth()
+    measureToolbarHeight()
+  })
 }
 
 function startDragToolbar(event) {
@@ -1681,8 +1691,9 @@ function startDragToolbar(event) {
 function onDragToolbar(event) {
   if (!isDraggingToolbar.value) return
   const width = toolbarWidth.value || measureToolbarWidth()
+  const height = toolbarHeight.value || measureToolbarHeight()
   const maxX = Math.max(0, window.innerWidth - width)
-  const maxY = Math.max(0, window.innerHeight - 40)
+  const maxY = Math.max(0, window.innerHeight - height)
   globalToolbarPos.value = {
     x: clamp(event.clientX - toolbarDragOffset.value.x, 0, maxX),
     y: clamp(event.clientY - toolbarDragOffset.value.y, 0, maxY),
@@ -1737,6 +1748,8 @@ function onToolbarPointerEnter() {
 // 移出工具条：贴边状态下延迟收起
 function onToolbarPointerLeave() {
   if (!toolbarEdge.value) return
+  // 点击唤出后的锁定期内不自动收起，避免触摸设备刚展开就被收起
+  if (Date.now() < toolbarExpandLockUntil) return
   if (toolbarCollapseTimer) clearTimeout(toolbarCollapseTimer)
   toolbarCollapseTimer = setTimeout(() => {
     toolbarCollapseTimer = null
@@ -1748,8 +1761,9 @@ function onToolbarPointerLeave() {
 function handleToolbarResize() {
   if (!globalToolbarPos.value) return
   const width = toolbarWidth.value || measureToolbarWidth()
+  const height = toolbarHeight.value || measureToolbarHeight()
   const maxX = Math.max(0, window.innerWidth - width)
-  const maxY = Math.max(0, window.innerHeight - 40)
+  const maxY = Math.max(0, window.innerHeight - height)
   const { x, y } = globalToolbarPos.value
   const clampedY = clamp(y, 0, maxY)
 
@@ -2231,7 +2245,6 @@ async function fetchBrowserExtensionVersion() {
 const showConnectModal = ref(true)  // 首次打开显示欢迎界面
 const showSettingsModal = ref(false) // 设置弹窗
 const showAdminPanel = ref(false) // 管理面板
-const showShortcutHelp = ref(false) // 快捷键一览弹窗
 const adminPanelRef = ref(null) // 管理面板组件引用（用于命令面板定位到系统配置）
 const showAgentSidebar = ref(false)    // Agent 侧边栏（默认收起）
 const agentSidebarRef = ref(null)     // Agent 侧边栏组件引用（用于调用宠物显隐）
@@ -5888,8 +5901,6 @@ const commandPaletteCtx = computed(() => ({
   },
   // 打开宠物大厅的「安装浏览器插件」弹层
   openInstallExtension: () => { petLobbyRef.value?.openInstallExtensionDialog?.() },
-  // 打开快捷键一览弹窗
-  openShortcutHelp: () => { showShortcutHelp.value = true; pushOverlayState() },
   // 退出登录：断开所有连接并清除认证信息（复用设置面板的断开逻辑）
   logout: disconnectAll,
   // 当前 Agent 组
@@ -6246,7 +6257,6 @@ function isAnyModalOpen() {
     showToolsModal.value ||
     showEditAccessModal.value ||
     showTopologyOverlay.value ||
-    showShortcutHelp.value ||
     confirmDialog.value
   )
 }
@@ -13470,11 +13480,6 @@ function handleGlobalKeydown(event) {
       showTopologyOverlay.value = false
       return
     }
-    // 快捷键一览弹窗打开时优先关闭它
-    if (showShortcutHelp.value) {
-      showShortcutHelp.value = false
-      return
-    }
     // 管理面板打开时优先关闭它
     if (showAdminPanel.value) {
       showAdminPanel.value = false
@@ -13979,9 +13984,10 @@ onMounted(() => {
   }
   window.addEventListener('resize', handleResize)
 
-  // 挂载后测量工具条实际宽度，并按贴边状态校正位置（避免恢复的位置越界）
+  // 挂载后测量工具条实际宽高，并按贴边状态校正位置（避免恢复的位置越界）
   nextTick(() => {
     measureToolbarWidth()
+    measureToolbarHeight()
     handleToolbarResize()
   })
 
@@ -14470,18 +14476,34 @@ body::-webkit-scrollbar {
   cursor: grabbing;
 }
 
-/* 移动端：按钮触控区放大 */
+/* 移动端：改为纵向排列，缩小按钮，避免横向占满屏幕顶部 */
 @media (max-width: 768px) {
   .global-toolbar {
     top: max(8px, env(safe-area-inset-top, 0px));
     right: max(8px, env(safe-area-inset-right, 0px));
+    flex-direction: column;
     gap: 2px;
-    padding: 3px 4px;
+    padding: 4px 3px;
   }
   .global-toolbar .icon-btn {
-    width: 40px;
-    height: 40px;
-    font-size: 18px;
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+  .global-toolbar-handle {
+    width: 28px;
+    height: 16px;
+    margin-right: 0;
+    font-size: 12px;
+  }
+  /* 纵向工具条的贴边窄边条：加大触摸区，便于触摸唤出 */
+  .global-toolbar-tab {
+    width: 28px;
+    height: 48px;
+  }
+  .global-toolbar-tab-grip {
+    width: 14px;
+    height: 3px;
   }
 }
 

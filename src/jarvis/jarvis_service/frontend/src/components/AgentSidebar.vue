@@ -230,7 +230,8 @@
       :class="petEdge === 'left' ? 'is-left' : 'is-right'"
       :style="{ top: petPos.y + 'px', height: petH() + 'px', width: petEdgePeek() + 'px' }"
       @mouseenter="onPetEdgeEnter"
-      @click="onPetEdgeEnter"
+      @pointerdown.stop.prevent="onPetEdgeActivate"
+      @click.stop.prevent="onPetEdgeActivate"
     ></div>
 
     <!-- 宠物旁的迷你网络拓扑（贴边收起态随宠物一起隐藏） -->
@@ -928,6 +929,23 @@ function onPetEdgeEnter() {
   clearPetEdgeLeaveTimer()
   petEdgeRevealed.value = true
   applyPetEdge()
+}
+
+// 点击/触摸触发条：把宠物完整唤回屏幕内（彻底解除贴边）。
+// 桌面端鼠标移入触发条时 onPetEdgeEnter 已让其临时滑出，此时点击同样解除贴边，
+// 避免「滑出后又被 mousemove 判定收回」的闪回；移动端无 hover，点击直接唤回。
+function onPetEdgeActivate() {
+  if (!petEdge.value) return
+  clearPetEdgeLeaveTimer()
+  const edge = petEdge.value
+  // 先滑出到该侧边缘，再解除贴边并夹取回可视区，避免位置跳变
+  const expandedX = petEdgeExpandedX(edge)
+  petEdge.value = null
+  petEdgeRevealed.value = false
+  petPos.value = clampPetPos(expandedX, petPos.value.y)
+  savePetEdge()
+  savePetPos()
+  petSfxChirp()
 }
 
 // 鼠标移出：贴边态滑回收起（延时执行，避免在触发条与宠物之间移动时来回抖动）
@@ -2323,7 +2341,11 @@ defineExpose({
   width: 18px;
   pointer-events: auto;
   cursor: pointer;
-  z-index: 899;
+  touch-action: none;
+  /* 参考全局工具条贴边窄边条：z-index 需高于 .pet-float(900)，
+     否则贴边收起时露出的那点边会被宠物热区 .pet-hit 覆盖，点击/触摸收不到事件。
+     收起态触发条在宠物之上，点它即唤出；滑出态触发条 v-show 隐藏，不影响宠物操作 */
+  z-index: 10000;
 }
 .pet-edge-trigger.is-left {
   left: 0;
