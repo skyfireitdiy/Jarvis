@@ -490,26 +490,6 @@ export const ACTIONS = [
     ],
     run: (ctx) => ctx.openInstallExtension && ctx.openInstallExtension(),
   },
-  {
-    id: "open-shortcut-help",
-    label: "查看快捷键一览",
-    shortcut: "Ctrl+Alt+/",
-    condition: "已登录",
-    en: "Keyboard Shortcuts",
-    group: "界面",
-    icon: "⌨️",
-    keywords: [
-      "快捷键",
-      "键盘",
-      "帮助",
-      "一览",
-      "shortcut",
-      "keyboard",
-      "help",
-      "keys",
-    ],
-    run: (ctx) => ctx.openShortcutHelp && ctx.openShortcutHelp(),
-  },
   // ===== 账号 =====
   {
     id: "logout",
