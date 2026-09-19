@@ -843,11 +843,14 @@ class RulesManager:
         return self._merged_rules
 
     def get_injectable_rules_content(self) -> str:
-        """返回注入提示词用的合并规则内容（单条过长时截短为摘要）。
+        """返回注入提示词用的规则内容。
 
-        与 get_loaded_rules_content 的区别：此法面向"注入用户提示/会话上下文"的场景，
-        单条规则超过 _RULE_INJECT_LIMIT 时截短并提示用 load_rule 取全文，
-        避免超大技能把上下文窗口一次性打爆。API 展示等场景仍用完整内容。
+        策略（自动/强触发载入的规则）：
+        - 有描述：只注入描述 + 建议，正文不进上下文，由模型按需用 load_rule 取全文；
+        - 无描述：注入正文（单条超过 _RULE_INJECT_LIMIT 时截短为摘要）。
+
+        显式指定（@rule:xxx）的规则不走此法，由调用方直接取完整正文。
+        API 展示等场景仍用 get_loaded_rules_content 的完整内容。
         """
         parts = []
         for rule_name in sorted(self.loaded_rules):
@@ -858,11 +861,14 @@ class RulesManager:
             description = ""
             if rule_path and rule_path != "--":
                 description = self._extract_rule_description(rule_path) or ""
-            body = _limit_rule_body(rule_name, body)
             if description:
-                parts.append(f"**规则描述**: {description}\n\n{body}")
+                parts.append(
+                    f"**规则描述**: {description}\n\n"
+                    f"[注：规则 {rule_name} 已载入但正文未注入；"
+                    "若与本任务相关，请先用 `load_rule` 工具加载其完整文本]"
+                )
             else:
-                parts.append(body)
+                parts.append(_limit_rule_body(rule_name, body))
         return "\n\n".join(parts)
 
     def get_rule_status(self, name: str) -> str:
