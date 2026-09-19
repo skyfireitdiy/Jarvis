@@ -3640,9 +3640,18 @@ async function openEditorFile(path, agentId = null) {
     fileSize: null,
   }
   const session = activeEditorSession.value
-  if (!session) return
-  session.tabs.push(tab)
-  session.activeTabPath = path
+  if (!session) {
+    // 编辑器面板可能通过 Ctrl+E / 命令面板打开（只设 showEditorPanel，未创建会话）。
+    // 此时按传入的 agentId 或当前 Agent 补建会话，避免点击文件静默无反应。
+    const targetAgent = (agentId && agentList.value.find(a => a.agent_id === agentId))
+      || getCurrentAgentOrNull()
+    if (!targetAgent) return
+    createEditorForAgent(targetAgent)
+    if (!activeEditorSession.value) return
+  }
+  const activeSession = activeEditorSession.value
+  activeSession.tabs.push(tab)
+  activeSession.activeTabPath = path
 
   try {
     const [content, fileStat] = await Promise.all([
@@ -5664,6 +5673,21 @@ function isFocusKeyAvailable(key) {
   return false
 }
 
+// 命名面板（terminal/editor/chat）的焦点 key：
+// 优先依据真实 DOM 焦点；焦点不在任何可聚焦元素上时（如仅鼠标点击过面板空白处，
+// activeElement 为 body），回退到最近一次交互的命名面板（activeWindow，由面板的
+// mousedown 更新），并用 isFocusKeyAvailable 过滤掉已关闭/已分离的残留值。
+function getNamedPanelFocusKey() {
+  const focusedKey = getFocusedZoneKey()
+  if (focusedKey === 'terminal' || focusedKey === 'editor' || focusedKey === 'chat') {
+    return focusedKey
+  }
+  if (activeWindow.value && isFocusKeyAvailable(activeWindow.value)) {
+    return activeWindow.value
+  }
+  return null
+}
+
 // 当前焦点所处面板的 key（session:<id> / terminal / editor / chat）
 // 命令面板打开时会抢走焦点，此时优先用"打开前"记录的快照（且该面板须仍有效）；
 // 否则依据真实 DOM 焦点，最后回退到当前激活 Panel
@@ -5673,6 +5697,8 @@ function getFocusedPanelKey() {
   }
   const focusedKey = getFocusedZoneKey()
   if (focusedKey) return focusedKey
+  const namedKey = getNamedPanelFocusKey()
+  if (namedKey) return namedKey
   if (isFocusKeyAvailable(commandPaletteFocusKey)) return commandPaletteFocusKey
   const panel = getCurrentPanel()
   if (panel && panel.agentId) return `session:${panel.id}`
@@ -13720,7 +13746,9 @@ function handleGlobalKeydown(event) {
   // 焦点不在任何面板内（即处于宠物大厅）且有激活宠物时，改为「隐藏该 Agent 输出并取消选中」
   if (isModifierPressed && !event.altKey && event.code === 'KeyW') {
     event.preventDefault()
-    if (!getFocusedZoneKey()) {
+    // 命名面板（terminal/editor/chat）内：即使焦点未落在可聚焦元素上（仅鼠标点击过面板），
+    // 也应关闭该面板，而不是被大厅逻辑拦截
+    if (!getFocusedZoneKey() && !getNamedPanelFocusKey()) {
       const lobby = petLobbyRef.value
       if (lobby && typeof lobby.hideActiveOutputAndClose === 'function' && lobby.hideActiveOutputAndClose()) {
         return
