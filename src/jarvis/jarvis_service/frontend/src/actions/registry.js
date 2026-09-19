@@ -531,26 +531,6 @@ export const ACTIONS = [
     ],
     run: (ctx) => ctx.logout && ctx.logout(),
   },
-  // ===== 标题栏 =====
-  {
-    id: "toggle-header",
-    label: "显示/隐藏标题栏",
-    shortcut: "Ctrl+Alt+Shift+H",
-    condition: "已登录",
-    en: "Toggle Header Bar",
-    group: "标题栏",
-    icon: "▤",
-    keywords: [
-      "标题栏",
-      "顶栏",
-      "顶部",
-      "header",
-      "titlebar",
-      "topbar",
-      "toggle",
-    ],
-    run: (ctx) => ctx.toggleHeader && ctx.toggleHeader(),
-  },
   // ===== 管理（需 admin 权限）=====
   {
     id: "admin-update-code-to-main",
