@@ -54,8 +54,9 @@
       @petOpenCommandPalette="openCommandPalette()"
     />
 
-    <!-- 全局工具条：常驻右上角，承载原顶栏的全部入口（不随面板开关消失） -->
+    <!-- 全局工具条：常驻右上角，承载原顶栏的全部入口（不随面板开关消失；登录界面不显示） -->
     <div
+      v-if="!showConnectModal"
       class="global-toolbar"
       ref="toolbarElRef"
       :class="{
@@ -90,9 +91,9 @@
       </button>
     </div>
 
-    <!-- 贴边收起后露出的窄边条：点击/触摸展开工具条（不含任何按钮，避免误触） -->
+    <!-- 贴边收起后露出的窄边条：点击/触摸展开工具条（不含任何按钮，避免误触；登录界面不显示） -->
     <div
-      v-if="toolbarCollapsed && toolbarEdge"
+      v-if="!showConnectModal && toolbarCollapsed && toolbarEdge"
       class="global-toolbar-tab"
       :class="toolbarEdge === 'left' ? 'edge-left' : 'edge-right'"
       :style="globalToolbarTabStyle"
