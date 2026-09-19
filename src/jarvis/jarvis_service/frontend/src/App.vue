@@ -13812,10 +13812,10 @@ function handleGlobalKeydown(event) {
   }
 
   // 注册表快捷键统一分发：命中 registry 中带 shortcut 的动作则执行
-  // 登录界面不响应；输入框/文本域/contentEditable 内保留原生行为
+  // 登录界面不响应；Ctrl+Alt 组合在输入框内也生效（不与输入框原生编辑冲突），
+  // 仅登录界面与未启用动作被跳过
   if ((event.ctrlKey || event.metaKey) && event.altKey) {
     if (showConnectModal.value) return
-    if (isEditableElement(event.target)) return
     const matched = actionDefs.find(a => a.shortcut && matchShortcut(a.shortcut, event))
     if (matched) {
       const ctx = commandPaletteCtx.value
