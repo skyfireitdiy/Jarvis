@@ -979,15 +979,23 @@ function canStealPetFocus() {
 
 // 聚焦某只宠物的输入框（多行/单行按当前 inputMode 自动匹配）
 // force=true 用于显式切换焦点（如刚激活宠物），跳过「用户正在其它输入框」的保护
+// 输入框仅在 pet.active 且 inputMode !== 'confirm' 时渲染；面板展开/inputMode 切换会替换元素，
+// 单次 nextTick 可能早于元素出现，故在若干帧内重试直到聚焦成功。
 function focusPetInput(agentId, force = false) {
   if (!agentId) return
   if (!force && !canStealPetFocus()) return
-  // 等待 DOM 更新后聚焦：inputMode 切换会替换 textarea/input 元素
-  nextTick(() => {
-    if (!force && !canStealPetFocus()) return
+  let attempts = 0
+  const tryFocus = () => {
     const el = stageRef.value && stageRef.value.querySelector(`[data-pet-input="${agentId}"]`)
-    if (el && document.activeElement !== el) el.focus()
-  })
+    if (el) {
+      if (document.activeElement !== el) el.focus()
+      // 已成功聚焦（或元素已存在但被其它控件抢占）即结束重试
+      if (document.activeElement === el) return
+    }
+    // 元素尚未渲染（面板刚展开 / inputMode 切换中）时继续重试，最多约 10 帧
+    if (attempts++ < 10) requestAnimationFrame(tryFocus)
+  }
+  nextTick(tryFocus)
 }
 
 // 刷新某只宠物的输入态与最新输出
@@ -1657,7 +1665,7 @@ function onPetDblClick(pet) {
   emit('selectAgent', pet.agentId)
 }
 
-function openPanel(pet) {
+function openPanel(pet, focusInput = false) {
   // 同一时刻只展开一只
   if (activePetId.value && activePetId.value !== pet.agentId) {
     const prev = petAgents.value.find(p => p.agentId === activePetId.value)
@@ -1675,9 +1683,14 @@ function openPanel(pet) {
     saveHiddenOutputs()
   }
   refreshPetData(pet)
-  // 仅当该 Agent 有待处理的输入请求时才自动聚焦输入框：
-  // 用户点开宠物可能只是想看输出，无请求时不打断其当前焦点
-  if (pet.hasInputRequest && pet.inputMode !== 'confirm') focusPetInput(pet.agentId, true)
+  // 聚焦输入框的两种情形：
+  // 1) 键盘方向键选中（focusInput=true）：键盘导航意图明确，始终把焦点交给输入框；
+  // 2) 鼠标点开且该 Agent 有待处理的输入请求：此时才自动聚焦，避免打断用户查看输出。
+  if (focusInput) {
+    focusPetInput(pet.agentId, true)
+  } else if (pet.hasInputRequest && pet.inputMode !== 'confirm') {
+    focusPetInput(pet.agentId, true)
+  }
 }
 
 function closePanel(pet) {
@@ -2135,8 +2148,8 @@ function selectAgentInDirection(dir) {
   }
   // 该方向上没有宠物：保持当前选中不变
   if (!best) return true
-  // 与单击一致：选中并展开面板（同一时刻只展开一只）
-  openPanel(best)
+  // 与单击一致：选中并展开面板（同一时刻只展开一只）；键盘选中后聚焦输入框
+  openPanel(best, true)
   return true
 }
 
