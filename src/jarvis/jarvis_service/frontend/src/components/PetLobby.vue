@@ -2146,8 +2146,12 @@ function selectAgentInDirection(dir) {
       bestSecondary = secondary
     }
   }
-  // 该方向上没有宠物：保持当前选中不变
-  if (!best) return true
+  // 该方向上没有宠物：保持当前选中不变，但仍把焦点交给当前选中宠物的输入框
+  // （如只有一个 Agent、或已位于该方向边缘时，键盘导航意图仍是「激活并输入」）
+  if (!best) {
+    if (current) focusPetInput(current.agentId, true)
+    return true
+  }
   // 与单击一致：选中并展开面板（同一时刻只展开一只）；键盘选中后聚焦输入框
   openPanel(best, true)
   return true
