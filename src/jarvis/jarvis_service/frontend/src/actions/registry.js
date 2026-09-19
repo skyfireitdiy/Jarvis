@@ -841,6 +841,33 @@ export const ACTIONS = [
     run: (ctx) =>
       ctx.selectLobbyNodeInDirection && ctx.selectLobbyNodeInDirection("down"),
   },
+
+  // ===== 大厅全部输出显隐（Ctrl+Alt+A）=====
+  // 一键切换：全部隐藏 ↔ 全部显示。仅用于命令面板/快捷键一览的展示与执行，
+  // 不参与 handleGlobalKeydown 的统一分发（由 App.vue 的 Ctrl+Alt+A 分支处理）。
+  {
+    id: "lobby-toggle-all-outputs",
+    label: "隐藏/显示全部输出",
+    shortcut: "Ctrl+Alt+A",
+    condition: "宠物大厅中有 Agent",
+    en: "Toggle All Outputs",
+    group: "大厅",
+    icon: "💬",
+    keywords: [
+      "大厅",
+      "输出",
+      "全部",
+      "隐藏",
+      "显示",
+      "气泡",
+      "lobby",
+      "output",
+      "toggle",
+      "all",
+    ],
+    enabled: (ctx) => !!ctx?.hasLobbyAgentsForOutput,
+    run: (ctx) => ctx.toggleAllLobbyOutputs && ctx.toggleAllLobbyOutputs(),
+  },
 ];
 
 // 大小写不敏感的子串 / 关键词模糊匹配；query 为空时返回全部

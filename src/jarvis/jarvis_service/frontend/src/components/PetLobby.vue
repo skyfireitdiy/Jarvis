@@ -172,24 +172,14 @@
         <span class="pet-lobby-display-label">{{ petsHidden ? '显示Agent精灵' : '隐藏Agent精灵' }}</span>
       </button>
 
-      <!-- 显示全部输出：遍历所有 Agent，显示其输出 -->
+      <!-- 全部输出显隐：一键切换（全部隐藏 ↔ 全部显示），按钮文案为将要执行的操作 -->
       <button
         class="pet-lobby-display-toggle"
-        title="显示所有 Agent 的输出"
-        @click.stop="showAllOutputs()"
+        :title="allOutputsHidden ? '显示所有 Agent 的输出' : '隐藏所有 Agent 的输出'"
+        @click.stop="toggleAllOutputs()"
       >
-        <span class="pet-lobby-display-icon">💬</span>
-        <span class="pet-lobby-display-label">显示全部输出</span>
-      </button>
-
-      <!-- 隐藏全部输出：遍历所有 Agent，隐藏其输出 -->
-      <button
-        class="pet-lobby-display-toggle"
-        title="隐藏所有 Agent 的输出"
-        @click.stop="hideAllOutputs()"
-      >
-        <span class="pet-lobby-display-icon">🚫</span>
-        <span class="pet-lobby-display-label">隐藏全部输出</span>
+        <span class="pet-lobby-display-icon">{{ allOutputsHidden ? '💬' : '🚫' }}</span>
+        <span class="pet-lobby-display-label">{{ allOutputsHidden ? '显示全部输出' : '隐藏全部输出' }}</span>
       </button>
 
       <!-- 安装浏览器插件：打开安装指引弹层（内含下载按钮）；有新版本时显示红点 -->
@@ -687,17 +677,24 @@ watch(petsHidden, (hidden) => {
 function toggleAllPets() {
   petsHidden.value = !petsHidden.value
 }
-// 显示全部输出：遍历所有 Agent，清除其单独隐藏标记
-function showAllOutputs() {
-  if (hiddenOutputIds.value.size) {
-    hiddenOutputIds.value = new Set()
+// 是否所有 Agent 的输出都已隐藏：用于「全部输出显隐」按钮的文案与图标
+// 无宠物时视为未隐藏，按钮显示「隐藏全部输出」
+const allOutputsHidden = computed(() => {
+  const pets = petAgents.value
+  if (!pets.length) return false
+  return pets.every(p => hiddenOutputIds.value.has(p.agentId))
+})
+// 全部输出显隐：已全部隐藏则全部显示，否则全部隐藏
+function toggleAllOutputs() {
+  if (allOutputsHidden.value) {
+    if (hiddenOutputIds.value.size) {
+      hiddenOutputIds.value = new Set()
+      saveHiddenOutputs()
+    }
+  } else {
+    hiddenOutputIds.value = new Set(petAgents.value.map(p => p.agentId))
     saveHiddenOutputs()
   }
-}
-// 隐藏全部输出：遍历所有 Agent，将其标记为单独隐藏
-function hideAllOutputs() {
-  hiddenOutputIds.value = new Set(petAgents.value.map(p => p.agentId))
-  saveHiddenOutputs()
 }
 
 // 单个 Agent 的输出显隐：独立控制并持久化
@@ -2218,7 +2215,7 @@ function renameActiveNode(nodeId) {
   return true
 }
 
-defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden, openInstallExtensionDialog, closeActivePanel, hideActiveOutputAndClose, closeActiveNode, renameActiveNode, selectAgentInDirection, selectNodeInDirection })
+defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden, openInstallExtensionDialog, closeActivePanel, hideActiveOutputAndClose, closeActiveNode, renameActiveNode, selectAgentInDirection, selectNodeInDirection, toggleAllOutputs })
 </script>
 
 <style scoped>

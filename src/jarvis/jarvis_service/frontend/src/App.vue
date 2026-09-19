@@ -5821,6 +5821,9 @@ const commandPaletteCtx = computed(() => ({
   // 大厅节点方向选中（Ctrl+Shift+方向键）：仅在大厅有节点时可用
   hasLobbyNodes: (availableNodeOptions.value || []).length > 0,
   selectLobbyNodeInDirection: (dir) => { petLobbyRef.value?.selectNodeInDirection?.(dir) },
+  // 大厅全部输出显隐（Ctrl+Alt+A）：仅在大厅有 Agent 时可用
+  hasLobbyAgentsForOutput: (agentList.value || []).some(a => a && a.status !== 'stopped'),
+  toggleAllLobbyOutputs: () => { petLobbyRef.value?.toggleAllOutputs?.() },
 }))
 
 // 命令面板动作清单（来自统一注册表，个别动作按当前状态动态调整文案/图标）
