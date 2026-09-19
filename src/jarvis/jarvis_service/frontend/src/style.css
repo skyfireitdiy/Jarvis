@@ -150,38 +150,6 @@ p {
   }
 }
 
-/* 头部样式 - 磁贴 */
-.app-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: var(--color-bg-tile);
-  color: var(--color-text-primary);
-  padding: 8px 16px;
-  border-radius: var(--tile-radius);
-  border: none;
-  box-shadow: var(--tile-shadow), var(--tile-shadow-inset);
-  position: relative;
-  overflow: hidden;
-}
-
-/* Header 底部光线扫描 */
-.app-header::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: -100%;
-  width: 60%;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    var(--color-accent),
-    transparent
-  );
-  animation: header-scan 4s ease-in-out infinite;
-}
-
 .subtitle {
   color: var(--color-text-secondary);
   font-size: 13px;
@@ -519,59 +487,6 @@ button:disabled {
   color: var(--color-text-primary);
 }
 
-/* Header Logo 样式 */
-.header-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.header-logo {
-  width: 32px;
-  height: 32px;
-  object-fit: contain;
-  position: relative;
-  filter: drop-shadow(0 0 8px rgba(32, 200, 255, 0.45));
-  animation: header-logo-halo 3.6s ease-in-out infinite;
-}
-
-@keyframes header-logo-halo {
-  0%,
-  100% {
-    filter: drop-shadow(0 0 6px rgba(32, 200, 255, 0.35));
-  }
-  50% {
-    filter: drop-shadow(0 0 14px rgba(32, 200, 255, 0.75));
-  }
-}
-
-.header-brand {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  background: linear-gradient(
-    100deg,
-    #20c8ff 0%,
-    #7ee7ff 28%,
-    #36ff7c 52%,
-    #20c8ff 78%
-  );
-  background-size: 220% 100%;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  animation: header-brand-sheen 6s linear infinite;
-}
-
-@keyframes header-brand-sheen {
-  from {
-    background-position: 0% 50%;
-  }
-  to {
-    background-position: 220% 50%;
-  }
-}
-
 /* ===== 动画特效 ===== */
 
 /* 面板首次渲染微光闪烁 */
@@ -596,16 +511,6 @@ button:disabled {
   }
 }
 
-/* Header 光线扫描动画 */
-@keyframes header-scan {
-  0% {
-    left: -60%;
-  }
-  100% {
-    left: 160%;
-  }
-}
-
 /* 页面加载渐入动画 - 只动opacity，translate独立属性不与hover transform冲突 */
 @keyframes fade-in {
   from {
@@ -616,10 +521,6 @@ button:disabled {
     opacity: 1;
     translate: 0 0;
   }
-}
-
-.app-header {
-  animation: fade-in 0.4s ease-out both;
 }
 
 .panel {
@@ -765,23 +666,6 @@ button:disabled {
   }
 }
 
-/* 顶部标题栏 */
-.app-header {
-  background: rgba(11, 20, 36, 0.78) !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  border-bottom: 1px solid rgba(32, 200, 255, 0.15) !important;
-  box-shadow: 0 4px 20px rgba(0, 120, 190, 0.12) !important;
-  z-index: 5 !important;
-}
-
-.header-title h1 {
-  font-family: "Consolas", "Microsoft YaHei", sans-serif !important;
-  font-weight: 700 !important;
-  letter-spacing: 1px !important;
-  text-shadow: 0 0 8px rgba(32, 200, 255, 0.5) !important;
-}
-
 /* 已连接状态点 - 绿色呼吸 */
 .dot.online {
   background: #36ff7c !important;
@@ -799,20 +683,6 @@ button:disabled {
 .dot.offline {
   background: #ff3c48 !important;
   box-shadow: 0 0 4px rgba(255, 60, 72, 0.4) !important;
-}
-
-/* 当前 Agent 信息胶囊 */
-.current-agent-info {
-  background: rgba(18, 30, 50, 0.65) !important;
-  border: 1px solid rgba(32, 200, 255, 0.2) !important;
-  border-radius: 12px !important;
-  box-shadow: 0 4px 16px rgba(0, 120, 190, 0.12) !important;
-}
-
-/* 路径文字等宽字体 */
-.current-agent-info .agent-dir {
-  font-family: "Consolas", "Microsoft YaHei", monospace !important;
-  font-size: 12px !important;
 }
 
 /* 日志输出面板 - 全息显示屏 */

@@ -54,90 +54,32 @@
       @petOpenCommandPalette="openCommandPalette()"
     />
 
+    <!-- 全局工具条：常驻右上角，承载原顶栏的全部入口（不随面板开关消失） -->
+    <div class="global-toolbar" :class="{ 'is-dragging': isDraggingToolbar }" :style="globalToolbarStyle">
+      <span class="global-toolbar-handle" title="拖动工具条" @pointerdown="startDragToolbar($event)">⠿</span>
+      <button class="icon-btn" @click="toggleAgentSidebar()" title="Agent 侧边栏 (Ctrl+A)">
+        📋
+      </button>
+      <button class="icon-btn chat-btn-wrapper" @click="toggleChatPanel()" :disabled="!socket" title="聊天室 (Ctrl+Alt+H)">
+        💬
+        <span v-if="chatUnreadCount > 0" class="chat-unread-badge">{{ chatUnreadCount > 99 ? '99+' : chatUnreadCount }}</span>
+      </button>
+      <button class="icon-btn" @click="toggleTerminalPanel()" :disabled="!socket" title="终端面板 (Ctrl+`)">
+        💻
+      </button>
+      <button class="icon-btn" @click="openCommandPalette()" title="命令面板 (Ctrl+P)">
+        ⌘
+      </button>
+      <button class="icon-btn" @click="showSettingsModal = true; pushOverlayState()" :disabled="!socket" title="设置 (Ctrl+Alt+,)">
+        ⚙
+      </button>
+      <button class="icon-btn" v-if="auth.userInfo?.is_admin" @click="showAdminPanel = true; pushOverlayState()" :disabled="!socket" title="管理 (Ctrl+Alt+Shift+A)">
+        🛡️
+      </button>
+    </div>
+
     <!-- 主内容区 -->
     <div class="main-content-wrapper">
-      <!-- 桌面端顶部感应区：鼠标移入唤出标题栏 -->
-      <div
-        v-if="!isMobileLayout"
-        class="top-hover-zone"
-        @mouseenter="showHeader"
-      ></div>
-      <!-- 顶部栏 -->
-      <header
-        ref="headerRef"
-        class="app-header"
-        :class="{ 'is-hidden': headerHidden }"
-        :style="{ '--app-header-h': headerHeight + 'px' }"
-        @mouseenter="showHeader"
-        @mouseleave="scheduleHideHeader"
-      >
-        <!-- 移动端快捷按钮 -->
-        <div class="mobile-header-actions">
-          <button class="icon-btn" @click="toggleAgentSidebar()" title="Agent列表">
-            📋
-          </button>
-          <button class="icon-btn chat-btn-wrapper" @click="toggleChatPanel()" :disabled="!socket" title="聊天室">
-            💬
-            <span v-if="chatUnreadCount > 0" class="chat-unread-badge">{{ chatUnreadCount > 99 ? '99+' : chatUnreadCount }}</span>
-          </button>
-          <button class="icon-btn" @click="toggleTerminalPanel()" :disabled="!socket" title="终端面板">
-            💻
-          </button>
-
-          <button class="icon-btn" @click="openCommandPalette()" title="命令面板">
-            ⌘
-          </button>
-
-          <button class="icon-btn" @click="showSettingsModal = true; pushOverlayState()" :disabled="!socket" title="设置">
-            ⚙
-          </button>
-          <button class="icon-btn" v-if="auth.userInfo?.is_admin" @click="showAdminPanel = true; pushOverlayState()" :disabled="!socket" title="管理">
-            🛡️
-          </button>
-        </div>
-        
-        <div class="header-title">
-          <img src="/icons/jarvis-pet.svg" alt="Jarvis" class="header-logo" />
-          <span class="header-brand">JARVIS</span>
-          <div class="status mobile-only">
-            <span :class="['dot', connectionStatus]"></span>
-            {{ connectionLabel }}
-          </div>
-          <button class="icon-btn desktop-only" @click="toggleAgentSidebar()" title="切换 Agent 侧边栏">
-            📋
-          </button>
-        </div>
-        
-        <div class="current-agent-info desktop-only" v-if="currentAgent">
-          <span class="agent-type">{{ currentAgent.name || (currentAgent.agent_type === 'agent' ? '🤖' : currentAgent.agent_type === 'code_agent' ? '💻' : '❓') }}</span>
-          <span class="agent-status-dot" :class="getStatusClass(currentAgent)" :title="getStatusText(currentAgent)"></span>
-          <span class="agent-node" v-if="getAgentNodeLabel(currentAgent)">🧭 {{ getAgentNodeDisplayLabel(currentAgent) }}</span>
-          <span class="agent-dir">{{ getWorkingDirDisplay(currentAgent.working_dir) }}</span>
-        </div>
-        
-        <div class="header-actions desktop-only">
-          <span v-if="auth.userInfo" class="user-info-display" :title="'当前用户: ' + auth.userInfo.username">
-            👤 {{ auth.userInfo.display_name || auth.userInfo.username }}
-          </span>
-          <button class="icon-btn chat-btn-wrapper" @click="toggleChatPanel()" :disabled="!socket" title="聊天室">
-            💬
-            <span v-if="chatUnreadCount > 0" class="chat-unread-badge">{{ chatUnreadCount > 99 ? '99+' : chatUnreadCount }}</span>
-          </button>
-          <button class="icon-btn" @click="toggleTerminalPanel()" :disabled="!socket" title="终端面板">
-            💻
-          </button>
-          <button class="icon-btn" @click="openCommandPalette()" title="命令面板 (Ctrl+P)">
-            ⌘
-          </button>
-          <button class="icon-btn" @click="showSettingsModal = true; pushOverlayState()" :disabled="!socket">
-            ⚙
-          </button>
-          <button class="icon-btn" v-if="auth.userInfo?.is_admin" @click="showAdminPanel = true; pushOverlayState()" :disabled="!socket" title="管理">
-            🛡️
-          </button>
-        </div>
-      </header>
-
     <!-- Panel 网格布局 -->
     <main class="panel-grid" :style="panelGridStyle">
       <SessionPanel
@@ -1607,6 +1549,76 @@ function getTerminalStyle(terminalContent) {
   }
 }
 
+// 全局工具条拖拽：位置持久化到 localStorage，null 表示使用默认（右上角）
+const GLOBAL_TOOLBAR_STORAGE_KEY = 'jarvis_global_toolbar_pos'
+const globalToolbarPos = ref(loadGlobalToolbarPos())
+const isDraggingToolbar = ref(false)
+const toolbarDragOffset = ref({ x: 0, y: 0 })
+
+function loadGlobalToolbarPos() {
+  try {
+    const savedValue = localStorage.getItem(GLOBAL_TOOLBAR_STORAGE_KEY)
+    if (!savedValue) return null
+    const parsedValue = JSON.parse(savedValue)
+    if (typeof parsedValue?.x !== 'number' || typeof parsedValue?.y !== 'number') {
+      return null
+    }
+    return { x: parsedValue.x, y: parsedValue.y }
+  } catch {
+    return null
+  }
+}
+
+const globalToolbarStyle = computed(() => {
+  if (!globalToolbarPos.value) return {}
+  return {
+    left: `${globalToolbarPos.value.x}px`,
+    top: `${globalToolbarPos.value.y}px`,
+    right: 'auto',
+  }
+})
+
+function startDragToolbar(event) {
+  // 仅响应主指针（鼠标左键 / 单指触摸）
+  if (event.button !== undefined && event.button !== 0) return
+  const toolbarEl = event.currentTarget?.parentElement
+  if (!toolbarEl) return
+  const rect = toolbarEl.getBoundingClientRect()
+  isDraggingToolbar.value = true
+  toolbarDragOffset.value = {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+  }
+  // 使用 Pointer Events，同时覆盖鼠标与触摸
+  document.addEventListener('pointermove', onDragToolbar)
+  document.addEventListener('pointerup', stopDragToolbar)
+  document.addEventListener('pointercancel', stopDragToolbar)
+  event.preventDefault()
+  event.stopPropagation()
+}
+
+function onDragToolbar(event) {
+  if (!isDraggingToolbar.value) return
+  const maxX = window.innerWidth - 40
+  const maxY = window.innerHeight - 40
+  globalToolbarPos.value = {
+    x: clamp(event.clientX - toolbarDragOffset.value.x, 0, Math.max(0, maxX)),
+    y: clamp(event.clientY - toolbarDragOffset.value.y, 0, Math.max(0, maxY)),
+  }
+  event.preventDefault()
+}
+
+function stopDragToolbar() {
+  document.removeEventListener('pointermove', onDragToolbar)
+  document.removeEventListener('pointerup', stopDragToolbar)
+  document.removeEventListener('pointercancel', stopDragToolbar)
+  if (!isDraggingToolbar.value) return
+  isDraggingToolbar.value = false
+  if (globalToolbarPos.value) {
+    localStorage.setItem(GLOBAL_TOOLBAR_STORAGE_KEY, JSON.stringify(globalToolbarPos.value))
+  }
+}
+
 // 拖拽相关函数
 function startDragSidebar(event) {
   isDraggingSidebar.value = true
@@ -2265,36 +2277,6 @@ const globalSearchExecuted = ref(false)
 const showEditorSidebar = ref(true)
 const editorSidebarView = ref('files')
 const windowWidth = ref(window.innerWidth)  // 窗口宽度，用于响应式检测
-// 顶部标题栏自动隐藏：默认隐藏，桌面端鼠标移到顶部感应区唤出，移动端经宠物菜单唤出
-const isMobileLayout = computed(() => windowWidth.value <= 768)
-const headerHidden = ref(true)
-const headerHeight = ref(0)
-let headerHideTimer = 0
-const headerRef = ref(null)
-
-function measureHeaderHeight() {
-  if (headerRef.value) headerHeight.value = headerRef.value.offsetHeight
-}
-function showHeader() {
-  clearTimeout(headerHideTimer)
-  headerHidden.value = false
-  requestAnimationFrame(measureHeaderHeight)
-}
-function hideHeader() {
-  clearTimeout(headerHideTimer)
-  measureHeaderHeight()
-  headerHidden.value = true
-}
-function toggleHeader() {
-  if (headerHidden.value) showHeader()
-  else hideHeader()
-}
-// 鼠标移出标题栏后延时缩回（给用户移动到感应区的时间）
-function scheduleHideHeader() {
-  if (isMobileLayout.value) return
-  clearTimeout(headerHideTimer)
-  headerHideTimer = setTimeout(() => { headerHidden.value = true }, 300)
-}
 const showCreateAgentModal = ref(false) // 创建 Agent 弹窗
 const showRenameAgentModal = ref(false) // 重命名 Agent 弹窗
 const renamingAgent = ref(null)          // 正在重命名的 Agent
@@ -5442,11 +5424,6 @@ function markTourSeen(tourId) {
   }
 }
 
-// 顶栏操作区选择器：移动端与桌面端布局不同
-function headerActionsSelector() {
-  return isMobileLayout.value ? '.mobile-header-actions' : '.header-actions'
-}
-
 // 各场景的引导步骤。target 命中不到元素时组件会自动退化为居中卡片
 function getTourSteps(tourId) {
   if (tourId === 'welcome') return WELCOME_TOUR_STEPS
@@ -5477,7 +5454,7 @@ const WELCOME_TOUR_STEPS = [
     id: 'welcome-start',
     icon: '🚀',
     title: '开始使用',
-    desc: '点击顶栏 📋 打开 Agent 侧边栏，用其中的「➕」创建第一个 Agent（也可按 Ctrl+N）；双击宠物打开对话面板，在底部输入框描述需求并按 Ctrl+Enter 发送。',
+    desc: '点击右上角 📋 打开 Agent 侧边栏，用其中的「➕」创建第一个 Agent（也可按 Ctrl+N）；双击宠物打开对话面板，在底部输入框描述需求并按 Ctrl+Enter 发送。',
     hint: '随时可在命令面板（Ctrl+P）里搜索「引导」重新查看，或搜索「重置新手引导」让各场景引导重新触发。',
   },
 ]
@@ -5490,7 +5467,7 @@ function LOBBY_TOUR_STEPS() {
       icon: '📊',
       title: '大厅仪表盘',
       desc: '这里实时显示当前时间、网关连接状态与地址、在线节点数，以及按状态分类的 Agent 数量，一眼掌握全局。',
-      hint: '网关离线时宠物会停止响应，先检查顶栏的连接状态。',
+      hint: '网关离线时宠物会停止响应，先检查大厅左上角仪表盘的连接状态。',
       target: '.pet-lobby-dash',
       placement: 'bottom',
     },
@@ -5507,9 +5484,9 @@ function LOBBY_TOUR_STEPS() {
       id: 'lobby-create',
       icon: '➕',
       title: '创建 Agent',
-      desc: '点击顶栏 📋 打开 Agent 侧边栏，用其中的「➕」创建 Agent（也可按 Ctrl+N），选择节点、Agent 类型与工作目录即可创建；还可以双击大厅中的节点，直接在指定节点上创建。',
+      desc: '点击右上角 📋 打开 Agent 侧边栏，用其中的「➕」创建 Agent（也可按 Ctrl+N），选择节点、Agent 类型与工作目录即可创建；还可以双击大厅中的节点，直接在指定节点上创建。',
       hint: '代码 Agent（jca）擅长读代码、改代码、跑验证；通用 Agent（jvs）适合分析、规划与执行。',
-      target: headerActionsSelector(),
+      target: '.global-toolbar',
       placement: 'bottom',
     },
     {
@@ -5542,16 +5519,16 @@ function AGENT_TOUR_STEPS() {
       title: 'Agent 状态',
       desc: '宠物与面板上的颜色表示 Agent 状态：运行中、等待输入、等待确认、空闲、已停止。等待输入时会高亮提醒你处理。',
       hint: '命令面板中的「奔赴等待输入的 Agent」可一键跳到最需要你的那只宠物。',
-      target: headerActionsSelector(),
+      target: '.global-toolbar',
       placement: 'bottom',
     },
     {
       id: 'agent-sidebar',
       icon: '📋',
       title: 'Agent 侧边栏',
-      desc: '点击顶栏的 📋 打开侧边栏，可查看全部 Agent、批量选择、按节点或自定义分组浏览。',
+      desc: '点击右上角的 📋 打开侧边栏，可查看全部 Agent、批量选择、按节点或自定义分组浏览。',
       hint: '侧边栏中可批量复制、批量删除、加入分组；单个 Agent 的重命名/复制/权限管理/无损重生/删除在命令面板（Ctrl+P）的「当前 Agent」组中。',
-      target: headerActionsSelector(),
+      target: '.global-toolbar',
       placement: 'bottom',
     },
     {
@@ -5560,7 +5537,7 @@ function AGENT_TOUR_STEPS() {
       title: '管理单个 Agent',
       desc: '在命令面板（Ctrl+P）的「当前 Agent」组中：重命名可改显示名；复制会按同样配置再建一个；权限管理控制谁能读、谁能交互；无损重生保留会话重建进程；删除则彻底移除。',
       hint: '「无损重生」与「权限管理」仅对 Agent 属主可见。',
-      target: headerActionsSelector(),
+      target: '.global-toolbar',
       placement: 'bottom',
     },
     {
@@ -5569,7 +5546,7 @@ function AGENT_TOUR_STEPS() {
       title: '自定义分组',
       desc: 'Agent 多了以后，可在侧边栏的「管理分组」中把 Agent 归入自定义分组，分组可折叠，便于按项目或用途归类。',
       hint: 'Agent 停止后会自动从分组中移除，避免分组里堆积无效条目。',
-      target: headerActionsSelector(),
+      target: '.global-toolbar',
       placement: 'bottom',
     },
   ]
@@ -5740,7 +5717,6 @@ const commandPaletteCtx = computed(() => ({
   openTopology: openTopologyOverlay,
   openSettings: () => { showSettingsModal.value = true },
   togglePetVisibility,
-  toggleHeader,
   openAgentList: openAgentListPalette,
   // 重新打开新手引导（首次登录后自动展示过一次，可随时重看）
   startOnboarding: (tourId) => startOnboarding(tourId || 'welcome'),
@@ -13797,9 +13773,6 @@ onMounted(() => {
   }
   window.visualViewport?.addEventListener('resize', visualViewportResizeHandler)
 
-  // 测量标题栏高度（用于自动隐藏时的位移量）
-  measureHeaderHeight()
-
   inputHistory.value = loadInputHistory()
   
   // 已登录时才启动 Agent 列表刷新，避免未获取 token 前向后端发送请求
@@ -13820,7 +13793,6 @@ onMounted(() => {
   handleResize = () => {
     windowWidth.value = window.innerWidth
     updateViewportHeight()
-    measureHeaderHeight()
     ensureAgentSidebarWidthInBounds()
     ensureEditorPanelInViewport()
     ensureTerminalPanelInViewport()
@@ -13892,9 +13864,6 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-
-  // 清理标题栏自动隐藏定时器
-  clearTimeout(headerHideTimer)
 
   // 清理新手引导延迟展示定时器
   clearOnboardingTimer()
@@ -14211,72 +14180,70 @@ body::-webkit-scrollbar {
   min-width: 0; /* 防止 flex 子元素溢出 */
 }
 
-/* 顶部栏 */
-.app-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 16px;
-  background: var(--color-bg-secondary);
-  border-bottom: 0.5px solid var(--color-border-subtle);
-  flex-shrink: 0;
-  transition: margin-top 0.25s ease, opacity 0.25s ease;
-}
-
-/* 自动隐藏：向上缩回（保留过渡动画，不用 display:none） */
-.app-header.is-hidden {
-  margin-top: calc(-1 * var(--app-header-h, 0px));
-  opacity: 0;
-  pointer-events: none;
-}
-
-/* 桌面端顶部感应区：鼠标移入唤出标题栏 */
-.top-hover-zone {
+/* 全局工具条：常驻右上角，承载原顶栏入口 */
+.global-toolbar {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 8px;
-  z-index: 1200;
-}
-
-.mobile-header-actions {
-  display: none;
-  gap: 8px;
-}
-
-/* 桌面端显示，移动端隐藏 */
-.desktop-only {
-  display: flex;
-}
-
-/* 移动端显示，桌面端隐藏 */
-.mobile-only {
-  display: none;
-}
-
-.header-title h1 {
-  font-size: 17px;
-  font-weight: 600;
-  margin: 0;
-  color: var(--color-text-primary);
-  letter-spacing: -0.02em;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-}
-
-.header-actions {
+  top: 10px;
+  right: 12px;
+  /* 置于最上层：高于面板(1100/2000)、弹窗(3000)、右键菜单与 Toast(9999) */
+  z-index: 10000;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: rgba(11, 20, 36, 0.78);
+  border: 1px solid rgba(32, 200, 255, 0.18);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 20px rgba(0, 120, 190, 0.12);
 }
 
-.user-info-display {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  padding: 0 8px;
-  border-right: 1px solid var(--color-border);
-  margin-right: 4px;
-  white-space: nowrap;
+.global-toolbar.is-dragging {
+  user-select: none;
+  cursor: grabbing;
+}
+
+/* 拖动把手：仅此处可拖动工具条 */
+.global-toolbar-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 28px;
+  margin-right: 2px;
+  border-radius: 6px;
+  color: rgba(160, 200, 230, 0.55);
+  font-size: 14px;
+  line-height: 1;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.global-toolbar-handle:hover {
+  color: rgba(120, 220, 255, 0.95);
+  background: rgba(32, 200, 255, 0.12);
+}
+
+.global-toolbar-handle:active {
+  cursor: grabbing;
+}
+
+/* 移动端：按钮触控区放大 */
+@media (max-width: 768px) {
+  .global-toolbar {
+    top: max(8px, env(safe-area-inset-top, 0px));
+    right: max(8px, env(safe-area-inset-right, 0px));
+    gap: 2px;
+    padding: 3px 4px;
+  }
+  .global-toolbar .icon-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+  }
 }
 
 .editor-panel {
@@ -14939,61 +14906,6 @@ body::-webkit-scrollbar {
   cursor: sw-resize;
 }
 
-/* 当前 Agent 信息 */
-.current-agent-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 16px;
-  background: rgba(54, 255, 124, 0.15);
-  border: none;
-  border-radius: var(--tile-radius-xs);
-  font-size: 13px;
-}
-
-.current-agent-info .agent-type {
-  font-weight: 600;
-}
-
-.current-agent-info .agent-status {
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 3px;
-  background: var(--color-bg-tertiary);
-}
-
-.current-agent-info .agent-status.running {
-  background: rgba(32, 200, 255, 0.2);
-  color: #20c8ff;
-}
-
-.current-agent-info .agent-status.stopped {
-  background: rgba(63, 185, 80, 0.2);
-  color: #36ff7c;
-}
-
-.current-agent-info .agent-status.waiting_multi {
-  background: rgba(210, 153, 34, 0.2);
-  color: #ff8520;
-}
-
-.current-agent-info .agent-status.waiting_single {
-  background: rgba(255, 60, 72, 0.2);
-  color: #ff3c48;
-}
-
-.current-agent-info .agent-port {
-  color: #8ba3b8;
-}
-
-.current-agent-info .agent-dir {
-  color: #8ba3b8;
-  font-size: 12px;
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 .icon-btn {
   background: var(--color-bg-hover);
@@ -17108,26 +17020,6 @@ body::-webkit-scrollbar {
     background: var(--color-bg-secondary);
   }
   
-  .app-header {
-    padding: 12px 16px;
-    padding-left: max(16px, env(safe-area-inset-left, 0px));
-    padding-right: max(16px, env(safe-area-inset-right, 0px));
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .mobile-header-actions {
-    order: 2;
-  }
-
-  .header-title {
-    order: 1;
-  }
-  .header-title h1 {
-    font-size: 16px;
-  }
-  
   .messages {
     padding: 12px;
     padding-left: max(12px, env(safe-area-inset-left, 0px));
@@ -17602,15 +17494,6 @@ body::-webkit-scrollbar {
     width: 280px;
   }
   
-  /* 顶部栏优化 */
-  .app-header {
-    padding: 12px 18px;
-  }
-  
-  .header-title h1 {
-    font-size: 16px;
-  }
-  
   /* 按钮优化 */
   .icon-btn {
     padding: 8px 12px;
@@ -17630,28 +17513,6 @@ body::-webkit-scrollbar {
     -webkit-overflow-scrolling: touch;
   }
 
-  .desktop-only {
-    display: none !important;
-  }
-
-  .mobile-only {
-    display: flex !important;
-  }
-  
-  .mobile-header-actions {
-    display: flex !important;
-  }
-  
-  .mobile-header-actions .icon-btn {
-    padding: 12px !important;
-    min-width: 44px !important;
-    min-height: 44px !important;
-  }
-  
-  .header-actions {
-    display: none !important;
-  }
-  
   .editor-panel {
     position: fixed !important;
     top: 0 !important;
@@ -17752,24 +17613,6 @@ body::-webkit-scrollbar {
   .batch-actions-buttons {
     width: 100%;
     justify-content: flex-end;
-  }
-  
-  /* ========== 顶部栏优化 ========== */
-  .app-header {
-    padding: 10px 14px;
-  }
-  
-  .header-title h1 {
-    font-size: 15px;
-  }
-  
-  /* 隐藏非必要信息 */
-  .current-agent-info .agent-dir {
-    display: none;
-  }
-  
-  .current-agent-info .agent-port {
-    display: none;
   }
   
   /* ========== 按钮优化 ========== */
