@@ -1,0 +1,8 @@
+{
+  "id": "20260919_115857_958726",
+  "type": "project_long_term",
+  "tags": ["jarvis", "frontend", "快捷键", "Ctrl+W", "验证"],
+  "content": "Jarvis 前端 Ctrl+W 修复（commit c2e4e2d + 9aa991e）已用浏览器扩展全场景实测通过（2026-09-18，线上 https://jvs-ai.cn/，产物 index-DiF4YDYG.js）：\n1) 场景1 编辑器面板内（焦点在 body，仅 mousedown 过面板）Ctrl+W → 正确关闭编辑器面板，未误关 session panel；\n2) 场景2 聊天面板内同上 → 正确关闭 chat 面板；\n3) 场景3 大厅选中宠物后 Ctrl+W → 走 hideActiveOutputAndClose()，取消选中（active class 移除、面板收起）；\n4) 场景4 编辑器面板点击文件树文件 → 发出 file-content/file-stat 请求，新增标签并加载 CodeMirror 内容（openEditorFile 补建 session 修复生效）。\n\n关键实现事实：\n- getNamedPanelFocusKey()（App.vue:5680）在 getFocusedZoneKey() 无命名面板结果时回退 activeWindow，并用 isFocusKeyAvailable() 过滤已关闭/已分离残留（isFocusKeyAvailable 检查 showXxxPanel && !xxxDetached && querySelector）。\n- Ctrl+W 分支（App.vue:13747）：!getFocusedZoneKey() && !getNamedPanelFocusKey() 才走大厅逻辑。\n- activeWindow 只在 focusWindow() 赋值、从不重置，故必须靠 isFocusKeyAvailable 过滤；实测关闭面板后残留 activeWindow 不会误判（isFocusKeyAvailable 返回 false）。\n\n测试技巧（生产环境读不到 Vue state）：\n- 激活大厅宠物必须用真实 PointerEvent 序列：pointerdown(元素) → pointerup(window)，因绑定的是 @pointerdown/onPetPointerUp（有 250ms 单击防抖）；直接 pet.click() 无效。\n- 面板激活用 mousedown 派发到 .editor-panel/.chat-panel/.terminal-panel 根元素触发 activeWindow 更新。\n- 编辑器文件树节点：agent 节点 class=tree-node-content agent-node-content，展开后目录=folder-icon、文件=tree-node-icon（无后缀）。",
+  "created_at": "2026-09-19T11:58:57.958758",
+  "updated_at": "2026-09-19T11:58:57.958770"
+}
