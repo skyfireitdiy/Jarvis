@@ -213,15 +213,28 @@
           @pointerup="onPetPointerUp"
           @pointercancel="onPetPointerUp"
           @contextmenu.prevent.stop
-          @mouseenter="petHover = true"
+          @mouseenter="petHover = true; clearPetEdgeLeaveTimer()"
           @mouseleave="petHover = false"
         ></div>
       </div>
     </div>
 
-    <!-- 宠物旁的迷你网络拓扑 -->
+    <!-- 贴边收起态：固定在屏幕内侧边缘的唤出触发条（宠物大部分在视口外，靠它接收鼠标移入）。
+         独立于 .pet-float 定位（position:fixed），不随宠物滑入/滑出动画移动，
+         否则动画期间触发条会跟着宠物跑出屏幕，导致鼠标反复 enter/leave 而抖动。
+         展开态的收回改由 document 的 mousemove 判定（见 onPetMouseMove），
+         避免宠物热区在动画中扫过鼠标位置抢走 hover 而反复抖动 -->
+    <div
+      v-show="petEdge && !petEdgeRevealed && petVisible"
+      class="pet-edge-trigger"
+      :class="petEdge === 'left' ? 'is-left' : 'is-right'"
+      :style="{ top: petPos.y + 'px', height: petH() + 'px' }"
+      @mouseenter="onPetEdgeEnter"
+    ></div>
+
+    <!-- 宠物旁的迷你网络拓扑（贴边收起态随宠物一起隐藏） -->
     <PetMiniTopology
-      v-show="petVisible && petTopoOn && !petPowerSaveActive"
+      v-show="petVisible && petTopoOn && !petPowerSaveActive && (!petEdge || petEdgeRevealed)"
       :nodes="nodes"
       :agents="agentList || []"
       :getStatusClass="getStatusClass"
@@ -620,6 +633,13 @@ const PET_RESTORE_POS_KEY = 'jarvis_pet_restore_pos'
 const PET_HIDDEN_KEY = 'jarvis_pet_hidden'
 const PET_POWER_SAVE_KEY = 'jarvis_pet_power_save'
 const PET_PIN_KEY = 'jarvis_pet_pinned'
+const PET_EDGE_KEY = 'jarvis_pet_edge'
+// 贴边判定阈值：拖拽结束时距屏幕左右边缘小于该值即吸附
+const PET_EDGE_SNAP = 24
+// 贴边收起后仍露出的宽度（像素）
+const PET_EDGE_PEEK = 18
+// 鼠标移出后延迟收回的时长（毫秒）：避免在触发条与宠物之间移动时来回抖动
+const PET_EDGE_LEAVE_DELAY = 160
 // 移动端宠物整体缩小一半（配合 .pet-float 的 scale(0.5)），此处返回视觉尺寸
 const PET_SCALE_MOBILE = 0.5
 const PET_W = 200
@@ -652,6 +672,12 @@ const petTopoOn = ref(true)      // 是否显示迷你拓扑图
 const petCast = ref('')          // 正在施放的法术类型（'' 表示未施法）
 const petPowerSave = ref(false)  // 省电模式：关闭一切装饰性特效与常驻运算（移动端/桌面端均可开启）
 const petPinned = ref(false)     // 固定宠物：禁止随机漫步（不影响其它交互）
+// 贴边隐藏：'left' | 'right' | null；非 null 表示已吸附到该侧并收起
+const petEdge = ref(null)
+// 贴边收起态下是否临时滑出（鼠标移入时展开）
+const petEdgeRevealed = ref(false)
+// 贴边态鼠标移出后的延时收回定时器
+let petEdgeLeaveTimer = 0
 
 // 是否处于移动端（用于宠物整体缩放等，不再限制省电模式开关）
 const isMobileView = computed(() => (props.windowWidth || window.innerWidth) <= 768)
@@ -853,6 +879,92 @@ function clampPetPos(x, y) {
   return { x: Math.max(0, Math.min(maxX, x)), y: Math.max(0, Math.min(maxY, y)) }
 }
 
+// ==================== 贴边隐藏 ====================
+// 贴边收起时宠物左上角的 x：左侧露右边一小条，右侧露左边一小条
+function petEdgeCollapsedX(edge) {
+  return edge === 'left' ? -(petW() - PET_EDGE_PEEK) : window.innerWidth - PET_EDGE_PEEK
+}
+
+// 贴边展开时宠物左上角的 x：完全贴到该侧边缘
+function petEdgeExpandedX(edge) {
+  return edge === 'left' ? 0 : Math.max(0, window.innerWidth - petW())
+}
+
+// 依据贴边状态与是否临时滑出，更新宠物 x（贴边态不走 clamp，允许越出视口）
+function applyPetEdge() {
+  if (!petEdge.value) return
+  const x = petEdgeRevealed.value
+    ? petEdgeExpandedX(petEdge.value)
+    : petEdgeCollapsedX(petEdge.value)
+  petPos.value = { x, y: petPos.value.y }
+}
+
+// 拖拽结束：贴近左右边缘则吸附并收起，否则取消贴边
+function snapPetToEdge() {
+  const x = petPos.value.x
+  const maxX = Math.max(0, window.innerWidth - petW())
+  const nearLeft = x <= PET_EDGE_SNAP
+  const nearRight = x >= maxX - PET_EDGE_SNAP
+  if (nearLeft || nearRight) {
+    petEdge.value = nearLeft ? 'left' : 'right'
+    petEdgeRevealed.value = false
+    applyPetEdge()
+  } else {
+    petEdge.value = null
+    petEdgeRevealed.value = false
+  }
+  savePetEdge()
+}
+
+// 鼠标移入：贴边态临时滑出，便于交互
+function onPetEdgeEnter() {
+  if (!petEdge.value || petEdgeRevealed.value) return
+  clearPetEdgeLeaveTimer()
+  petEdgeRevealed.value = true
+  applyPetEdge()
+}
+
+// 鼠标移出：贴边态滑回收起（延时执行，避免在触发条与宠物之间移动时来回抖动）
+function onPetEdgeLeave() {
+  if (!petEdge.value || !petEdgeRevealed.value) return
+  clearPetEdgeLeaveTimer()
+  petEdgeLeaveTimer = window.setTimeout(() => {
+    petEdgeLeaveTimer = 0
+    if (!petEdge.value || !petEdgeRevealed.value) return
+    petEdgeRevealed.value = false
+    applyPetEdge()
+  }, PET_EDGE_LEAVE_DELAY)
+}
+
+function clearPetEdgeLeaveTimer() {
+  if (petEdgeLeaveTimer) {
+    clearTimeout(petEdgeLeaveTimer)
+    petEdgeLeaveTimer = 0
+  }
+}
+
+function savePetEdge() {
+  try {
+    localStorage.setItem(PET_EDGE_KEY, petEdge.value || '')
+  } catch (e) {
+    console.warn('[AGENT_SIDEBAR] Failed to save pet edge:', e)
+  }
+}
+
+function initPetEdge() {
+  let saved = ''
+  try {
+    saved = localStorage.getItem(PET_EDGE_KEY) || ''
+  } catch (e) {
+    saved = ''
+  }
+  if (saved === 'left' || saved === 'right') {
+    petEdge.value = saved
+    petEdgeRevealed.value = false
+    applyPetEdge()
+  }
+}
+
 // 还原按钮独立于宠物尺寸，可拖到屏幕任意边角
 function clampRestorePos(x, y) {
   const maxX = Math.max(0, window.innerWidth - RESTORE_W)
@@ -914,6 +1026,21 @@ function initPetPos() {
 
 let petRaf = 0
 function onPetMouseMove(e) {
+  // 贴边展开态：用鼠标位置判定是否仍在「宠物 ∪ 触发条」范围内，决定收回。
+  // 不依赖元素 mouseleave，避免宠物热区在滑出动画中扫过鼠标位置抢走 hover 而反复抖动
+  if (petVisible.value && petEdge.value && petEdgeRevealed.value) {
+    const f = document.querySelector('.pet-float')
+    if (f) {
+      const r = f.getBoundingClientRect()
+      // 宠物矩形（含收起时露出的部分）与屏幕内侧触发条共同构成"保持展开"区域
+      const inPet = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom
+      const inTrigger = petEdge.value === 'left'
+        ? e.clientX <= PET_EDGE_PEEK
+        : e.clientX >= window.innerWidth - PET_EDGE_PEEK
+      if (inPet || inTrigger) clearPetEdgeLeaveTimer()
+      else onPetEdgeLeave()
+    }
+  }
   if (petRaf) return
   petRaf = requestAnimationFrame(() => {
     petRaf = 0
@@ -989,6 +1116,7 @@ function onPetPointerUp(e) {
   e.target.releasePointerCapture?.(e.pointerId)
   if (petMoved) {
     petDrag.value = false
+    snapPetToEdge()
     savePetPos()
     return
   }
@@ -1817,6 +1945,11 @@ function schedulePetAction() {
 }
 
 function onPetResize() {
+  if (petEdge.value) {
+    // 贴边态：按新视口宽度重算贴边位置
+    applyPetEdge()
+    return
+  }
   petPos.value = clampPetPos(petPos.value.x, petPos.value.y)
 }
 
@@ -1826,7 +1959,7 @@ let petWanderRaf = 0     // 漫步动画帧
 // 当前是否可自由漫步：未固定/拖拽/悬停/睡眠/隐藏/摸头，且页面可见
 function canPetWander() {
   return !petPinned.value && !petPowerSaveActive.value && !document.hidden && !petHover.value && !petDrag.value &&
-    !petSleep.value && !petHidden.value && !petPetting.value && !petWalking.value
+    !petSleep.value && !petHidden.value && !petPetting.value && !petWalking.value && !petEdge.value
 }
 
 function schedulePetWander() {
@@ -1963,6 +2096,7 @@ function togglePetPin() {
 onMounted(() => {
   initPetPos()
   initRestorePos()
+  initPetEdge()
   try {
     petSfxOn.value = localStorage.getItem(PET_SFX_KEY) !== '0'
   } catch (e) {
@@ -2027,6 +2161,7 @@ onUnmounted(() => {
   clearTimeout(petCastTimer)
   clearTimeout(petCastClearTimer)
   clearTimeout(petEncourageTimer)
+  clearTimeout(petEdgeLeaveTimer)
   if (petRaf) cancelAnimationFrame(petRaf)
   if (petWanderRaf) cancelAnimationFrame(petWanderRaf)
   try {
@@ -2171,6 +2306,24 @@ defineExpose({
   height: 230px;
   pointer-events: none;
   touch-action: none;
+  /* 贴边滑入/滑出动画（位移走 left，避免与移动端 scale 的 transform 冲突） */
+  transition: left 0.22s ease;
+}
+
+/* 贴边态：固定在屏幕内侧边缘的唤出触发条，接收鼠标移入以临时滑出宠物。
+   用 position:fixed 独立于 .pet-float 定位，避免随宠物滑入/滑出动画移动 */
+.pet-edge-trigger {
+  position: fixed;
+  width: 18px;
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 899;
+}
+.pet-edge-trigger.is-left {
+  left: 0;
+}
+.pet-edge-trigger.is-right {
+  right: 0;
 }
 
 /* 移动端：宠物整体缩小一半。以左上角为缩放原点，使 petPos 仍是视觉左上角，
@@ -2640,6 +2793,7 @@ defineExpose({
   background: rgba(32, 200, 255, 0.12);
   cursor: pointer;
   pointer-events: auto;
+  z-index: 5;
   opacity: 0.5;
   transition: opacity 0.2s ease, background 0.2s ease, transform 0.2s ease;
 }
@@ -2673,6 +2827,7 @@ defineExpose({
   background: rgba(32, 200, 255, 0.12);
   cursor: pointer;
   pointer-events: auto;
+  z-index: 5;
   opacity: 0.5;
   transition: opacity 0.2s ease, background 0.2s ease, transform 0.2s ease;
 }
@@ -2704,6 +2859,7 @@ defineExpose({
   background: rgba(32, 200, 255, 0.12);
   cursor: pointer;
   pointer-events: auto;
+  z-index: 5;
   opacity: 0.5;
   transition: opacity 0.2s ease, background 0.2s ease, transform 0.2s ease;
 }
