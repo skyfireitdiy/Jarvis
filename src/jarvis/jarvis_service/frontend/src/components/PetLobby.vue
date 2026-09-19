@@ -2075,8 +2075,9 @@ function closeActiveNode() {
 }
 
 // 供父组件调用：按方向选中 Agent（Ctrl+Alt+方向键）
-// 以当前选中宠物的中心为基准，选该方向上「横向/纵向偏移最小、再按垂直/水平距离最近」的宠物；
-// 无选中时从该方向最靠边的宠物开始（如 → 取最左侧的第一只）。
+// 有选中：以当前选中宠物的中心为基准，选该方向上「横向/纵向偏移最小、再按垂直/水平距离最近」的宠物。
+// 无选中：从该方向的反向边缘开始——→ 取全场最左的第一只、← 取最右、↓ 取最上、↑ 取最下，
+//         之后连续按同一方向即可依次向该方向推进。
 // 返回 true 表示已消费该请求（大厅无宠物时返回 false，交由父组件走区域焦点跳转）
 function selectAgentInDirection(dir) {
   const pets = petAgents.value
@@ -2084,35 +2085,50 @@ function selectAgentInDirection(dir) {
   const cx = (pet) => pet.x + PET_W / 2
   const cy = (pet) => pet.y + PET_H / 2
   const current = pets.find(p => p.agentId === activePetId.value) || null
-  // 无选中（或选中项已消失）时，用舞台中心作为基准，保证「第一个」符合直觉
-  const baseX = current ? cx(current) : stageSize.value.w / 2
-  const baseY = current ? cy(current) : stageSize.value.h / 2
 
   let best = null
   let bestPrimary = Infinity
   let bestSecondary = Infinity
   for (const pet of pets) {
     if (current && pet.agentId === current.agentId) continue
-    const dx = cx(pet) - baseX
-    const dy = cy(pet) - baseY
     let primary
     let secondary
-    if (dir === 'left') {
-      if (dx >= 0) continue
-      primary = -dx
-      secondary = Math.abs(dy)
-    } else if (dir === 'right') {
-      if (dx <= 0) continue
-      primary = dx
-      secondary = Math.abs(dy)
-    } else if (dir === 'up') {
-      if (dy >= 0) continue
-      primary = -dy
-      secondary = Math.abs(dx)
+    if (!current) {
+      // 无选中：不做方向过滤，直接按「该方向的反向边缘」排序，取第一只
+      // left → 取最右（x 最大）；right → 取最左（x 最小）；up → 取最下（y 最大）；down → 取最上（y 最小）
+      if (dir === 'left') {
+        primary = -cx(pet)
+        secondary = cy(pet)
+      } else if (dir === 'right') {
+        primary = cx(pet)
+        secondary = cy(pet)
+      } else if (dir === 'up') {
+        primary = -cy(pet)
+        secondary = cx(pet)
+      } else {
+        primary = cy(pet)
+        secondary = cx(pet)
+      }
     } else {
-      if (dy <= 0) continue
-      primary = dy
-      secondary = Math.abs(dx)
+      const dx = cx(pet) - cx(current)
+      const dy = cy(pet) - cy(current)
+      if (dir === 'left') {
+        if (dx >= 0) continue
+        primary = -dx
+        secondary = Math.abs(dy)
+      } else if (dir === 'right') {
+        if (dx <= 0) continue
+        primary = dx
+        secondary = Math.abs(dy)
+      } else if (dir === 'up') {
+        if (dy >= 0) continue
+        primary = -dy
+        secondary = Math.abs(dx)
+      } else {
+        if (dy <= 0) continue
+        primary = dy
+        secondary = Math.abs(dx)
+      }
     }
     if (primary < bestPrimary || (primary === bestPrimary && secondary < bestSecondary)) {
       best = pet
