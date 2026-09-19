@@ -13475,6 +13475,11 @@ function handleGlobalKeydown(event) {
       showShortcutHelp.value = false
       return
     }
+    // 管理面板打开时优先关闭它
+    if (showAdminPanel.value) {
+      showAdminPanel.value = false
+      return
+    }
     // 弹出面板（diff/rules/tools/缓存/重命名/权限管理）：Esc 关闭
     if (showDiffModal.value) {
       showDiffModal.value = false
