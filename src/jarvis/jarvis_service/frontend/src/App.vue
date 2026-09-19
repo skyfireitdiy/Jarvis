@@ -55,8 +55,20 @@
     />
 
     <!-- 全局工具条：常驻右上角，承载原顶栏的全部入口（不随面板开关消失） -->
-    <div class="global-toolbar" :class="{ 'is-dragging': isDraggingToolbar }" :style="globalToolbarStyle">
-      <span class="global-toolbar-handle" title="拖动工具条" @pointerdown="startDragToolbar($event)">⠿</span>
+    <div
+      class="global-toolbar"
+      ref="toolbarElRef"
+      :class="{
+        'is-dragging': isDraggingToolbar,
+        'is-collapsed': toolbarCollapsed,
+        'edge-left': toolbarEdge === 'left',
+        'edge-right': toolbarEdge === 'right',
+      }"
+      :style="globalToolbarStyle"
+      @pointerenter="onToolbarPointerEnter"
+      @pointerleave="onToolbarPointerLeave"
+    >
+      <span class="global-toolbar-handle" title="拖动工具条（拖到屏幕边缘可自动隐藏）" @pointerdown="startDragToolbar($event)">⠿</span>
       <button class="icon-btn" @click="toggleAgentSidebar()" title="Agent 侧边栏 (Ctrl+A)">
         📋
       </button>
@@ -76,6 +88,18 @@
       <button class="icon-btn" v-if="auth.userInfo?.is_admin" @click="showAdminPanel = true; pushOverlayState()" :disabled="!socket" title="管理 (Ctrl+Alt+Shift+A)">
         🛡️
       </button>
+    </div>
+
+    <!-- 贴边收起后露出的窄边条：点击/触摸展开工具条（不含任何按钮，避免误触） -->
+    <div
+      v-if="toolbarCollapsed && toolbarEdge"
+      class="global-toolbar-tab"
+      :class="toolbarEdge === 'left' ? 'edge-left' : 'edge-right'"
+      :style="globalToolbarTabStyle"
+      title="展开工具条"
+      @pointerdown.stop.prevent="expandToolbar()"
+    >
+      <span class="global-toolbar-tab-grip"></span>
     </div>
 
     <!-- 主内容区 -->
@@ -1538,7 +1562,7 @@ function getTerminalStyle(terminalContent) {
   
   const contentHeight = lineCount * fontSize * lineHeight
   const totalHeight = contentHeight + headerHeight + contentPadding
-  
+
   if (lineCount <= maxLines) {
     // 行数少时，计算实际高度：内容高度 + header高度 + padding
     return { ...baseStyle, height: `${totalHeight}px` }
@@ -1549,11 +1573,15 @@ function getTerminalStyle(terminalContent) {
   }
 }
 
-// 全局工具条拖拽：位置持久化到 localStorage，null 表示使用默认（右上角）
+// 全局工具条拖拽 + 贴边隐藏：位置持久化到 localStorage，null 表示使用默认（右上角）
 const GLOBAL_TOOLBAR_STORAGE_KEY = 'jarvis_global_toolbar_pos'
+const GLOBAL_TOOLBAR_EDGE_SNAP = 24 // 距屏幕边缘多少像素内视为贴边
 const globalToolbarPos = ref(loadGlobalToolbarPos())
 const isDraggingToolbar = ref(false)
 const toolbarDragOffset = ref({ x: 0, y: 0 })
+const toolbarEdge = ref(null) // 'left' | 'right' | null，贴边方向
+const toolbarCollapsed = ref(false) // 贴边后是否已收起
+let toolbarCollapseTimer = null
 
 function loadGlobalToolbarPos() {
   try {
@@ -1563,9 +1591,25 @@ function loadGlobalToolbarPos() {
     if (typeof parsedValue?.x !== 'number' || typeof parsedValue?.y !== 'number') {
       return null
     }
+    // 恢复贴边状态（旧数据无该字段时视为常驻）
+    if (parsedValue.edge === 'left' || parsedValue.edge === 'right') {
+      toolbarEdge.value = parsedValue.edge
+      toolbarCollapsed.value = true
+    }
     return { x: parsedValue.x, y: parsedValue.y }
   } catch {
     return null
+  }
+}
+
+function saveGlobalToolbarPos() {
+  if (globalToolbarPos.value) {
+    localStorage.setItem(GLOBAL_TOOLBAR_STORAGE_KEY, JSON.stringify({
+      ...globalToolbarPos.value,
+      edge: toolbarEdge.value,
+    }))
+  } else {
+    localStorage.removeItem(GLOBAL_TOOLBAR_STORAGE_KEY)
   }
 }
 
@@ -1578,17 +1622,50 @@ const globalToolbarStyle = computed(() => {
   }
 })
 
+// 工具条实际宽度（用于贴边吸附与拖动边界计算）
+const toolbarElRef = ref(null)
+const toolbarWidth = ref(0)
+
+function measureToolbarWidth() {
+  const width = toolbarElRef.value?.offsetWidth || 0
+  if (width > 0) toolbarWidth.value = width
+  return width
+}
+
+// 收起后露出的窄边条位置：与工具条同高，贴在被吸附的那一侧
+const globalToolbarTabStyle = computed(() => {
+  const pos = globalToolbarPos.value
+  if (!pos) return {}
+  return {
+    top: `${pos.y}px`,
+  }
+})
+
+// 点击/触摸窄边条：展开工具条
+function expandToolbar() {
+  if (toolbarCollapseTimer) {
+    clearTimeout(toolbarCollapseTimer)
+    toolbarCollapseTimer = null
+  }
+  toolbarCollapsed.value = false
+}
+
 function startDragToolbar(event) {
   // 仅响应主指针（鼠标左键 / 单指触摸）
   if (event.button !== undefined && event.button !== 0) return
   const toolbarEl = event.currentTarget?.parentElement
   if (!toolbarEl) return
-  const rect = toolbarEl.getBoundingClientRect()
   isDraggingToolbar.value = true
-  toolbarDragOffset.value = {
-    x: event.clientX - rect.left,
-    y: event.clientY - rect.top,
-  }
+  toolbarCollapsed.value = false
+  toolbarEdge.value = null
+  // 收起态带有 translateX 位移，需等展开渲染完成后再取真实位置，避免拖动起点跳变
+  nextTick(() => {
+    const rect = toolbarEl.getBoundingClientRect()
+    toolbarDragOffset.value = {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    }
+  })
   // 使用 Pointer Events，同时覆盖鼠标与触摸
   document.addEventListener('pointermove', onDragToolbar)
   document.addEventListener('pointerup', stopDragToolbar)
@@ -1599,11 +1676,12 @@ function startDragToolbar(event) {
 
 function onDragToolbar(event) {
   if (!isDraggingToolbar.value) return
-  const maxX = window.innerWidth - 40
-  const maxY = window.innerHeight - 40
+  const width = toolbarWidth.value || measureToolbarWidth()
+  const maxX = Math.max(0, window.innerWidth - width)
+  const maxY = Math.max(0, window.innerHeight - 40)
   globalToolbarPos.value = {
-    x: clamp(event.clientX - toolbarDragOffset.value.x, 0, Math.max(0, maxX)),
-    y: clamp(event.clientY - toolbarDragOffset.value.y, 0, Math.max(0, maxY)),
+    x: clamp(event.clientX - toolbarDragOffset.value.x, 0, maxX),
+    y: clamp(event.clientY - toolbarDragOffset.value.y, 0, maxY),
   }
   event.preventDefault()
 }
@@ -1614,9 +1692,87 @@ function stopDragToolbar() {
   document.removeEventListener('pointercancel', stopDragToolbar)
   if (!isDraggingToolbar.value) return
   isDraggingToolbar.value = false
-  if (globalToolbarPos.value) {
-    localStorage.setItem(GLOBAL_TOOLBAR_STORAGE_KEY, JSON.stringify(globalToolbarPos.value))
+  snapToolbarToEdge()
+  saveGlobalToolbarPos()
+}
+
+// 松手后判断是否贴边：靠左/靠右则吸附并自动收起
+function snapToolbarToEdge() {
+  const pos = globalToolbarPos.value
+  if (!pos) return
+  const width = toolbarWidth.value || measureToolbarWidth()
+  const maxX = Math.max(0, window.innerWidth - width)
+  // 距目标边缘在阈值内即视为贴边
+  const nearLeft = pos.x <= GLOBAL_TOOLBAR_EDGE_SNAP
+  const nearRight = pos.x >= maxX - GLOBAL_TOOLBAR_EDGE_SNAP
+  if (nearLeft) {
+    toolbarEdge.value = 'left'
+    globalToolbarPos.value = { x: 0, y: pos.y }
+    toolbarCollapsed.value = true
+  } else if (nearRight) {
+    toolbarEdge.value = 'right'
+    globalToolbarPos.value = { x: maxX, y: pos.y }
+    toolbarCollapsed.value = true
+  } else {
+    toolbarEdge.value = null
+    toolbarCollapsed.value = false
   }
+}
+
+// 鼠标/触摸移入工具条：展开
+function onToolbarPointerEnter() {
+  if (toolbarCollapseTimer) {
+    clearTimeout(toolbarCollapseTimer)
+    toolbarCollapseTimer = null
+  }
+  if (toolbarEdge.value) {
+    toolbarCollapsed.value = false
+  }
+}
+
+// 移出工具条：贴边状态下延迟收起
+function onToolbarPointerLeave() {
+  if (!toolbarEdge.value) return
+  if (toolbarCollapseTimer) clearTimeout(toolbarCollapseTimer)
+  toolbarCollapseTimer = setTimeout(() => {
+    toolbarCollapseTimer = null
+    if (toolbarEdge.value) toolbarCollapsed.value = true
+  }, 400)
+}
+
+// 窗口尺寸变化时，重新校正工具条位置；若越界则恢复到侧边隐藏状态
+function handleToolbarResize() {
+  if (!globalToolbarPos.value) return
+  const width = toolbarWidth.value || measureToolbarWidth()
+  const maxX = Math.max(0, window.innerWidth - width)
+  const maxY = Math.max(0, window.innerHeight - 40)
+  const { x, y } = globalToolbarPos.value
+  const clampedY = clamp(y, 0, maxY)
+
+  if (toolbarEdge.value === 'right') {
+    globalToolbarPos.value = { x: maxX, y: clampedY }
+    return
+  }
+  if (toolbarEdge.value === 'left') {
+    globalToolbarPos.value = { x: 0, y: clampedY }
+    return
+  }
+
+  // 常驻态：若因屏幕变小导致越界（跑出可视区），吸附到最近的侧边并收起
+  const overflowX = x < 0 || x > maxX
+  const overflowY = y < 0 || y > maxY
+  if (overflowX || overflowY) {
+    toolbarEdge.value = x + width / 2 < window.innerWidth / 2 ? 'left' : 'right'
+    globalToolbarPos.value = {
+      x: toolbarEdge.value === 'left' ? 0 : maxX,
+      y: clampedY,
+    }
+    toolbarCollapsed.value = true
+    saveGlobalToolbarPos()
+    return
+  }
+
+  globalToolbarPos.value = { x, y: clampedY }
 }
 
 // 拖拽相关函数
@@ -13804,6 +13960,7 @@ onMounted(() => {
     saveEditorPanelRect()
     saveTerminalPanelRect()
     layoutCodeMirrorEditor()
+    handleToolbarResize()
 
     const activeSession = terminalSessions.value.find(session => session.terminal_id === activeTerminalId.value)
     if (activeSession && activeSession.fitAddon && activeSession.terminal) {
@@ -13812,8 +13969,13 @@ onMounted(() => {
     }
   }
   window.addEventListener('resize', handleResize)
-  
-  // 添加beforeunload监听
+
+  // 挂载后测量工具条实际宽度，并按贴边状态校正位置（避免恢复的位置越界）
+  nextTick(() => {
+    measureToolbarWidth()
+    handleToolbarResize()
+  })
+
   window.addEventListener('beforeunload', handleBeforeUnload)
   
   // 移动端：监听返回键（popstate事件）
@@ -13904,6 +14066,12 @@ onUnmounted(() => {
   
   // 移除窗口resize监听
   window.removeEventListener('resize', handleResize)
+
+  // 清理工具条贴边收起定时器
+  if (toolbarCollapseTimer) {
+    clearTimeout(toolbarCollapseTimer)
+    toolbarCollapseTimer = null
+  }
   
   // 移除beforeunload监听
   window.removeEventListener('beforeunload', handleBeforeUnload)
@@ -14197,11 +14365,73 @@ body::-webkit-scrollbar {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 4px 20px rgba(0, 120, 190, 0.12);
+  transition: transform 0.22s ease, opacity 0.22s ease;
+}
+
+/* 贴边收起：工具条整体移出屏幕，由独立的窄边条负责唤出 */
+.global-toolbar.is-collapsed {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.global-toolbar.is-collapsed.edge-left {
+  transform: translateX(-100%);
+}
+
+.global-toolbar.is-collapsed.edge-right {
+  transform: translateX(100%);
+}
+
+/* 贴边收起后露出的窄边条：纯触发区，不含按钮 */
+.global-toolbar-tab {
+  position: fixed;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 44px;
+  border-radius: 8px;
+  background: rgba(11, 20, 36, 0.78);
+  border: 1px solid rgba(32, 200, 255, 0.18);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 20px rgba(0, 120, 190, 0.12);
+  cursor: pointer;
+  touch-action: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.global-toolbar-tab.edge-left {
+  left: 0;
+  border-left: none;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.global-toolbar-tab.edge-right {
+  right: 0;
+  border-right: none;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.global-toolbar-tab:hover {
+  background: rgba(20, 40, 66, 0.92);
+  border-color: rgba(32, 200, 255, 0.45);
+}
+
+.global-toolbar-tab-grip {
+  width: 3px;
+  height: 20px;
+  border-radius: 2px;
+  background: rgba(120, 220, 255, 0.7);
 }
 
 .global-toolbar.is-dragging {
   user-select: none;
   cursor: grabbing;
+  transition: none;
 }
 
 /* 拖动把手：仅此处可拖动工具条 */
