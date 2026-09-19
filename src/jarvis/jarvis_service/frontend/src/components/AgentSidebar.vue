@@ -228,8 +228,9 @@
       v-show="petEdge && !petEdgeRevealed && petVisible"
       class="pet-edge-trigger"
       :class="petEdge === 'left' ? 'is-left' : 'is-right'"
-      :style="{ top: petPos.y + 'px', height: petH() + 'px' }"
+      :style="{ top: petPos.y + 'px', height: petH() + 'px', width: petEdgePeek() + 'px' }"
       @mouseenter="onPetEdgeEnter"
+      @click="onPetEdgeEnter"
     ></div>
 
     <!-- 宠物旁的迷你网络拓扑（贴边收起态随宠物一起隐藏） -->
@@ -636,8 +637,9 @@ const PET_PIN_KEY = 'jarvis_pet_pinned'
 const PET_EDGE_KEY = 'jarvis_pet_edge'
 // 贴边判定阈值：拖拽结束时距屏幕左右边缘小于该值即吸附
 const PET_EDGE_SNAP = 24
-// 贴边收起后仍露出的宽度（像素）
-const PET_EDGE_PEEK = 18
+// 贴边收起后仍露出的宽度（像素）：保证收起态仍能看到宠物一角，便于定位
+const PET_EDGE_PEEK_DESKTOP = 28
+const PET_EDGE_PEEK_MOBILE = 40
 // 鼠标移出后延迟收回的时长（毫秒）：避免在触发条与宠物之间移动时来回抖动
 const PET_EDGE_LEAVE_DELAY = 160
 // 移动端宠物整体缩小一半（配合 .pet-float 的 scale(0.5)），此处返回视觉尺寸
@@ -652,6 +654,10 @@ function petW() {
 }
 function petH() {
   return isMobileView.value ? Math.round(PET_H * PET_SCALE_MOBILE) : PET_H
+}
+// 贴边收起后露出的宽度：移动端宠物被 scale(0.5) 缩小，需给更大的原始值才能露出可辨识的一角
+function petEdgePeek() {
+  return isMobileView.value ? PET_EDGE_PEEK_MOBILE : PET_EDGE_PEEK_DESKTOP
 }
 const petPos = ref({ x: 0, y: 0 })
 const restorePos = ref({ x: 0, y: 0 })
@@ -882,7 +888,7 @@ function clampPetPos(x, y) {
 // ==================== 贴边隐藏 ====================
 // 贴边收起时宠物左上角的 x：左侧露右边一小条，右侧露左边一小条
 function petEdgeCollapsedX(edge) {
-  return edge === 'left' ? -(petW() - PET_EDGE_PEEK) : window.innerWidth - PET_EDGE_PEEK
+  return edge === 'left' ? -(petW() - petEdgePeek()) : window.innerWidth - petEdgePeek()
 }
 
 // 贴边展开时宠物左上角的 x：完全贴到该侧边缘
@@ -1035,8 +1041,8 @@ function onPetMouseMove(e) {
       // 宠物矩形（含收起时露出的部分）与屏幕内侧触发条共同构成"保持展开"区域
       const inPet = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom
       const inTrigger = petEdge.value === 'left'
-        ? e.clientX <= PET_EDGE_PEEK
-        : e.clientX >= window.innerWidth - PET_EDGE_PEEK
+        ? e.clientX <= petEdgePeek()
+        : e.clientX >= window.innerWidth - petEdgePeek()
       if (inPet || inTrigger) clearPetEdgeLeaveTimer()
       else onPetEdgeLeave()
     }
