@@ -131,7 +131,9 @@ export const ACTIONS = [
     id: "current-rename",
     label: "重命名",
     shortcut: "F2",
-    condition: "需选中当前 Agent",
+    // F2 在大厅选中节点时让位给 node-rename（见 App.vue 的 F2 分支）
+    shortcutScope: "global",
+    condition: "需选中当前 Agent；大厅中选中节点时优先重命名该节点",
     en: "Rename",
     group: "当前 Agent",
     icon: "✏",
@@ -614,6 +616,135 @@ export const ACTIONS = [
         ctx.hasPermission("admin:permissions")),
     run: (ctx) => ctx.openAdminPanel && ctx.openAdminPanel(),
   },
+  // ===== 节点（作用于大厅中选中的节点）=====
+  {
+    id: "node-create-agent",
+    label: "在选中节点创建 Agent",
+    shortcut: "Ctrl+Alt+Shift+C",
+    condition: "大厅中已选中节点",
+    en: "Create Agent on Node",
+    group: "节点",
+    icon: "➕",
+    keywords: ["节点", "创建", "agent", "node", "create"],
+    enabled: (ctx) => !!ctx?.currentNodeId,
+    run: (ctx) =>
+      ctx.createAgentOnNode && ctx.createAgentOnNode(ctx.currentNodeId),
+  },
+  {
+    id: "node-open-terminal",
+    label: "打开选中节点终端",
+    shortcut: "Ctrl+Alt+Shift+L",
+    condition: "大厅中已选中节点",
+    en: "Open Node Terminal",
+    group: "节点",
+    icon: "⌨️",
+    keywords: ["节点", "终端", "terminal", "node", "shell"],
+    enabled: (ctx) => !!ctx?.currentNodeId,
+    run: (ctx) =>
+      ctx.openTerminalOnNode && ctx.openTerminalOnNode(ctx.currentNodeId),
+  },
+  {
+    id: "node-update-code",
+    label: "更新选中节点代码",
+    shortcut: "Ctrl+Alt+Shift+G",
+    condition: "大厅中已选中节点",
+    en: "Update Node Code",
+    group: "节点",
+    icon: "🔄",
+    keywords: ["节点", "更新", "代码", "node", "update", "code", "pull"],
+    enabled: (ctx) => !!ctx?.currentNodeId,
+    run: (ctx) => ctx.updateNodeCode && ctx.updateNodeCode(ctx.currentNodeId),
+  },
+  {
+    id: "node-restart-service",
+    label: "重启选中节点服务",
+    shortcut: "Ctrl+Alt+Shift+P",
+    condition: "大厅中已选中节点",
+    en: "Restart Node Service",
+    group: "节点",
+    icon: "♻️",
+    keywords: ["节点", "重启", "服务", "node", "restart", "service"],
+    enabled: (ctx) => !!ctx?.currentNodeId,
+    run: (ctx) =>
+      ctx.restartNodeService && ctx.restartNodeService(ctx.currentNodeId),
+  },
+  {
+    // 与「当前 Agent」组 current-rename 共用 F2：两者通过 shortcutScope 区分场景，
+    // 大厅中选中节点时优先执行本动作（见 App.vue 的 F2 分支）
+    id: "node-rename",
+    label: "重命名选中节点",
+    shortcut: "F2",
+    shortcutScope: "node",
+    condition: "大厅中已选中节点",
+    en: "Rename Node",
+    group: "节点",
+    icon: "✏️",
+    keywords: ["节点", "重命名", "改名", "node", "rename"],
+    enabled: (ctx) => !!ctx?.currentNodeId,
+    run: (ctx) => ctx.renameNode && ctx.renameNode(ctx.currentNodeId),
+    // 重命名需在大厅内弹输入框，命令面板需先关闭让出焦点
+    closePaletteOnRun: true,
+  },
+  // ===== 大厅方向选中（Ctrl+Alt+方向键）=====
+  // 与 App.vue 中既有的「区域焦点跳转」共用同一物理键：大厅有宠物时优先选中宠物，
+  // 无宠物时回退为区域跳转（见 App.vue 的 Ctrl+Alt+方向键分支）。
+  // 这四个动作仅用于命令面板/快捷键一览的展示与执行，不参与 handleGlobalKeydown 的
+  // registry 统一分发（该分发要求 ctrl+alt 且未被前面的分支消费，方向键分支已提前 return）。
+  {
+    id: "lobby-select-left",
+    label: "选中左侧 Agent",
+    shortcut: "Ctrl+Alt+ArrowLeft",
+    condition: "宠物大厅中有 Agent",
+    en: "Select Agent to the Left",
+    group: "大厅",
+    icon: "⬅️",
+    keywords: ["大厅", "选中", "方向", "左", "lobby", "select", "left"],
+    enabled: (ctx) => !!ctx?.hasLobbyAgents,
+    run: (ctx) =>
+      ctx.selectLobbyAgentInDirection &&
+      ctx.selectLobbyAgentInDirection("left"),
+  },
+  {
+    id: "lobby-select-right",
+    label: "选中右侧 Agent",
+    shortcut: "Ctrl+Alt+ArrowRight",
+    condition: "宠物大厅中有 Agent",
+    en: "Select Agent to the Right",
+    group: "大厅",
+    icon: "➡️",
+    keywords: ["大厅", "选中", "方向", "右", "lobby", "select", "right"],
+    enabled: (ctx) => !!ctx?.hasLobbyAgents,
+    run: (ctx) =>
+      ctx.selectLobbyAgentInDirection &&
+      ctx.selectLobbyAgentInDirection("right"),
+  },
+  {
+    id: "lobby-select-up",
+    label: "选中上方 Agent",
+    shortcut: "Ctrl+Alt+ArrowUp",
+    condition: "宠物大厅中有 Agent",
+    en: "Select Agent Above",
+    group: "大厅",
+    icon: "⬆️",
+    keywords: ["大厅", "选中", "方向", "上", "lobby", "select", "up"],
+    enabled: (ctx) => !!ctx?.hasLobbyAgents,
+    run: (ctx) =>
+      ctx.selectLobbyAgentInDirection && ctx.selectLobbyAgentInDirection("up"),
+  },
+  {
+    id: "lobby-select-down",
+    label: "选中下方 Agent",
+    shortcut: "Ctrl+Alt+ArrowDown",
+    condition: "宠物大厅中有 Agent",
+    en: "Select Agent Below",
+    group: "大厅",
+    icon: "⬇️",
+    keywords: ["大厅", "选中", "方向", "下", "lobby", "select", "down"],
+    enabled: (ctx) => !!ctx?.hasLobbyAgents,
+    run: (ctx) =>
+      ctx.selectLobbyAgentInDirection &&
+      ctx.selectLobbyAgentInDirection("down"),
+  },
 ];
 
 // 大小写不敏感的子串 / 关键词模糊匹配；query 为空时返回全部
@@ -652,6 +783,46 @@ export function groupActions(actions) {
     buckets.get(key).push(action);
   }
   return order.map((group) => ({ group, actions: buckets.get(group) }));
+}
+
+// ===== 快捷键冲突自检 =====
+// 同一个物理键在不同场景下复用是允许的，但必须能明确区分，否则 handleGlobalKeydown
+// 用 actionDefs.find(...) 取首个匹配项时会产生歧义（后注册的动作永远不生效）。
+// 约定：同键动作必须声明 shortcutScope，且 scope 互不相同；未声明 scope 视为 "global"。
+// 例：F2 的 current-rename 为 "global"，node-rename 为 "node"（节点选中时优先）。
+export function findShortcutConflicts(actions = ACTIONS) {
+  const byShortcut = new Map();
+  for (const action of Array.isArray(actions) ? actions : []) {
+    if (!action?.shortcut) continue;
+    const key = String(action.shortcut).trim().toLowerCase();
+    if (!byShortcut.has(key)) byShortcut.set(key, []);
+    byShortcut.get(key).push(action);
+  }
+  const conflicts = [];
+  for (const [shortcut, list] of byShortcut) {
+    if (list.length < 2) continue;
+    const scopes = list.map((a) => a.shortcutScope || "global");
+    const duplicated = scopes.filter((s, i) => scopes.indexOf(s) !== i);
+    if (duplicated.length > 0) {
+      conflicts.push({
+        shortcut,
+        reason: `shortcutScope 重复：${[...new Set(duplicated)].join(", ")}`,
+        actions: list.map((a) => a.id),
+      });
+    }
+  }
+  return conflicts;
+}
+
+// 开发期自检：注册表出现无法区分的同键动作时在控制台告警（不阻断运行）
+if (import.meta.env?.DEV) {
+  const conflicts = findShortcutConflicts();
+  if (conflicts.length > 0) {
+    console.warn(
+      "[shortcut] 检测到快捷键冲突（同键动作需声明互不相同的 shortcutScope）：",
+      conflicts,
+    );
+  }
 }
 
 export default ACTIONS;

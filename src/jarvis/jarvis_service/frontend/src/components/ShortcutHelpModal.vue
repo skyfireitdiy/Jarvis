@@ -69,6 +69,8 @@ const emit = defineEmits(['update:visible', 'close'])
 const query = ref('')
 
 // 仅展示带快捷键的动作
+// 同键动作（如 F2 在「当前 Agent」与「节点」两个场景复用）由注册表的 shortcutScope 区分：
+// 一览表按 group 分组展示，各行的「触发条件 / 场景」列已说明适用场景，不会产生歧义。
 const shortcutActions = computed(() => ACTIONS.filter(a => a && a.shortcut))
 
 const total = computed(() => shortcutActions.value.length)
@@ -77,7 +79,7 @@ const groups = computed(() => {
   const q = query.value.trim().toLowerCase()
   const list = q
     ? shortcutActions.value.filter(a => {
-        const haystack = [a.label, a.en, a.shortcut, a.condition, a.group]
+        const haystack = [a.label, a.en, a.shortcut, a.condition, a.group, a.shortcutScope]
           .filter(Boolean)
           .join(' ')
           .toLowerCase()

@@ -522,6 +522,7 @@
           @complete="onLobbyComplete"
           @openCompletions="onLobbyOpenCompletions"
           @activePetChange="lobbyActiveAgentId = $event"
+          @activeNodeChange="lobbyActiveNodeId = $event"
           @createAgentOnNode="onLobbyCreateAgentOnNode"
           @openOnboarding="(tourId) => startOnboarding(tourId || 'welcome')"
           @contextAgent="onLobbyContextAgent"
@@ -5807,6 +5808,16 @@ const commandPaletteCtx = computed(() => ({
   isWaitingInput,
   // 已在某个 Panel 中打开的 Agent（用于把“激活”的 Agent 排在列表上方）
   openedAgentIds: new Set(panels.value.filter(p => p.agentId).map(p => p.agentId)),
+  // 节点组：作用于大厅中选中的节点（lobbyActiveNodeId）
+  currentNodeId: lobbyActiveNodeId.value,
+  createAgentOnNode: (nodeId) => onLobbyCreateAgentOnNode(nodeId),
+  openTerminalOnNode: (nodeId) => createTerminalForNode(nodeId),
+  updateNodeCode: (nodeId) => confirmUpdateNodeCode(nodeId),
+  restartNodeService: (nodeId) => confirmRestartNodeService(nodeId),
+  renameNode: (nodeId) => { petLobbyRef.value?.renameActiveNode?.(nodeId) },
+  // 大厅方向选中（Ctrl+Alt+方向键）：仅在大厅有 Agent 时可用
+  hasLobbyAgents: (agentList.value || []).some(a => a && a.status !== 'stopped'),
+  selectLobbyAgentInDirection: (dir) => { petLobbyRef.value?.selectAgentInDirection?.(dir) },
 }))
 
 // 命令面板动作清单（来自统一注册表，个别动作按当前状态动态调整文案/图标）
@@ -6015,7 +6026,8 @@ function onLobbyRenameNode({ nodeId, name }) {
 
 // 执行命令面板中的动作
 function onCommandRun(action, openMode) {
-  showCommandPalette.value = false
+  // 需要弹层输入的动作（如节点重命名）先关闭面板让出焦点，避免弹层被面板遮挡/抢焦点
+  if (!action?.closePaletteOnRun) showCommandPalette.value = false
   if (!action || typeof action.run !== 'function') return
   try {
     action.run(commandPaletteCtx.value, openMode)
@@ -6280,6 +6292,7 @@ const completionAgentId = ref(null) // 记录打开补全列表时的 Panel agen
 const completionSource = ref('panel') // 补全来源：'panel' 或 'lobby'（宠物大厅）
 const petLobbyRef = ref(null) // 宠物大厅组件引用（用于写回大厅输入框补全文本）
 const lobbyActiveAgentId = ref(null) // 宠物大厅中当前选中的宠物对应的 agentId
+const lobbyActiveNodeId = ref(null) // 宠物大厅中当前选中的节点 id（节点操作快捷键据此作用）
 const completions = ref([]) // 补全列表数据
 const completionSearch = ref('') // 补全搜索关键词
 const fileCompletions = ref([]) // 文件补全搜索结果
@@ -13152,14 +13165,20 @@ function handleGlobalKeydown(event) {
     return
   }
 
-  // Ctrl/Cmd + Alt + 方向键：依据当前布局，向对应方向切换到最近的焦点区域（Session Panel / 集成终端 / 编辑器）
-  // 使用 Ctrl+Alt 组合，避免与输入框/其它控件的方向键行为冲突
+  // Ctrl/Cmd + Alt + 方向键：优先在大厅中按方向选中 Agent（相对当前选中宠物的位置，
+  // 无选中时从该方向最靠边的一只开始）；大厅无宠物时回退为区域级焦点跳转
+  // （Session Panel / 集成终端 / 编辑器）。使用 Ctrl+Alt 组合，避免与输入框/其它控件的方向键行为冲突
   if (event.ctrlKey && event.altKey && !event.shiftKey &&
       (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
     event.preventDefault()
     showCommandPalette.value = false
     const dirMap = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' }
-    moveFocusInDirection(dirMap[event.key])
+    const dir = dirMap[event.key]
+    const lobby = petLobbyRef.value
+    if (lobby && typeof lobby.selectAgentInDirection === 'function' && lobby.selectAgentInDirection(dir)) {
+      return
+    }
+    moveFocusInDirection(dir)
     return
   }
 
@@ -13228,9 +13247,17 @@ function handleGlobalKeydown(event) {
     }
   }
 
-  // F2 重命名当前 Agent（已打开重命名弹窗时不重复触发）
+  // F2 重命名：同一物理键在不同场景下复用，按 registry 的 shortcutScope 分派
+  // - node 场景：大厅中选中节点时重命名该节点（优先级高于 Agent）
+  // - global 场景：重命名当前 Agent
+  // 已打开 Agent 重命名弹窗时不重复触发
   if (event.key === 'F2') {
     if (showRenameAgentModal.value) return
+    const lobby = petLobbyRef.value
+    if (lobby && typeof lobby.renameActiveNode === 'function' && lobby.renameActiveNode()) {
+      event.preventDefault()
+      return
+    }
     const agent = getCurrentAgentOrNull()
     if (agent) {
       event.preventDefault()

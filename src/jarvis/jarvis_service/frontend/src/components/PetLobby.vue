@@ -97,7 +97,8 @@
           v-for="n in nodeItems"
           :key="n.node_id"
           class="lobby-node"
-          :class="['st-' + n.state, { 'is-center': n.isMaster }]"
+          :class="['st-' + n.state, { 'is-center': n.isMaster, active: n.active }]"
+          @click.stop="onNodeClick(n)"
           @contextmenu.prevent.stop="onNodeContextMenu(n, $event)"
         >
           <!-- 机箱主体 -->
@@ -573,7 +574,7 @@ const props = defineProps({
   checkExtensionVersion: { type: Function, default: null },
 })
 
-const emit = defineEmits(['selectAgent', 'sendInput', 'complete', 'openCompletions', 'activePetChange', 'createAgentOnNode', 'contextAgent', 'contextRun', 'nodeContextRun', 'renameNode', 'addAgentToGroup', 'removeAgentFromGroup', 'openOnboarding'])
+const emit = defineEmits(['selectAgent', 'sendInput', 'complete', 'openCompletions', 'activePetChange', 'activeNodeChange', 'createAgentOnNode', 'contextAgent', 'contextRun', 'nodeContextRun', 'renameNode', 'addAgentToGroup', 'removeAgentFromGroup', 'openOnboarding'])
 
 // 宠物尺寸常量（与 CSS 中的 .lobby-pet 宽高保持一致）
 const PET_W = 72
@@ -588,6 +589,8 @@ const stageRef = ref(null)
 const stageSize = ref({ w: 0, h: 0 })
 const petAgents = ref([])
 const activePetId = ref(null)
+// 选中的节点 id：节点操作（创建 Agent / 打开终端 / 更新代码 / 重启服务）据此作用于该节点
+const activeNodeId = ref(null)
 // 是否允许宠物自由游走：持久化到 localStorage（默认开启）
 const ROAMING_KEY = 'jarvis.petLobby.roaming'
 function loadRoaming() {
@@ -829,6 +832,7 @@ const nodeItems = computed(() => {
         versionMismatch,
         rw,
         rh,
+        active: activeNodeId.value === n.node_id,
         fill: state === 'offline'
           ? 'rgba(255,93,108,0.10)'
           : (isMaster ? 'url(#lobby-center-fill)' : 'rgba(8,18,30,0.7)'),
@@ -1219,6 +1223,8 @@ function onStageClick(event) {
   closeContextMenu()
   // 仅当点击目标是舞台本身（空白区域）时才处理；宠物及其面板已 stop 冒泡
   if (event.target !== stageRef.value) return
+  // 点击空白处取消节点选中
+  activeNodeId.value = null
   for (const pet of petAgents.value) {
     if (pet.active) closePanel(pet)
   }
@@ -1295,9 +1301,17 @@ function onPetContextMenu(pet, event) {
   }
 }
 
+// 在节点上单击：选中该节点（节点操作快捷键据此作用于该节点）；再次点击同一节点则取消选中
+function onNodeClick(node) {
+  if (!node) return
+  activeNodeId.value = activeNodeId.value === node.node_id ? null : node.node_id
+}
+
 // 在节点上右键：弹出节点操作菜单
 function onNodeContextMenu(node, event) {
   if (!node) return
+  // 右键同时选中该节点，使节点操作快捷键与菜单作用于同一节点
+  activeNodeId.value = node.node_id
   const pos = placeContextMenu(event, nodeMenuActions.value.length)
   if (!pos) return
   contextMenu.value = {
@@ -1318,6 +1332,8 @@ const renameInputRef = ref(null)
 
 function openRenameDialog(nodeId, currentName) {
   if (!nodeId) return
+  // 已打开时不重复触发（F2 连按、快捷键与右键菜单并发时避免重置输入内容）
+  if (renameDialog.value.visible) return
   renameDialog.value = {
     visible: true,
     nodeId,
@@ -2016,6 +2032,12 @@ watch(activePetId, (id) => {
   emit('activePetChange', id || null)
 }, { immediate: true })
 
+// 选中的节点变化时通知父组件（用于「节点」相关快捷键与命令面板）
+// immediate: 组件挂载时同步一次（清空父组件中可能残留的旧选中态）
+watch(activeNodeId, (id) => {
+  emit('activeNodeChange', id || null)
+}, { immediate: true })
+
 // 供父组件写回补全文本：把 @ 及后续搜索词替换为补全值，并同步 DOM 光标
 function insertCompletionText(agentId, text, cursorPos, hasAtSymbol) {
   const pet = petAgents.value.find(p => p.agentId === agentId)
@@ -2047,7 +2069,76 @@ function insertCompletionText(agentId, text, cursorPos, hasAtSymbol) {
   })
 }
 
-defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden, openInstallExtensionDialog, closeActivePanel, hideActiveOutputAndClose })
+// 供父组件清除节点选中（如执行完节点操作后）
+function closeActiveNode() {
+  activeNodeId.value = null
+}
+
+// 供父组件调用：按方向选中 Agent（Ctrl+Alt+方向键）
+// 以当前选中宠物的中心为基准，选该方向上「横向/纵向偏移最小、再按垂直/水平距离最近」的宠物；
+// 无选中时从该方向最靠边的宠物开始（如 → 取最左侧的第一只）。
+// 返回 true 表示已消费该请求（大厅无宠物时返回 false，交由父组件走区域焦点跳转）
+function selectAgentInDirection(dir) {
+  const pets = petAgents.value
+  if (!pets.length) return false
+  const cx = (pet) => pet.x + PET_W / 2
+  const cy = (pet) => pet.y + PET_H / 2
+  const current = pets.find(p => p.agentId === activePetId.value) || null
+  // 无选中（或选中项已消失）时，用舞台中心作为基准，保证「第一个」符合直觉
+  const baseX = current ? cx(current) : stageSize.value.w / 2
+  const baseY = current ? cy(current) : stageSize.value.h / 2
+
+  let best = null
+  let bestPrimary = Infinity
+  let bestSecondary = Infinity
+  for (const pet of pets) {
+    if (current && pet.agentId === current.agentId) continue
+    const dx = cx(pet) - baseX
+    const dy = cy(pet) - baseY
+    let primary
+    let secondary
+    if (dir === 'left') {
+      if (dx >= 0) continue
+      primary = -dx
+      secondary = Math.abs(dy)
+    } else if (dir === 'right') {
+      if (dx <= 0) continue
+      primary = dx
+      secondary = Math.abs(dy)
+    } else if (dir === 'up') {
+      if (dy >= 0) continue
+      primary = -dy
+      secondary = Math.abs(dx)
+    } else {
+      if (dy <= 0) continue
+      primary = dy
+      secondary = Math.abs(dx)
+    }
+    if (primary < bestPrimary || (primary === bestPrimary && secondary < bestSecondary)) {
+      best = pet
+      bestPrimary = primary
+      bestSecondary = secondary
+    }
+  }
+  // 该方向上没有宠物：保持当前选中不变
+  if (!best) return true
+  // 与单击一致：选中并展开面板（同一时刻只展开一只）
+  openPanel(best)
+  return true
+}
+
+// 供父组件调用：重命名节点（不传 nodeId 时取当前选中的节点）
+// 返回 true 表示已消费该请求（无节点或弹层已打开时返回 false）
+function renameActiveNode(nodeId) {
+  const targetId = nodeId || activeNodeId.value
+  if (!targetId) return false
+  if (renameDialog.value.visible) return true
+  const node = (props.nodes || []).find(n => n.node_id === targetId)
+  openRenameDialog(targetId, (node && (node.short || node.name)) || targetId)
+  return true
+}
+
+defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden, openInstallExtensionDialog, closeActivePanel, hideActiveOutputAndClose, closeActiveNode, renameActiveNode, selectAgentInDirection })
 </script>
 
 <style scoped>
@@ -2118,6 +2209,19 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden, openInst
 }
 .lobby-node-body {
   transition: filter 0.15s ease;
+}
+
+/* 选中的节点：机箱描边加粗发光 + 轻微放大，明确当前节点操作的作用对象 */
+.lobby-node.active .lobby-node-body {
+  stroke-width: 2.6;
+  filter: drop-shadow(0 0 6px currentColor) brightness(1.25);
+}
+.lobby-node.active .lobby-node-label {
+  fill: rgba(220, 245, 255, 0.95);
+  font-weight: 600;
+}
+.lobby-node.active .lobby-node-count {
+  fill: rgba(200, 235, 255, 0.8);
 }
 
 .lobby-node-led {
@@ -3090,10 +3194,12 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden, openInst
 }
 
 /* 节点重命名弹层 */
+/* 与其它弹层（命令面板/设置等）同为 z-index 3000；PetLobby 在 DOM 中位于其后，
+   同层级时后出现者在上，故可覆盖命令面板，保证从命令面板触发时弹层可见可输入 */
 .lobby-rename-mask {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 70;
+  z-index: 3000;
   display: flex;
   align-items: center;
   justify-content: center;
