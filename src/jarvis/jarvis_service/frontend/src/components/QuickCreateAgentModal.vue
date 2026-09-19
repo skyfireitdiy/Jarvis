@@ -12,10 +12,10 @@
           class="form-control"
           rows="4"
           placeholder="例如：帮我分析当前项目的目录结构并给出优化建议"
-          @keydown.ctrl.enter.prevent="submit"
-          @keydown.meta.enter.prevent="submit"
+          @keydown="handleKeydown"
+          @keyup="handleKeyup"
         ></textarea>
-        <div class="form-help">按 Ctrl / Cmd + Enter 快速提交。</div>
+        <div class="form-help">按 Ctrl / Cmd + Enter 或 Ctrl + D 快速提交；右 Ctrl 快速双击也可提交。</div>
       </div>
 
       <div v-if="error" class="error-message">{{ error }}</div>
@@ -63,6 +63,45 @@ function submit() {
     agentType: 'agent',
     workingDir: '~'
   })
+}
+
+// 提交快捷键与多行输入保持一致：Ctrl/Cmd+Enter、Ctrl+D、右 Ctrl 快速双击
+const DOUBLE_TAP_MS = 300 // 双击判定窗口
+const QUICK_TAP_MS = 250  // 单次「快速按下」判定
+let ctrlDownTime = 0
+let lastQuickTapTime = 0
+
+function handleKeydown(event) {
+  // 右 Ctrl 快速双击 → 提交（本弹窗无语音输入，故不处理按住说话）
+  if (event.code === 'ControlRight') {
+    event.preventDefault()
+    const now = Date.now()
+    if (lastQuickTapTime && now - lastQuickTapTime < DOUBLE_TAP_MS) {
+      lastQuickTapTime = 0
+      submit()
+      return
+    }
+    ctrlDownTime = now
+    return
+  }
+  // Ctrl/Cmd + Enter 或 Ctrl + D → 提交
+  const key = typeof event.key === 'string' ? event.key.toLowerCase() : ''
+  if ((event.ctrlKey || event.metaKey) && (key === 'enter' || key === 'd')) {
+    event.preventDefault()
+    submit()
+  }
+}
+
+function handleKeyup(event) {
+  if (event.code !== 'ControlRight') return
+  event.preventDefault()
+  // 按下时间很短视为「快速单击」，为下一次双击判定做记录
+  if (ctrlDownTime && Date.now() - ctrlDownTime < QUICK_TAP_MS) {
+    lastQuickTapTime = Date.now()
+  } else {
+    lastQuickTapTime = 0
+  }
+  ctrlDownTime = 0
 }
 </script>
 
