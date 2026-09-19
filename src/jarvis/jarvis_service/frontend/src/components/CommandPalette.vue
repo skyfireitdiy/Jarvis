@@ -131,6 +131,8 @@ const agentEntries = computed(() => {
   const opened = ctx.openedAgentIds instanceof Set ? ctx.openedAgentIds : new Set()
   const q = agentQuery.value.trim().toLowerCase()
   const isOpened = agent => opened.has(agent?.agent_id)
+  // 运行中：agent.status 非 stopped（与大厅/状态图标判断保持一致）
+  const isRunning = agent => !!agent && agent.status !== 'stopped'
   return list
     .filter(agent => {
       if (!q) return true
@@ -138,8 +140,12 @@ const agentEntries = computed(() => {
       const haystack = [agent?.name, agent?.agent_id, nodeLabel].filter(Boolean).join(' ').toLowerCase()
       return haystack.includes(q)
     })
-    // 已在 Panel 中打开的（激活的）排在前面，其余保持原顺序
-    .sort((a, b) => (isOpened(b) ? 1 : 0) - (isOpened(a) ? 1 : 0))
+    // 运行中的 Agent 排在前面；其次面板已打开的排在前面；其余保持原顺序
+    .sort((a, b) => {
+      const runningDiff = (isRunning(b) ? 1 : 0) - (isRunning(a) ? 1 : 0)
+      if (runningDiff !== 0) return runningDiff
+      return (isOpened(b) ? 1 : 0) - (isOpened(a) ? 1 : 0)
+    })
     .map(agent => {
       const nodeLabel = typeof ctx.getAgentNodeLabel === 'function' ? ctx.getAgentNodeLabel(agent) : ''
       const active = agent?.agent_id === ctx.currentAgentId
@@ -158,7 +164,9 @@ const agentEntries = computed(() => {
         icon: agentStatusIcon(agent),
         keywords: [nodeLabel],
         meta: metaParts.join('   '),
-        disabled: active,
+        // 仅当「当前 Agent 且其面板已打开」时禁用（选中它只是切回自身，无意义）；
+        // 当前 Agent 的面板未打开时仍可选中，用于重新打开它
+        disabled: active && isOpened(agent),
         isAgentEntry: true,
         run: (c, openMode) => c.switchToAgent && c.switchToAgent(agent, openMode),
       }
