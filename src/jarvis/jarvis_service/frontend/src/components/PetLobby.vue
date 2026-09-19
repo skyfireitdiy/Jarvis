@@ -2143,6 +2143,70 @@ function selectAgentInDirection(dir) {
   return true
 }
 
+// 供父组件调用：按方向选中节点（Ctrl+Shift+方向键）
+// 有选中：以当前选中节点为基准，选该方向上「横向/纵向偏移最小、再按垂直/水平距离最近」的节点。
+// 无选中：从该方向的反向边缘开始——→ 取最左的第一只、← 取最右、↓ 取最上、↑ 取最下。
+// 返回 true 表示已消费该请求（大厅无节点时返回 false）
+function selectNodeInDirection(dir) {
+  const nodes = nodeItems.value
+  if (!nodes.length) return false
+  const current = nodes.find(n => n.node_id === activeNodeId.value) || null
+
+  let best = null
+  let bestPrimary = Infinity
+  let bestSecondary = Infinity
+  for (const node of nodes) {
+    if (current && node.node_id === current.node_id) continue
+    let primary
+    let secondary
+    if (!current) {
+      // 无选中：不做方向过滤，直接按「该方向的反向边缘」排序，取第一只
+      if (dir === 'left') {
+        primary = -node.x
+        secondary = node.y
+      } else if (dir === 'right') {
+        primary = node.x
+        secondary = node.y
+      } else if (dir === 'up') {
+        primary = -node.y
+        secondary = node.x
+      } else {
+        primary = node.y
+        secondary = node.x
+      }
+    } else {
+      const dx = node.x - current.x
+      const dy = node.y - current.y
+      if (dir === 'left') {
+        if (dx >= 0) continue
+        primary = -dx
+        secondary = Math.abs(dy)
+      } else if (dir === 'right') {
+        if (dx <= 0) continue
+        primary = dx
+        secondary = Math.abs(dy)
+      } else if (dir === 'up') {
+        if (dy >= 0) continue
+        primary = -dy
+        secondary = Math.abs(dx)
+      } else {
+        if (dy <= 0) continue
+        primary = dy
+        secondary = Math.abs(dx)
+      }
+    }
+    if (primary < bestPrimary || (primary === bestPrimary && secondary < bestSecondary)) {
+      best = node
+      bestPrimary = primary
+      bestSecondary = secondary
+    }
+  }
+  // 该方向上没有节点：保持当前选中不变
+  if (!best) return true
+  activeNodeId.value = best.node_id
+  return true
+}
+
 // 供父组件调用：重命名节点（不传 nodeId 时取当前选中的节点）
 // 返回 true 表示已消费该请求（无节点或弹层已打开时返回 false）
 function renameActiveNode(nodeId) {
@@ -2154,7 +2218,7 @@ function renameActiveNode(nodeId) {
   return true
 }
 
-defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden, openInstallExtensionDialog, closeActivePanel, hideActiveOutputAndClose, closeActiveNode, renameActiveNode, selectAgentInDirection })
+defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden, openInstallExtensionDialog, closeActivePanel, hideActiveOutputAndClose, closeActiveNode, renameActiveNode, selectAgentInDirection, selectNodeInDirection })
 </script>
 
 <style scoped>
