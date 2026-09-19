@@ -104,6 +104,21 @@
       <span class="global-toolbar-tab-grip"></span>
     </div>
 
+    <!-- 悬浮入口：一句话创建 Agent（移动端无键盘，快捷键/命令面板不便触发；可拖动避开控件） -->
+    <button
+      v-if="!showConnectModal"
+      ref="quickCreateFabElRef"
+      class="quick-create-fab"
+      :class="{ 'is-dragging': isDraggingQuickCreateFab }"
+      :style="quickCreateFabStyle"
+      :disabled="!socket"
+      title="一句话创建 Agent (Ctrl+Alt+N)｜可拖动"
+      @pointerdown.stop.prevent="startDragQuickCreateFab($event)"
+      @click.stop="onQuickCreateFabClick()"
+    >
+      ⚡
+    </button>
+
     <!-- 主内容区 -->
     <div class="main-content-wrapper">
     <!-- Panel 网格布局 -->
@@ -948,6 +963,16 @@
       @selectDir="openDirDialog"
     />
 
+    <!-- 一句话创建 Agent 弹窗 -->
+    <QuickCreateAgentModal
+      :visible="showQuickCreateAgentModal"
+      :loading="quickCreateAgentLoading"
+      :error="quickCreateAgentError"
+      @close="showQuickCreateAgentModal = false"
+      @submit="submitQuickCreateAgent"
+      @open-full="openFullCreateAgentFromQuick"
+    />
+
     <!-- 重命名 Agent 弹窗 -->
     <RenameAgentModal
       :visible="showRenameAgentModal"
@@ -1294,6 +1319,7 @@ import EditorPanel from './components/EditorPanel.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import CreateAgentModal from './components/CreateAgentModal.vue'
+import QuickCreateAgentModal from './components/QuickCreateAgentModal.vue'
 import SessionPanel from './components/SessionPanel.vue'
 import { renderSideBySideDiff, escapeHtml } from './diffRenderer.js'
 import RenameAgentModal from './components/RenameAgentModal.vue'
@@ -1791,6 +1817,133 @@ function handleToolbarResize() {
   }
 
   globalToolbarPos.value = { x, y: clampedY }
+}
+
+// ===== 悬浮入口（一句话创建 Agent）拖拽 + 位置持久化 =====
+// 未拖动过时使用右下角默认位置（null），拖动后记录绝对坐标
+const QUICK_CREATE_FAB_STORAGE_KEY = 'jarvis_quick_create_fab_pos'
+const QUICK_CREATE_FAB_SIZE = 48 // 与 .quick-create-fab 尺寸保持一致（移动端 56，仅用于边界估算）
+const quickCreateFabElRef = ref(null)
+const quickCreateFabPos = ref(loadQuickCreateFabPos())
+const isDraggingQuickCreateFab = ref(false)
+const quickCreateFabDragOffset = ref({ x: 0, y: 0 })
+// 区分"点击"与"拖动"：拖动超过阈值后抬手不再触发打开弹窗
+const QUICK_CREATE_FAB_DRAG_THRESHOLD = 4
+let quickCreateFabMoved = false
+
+function loadQuickCreateFabPos() {
+  try {
+    const savedValue = localStorage.getItem(QUICK_CREATE_FAB_STORAGE_KEY)
+    if (!savedValue) return null
+    const parsedValue = JSON.parse(savedValue)
+    if (typeof parsedValue?.x !== 'number' || typeof parsedValue?.y !== 'number') {
+      return null
+    }
+    return { x: parsedValue.x, y: parsedValue.y }
+  } catch {
+    return null
+  }
+}
+
+function saveQuickCreateFabPos() {
+  try {
+    if (quickCreateFabPos.value) {
+      localStorage.setItem(QUICK_CREATE_FAB_STORAGE_KEY, JSON.stringify(quickCreateFabPos.value))
+    } else {
+      localStorage.removeItem(QUICK_CREATE_FAB_STORAGE_KEY)
+    }
+  } catch {
+    /* 隐私模式下写入失败可忽略 */
+  }
+}
+
+// 悬浮入口实际尺寸（移动端媒体查询下更大，需实测）
+function measureQuickCreateFab() {
+  const el = quickCreateFabElRef.value
+  return {
+    width: el?.offsetWidth || QUICK_CREATE_FAB_SIZE,
+    height: el?.offsetHeight || QUICK_CREATE_FAB_SIZE,
+  }
+}
+
+// 拖动过则用绝对坐标；否则回落到右下角默认位置（由 CSS 控制）
+const quickCreateFabStyle = computed(() => {
+  const pos = quickCreateFabPos.value
+  if (!pos) return {}
+  return {
+    left: `${pos.x}px`,
+    top: `${pos.y}px`,
+    right: 'auto',
+    bottom: 'auto',
+  }
+})
+
+function startDragQuickCreateFab(event) {
+  // 仅响应主指针（鼠标左键 / 单指触摸）
+  if (event.button !== undefined && event.button !== 0) return
+  const el = event.currentTarget
+  if (!el) return
+  isDraggingQuickCreateFab.value = true
+  quickCreateFabMoved = false
+  const rect = el.getBoundingClientRect()
+  quickCreateFabDragOffset.value = {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+  }
+  // 首次拖动时把当前位置固定下来，避免从 CSS 默认位置跳到绝对坐标
+  if (!quickCreateFabPos.value) {
+    quickCreateFabPos.value = { x: rect.left, y: rect.top }
+  }
+  document.addEventListener('pointermove', onDragQuickCreateFab)
+  document.addEventListener('pointerup', stopDragQuickCreateFab)
+  document.addEventListener('pointercancel', stopDragQuickCreateFab)
+  event.preventDefault()
+}
+
+function onDragQuickCreateFab(event) {
+  if (!isDraggingQuickCreateFab.value) return
+  const { width, height } = measureQuickCreateFab()
+  const maxX = Math.max(0, window.innerWidth - width)
+  const maxY = Math.max(0, window.innerHeight - height)
+  const nextX = clamp(event.clientX - quickCreateFabDragOffset.value.x, 0, maxX)
+  const nextY = clamp(event.clientY - quickCreateFabDragOffset.value.y, 0, maxY)
+  if (Math.abs(nextX - quickCreateFabPos.value.x) > QUICK_CREATE_FAB_DRAG_THRESHOLD
+    || Math.abs(nextY - quickCreateFabPos.value.y) > QUICK_CREATE_FAB_DRAG_THRESHOLD) {
+    quickCreateFabMoved = true
+  }
+  quickCreateFabPos.value = { x: nextX, y: nextY }
+  event.preventDefault()
+}
+
+function stopDragQuickCreateFab() {
+  document.removeEventListener('pointermove', onDragQuickCreateFab)
+  document.removeEventListener('pointerup', stopDragQuickCreateFab)
+  document.removeEventListener('pointercancel', stopDragQuickCreateFab)
+  if (!isDraggingQuickCreateFab.value) return
+  isDraggingQuickCreateFab.value = false
+  saveQuickCreateFabPos()
+}
+
+// 点击悬浮入口：拖动过则不触发（避免拖完误开弹窗）
+function onQuickCreateFabClick() {
+  if (quickCreateFabMoved) {
+    quickCreateFabMoved = false
+    return
+  }
+  openQuickCreateAgent()
+}
+
+// 窗口尺寸变化时校正悬浮入口位置，避免越界跑出可视区
+function handleQuickCreateFabResize() {
+  if (!quickCreateFabPos.value) return
+  const { width, height } = measureQuickCreateFab()
+  const maxX = Math.max(0, window.innerWidth - width)
+  const maxY = Math.max(0, window.innerHeight - height)
+  quickCreateFabPos.value = {
+    x: clamp(quickCreateFabPos.value.x, 0, maxX),
+    y: clamp(quickCreateFabPos.value.y, 0, maxY),
+  }
+  saveQuickCreateFabPos()
 }
 
 // 拖拽相关函数
@@ -2451,6 +2604,9 @@ const showEditorSidebar = ref(true)
 const editorSidebarView = ref('files')
 const windowWidth = ref(window.innerWidth)  // 窗口宽度，用于响应式检测
 const showCreateAgentModal = ref(false) // 创建 Agent 弹窗
+const showQuickCreateAgentModal = ref(false) // 一句话创建 Agent 弹窗
+const quickCreateAgentLoading = ref(false) // 一句话创建：请求中
+const quickCreateAgentError = ref('') // 一句话创建：错误提示
 const showRenameAgentModal = ref(false) // 重命名 Agent 弹窗
 const renamingAgent = ref(null)          // 正在重命名的 Agent
 const renameAgentName = ref('')           // 重命名的新名称
@@ -5872,6 +6028,7 @@ const commandPaletteCtx = computed(() => ({
   petGotoWaitingAgent,
   syncAllStatus: petSyncAllStatus,
   openCreateAgentModal,
+  openQuickCreateAgent,
   refreshAgentList: fetchAgentList,
   restartGateway,
   restartAllNodes,
@@ -5909,6 +6066,14 @@ const commandPaletteCtx = computed(() => ({
   viewCurrentTools: () => { const a = getCurrentAgentOrNull(); if (a) viewTools(a) },
   createTerminalForCurrent: () => { const a = getCurrentAgentOrNull(); if (a) createTerminalForAgent(a) },
   openEditorForCurrent: () => { const a = getCurrentAgentOrNull(); if (a) createEditorForAgent(a) },
+  // 全局：打开/隐藏编辑器面板（与 Ctrl+E 分支行为一致，不依赖当前 Agent）
+  toggleEditorPanel: () => {
+    if (showEditorPanel.value) {
+      closeEditorPanel()
+    } else {
+      showEditorPanel.value = true
+    }
+  },
   toggleCurrentAutoScroll,
   toggleCurrentAutoRead,
   exitCurrentNonInteractive,
@@ -6250,6 +6415,7 @@ function isAnyModalOpen() {
     showDiffModal.value ||
     showRulesModal.value ||
     showCreateAgentModal.value ||
+    showQuickCreateAgentModal.value ||
     showRenameAgentModal.value ||
     showSessionDialog.value ||
     showDirDialog.value ||
@@ -6280,7 +6446,7 @@ const isWaitingMultiDisabled = computed(() => {
   }
   return false // 永远启用
 })
-const newAgentType = ref('code_agent') // 新 Agent 类型
+const newAgentType = ref('agent') // 新 Agent 类型（默认通用 Agent，避免误建 git 仓库）
 const newAgentDir = ref('~')       // 新 Agent 工作目录（默认用户目录）
 const newAgentName = ref('通用Agent') // 新 Agent 名称（可选，默认为'通用Agent'）
 const modelGroups = ref([])        // 模型组列表
@@ -7995,6 +8161,121 @@ function getEditorTargetNodeId() {
   return String(editorAgentNodeId || getCurrentAgentNodeId() || 'master').trim() || 'master'
 }
 
+// 校验：同一节点同一工作目录不允许同时有两个未启用 worktree 的 code_agent。
+// 返回冲突提示文案，无冲突返回空串。
+function checkCodeAgentDirConflict({ agentType, worktree, workingDir, nodeId }) {
+  if (agentType !== 'code_agent' || worktree) return ''
+  const targetNodeId = String(nodeId || 'master').trim() || 'master'
+  const normalizedDir = String(workingDir || '').trim()
+  const conflictingAgent = agentList.value.find(agent => {
+    if (isStoppedAgent(agent)) return false  // 已停止的 agent 不冲突
+    if (agent.agent_type !== 'code_agent') return false
+    if (agent.worktree) return false  // 启用了 worktree 的不冲突
+    const agentNodeId = String(agent.node_id || '').trim() || 'master'
+    if (agentNodeId !== targetNodeId) return false
+    if (agent.working_dir?.trim() !== normalizedDir) return false
+    return true
+  })
+  if (!conflictingAgent) return ''
+  const conflictName = conflictingAgent.name || conflictingAgent.agent_id || '未命名'
+  return `工作目录冲突：节点 ${targetNodeId} 下已存在未启用 worktree 的代码 Agent「${conflictName}」。\n同一工作目录下只能有一个未启用 worktree 的代码 Agent。\n请启用 worktree 或选择其他工作目录。`
+}
+
+// 参数化创建 Agent：只负责校验与请求，返回 { ok, agent, error }，不处理任何 UI 副作用。
+// 供「新建 Agent 弹窗」与「一句话创建」共用。
+async function createAgentWithOptions(options = {}) {
+  const {
+    agentType = 'agent',
+    workingDir = '~',
+    name = '',
+    llmGroup = 'default',
+    worktree = false,
+    quickMode = false,
+    restoreSession = false,
+    noInteractionMode = false,
+    task = '',
+    nodeId = '',
+    proxyNode = '',
+    accessAclRead = [],
+    accessAclInteract = [],
+  } = options
+
+  const trimmedDir = String(workingDir || '').trim()
+  if (!trimmedDir) return { ok: false, error: '工作目录不能为空' }
+  const trimmedTask = String(task || '').trim()
+  if (noInteractionMode && !trimmedTask) {
+    return { ok: false, error: '无交互模式下必须提供任务描述' }
+  }
+  const conflict = checkCodeAgentDirConflict({
+    agentType,
+    worktree: agentType === 'code_agent' ? worktree : false,
+    workingDir: trimmedDir,
+    nodeId,
+  })
+  if (conflict) return { ok: false, error: conflict }
+
+  try {
+    const { host, port } = getGatewayAddress()
+    const targetNodeId = String(nodeId || 'master').trim() || 'master'
+    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, 'agents'), {
+      method: 'POST',
+      body: JSON.stringify({
+        agent_type: agentType,
+        working_dir: trimmedDir,
+        name: name || undefined,
+        llm_group: llmGroup,
+        worktree: agentType === 'code_agent' ? worktree : false,
+        quick_mode: quickMode,
+        restore_session: restoreSession,
+        no_interaction_mode: noInteractionMode,
+        task: trimmedTask || undefined,
+        node_id: targetNodeId,
+        proxy_node: proxyNode || undefined,
+        access_acl: (accessAclRead.length || accessAclInteract.length) ? {
+          read: accessAclRead,
+          interact: accessAclInteract,
+        } : undefined,
+      })
+    })
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}))
+      return { ok: false, error: error.error?.message || error.detail || '未知错误' }
+    }
+    const result = await response.json()
+    if (!result.success || !result.data) {
+      return { ok: false, error: '返回数据格式错误' }
+    }
+    const agent = {
+      ...result.data,
+      node_id: String(result.data?.node_id || '').trim() || 'master',
+    }
+    return { ok: true, agent }
+  } catch (error) {
+    console.error('[AGENT] Create failed:', error)
+    return { ok: false, error: error.message }
+  }
+}
+
+// 创建成功后的公共收尾：加入列表、刷新、按当前场景打开 Panel 或留在大厅、展示引导。
+async function afterAgentCreated(agent) {
+  // 添加到列表开头（让后创建的 agent 排在前面）
+  agentList.value.unshift(agent)
+  // 若当前处于宠物大厅（无任何可见 Panel），保持在大厅，不切换到 Panel；
+  // 否则（已有 Panel 打开）按原逻辑在新 Panel 中打开该 Agent
+  if (!hasNoPanel.value) {
+    await openAgentInPanel(agent)
+  }
+  // 刷新列表
+  await fetchAgentList()
+  // 开始定时刷新列表
+  startAgentListRefresh()
+  // 首次创建出 Agent 后展示 Agent 场景引导。
+  // openAgentInPanel 会在 nextTick 中调度 Panel 场景引导；此处再注册一个 nextTick
+  // （注册更晚，回调更晚执行），使 Agent 引导清除 Panel 引导的定时器并优先展示，
+  // 避免「创建 Agent」这一更强场景的引导被 Panel 引导吞掉。
+  nextTick(() => maybeStartTour('agent'))
+}
+
 async function createAgent() {
   if (!newAgentDir.value.trim()) return
   // 无交互模式下必须提供任务描述
@@ -8002,96 +8283,84 @@ async function createAgent() {
     alert('无交互模式下必须提供任务描述')
     return
   }
-  // 校验：同一节点同一工作目录不允许同时有两个未启用 worktree 的 code_agent
-  if (newAgentType.value === 'code_agent' && !newCodeAgentWorktree.value) {
-    const targetNodeId = String(newAgentNodeId.value || 'master').trim() || 'master'
-    const normalizedDir = newAgentDir.value.trim()
-    const conflictingAgent = agentList.value.find(agent => {
-      if (isStoppedAgent(agent)) return false  // 已停止的 agent 不冲突
-      if (agent.agent_type !== 'code_agent') return false
-      if (agent.worktree) return false  // 启用了 worktree 的不冲突
-      const agentNodeId = String(agent.node_id || '').trim() || 'master'
-      if (agentNodeId !== targetNodeId) return false
-      if (agent.working_dir?.trim() !== normalizedDir) return false
-      return true
-    })
-    if (conflictingAgent) {
-      const conflictName = conflictingAgent.name || conflictingAgent.agent_id || '未命名'
-      newAgentCreateError.value = `工作目录冲突：节点 ${targetNodeId} 下已存在未启用 worktree 的代码 Agent「${conflictName}」。\n同一工作目录下只能有一个未启用 worktree 的代码 Agent。\n请启用 worktree 或选择其他工作目录。`
-      return
-    }
-  }
-  try {
-    const { host, port } = getGatewayAddress()
-    const targetNodeId = String(newAgentNodeId.value || 'master').trim() || 'master'
-    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, 'agents'), {
-      method: 'POST',
-      body: JSON.stringify({
-        agent_type: newAgentType.value,
-        working_dir: newAgentDir.value,
-        name: newAgentName.value || undefined,
-        llm_group: newAgentModelGroup.value,
-        worktree: newAgentType.value === 'code_agent' ? newCodeAgentWorktree.value : false,
-        quick_mode: newAgentQuickMode.value,
-        restore_session: newAgentRestoreSession.value,
-        no_interaction_mode: newAgentNoInteractionMode.value,
-        task: newAgentNoInteractionMode.value && newAgentTaskDescription.value.trim() ? newAgentTaskDescription.value.trim() : undefined,
-        node_id: targetNodeId,
-        proxy_node: newAgentProxyNode.value || undefined,
-        access_acl: (newAgentAccessAclRead.value.length || newAgentAccessAclInteract.value.length) ? {
-          read: newAgentAccessAclRead.value,
-          interact: newAgentAccessAclInteract.value,
-        } : undefined,
-      })
-    })
-    if (!response.ok) {
-      const error = await response.json()
-      alert(`创建失败: ${error.error?.message || error.detail || '未知错误'}`)
-      return
-    }
-    const result = await response.json()
-    // 后端返回格式: { success: true, data: agent }
-    if (result.success && result.data) {
-      const agent = {
-        ...result.data,
-        node_id: String(result.data?.node_id || '').trim() || 'master',
-      }
-      // 添加到列表开头（让后创建的 agent 排在前面）
-      agentList.value.unshift(agent)
-      // 关闭创建弹窗
-      showCreateAgentModal.value = false
-      newAgentDir.value = '~' // 重置为默认值
-      newAgentCreateError.value = '' // 重置错误信息
-      newCodeAgentWorktree.value = false
-      newAgentQuickMode.value = false
-      newAgentRestoreSession.value = false
-      newAgentNoInteractionMode.value = false
-      newAgentTaskDescription.value = ''
-      newAgentNodeId.value = ''
-      newAgentAccessAclRead.value = []
-      newAgentAccessAclInteract.value = []
-      // 重置为默认名称（根据当前选中的 agent 类型）
-      newAgentName.value = generateAgentName(newAgentType.value)
-      // 若当前处于宠物大厅（无任何可见 Panel），保持在大厅，不切换到 Panel；
-      // 否则（已有 Panel 打开）按原逻辑在新 Panel 中打开该 Agent
-      if (!hasNoPanel.value) {
-        await openAgentInPanel(agent)
-      }
-      // 刷新列表
-      await fetchAgentList()
-      // 开始定时刷新列表
-      startAgentListRefresh()
-      // 首次创建出 Agent 后展示 Agent 场景引导。
-      // openAgentInPanel 会在 nextTick 中调度 Panel 场景引导；此处再注册一个 nextTick
-      // （注册更晚，回调更晚执行），使 Agent 引导清除 Panel 引导的定时器并优先展示，
-      // 避免「创建 Agent」这一更强场景的引导被 Panel 引导吞掉。
-      nextTick(() => maybeStartTour('agent'))
+  const result = await createAgentWithOptions({
+    agentType: newAgentType.value,
+    workingDir: newAgentDir.value,
+    name: newAgentName.value,
+    llmGroup: newAgentModelGroup.value,
+    worktree: newCodeAgentWorktree.value,
+    quickMode: newAgentQuickMode.value,
+    restoreSession: newAgentRestoreSession.value,
+    noInteractionMode: newAgentNoInteractionMode.value,
+    task: newAgentNoInteractionMode.value ? newAgentTaskDescription.value : '',
+    nodeId: newAgentNodeId.value,
+    proxyNode: newAgentProxyNode.value,
+    accessAclRead: newAgentAccessAclRead.value,
+    accessAclInteract: newAgentAccessAclInteract.value,
+  })
+  if (!result.ok) {
+    // 工作目录冲突提示走弹窗内错误区，其余走 alert（保持原有表现）
+    if (result.error && result.error.includes('工作目录冲突')) {
+      newAgentCreateError.value = result.error
     } else {
-      alert('创建失败：返回数据格式错误')
+      alert(`创建失败: ${result.error}`)
     }
-  } catch (error) {
-    console.error('[AGENT] Create failed:', error)
-    alert(`创建失败: ${error.message}`)
+    return
+  }
+  // 关闭创建弹窗
+  showCreateAgentModal.value = false
+  newAgentDir.value = '~' // 重置为默认值
+  newAgentCreateError.value = '' // 重置错误信息
+  newCodeAgentWorktree.value = false
+  newAgentQuickMode.value = false
+  newAgentRestoreSession.value = false
+  newAgentNoInteractionMode.value = false
+  newAgentTaskDescription.value = ''
+  newAgentNodeId.value = ''
+  newAgentAccessAclRead.value = []
+  newAgentAccessAclInteract.value = []
+  // 重置为默认名称（根据当前选中的 agent 类型）
+  newAgentName.value = generateAgentName(newAgentType.value)
+  await afterAgentCreated(result.agent)
+}
+// 打开「一句话创建 Agent」弹窗（除任务外全部使用默认参数）
+function openQuickCreateAgent() {
+  quickCreateAgentError.value = ''
+  quickCreateAgentLoading.value = false
+  showQuickCreateAgentModal.value = true
+  pushOverlayState()
+}
+
+// 从「一句话创建」切到完整创建面板：关闭快捷弹窗并打开完整弹窗
+async function openFullCreateAgentFromQuick() {
+  showQuickCreateAgentModal.value = false
+  await openCreateAgentModal()
+}
+
+// 提交「一句话创建 Agent」：创建后 Agent 立即执行该任务，但保留交互确认（no_interaction_mode=false）
+async function submitQuickCreateAgent({ task, agentType = 'agent', workingDir = '~' } = {}) {
+  const trimmedTask = String(task || '').trim()
+  if (!trimmedTask) return
+  quickCreateAgentLoading.value = true
+  quickCreateAgentError.value = ''
+  try {
+    const result = await createAgentWithOptions({
+      agentType,
+      workingDir,
+      name: generateAgentName(agentType),
+      llmGroup: 'default',
+      noInteractionMode: false,
+      task: trimmedTask,
+      nodeId: 'master',
+    })
+    if (!result.ok) {
+      quickCreateAgentError.value = result.error || '创建失败'
+      return
+    }
+    showQuickCreateAgentModal.value = false
+    await afterAgentCreated(result.agent)
+  } finally {
+    quickCreateAgentLoading.value = false
   }
 }
 // 打开补全列表
@@ -13515,6 +13784,8 @@ function handleGlobalKeydown(event) {
       showSettingsModal.value = false
     } else if (showCreateAgentModal.value) {
       showCreateAgentModal.value = false
+    } else if (showQuickCreateAgentModal.value) {
+      showQuickCreateAgentModal.value = false
     } else if (showSessionDialog.value) {
       cancelSessionDialog()
     } else if (showDirDialog.value) {
@@ -13975,6 +14246,7 @@ onMounted(() => {
     saveTerminalPanelRect()
     layoutCodeMirrorEditor()
     handleToolbarResize()
+    handleQuickCreateFabResize()
 
     const activeSession = terminalSessions.value.find(session => session.terminal_id === activeTerminalId.value)
     if (activeSession && activeSession.fitAddon && activeSession.terminal) {
@@ -14449,6 +14721,53 @@ body::-webkit-scrollbar {
   transition: none;
 }
 
+/* 悬浮入口：一句话创建 Agent（右下角，移动端可点） */
+.quick-create-fab {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  z-index: 10000;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(32, 200, 255, 0.35);
+  background: rgba(11, 20, 36, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 20px rgba(0, 120, 190, 0.25);
+  color: #7ddcff;
+  font-size: 22px;
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.quick-create-fab.is-dragging {
+  cursor: grabbing;
+  transition: none;
+}
+
+.quick-create-fab:hover:not(:disabled) {
+  background: rgba(20, 40, 66, 0.95);
+  border-color: rgba(32, 200, 255, 0.6);
+  transform: translateY(-2px);
+}
+
+.quick-create-fab:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.quick-create-fab:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* 拖动把手：仅此处可拖动工具条 */
 .global-toolbar-handle {
   display: flex;
@@ -14504,6 +14823,14 @@ body::-webkit-scrollbar {
   .global-toolbar-tab-grip {
     width: 14px;
     height: 3px;
+  }
+  /* 悬浮入口：移动端加大触摸区，避开底部安全区 */
+  .quick-create-fab {
+    width: 56px;
+    height: 56px;
+    font-size: 26px;
+    right: max(12px, env(safe-area-inset-right, 0px));
+    bottom: max(20px, env(safe-area-inset-bottom, 0px));
   }
 }
 

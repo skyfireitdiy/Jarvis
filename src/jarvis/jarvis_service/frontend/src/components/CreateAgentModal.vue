@@ -175,7 +175,7 @@ const props = defineProps({
   nodeOptions: { type: Array, default: () => [] },
   nodeId: { type: String, default: '' },
   noNodeAccess: { type: Boolean, default: false },
-  agentType: { type: String, default: 'code_agent' },
+  agentType: { type: String, default: 'agent' },
   agentName: { type: String, default: '' },
   modelGroups: { type: Array, default: () => [] },
   modelGroup: { type: String, default: 'default' },
