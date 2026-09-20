@@ -5443,11 +5443,13 @@ def create_app(
                 smart_llm_ref = group_config.get("smart_llm", "")
                 normal_llm_ref = group_config.get("normal_llm", "")
                 cheap_llm_ref = group_config.get("cheap_llm", "")
+                eval_llm_ref = group_config.get("eval_llm", "")
 
                 # 从 llms 中获取实际模型名称
                 smart_model = "-"
                 normal_model = "-"
                 cheap_model = "-"
+                eval_model = "-"
 
                 if isinstance(llms, dict):
                     if smart_llm_ref and smart_llm_ref in llms:
@@ -5467,12 +5469,18 @@ def create_app(
                         if isinstance(cheap_config, dict):
                             cheap_model = str(cheap_config.get("model", cheap_llm_ref))
 
+                    if eval_llm_ref and eval_llm_ref in llms:
+                        eval_config = llms[eval_llm_ref]
+                        if isinstance(eval_config, dict):
+                            eval_model = str(eval_config.get("model", eval_llm_ref))
+
                 data.append(
                     {
                         "name": group_name,
                         "smart_model": smart_model,
                         "normal_model": normal_model,
                         "cheap_model": cheap_model,
+                        "eval_model": eval_model,
                     }
                 )
 

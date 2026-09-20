@@ -292,6 +292,7 @@ def run_quick_config():
     normal_model = ""
     smart_model = ""
     cheap_model = ""
+    eval_model = ""
 
     # 选择 normal/smart/cheap 模型
     if len(role_candidate_models) == 1:
@@ -357,6 +358,30 @@ def run_quick_config():
             PrettyOutput.auto_print("❌ 请输入有效的数字序号")
             return
 
+    # Eval（可选，留空则不启用结构化评估模型）
+    table_lines = ["| 序号 | 模型名称 |", "|------|----------|"]
+    for i, model in enumerate(role_candidate_models, 1):
+        table_lines.append(f"| {i} | {model} |")
+    PrettyOutput.print_markdown(
+        "\n".join(table_lines),
+        title="请选择 Eval 模型（结构化评估，可留空跳过）",
+    )
+    eval_choice = get_single_line_input(
+        "请输入 Eval 模型序号 (留空则不启用结构化评估模型):"
+    )
+    if eval_choice.strip():
+        try:
+            eval_idx = int(eval_choice.strip()) - 1
+            if 0 <= eval_idx < len(role_candidate_models):
+                eval_model = role_candidate_models[eval_idx]
+                PrettyOutput.auto_print(f"🧪 Eval模型: {eval_model}")
+            else:
+                PrettyOutput.auto_print(f"❌ 无效的模型序号: {eval_choice}")
+                return
+        except ValueError:
+            PrettyOutput.auto_print("❌ 请输入有效的数字序号")
+            return
+
     # 测试API连通性
     PrettyOutput.auto_print(f"🔍 正在测试模型 {normal_model} 的API连通性...")
     success, error_msg = test_model_connection(
@@ -387,7 +412,9 @@ def run_quick_config():
 
     # 设置最大token数
     default_max_tokens = 200000
-    unique_role_models = list(dict.fromkeys([normal_model, smart_model, cheap_model]))
+    unique_role_models = list(
+        dict.fromkeys([normal_model, smart_model, cheap_model, eval_model])
+    )
     existing_model_configs = {
         llm_config.get("model"): llm_config
         for llm_config in config.get("llms", {}).values()
@@ -500,13 +527,18 @@ def run_quick_config():
     PrettyOutput.auto_print(f"✅ 已为 {len(unique_role_models)} 个模型创建配置")
 
     # 创建模型组
-    config["llm_groups"][group_name] = {
+    group_config = {
         "normal_llm": model_config_names[normal_model],
         "smart_llm": model_config_names[smart_model],
         "cheap_llm": model_config_names[cheap_model],
     }
+    # 仅在选择了 Eval 模型时写入，未选择则不产生 eval_llm 键
+    if eval_model:
+        group_config["eval_llm"] = model_config_names[eval_model]
+    config["llm_groups"][group_name] = group_config
     PrettyOutput.auto_print(
         f"✅ 已创建模型组 '{group_name}'，normal={normal_model}, smart={smart_model}, cheap={cheap_model}"
+        + (f", eval={eval_model}" if eval_model else "")
     )
 
     # 设置默认模型组

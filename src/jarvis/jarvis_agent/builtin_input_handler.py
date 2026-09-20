@@ -1948,11 +1948,11 @@ def get_platform_type_from_agent(agent: Any) -> str:
     return getattr(agent, "_model_type", "normal")
 
 
-def list_model_groups() -> Optional[List[Tuple[str, str, str, str]]]:
+def list_model_groups() -> Optional[List[Tuple[str, str, str, str, str]]]:
     """列出所有可用的模型组
 
     返回:
-        Optional[List[Tuple[str, str, str, str]]]: 模型组列表，每个元素为 (group_name, smart_model, normal_model, cheap_model)
+        Optional[List[Tuple[str, str, str, str, str]]]: 模型组列表，每个元素为 (group_name, smart_model, normal_model, cheap_model, eval_model)
     """
 
     model_groups = _get_global_config().get("llm_groups", {})
@@ -1967,7 +1967,11 @@ def list_model_groups() -> Optional[List[Tuple[str, str, str, str]]]:
             smart_model = group_config.get("smart_llm", "-")
             normal_model = group_config.get("normal_llm", "-")
             cheap_model = group_config.get("cheap_llm", "-")
-            groups.append((group_name, smart_model, normal_model, cheap_model))
+            # 未配置结构化评估模型时显示为 "-"
+            eval_model = group_config.get("eval_llm", "-")
+            groups.append(
+                (group_name, smart_model, normal_model, cheap_model, eval_model)
+            )
 
     return groups
 
@@ -2131,12 +2135,25 @@ def switch_model_group(agent: Any) -> bool:
 
     # 显示模型组列表（仅在fzf不可用时打印markdown表格）
     if not fzf_available:
-        headers = ["编号", "模型组名称", "Smart", "Normal", "Cheap"]
+        headers = ["编号", "模型组名称", "Smart", "Normal", "Cheap", "Eval"]
         rows = []
-        for idx, (group_name, smart_model, normal_model, cheap_model) in enumerate(
-            groups, 1
-        ):
-            rows.append([str(idx), group_name, smart_model, normal_model, cheap_model])
+        for idx, (
+            group_name,
+            smart_model,
+            normal_model,
+            cheap_model,
+            eval_model,
+        ) in enumerate(groups, 1):
+            rows.append(
+                [
+                    str(idx),
+                    group_name,
+                    smart_model,
+                    normal_model,
+                    cheap_model,
+                    eval_model,
+                ]
+            )
         _print_markdown_table("📋 可用模型组", headers, rows)
         PrettyOutput.auto_print("")
     # 用户选择（使用交互式选择器）
@@ -2144,12 +2161,12 @@ def switch_model_group(agent: Any) -> bool:
     if fzf_available:
         # fzf模式下显示详细信息
         choice_names = [
-            f"{group_name} (Smart: {smart_model}, Normal: {normal_model}, Cheap: {cheap_model})"
-            for group_name, smart_model, normal_model, cheap_model in groups
+            f"{group_name} (Smart: {smart_model}, Normal: {normal_model}, Cheap: {cheap_model}, Eval: {eval_model})"
+            for group_name, smart_model, normal_model, cheap_model, eval_model in groups
         ]
     else:
         # 单行输入模式下显示简单名称
-        choice_names = [group_name for group_name, _, _, _ in groups]
+        choice_names = [group_name for group_name, *_ in groups]
 
     selected = get_choice("请选择模型组:", choice_names)
 
@@ -2167,7 +2184,7 @@ def switch_model_group(agent: Any) -> bool:
 
     # 查找选择的模型组索引
     choice_idx = -1
-    for idx, (group_name, _, _, _) in enumerate(groups):
+    for idx, (group_name, *_) in enumerate(groups):
         if group_name == selected_group_name:
             choice_idx = idx
             break
