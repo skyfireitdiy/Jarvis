@@ -34,6 +34,7 @@
     "codemirror": "^6.0.2",
     "d3-graphviz": "^5.6.0",
     "highlight.js": "^11.9.0",
+    "html-to-image": "^1.11.13",
     "marked": "^11.1.1",
     "mermaid": "^11.15.0",
     "plantuml-encoder": "^1.4.0",
