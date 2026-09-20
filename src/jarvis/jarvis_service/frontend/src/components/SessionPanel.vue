@@ -30,6 +30,13 @@
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
               </svg>
             </button>
+            <button class="icon-btn export-message-btn" @click="exportMessageAsImage(item, index, $event)" title="导出为图片" v-if="item.text">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <path d="M21 15l-5-5L5 21"></path>
+              </svg>
+            </button>
             <div class="message-body markdown-content" v-html="item.html"></div>
             <!-- 流式输出打字机光标（宠物缩略图） -->
             <span v-if="item.isStreaming && item.output_type === 'STREAM'" class="stream-caret" aria-hidden="true">
@@ -190,6 +197,7 @@
 
 <script setup>
 import { ref, onBeforeUnmount } from 'vue'
+import { exportElementAsImage } from '../utils/exportImage.js'
 
 const props = defineProps({
   agent: { type: Object, default: null },
@@ -345,6 +353,30 @@ async function copyToClipboard(text, index) {
       emit('show-toast', '复制失败，请手动复制', 'error')
     }
   }
+}
+
+// 导出单条消息为图片（带 Agent 名与时间的信息条）
+async function exportMessageAsImage(item, index, event) {
+  if (!item || !item.text) return
+  // 从按钮所在的消息节点内定位 .message-body，避免导出到其它消息
+  const contentEl = event?.currentTarget?.closest('.message-content')?.querySelector('.message-body')
+  if (!contentEl) return
+  const result = await exportElementAsImage(contentEl, {
+    title: props.agent?.name || props.agent?.agent_id || 'Agent',
+    subtitle: item.agent_name || '',
+    time: formatMessageTime(item.timestamp) || new Date().toLocaleString(),
+    filename: `jarvis-${props.agent?.name || props.agent?.agent_id || 'agent'}-${Date.now()}`,
+  })
+  if (!result.ok) {
+    emit('show-toast', result.error || '导出失败', 'error')
+    return
+  }
+  const tip = result.mode === 'clipboard'
+    ? '图片已复制到剪贴板'
+    : result.mode === 'clipboard+download'
+      ? '图片已复制并下载'
+      : '已下载图片'
+  emit('show-toast', tip, 'success')
 }
 
 function formatMessageTime(timestamp) {
@@ -1112,6 +1144,34 @@ function getTerminalStyle(terminalContent) {
 }
 
 .copy-message-btn:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+}
+
+.export-message-btn {
+  position: absolute;
+  top: 0;
+  right: 34px;
+  background: var(--color-bg-hover);
+  border: none;
+  border-radius: var(--tile-radius-xs);
+  padding: 4px 8px;
+  color: var(--color-text-secondary);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 10;
+}
+
+.export-message-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.message-content:hover .export-message-btn {
+  opacity: 1;
+}
+
+.export-message-btn:hover {
   background: var(--color-bg-tertiary);
   color: var(--color-text-primary);
 }

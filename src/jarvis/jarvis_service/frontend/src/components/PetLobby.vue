@@ -265,6 +265,12 @@
             :title="pet.copied ? '已复制' : '复制输出'"
             @click.stop="copyPetOutput(pet)"
           >{{ pet.copied ? '✓' : '⧉' }}</button>
+          <button
+            class="lobby-pet-export"
+            :class="{ exported: pet.exported }"
+            :title="pet.exported ? '已导出' : '导出为图片'"
+            @click.stop="exportPetOutput(pet)"
+          >{{ pet.exported ? '✓' : '🖼' }}</button>
         </div>
 
         <!-- 确认控件：需要确认时直接显示（无需点击） -->
@@ -532,6 +538,7 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { normalizeNodeStatus, normalizeAgentStatus } from './topology.js'
+import { exportElementAsImage } from '../utils/exportImage.js'
 
 const props = defineProps({
   agents: { type: Array, default: () => [] },
@@ -963,6 +970,32 @@ async function copyPetOutput(pet) {
   pet.copied = true
   if (pet.copyTimer) clearTimeout(pet.copyTimer)
   pet.copyTimer = setTimeout(() => { pet.copied = false }, 1200)
+}
+
+// 导出某只宠物的输出内容为图片（带 Agent 名与时间的信息条）
+async function exportPetOutput(pet) {
+  if (!pet || !pet.output || pet.exporting) return
+  // 用 data-pet-output 精确定位该宠物的输出元素，避免导出到其它宠物
+  const el = stageRef.value?.querySelector(`[data-pet-output="${CSS.escape(pet.agentId)}"]`)
+  if (!el) return
+  pet.exporting = true
+  try {
+    const result = await exportElementAsImage(el, {
+      title: pet.name || pet.agentId,
+      subtitle: pet.agentType === 'code_agent' ? 'Code Agent' : 'Agent',
+      time: new Date().toLocaleString(),
+      filename: `jarvis-${pet.name || pet.agentId}-${Date.now()}`,
+    })
+    if (!result.ok) {
+      console.error('[PET-EXPORT] 导出失败:', result.error)
+      return
+    }
+    pet.exported = true
+    if (pet.exportTimer) clearTimeout(pet.exportTimer)
+    pet.exportTimer = setTimeout(() => { pet.exported = false }, 1200)
+  } finally {
+    pet.exporting = false
+  }
 }
 
 // 判断当前焦点是否允许被宠物输入框接管：
@@ -3067,6 +3100,38 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden, openInst
   border-color: rgba(32, 200, 255, 0.7);
 }
 .lobby-pet-copy.copied {
+  opacity: 1;
+  color: #34d99b;
+  border-color: rgba(52, 217, 155, 0.7);
+}
+.lobby-pet-export {
+  position: absolute;
+  top: 6px;
+  right: 32px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+  color: #9fd8ef;
+  background: rgba(10, 24, 38, 0.85);
+  border: 1px solid rgba(32, 200, 255, 0.35);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0.35;
+  transition: opacity 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.lobby-pet-output-wrap:hover .lobby-pet-export {
+  opacity: 1;
+}
+.lobby-pet-export:hover {
+  color: #dff1fb;
+  border-color: rgba(32, 200, 255, 0.7);
+}
+.lobby-pet-export.exported {
   opacity: 1;
   color: #34d99b;
   border-color: rgba(52, 217, 155, 0.7);
