@@ -472,12 +472,15 @@ def _expand_llm_references(group_config: Dict[str, Any]) -> Dict[str, Any]:
         "smart_platform",
         "smart_model",
         "smart_max_input_token_count",
+        "eval_platform",
+        "eval_model",
+        "eval_max_input_token_count",
     ]
     found_forbidden = [key for key in forbidden_keys if key in expanded_config]
     if found_forbidden:
         raise ValueError(
             f"❌ 错误：llm_groups 中不再支持直接定义以下参数: {', '.join(found_forbidden)}。"
-            f"请使用 normal_llm、cheap_llm、smart_llm 引用 llms 中定义的配置。"
+            f"请使用 normal_llm、cheap_llm、smart_llm、eval_llm 引用 llms 中定义的配置。"
         )
 
     # 验证至少需要 normal_llm 引用
@@ -549,6 +552,29 @@ def _expand_llm_references(group_config: Dict[str, Any]) -> Dict[str, Any]:
                 expanded_config["smart_llm_config"] = llm_ref["llm_config"].copy()
             expanded_config.pop("smart_llm", None)
 
+    # 处理 eval_llm 引用（结构化评估模型，可选）
+    # 未配置时不展开任何 eval_* 键，调用方据此判断"未配置"并回退现有流程
+    if "eval_llm" in expanded_config:
+        # 跳过空值（空字符串或 None）
+        if not expanded_config.get("eval_llm"):
+            expanded_config.pop("eval_llm", None)
+        else:
+            llm_ref = _resolve_llm_reference(expanded_config["eval_llm"])
+            if not llm_ref:
+                raise ValueError(
+                    f"❌ 错误：eval_llm 引用的 '{expanded_config['eval_llm']}' 在 llms 中不存在。"
+                )
+            # 直接使用引用的值
+            expanded_config["eval_platform"] = llm_ref.get("platform", "openai")
+            expanded_config["eval_model"] = llm_ref.get("model", "gpt-5")
+            expanded_config["eval_max_input_token_count"] = llm_ref.get(
+                "max_input_token_count", 200000
+            )
+            # 合并 llm_config
+            if "llm_config" in llm_ref:
+                expanded_config["eval_llm_config"] = llm_ref["llm_config"].copy()
+            expanded_config.pop("eval_llm", None)
+
     return expanded_config
 
 
@@ -601,6 +627,7 @@ def _get_resolved_model_config() -> Dict[str, Any]:
         "llm_config",
         "cheap_llm_config",
         "smart_llm_config",
+        "eval_llm_config",
     ]
     for key in override_keys:
         if key in GLOBAL_CONFIG_DATA:
@@ -719,6 +746,75 @@ def get_smart_model_name() -> str:
     if smart_model:
         return cast(str, smart_model)
     return get_normal_model_name()
+
+
+def is_eval_model_configured() -> bool:
+    """
+    判断是否配置了结构化评估模型（eval_llm）。
+
+    只有显式配置了 eval_llm 才返回 True；未配置时调用方应回退到现有流程。
+
+    返回：
+        bool: 是否配置了结构化评估模型
+    """
+    config = _get_resolved_model_config()
+    return bool(config.get("eval_platform") and config.get("eval_model"))
+
+
+def get_eval_platform_name() -> str:
+    """
+    获取结构化评估模型的平台名称。
+
+    返回：
+        str: 平台名称，如果未配置则回退到正常操作平台
+    """
+    config = _get_resolved_model_config()
+    eval_platform = config.get("eval_platform")
+    if eval_platform:
+        return cast(str, eval_platform)
+    return get_normal_platform_name()
+
+
+def get_eval_model_name() -> str:
+    """
+    获取结构化评估模型的模型名称。
+
+    返回：
+        str: 模型名称，如果未配置则回退到正常操作模型
+    """
+    config = _get_resolved_model_config()
+    eval_model = config.get("eval_model")
+    if eval_model:
+        return cast(str, eval_model)
+    return get_normal_model_name()
+
+
+def get_eval_max_input_token_count() -> int:
+    """
+    获取结构化评估模型允许的最大输入token数量。
+
+    返回:
+        int: 模型能处理的最大输入token数量，如果未配置则回退到正常配置
+    """
+    config = _get_resolved_model_config()
+    eval_max_token = config.get("eval_max_input_token_count")
+    if eval_max_token:
+        return int(eval_max_token)
+    return get_max_input_token_count()
+
+
+def get_eval_llm_config() -> Dict[str, Any]:
+    """
+    获取结构化评估模型的 llm_config 配置。
+
+    返回：
+        Dict[str, Any]: llm_config 配置字典，如果未配置则回退到正常配置
+    """
+    config = _get_resolved_model_config()
+    llm_config = dict(config.get("eval_llm_config", {}))
+    if not llm_config:
+        llm_config = dict(config.get("llm_config", {}))
+    return llm_config
 
 
 def is_execute_tool_confirm() -> bool:

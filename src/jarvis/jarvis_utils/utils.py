@@ -888,12 +888,15 @@ def _show_usage_stats(welcome_str: str) -> None:
         from jarvis.jarvis_utils.config import (
             get_cheap_model_name,
             get_cheap_platform_name,
+            get_eval_model_name,
+            get_eval_platform_name,
             get_jarvis_gitee_url,
             get_jarvis_github_url,
             get_normal_model_name,
             get_normal_platform_name,
             get_smart_model_name,
             get_smart_platform_name,
+            is_eval_model_configured,
         )
 
         # 欢迎信息 Panel
@@ -914,9 +917,26 @@ def _show_usage_stats(welcome_str: str) -> None:
                 normal_platform = get_normal_platform_name()
                 smart_model = get_smart_model_name()
                 smart_platform = get_smart_platform_name()
-                model_info = f"💰 {cheap_model}({cheap_platform})  ⭐ {normal_model}({normal_platform})  🧠 {smart_model}({smart_platform})"
+                # 纵向逐行展示，避免横向拼接在窄终端下显示不全
+                model_lines = [
+                    f"💰 Cheap: {cheap_model}({cheap_platform})",
+                    f"⭐ Normal: {normal_model}({normal_platform})",
+                    f"🧠 Smart: {smart_model}({smart_platform})",
+                ]
+                # Eval 为选配，未配置时明确标注
+                if is_eval_model_configured():
+                    model_lines.append(
+                        f"🧪 Eval: {get_eval_model_name()}({get_eval_platform_name()})"
+                    )
+                else:
+                    model_lines.append("🧪 Eval: 未配置")
             except Exception:
-                model_info = "💰  未知  ⭐  未知  🧠  未知"
+                model_lines = [
+                    "💰 Cheap: 未知",
+                    "⭐ Normal: 未知",
+                    "🧠 Smart: 未知",
+                    "🧪 Eval: 未配置",
+                ]
 
             work_dir = os.getcwd()
             work_dir_info = f"📁 工作目录: {work_dir}"
@@ -929,7 +949,7 @@ def _show_usage_stats(welcome_str: str) -> None:
                 Align.center(Text(jarvis_ascii_art_str, style="bold blue")),
                 Align.center(Text(welcome_str, style="bold")),
                 "",  # for a blank line
-                Align.center(Text(model_info, style="cyan")),
+                *[Align.center(Text(line, style="cyan")) for line in model_lines],
                 Align.center(Text(work_dir_info, style="dim")),
                 "",  # for a blank line
                 Align.center(Text(f"🎯 v{__version__}", style="bold green")),

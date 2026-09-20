@@ -1,0 +1,8 @@
+{
+  "id": "20260920_153757_348504",
+  "type": "project_long_term",
+  "tags": ["jarvis", "前端", "导出图片", "exportImage"],
+  "content": "前端导出图片功能：src/jarvis/jarvis_service/frontend/src/utils/exportImage.js 提供 exportElementAsImage(el, meta)，用 html-to-image 的 toBlob 渲染 DOM → canvas 合成（顶部信息条+内容+底部水印）→ 优先复制剪贴板，失败降级下载。\n返回 mode 取值：'clipboard'（桌面复制成功）、'clipboard+download'（移动端复制并下载）、'download'（降级下载）。\n调用方：PetLobby.vue 的 exportPetOutput()、SessionPanel.vue 的 exportMessageAsImage()。\n关键坑：canvas 合成时信息条必须使用与内容图相同的 pixelRatio，否则长内容（pixelRatio 被降级）会导致比例失真。",
+  "created_at": "2026-09-20T15:37:57.348529",
+  "updated_at": "2026-09-20T15:37:57.348533"
+}

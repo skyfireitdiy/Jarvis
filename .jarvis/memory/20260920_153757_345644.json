@@ -1,0 +1,8 @@
+{
+  "id": "20260920_153757_345644",
+  "type": "project_long_term",
+  "tags": ["jarvis", "platform", "架构约定", "扩展开发"],
+  "content": "Jarvis 平台适配器（jarvis_platform）新增平台的约定：\n1) 在 src/jarvis/jarvis_platform/ 下新建 .py 文件，定义 BasePlatform 子类即可被 registry 自动发现，无需改 registry.py；\n2) 必须实现 REQUIRED_METHODS：chat/name/delete_chat/set_system_prompt/set_model_name/get_model_list，以及 set_messages/get_messages/trim_messages/get_required_env_keys；\n3) 配置键惯例为 <prefix>_api_key / <prefix>_base_url，优先读 self._llm_config，回退环境变量；\n4) 代理模式：jglobals.proxy_node + master_url 时把 base_url 改写为 f\"{master_url}/api/node/{proxy_node}/http_proxy/{base_url}\"，并用 self._get_proxy_extra_headers() 动态注入 X-Jarvis-Token；\n5) 注意：基类 __init__ 会无条件从全局配置取 model_name，新平台需自己兜底回退到本平台默认模型名，否则会串到其它平台的模型名（如 gpt-5）。",
+  "created_at": "2026-09-20T15:37:57.345677",
+  "updated_at": "2026-09-20T15:37:57.345683"
+}

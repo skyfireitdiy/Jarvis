@@ -29,6 +29,8 @@ from jarvis.jarvis_utils.config import get_smart_max_input_token_count
 from jarvis.jarvis_utils.config import get_llm_config
 from jarvis.jarvis_utils.config import get_normal_model_name
 from jarvis.jarvis_utils.config import get_cheap_model_name
+from jarvis.jarvis_utils.config import get_eval_max_input_token_count
+from jarvis.jarvis_utils.config import get_eval_model_name
 from jarvis.jarvis_utils.config import get_smart_model_name
 from jarvis.jarvis_utils.config import is_immediate_abort
 from jarvis.jarvis_utils.config import is_print_prompt
@@ -60,7 +62,7 @@ class BasePlatform(ABC):
         """初始化模型
 
         参数:
-            platform_type: 平台类型，可选值为 'normal'、'cheap' 或 'smart'
+            platform_type: 平台类型，可选值为 'normal'、'cheap'、'smart' 或 'eval'
             agent: Agent实例，用于回调触发总结等功能
         """
         self.suppress_output = False  # 添加输出控制标志
@@ -78,6 +80,8 @@ class BasePlatform(ABC):
             self.model_name = get_cheap_model_name()
         elif platform_type == "smart":
             self.model_name = get_smart_model_name()
+        elif platform_type == "eval":
+            self.model_name = get_eval_model_name()
         else:
             self.model_name = get_normal_model_name()
 
@@ -720,6 +724,8 @@ class BasePlatform(ABC):
             return get_cheap_max_input_token_count()
         elif self.platform_type == "smart":
             return get_smart_max_input_token_count()
+        elif self.platform_type == "eval":
+            return get_eval_max_input_token_count()
         else:
             return get_max_input_token_count()
 

@@ -282,7 +282,7 @@ def llm_delete(
     # 检查是否被模型组引用
     llm_groups = config.get("llm_groups", {})
     for group_name, group_config in llm_groups.items():
-        for key in ["normal_llm", "cheap_llm", "smart_llm"]:
+        for key in ["normal_llm", "cheap_llm", "smart_llm", "eval_llm"]:
             if group_config.get(key) == name:
                 PrettyOutput.auto_print(f"⚠️ 该配置被模型组 '{group_name}' 引用")
 
@@ -857,8 +857,8 @@ def group_list() -> None:
 
     # 创建 markdown 表格
     md_lines = ["## ✅ 模型组列表", ""]
-    md_lines.append("| 组名 | normal | smart | cheap |")
-    md_lines.append("|------|--------|-------|-------|")
+    md_lines.append("| 组名 | normal | smart | cheap | eval |")
+    md_lines.append("|------|--------|-------|-------|------|")
 
     # 添加数据行
     for name in sorted(llm_groups.keys()):
@@ -866,7 +866,10 @@ def group_list() -> None:
         normal_llm = group_config.get("normal_llm", "N/A")
         smart_llm = group_config.get("smart_llm", "N/A")
         cheap_llm = group_config.get("cheap_llm", "N/A")
-        md_lines.append(f"| {name} | {normal_llm} | {smart_llm} | {cheap_llm} |")
+        eval_llm = group_config.get("eval_llm", "N/A")
+        md_lines.append(
+            f"| {name} | {normal_llm} | {smart_llm} | {cheap_llm} | {eval_llm} |"
+        )
 
     # 打印表格
     md_table = "\n".join(md_lines)
@@ -924,6 +927,7 @@ def group_show(
     PrettyOutput.auto_print(f"  normal_llm: {group_config.get('normal_llm', 'N/A')}")
     PrettyOutput.auto_print(f"  cheap_llm: {group_config.get('cheap_llm', 'N/A')}")
     PrettyOutput.auto_print(f"  smart_llm: {group_config.get('smart_llm', 'N/A')}")
+    PrettyOutput.auto_print(f"  eval_llm: {group_config.get('eval_llm', 'N/A')}")
 
 
 @group_app.command("delete")
@@ -1048,6 +1052,11 @@ def group_add(name: Optional[str] = typer.Argument(None, help="模型组名称")
         "Smart LLM 配置 (序号或名称，留空则与 normal 相同): ", allow_empty=True
     )
 
+    # 可选的结构化评估模型
+    eval_llm = resolve_llm_choice(
+        "结构化评估模型 LLM 配置 (序号或名称，留空则不启用): ", allow_empty=True
+    )
+
     # 如果未提供模型组名称，提示用户输入
     if name is None:
         # 根据选择的配置生成默认名称建议
@@ -1086,6 +1095,8 @@ def group_add(name: Optional[str] = typer.Argument(None, help="模型组名称")
         group_config["cheap_llm"] = cheap_llm
     if smart_llm:
         group_config["smart_llm"] = smart_llm
+    if eval_llm:
+        group_config["eval_llm"] = eval_llm
 
     # 保存配置
     config["llm_groups"][name] = group_config
@@ -1156,7 +1167,7 @@ def group_update(
     group_config = config["llm_groups"][name]
     PrettyOutput.auto_print(f"📝 更新模型组: {name}")
     PrettyOutput.auto_print(
-        f"  当前值 - normal: {group_config.get('normal_llm', 'N/A')}, cheap: {group_config.get('cheap_llm', 'N/A')}, smart: {group_config.get('smart_llm', 'N/A')}"
+        f"  当前值 - normal: {group_config.get('normal_llm', 'N/A')}, cheap: {group_config.get('cheap_llm', 'N/A')}, smart: {group_config.get('smart_llm', 'N/A')}, eval: {group_config.get('eval_llm', 'N/A')}"
     )
     md_lines = ["## 可用的 LLM 配置", "", "| 序号 | 配置名称 |", "|------|----------|"]
     for i, llm_name in enumerate(llm_list, 1):
@@ -1202,6 +1213,12 @@ def group_update(
     if smart_llm:
         group_config["smart_llm"] = smart_llm
 
+    eval_llm = resolve_llm_choice(
+        f"结构化评估模型 LLM (当前: {group_config.get('eval_llm', '')}, 序号或名称，留空不变): "
+    )
+    if eval_llm:
+        group_config["eval_llm"] = eval_llm
+
     # 保存配置
     if _save_config(config):
         PrettyOutput.auto_print(f"✅ 已更新模型组: {name}")
@@ -1226,7 +1243,7 @@ def group_set(
     # 如果没有指定名称，使用交互式选择
     if name is None:
         fzf_options = [
-            f"{group_name} (smart: {group_config.get('smart_llm', 'N/A')}, normal: {group_config.get('normal_llm', 'N/A')}, cheap: {group_config.get('cheap_llm', 'N/A')})"
+            f"{group_name} (smart: {group_config.get('smart_llm', 'N/A')}, normal: {group_config.get('normal_llm', 'N/A')}, cheap: {group_config.get('cheap_llm', 'N/A')}, eval: {group_config.get('eval_llm', 'N/A')})"
             for group_name, group_config in sorted(llm_groups.items())
         ]
         selected_str = fzf_select(fzf_options, prompt="选择要设置的模型组 > ")

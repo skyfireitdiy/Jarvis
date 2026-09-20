@@ -1,0 +1,8 @@
+{
+  "id": "20260920_153757_347137",
+  "type": "project_long_term",
+  "tags": ["jarvis", "jev", "typesafe", "platform", "平台适配器"],
+  "content": "已新增 Jev 平台适配器：src/jarvis/jarvis_platform/jev.py，类 JevPlatform，platform_name()='jev'。\nJev 是 TypeSafe 的 System One 模型（托管 API，不开源不可本地部署），只做类型化决策（noul/choice/score），无对话、无流式、仅文本输入。\n接口：POST {base_url}/v1/systemone，请求体 {state, model, questions}，响应 {model, answers, usage}。\n适配方式：chat() 接受 JSON 字符串 {\"state\":..., \"questions\":{...}}，把 answers 序列化为可读文本返回。\n配置键 typesafe_api_key/typesafe_api_base，默认 base_url=https://api.typesafe.ai，默认模型 jev-latest。\n注意：官方明确中文（CJK）效果弱于英文，且为境外托管 API 存在数据出境问题。",
+  "created_at": "2026-09-20T15:37:57.347159",
+  "updated_at": "2026-09-20T15:37:57.347163"
+}

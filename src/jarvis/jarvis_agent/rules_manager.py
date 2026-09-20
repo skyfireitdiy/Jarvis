@@ -24,6 +24,7 @@ from jarvis.jarvis_utils.config import get_central_rules_repo
 from jarvis.jarvis_utils.exception_utils import save_exception
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_rules_load_dirs
+from jarvis.jarvis_utils.decision import decide
 from jarvis.jarvis_utils.utils import daily_check_git_updates
 
 # 注入上下文的单条规则体上限：超过则截断并提示用 load_rule 补取完整文本。
@@ -1160,13 +1161,6 @@ class RulesManager:
             # 直接对全量候选做一次 normal 选择（不再经 cheap 窄化，避免弱模型筛丢正确规则）
             top_rules = all_rules_list
 
-            # 创建 normal 类型的模型
-            registry = PlatformRegistry.get_global_platform_registry()
-            model = registry.create_platform(platform_type="normal")
-            if model is None:
-                PrettyOutput.auto_print("⚠️  无法创建 normal 类型模型")
-                return None
-
             # 构造编号列表（全量候选）
             numbered_rules = ""
             for i, rule_name in enumerate(top_rules, 1):
@@ -1197,10 +1191,24 @@ class RulesManager:
 
 所选规则序号："""
 
-            # 调用模型选择规则（关闭输出抑制，允许模型输出分析过程）
-            model.set_suppress_output(False)
-            response = model.chat_until_success(prompt).strip()
-            model.set_suppress_output(True)
+            def _select_with_normal_model() -> str:
+                """现有流程：用 normal 模型选择规则编号。"""
+                registry = PlatformRegistry.get_global_platform_registry()
+                model = registry.create_platform(platform_type="normal")
+                if model is None:
+                    PrettyOutput.auto_print("⚠️  无法创建 normal 类型模型")
+                    return ""
+                # 调用模型选择规则（关闭输出抑制，允许模型输出分析过程）
+                model.set_suppress_output(False)
+                try:
+                    return model.chat_until_success(prompt).strip()
+                finally:
+                    model.set_suppress_output(True)
+
+            # 配置了结构化评估模型则用它，否则走现有 normal 流程
+            response = decide(prompt, _select_with_normal_model)
+            if not response:
+                return None
 
             # 从响应中提取<NUM>标签内的内容
             import re

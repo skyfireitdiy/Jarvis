@@ -11,8 +11,10 @@ from typing import Type
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.config import get_cheap_platform_name
 from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_eval_platform_name
 from jarvis.jarvis_utils.config import get_normal_platform_name
 from jarvis.jarvis_utils.config import get_smart_platform_name
+from jarvis.jarvis_utils.config import is_eval_model_configured
 from jarvis.jarvis_utils.output import PrettyOutput
 
 REQUIRED_METHODS = [
@@ -224,6 +226,18 @@ class PlatformRegistry:
             )
         return platform
 
+    def get_eval_platform(self) -> Optional[BasePlatform]:
+        """获取结构化评估模型平台实例。
+
+        未配置 eval_llm 时返回 None（调用方据此回退现有流程），不抛异常。
+        """
+        if not is_eval_model_configured():
+            return None
+        return self.create_platform(
+            platform_type="eval",
+            silent=True,
+        )
+
     def register_platform(self, name: str, platform_class: Type[BasePlatform]) -> None:
         """Register platform class
 
@@ -242,7 +256,7 @@ class PlatformRegistry:
 
         Args:
             name: Platform name
-            platform_type: 平台类型，可选值为 'normal'、'cheap' 或 'smart'
+            platform_type: 平台类型，可选值为 'normal'、'cheap'、'smart' 或 'eval'
             silent: 如果为 True，失败时不打印错误信息（默认 False，保持向后兼容）
 
         Returns:
@@ -252,6 +266,8 @@ class PlatformRegistry:
             name = get_smart_platform_name()
         elif platform_type == "cheap":
             name = get_cheap_platform_name()
+        elif platform_type == "eval":
+            name = get_eval_platform_name()
         else:
             name = get_normal_platform_name()
 
