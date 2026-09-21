@@ -184,7 +184,8 @@ class SubAgentTool:
                 # 安全兜底：无法从父Agent获取配置则保持为None，使用系统默认
                 pass
 
-            # 如果父Agent设置了auto_complete或non_interactive，子Agent强制非交互模式
+            # 继承父Agent的交互配置：父Agent非交互或自动完成时，子Agent强制非交互；
+            # 否则子Agent保持可交互，与父Agent一致。
             force_non_interactive = (
                 parent_non_interactive is True or parent_auto_complete is True
             )
@@ -211,9 +212,7 @@ class SubAgentTool:
                 use_analysis=parent_use_analysis,
                 force_save_memory=None,
                 files=None,
-                non_interactive=force_non_interactive
-                if force_non_interactive
-                else True,
+                non_interactive=force_non_interactive,
                 rule_names=rule_names,
             )
             # 标记当前 agent 为 sub_agent，禁止其创建 sub 类型任务或嵌套 sub_agent
