@@ -221,7 +221,8 @@ class SubCodeAgentTool:
                 parent_non_interactive = None
                 parent_auto_complete = None
 
-            # 如果父Agent设置了auto_complete或non_interactive，子Agent强制非交互模式
+            # 继承父 Agent 的交互配置：父Agent非交互或自动完成时，子Agent强制非交互；
+            # 否则子Agent保持可交互，与父Agent一致。
             force_non_interactive = (
                 parent_non_interactive is True or parent_auto_complete is True
             )
@@ -236,9 +237,7 @@ class SubCodeAgentTool:
                     need_summary=True,
                     append_tools=append_tools,
                     tool_group=tool_group,
-                    non_interactive=force_non_interactive
-                    if force_non_interactive
-                    else True,
+                    non_interactive=force_non_interactive,
                     rule_names=rule_names,
                     disable_review=disable_review,
                     auto_complete=True,
