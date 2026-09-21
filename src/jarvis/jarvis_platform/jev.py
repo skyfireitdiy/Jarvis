@@ -44,6 +44,7 @@ import jarvis.jarvis_utils.globals as jglobals
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.content_types import ContentBlock
 from jarvis.jarvis_utils.config import get_request_timeout
+from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # 默认 API 地址与模型
@@ -170,10 +171,71 @@ class JevPlatform(BasePlatform):
         headers.update(self._get_proxy_extra_headers())
         return headers
 
+    def _truncate_message_if_needed(self, message: str) -> str:
+        """按 JSON 结构截断超长消息，保证截断结果仍是合法 JSON。
+
+        Jev 的输入是 JSON 协议字符串，基类的通用截断会按字符数硬切并追加裸换行
+        提示，导致 JSON 被切坏（报 "Invalid control character" / "Unterminated
+        string"）。这里改为：解析出 JSON 后只截断 ``state`` 字段的值，再重新
+        序列化，从而始终产出合法 JSON。
+
+        参数:
+            message: 原始消息（JSON 字符串）
+
+        返回:
+            str: 截断后的合法 JSON 字符串；无需截断或无法解析时返回原消息
+        """
+        try:
+            remaining_tokens = self.get_remaining_token_count()
+            message_tokens = get_context_token_count(message)
+            if message_tokens <= remaining_tokens:
+                return message
+
+            # 需要截断：保留剩余 token 的 80% 作为安全余量
+            target_tokens = int(remaining_tokens * 0.8)
+            if target_tokens <= 0:
+                PrettyOutput.auto_print("⚠️ 警告：剩余token不足，无法发送消息")
+                return ""
+
+            target_chars = target_tokens * 4
+            if len(message) <= target_chars:
+                return message
+
+            try:
+                payload = json.loads(message, strict=False)
+            except Exception:
+                # 无法解析为 JSON 时不擅自改写，交由上层按原样处理
+                return message
+
+            if not isinstance(payload, dict) or not isinstance(
+                payload.get("state"), str
+            ):
+                # state 不是字符串（如对象/数组）时无法安全截断，保持原样
+                return message
+
+            # 计算除 state 外的固定开销，剩余额度全部给 state
+            state = payload["state"]
+            overhead = len(json.dumps({**payload, "state": ""}, ensure_ascii=False))
+            budget = max(0, target_chars - overhead - 64)  # 预留截断提示空间
+            if budget <= 0:
+                PrettyOutput.auto_print("⚠️ 警告：剩余token不足，无法发送消息")
+                return ""
+
+            note = "\n\n... (消息过长，已截断以避免超出上下文限制)"
+            payload["state"] = state[:budget] + note
+            truncated = json.dumps(payload, ensure_ascii=False)
+            PrettyOutput.auto_print(
+                f"⚠️ 警告：消息过长（{message_tokens} tokens），"
+                f"已按 JSON 结构截断至约 {target_tokens} tokens"
+            )
+            return truncated
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 警告：检查消息长度时出错: {e}，使用原消息")
+            return message
+
     @staticmethod
     def _validate_questions(questions: Any) -> Dict[str, Any]:
         """校验并规范化 questions 字段。
-
         参数:
             questions: 待校验的问题映射
 
@@ -226,7 +288,7 @@ class JevPlatform(BasePlatform):
 
     @classmethod
     def parse_state_and_questions(
-        cls, message: Union[str, List[ContentBlock]]
+        cls, message: Union[str, List[ContentBlock], Dict[str, Any]]
     ) -> Tuple[Any, Dict[str, Any]]:
         """把 chat() 的 message 解析为 (state, questions)。
 
@@ -251,7 +313,9 @@ class JevPlatform(BasePlatform):
         if isinstance(message, str):
             raw = message.strip()
             try:
-                payload = json.loads(raw)
+                # strict=False 容忍字符串内的裸控制字符（换行/制表符等），
+                # 作为对上游可能引入裸控制字符的额外防御。
+                payload = json.loads(raw, strict=False)
             except Exception as e:
                 raise ValueError(
                     "Jev 平台要求输入为 JSON 字符串，形如 "
