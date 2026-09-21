@@ -139,6 +139,55 @@ def test_jev_truncation_keeps_invalid_json_as_is():
 
 
 # --------------------------------------------------------------------------
+# 剩余 token 不足：必须先尝试裁剪历史，绝不能返回空串
+# --------------------------------------------------------------------------
+
+
+def test_truncation_trims_history_when_no_remaining_tokens():
+    """剩余 token 为 0 时先裁剪历史；裁剪成功后正常返回原消息。
+
+    回归护栏：曾因漏掉基类的裁剪分支，在 remaining<=0 时直接返回空串，
+    导致上层 json.loads("") 报 "Expecting value: line 1 column 1 (char 0)"。
+    """
+    raw = _big_payload(state_len=10)
+    p = _make_platform()
+    # 第一次查询返回 0（触发裁剪），裁剪后重新查询返回充足额度
+    with (
+        patch.object(JevPlatform, "get_remaining_token_count", side_effect=[0, 100000]),
+        patch.object(JevPlatform, "trim_messages", return_value=True) as mock_trim,
+        patch.object(
+            JevPlatform, "_get_platform_max_input_token_count", return_value=100000
+        ),
+    ):
+        out = JevPlatform._truncate_message_if_needed(p, raw)
+
+    mock_trim.assert_called_once()
+    assert out == raw
+    assert json.loads(out)["state"]  # 仍是合法 JSON
+
+
+def test_truncation_never_returns_empty_string_when_trim_fails():
+    """裁剪失败且无剩余 token 时返回原消息，而不是空串。"""
+    raw = _big_payload(state_len=10)
+    p = _make_platform()
+    with (
+        patch.object(JevPlatform, "get_remaining_token_count", return_value=0),
+        patch.object(JevPlatform, "trim_messages", return_value=False),
+        patch.object(
+            JevPlatform, "_get_platform_max_input_token_count", return_value=100000
+        ),
+    ):
+        out = JevPlatform._truncate_message_if_needed(p, raw)
+
+    # 关键：不能是空串，否则上层解析报 "Expecting value ... char 0"
+    assert out != ""
+    assert out == raw
+    # 且必须能被正常解析，不会抛出 ValueError
+    state, questions = JevPlatform.parse_state_and_questions(out)
+    assert "q1" in questions
+
+
+# --------------------------------------------------------------------------
 # 解析：裸控制字符容错
 # --------------------------------------------------------------------------
 

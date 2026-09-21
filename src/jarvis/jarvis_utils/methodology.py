@@ -221,14 +221,17 @@ def _select_methodologies_with_eval_model(
     """
     from jarvis.jarvis_utils.decision import decide_choice
 
-    # 候选 ID 直接使用标题，描述中附带可用工具信息以提升判断质量
-    candidates = {
-        title: f"{title}\n可用工具：{prompt}" if prompt else title
-        for title in methodology_titles
-    }
+    # 候选描述只保留标题本身：可用工具列表放在 state 里（只出现一次），
+    # 若复制进每个候选，110 个候选会把工具列表重复 110 遍，导致 payload
+    # 膨胀 10 倍以上并触发服务端 max_tokens_exceeded。
+    candidates = {title: title for title in methodology_titles}
+    # 把用户任务与可用工具合并为一次性的评估状态
+    task_desc = user_input
+    if prompt:
+        task_desc = f"{user_input}\n\n可用工具：\n{prompt}"
 
     return decide_choice(
-        user_input,
+        task_desc,
         candidates,
         fallback,
         max_select=3,

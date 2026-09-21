@@ -187,6 +187,23 @@ class JevPlatform(BasePlatform):
         """
         try:
             remaining_tokens = self.get_remaining_token_count()
+
+            # 剩余 token 不足时先尝试裁剪历史消息腾出空间（与基类行为一致）。
+            # Jev 无对话上下文，trim_messages 会清空非系统消息，通常能立刻腾出空间。
+            if remaining_tokens <= 0:
+                PrettyOutput.auto_print("⚠️ 警告：剩余token为0，尝试裁剪历史消息...")
+                if self.trim_messages():
+                    remaining_tokens = self.get_remaining_token_count()
+                    PrettyOutput.auto_print(
+                        f"✅ 裁剪成功，当前剩余token: {remaining_tokens}"
+                    )
+                if remaining_tokens <= 0:
+                    # 裁剪失败或裁剪后仍无空间：无法安全截断 JSON 协议消息，
+                    # 返回原消息交由上层处理（返回空串会让上层解析报
+                    # "Expecting value: line 1 column 1"，反而掩盖真实原因）。
+                    PrettyOutput.auto_print("⚠️ 警告：裁剪后仍无剩余token，按原消息发送")
+                    return message
+
             message_tokens = get_context_token_count(message)
             if message_tokens <= remaining_tokens:
                 return message
@@ -218,8 +235,10 @@ class JevPlatform(BasePlatform):
             overhead = len(json.dumps({**payload, "state": ""}, ensure_ascii=False))
             budget = max(0, target_chars - overhead - 64)  # 预留截断提示空间
             if budget <= 0:
-                PrettyOutput.auto_print("⚠️ 警告：剩余token不足，无法发送消息")
-                return ""
+                # 固定开销已占满额度：截断 state 也无法让消息合法变短，
+                # 返回原消息交由上层处理，避免产出语义为空的空串。
+                PrettyOutput.auto_print("⚠️ 警告：剩余token不足，按原消息发送")
+                return message
 
             note = "\n\n... (消息过长，已截断以避免超出上下文限制)"
             payload["state"] = state[:budget] + note
