@@ -1,0 +1,8 @@
+{
+  "id": "20260921_073443_693493",
+  "type": "project_long_term",
+  "tags": ["methodology", "jev", "decide_choice", "决策"],
+  "content": "Jarvis 方法论加载（src/jarvis/jarvis_utils/methodology.py load_methodology）已改为 JEV 优先 + Normal 兜底：\n- 新增 _select_methodologies_with_eval_model(user_input, prompt, methodology_titles, fallback)：候选 ID=方法论标题，描述附带可用工具，走 decision.decide_choice(max_select=3) 返回标题列表；未配置/失败时返回 fallback() 的值（此处 fallback=lambda:None → 返回 None）。\n- 新增 _select_methodologies_with_normal_model(platform, methodologies, methodology_titles, prompt, user_input)：原 <NUM> 序号提示词+解析逻辑抽出，返回 List[Tuple[str,str]]，未选中返回 []。\n- 主流程：picked_titles 非空则用 dict(methodologies) 按标题回取；否则调 normal 兜底。后续 token 限制与生成步骤逻辑不变（仍用 normal 平台）。\n- 关键点：decide_choice 返回类型随路径不同（JEV 成功=候选ID列表；失败=fallback 返回值），故 fallback 必须返回 None 以便区分。\n- 测试：tests/jarvis_utils/test_methodology.py 共 8 用例，覆盖 normal 解析与 eval 优先/回退。全量 tests/jarvis_utils/ 341 passed。",
+  "created_at": "2026-09-21T07:34:43.693522",
+  "updated_at": "2026-09-21T07:34:43.693528"
+}
