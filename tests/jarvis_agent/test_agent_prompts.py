@@ -35,6 +35,14 @@ def test_classify_returns_recommended_temperature(monkeypatch):
 
     from jarvis.jarvis_agent.agent_prompts import classify_user_request
     from jarvis.jarvis_platform.registry import PlatformRegistry
+    from jarvis.jarvis_utils import decision as decision_module
+
+    # 隔离结构化评估模型（eval_llm）：本用例只验证文本模型路径的温度档解析。
+    # 若用户真实配置中启用了 eval_llm，classify_user_request 会优先走评估模型路径，
+    # 从而绕过此处 monkeypatch 的 cheap 平台，导致断言与预期不符。
+    monkeypatch.setattr(
+        decision_module, "get_eval_platform", lambda: None
+    )
 
     class _FakePlatform:
         def __init__(self, text):
