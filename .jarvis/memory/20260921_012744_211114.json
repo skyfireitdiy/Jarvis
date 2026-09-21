@@ -1,0 +1,14 @@
+{
+  "id": "20260921_012744_211114",
+  "type": "project_long_term",
+  "tags": [
+    "nginx",
+    "jvs-ai.cn",
+    "部署",
+    "前端",
+    "架构"
+  ],
+  "content": "Jarvis 本机 nginx 部署拓扑（配置 /etc/nginx/sites-available/jvs-ai.cn）：80 -> 301 跳转 https://jvs-ai.cn；443 ssl -> 反代 127.0.0.1:5173（Jarvis 前端，vite）；4443 ssl -> 反代 127.0.0.1:8000（Gateway/jwg，FastAPI+uvicorn）。均支持 WebSocket（map $http_upgrade $connection_upgrade）。证书 /etc/nginx/ssl/full_chain.pem|private.key，CN=jvs-ai.cn。前端由 `jarvis-service run --gateway-host 127.0.0.1 --gateway-port 8000 --frontend-host 127.0.0.1 --frontend-port 5173` 统一拉起。",
+  "created_at": "2026-09-21T01:27:44.211145",
+  "updated_at": "2026-09-21T01:27:44.211151"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260921_012744_212616",
+  "type": "project_long_term",
+  "tags": [
+    "前端",
+    "vite",
+    "构建",
+    "故障"
+  ],
+  "content": "Jarvis 前端（src/jarvis/jarvis_service/frontend）以 `vite preview` 模式运行在 5173，该模式只服务 dist/ 构建产物。若未执行 `npm run build` 生成 dist/，则所有路径返回空 404（Content-Length: 0），nginx 会如实透传 404。排查要点：nginx 正常但反代 404 时，先直连上游端口确认，并检查 dist/ 是否存在。每次前端代码改动后必须重新 build，否则线上仍是旧版本。",
+  "created_at": "2026-09-21T01:27:44.212641",
+  "updated_at": "2026-09-21T01:27:44.212646"
+}
