@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from jarvis.jarvis_utils.methodology import (
     _get_methodology_directory,
+    _select_methodologies_with_eval_model,
     _select_methodologies_with_normal_model,
     load_methodology,
 )
@@ -102,6 +103,69 @@ class TestSelectMethodologiesWithNormalModel:
             user_input="test",
         )
         assert result == [("A", "content-a")]
+
+
+class TestSelectMethodologiesWithEvalModel:
+    """测试 _select_methodologies_with_eval_model 的候选构造。
+
+    关键回归点：可用工具列表必须只出现在 state 中一次，不能复制进每个候选，
+    否则候选数量多时会令 payload 膨胀数十倍并触发服务端 max_tokens_exceeded。
+    """
+
+    def _capture(self, prompt: str, titles):
+        """调用函数并捕获传给 decide_choice 的 (task, candidates)"""
+        captured = {}
+
+        def fake_decide_choice(task, candidates, fallback, *, max_select=3):
+            captured["task"] = task
+            captured["candidates"] = candidates
+            captured["max_select"] = max_select
+            return ["A"]
+
+        with patch(
+            "jarvis.jarvis_utils.decision.decide_choice", side_effect=fake_decide_choice
+        ):
+            result = _select_methodologies_with_eval_model(
+                "用户需求", prompt, titles, lambda: None
+            )
+        return result, captured
+
+    def test_tool_list_placed_in_state_once(self):
+        """工具列表只放进 state，不复制进候选描述"""
+        titles = ["A", "B", "C"]
+        prompt = "TOOL-LIST-MARKER"
+        result, captured = self._capture(prompt, titles)
+
+        assert result == ["A"]
+        # 候选描述就是标题本身，不含工具列表
+        assert captured["candidates"] == {"A": "A", "B": "B", "C": "C"}
+        for desc in captured["candidates"].values():
+            assert prompt not in desc
+        # 工具列表出现在 state 中（仅一次）
+        assert captured["task"].count(prompt) == 1
+        assert "用户需求" in captured["task"]
+
+    def test_payload_size_stable_across_candidate_count(self):
+        """候选数量增加时，工具列表不会随之重复，payload 增长应近似线性"""
+        prompt = "X" * 1000
+        _, small = self._capture(prompt, ["A"])
+        _, large = self._capture(prompt, [f"title-{i}" for i in range(50)])
+
+        small_len = len(small["task"]) + sum(
+            len(k) + len(v) for k, v in small["candidates"].items()
+        )
+        large_len = len(large["task"]) + sum(
+            len(k) + len(v) for k, v in large["candidates"].items()
+        )
+        # 若工具列表被复制进候选，50 个候选会额外增加约 50*1000 字符
+        extra = large_len - small_len
+        assert extra < 5000, f"候选增长引入的额外开销过大: {extra}"
+
+    def test_empty_prompt_keeps_task_clean(self):
+        """无工具列表时 state 只含用户输入，不追加多余内容"""
+        _, captured = self._capture("", ["A"])
+        assert captured["task"] == "用户需求"
+        assert captured["candidates"] == {"A": "A"}
 
 
 class TestLoadMethodologyEvalFirst:
