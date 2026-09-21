@@ -375,6 +375,8 @@ llm_groups:
   default:
     normal_llm: gpt-5
     fast_llm: gpt-5-mini
+    # 可选：结构化评估模型（如 Jev），用于方法论/规则等候选选择场景
+    eval_llm: jev
   code:
     normal_llm: claude-sonnet
 
@@ -397,7 +399,15 @@ llms:
     max_input_token_count: 128000
     llm_config:
       anthropic_api_key: "your-anthropic-key-here"
+  jev:
+    platform: jev
+    model: jev-latest
+    max_input_token_count: 128000
+    llm_config:
+      jev_api_key: "your-jev-key-here"
 ```
+
+> **关于 `eval_llm`（可选）**：为模型组配置 `eval_llm` 后，方法论加载、规则选择等"从候选中挑相关项"的场景会优先用该结构化评估模型（如 Jev）打分选择；未配置或调用失败时自动回退到 `normal_llm` 的常规流程，不影响原有行为。
 
 更多配置项见 [使用指南](docs/jarvis_book/4.使用指南.md)。
 
