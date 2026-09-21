@@ -24,7 +24,7 @@ from jarvis.jarvis_utils.config import get_central_rules_repo
 from jarvis.jarvis_utils.exception_utils import save_exception
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_rules_load_dirs
-from jarvis.jarvis_utils.decision import decide
+from jarvis.jarvis_utils.decision import decide_choice
 from jarvis.jarvis_utils.utils import daily_check_git_updates
 
 # 注入上下文的单条规则体上限：超过则截断并提示用 load_rule 补取完整文本。
@@ -1205,11 +1205,30 @@ class RulesManager:
                 finally:
                     model.set_suppress_output(True)
 
-            # 配置了结构化评估模型则用它，否则走现有 normal 流程
-            response = decide(prompt, _select_with_normal_model)
+            # 优先用结构化评估模型做候选选择：它只接受 JSON 协议，
+            # 无法消费自然语言提示词，故走 decide_choice 做协议转换。
+            # 未配置评估模型或调用失败时，decide_choice 内部会回退到现有流程。
+            picked_rules = decide_choice(
+                task_description,
+                {
+                    rule_name: desc_by_name.get(rule_name, "（无描述）")
+                    for rule_name in top_rules
+                },
+                lambda: None,
+                max_select=MAX_AUTO_RULES,
+            )
+            if picked_rules:
+                PrettyOutput.auto_print(
+                    f"✅ 结构化评估模型选出 {len(picked_rules)} 个规则"
+                )
+                return picked_rules
+
+            # 结构化评估模型未选出候选（未配置/失败/无匹配）时，走现有 normal 流程。
+            # 注意：这里不能再用 decide()，因为该 prompt 是自然语言协议，
+            # 结构化评估模型无法消费，只会白白失败一次。
+            response = _select_with_normal_model()
             if not response:
                 return None
-
             # 从响应中提取<NUM>标签内的内容
             import re
 
@@ -1574,6 +1593,8 @@ data parsing
 关键词："""
 
             # 调用LLM生成关键词（使用cheap模型以降低成本）
+            # 注：此处是"生成"而非"从候选中选择"，结构化评估模型无法胜任，
+            # 故不接入 decide/decide_choice，保持原有 cheap 模型流程。
             registry = PlatformRegistry.get_global_platform_registry()
             model = registry.get_cheap_platform()
             if model is None:

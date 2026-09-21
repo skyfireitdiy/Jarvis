@@ -45,6 +45,7 @@ from jarvis.jarvis_agent.rules_manager import RulesManager
 # 本地库导入
 # jarvis_agent 相关
 from jarvis.jarvis_utils.config import is_enable_quick_mode
+from jarvis.jarvis_utils.decision import decide_choice
 from jarvis.jarvis_utils.exception_utils import save_exception
 from jarvis.jarvis_utils.config import is_enable_request_classification
 from jarvis.jarvis_agent.prompt_builder import build_action_prompt
@@ -3812,8 +3813,10 @@ class Agent:
         # 为工具选择构建提示（仅包含用户自定义工具）
         tools_prompt_part = ""
         tool_names = []
+        tool_desc_by_name = {}
         for i, tool in enumerate(custom_tools, 1):
             tool_names.append(tool["name"])
+            tool_desc_by_name[tool["name"]] = tool["description"]
             tools_prompt_part += f"{i}. {tool['name']}: {tool['description']}\n"
 
         selection_prompt = f"""
@@ -3850,16 +3853,37 @@ class Agent:
 
         # 使用临时模型实例调用模型，以避免污染历史记录
         try:
-            temp_model = self._create_temp_model("你是辅助筛选工具的助手。")
-            selected_tools_str = temp_model.chat_until_success(selection_prompt)
+            def _select_with_normal_model() -> str:
+                """现有流程：用临时模型筛选工具编号。"""
+                temp_model = self._create_temp_model("你是辅助筛选工具的助手。")
+                return temp_model.chat_until_success(selection_prompt)
 
-            # 解析响应并筛选工具
-            selected_indices = [
-                int(i.strip()) for i in re.findall(r"\d+", selected_tools_str)
-            ]
-            selected_tool_names = [
-                tool_names[i - 1] for i in selected_indices if 0 < i <= len(tool_names)
-            ]
+            # 优先用结构化评估模型做候选选择：它只接受 JSON 协议，
+            # 无法消费自然语言提示词，故走 decide_choice 做协议转换。
+            # 未配置评估模型或调用失败时，decide_choice 内部会回退到 lambda: None。
+            picked_tools = decide_choice(
+                task,
+                {name: desc for name, desc in tool_desc_by_name.items()},
+                lambda: None,
+                max_select=len(tool_names),
+            )
+            if picked_tools:
+                selected_tool_names = sorted(set(picked_tools))
+            else:
+                # 结构化评估模型未选出工具（未配置/失败/无匹配）时，走现有流程。
+                # 注意：这里不能再用 decide()，因为 selection_prompt 是自然语言协议，
+                # 结构化评估模型无法消费，只会白白失败一次。
+                selected_tools_str = _select_with_normal_model()
+
+                # 解析响应并筛选工具
+                selected_indices = [
+                    int(i.strip()) for i in re.findall(r"\d+", selected_tools_str)
+                ]
+                selected_tool_names = [
+                    tool_names[i - 1]
+                    for i in selected_indices
+                    if 0 < i <= len(tool_names)
+                ]
 
             if selected_tool_names:
                 # 移除重复项
