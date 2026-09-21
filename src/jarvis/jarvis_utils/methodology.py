@@ -196,6 +196,151 @@ def _load_all_methodologies() -> List[Tuple[str, str]]:
     return all_methodologies
 
 
+def _select_methodologies_with_eval_model(
+    user_input: str,
+    prompt: str,
+    methodology_titles: List[str],
+    fallback: Any,
+) -> Optional[List[str]]:
+    """
+    优先用结构化评估模型（如 Jev）选择相关方法论标题。
+
+    结构化评估模型只接受 JSON 协议、返回结构化答案，无法消费自然语言提示词，
+    因此通过 decide_choice 把"候选标题 + 用户需求"翻译成结构化问题，再把答案
+    翻译回候选标题列表。未配置评估模型或调用失败时，decide_choice 内部会执行
+    fallback 并返回其返回值（此处 fallback 返回 None）。
+
+    参数：
+        user_input: 用户输入文本，用于描述任务
+        prompt: 可用工具内容，作为候选说明的一部分
+        methodology_titles: 所有方法论标题列表
+        fallback: 未配置评估模型或调用失败时执行的现有流程，返回 None
+
+    返回：
+        Optional[List[str]]: 选中的方法论标题列表；评估模型不可用时返回 None。
+    """
+    from jarvis.jarvis_utils.decision import decide_choice
+
+    # 候选 ID 直接使用标题，描述中附带可用工具信息以提升判断质量
+    candidates = {
+        title: f"{title}\n可用工具：{prompt}" if prompt else title
+        for title in methodology_titles
+    }
+
+    return decide_choice(
+        user_input,
+        candidates,
+        fallback,
+        max_select=3,
+    )
+
+
+def _select_methodologies_with_normal_model(
+    platform: Any,
+    methodologies: List[Tuple[str, str]],
+    methodology_titles: List[str],
+    prompt: str,
+    user_input: str,
+) -> List[Tuple[str, str]]:
+    """
+    现有流程：用 normal 模型选择方法论序号并解析。
+
+    参数：
+        platform: normal 平台实例
+        methodologies: 所有方法论列表，每个元素为(问题类型, 方法论内容)元组
+        methodology_titles: 所有方法论标题列表
+        prompt: 可用工具内容
+        user_input: 用户输入文本
+
+    返回：
+        List[Tuple[str, str]]: 选中的方法论列表，未选中时返回空列表。
+    """
+    # 让大模型选择相关性高的方法论
+    methodology_titles_text = "\n".join(
+        [f"{i}. {title}" for i, title in enumerate(methodology_titles, 1)]
+    )
+
+    selection_prompt = f"""以下是所有可用的方法论标题：
+
+<methodology_titles>
+{methodology_titles_text}
+</methodology_titles>
+
+<available_tools>
+{prompt}
+</available_tools>
+
+<user_requirement>
+{user_input}
+</user_requirement>
+
+请分析用户的需求，从上述方法论中选择与需求相关性较高的方法论（可以选择多个）。
+
+请严格按以下格式返回序号：
+<NUM>序号1,序号2,序号3</NUM>
+
+例如：<NUM>1,3,5</NUM>
+
+如果没有相关的方法论，请返回：<NUM>none</NUM>
+
+切记：只返回<NUM>标签内的内容，不要有任何其他输出。
+"""
+
+    response = platform.chat_until_success(selection_prompt).strip()
+
+    # 重置平台，恢复输出
+    platform.reset()
+    platform.set_suppress_output(False)
+
+    # 从响应中提取序号 - 支持多种格式，包括<NUM>标签和直接数字
+    import re
+
+    selected_indices_str = ""
+
+    # 首先尝试提取<NUM>标签内的内容
+    num_match = re.search(r"<NUM>(.*?)</NUM>", response, re.DOTALL)
+    if num_match:
+        selected_indices_str = num_match.group(1).strip()
+
+    # 如果没有找到<NUM>标签，或者内容为空，尝试从整个响应中提取数字
+    if not selected_indices_str:
+        # 查找所有数字（支持逗号或空格分隔，如 "1,2,3" 或 "1 2 3"）
+        # 先尝试匹配 "1,2,3" 或 "1, 2, 3" 格式
+        number_pattern = r"(?:^|\s|,)(\d+)(?:\s*,\s*|\s+|\s*$)"
+        numbers = re.findall(number_pattern, response)
+        if numbers:
+            selected_indices_str = ",".join(numbers)
+        else:
+            # 如果上面的模式没找到，尝试更宽松的匹配：直接找所有数字
+            all_numbers = re.findall(r"\d+", response)
+            # 过滤掉可能是年份等的大数字（假设方法论数量不会超过1000）
+            valid_numbers = [n for n in all_numbers if int(n) <= len(methodologies)]
+            if valid_numbers:
+                selected_indices_str = ",".join(valid_numbers)
+
+    if selected_indices_str.lower() == "none":
+        PrettyOutput.auto_print("无历史方法论可参")
+        return []
+
+    # 解析选择的序号
+    selected_methodologies: List[Tuple[str, str]] = []
+    try:
+        if selected_indices_str:
+            indices = [
+                int(idx.strip())
+                for idx in selected_indices_str.split(",")
+                if idx.strip().isdigit()
+            ]
+            for idx in indices:
+                if 1 <= idx <= len(methodologies):
+                    selected_methodologies.append(methodologies[idx - 1])
+    except Exception:
+        # 如果解析失败，返回空结果
+        return []
+
+    return selected_methodologies
+
+
 def load_methodology(
     user_input: str,
     tool_registery: Optional[Any] = None,
@@ -234,88 +379,34 @@ def load_methodology(
         # 步骤1：获取所有方法论的标题
         methodology_titles = [title for title, _ in methodologies]
 
-        # 步骤2：让大模型选择相关性高的方法论
-        methodology_titles_text = "\n".join(
-            [f"{i}. {title}" for i, title in enumerate(methodology_titles, 1)]
+        # 步骤2：选择相关性高的方法论。
+        # 优先用结构化评估模型（如 Jev）做候选选择：它只接受 JSON 协议，
+        # 无法消费自然语言提示词，故走 decide_choice 做协议转换。
+        # 未配置评估模型或调用失败时，decide_choice 内部会回退到现有流程。
+        picked_titles = _select_methodologies_with_eval_model(
+            user_input=user_input,
+            prompt=prompt,
+            methodology_titles=methodology_titles,
+            fallback=lambda: None,
         )
 
-        selection_prompt = f"""以下是所有可用的方法论标题：
-
-<methodology_titles>
-{methodology_titles_text}
-</methodology_titles>
-
-<available_tools>
-{prompt}
-</available_tools>
-
-<user_requirement>
-{user_input}
-</user_requirement>
-
-请分析用户的需求，从上述方法论中选择与需求相关性较高的方法论（可以选择多个）。
-
-请严格按以下格式返回序号：
-<NUM>序号1,序号2,序号3</NUM>
-
-例如：<NUM>1,3,5</NUM>
-
-如果没有相关的方法论，请返回：<NUM>none</NUM>
-
-切记：只返回<NUM>标签内的内容，不要有任何其他输出。
-"""
-
-        response = platform.chat_until_success(selection_prompt).strip()
-
-        # 重置平台，恢复输出
-        platform.reset()
-        platform.set_suppress_output(False)
-
-        # 从响应中提取序号 - 支持多种格式，包括<NUM>标签和直接数字
-        import re
-
-        selected_indices_str = ""
-
-        # 首先尝试提取<NUM>标签内的内容
-        num_match = re.search(r"<NUM>(.*?)</NUM>", response, re.DOTALL)
-        if num_match:
-            selected_indices_str = num_match.group(1).strip()
-
-        # 如果没有找到<NUM>标签，或者内容为空，尝试从整个响应中提取数字
-        if not selected_indices_str:
-            # 查找所有数字（支持逗号或空格分隔，如 "1,2,3" 或 "1 2 3"）
-            # 先尝试匹配 "1,2,3" 或 "1, 2, 3" 格式
-            number_pattern = r"(?:^|\s|,)(\d+)(?:\s*,\s*|\s+|\s*$)"
-            numbers = re.findall(number_pattern, response)
-            if numbers:
-                selected_indices_str = ",".join(numbers)
-            else:
-                # 如果上面的模式没找到，尝试更宽松的匹配：直接找所有数字
-                all_numbers = re.findall(r"\d+", response)
-                # 过滤掉可能是年份等的大数字（假设方法论数量不会超过1000）
-                valid_numbers = [n for n in all_numbers if int(n) <= len(methodologies)]
-                if valid_numbers:
-                    selected_indices_str = ",".join(valid_numbers)
-
-        if selected_indices_str.lower() == "none":
-            PrettyOutput.auto_print("无历史方法论可参")
-            return "⚠️ 无历史方法论可参"
-
-        # 解析选择的序号
-        selected_methodologies = []
-        try:
-            if selected_indices_str:
-                indices = [
-                    int(idx.strip())
-                    for idx in selected_indices_str.split(",")
-                    if idx.strip().isdigit()
-                ]
-                for idx in indices:
-                    if 1 <= idx <= len(methodologies):
-                        selected_methodologies.append(methodologies[idx - 1])
-        except Exception:
-            # 如果解析失败，返回空结果
-            return "无历史方法论可参"
+        if picked_titles:
+            # 结构化评估模型返回的是标题列表，按标题回取方法论内容
+            title_to_methodology = dict(methodologies)
+            selected_methodologies = [
+                (title, title_to_methodology[title])
+                for title in picked_titles
+                if title in title_to_methodology
+            ]
+        else:
+            # 结构化评估模型未选出候选（未配置/失败/无匹配）时，走现有 normal 流程
+            selected_methodologies = _select_methodologies_with_normal_model(
+                platform=platform,
+                methodologies=methodologies,
+                methodology_titles=methodology_titles,
+                prompt=prompt,
+                user_input=user_input,
+            )
 
         if not selected_methodologies:
             return "无历史方法论可参"
