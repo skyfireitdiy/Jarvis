@@ -225,8 +225,26 @@ def classify_user_request(
                 text_parts.append(block.get("text", ""))
         user_input = "\n".join(text_parts) if text_parts else "[多模态内容]"
 
+    # 优先用结构化评估模型（eval_llm，如 Jev）做分类：它只接受 JSON 协议、
+    # 返回结构化答案，无法消费自然语言提示词，故走专用协议转换；
+    # 未配置评估模型或调用失败时，回退到 cheap/normal 文本模型流程。
+    eval_result = _classify_with_eval_model(
+        user_input,
+        scenario_subdir,
+        classification_context,
+        difficulty_descriptions,
+        temperature_descriptions,
+        temperature_map,
+    )
+    if eval_result is not None:
+        scenario, difficulty, temperature = eval_result
+        _print_classification_result(
+            scenario_subdir, scenario, difficulty, temperature, default_scenario_name
+        )
+        return scenario, difficulty, temperature
+
     try:
-        # 分类/路由属低风险判断，优先使用 cheap 档以节省成本；未配置 cheap 时回退 normal
+        # 未配置 eval 时：优先使用 cheap 档以节省成本；未配置 cheap 时回退 normal
         registry = PlatformRegistry()
         try:
             platform = registry.get_cheap_platform()
@@ -313,20 +331,202 @@ temperature: <档位>
                 if temperature_value in temperature_map:
                     temperature = temperature_map[temperature_value]
 
-        difficulty_display = {"easy": "简单", "medium": "中等", "hard": "困难"}.get(
-            difficulty, difficulty
-        )
-        temperature_display = {0.5: "偏精确", 0.7: "均衡", 1.0: "偏创意"}.get(
-            temperature, temperature
-        )
-        PrettyOutput.auto_print(
-            f"📋 需求分类结果: {current_scenario_types.get(scenario, default_scenario_name)} ({scenario}) | 难度: {difficulty_display} ({difficulty}) | 温度: {temperature_display} ({temperature})"
+        _print_classification_result(
+            scenario_subdir, scenario, difficulty, temperature, default_scenario_name
         )
         return scenario, difficulty, temperature
 
     except Exception:
         PrettyOutput.auto_print("⚠")
         return "default", "medium", 0.7
+
+
+def _print_classification_result(
+    scenario_subdir: str,
+    scenario: str,
+    difficulty: str,
+    temperature: float,
+    default_scenario_name: str,
+) -> None:
+    """打印需求分类结果（场景/难度/温度）。
+
+    参数:
+        scenario_subdir: 场景子目录名
+        scenario: 场景类型 ID
+        difficulty: 难度等级（easy/medium/hard）
+        temperature: 采样温度数值
+        default_scenario_name: 默认场景名称（用于显示）
+    """
+    try:
+        current_scenario_types = _get_scenario_types(scenario_subdir)
+    except Exception:
+        current_scenario_types = {}
+    difficulty_display = {"easy": "简单", "medium": "中等", "hard": "困难"}.get(
+        difficulty, difficulty
+    )
+    temperature_display = {0.5: "偏精确", 0.7: "均衡", 1.0: "偏创意"}.get(
+        temperature, temperature
+    )
+    PrettyOutput.auto_print(
+        f"📋 需求分类结果: {current_scenario_types.get(scenario, default_scenario_name)} ({scenario}) | 难度: {difficulty_display} ({difficulty}) | 温度: {temperature_display} ({temperature})"
+    )
+
+
+def _classify_with_eval_model(
+    user_input: str,
+    scenario_subdir: str,
+    classification_context: str,
+    difficulty_descriptions: Dict[str, str],
+    temperature_descriptions: Dict[str, str],
+    temperature_map: Dict[str, float],
+) -> Optional[Tuple[str, str, float]]:
+    """用结构化评估模型（eval_llm，如 Jev）对用户需求分类。
+
+    结构化评估模型只接受 JSON 协议（state + questions），无法消费自然语言
+    提示词，故这里把"场景/难度/温度"翻译成三个 choice 问题，再解析其返回的
+    可读答案文本。未配置评估模型、调用失败或解析失败时返回 None，由调用方
+    回退到文本模型流程。
+
+    参数:
+        user_input: 用户输入的需求描述（已转为纯文本）
+        scenario_subdir: 场景子目录名
+        classification_context: 分类上下文描述
+        difficulty_descriptions: 难度等级描述字典
+        temperature_descriptions: 温度档位描述字典
+        temperature_map: 温度档位 → 数值映射
+
+    返回:
+        Optional[Tuple[str, str, float]]: (场景类型, 难度等级, 采样温度)，
+        未配置评估模型或失败时返回 None
+    """
+    from jarvis.jarvis_utils.decision import get_eval_platform
+
+    platform = get_eval_platform()
+    if platform is None:
+        return None
+
+    try:
+        scenarios = _load_scenario_types(scenario_subdir)
+        current_scenario_types = {
+            scenario_id: scenario_info["name"]
+            for scenario_id, scenario_info in scenarios.items()
+        }
+
+        # 场景候选：以 scenario_id 为 criteria 键，名称+描述作为说明
+        scenario_criteria: Dict[str, str] = {}
+        for scenario_id, scenario_info in scenarios.items():
+            scenario_criteria[scenario_id] = (
+                f"{scenario_info['name']}：{scenario_info['description']}"
+            )
+
+        # 难度候选：easy/medium/hard
+        difficulty_criteria = {
+            k: f"{'简单' if k == 'easy' else '中等' if k == 'medium' else '困难'}：{v}"
+            for k, v in difficulty_descriptions.items()
+        }
+
+        # 温度档位候选：low/medium/high
+        temperature_criteria = {
+            k: f"{'偏精确' if k == 'low' else '均衡' if k == 'medium' else '偏创意'}：{v}"
+            for k, v in temperature_descriptions.items()
+        }
+
+        payload = {
+            "state": f"用户所请：\n{user_input}",
+            "questions": {
+                "scenario": {
+                    "type": "choice",
+                    "instructions": (
+                        f"判断用户所请属于哪种{classification_context}。"
+                        "若难以确定，选择 default。"
+                    ),
+                    "criteria": scenario_criteria,
+                },
+                "difficulty": {
+                    "type": "choice",
+                    "instructions": "评估该任务的难度等级。若难以确定，选择 medium。",
+                    "criteria": difficulty_criteria,
+                },
+                "temperature": {
+                    "type": "choice",
+                    "instructions": (
+                        "依据任务性质（需精确还是需创意，而非难度）"
+                        "选择所需采样温度档。若难以确定，选择 medium。"
+                    ),
+                    "criteria": temperature_criteria,
+                },
+            },
+        }
+
+        import json
+
+        platform.set_suppress_output(True)
+        try:
+            response = platform.chat_until_success(
+                json.dumps(payload, ensure_ascii=False)
+            )
+        finally:
+            try:
+                platform.delete_chat()
+            except Exception:
+                pass
+
+        if not response:
+            PrettyOutput.auto_print("⚠️ 结构化评估模型返回为空，回退文本模型分类")
+            return None
+
+        answers = _parse_choice_answers(response)
+        if not answers:
+            PrettyOutput.auto_print("⚠️ 未能解析结构化评估结果，回退文本模型分类")
+            return None
+
+        scenario = "default"
+        scenario_value = answers.get("scenario", "")
+        for scenario_type in current_scenario_types.keys():
+            if scenario_type in scenario_value or scenario_value == scenario_type:
+                scenario = scenario_type
+                break
+
+        difficulty = "medium"
+        difficulty_value = answers.get("difficulty", "")
+        if difficulty_value in ("easy", "medium", "hard"):
+            difficulty = difficulty_value
+
+        temperature = 0.7
+        temperature_value = answers.get("temperature", "")
+        if temperature_value in temperature_map:
+            temperature = temperature_map[temperature_value]
+
+        return scenario, difficulty, temperature
+    except Exception as e:
+        PrettyOutput.auto_print(f"⚠️ 结构化评估模型分类失败，回退文本模型分类: {e}")
+        return None
+
+
+def _parse_choice_answers(response: str) -> Dict[str, str]:
+    """从结构化评估模型的可读答案文本中解析各 choice 问题的取值。
+
+    答案文本形如：
+        - scenario [choice]: 通用开发
+        - difficulty [choice]: medium
+        - temperature [choice]: low
+
+    参数:
+        response: 结构化评估模型返回的可读答案文本
+
+    返回:
+        Dict[str, str]: {问题ID: 选项值}，解析失败时返回空字典
+    """
+    import re
+
+    pattern = re.compile(r"^-\s*(.+?)\s*\[choice\]:\s*(.+?)\s*$")
+    answers: Dict[str, str] = {}
+    for line in response.splitlines():
+        match = pattern.match(line.strip())
+        if not match:
+            continue
+        answers[match.group(1)] = match.group(2)
+    return answers
 
 
 def _front_matter_dict(
