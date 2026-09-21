@@ -132,9 +132,9 @@ export const ACTIONS = [
     id: "current-rename",
     label: "重命名",
     shortcut: "F2",
-    // F2 在大厅选中节点时让位给 node-rename（见 App.vue 的 F2 分支）
+    // F2 优先重命名当前 Agent；无当前 Agent 时才让位给 node-rename（见 App.vue 的 F2 分支）
     shortcutScope: "global",
-    condition: "需选中当前 Agent；大厅中选中节点时优先重命名该节点",
+    condition: "需选中当前 Agent；与节点重命名共用 F2 时以 Agent 优先",
     en: "Rename",
     group: "当前 Agent",
     icon: "✏",
@@ -651,12 +651,12 @@ export const ACTIONS = [
   },
   {
     // 与「当前 Agent」组 current-rename 共用 F2：两者通过 shortcutScope 区分场景，
-    // 大厅中选中节点时优先执行本动作（见 App.vue 的 F2 分支）
+    // 有当前 Agent 时优先重命名 Agent，无当前 Agent 时才执行本动作（见 App.vue 的 F2 分支）
     id: "node-rename",
     label: "重命名选中节点",
     shortcut: "F2",
     shortcutScope: "node",
-    condition: "大厅中已选中节点",
+    condition: "大厅中已选中节点；与 Agent 重命名共用 F2 时以 Agent 优先",
     en: "Rename Node",
     group: "节点",
     icon: "✏️",

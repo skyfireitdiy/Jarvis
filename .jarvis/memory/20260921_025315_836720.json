@@ -1,0 +1,8 @@
+{
+  "id": "20260921_025315_836720",
+  "type": "project_long_term",
+  "tags": ["frontend", "shortcut", "registry", "App.vue", "F2", "F12"],
+  "content": "Jarvis 前端快捷键机制（已核实）：\n1) 注册表 src/jarvis/jarvis_service/frontend/src/actions/registry.js（932行）。动作字段：id/label/en/group/icon/keywords/shortcut?/shortcutScope?/enabled?(ctx)/run(ctx)。\n2) 全仓库源码无 F12/F3-F11，仅有 F2（两处）：current-rename(registry.js:132, shortcutScope:'global') 与 node-rename(registry.js:655, shortcutScope:'node')。\n3) 同键冲突约定 findShortcutConflicts(registry.js:897-919)：同键动作必须声明互不相同的 shortcutScope，未声明视为 'global'；仅 DEV console.warn，不阻断。\n4) 全局键盘分发 handleGlobalKeydown 在 App.vue:13653-13926。无修饰键的 F 键走不到末尾 registry 统一分发（13913 要求 ctrl/meta+alt），必须像 F2 一样写独立分支。\n5) F2 分支 App.vue:13781-13794 当前语义=节点优先：先 lobby.renameActiveNode() 成功则 return，否则才重命名当前 Agent。与用户新需求『Agent 优先』方向相反。\n6) matchShortcut(App.vue:13624) 基于 event.code，支持 F[0-9]{1,2}，F12 可被识别。\n7) 节点组(node-*)快捷键用 Ctrl+Alt+Shift+X，Agent 组(current-*)用 Ctrl+Alt+X，物理键目前无实际同键冲突。",
+  "created_at": "2026-09-21T02:53:15.836752",
+  "updated_at": "2026-09-21T02:53:15.836758"
+}

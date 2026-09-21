@@ -13775,20 +13775,20 @@ function handleGlobalKeydown(event) {
   }
 
   // F2 重命名：同一物理键在不同场景下复用，按 registry 的 shortcutScope 分派
-  // - node 场景：大厅中选中节点时重命名该节点（优先级高于 Agent）
-  // - global 场景：重命名当前 Agent
+  // - global 场景：重命名当前 Agent（优先级高于节点）
+  // - node 场景：无当前 Agent 时，大厅中选中节点则重命名该节点
   // 已打开 Agent 重命名弹窗时不重复触发
   if (event.key === 'F2') {
     if (showRenameAgentModal.value) return
-    const lobby = petLobbyRef.value
-    if (lobby && typeof lobby.renameActiveNode === 'function' && lobby.renameActiveNode()) {
-      event.preventDefault()
-      return
-    }
     const agent = getCurrentAgentOrNull()
     if (agent) {
       event.preventDefault()
       renameAgent(agent)
+      return
+    }
+    const lobby = petLobbyRef.value
+    if (lobby && typeof lobby.renameActiveNode === 'function' && lobby.renameActiveNode()) {
+      event.preventDefault()
     }
     return
   }
