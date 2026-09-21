@@ -666,6 +666,12 @@ def get_llm_config(platform_type: str = "normal") -> Dict[str, Any]:
         if not llm_config:
             llm_config = dict(config.get("llm_config", {}))
         return llm_config
+    elif platform_type == "eval":
+        llm_config = dict(config.get("eval_llm_config", {}))
+        # 如果 eval_llm_config 为空，回退到 normal_llm_config（与 get_eval_platform_name 的回退逻辑一致）
+        if not llm_config:
+            llm_config = dict(config.get("llm_config", {}))
+        return llm_config
     else:
         return dict(config.get("llm_config", {}))
 
