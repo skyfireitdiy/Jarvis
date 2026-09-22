@@ -238,6 +238,7 @@
         <div class="lobby-pet-shadow"></div>
       </div>
       <div class="lobby-pet-name"><span class="lobby-pet-type">{{ pet.agentType === 'code_agent' ? '💻' : '🤖' }}</span>{{ pet.name }}</div>
+      <div v-if="petWorkingDir(pet)" class="lobby-pet-dir" :title="petWorkingDir(pet)">{{ petWorkingDir(pet) }}</div>
       <div class="lobby-pet-status" :class="pet.statusClass"></div>
 
       <!-- 输出气泡 + 输入/确认控件：堆叠在宠物下方 -->
@@ -549,6 +550,8 @@ const props = defineProps({
   getLatestOutput: { type: Function, default: null },
   historyNav: { type: Function, default: null },
   getNodeDisplayName: { type: Function, default: null },
+  // 工作目录展示：由父组件注入以复用「隐藏工作目录」偏好（开启时返回占位符）
+  getWorkingDirDisplay: { type: Function, default: null },
   // 右键菜单动作（复用命令面板「当前 Agent」组），由父组件按当前 Agent 计算后传入
   contextActions: { type: Array, default: () => [] },
   // 节点右键菜单动作，由父组件传入（便于后续扩展更多节点功能）
@@ -1034,6 +1037,14 @@ function focusPetInput(agentId, force = false) {
   nextTick(tryFocus)
 }
 
+// 宠物名字下方展示的工作目录：复用父组件的「隐藏工作目录」偏好（未注入时回退原始目录）
+function petWorkingDir(pet) {
+  if (!pet) return ''
+  const dir = pet.workingDir || ''
+  if (!dir) return ''
+  return props.getWorkingDirDisplay ? props.getWorkingDirDisplay(dir) : dir
+}
+
 // 刷新某只宠物的输入态与最新输出
 function refreshPetData(pet) {
   if (!pet) return
@@ -1128,6 +1139,7 @@ function syncPets() {
         agentId,
         name: agent.name || agent.agent_id,
         agentType: agent.agent_type || 'agent',
+        workingDir: agent.working_dir || '',
         x: start.x,
         y: start.y,
         target: pickTarget(),
@@ -1156,6 +1168,7 @@ function syncPets() {
     } else {
       pet.name = agent.name || agent.agent_id
       pet.agentType = agent.agent_type || 'agent'
+      pet.workingDir = agent.working_dir || ''
     }
     const statusClass = props.getStatusClass ? props.getStatusClass(agent) : ''
     pet.statusClass = statusClass
@@ -2876,16 +2889,30 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden, openInst
   left: 50%;
   bottom: -4px;
   transform: translateX(-50%);
-  max-width: 88px;
+  /* 名字显示全称：不截断、不换行，允许向两侧溢出（居中，pointer-events: none 不挡交互） */
+  max-width: none;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   font-size: 11px;
   color: rgba(180, 220, 245, 0.85);
   text-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
   pointer-events: none;
 }
 
+/* 名字下方的工作目录：次要信息，弱化显示，截断过长路径 */
+.lobby-pet-dir {
+  position: absolute;
+  left: 50%;
+  bottom: -17px;
+  transform: translateX(-50%);
+  max-width: 160px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 9px;
+  color: rgba(150, 190, 215, 0.7);
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
 /* 类型图标：CodeAgent 💻 / 普通 Agent 🤖，与侧边栏列表保持一致 */
 .lobby-pet-type {
   margin-right: 3px;
