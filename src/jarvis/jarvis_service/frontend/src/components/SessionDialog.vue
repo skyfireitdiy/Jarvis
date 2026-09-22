@@ -5,9 +5,19 @@
         <h2>选择会话恢复</h2>
         <button class="close-btn" @click="$emit('cancel')">×</button>
       </div>
-      <div class="session-list" v-if="sessions.length > 0">
+      <div class="session-search" v-if="sessions.length > 0">
+        <input
+          v-model="query"
+          type="text"
+          placeholder="搜索会话名称…"
+          class="session-search-input"
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </div>
+      <div class="session-list" v-if="filteredSessions.length > 0">
         <div
-          v-for="session in sessions"
+          v-for="session in filteredSessions"
           :key="session.file"
           class="session-item"
           :class="{ active: selectedSession === session.file }"
@@ -18,7 +28,8 @@
         </div>
       </div>
       <div class="empty-state" v-else>
-        <p>没有可恢复的会话</p>
+        <p v-if="sessions.length > 0 && query">没有匹配「{{ query }}」的会话</p>
+        <p v-else>没有可恢复的会话</p>
       </div>
       <div class="modal-actions">
         <button class="ghost-btn" @click="$emit('cancel')">跳过</button>
@@ -31,7 +42,8 @@
 </template>
 
 <script setup>
-defineProps({
+import { computed, ref } from 'vue'
+const props = defineProps({
   visible: Boolean,
   sessions: {
     type: Array,
@@ -44,6 +56,18 @@ defineProps({
 })
 
 defineEmits(['update:visible', 'update:selectedSession', 'restore', 'cancel'])
+
+// 搜索关键词（大小写不敏感，匹配会话名称/时间戳/文件名）
+const query = ref('')
+// 按关键词过滤后的会话列表
+const filteredSessions = computed(() => {
+  const q = String(query.value || '').trim().toLowerCase()
+  if (!q) return props.sessions
+  return (props.sessions || []).filter((s) => {
+    const haystack = [s?.name, s?.timestamp, s?.file].filter(Boolean).join(' ').toLowerCase()
+    return haystack.includes(q)
+  })
+})
 </script>
 
 <style scoped>
@@ -107,6 +131,26 @@ defineEmits(['update:visible', 'update:selectedSession', 'restore', 'cancel'])
   border-radius: var(--tile-radius);
   border: none;
   margin-bottom: 20px;
+}
+
+.session-search {
+  margin-bottom: 12px;
+}
+
+.session-search-input {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--color-bg-primary);
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--tile-radius);
+  color: var(--color-text-primary);
+  font-size: 14px;
+}
+
+.session-search-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  background: var(--color-bg-primary);
 }
 
 .session-item {

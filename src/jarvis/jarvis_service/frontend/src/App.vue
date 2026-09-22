@@ -86,6 +86,9 @@
       <button class="icon-btn" @click="showSettingsModal = true; pushOverlayState()" :disabled="!socket" title="设置 (Ctrl+Alt+,)">
         ⚙
       </button>
+      <button class="icon-btn" @click="openDocs()" title="使用文档 (Ctrl+Alt+Shift+H)">
+        ❓
+      </button>
       <button class="icon-btn" v-if="auth.userInfo?.is_admin" @click="showAdminPanel = true; pushOverlayState()" :disabled="!socket" title="管理 (Ctrl+Alt+Shift+A)">
         🛡️
       </button>
@@ -5601,6 +5604,13 @@ function openTopologyOverlay() {
   showTopologyOverlay.value = true
 }
 
+// 公网使用文档站点（MkDocs 发布到 GitHub Pages）
+const DOCS_URL = 'https://skyfireitdiy.github.io/Jarvis/'
+// 打开使用文档（新标签页，不阻塞当前界面）
+function openDocs() {
+  window.open(DOCS_URL, '_blank', 'noopener')
+}
+
 // 打开命令面板时，记录"打开前"焦点所在的面板区域
 // （命令面板会抢走焦点，导致执行关闭/分离时无法从活动元素推断目标）
 let commandPaletteFocusKey = null
@@ -6149,6 +6159,7 @@ const commandPaletteCtx = computed(() => ({
   manageGroups: () => { agentSidebarRef.value?.openManageGroups?.() },
   openTopology: openTopologyOverlay,
   openSettings: () => { showSettingsModal.value = true },
+  openDocs: openDocs,
   togglePetVisibility,
   openAgentList: openAgentListPalette,
   // 重新打开新手引导（首次登录后自动展示过一次，可随时重看）
