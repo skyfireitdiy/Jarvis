@@ -270,6 +270,10 @@ const singleInputRef = ref(null)
 function canStealFocus() {
   // 有模态弹窗打开时，用户正在弹窗内操作，不抢焦点
   if (hasVisibleModalOverlay()) return false
+  // 用户正在选中文本时，不抢焦点：
+  // 选中文本不会改变 document.activeElement（通常仍是 body），
+  // 若此时聚焦输入框会清空选区，导致用户来不及复制。
+  if (hasActiveTextSelection()) return false
   const active = document.activeElement
   if (!active || active === document.body) return true
   const currentEl = props.inputMode === 'multi' ? multiInputRef.value : singleInputRef.value
@@ -296,6 +300,15 @@ function hasVisibleModalOverlay() {
     }
   }
   return false
+}
+
+// 检测页面是否存在非空的文本选区。
+// 用户选中文字时 document.activeElement 通常仍是 body，仅靠 activeElement 无法识别；
+// 此时若聚焦输入框会清空选区，导致用户来不及复制。
+function hasActiveTextSelection() {
+  const selection = window.getSelection && window.getSelection()
+  if (!selection || selection.isCollapsed) return false
+  return Boolean(selection.toString().trim())
 }
 
 // 聚焦输入框
