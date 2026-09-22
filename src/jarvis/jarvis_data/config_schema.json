@@ -280,15 +280,78 @@
       "description": "构建验证的超时时间（秒）。当构建验证执行时间超过此值时，将终止验证并报告超时。",
       "default": 30
     },
-    "enable_startup_config_selector": {
-      "type": "boolean",
-      "description": "在进入默认通用代理前，列出可用配置（agent/multi_agent/roles）供选择",
-      "default": true
-    },
     "enable_autonomous": {
       "type": "boolean",
       "description": "是否启用智能增强功能（情绪识别、歧义检测、对话管理、主动交互）",
       "default": false
+    },
+    "auto_methodology_extraction": {
+      "type": "boolean",
+      "description": "是否启用方法论自动提取。启用后任务完成时会自动从执行过程中提取方法论并保存",
+      "default": false
+    },
+    "enable_native_tool_calls": {
+      "type": "boolean",
+      "description": "是否启用原生 function calling（向支持 tools 的模型发送结构化工具定义）。对不支持 tools 的端点会自动降级为纯文本协议",
+      "default": true
+    },
+    "request_timeout": {
+      "type": "number",
+      "description": "SDK 请求超时时间（秒）。未配置或为 0 时不显式设置，使用各 SDK 默认超时",
+      "default": 0
+    },
+    "builtin_input_handler_dirs": {
+      "type": "array",
+      "description": "内置输入处理器扩展脚本目录列表，会扫描其中的 Python 文件并动态注册自定义输入处理器",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "jarvis_github_url": {
+      "type": "string",
+      "description": "Jarvis 的 GitHub 仓库地址，未配置时自动写入默认值",
+      "default": "https://github.com/skyfireitdiy/Jarvis.git"
+    },
+    "jarvis_gitee_url": {
+      "type": "string",
+      "description": "Jarvis 的 Gitee 仓库地址，未配置时自动写入默认值",
+      "default": "https://gitee.com/skyfireitdiy/Jarvis.git"
+    },
+    "lsp": {
+      "type": "object",
+      "description": "LSP（语言服务器协议）配置。用户配置会与内置默认语言配置合并，同名语言以用户配置为准",
+      "properties": {
+        "languages": {
+          "type": "object",
+          "description": "按语言名定义的 LSP 配置，会覆盖内置的同名语言配置",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "command": {
+                "type": "string",
+                "description": "语言服务器启动命令"
+              },
+              "args": {
+                "type": "array",
+                "description": "语言服务器启动参数列表",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "file_extensions": {
+                "type": "array",
+                "description": "该语言对应的文件扩展名列表",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": ["command", "args", "file_extensions"]
+          }
+        }
+      },
+      "default": {}
     },
     "gateway_auth": {
       "type": "object",
@@ -375,15 +438,14 @@
           "description": "多行输入提交快捷键列表（数组格式）",
           "items": {
             "type": "string"
-          },
-          "default": ["c-j", "c-]", "c-d"]
+          }
         },
         {
           "type": "string",
-          "description": "多行输入提交快捷键（字符串格式，逗号分隔）",
-          "default": "c-j,c-],c-d"
+          "description": "多行输入提交快捷键（字符串格式，逗号分隔）"
         }
       ],
+      "default": ["c-j", "c-]", "c-d"],
       "description": "多行输入提交快捷键。支持数组格式（如 [\"c-j\", \"c-]\", \"c-d\"]）或字符串格式（如 \"c-j,c-],c-d\"）。默认值为 Ctrl+J、Ctrl+] 和 Ctrl+D。常用快捷键：c-j (Ctrl+J), c-] (Ctrl+]), c-d (Ctrl+D), c-enter (Ctrl+Enter)"
     },
     "replace_map": {
