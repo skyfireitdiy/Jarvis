@@ -493,6 +493,7 @@
           :getLatestOutput="getLobbyLatestOutput"
           :historyNav="onLobbyHistoryNav"
           :getNodeDisplayName="getNodeDisplayName"
+          :getWorkingDirDisplay="getWorkingDirDisplay"
           :gatewayAddress="gatewayAddressDisplay"
           :connectionStatus="connectionStatus"
           :connectionLabel="connectionLabel"
