@@ -4218,6 +4218,19 @@ function closePanel(panelId) {
   }
 }
 
+// 移动端返回键：关闭当前所有可见的内嵌 Panel（含终端/聊天/编辑器），回到宠物大厅。
+// 移动端只允许一个内嵌 Panel，故直接关闭全部可见项即可。
+function closeVisiblePanelsOnMobile() {
+  if (showTerminalPanel.value && !terminalDetached.value) showTerminalPanel.value = false
+  if (showChatPanel.value && !chatDetached.value) showChatPanel.value = false
+  if (showEditorPanel.value && !editorDetached.value) closeEditorPanel()
+  for (const panel of [...panels.value]) {
+    if (!sessionDetachedPanels.value.has(panel.id)) {
+      closePanel(panel.id)
+    }
+  }
+}
+
 // 关闭 Panel 中的 Agent（保留 Panel）
 function closeAgentInPanel(panelId) {
   const panel = panels.value.find(p => p.id === panelId)
@@ -4258,6 +4271,11 @@ function activatePanel(panelId) {
 function openAgentInPanel(agent, panelId = null) {
   // 移动端不支持多 Panel，直接切换
   if (windowWidth.value <= 768) {
+    // 从大厅进入 Panel 时推送一条历史状态，使移动端返回键能关闭 Panel 回到大厅
+    // （已有可见 Panel 时不重复推送，避免返回键需要多按几次）
+    if (hasNoPanel.value) {
+      pushOverlayState()
+    }
     // 确保至少有一个 Panel 存在
     if (panels.value.length === 0) {
       createPanel()
@@ -14383,6 +14401,9 @@ onMounted(() => {
         showTerminalPanel.value = false
       } else if (showMobileMenu.value) {
         showMobileMenu.value = false
+      } else if (windowWidth.value <= 768 && !hasNoPanel.value) {
+        // 移动端：关闭当前可见的 Panel，回到宠物大厅
+        closeVisiblePanelsOnMobile()
       } else {
       }
     } else {

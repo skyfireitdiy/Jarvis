@@ -1,0 +1,8 @@
+{
+  "id": "20260922_041935_123196",
+  "type": "project_long_term",
+  "tags": ["jarvis", "frontend", "mobile", "popstate", "history", "App.vue"],
+  "content": "Jarvis 前端移动端返回键机制（App.vue）：\n- 浮层打开时调用 pushOverlayState()（仅 windowWidth<=768 时 window.history.pushState({overlay:true}) 并 historyStateCount++）；handlePopState（onMounted 内注册）在 historyStateCount>0 时自减并关闭浮层，否则放行默认后退。\n- 既有约定：只在「打开」时 push，UI 关闭时不回退 historyStateCount（侧边栏/终端均如此），因此计数可能略大于实际打开数，属既有行为。\n- 2026-09 修复 Bug「移动端在 SessionPanel 按返回键应回到大厅」：根因是打开 SessionPanel 从未 push 历史状态，且 handlePopState 无关闭 SessionPanel 的分支。修复：openAgentInPanel 移动端分支在 hasNoPanel 为真时 pushOverlayState()；handlePopState 新增分支 `windowWidth<=768 && !hasNoPanel` 时调用新增函数 closeVisiblePanelsOnMobile()（关闭终端/聊天/编辑器内嵌面板 + 所有未 detach 的 panels，回到 PetLobby）。\n- 相关：hasNoPanel = embeddedPanelCount===0 时渲染 PetLobby；closePanel(panelId) 关闭面板并激活相邻面板。",
+  "created_at": "2026-09-22T04:19:35.123239",
+  "updated_at": "2026-09-22T04:19:35.123245"
+}
