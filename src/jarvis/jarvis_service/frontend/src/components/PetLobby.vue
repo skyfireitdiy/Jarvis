@@ -1699,7 +1699,11 @@ function onPetClick(pet) {
   }
   clickTimer = setTimeout(() => {
     clickTimer = null
-    if (activePetId.value === pet.agentId && pet.active) return
+    // 已激活时再次单击：隐藏该 Agent 输出并取消激活，而不是重复展开
+    if (activePetId.value === pet.agentId && pet.active) {
+      hideActiveOutputAndClose()
+      return
+    }
     openPanel(pet)
   }, 250)
 }
