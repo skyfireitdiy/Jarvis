@@ -120,6 +120,27 @@
         </div>
       </div>
 
+      <!-- 配置备份与恢复 -->
+      <div class="form-group">
+        <label>配置备份与恢复</label>
+        <div class="form-help" style="margin-bottom:10px">将某个节点的配置导出为 JSON 备份，或从备份文件恢复（需 admin:config 权限，导入前会自动备份现有配置）。</div>
+        <div class="config-backup-row">
+          <select v-model="backupNodeId" class="node-select">
+            <option value="" disabled>选择节点</option>
+            <option v-for="node in nodeList" :key="node.value" :value="node.value">{{ node.value }}</option>
+          </select>
+          <div class="config-backup-actions">
+            <button class="ghost-btn" @click="exportConfig" :disabled="!backupNodeId || exporting">
+              {{ exporting ? '导出中…' : '导出配置' }}
+            </button>
+            <button class="ghost-btn" @click="triggerImportFile" :disabled="!backupNodeId || importing">
+              {{ importing ? '导入中…' : '导入配置' }}
+            </button>
+          </div>
+          <input ref="importFileEl" type="file" accept=".json,application/json" style="display:none" @change="onImportFileChange" />
+        </div>
+      </div>
+
 
       <div class="modal-actions">
         <button class="ghost-btn" @click="close">关闭</button>
@@ -305,6 +326,77 @@ function confirmClearHistory() {
 // 断开所有连接
 function disconnectAll() {
   emit('disconnectAll')
+}
+
+// ===== 配置备份与恢复 =====
+const backupNodeId = ref('')
+const exporting = ref(false)
+const importing = ref(false)
+const importFileEl = ref(null)
+
+// 导出配置：从选中节点拉取配置并下载为 JSON 文件
+async function exportConfig() {
+  if (!backupNodeId.value) { props.showToast('请先选择节点', 'warning'); return }
+  exporting.value = true
+  try {
+    const resp = await props.fetchWithAuth(buildApiUrl(`/api/nodes/${backupNodeId.value}/config`), { method: 'GET' })
+    const result = await resp.json()
+    if (!resp.ok || !result.success) {
+      throw new Error(result.error?.message || '获取配置失败')
+    }
+    const config = result.data?.config || {}
+    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `jarvis-config-${backupNodeId.value}-${new Date().toISOString().slice(0, 10)}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    props.showToast(`已导出 ${Object.keys(config).length} 项配置`, 'success')
+  } catch (e) {
+    props.showToast('导出失败: ' + (e.message || '未知错误'), 'error')
+  } finally {
+    exporting.value = false
+  }
+}
+
+// 触发文件选择
+function triggerImportFile() {
+  if (!backupNodeId.value) { props.showToast('请先选择节点', 'warning'); return }
+  importFileEl.value?.click()
+}
+
+// 读取导入文件并应用到选中节点
+async function onImportFileChange(event) {
+  const file = event.target.files?.[0]
+  event.target.value = '' // 允许重复选择同一文件
+  if (!file) return
+  try {
+    const text = await file.text()
+    const parsed = JSON.parse(text) // 校验 JSON 格式
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      throw new Error('配置文件必须是 JSON 对象')
+    }
+    if (!backupNodeId.value) { props.showToast('请先选择节点', 'warning'); return }
+    importing.value = true
+    const sections = Object.keys(parsed)
+    if (sections.length === 0) { props.showToast('配置文件中没有可导入的内容', 'warning'); return }
+    const resp = await props.fetchWithAuth(buildApiUrl(`/api/nodes/${backupNodeId.value}/config`), {
+      method: 'POST',
+      body: JSON.stringify({ config_sections: sections, config_data: parsed }),
+    })
+    const result = await resp.json()
+    if (!resp.ok || !result.success) {
+      throw new Error(result.error?.message || '导入配置失败')
+    }
+    props.showToast(`已导入 ${sections.length} 项配置到 ${backupNodeId.value}`, 'success')
+  } catch (e) {
+    props.showToast('导入失败: ' + (e.message || '未知错误'), 'error')
+  } finally {
+    importing.value = false
+  }
 }
 
 // 修改密码
@@ -895,5 +987,44 @@ async function changePassword() {
 /* ========== 配置同步按钮样式 ========== */
 .config-sync-button {
   margin-top: 16px;
+}
+
+/* ========== 配置备份与恢复样式 ========== */
+.config-backup-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.config-backup-row .node-select {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--color-bg-primary);
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--tile-radius);
+  color: var(--color-text-primary);
+  font-size: 14px;
+  cursor: pointer;
+  appearance: none;
+}
+
+.config-backup-row .node-select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.config-backup-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.config-backup-actions .ghost-btn {
+  flex: 1;
+  text-align: center;
+}
+
+.config-backup-actions .ghost-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 </style>
