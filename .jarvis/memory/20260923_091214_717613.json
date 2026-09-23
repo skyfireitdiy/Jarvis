@@ -1,0 +1,8 @@
+{
+  "id": "20260923_091214_717613",
+  "type": "project_long_term",
+  "tags": ["mkdocs", "修复", "definition", "repo_url"],
+  "content": "mkdocs.yml 的 `definition:` 键是无效配置（mkdocs 不识别，导致 --strict 失败、非 strict 报 WARNING）。它本意是 repo_url/edit_uri，应提升为顶层键 `repo_url:` 和 `edit_uri:`。已修复（提交 #1763），修复后 mkdocs build --strict EXIT=0。",
+  "created_at": "2026-09-23T09:12:14.717636",
+  "updated_at": "2026-09-23T09:12:14.717640"
+}

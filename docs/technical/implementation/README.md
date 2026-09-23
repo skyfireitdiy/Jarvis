@@ -27,6 +27,6 @@
 
 ## 相关文档
 
-- [最佳实践文档](../best_practices/) - 使用指南和最佳实践
-- [配置文档](../jarvis_config.md) - 系统配置说明
-- [Jarvis Book](../jarvis_book/) - 完整的用户手册
+- [最佳实践文档](../../best_practices/Jarvis规则系统介绍.md) - 使用指南和最佳实践
+- [配置文档](../../jarvis_config.md) - 系统配置说明
+- [Jarvis Book](../../jarvis_book/1.项目介绍.md) - 完整的用户手册

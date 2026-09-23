@@ -15,9 +15,14 @@
 
    `jca --web-gateway --web-gateway-port 8001`
 
-4. 如果你需要为网关设置密码认证，可以在启动时追加：
+4. 如果你需要为网关设置登录密码，可以先用环境变量 `JARVIS_ADMIN_PASSWORD` 设置 admin 初始密码，然后再启动：
 
-   `jca --web-gateway --gateway-password "你的密码"`
+   ```bash
+   export JARVIS_ADMIN_PASSWORD='你的密码'
+   jca --web-gateway
+   ```
+
+   首次启动时会自动创建 `admin` 账号，其初始密码即为此环境变量的值（未设置时会生成随机密码并打印到日志，详见「配置网关认证密码与未设置密码时的访问策略」）。
 
 5. 启动完成后，系统会先准备代码代理环境，再在本机启动 Web Gateway 服务。
 6. 之后你可以让支持该入口的本地客户端连接到终端里显示的 WebSocket 地址。

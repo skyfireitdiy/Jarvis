@@ -22,7 +22,7 @@
    mcp:
      - name: local-mcp
        type: stdio
-       enabled: true
+       enable: true
        command: python
        args:
          - /path/to/your_mcp_server.py
@@ -34,8 +34,8 @@
    mcp:
      - name: remote-mcp
        type: sse
-       enabled: true
-       url: http://127.0.0.1:8081/sse
+       enable: true
+       base_url: http://127.0.0.1:8081/sse
    ```
 
 7. 保存配置文件。

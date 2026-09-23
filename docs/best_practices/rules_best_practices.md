@@ -780,10 +780,10 @@ with open('file.txt', 'r') as f:
 
 ## 🔗 相关资源
 
-- [builtin/rules/](../../builtin/rules/) - 内置规则目录
-- [builtin/rules/testing/](../../builtin/rules/testing/) - 内置测试规则目录
+- [builtin/rules/](https://github.com/skyfireitdiy/Jarvis/tree/main/builtin/rules) - 内置规则目录
+- [builtin/rules/testing/](https://github.com/skyfireitdiy/Jarvis/tree/main/builtin/rules/testing) - 内置测试规则目录
 - [docs/jarvis_config.md](../jarvis_config.md) - 配置系统文档
-- [builtin_rules.py](../../src/jarvis/jarvis_code_agent/builtin_rules.py) - 加载
+- [builtin_rules.py](https://github.com/skyfireitdiy/Jarvis/blob/main/src/jarvis/jarvis_code_agent/builtin_rules.py) - 加载
 - code_agent_rules.py - 管理
 
 ---

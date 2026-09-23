@@ -1,0 +1,8 @@
+{
+  "id": "20260923_091214_714754",
+  "type": "project_long_term",
+  "tags": ["mkdocs", "docs", "文档站", "nav", "构建"],
+  "content": "Jarvis mkdocs 文档站改造完成（提交 #1752~#1763）：docs_dir 从 docs/用户手册 提升为 docs；mkdocs.yml 配置完整 nav（首页/入门/用户手册/使用指南与进阶/最佳实践/技术文档/对比与分析/部署与运维/帮助与社区，共 209 条引用）；exclude_docs 排除 design/competition/landing/images 及 4 个顶层文件（GITHUB_PAGES_DEPLOYMENT.md、collaborative_agent_paper.md、Jarvis_vs_ZeroClaw对比报告.md、_v2.md）。新建 docs/index.md 首页。",
+  "created_at": "2026-09-23T09:12:14.714795",
+  "updated_at": "2026-09-23T09:12:14.714802"
+}
