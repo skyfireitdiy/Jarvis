@@ -42,8 +42,6 @@ def get_auth_headers():
     return {"Authorization": f"Bearer {TEST_AUTH_TOKEN}"}
 
 
-
-
 def test_session_output_router_drops_messages_without_subscribers():
     """无订阅者时，router 不应缓存或延迟回放消息"""
     router = SessionOutputRouter()
@@ -126,3 +124,36 @@ def test_create_app_attaches_timer_manager_to_app_state():
 
 def test_create_timer_with_create_agent_action(tmp_path):
     _cleanup_timer_persistence()
+
+
+def test_set_node_config_rejects_schema_invalid_config():
+    """保存配置前应使用 config_schema.json 校验，非法配置不得写入。"""
+    client = create_test_client()
+    headers = get_auth_headers()
+
+    # 非法配置：mcp 应为 array，给成 string
+    resp = client.post(
+        "/api/nodes/nonexistent-node/config",
+        headers=headers,
+        json={
+            "config_sections": ["mcp"],
+            "config_data": {"mcp": "not-an-array"},
+        },
+    )
+    body = resp.json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "CONFIG_SCHEMA_VALIDATION_FAILED"
+    assert any(e["path"] == "mcp" for e in body["error"]["details"])
+
+    # 合法配置应通过校验（此处因节点不存在而返回 NODE_NOT_FOUND，而非校验失败）
+    resp2 = client.post(
+        "/api/nodes/nonexistent-node/config",
+        headers=headers,
+        json={
+            "config_sections": ["llm_group"],
+            "config_data": {"llm_group": "qwen3"},
+        },
+    )
+    body2 = resp2.json()
+    assert body2["success"] is False
+    assert body2["error"]["code"] == "NODE_NOT_FOUND"

@@ -4568,6 +4568,46 @@ def create_app(
                 },
             }
 
+    def _validate_config_against_schema(
+        config_data: Dict[str, Any],
+    ) -> List[Dict[str, str]]:
+        """用 config_schema.json 校验配置，返回错误列表（空表示通过）。
+
+        Args:
+            config_data: 待校验的完整配置字典
+
+        Returns:
+            错误列表，每项含 path 与 message；为空表示校验通过
+        """
+        try:
+            from jarvis.jarvis_config.schema_parser import SchemaParser
+
+            import importlib.resources as resources
+
+            try:
+                schema_path = pathlib.Path(
+                    str(resources.files("jarvis.jarvis_data") / "config_schema.json")
+                )
+            except Exception:
+                schema_path = (
+                    pathlib.Path(__file__).resolve().parent.parent
+                    / "jarvis_data"
+                    / "config_schema.json"
+                )
+            if not schema_path.exists():
+                return [
+                    {
+                        "path": "",
+                        "message": f"Config schema not found: {schema_path}",
+                    }
+                ]
+
+            parser = SchemaParser(str(schema_path))
+            errors = parser.validate_config(config_data)
+            return [{"path": e.path or "", "message": e.message} for e in errors]
+        except Exception as e:
+            return [{"path": "", "message": f"Schema 校验失败：{e}"}]
+
     @app.get("/api/nodes/{node_id}/config", dependencies=[Depends(verify_token)])
     async def get_node_config(node_id: str, request: Request) -> Dict[str, Any]:
         """获取指定节点的配置（需要admin:config权限）。"""
@@ -4718,6 +4758,18 @@ def create_app(
                     "error": {
                         "code": "INVALID_REQUEST",
                         "message": "config_data is required",
+                    },
+                }
+
+            # 用 config_schema.json 对提交的配置做 Schema 校验，防止非法格式写入导致应用无法启动
+            schema_errors = _validate_config_against_schema(config_data)
+            if schema_errors:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "CONFIG_SCHEMA_VALIDATION_FAILED",
+                        "message": "配置不符合 Schema 规范，未写入",
+                        "details": schema_errors,
                     },
                 }
 
