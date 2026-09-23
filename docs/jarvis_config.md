@@ -412,6 +412,25 @@ jarvis-config web complex.json config.json --port 3000
 
 ---
 
+## 🔗 与 Web 界面内嵌配置编辑器的关系
+
+除了本页介绍的独立 CLI 工具 `jarvis-config`，Jarvis 的 Web 界面也内置了一个配置文件编辑器。两者都基于同一份 `config_schema.json` 动态生成表单，但运行方式与接口不同：
+
+| 对比项   | 独立 CLI 工具（`jarvis-config web`） | Web 界面内嵌编辑器                       |
+| -------- | ------------------------------------ | ---------------------------------------- |
+| 启动方式 | 终端执行命令，单独启动服务           | 无需单独启动，随 Web Gateway 提供        |
+| 入口     | 浏览器访问 CLI 打印的地址            | Web 界面「设置」弹窗中的「配置文件编辑」 |
+| Schema   | `GET /api/schema`                    | `GET /api/config/schema`                 |
+| 保存     | `POST /api/save`                     | `POST /api/nodes/{node_id}/config`       |
+| 权限     | 无额外权限要求（本地单独服务）       | 需要 `admin:config` 权限                 |
+| 纯文本   | 无独立纯文本视图                     | 提供「表单 / 纯文本」双视图              |
+
+如果你已经连上 Web Gateway，推荐直接使用内嵌编辑器；如果你希望在独立的本地服务中编辑任意 Schema 与输出文件，则使用 `jarvis-config web`。
+
+内嵌编辑器的详细操作步骤见：[在 Web 界面中编辑配置文件](用户手册/04_web_界面与网关/在_Web_界面中编辑配置文件.md)。
+
+---
+
 ## 📝 注意事项
 
 1. **Schema 版本**：支持 JSON Schema Draft-07 规范
