@@ -196,6 +196,54 @@ def set_llm_group(llm_group: Optional[str]) -> None:
         GLOBAL_CONFIG_DATA["llm_group"] = llm_group
 
 
+def get_fallback_group() -> Optional[str]:
+    """获取当前模型组的备用模型组名称
+
+    备用组由 llm_groups 中当前组的 fallback_group 字段指定，用于非交互模式下
+    当前组模型连续失败时自动切换。
+
+    返回:
+        Optional[str]: 备用模型组名称；未配置当前组、未配置 fallback_group、
+            备用组为空或与当前组相同、或备用组不在 llm_groups 中时返回 None
+    """
+    current_group = get_llm_group()
+    if not current_group:
+        return None
+
+    model_groups = GLOBAL_CONFIG_DATA.get("llm_groups", {})
+    if not isinstance(model_groups, dict):
+        return None
+
+    group_config = model_groups.get(current_group)
+    if not isinstance(group_config, dict):
+        return None
+
+    fallback_group = group_config.get("fallback_group")
+    if not isinstance(fallback_group, str):
+        return None
+    fallback_group = fallback_group.strip()
+    if not fallback_group or fallback_group == current_group:
+        return None
+    if fallback_group not in model_groups:
+        return None
+    return fallback_group
+
+
+def switch_to_fallback_group() -> bool:
+    """切换到当前模型组的备用模型组
+
+    仅切换全局配置中的 llm_group；调用方需在切换后重建模型实例以使配置生效。
+
+    返回:
+        bool: 是否切换成功（无可用备用组时返回 False）
+    """
+    fallback_group = get_fallback_group()
+    if not fallback_group:
+        return False
+    set_llm_group(fallback_group)
+    return True
+
+
 def get_plugin_dirs() -> List[str]:
     """获取插件目录列表
 

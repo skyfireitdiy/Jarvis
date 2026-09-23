@@ -584,6 +584,13 @@ class BasePlatform(ABC):
                 lambda: while_success(lambda: self._chat(message, max_output))
             )
 
+            # 模型连续失败时，非交互模式下尝试切换到备用模型组重试一次
+            if result is False or result == "":
+                if self._try_switch_to_fallback_group():
+                    result = while_true(
+                        lambda: while_success(lambda: self._chat(message, max_output))
+                    )
+
             # Check if result is empty or False (retry exhausted)
             # Convert False to empty string for type safety
             if result is False or result == "":
@@ -600,6 +607,56 @@ class BasePlatform(ABC):
             return result
         finally:
             set_in_chat(False)
+
+    def _try_switch_to_fallback_group(self) -> bool:
+        """模型连续失败时尝试切换到备用模型组
+
+        仅在非交互模式下生效；未配置备用模型组、备用组无效或切换失败时返回 False。
+
+        返回:
+            bool: 是否成功切换到备用模型组
+        """
+        from jarvis.jarvis_utils.config import is_non_interactive
+        from jarvis.jarvis_utils.config import switch_to_fallback_group
+
+        try:
+            if not is_non_interactive():
+                return False
+            if not switch_to_fallback_group():
+                return False
+
+            if self.agent is None:
+                # 无 Agent 实例时仅切换全局配置，由调用方负责重建模型
+                PrettyOutput.auto_print("🔄 已切换到备用模型组")
+                return True
+
+            # 重建模型实例，使新的模型组配置生效
+            from jarvis.jarvis_platform.registry import PlatformRegistry
+
+            old_messages = self.get_messages()
+            platform_registry = PlatformRegistry()
+            if self.platform_type == "smart":
+                new_model = platform_registry.get_smart_platform()
+            elif self.platform_type == "cheap":
+                new_model = platform_registry.get_cheap_platform()
+            elif self.platform_type == "eval":
+                new_model = platform_registry.get_eval_platform()
+            else:
+                new_model = platform_registry.get_normal_platform()
+            if new_model is None:
+                return False
+            new_model.set_suppress_output(self.suppress_output)
+            new_model.agent = self.agent
+            if old_messages:
+                new_model.set_messages(old_messages)
+            self.agent.model = new_model
+            if getattr(self.agent, "session", None) is not None:
+                self.agent.session.model = new_model
+            PrettyOutput.auto_print("🔄 已切换到备用模型组，正在重试")
+            return True
+        except Exception as e:
+            PrettyOutput.auto_print(f"❌ 切换到备用模型组失败: {e}")
+            return False
 
     @abstractmethod
     def name(self) -> str:

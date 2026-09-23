@@ -481,21 +481,9 @@ class SchemaParser:
             return
 
         # 转换基本类型
-        if "type" in schema:
-            expected_type = schema["type"]
-            if isinstance(expected_type, list):
-                # 对于多类型，尝试第一个匹配的类型
-                for t in expected_type:
-                    converted = self._try_convert(value, t)
-                    if converted is not None:
-                        # 注意：这里无法直接修改外层的 value 引用
-                        # 所以需要特殊处理对象和数组的情况
-                        pass
-            else:
-                converted = self._try_convert(value, expected_type)
-                if converted is not None and converted is not value:
-                    # 注意：基本类型无法就地修改，需要在调用层处理
-                    pass
+        # 注意：基本类型（标量）无法就地修改，此处不做顶层标量转换。
+        # 标量转换仅对可写容器（list/dict）中的元素/字段生效（见下方递归处理），
+        # 顶层标量由调用方在赋值处转换。此前的顶层转换逻辑为死代码（converted 被丢弃）。
 
         # 递归处理数组和对象
         if isinstance(value, list) and "items" in schema:

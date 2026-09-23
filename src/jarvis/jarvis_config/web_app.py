@@ -5,9 +5,10 @@ FastAPI Web 应用
 提供配置表单的 Web 服务
 """
 
+import copy
 import json
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import yaml  # type: ignore[import-untyped]
 
@@ -26,12 +27,6 @@ class SaveConfigRequest(BaseModel):
     config: Dict[str, Any]
 
 
-# 存储全局状态（在实际应用中应该使用更好的状态管理）
-_schema_parser: Optional[SchemaParser] = None
-_output_path: Optional[Path] = None
-_existing_config: Dict[str, Any] = {}
-
-
 def create_app(schema_path: Path, output_path: Path) -> FastAPI:
     """创建 FastAPI 应用
 
@@ -42,24 +37,21 @@ def create_app(schema_path: Path, output_path: Path) -> FastAPI:
     Returns:
         FastAPI 应用实例
     """
-    global _schema_parser, _output_path, _existing_config
-
-    # 初始化 schema 解析器
-    _schema_parser = SchemaParser(schema_path)
-    _output_path = output_path
+    # 应用实例级状态（闭包变量），避免模块级全局状态被多个实例互相污染
+    schema_parser = SchemaParser(schema_path)
 
     # 加载现有配置文件（如果存在）
-    _existing_config = {}
+    existing_config: Dict[str, Any] = {}
     if output_path.exists():
         try:
             with open(output_path, "r", encoding="utf-8") as f:
                 if output_path.suffix in (".yaml", ".yml"):
-                    _existing_config = yaml.safe_load(f) or {}
+                    existing_config = yaml.safe_load(f) or {}
                 else:
-                    _existing_config = json.load(f)
+                    existing_config = json.load(f)
         except Exception:
             # 如果加载失败，使用空配置
-            _existing_config = {}
+            existing_config = {}
 
     # 创建 FastAPI 应用
     app = FastAPI(
@@ -69,10 +61,13 @@ def create_app(schema_path: Path, output_path: Path) -> FastAPI:
     )
 
     # 启用 CORS
+    # 注意：allow_credentials=True 与 allow_origins=["*"] 不能同时使用（浏览器规范禁止，
+    # 否则会报 "Cannot use wildcard in Access-Control-Allow-Origin with credentials"）。
+    # 本地工具场景使用通配来源即可，不携带凭证。
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
-        allow_credentials=True,
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -91,30 +86,31 @@ def create_app(schema_path: Path, output_path: Path) -> FastAPI:
         Returns:
             Schema 对象，包含属性、类型、约束等信息
         """
-        if _schema_parser is None:
+        if schema_parser is None:
             raise HTTPException(status_code=500, detail="Schema parser not initialized")
 
-        properties = _schema_parser.get_properties()
+        # 深拷贝属性，避免就地修改 parser 缓存的 schema（重复调用会嵌套污染 _meta）
+        properties = copy.deepcopy(schema_parser.get_properties())
 
         # 为每个属性添加额外的元数据
         for prop_name in properties:
-            schema_default = _schema_parser.get_default_value(prop_name)
+            schema_default = schema_parser.get_default_value(prop_name)
             # 如果现有配置中有该属性的值，则用该值覆盖默认值
-            if prop_name in _existing_config:
-                schema_default = _existing_config[prop_name]
+            if prop_name in existing_config:
+                schema_default = existing_config[prop_name]
 
             properties[prop_name]["_meta"] = {
                 "default": schema_default,
-                "enum": _schema_parser.get_enum(prop_name),
-                "description": _schema_parser.get_description_for_property(prop_name),
-                "required": prop_name in _schema_parser.get_required(),
+                "enum": schema_parser.get_enum(prop_name),
+                "description": schema_parser.get_description_for_property(prop_name),
+                "required": prop_name in schema_parser.get_required(),
             }
 
         return {
-            "title": _schema_parser.get_title(),
-            "description": _schema_parser.get_description(),
+            "title": schema_parser.get_title(),
+            "description": schema_parser.get_description(),
             "properties": properties,
-            "required": _schema_parser.get_required(),
+            "required": schema_parser.get_required(),
         }
 
     @app.post("/api/save")
@@ -127,11 +123,6 @@ def create_app(schema_path: Path, output_path: Path) -> FastAPI:
         Returns:
             保存结果
         """
-        if _schema_parser is None:
-            raise HTTPException(status_code=500, detail="Schema parser not initialized")
-
-        if _output_path is None:
-            raise HTTPException(status_code=500, detail="Output path not set")
 
         # 清理配置中的 null 值（递归移除）
         def clean_null_values(obj: Any) -> Any:
@@ -146,7 +137,7 @@ def create_app(schema_path: Path, output_path: Path) -> FastAPI:
         cleaned_config = clean_null_values(request.config)
 
         # 验证配置
-        errors = _schema_parser.validate_config(cleaned_config)
+        errors = schema_parser.validate_config(cleaned_config)
         if errors:
             return {
                 "success": False,
@@ -158,10 +149,10 @@ def create_app(schema_path: Path, output_path: Path) -> FastAPI:
         # 保存配置文件
         try:
             # 确保输出目录存在
-            _output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
 
-            if _output_path.suffix in (".yaml", ".yml"):
-                with open(_output_path, "w", encoding="utf-8") as f:
+            if output_path.suffix in (".yaml", ".yml"):
+                with open(output_path, "w", encoding="utf-8") as f:
                     yaml.dump(
                         cleaned_config,
                         f,
@@ -170,13 +161,13 @@ def create_app(schema_path: Path, output_path: Path) -> FastAPI:
                         sort_keys=False,
                     )
             else:
-                with open(_output_path, "w", encoding="utf-8") as f:
+                with open(output_path, "w", encoding="utf-8") as f:
                     json.dump(cleaned_config, f, indent=2, ensure_ascii=False)
 
             return {
                 "success": True,
-                "message": f"配置已保存到 {_output_path}",
-                "path": str(_output_path),
+                "message": f"配置已保存到 {output_path}",
+                "path": str(output_path),
             }
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"保存配置失败: {str(e)}")
