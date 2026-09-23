@@ -170,7 +170,14 @@ async function apiPost(path, body) {
     }
   }
   if (!resp || resp.success === false) {
-    const msg = resp && resp.error && resp.error.message ? resp.error.message : '请求失败'
+    let msg = resp && resp.error && resp.error.message ? resp.error.message : '请求失败'
+    const details = resp && resp.error && resp.error.details
+    if (Array.isArray(details) && details.length > 0) {
+      const lines = details
+        .map((d) => (d && d.path ? `${d.path}: ${d.message}` : (d && d.message) || ''))
+        .filter(Boolean)
+      if (lines.length > 0) msg += `\n${lines.join('\n')}`
+    }
     throw new Error(msg)
   }
   return resp
