@@ -304,7 +304,8 @@ markdown_extensions:
   - toc:
       permalink: true
       toc_depth: 3
-      slugify: !!python/name:pymdownx.slugs.uslugify
+      slugify:
+        !!python/object/apply:pymdownx.slugs.slugify { kwds: { case: lower } }
   - pymdownx.arithmatex:
       generic: true
   - pymdownx.betterem:

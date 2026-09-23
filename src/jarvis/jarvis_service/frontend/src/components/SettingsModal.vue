@@ -141,6 +141,23 @@
         </div>
       </div>
 
+      <!-- 配置文件编辑 -->
+      <div class="form-group">
+        <label>配置文件编辑</label>
+        <div class="form-help" style="margin-bottom:10px">基于 JSON Schema 动态生成表单编辑配置文件（~/.jarvis/config.yaml），支持纯文本预览（需 admin:config 权限）。</div>
+        <button class="ghost-btn" @click="openConfigEditor">编辑配置文件</button>
+      </div>
+
+      <!-- 配置文件编辑器弹窗 -->
+      <ConfigEditorModal
+        :visible="showConfigEditor"
+        :fetchWithAuth="props.fetchWithAuth"
+        :gatewayUrl="props.gatewayUrl"
+        :getHttpProtocol="props.getHttpProtocol"
+        :showToast="props.showToast"
+        :nodeId="backupNodeId || 'master'"
+        @update:visible="showConfigEditor = $event"
+      />
 
       <div class="modal-actions">
         <button class="ghost-btn" @click="close">关闭</button>
@@ -151,6 +168,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import ConfigEditorModal from './ConfigEditorModal.vue'
 
 const props = defineProps({
   visible: {
@@ -210,6 +228,8 @@ const changePasswordForm = ref({ old_password: '', new_password: '', confirm_pas
 const loading = ref(false)
 // 节点显示名本地副本（编辑中，input 时即时更新并向上同步）
 const localNodeDisplayNames = ref({ ...(props.nodeDisplayNames || {}) })
+// 配置文件编辑器弹窗
+const showConfigEditor = ref(false)
 
 // 节点列表（去重，value 为原始 node_id）
 const nodeList = computed(() => {
@@ -294,6 +314,11 @@ function onNodeNameInput(nodeId, value) {
 // 关闭弹窗
 function close() {
   emit('update:visible', false)
+}
+
+// 打开配置文件编辑器弹窗
+function openConfigEditor() {
+  showConfigEditor.value = true
 }
 
 // 处理免登录设置变更

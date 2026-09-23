@@ -1,0 +1,8 @@
+{
+  "id": "20260923_150900_162759",
+  "type": "project_long_term",
+  "tags": ["配置编辑器", "面板空白", "fetchWithAuth", "Response解析"],
+  "content": "配置编辑器面板空白的根因：ConfigEditorModal.vue 的 apiGet/apiPost 直接访问 fetchWithAuth 返回值的 .success/.data 字段，但 App.vue 的 fetchWithAuth 返回的是原生 Response 对象（需 .json() 解析），导致 schema.value={}、config.value={}、formData 为空 → 表单空白。修复：在 apiGet/apiPost 中先判断 rawResp.json 是否为函数并解析。新 JS 为 index-BoCGwpyL.js（旧 index-C7RHAyjm.js）。注意：不能刷新用户浏览器页面（会掉登录），需用户手动刷新加载新 JS。",
+  "created_at": "2026-09-23T15:09:00.162798",
+  "updated_at": "2026-09-23T15:09:00.162805"
+}

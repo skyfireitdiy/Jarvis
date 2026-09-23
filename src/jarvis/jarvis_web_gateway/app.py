@@ -4512,6 +4512,62 @@ def create_app(
             },
         }
 
+    @app.get("/api/config/schema", dependencies=[Depends(verify_token)])
+    async def get_config_schema(request: Request) -> Dict[str, Any]:
+        """获取配置 JSON Schema（需要 admin:config 权限）。
+
+        供前端「配置文件」编辑器按 Schema 动态生成表单使用。
+        """
+        from fastapi import HTTPException
+
+        user_info = getattr(request.state, "user_info", None)
+        if (
+            user_info
+            and user_info.get("user_id") != "system"
+            and not permission_manager.check_permission(
+                user_info["user_id"], "admin:config"
+            )
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "PERMISSION_DENIED",
+                    "message": "Permission denied: admin:config",
+                },
+            )
+        try:
+            import importlib.resources as resources
+
+            try:
+                schema_path = pathlib.Path(
+                    str(resources.files("jarvis.jarvis_data") / "config_schema.json")
+                )
+            except Exception:
+                schema_path = (
+                    pathlib.Path(__file__).resolve().parent.parent
+                    / "jarvis_data"
+                    / "config_schema.json"
+                )
+            if not schema_path.exists():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "SCHEMA_NOT_FOUND",
+                        "message": f"Config schema not found: {schema_path}",
+                    },
+                }
+            with open(schema_path, "r", encoding="utf-8") as f:
+                schema = json.load(f)
+            return {"success": True, "data": schema}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {
+                    "code": "GET_SCHEMA_FAILED",
+                    "message": str(e),
+                },
+            }
+
     @app.get("/api/nodes/{node_id}/config", dependencies=[Depends(verify_token)])
     async def get_node_config(node_id: str, request: Request) -> Dict[str, Any]:
         """获取指定节点的配置（需要admin:config权限）。"""

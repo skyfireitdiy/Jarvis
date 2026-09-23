@@ -157,6 +157,10 @@
             "type": "string",
             "description": "引用 llms 中定义的结构化评估LLM配置名称（可选，用于让模型做判断的决策场景，不配置则回退 Normal 模型）"
           },
+          "fallback_group": {
+            "type": "string",
+            "description": "备用模型组名称（可选，需为 llm_groups 中已定义的组名）。仅非交互模式下，当本组的模型连续失败时自动切换到该备用组；交互模式或未配置时不切换"
+          },
           "ENV": {
             "type": "object",
             "description": "该模型组特定的环境变量，会覆盖全局 ENV 配置",

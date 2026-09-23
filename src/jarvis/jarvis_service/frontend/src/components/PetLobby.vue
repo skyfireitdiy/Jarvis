@@ -1340,6 +1340,9 @@ function onPetContextMenu(pet, event) {
     clearTimeout(clickTimer)
     clickTimer = null
   }
+  // 标记本次手势已触发右键菜单：移动端长按的 pointerup 晚于 contextmenu，
+  // 届时据此抑制 onPetClick，避免长按同时切换 Agent 激活状态
+  contextMenuTriggered = true
   // 先请求父组件把「当前 Agent」切到该宠物（决定菜单动作与可用性）
   emit('contextAgent', pet.agentId)
   const pos = placeContextMenu(event, petMenuActions.value.length)
@@ -1578,12 +1581,17 @@ function onContextAction(act) {
 // 拖动状态
 const DRAG_THRESHOLD = 4 // 超过该位移视为拖动而非点击
 let dragState = null // { pet, startX, startY, offsetX, offsetY, moved }
+// 标记当前手势是否已触发右键菜单（移动端长按会先 contextmenu 后 pointerup，
+// 需据此抑制 pointerup 触发的单击，避免长按同时切换 Agent 激活状态）
+let contextMenuTriggered = false
 
 function onPetPointerDown(pet, event) {
   // 仅响应鼠标左键 / 触摸 / 笔
   if (event.button !== undefined && event.button !== 0) return
   const stage = stageRef.value
   if (!stage) return
+  // 新一轮手势开始，重置右键菜单标记
+  contextMenuTriggered = false
   // 触摸/笔：阻止浏览器接管手势（滚动、缩放），否则 pointermove 会被 pointercancel 打断
   if (event.pointerType && event.pointerType !== 'mouse') {
     event.preventDefault()
@@ -1670,7 +1678,9 @@ function onPetPointerUp() {
     return
   }
   // 未发生拖动：视为单击
-  if (!moved) onPetClick(pet)
+  // 若本次手势已触发右键菜单（移动端长按），则抑制单击，避免同时切换 Agent 激活状态
+  if (!moved && !contextMenuTriggered) onPetClick(pet)
+  contextMenuTriggered = false
 }
 
 // 指针被浏览器取消（如触摸被系统手势抢占）时，安全复位，避免 dragState 悬挂
