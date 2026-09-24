@@ -1304,12 +1304,17 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, triggerRef, watch } from 'vue'
-import * as monaco from 'monaco-editor'
+// 必须用 ESM 版入口：包根路径在打包时会被解析到 min/（AMD 格式），
+// 拿不到 monaco.lsp（Monaco 内置的 LSP 客户端），也无法按 ESM 方式使用。
+import * as monaco from 'monaco-editor/esm/vs/editor/editor.main.js'
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker.js?worker'
 import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker.js?worker'
 import cssWorker from 'monaco-editor/esm/vs/language/css/css.worker.js?worker'
 import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker.js?worker'
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker.js?worker'
+// LSP 接入：语言清单来自后端 /api/lsp/servers，前端不含任何语言硬编码
+import { loadLspServers, getServerByLanguage, getServerByPath } from './lsp/registry.js'
+import { ensureClient, disposeClient, disposeAll as disposeAllLspClients } from './lsp/manager.js'
 
 // Monaco 在 vite 下必须显式提供 worker 工厂，否则编辑器无法启动
 self.MonacoEnvironment = {
@@ -3148,7 +3153,86 @@ function activateEditorTab(path) {
       layoutMonacoEditor()
       cmEditorView.focus()
     })
+    // 模型就绪后尝试接入 LSP（失败静默降级，不影响编辑器）
+    activateLspForModel(path, modelData)
   }
+}
+
+// ---------------------------------------------------------------------------
+// LSP 接入（薄层：所有逻辑在 src/lsp/ 模块内，此处只做时机编排）
+// ---------------------------------------------------------------------------
+
+// 语言清单只需拉一次，失败也不阻塞编辑器
+let lspRegistryReady = false
+async function ensureLspRegistry() {
+  if (lspRegistryReady) return
+  try {
+    await loadLspServers({
+      fetchWithAuth,
+      getGatewayAddress,
+      getHttpProtocol,
+    })
+    lspRegistryReady = true
+  } catch {
+    // registry 内部已降级处理，这里兜底
+  }
+}
+
+// 记录 path -> { serverId, root }，供关闭标签时精确释放
+const lspBindings = new Map()
+
+/**
+ * 为当前模型接入 LSP。
+ *
+ * 已知限制：仅支持 master 本地（文件读写走 /api/node/{id}/... 时，
+ * 非 master 节点的文件系统与本地 LSP 进程不一致，故跳过）。
+ */
+async function activateLspForModel(path, modelData) {
+  if (!path || !modelData || !modelData.model) return
+  // 只读预览、非 master 节点：不接入
+  if (getEditorTargetNodeId() !== 'master') return
+
+  await ensureLspRegistry()
+
+  const language = modelData.model.getLanguageId?.() || modelData.language
+  const spec = getServerByLanguage(language) || getServerByPath(path)
+  if (!spec) return
+
+  const workspaceRoot = resolveLspWorkspaceRoot(path)
+  const client = await ensureClient({
+    spec,
+    workspaceRoot,
+    model: modelData.model,
+    deps: { fetchWithAuth, getGatewayAddress, getWebSocketProtocol, buildWebSocketProtocols },
+  })
+  if (client) {
+    lspBindings.set(path, { serverId: spec.id, root: workspaceRoot })
+  }
+}
+
+/** 由文件路径推导 workspace 根目录（取所在目录，后端会校验其存在性）。 */
+function resolveLspWorkspaceRoot(path) {
+  const normalized = String(path || '')
+  const idx = normalized.lastIndexOf('/')
+  return idx > 0 ? normalized.slice(0, idx) : ''
+}
+
+/**
+ * 释放某个文件绑定的 LSP 连接。
+ * 仅当同一 (serverId, root) 已无其他文件在用时才真正关闭连接，
+ * 避免频繁开关标签导致反复重启语言服务器。
+ */
+function releaseLspBinding(path) {
+  const binding = lspBindings.get(path)
+  if (!binding) return
+  lspBindings.delete(path)
+
+  for (const other of lspBindings.values()) {
+    if (other.serverId === binding.serverId && other.root === binding.root) {
+      return // 仍有其他文件在用同一连接
+    }
+  }
+  disposeClient(binding.serverId, binding.root)
 }
 
 function resolveAgentRelativePath(relativePath) {
@@ -3722,6 +3806,9 @@ async function closeEditorTab(path) {
     }
     editorModels.delete(path)
   }
+
+  // 释放该文件绑定的 LSP client（若该 server 无其他文件在用，则关闭连接）
+  releaseLspBinding(path)
 
   if (wasActive) {
     const nextTab = session.tabs[index] || session.tabs[index - 1] || null
@@ -14311,6 +14398,9 @@ onUnmounted(() => {
     }
   }
   editorModels.clear()
+  // 释放全部 LSP 连接，避免 WS 泄漏
+  disposeAllLspClients()
+  lspBindings.clear()
 
   // 移除全局键盘事件监听
   document.removeEventListener('keydown', handleGlobalKeydown, { capture: true })
