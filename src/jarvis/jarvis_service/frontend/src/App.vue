@@ -304,6 +304,7 @@
                     <div
                       class="editor-file-tree-root"
                       @click.stop="ensureEditorSidebarFileTree(agent)"
+                      @contextmenu.prevent.stop="openFileTreeContextMenu(agent, null, $event)"
                     >
                       {{ getWorkingDirDisplay(agent.working_dir) }}
                     </div>
@@ -320,6 +321,7 @@
                           class="tree-node-content"
                           :style="{ paddingLeft: `${8 + visibleNode.depth * 20}px` }"
                           @click.stop="handleFileTreeNodeClick(agent.agent_id, visibleNode.node)"
+                          @contextmenu.prevent.stop="openFileTreeContextMenu(agent, visibleNode.node, $event)"
                         >
                           <span
                             v-if="visibleNode.node.type === 'directory'"
@@ -375,6 +377,7 @@
                           <div
                             class="editor-file-tree-root"
                             @click.stop="ensureEditorSidebarFileTree(agent)"
+                            @contextmenu.prevent.stop="openFileTreeContextMenu(agent, null, $event)"
                           >
                             {{ getWorkingDirDisplay(agent.working_dir) }}
                           </div>
@@ -391,6 +394,7 @@
                                 class="tree-node-content"
                                 :style="{ paddingLeft: `${8 + visibleNode.depth * 20}px` }"
                                 @click.stop="handleFileTreeNodeClick(agent.agent_id, visibleNode.node)"
+                                @contextmenu.prevent.stop="openFileTreeContextMenu(agent, visibleNode.node, $event)"
                               >
                                 <span
                                   v-if="visibleNode.node.type === 'directory'"
@@ -989,6 +993,19 @@
       @confirm="confirmRename"
     />
 
+    <!-- 通用输入弹窗（如新建文件/文件夹命名） -->
+    <InputPromptModal
+      :visible="inputPrompt.visible"
+      :title="inputPrompt.title"
+      :label="inputPrompt.label"
+      :placeholder="inputPrompt.placeholder"
+      :model-value="inputPrompt.value"
+      :error="inputPrompt.error"
+      @update:model-value="inputPrompt.value = $event"
+      @cancel="cancelInputPrompt"
+      @confirm="confirmInputPrompt"
+    />
+
     <!-- Agent ACL编辑弹窗 -->
     <div v-if="showEditAccessModal" class="modal-overlay" @click.self="showEditAccessModal = false">
       <div class="modal-content" style="max-width: 480px;">
@@ -1285,6 +1302,27 @@
       </div>
     </div>
 
+    <!-- 编辑器目录树右键菜单 -->
+    <div
+      v-if="fileTreeContextMenu.visible"
+      class="file-tree-context-menu"
+      :style="{ left: fileTreeContextMenu.x + 'px', top: fileTreeContextMenu.y + 'px' }"
+      @pointerdown.stop
+      @click.stop
+      @contextmenu.prevent.stop
+    >
+      <button
+        v-for="act in fileTreeContextActions"
+        :key="act.id"
+        class="file-tree-context-item"
+        :disabled="act.enabled === false"
+        @click="runFileTreeContextAction(act)"
+      >
+        <span class="file-tree-context-icon">{{ act.icon }}</span>
+        <span class="file-tree-context-label">{{ act.label }}</span>
+      </button>
+    </div>
+
     <!-- 新手引导（按场景首次触发，可随时从命令面板重新查看） -->
     <OnboardingTour
       v-model:visible="showOnboarding"
@@ -1354,6 +1392,7 @@ import QuickCreateAgentModal from './components/QuickCreateAgentModal.vue'
 import SessionPanel from './components/SessionPanel.vue'
 import { renderSideBySideDiff, escapeHtml } from './diffRenderer.js'
 import RenameAgentModal from './components/RenameAgentModal.vue'
+import InputPromptModal from './components/InputPromptModal.vue'
 import AdminPanel from './components/AdminPanel.vue'
 import CommandPalette from './components/CommandPalette.vue'
 import TopologyOverlay from './components/TopologyOverlay.vue'
@@ -3834,6 +3873,200 @@ async function handleFileTreeNodeClick(agentId, node) {
   }
 
   await openEditorFile(node.path, agentId)
+}
+
+// ===== 编辑器目录树右键菜单 =====
+// node 为目录节点；node 为 null 时表示作用对象是该 Agent 的工作目录根
+const fileTreeContextMenu = ref({ visible: false, x: 0, y: 0, agentId: '', node: null })
+
+// 通用输入弹窗状态（如新建文件/文件夹命名）
+const inputPrompt = ref({
+  visible: false,
+  title: '',
+  label: '',
+  placeholder: '',
+  value: '',
+  error: '',
+  onConfirm: null,
+})
+
+function openInputPrompt({ title, label = '', placeholder = '', value = '', onConfirm }) {
+  inputPrompt.value = { visible: true, title, label, placeholder, value, error: '', onConfirm }
+}
+
+function cancelInputPrompt() {
+  inputPrompt.value = { ...inputPrompt.value, visible: false, onConfirm: null }
+}
+
+function confirmInputPrompt() {
+  const prompt = inputPrompt.value
+  if (!prompt.visible) return
+  const result = prompt.onConfirm ? prompt.onConfirm(prompt.value) : null
+  // onConfirm 返回字符串表示校验失败，作为错误提示保留弹窗
+  if (typeof result === 'string') {
+    inputPrompt.value = { ...prompt, error: result }
+    return
+  }
+  inputPrompt.value = { ...prompt, visible: false, onConfirm: null }
+}
+
+function closeFileTreeContextMenu() {
+  if (fileTreeContextMenu.value.visible) {
+    fileTreeContextMenu.value = { ...fileTreeContextMenu.value, visible: false }
+  }
+}
+
+// 菜单作用目录的绝对路径：目录节点用 node.path，根用 agent.working_dir
+function getFileTreeContextDirPath() {
+  const menu = fileTreeContextMenu.value
+  if (menu.node && menu.node.path) return menu.node.path
+  const agent = agentList.value.find(a => a.agent_id === menu.agentId)
+  return agent?.working_dir || ''
+}
+
+// 在目录树节点/工作目录根上右键：就地弹出菜单（视口坐标 + 边界收敛）
+function openFileTreeContextMenu(agent, node, event) {
+  if (!agent || !event) return
+  const MENU_W = 220
+  const MENU_H = 220
+  let x = event.clientX
+  let y = event.clientY
+  if (x + MENU_W > window.innerWidth) x = Math.max(window.innerWidth - MENU_W, 0)
+  if (y + MENU_H > window.innerHeight) y = Math.max(window.innerHeight - MENU_H, 0)
+  fileTreeContextMenu.value = {
+    visible: true,
+    x,
+    y,
+    agentId: agent.agent_id,
+    node: node && node.type === 'directory' ? node : null,
+  }
+  // 点击菜单外部时关闭（一次性监听，避免常驻 document 监听）
+  nextTick(() => {
+    document.addEventListener('pointerdown', closeFileTreeContextMenu, { once: true })
+  })
+}
+
+// 目录树右键菜单项
+const fileTreeContextActions = computed(() => {
+  const hasAgent = Boolean(fileTreeContextMenu.value.agentId)
+  return [
+    { id: 'new-file', label: '新建文件', icon: '📄', enabled: hasAgent },
+    { id: 'new-folder', label: '新建文件夹', icon: '📁', enabled: hasAgent },
+    { id: 'find-in-folder', label: '在当前目录下查找', icon: '🔍', enabled: hasAgent },
+    { id: 'refresh', label: '刷新', icon: '🔄', enabled: hasAgent },
+    { id: 'copy-path', label: '复制路径', icon: '📋', enabled: hasAgent },
+  ]
+})
+
+// 把绝对路径转为相对 working_dir 的 glob（用于「在当前目录下查找」）
+function buildDirSearchGlob(agentId, dirPath) {
+  const agent = agentList.value.find(a => a.agent_id === agentId)
+  const workingDir = String(agent?.working_dir || '').replace(/\/$/, '')
+  const normalizedDir = String(dirPath || '').replace(/\/$/, '')
+  if (!workingDir || !normalizedDir || normalizedDir === workingDir) return ''
+  if (!normalizedDir.startsWith(workingDir + '/')) return ''
+  const relative = normalizedDir.slice(workingDir.length + 1)
+  return relative ? `${relative}/**` : ''
+}
+
+// 执行目录树右键菜单动作
+async function runFileTreeContextAction(action) {
+  if (!action || action.enabled === false) return
+  const menu = { ...fileTreeContextMenu.value }
+  const agent = agentList.value.find(a => a.agent_id === menu.agentId)
+  closeFileTreeContextMenu()
+  if (!agent) return
+
+  if (action.id === 'new-file' || action.id === 'new-folder') {
+    const kind = action.id === 'new-file' ? 'file' : 'directory'
+    const label = kind === 'file' ? '文件' : '文件夹'
+    const dirPath = getFileTreeContextDirPath() || agent.working_dir
+    openInputPrompt({
+      title: `新建${label}`,
+      label: `${label}名称`,
+      placeholder: `请输入新${label}名称`,
+      value: '',
+      onConfirm: (rawName) => {
+        const trimmedName = String(rawName || '').trim()
+        if (!trimmedName) return '名称不能为空'
+        if (trimmedName.includes('/') || trimmedName.includes('\\')) return '名称不能包含路径分隔符'
+        const absPath = `${String(dirPath).replace(/\/$/, '')}/${trimmedName}`
+        createFileOrDirectory(agent.agent_id, absPath, kind)
+          .then(() => refreshFileTreeDir(agent.agent_id, menu.node))
+          .then(() => (kind === 'file' ? openEditorFile(absPath, agent.agent_id) : null))
+          .then(() => showToast(`${label}已创建`, 'success'))
+          .catch((error) => showToast(error.message || `创建${label}失败`, 'error'))
+        return null
+      },
+    })
+    return
+  }
+
+  if (action.id === 'find-in-folder') {
+    const dirPath = getFileTreeContextDirPath()
+    globalSearchFileGlob.value = buildDirSearchGlob(agent.agent_id, dirPath)
+    setEditorSidebarView('search')
+    nextTick(() => {
+      const input = document.querySelector('.editor-global-search-input')
+      if (input) input.focus()
+    })
+    return
+  }
+
+  if (action.id === 'refresh') {
+    await refreshFileTreeDir(agent.agent_id, menu.node)
+    return
+  }
+
+  if (action.id === 'copy-path') {
+    const dirPath = getFileTreeContextDirPath()
+    if (!dirPath) return
+    try {
+      await navigator.clipboard.writeText(dirPath)
+      showToast('路径已复制', 'success')
+    } catch (error) {
+      showToast('复制路径失败', 'error')
+    }
+  }
+}
+
+// 刷新指定目录节点（node 为 null 时刷新工作目录根）
+async function refreshFileTreeDir(agentId, node) {
+  const agent = agentList.value.find(a => a.agent_id === agentId)
+  if (!agent) return
+  if (!node) {
+    fileTreeState.value.delete(agentId)
+    initFileTreeState(agentId)
+    await initFileTree(agentId, agent.working_dir)
+    triggerRef(fileTreeState)
+    return
+  }
+  node.loaded = false
+  node.children = []
+  await loadFileTreeNode(agentId, node)
+  triggerRef(fileTreeState)
+}
+
+// 调用后端创建文件/目录接口（不覆盖已存在路径）
+async function createFileOrDirectory(agentId, absPath, kind) {
+  const { host, port } = getGatewayAddress()
+  const agent = agentList.value.find(a => a.agent_id === agentId)
+  if (!agent) {
+    throw new Error(`找不到Agent: ${agentId}`)
+  }
+  if (!agent.node_id) {
+    throw new Error(`Agent没有node_id: ${agentId}`)
+  }
+  const targetNodeId = String(agent.node_id).trim()
+  const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, 'file-create'), {
+    method: 'POST',
+    body: JSON.stringify({ path: absPath, content: '', kind, node_id: targetNodeId })
+  })
+  const result = await response.json()
+  if (!response.ok || !result.success) {
+    throw new Error(result.error?.message || '创建失败')
+  }
+  return result.data
 }
 
 // 消息和终端
@@ -6442,6 +6675,7 @@ function isAnyModalOpen() {
     showCreateAgentModal.value ||
     showQuickCreateAgentModal.value ||
     showRenameAgentModal.value ||
+    inputPrompt.value.visible ||
     showSessionDialog.value ||
     showDirDialog.value ||
     showCommandPalette.value ||
@@ -17906,6 +18140,54 @@ body::-webkit-scrollbar {
   text-align: center;
 }
 .panel-context-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 编辑器目录树右键菜单 */
+.file-tree-context-menu {
+  position: fixed;
+  z-index: 9999;
+  min-width: 220px;
+  max-width: 320px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 4px;
+  border-radius: 10px;
+  background: rgba(12, 22, 34, 0.96);
+  border: 1px solid rgba(32, 200, 255, 0.35);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.file-tree-context-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: #d7e8f5;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.file-tree-context-item:hover:not(:disabled) {
+  background: rgba(32, 200, 255, 0.16);
+}
+.file-tree-context-item:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.file-tree-context-icon {
+  width: 18px;
+  text-align: center;
+}
+.file-tree-context-label {
   flex: 1;
   white-space: nowrap;
   overflow: hidden;
