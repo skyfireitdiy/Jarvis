@@ -15938,6 +15938,7 @@ body::-webkit-scrollbar {
   color: var(--color-text-secondary);
   font-size: 12px;
   cursor: pointer;
+  touch-action: manipulation;
 }
 
 .editor-global-search-mode-tab.active {
@@ -15959,6 +15960,10 @@ body::-webkit-scrollbar {
   color: var(--color-text-primary);
   font-size: 12px;
   box-sizing: border-box;
+  /* 覆盖 .editor-panel 的 user-select: none，否则移动端点击输入框无法唤起软键盘 */
+  user-select: text;
+  -webkit-user-select: text;
+  touch-action: manipulation;
 }
 
 .editor-global-search-input:focus {
