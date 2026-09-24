@@ -426,11 +426,25 @@
             </div>
             <div v-else class="editor-sidebar-content">
               <div class="editor-global-search-panel">
+                <div class="editor-global-search-mode-tabs">
+                  <button
+                    class="editor-global-search-mode-tab"
+                    :class="{ active: globalSearchMode === 'content' }"
+                    :disabled="globalSearchLoading"
+                    @click="setGlobalSearchMode('content')"
+                  >内容</button>
+                  <button
+                    class="editor-global-search-mode-tab"
+                    :class="{ active: globalSearchMode === 'filename' }"
+                    :disabled="globalSearchLoading"
+                    @click="setGlobalSearchMode('filename')"
+                  >文件名</button>
+                </div>
                 <input
                   v-model="globalSearchQuery"
                   class="editor-global-search-input"
                   type="text"
-                  placeholder="全局搜索文件内容..."
+                  :placeholder="globalSearchMode === 'filename' ? '按文件名模糊搜索...' : '全局搜索文件内容...'"
                   :disabled="globalSearchLoading || !currentAgentId"
                   @keydown.enter.prevent="runGlobalSearch"
                 >
@@ -447,12 +461,12 @@
                     <input v-model="globalSearchCaseSensitive" type="checkbox">
                     <span>区分大小写</span>
                   </label>
-                  <label class="editor-global-search-toggle">
+                  <label v-if="globalSearchMode === 'content'" class="editor-global-search-toggle">
                     <input v-model="globalSearchWholeWord" type="checkbox">
                     <span>全词匹配</span>
                   </label>
                   <div class="editor-global-search-actions">
-                    <button class="icon-btn editor-global-search-btn" @click="runGlobalSearch" :disabled="globalSearchLoading || !currentAgentId || !globalSearchQuery.trim()" title="全局搜索">🔍</button>
+                    <button class="icon-btn editor-global-search-btn" @click="runGlobalSearch" :disabled="globalSearchLoading || !currentAgentId || !globalSearchQuery.trim()" :title="globalSearchMode === 'filename' ? '文件名搜索' : '全局搜索'">🔍</button>
                     <button class="icon-btn editor-global-search-btn" @click="clearGlobalSearch" :disabled="globalSearchLoading" title="清空搜索">✕</button>
                   </div>
                 </div>
@@ -461,29 +475,46 @@
                 <div class="editor-global-search-summary">
                   <span v-if="globalSearchLoading">搜索中...</span>
                   <span v-else-if="globalSearchError" class="error">{{ globalSearchError }}</span>
+                  <span v-else-if="globalSearchExecuted && globalSearchMode === 'filename'">找到 {{ fileSearchResults.length }} 个文件（共扫描 {{ globalSearchTotalFiles }} 个）</span>
                   <span v-else-if="globalSearchExecuted">找到 {{ globalSearchTotalMatches }} 处匹配，分布在 {{ globalSearchTotalFiles }} 个文件</span>
-                  <span v-else>输入关键词并回车，可在当前 Agent 工作目录中全局搜索</span>
+                  <span v-else>{{ globalSearchMode === 'filename' ? '输入关键词并回车，可按文件名模糊搜索' : '输入关键词并回车，可在当前 Agent 工作目录中全局搜索' }}</span>
                 </div>
-                <div v-if="!globalSearchLoading && globalSearchExecuted && globalSearchResults.length === 0 && !globalSearchError" class="editor-global-search-empty">
-                  未找到匹配结果
-                </div>
-                <div v-for="result in globalSearchResults" :key="result.file_path" class="editor-global-search-file-group">
-                  <div class="editor-global-search-file-path" @click="openEditorFile(resolveAgentRelativePath(result.file_path))">
-                    {{ result.file_path }}
-                    <span class="editor-global-search-file-count">({{ result.matches.length }})</span>
+                <template v-if="globalSearchMode === 'filename'">
+                  <div v-if="!globalSearchLoading && globalSearchExecuted && fileSearchResults.length === 0 && !globalSearchError" class="editor-global-search-empty">
+                    未找到匹配文件
                   </div>
                   <button
-                    v-for="match in result.matches"
-                    :key="`${result.file_path}:${match.line_number}:${match.match_start}`"
-                    class="editor-global-search-match"
-                    @click="openGlobalSearchResult(result.file_path, match.line_number, match.match_start, match.match_end)"
+                    v-for="result in fileSearchResults"
+                    :key="result.file_path"
+                    class="editor-global-search-file-result"
+                    @click="openFileSearchResult(result.file_path)"
                   >
-                    <span class="editor-global-search-line">{{ match.line_number }}</span>
-                    <span class="editor-global-search-text">
-                      {{ match.line_content.slice(0, match.match_start) }}<mark>{{ match.line_content.slice(match.match_start, match.match_end) }}</mark>{{ match.line_content.slice(match.match_end) }}
-                    </span>
+                    <span class="editor-global-search-file-result-name">{{ result.name }}</span>
+                    <span class="editor-global-search-file-result-path">{{ result.file_path }}</span>
                   </button>
-                </div>
+                </template>
+                <template v-else>
+                  <div v-if="!globalSearchLoading && globalSearchExecuted && globalSearchResults.length === 0 && !globalSearchError" class="editor-global-search-empty">
+                    未找到匹配结果
+                  </div>
+                  <div v-for="result in globalSearchResults" :key="result.file_path" class="editor-global-search-file-group">
+                    <div class="editor-global-search-file-path" @click="openEditorFile(resolveAgentRelativePath(result.file_path))">
+                      {{ result.file_path }}
+                      <span class="editor-global-search-file-count">({{ result.matches.length }})</span>
+                    </div>
+                    <button
+                      v-for="match in result.matches"
+                      :key="`${result.file_path}:${match.line_number}:${match.match_start}`"
+                      class="editor-global-search-match"
+                      @click="openGlobalSearchResult(result.file_path, match.line_number, match.match_start, match.match_end)"
+                    >
+                      <span class="editor-global-search-line">{{ match.line_number }}</span>
+                      <span class="editor-global-search-text">
+                        {{ match.line_content.slice(0, match.match_start) }}<mark>{{ match.line_content.slice(match.match_start, match.match_end) }}</mark>{{ match.line_content.slice(match.match_end) }}
+                      </span>
+                    </button>
+                  </div>
+                </template>
               </div>
             </div>
           </aside>
@@ -840,11 +871,25 @@
           </div>
           <div v-else class="editor-sidebar-content">
             <div class="editor-global-search-panel">
+              <div class="editor-global-search-mode-tabs">
+                <button
+                  class="editor-global-search-mode-tab"
+                  :class="{ active: globalSearchMode === 'content' }"
+                  :disabled="globalSearchLoading"
+                  @click="setGlobalSearchMode('content')"
+                >内容</button>
+                <button
+                  class="editor-global-search-mode-tab"
+                  :class="{ active: globalSearchMode === 'filename' }"
+                  :disabled="globalSearchLoading"
+                  @click="setGlobalSearchMode('filename')"
+                >文件名</button>
+              </div>
               <input
                 v-model="globalSearchQuery"
                 class="editor-global-search-input"
                 type="text"
-                placeholder="全局搜索文件内容..."
+                :placeholder="globalSearchMode === 'filename' ? '按文件名模糊搜索...' : '全局搜索文件内容...'"
                 :disabled="globalSearchLoading || !currentAgentId"
                 @keydown.enter.prevent="runGlobalSearch"
               >
@@ -861,12 +906,12 @@
                   <input v-model="globalSearchCaseSensitive" type="checkbox">
                   <span>区分大小写</span>
                 </label>
-                <label class="editor-global-search-toggle">
+                <label v-if="globalSearchMode === 'content'" class="editor-global-search-toggle">
                   <input v-model="globalSearchWholeWord" type="checkbox">
                   <span>全词匹配</span>
                 </label>
                 <div class="editor-global-search-actions">
-                  <button class="icon-btn editor-global-search-btn" @click="runGlobalSearch" :disabled="globalSearchLoading || !currentAgentId || !globalSearchQuery.trim()" title="全局搜索">🔍</button>
+                  <button class="icon-btn editor-global-search-btn" @click="runGlobalSearch" :disabled="globalSearchLoading || !currentAgentId || !globalSearchQuery.trim()" :title="globalSearchMode === 'filename' ? '文件名搜索' : '全局搜索'">🔍</button>
                   <button class="icon-btn editor-global-search-btn" @click="clearGlobalSearch" :disabled="globalSearchLoading" title="清空搜索">✕</button>
                 </div>
               </div>
@@ -875,29 +920,46 @@
               <div class="editor-global-search-summary">
                 <span v-if="globalSearchLoading">搜索中...</span>
                 <span v-else-if="globalSearchError" class="error">{{ globalSearchError }}</span>
+                <span v-else-if="globalSearchExecuted && globalSearchMode === 'filename'">找到 {{ fileSearchResults.length }} 个文件（共扫描 {{ globalSearchTotalFiles }} 个）</span>
                 <span v-else-if="globalSearchExecuted">找到 {{ globalSearchTotalMatches }} 处匹配，分布在 {{ globalSearchTotalFiles }} 个文件</span>
-                <span v-else>输入关键词并回车，可在当前 Agent 工作目录中全局搜索</span>
+                <span v-else>{{ globalSearchMode === 'filename' ? '输入关键词并回车，可按文件名模糊搜索' : '输入关键词并回车，可在当前 Agent 工作目录中全局搜索' }}</span>
               </div>
-              <div v-if="!globalSearchLoading && globalSearchExecuted && globalSearchResults.length === 0 && !globalSearchError" class="editor-global-search-empty">
-                未找到匹配结果
-              </div>
-              <div v-for="result in globalSearchResults" :key="result.file_path" class="editor-global-search-file-group">
-                <div class="editor-global-search-file-path" @click="openEditorFile(resolveAgentRelativePath(result.file_path))">
-                  {{ result.file_path }}
-                  <span class="editor-global-search-file-count">({{ result.matches.length }})</span>
+              <template v-if="globalSearchMode === 'filename'">
+                <div v-if="!globalSearchLoading && globalSearchExecuted && fileSearchResults.length === 0 && !globalSearchError" class="editor-global-search-empty">
+                  未找到匹配文件
                 </div>
                 <button
-                  v-for="match in result.matches"
-                  :key="`${result.file_path}:${match.line_number}:${match.match_start}`"
-                  class="editor-global-search-match"
-                  @click="openGlobalSearchResult(result.file_path, match.line_number, match.match_start, match.match_end)"
+                  v-for="result in fileSearchResults"
+                  :key="result.file_path"
+                  class="editor-global-search-file-result"
+                  @click="openFileSearchResult(result.file_path)"
                 >
-                  <span class="editor-global-search-line">{{ match.line_number }}</span>
-                  <span class="editor-global-search-text">
-                    {{ match.line_content.slice(0, match.match_start) }}<mark>{{ match.line_content.slice(match.match_start, match.match_end) }}</mark>{{ match.line_content.slice(match.match_end) }}
-                  </span>
+                  <span class="editor-global-search-file-result-name">{{ result.name }}</span>
+                  <span class="editor-global-search-file-result-path">{{ result.file_path }}</span>
                 </button>
-              </div>
+              </template>
+              <template v-else>
+                <div v-if="!globalSearchLoading && globalSearchExecuted && globalSearchResults.length === 0 && !globalSearchError" class="editor-global-search-empty">
+                  未找到匹配结果
+                </div>
+                <div v-for="result in globalSearchResults" :key="result.file_path" class="editor-global-search-file-group">
+                  <div class="editor-global-search-file-path" @click="openEditorFile(resolveAgentRelativePath(result.file_path))">
+                    {{ result.file_path }}
+                    <span class="editor-global-search-file-count">({{ result.matches.length }})</span>
+                  </div>
+                  <button
+                    v-for="match in result.matches"
+                    :key="`${result.file_path}:${match.line_number}:${match.match_start}`"
+                    class="editor-global-search-match"
+                    @click="openGlobalSearchResult(result.file_path, match.line_number, match.match_start, match.match_end)"
+                  >
+                    <span class="editor-global-search-line">{{ match.line_number }}</span>
+                    <span class="editor-global-search-text">
+                      {{ match.line_content.slice(0, match.match_start) }}<mark>{{ match.line_content.slice(match.match_start, match.match_end) }}</mark>{{ match.line_content.slice(match.match_end) }}
+                    </span>
+                  </button>
+                </div>
+              </template>
             </div>
           </div>
         </aside>
@@ -2541,6 +2603,9 @@ const globalSearchResults = ref([])
 const globalSearchTotalFiles = ref(0)
 const globalSearchTotalMatches = ref(0)
 const globalSearchExecuted = ref(false)
+// 搜索模式：'content' 搜文件内容，'filename' 按文件名模糊搜索
+const globalSearchMode = ref('content')
+const fileSearchResults = ref([])
 const showEditorSidebar = ref(true)
 const editorSidebarView = ref('files')
 const windowWidth = ref(window.innerWidth)  // 窗口宽度，用于响应式检测
@@ -3306,6 +3371,30 @@ async function fetchGlobalSearchResults(agentId, payload) {
   return result.data
 }
 
+async function fetchFileSearchResults(agentId, payload) {
+  const { host, port } = getGatewayAddress()
+  const agent = agentList.value.find(a => a.agent_id === agentId)
+  if (!agent) {
+    throw new Error(`找不到Agent: ${agentId}`)
+  }
+  if (!agent.node_id) {
+    throw new Error(`Agent没有node_id: ${agentId}`)
+  }
+  const targetNodeId = String(agent.node_id).trim()
+  const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `file-search/${agentId}`), {
+    method: 'POST',
+    body: JSON.stringify({
+      ...payload,
+      node_id: targetNodeId,
+    })
+  })
+  const result = await response.json()
+  if (!response.ok || !result.success || !result.data) {
+    throw new Error(result.error?.message || '文件名搜索失败')
+  }
+  return result.data
+}
+
 const hasEditorSidebarFileTree = computed(() => {
   const agentId = activeEditorSessionId.value
   if (!agentId) return false
@@ -3357,6 +3446,7 @@ function clearGlobalSearch() {
   globalSearchWholeWord.value = false
   globalSearchError.value = ''
   globalSearchResults.value = []
+  fileSearchResults.value = []
   globalSearchTotalFiles.value = 0
   globalSearchTotalMatches.value = 0
   globalSearchExecuted.value = false
@@ -3373,6 +3463,7 @@ async function runGlobalSearch() {
     globalSearchError.value = '请输入搜索关键词'
     globalSearchExecuted.value = false
     globalSearchResults.value = []
+    fileSearchResults.value = []
     setEditorSidebarView('search')
     return
   }
@@ -3383,6 +3474,19 @@ async function runGlobalSearch() {
   globalSearchExecuted.value = false
 
   try {
+    if (globalSearchMode.value === 'filename') {
+      const data = await fetchFileSearchResults(currentAgentId.value, {
+        query,
+        case_sensitive: globalSearchCaseSensitive.value,
+        max_results: 200,
+        file_glob: globalSearchFileGlob.value.trim(),
+      })
+      fileSearchResults.value = Array.isArray(data.results) ? data.results : []
+      globalSearchTotalFiles.value = Number(data.total_files || 0)
+      globalSearchTotalMatches.value = 0
+      globalSearchExecuted.value = true
+      return
+    }
     const data = await fetchGlobalSearchResults(currentAgentId.value, {
       query,
       case_sensitive: globalSearchCaseSensitive.value,
@@ -3397,6 +3501,7 @@ async function runGlobalSearch() {
   } catch (error) {
     globalSearchError.value = error.message || '全局搜索失败'
     globalSearchResults.value = []
+    fileSearchResults.value = []
     globalSearchTotalFiles.value = 0
     globalSearchTotalMatches.value = 0
     globalSearchExecuted.value = true
@@ -3404,6 +3509,21 @@ async function runGlobalSearch() {
   } finally {
     globalSearchLoading.value = false
   }
+}
+
+function setGlobalSearchMode(mode) {
+  if (globalSearchMode.value === mode) return
+  globalSearchMode.value = mode
+  globalSearchError.value = ''
+  globalSearchExecuted.value = false
+  globalSearchResults.value = []
+  fileSearchResults.value = []
+  globalSearchTotalFiles.value = 0
+  globalSearchTotalMatches.value = 0
+}
+
+function openFileSearchResult(filePath) {
+  openEditorFile(resolveAgentRelativePath(filePath), currentAgentId.value)
 }
 
 async function openGlobalSearchResult(filePath, lineNumber, matchStart = 0, matchEnd = matchStart) {
@@ -15804,6 +15924,32 @@ body::-webkit-scrollbar {
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
+.editor-global-search-mode-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.editor-global-search-mode-tab {
+  flex: 1;
+  padding: 6px 10px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.editor-global-search-mode-tab.active {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.editor-global-search-mode-tab:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .editor-global-search-input {
   width: 100%;
   padding: 8px 10px;
@@ -15883,6 +16029,36 @@ body::-webkit-scrollbar {
 .editor-global-search-file-count {
   margin-left: 4px;
   color: var(--color-text-secondary);
+}
+
+.editor-global-search-file-result {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.editor-global-search-file-result:hover {
+  background: var(--color-bg-hover);
+}
+
+.editor-global-search-file-result-name {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.editor-global-search-file-result-path {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  word-break: break-all;
 }
 
 .editor-global-search-match {
