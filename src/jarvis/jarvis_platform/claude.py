@@ -447,9 +447,7 @@ class ClaudeModel(BasePlatform):
         # 追加用户消息（工具后续轮 append_user=False，避免重复加空消息）
         # 同时清理孤立代理字符，避免 SDK 编码请求体时抛 UnicodeEncodeError
         if append_user and message:
-            self.messages.append(
-                sanitize_message({"role": "user", "content": message})
-            )
+            self.messages.append(sanitize_message({"role": "user", "content": message}))
 
         system_text, anthropic_messages = to_anthropic_messages(self.messages)
         if append_user and message:
@@ -505,18 +503,29 @@ class ClaudeModel(BasePlatform):
 
                 start_time = time.time()
                 gen = _gen()
+                # 已确认支持原生工具的模型：流式异常需向上抛出，交由外层决定，
+                # 避免渲染管线吞掉异常后误判为"成功但空输出"而静默降级。
+                _raise_on_error = getattr(self, "_native_confirmed", False)
                 if not self.suppress_output:
                     if get_pretty_output():
                         content, _reasoning, _ft = self._chat_with_pretty_output(
-                            render_message, start_time, chat_iterator=gen
+                            render_message,
+                            start_time,
+                            chat_iterator=gen,
+                            raise_on_error=_raise_on_error,
                         )
                     else:
                         content, _reasoning, _ft = self._chat_with_simple_output(
-                            render_message, start_time, chat_iterator=gen
+                            render_message,
+                            start_time,
+                            chat_iterator=gen,
+                            raise_on_error=_raise_on_error,
                         )
                 else:
                     content, _reasoning = self._chat_with_suppressed_output(
-                        render_message, chat_iterator=gen
+                        render_message,
+                        chat_iterator=gen,
+                        raise_on_error=_raise_on_error,
                     )
                 # 渲染层可能提前 break 未耗尽生成器，此处显式耗尽以触发 get_final_message 与 tool_calls 解析
                 for _ in gen:
@@ -569,8 +578,15 @@ class ClaudeModel(BasePlatform):
                         start_time,
                         tool_calls=tool_calls or None,
                     )
+                # 原生请求成功返回，说明该端点确实支持 tools：记录该模型支持原生，
+                # 之后即使遇到临时错误也不再降级为纯文本协议。
+                self.mark_native_supported()
                 return (content or None), (tool_calls or None)
             except Exception as e:
+                if getattr(self, "_native_confirmed", False):
+                    # 该模型曾被确认支持原生工具调用，不再降级到纯文本协议，
+                    # 直接向上抛出，避免静默退化为弱能力路径。
+                    raise
                 PrettyOutput.auto_print(
                     f"⚠️ 原生工具调用不可用（{str(e)}），本模型将回退纯文本协议"
                 )

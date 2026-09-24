@@ -688,18 +688,29 @@ class OpenAIModel(BasePlatform):
                                     entry["arguments"] += fn.arguments or ""
 
                 start_time = time.time()
+                # 已确认支持原生工具的模型：流式异常需向上抛出，交由外层决定，
+                # 避免渲染管线吞掉异常后误判为"成功但空输出"而静默降级。
+                _raise_on_error = getattr(self, "_native_confirmed", False)
                 if not self.suppress_output:
                     if get_pretty_output():
                         content, _reasoning, _ft = self._chat_with_pretty_output(
-                            render_message, start_time, chat_iterator=_gen()
+                            render_message,
+                            start_time,
+                            chat_iterator=_gen(),
+                            raise_on_error=_raise_on_error,
                         )
                     else:
                         content, _reasoning, _ft = self._chat_with_simple_output(
-                            render_message, start_time, chat_iterator=_gen()
+                            render_message,
+                            start_time,
+                            chat_iterator=_gen(),
+                            raise_on_error=_raise_on_error,
                         )
                 else:
                     content, _reasoning = self._chat_with_suppressed_output(
-                        render_message, chat_iterator=_gen()
+                        render_message,
+                        chat_iterator=_gen(),
+                        raise_on_error=_raise_on_error,
                     )
 
                 # 从累积的 tool_calls 分片解析规范格式
@@ -755,8 +766,15 @@ class OpenAIModel(BasePlatform):
                         start_time,
                         tool_calls=tool_calls or None,
                     )
+                # 原生请求成功返回，说明该端点确实支持 tools：记录该模型支持原生，
+                # 之后即使遇到临时错误也不再降级为纯文本协议。
+                self.mark_native_supported()
                 return (content or None), (tool_calls or None)
             except Exception as e:
+                if getattr(self, "_native_confirmed", False):
+                    # 该模型曾被确认支持原生工具调用，不再降级到纯文本协议，
+                    # 直接向上抛出，避免静默退化为弱能力路径。
+                    raise
                 PrettyOutput.auto_print(
                     f"⚠️ 原生工具调用不可用（{str(e)}），本模型将回退纯文本协议"
                 )

@@ -23,6 +23,8 @@ import jarvis.jarvis_utils.globals as G
 from jarvis.jarvis_utils.config import get_cheap_max_input_token_count
 from jarvis.jarvis_utils.config import get_conversation_turn_threshold
 from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import is_model_native_supported
+from jarvis.jarvis_utils.config import mark_model_native_supported
 from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.config import get_pretty_output
 from jarvis.jarvis_utils.config import get_smart_max_input_token_count
@@ -72,8 +74,6 @@ class BasePlatform(ABC):
         self._session_history_file: Optional[str] = None
         self.platform_type: str = platform_type  # 平台类型：normal/cheap/smart
         self.agent = agent  # 保存Agent引用，用于回调
-        # 原生 function calling 一旦因端点不支持而失败即置位，之后本实例回退纯文本协议
-        self._native_disabled = False
 
         # 根据 platform_type 获取对应的 model_name
         if platform_type == "cheap":
@@ -84,6 +84,11 @@ class BasePlatform(ABC):
             self.model_name = get_eval_model_name()
         else:
             self.model_name = get_normal_model_name()
+
+        # 原生 function calling 一旦因端点不支持而失败即置位，之后本实例回退纯文本协议。
+        # 但若该模型曾被确认支持原生工具调用（成功返回过原生响应），则不再降级。
+        self._native_disabled = False
+        self._native_confirmed = is_model_native_supported(self.model_name)
 
         # 获取 llm_config 供子类使用
         self._llm_config = get_llm_config(platform_type)
@@ -119,6 +124,15 @@ class BasePlatform(ABC):
         默认 False；OpenAI 兼容与 Anthropic 平台覆写为 True。
         """
         return False
+
+    def mark_native_supported(self) -> None:
+        """标记当前模型已确认支持原生 function calling 并持久化。
+
+        在原生请求成功返回（拿到 content 或 tool_calls）后调用：
+        说明该端点确实支持 tools，之后即使遇到临时错误也不再降级到纯文本协议。
+        """
+        self._native_confirmed = True
+        mark_model_native_supported(self.model_name)
 
     def append_native_tool_result(
         self, tool_call_id: str, name: str, content: str
@@ -336,12 +350,14 @@ class BasePlatform(ABC):
         start_time: float,
         max_output: int = 0,
         chat_iterator: Optional[Generator[Tuple[str, str], None, None]] = None,
+        raise_on_error: bool = False,
     ) -> Tuple[str, str, float]:
         """使用 pretty output 模式进行聊天（封装到 PrettyOutput）
 
         参数:
             chat_iterator: 可选的自定义响应迭代器；为 None 时使用 self.chat(message)。
                 供原生工具调用等需要自定义生成器的场景复用同一渲染管线。
+            raise_on_error: 流式异常是否向上抛出（原生工具调用路径在已确认支持时使用）
         """
         # 对于多模态消息，只传递提示字符串给PrettyOutput
         display_message = message if isinstance(message, str) else "[多模态消息]"
@@ -361,6 +377,7 @@ class BasePlatform(ABC):
             max_output=max_output,
             check_interrupt=lambda: bool(get_interrupt()),
             panel_lock=self._panel_lock,
+            raise_on_error=raise_on_error,
         )
 
     def _chat_with_simple_output(
@@ -369,11 +386,13 @@ class BasePlatform(ABC):
         start_time: float,
         max_output: int = 0,
         chat_iterator: Optional[Generator[Tuple[str, str], None, None]] = None,
+        raise_on_error: bool = False,
     ) -> Tuple[str, str, float]:
         """使用简单输出模式进行聊天（封装到 PrettyOutput）
 
         参数:
             chat_iterator: 可选的自定义响应迭代器；为 None 时使用 self.chat(message)。
+            raise_on_error: 流式异常是否向上抛出（原生工具调用路径在已确认支持时使用）
         """
         # 对于多模态消息，只传递提示字符串给PrettyOutput
         display_message = message if isinstance(message, str) else "[多模态消息]"
@@ -390,6 +409,7 @@ class BasePlatform(ABC):
             get_context_token_count=get_context_token_count,
             get_used_token_count=self.get_used_token_count,
             get_platform_max_input_token_count=self._get_platform_max_input_token_count,
+            raise_on_error=raise_on_error,
         )
         return response, reasoning_content, first_token_time
 
@@ -398,6 +418,7 @@ class BasePlatform(ABC):
         message: Union[str, List[ContentBlock]],
         max_output: int = 0,
         chat_iterator: Optional[Generator[Tuple[str, str], None, None]] = None,
+        raise_on_error: bool = False,
     ) -> Tuple[str, str]:
         """使用无人值守模式进行聊天
 
@@ -405,6 +426,7 @@ class BasePlatform(ABC):
             message: 用户消息
             max_output: 最大输出长度，0表示无限制
             chat_iterator: 可选的自定义响应迭代器；为 None 时使用 self.chat(message)。
+            raise_on_error: 流式异常是否向上抛出（原生工具调用路径在已确认支持时使用）
 
         返回:
             Tuple[str, str]: (模型响应, 推理内容)
@@ -431,6 +453,8 @@ class BasePlatform(ABC):
         except Exception as e:
             # 发生异常时，打印错误信息并返回已收集的内容
             PrettyOutput.auto_print(f"⚠️ 流式输出异常: {e}")
+            if raise_on_error:
+                raise
             self._append_session_history(message, response)
             return response, reasoning_content
         return response, reasoning_content
