@@ -1937,6 +1937,17 @@ def create_app(
         if child_node_client is not None:
             await child_node_client.stop()
         timer_manager.shutdown()
+        # 回收全部语言服务器子进程（自定义 lifespan 下 on_shutdown 事件不会触发）
+        lsp_pool = getattr(app.state, "lsp_process_pool", None)
+        if lsp_pool is not None:
+            try:
+                await lsp_pool.shutdown()
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_web_gateway.app",
+                    function="lifespan",
+                )
         set_current_gateway(None)
         # 停止 Unix Domain Socket 服务器
         await _stop_node_secret_socket_server()
@@ -3176,6 +3187,117 @@ def create_app(
             await websocket.close(code=4404)
             return
         await node_connection_manager.handle_node_websocket(websocket)
+
+    # ------------------------------------------------------------------
+    # LSP 语言服务器桥接（插件化：新增语言只需在 lsp_servers/ 丢清单 JSON）
+    # ------------------------------------------------------------------
+    from jarvis.jarvis_web_gateway.lsp_bridge import (
+        LspProcessPool,
+        resolve_workspace_root,
+    )
+    from jarvis.jarvis_web_gateway.lsp_registry import (
+        get_lsp_server_spec,
+        load_lsp_server_specs,
+    )
+
+    lsp_process_pool = LspProcessPool()
+    # 供 lifespan 在应用退出时回收子进程。注意：本应用使用自定义 lifespan，
+    # 此时 add_event_handler("shutdown", ...) 不会被调用，必须显式接入。
+    app.state.lsp_process_pool = lsp_process_pool
+
+    @app.get("/api/lsp/servers", dependencies=[Depends(verify_token)])
+    async def list_lsp_servers() -> Dict[str, Any]:
+        """列出全部已注册的 LSP 语言服务器清单。
+
+        只暴露前端需要的字段，不返回 command / args / 环境变量等敏感信息。
+        """
+        specs = load_lsp_server_specs()
+        return {
+            "success": True,
+            "servers": [
+                {
+                    "id": spec.get("id"),
+                    "monacoLanguage": spec.get("monacoLanguage"),
+                    "extensions": spec.get("extensions", []),
+                    "installHint": spec.get("installHint", ""),
+                    "source": spec.get("_source", ""),
+                }
+                for spec in sorted(specs.values(), key=lambda s: s.get("id", ""))
+            ],
+        }
+
+    @app.websocket("/api/lsp/{server_id}")
+    async def lsp_websocket_endpoint(websocket: WebSocket, server_id: str) -> None:
+        """WebSocket ↔ 语言服务器子进程 stdio 的通用 JSON-RPC 桥接。
+
+        对语言完全无感知：命令来自清单，消息纯转发。
+        查询参数：``root``（可选）workspace 根目录。
+        """
+        # 鉴权（复用既有 WS 鉴权模式）
+        auth_payload = _extract_auth_from_headers(websocket)
+        if auth_payload is not None:
+            authorized, reason = gateway._check_auth(auth_payload)
+        else:
+            authorized = any(auth is not None for auth in manager._auth_store.values())
+            reason = "Authentication required"
+        if not authorized:
+            await websocket.accept(subprotocol="jarvis-ws")
+            await _send_error(websocket, "AUTH_FAILED", reason or "Invalid token")
+            await websocket.close(code=4401, reason="Unauthorized")
+            return
+
+        # 校验 server_id
+        spec = get_lsp_server_spec(server_id)
+        if spec is None:
+            await websocket.accept(subprotocol="jarvis-ws")
+            await _send_error(
+                websocket, "UNKNOWN_SERVER", f"unknown lsp server id: {server_id}"
+            )
+            await websocket.close(code=4404, reason="Unknown server")
+            return
+
+        raw_root = websocket.query_params.get("root")
+        workspace_root = resolve_workspace_root(raw_root, spec)
+
+        try:
+            proc = await lsp_process_pool.get_or_create(server_id, workspace_root)
+        except Exception as e:
+            await websocket.accept(subprotocol="jarvis-ws")
+            await _send_error(websocket, "SERVER_START_FAILED", str(e))
+            await websocket.close(code=4400, reason="Server start failed")
+            return
+
+        await websocket.accept(subprotocol="jarvis-ws")
+
+        async def _send_to_ws(message: Dict[str, Any]) -> None:
+            await websocket.send_text(json.dumps(message, ensure_ascii=False))
+
+        lsp_process_pool.subscribe(proc, _send_to_ws)
+
+        try:
+            while True:
+                text = await websocket.receive_text()
+                try:
+                    message = json.loads(text)
+                except json.JSONDecodeError:
+                    logger.warning(
+                        "[lsp_bridge] 收到非 JSON 的 WS 消息，已忽略 (server_id=%s)",
+                        server_id,
+                    )
+                    continue
+                if not isinstance(message, dict):
+                    continue
+                try:
+                    await lsp_process_pool.send(proc, message)
+                except RuntimeError as e:
+                    await _send_error(websocket, "SERVER_GONE", str(e))
+                    break
+        except WebSocketDisconnect:
+            pass
+        except Exception as e:
+            logger.warning("[lsp_bridge] WS 桥接异常 (server_id=%s): %s", server_id, e)
+        finally:
+            lsp_process_pool.unsubscribe(proc)
 
     # 浏览器扩展 WebSocket：用户浏览器内的插件主动连出到网关
     @app.websocket("/api/browser-ext/ws")

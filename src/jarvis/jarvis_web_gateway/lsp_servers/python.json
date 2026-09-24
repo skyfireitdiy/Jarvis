@@ -1,0 +1,10 @@
+{
+  "id": "python",
+  "monacoLanguage": "python",
+  "extensions": [".py", ".pyi"],
+  "command": ["pylsp"],
+  "args": [],
+  "rootMarkers": ["pyproject.toml", "setup.py", "setup.cfg", ".git"],
+  "initializationOptions": {},
+  "installHint": "pip install python-lsp-server"
+}
