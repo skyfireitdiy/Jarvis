@@ -185,11 +185,101 @@ websocat -H="Sec-WebSocket-Protocol: jarvis-ws,jarvis-token.<urlencoded-token>" 
    打开文件时可能各起一个语言服务器进程。
 3. **未实现 `didSave`**：当前同步 didOpen / didChange / didClose，未发送 didSave。
 
+## CodeAgent 集成
+
+除编辑器（Monaco）外，LSP 能力也以原生工具形式暴露给 CodeAgent。
+
+### 工具形态
+
+工具名 `lsp`（`src/jarvis/jarvis_tools/lsp.py`），采用**单工具 + action 枚举**设计，
+避免为每个 LSP 方法注册一个工具而污染工具列表。已注册进 CodeAgent 的
+`base_tools`（`code_agent.py` 的 `_build_code_agent_tool_list`）。
+
+```json
+{
+  "name": "lsp",
+  "arguments": {
+    "action": "find_definition",
+    "file_path": "src/main.py",
+    "symbol_name": "MyClass"
+  }
+}
+```
+
+### action 列表
+
+| action               | 必填参数               | 对应 LSPDaemonClient 方法 |
+| -------------------- | ---------------------- | ------------------------- |
+| document_symbols     | file_path              | `document_symbol`         |
+| find_definition      | file_path, symbol_name | `definition_by_name`      |
+| find_references      | file_path, symbol_name | `references_by_name`      |
+| find_implementation  | file_path, symbol_name | `implementation_by_name`  |
+| find_type_definition | file_path, symbol_name | `type_definition_by_name` |
+| find_callers         | file_path, symbol_name | `incoming_calls_by_name`  |
+| find_callees         | file_path, symbol_name | `outgoing_calls_by_name`  |
+| hover                | file_path, line        | `hover`                   |
+| diagnostic           | file_path              | `diagnostic`              |
+| code_action          | file_path, symbol_name | `code_action_by_name`     |
+| workspace_symbols    | query                  | `workspace_symbol`        |
+
+### 参数与推断
+
+- `language` 省略时用 `LSPConfigReader.detect_language()` 按扩展名推断；
+- `project_path` 省略时取 `file_path` 所在目录；
+- `file_path` 支持相对路径（相对当前工作目录）与绝对路径，内部用 `os.path.abspath` 归一化；
+- 参数设计面向 LLM：优先 `symbol_name`，避免精确行列号（仅 `hover` 需要 `line`）。
+
+### 返回格式
+
+统一为 `{"success": bool, "stdout": str, "stderr": str}`，`stdout` 为 JSON 文本：
+
+```json
+{
+  "action": "find_definition",
+  "language": "python",
+  "project_path": "/path/to/project",
+  "file_path": "/path/to/project/src/main.py",
+  "result": {
+    "file_path": "...",
+    "line": 43,
+    "column": 5,
+    "symbol_name": "..."
+  }
+}
+```
+
+### 异步桥接
+
+`LSPDaemonClient` 为全异步接口，而工具 `execute` 是同步方法。实现中：
+
+- 当前线程无运行中事件循环 → 直接 `asyncio.run()`；
+- 当前线程已有运行中事件循环（如 Web 网关内）→ 另起线程执行 `asyncio.run()`，
+  避免 `RuntimeError: This event loop is already running`。
+
+### 降级行为
+
+以下情况均返回 `success=false`，不抛异常、不中断 Agent：
+
+| 情况                                                                     | `stderr` 内容                                    |
+| ------------------------------------------------------------------------ | ------------------------------------------------ |
+| 语言无法识别                                                             | 提示用 `language` 显式指定，并列出当前支持的语言 |
+| 语言服务器未安装 / daemon 启动失败                                       | 原因 + 对应语言的 `install_hint`                 |
+| 语言服务器不支持该 LSP 方法（如 pylsp 不支持 `textDocument/diagnostic`） | 原因 + `install_hint`                            |
+
+### 与其它工具的边界
+
+- 语义查询（定义/引用/实现/诊断/修复）→ `lsp`；
+- 纯文本搜索 → `execute_script` + rg（LSP 不适用于文本匹配）；
+- 调用链/依赖图分析 → `symbol_dependency`（静态解析，无需语言服务器）；
+- 读取文件内容 → `read_code`。
+
 ## 相关源码
 
 | 文件                                                     | 职责                                                            |
 | -------------------------------------------------------- | --------------------------------------------------------------- |
 | `src/jarvis/jarvis_lsp/config.py`                        | **配置读取层（唯一来源）**，内置默认语言，jarvis-lsp 与网关共用 |
+| `src/jarvis/jarvis_tools/lsp.py`                         | **CodeAgent 的 LSP 工具**，action 分派、语言推断、异步桥接      |
+| `src/jarvis/jarvis_lsp/daemon_client.py`                 | LSP 守护进程客户端（全异步），工具层复用之                      |
 | `src/jarvis/jarvis_web_gateway/lsp_registry.py`          | 把配置转换为网关 spec 结构                                      |
 | `src/jarvis/jarvis_web_gateway/lsp_bridge.py`            | LSP 分帧编解码、进程池、workspace root 解析                     |
 | `src/jarvis/jarvis_web_gateway/app.py`                   | `GET /api/lsp/servers`、`WS /api/lsp/{server_id}`               |

@@ -34,6 +34,65 @@ description: 当需要使用LSP工具进行代码分析或开发环境配置时�
 - 完整性：含类型信息、文档字符串、调用关系等
 - 一致性：统一的接口，支持多种编程语言
 
+### 1.1 CodeAgent 内使用 `lsp` 工具（必守）
+
+在 CodeAgent 中，LSP 能力已封装为原生工具 `lsp`，**必须优先用 `lsp` 工具，而非 `execute_script` 调用 `jlsp` CLI**：
+
+- **必须**：CodeAgent 内所有 LSP 语义查询都通过 `lsp` 工具完成
+- **禁止**：用 `execute_script` 拼 shell 命令调用 `jlsp`（易受路径转义影响，且无结构化返回）
+- **禁止**：用 `lsp` 工具做纯文本搜索（应用 `execute_script` + rg）
+
+**调用格式**：
+
+```json
+{
+  "name": "lsp",
+  "arguments": {
+    "action": "find_definition",
+    "file_path": "src/main.py",
+    "symbol_name": "MyClass"
+  }
+}
+```
+
+**action 与参数对照**：
+
+| action               | 必填参数               | 说明                            |
+| -------------------- | ---------------------- | ------------------------------- |
+| document_symbols     | file_path              | 列出文件全部符号                |
+| find_definition      | file_path, symbol_name | 按符号名查定义                  |
+| find_references      | file_path, symbol_name | 按符号名查引用                  |
+| find_implementation  | file_path, symbol_name | 按符号名查实现                  |
+| find_type_definition | file_path, symbol_name | 按符号名查类型定义              |
+| find_callers         | file_path, symbol_name | 谁调用了该符号                  |
+| find_callees         | file_path, symbol_name | 该符号调用了谁                  |
+| hover                | file_path, line        | 类型/文档信息（line 从 1 开始） |
+| diagnostic           | file_path              | 错误与警告                      |
+| code_action          | file_path, symbol_name | 按符号名获取修复建议            |
+| workspace_symbols    | query                  | 全工作区搜索符号                |
+
+**自动推断**：
+
+- `language` 省略时按文件扩展名推断（如 `.py` → python）
+- `project_path` 省略时取 `file_path` 所在目录
+- `file_path` 支持相对路径（相对当前工作目录）与绝对路径
+
+**返回格式**：`{"success": bool, "stdout": <JSON>, "stderr": <错误>}`，`stdout` 中 `result` 字段为查询结果。
+
+**降级行为**：语言无法识别、语言服务器未安装、daemon 启动失败时返回 `success=false`，`stderr` 含原因与安装提示，不会中断任务。
+
+### 1.2 工具选择边界（必守）
+
+| 场景                 | 应使用                | 理由                     |
+| -------------------- | --------------------- | ------------------------ |
+| 查符号定义/引用/实现 | `lsp`                 | 语义准确，支持跨文件     |
+| 查类型/文档字符串    | `lsp` hover           | LSP 独有                 |
+| 查语法错误/lint 警告 | `lsp` diagnostic      | LSP 独有                 |
+| 查重构/修复建议      | `lsp` code_action     | LSP 独有                 |
+| 纯文本搜索           | `execute_script` + rg | LSP 不适用于文本匹配     |
+| 调用链/依赖图分析    | `symbol_dependency`   | 静态解析，无需语言服务器 |
+| 读取文件内容         | `read_code`           | —                        |
+
 ### 2. 命令使用原则（必守）
 
 **符号查询类命令**（优先用）：
@@ -140,9 +199,9 @@ description: 当需要使用LSP工具进行代码分析或开发环境配置时�
 
 ### 符号查询类
 
-| 命令             | 参数                    | 说明                 | LLM适用性 |
+| 命令             | 参数                    | 说明                 | LLM适用性  |
 | ---------------- | ----------------------- | -------------------- | ---------- |
-| document_symbols | file_path               | 列出文件中所有符号 | ⭐⭐⭐⭐⭐ |
+| document_symbols | file_path               | 列出文件中所有符号   | ⭐⭐⭐⭐⭐ |
 | def-name         | file_path, symbol_name  | 通过符号名查找定义   | ⭐⭐⭐⭐⭐ |
 | ref-name         | file_path, symbol_name  | 通过符号名查找引用   | ⭐⭐⭐⭐⭐ |
 | impl-name        | file_path, symbol_name  | 通过符号名查找实现   | ⭐⭐⭐⭐⭐ |
