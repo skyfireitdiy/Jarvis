@@ -165,13 +165,18 @@ class LSPDaemon:
     async def handle_client(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
-        """处理客户端连接"""
+        """处理客户端连接
+
+        客户端（daemon_client）采用「一请求一连接」语义：每次请求新建连接、
+        读取响应后立即关闭。因此这里处理完单个请求后即结束，避免服务端继续
+        在已关闭的连接上 readline/write 而触发 Connection reset by peer。
+        """
         try:
-            while self.running:
+            if self.running:
                 # 读取请求
                 line = await reader.readline()
                 if not line:
-                    break
+                    return
 
                 try:
                     # 解析 Content-Length 头
@@ -193,7 +198,12 @@ class LSPDaemon:
 
                     # 发送响应
                     response_json = json.dumps(response, ensure_ascii=False)
-                    response_data = f"Content-Length: {len(response_json)}\r\n\r\n{response_json}".encode()
+                    response_bytes = response_json.encode()
+                    # Content-Length 必须是 UTF-8 字节数（非字符数），否则含中文时响应被截断
+                    response_data = (
+                        f"Content-Length: {len(response_bytes)}\r\n\r\n".encode()
+                        + response_bytes
+                    )
                     writer.write(response_data)
                     await writer.drain()
 
@@ -204,10 +214,13 @@ class LSPDaemon:
                         "error": str(e),
                     }
                     error_json = json.dumps(error_response, ensure_ascii=False)
-                    error_data = f"Content-Length: {len(error_json)}\r\n\r\n{error_json}".encode()
+                    error_bytes = error_json.encode()
+                    error_data = (
+                        f"Content-Length: {len(error_bytes)}\r\n\r\n".encode()
+                        + error_bytes
+                    )
                     writer.write(error_data)
                     await writer.drain()
-                    break
 
         except Exception as e:
             save_exception(e, module="jarvis_lsp.daemon", function="__init__")

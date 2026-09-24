@@ -39,9 +39,14 @@ class LSPDaemonClient:
         self._is_unix = isinstance(addr, str)
         # 兼容旧代码中 client.socket_path 的引用（如 daemon_stop）
         self.socket_path = addr if self._is_unix else f"{addr[0]}:{addr[1]}"
+        # 守护进程就绪标志：仅在首次请求时探测/启动，避免每次请求都额外
+        # 建立一条探测连接（探测连接被立即关闭会让服务端读到 RST，干扰正常请求）
+        self._daemon_ready = False
 
     async def _ensure_daemon_running(self) -> None:
-        """确保守护进程正在运行"""
+        """确保守护进程正在运行（仅在未确认就绪时探测/启动）"""
+        if self._daemon_ready:
+            return
 
         async def _try_connect() -> bool:
             try:
@@ -68,6 +73,7 @@ class LSPDaemonClient:
                 return False
 
         if await _try_connect():
+            self._daemon_ready = True
             return
 
         # 启动守护进程
@@ -88,12 +94,17 @@ class LSPDaemonClient:
                 cwd=os.path.expanduser("~"),
             )
         else:
-            await asyncio.create_subprocess_exec(
-                sys.executable,
-                daemon_script,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
+            # 必须用 subprocess.Popen 而非 asyncio.create_subprocess_exec：
+            # 后者创建的子进程由当前事件循环托管，asyncio.run 结束/进程退出时
+            # 会被一并终止，导致守护进程随客户端进程消亡（下次调用需重启，
+            # 且重启窗口内容易出现 Connection reset by peer）。
+            subprocess.Popen(
+                [sys.executable, daemon_script],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
                 start_new_session=True,
+                cwd=os.path.expanduser("~"),
             )
 
         # 等待守护进程就绪（最多 5 秒）
@@ -101,6 +112,7 @@ class LSPDaemonClient:
             await asyncio.sleep(0.1)
             if await _try_connect():
                 await asyncio.sleep(0.5)
+                self._daemon_ready = True
                 return
 
         raise RuntimeError(
@@ -127,8 +139,10 @@ class LSPDaemonClient:
 
         request = {"method": method, "params": params}
         request_json = json.dumps(request, ensure_ascii=False)
+        request_bytes = request_json.encode()
+        # Content-Length 必须是 UTF-8 字节数（非字符数），否则含中文时请求被截断
         request_data = (
-            f"Content-Length: {len(request_json)}\r\n\r\n{request_json}".encode()
+            f"Content-Length: {len(request_bytes)}\r\n\r\n".encode() + request_bytes
         )
 
         try:
@@ -172,8 +186,11 @@ class LSPDaemonClient:
             return response
 
         except ConnectionRefusedError:
+            self._daemon_ready = False
             raise RuntimeError("无法连接到守护进程。请先运行: jlsp daemon start")
         except Exception as e:
+            # 通信失败可能因守护进程已退出，重置标志以便下次请求重新探测/启动
+            self._daemon_ready = False
             raise RuntimeError(f"守护进程通信失败: {e}")
 
     async def start_server(self, language: str, project_path: str) -> int:

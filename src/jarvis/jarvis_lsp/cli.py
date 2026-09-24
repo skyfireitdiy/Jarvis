@@ -768,8 +768,12 @@ def daemon_stop() -> None:
             sock.connect((client.addr[0], client.addr[1]))
 
         request = {"id": 1, "method": "shutdown", "params": {}}
-        message = json.dumps(request)
-        sock.sendall(f"Content-Length: {len(message)}\r\n\r\n{message}".encode("utf-8"))
+        message_bytes = json.dumps(request).encode("utf-8")
+        # Content-Length 必须是 UTF-8 字节数（非字符数）
+        sock.sendall(
+            f"Content-Length: {len(message_bytes)}\r\n\r\n".encode("utf-8")
+            + message_bytes
+        )
         sock.close()
 
         print("✅ LSP 守护进程已停止")
