@@ -1,7 +1,7 @@
 """Jarvis 权限管理模块
 
-职责：权限组管理、权限检查、资源级ACL
-数据存储：jarvis_data_dir/auth/ 下5个JSON文件
+职责：权限组管理、权限检查
+数据存储：jarvis_data_dir/auth/ 下4个JSON文件
 """
 
 import os
@@ -57,7 +57,7 @@ BUILTIN_GROUPS = {
 
 
 class PermissionManager:
-    """权限管理器，负责权限组管理、权限检查、资源级ACL"""
+    """权限管理器，负责权限组管理、权限检查"""
 
     def __init__(self, data_dir: str):
         self._data_dir = os.path.join(data_dir, "auth")
@@ -70,12 +70,10 @@ class PermissionManager:
         self._user_permissions_file = os.path.join(
             self._data_dir, "user_permissions.json"
         )
-        self._resource_acl_file = os.path.join(self._data_dir, "resource_acl.json")
         self._groups: dict = {}
         self._group_permissions: dict = {}
         self._user_groups: dict = {}
         self._user_permissions: dict = {}
-        self._resource_acl: dict = {}
         self._permission_cache: dict = {}
         self._user_manager = None  # 注入UserManager引用，用于is_admin检查
         self._load_data()
@@ -102,7 +100,6 @@ class PermissionManager:
         self._group_permissions = self._load_json(self._group_permissions_file)
         self._user_groups = self._load_json(self._user_groups_file)
         self._user_permissions = self._load_json(self._user_permissions_file)
-        self._resource_acl = self._load_json(self._resource_acl_file)
 
     def _save_groups(self) -> None:
         self._save_json(self._groups_file, self._groups)
@@ -115,9 +112,6 @@ class PermissionManager:
 
     def _save_user_permissions(self) -> None:
         self._save_json(self._user_permissions_file, self._user_permissions)
-
-    def _save_resource_acl(self) -> None:
-        self._save_json(self._resource_acl_file, self._resource_acl)
 
     def _ensure_builtin_groups(self) -> None:
         for group_id, group_def in BUILTIN_GROUPS.items():
@@ -192,23 +186,6 @@ class PermissionManager:
                     if decision == "allow":
                         return True
         return False
-
-    def check_resource_permission(
-        self,
-        user_id: str,
-        resource_type: str,
-        resource_id: str,
-        permission: str,
-        owner_id: Optional[str] = None,
-    ) -> bool:
-        if owner_id and user_id == owner_id:
-            return True
-        resource_acls = self._resource_acl.get(resource_type, {})
-        acl = resource_acls.get(resource_id, {})
-        user_acl = acl.get(user_id, [])
-        if permission in user_acl or "*" in user_acl:
-            return True
-        return self.check_permission(user_id, f"{resource_type}:{permission}")
 
     def get_user_permissions(self, user_id: str) -> dict:
         result = {"allowed": [], "denied": []}
@@ -328,27 +305,6 @@ class PermissionManager:
         self._save_user_permissions()
         self.invalidate_cache(user_id)
         return self._user_permissions[user_id]
-
-    # --- 资源ACL方法 ---
-
-    def set_resource_acl(self, resource_type: str, resource_id: str, acl: dict) -> dict:
-        if resource_type not in self._resource_acl:
-            self._resource_acl[resource_type] = {}
-        self._resource_acl[resource_type][resource_id] = acl
-        self._save_resource_acl()
-        return self._resource_acl[resource_type][resource_id]
-
-    def get_resource_acl(self, resource_type: str, resource_id: str) -> dict:
-        return self._resource_acl.get(resource_type, {}).get(resource_id, {})
-
-    def delete_resource_acl(self, resource_type: str, resource_id: str) -> bool:
-        if resource_type not in self._resource_acl:
-            return False
-        if resource_id not in self._resource_acl[resource_type]:
-            return False
-        del self._resource_acl[resource_type][resource_id]
-        self._save_resource_acl()
-        return True
 
     # --- 节点访问检查 ---
 
