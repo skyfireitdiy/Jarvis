@@ -1220,6 +1220,7 @@ class PrettyOutput:
         max_output: int = 0,
         check_interrupt: Callable[[], bool] = lambda: False,
         panel_lock: Optional[threading.RLock] = None,
+        raise_on_error: bool = False,
     ) -> Tuple[str, str, float]:
         """
         使用Live+Panel进行流式聊天输出（pretty output模式）。
@@ -1238,6 +1239,8 @@ class PrettyOutput:
             max_output: 最大输出长度，0表示无限制
             check_interrupt: 检查是否请求中断的回调
             panel_lock: 用于保护panel更新的线程锁（可选）
+            raise_on_error: 流式过程中发生异常时是否向上抛出（默认 False，
+                保持"打印错误并返回已收集内容"的既有行为）
 
         返回：
             Tuple[str, str, float]: (模型响应, 推理内容, 首token时间)
@@ -1271,6 +1274,11 @@ class PrettyOutput:
                         first_token_time = time.time() - start_time
                         break
             except StopIteration:
+                append_session_history(message, "")
+                return "", "", 0.0
+            except Exception:
+                if raise_on_error:
+                    raise
                 append_session_history(message, "")
                 return "", "", 0.0
 
@@ -1574,6 +1582,8 @@ class PrettyOutput:
             except Exception as e:
                 # 发生异常时，打印错误信息并返回已收集的内容
                 PrettyOutput.auto_print(f"⚠️ 流式输出异常: {e}")
+                if raise_on_error:
+                    raise
                 _flush_buffer()
                 append_session_history(message, response)
                 return response, reasoning_content, first_token_time
@@ -1636,6 +1646,7 @@ class PrettyOutput:
         get_context_token_count: Optional[Callable[[str], int]] = None,
         get_used_token_count: Optional[Callable[[], int]] = None,
         get_platform_max_input_token_count: Optional[Callable[[], int]] = None,
+        raise_on_error: bool = False,
     ) -> Tuple[str, str, float]:
         """
         使用简单模式进行流式聊天输出（逐字符打印）。
@@ -1650,6 +1661,8 @@ class PrettyOutput:
             append_session_history: 追加会话历史的回调
             get_context_token_count: 计算文本token数的回调（用于显示速度，可选）
             output_sink: 输出后端（可选），用于 Gateway 模式流式发送
+            raise_on_error: 流式过程中发生异常时是否向上抛出（默认 False，
+                保持"打印错误并返回已收集内容"的既有行为）
 
         返回：
             Tuple[str, str, float]: (模型响应, 推理内容, 首token时间)
@@ -1731,6 +1744,8 @@ class PrettyOutput:
         except Exception as e:
             # 发生异常时，打印错误信息并返回已收集的内容
             PrettyOutput.auto_print(f"⚠️ 流式输出异常: {e}")
+            if raise_on_error:
+                raise
             append_session_history(message, response)
             return response, reasoning_content, first_token_time
 

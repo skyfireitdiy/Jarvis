@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import json
 import os
 import subprocess
 import sys
@@ -1258,6 +1259,61 @@ def is_enable_native_tool_calls() -> bool:
         bool: 如果启用原生工具调用则返回 True，默认为 True
     """
     return bool(GLOBAL_CONFIG_DATA.get("enable_native_tool_calls", True))
+
+
+def _get_native_support_file() -> str:
+    """原生工具调用支持记录文件路径。"""
+    return os.path.join(get_data_dir(), "native_tool_support.json")
+
+
+def is_model_native_supported(model_name: str) -> bool:
+    """
+    查询某个模型是否曾被确认支持原生 function calling。
+
+    一旦某模型成功完成过一次原生工具调用，即被持久化记录为支持；
+    之后即使遇到临时错误也不再降级到纯文本协议。
+
+    返回：
+        bool: 该模型是否已被记录为支持原生工具调用
+    """
+    if not model_name:
+        return False
+    try:
+        with open(_get_native_support_file(), "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return bool(isinstance(data, dict) and data.get(model_name))
+    except Exception:
+        return False
+
+
+def mark_model_native_supported(model_name: str) -> None:
+    """
+    持久化记录某个模型支持原生 function calling。
+
+    在模型成功返回原生响应（content 或 tool_calls）后调用。
+    写入失败不影响主流程。
+    """
+    if not model_name:
+        return
+    try:
+        path = _get_native_support_file()
+        data: dict = {}
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    data = loaded
+            except Exception:
+                data = {}
+        if data.get(model_name):
+            return
+        data[model_name] = True
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
 
 
 def get_request_timeout() -> Optional[float]:
