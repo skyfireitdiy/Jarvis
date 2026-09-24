@@ -1113,16 +1113,40 @@
       @cancel="cancelSessionDialog"
     />
 
-    <!-- Diff 浮动窗口 -->
+    <!-- Diff 浮动窗口：左侧文件列表 + 右侧选中文件的 diff 对比 -->
     <div v-if="showDiffModal" class="diff-modal-overlay" @click.self="showDiffModal = false">
       <div class="diff-modal">
         <div class="diff-modal-header">
-          <h3>代码变更</h3>
+          <h3>代码变更<span v-if="diffFiles.length" class="diff-modal-count">（{{ diffFiles.length }} 个文件）</span></h3>
           <button class="icon-btn" @click="showDiffModal = false" title="关闭">✕</button>
         </div>
-        <div class="diff-modal-content">
-          <div v-if="diffLoading" class="diff-loading">加载中...</div>
-          <div v-else v-html="diffContent"></div>
+        <div v-if="diffLoading" class="diff-loading">加载中...</div>
+        <div v-else-if="diffError" class="diff-error">{{ diffError }}</div>
+        <div v-else-if="diffFiles.length === 0" class="diff-empty">暂无变更</div>
+        <div v-else class="diff-modal-body" :class="{ 'mobile-detail': diffMobileShowDetail }">
+          <div class="diff-file-list">
+            <div
+              v-for="(file, index) in diffFiles"
+              :key="file.file_path || index"
+              class="diff-file-item"
+              :class="{ active: index === diffActiveIndex }"
+              :title="file.file_path"
+              @click="selectDiffFile(index)"
+            >
+              <span class="diff-file-item-path">{{ file.file_path || 'Unknown' }}</span>
+              <span class="diff-file-item-stats">
+                <span class="diff-additions">+{{ file.additions || 0 }}</span>
+                <span class="diff-deletions">-{{ file.deletions || 0 }}</span>
+              </span>
+            </div>
+          </div>
+          <div class="diff-file-view">
+            <button class="diff-mobile-back" @click="diffMobileShowDetail = false">
+              <span class="diff-mobile-back-icon">‹</span>
+              <span class="diff-mobile-back-text">{{ diffFiles[diffActiveIndex]?.file_path || '文件列表' }}</span>
+            </button>
+            <div v-html="diffActiveHtml"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -2306,8 +2330,18 @@ const activeWindow = ref(null)        // 当前焦点窗口: 'terminal' | 'edito
 
 // Diff 浮动窗口状态
 const showDiffModal = ref(false)      // 显示diff浮动窗口
-const diffContent = ref('')           // diff内容
+const diffFiles = ref([])             // 结构化 diff 文件列表（每个元素含 file_path/additions/deletions/rows）
+const diffActiveIndex = ref(0)        // 当前选中的文件索引
 const diffLoading = ref(false)        // 加载状态
+const diffError = ref('')             // 加载失败时的错误信息
+// 移动端两级导航：false=文件列表，true=选中文件的 diff 详情
+const diffMobileShowDetail = ref(false)
+// 当前选中文件的渲染结果（复用 renderSideBySideDiff）
+const diffActiveHtml = computed(() => {
+  const file = diffFiles.value[diffActiveIndex.value]
+  if (!file) return ''
+  return renderSideBySideDiff(file)
+})
 
 // Rules 浮动窗口状态
 const showRulesModal = ref(false)     // 显示rules浮动窗口
@@ -8913,6 +8947,15 @@ function deleteAgentGroup(groupId) {
   )
 }
 
+// 选中某个文件：桌面端仅切换右侧内容，移动端进入全屏详情
+function selectDiffFile(index) {
+  diffActiveIndex.value = index
+  // 移动端（窄屏）点击文件后全屏展示该文件 diff，由顶部返回按钮回到列表
+  if (windowWidth.value <= 768) {
+    diffMobileShowDetail.value = true
+  }
+}
+
 // 查看 Agent 的 Diff
 async function viewDiff(agent) {
   if (!agent || !agent.agent_id) {
@@ -8922,7 +8965,10 @@ async function viewDiff(agent) {
 
   diffLoading.value = true
   showDiffModal.value = true
-  diffContent.value = ''
+  diffFiles.value = []
+  diffActiveIndex.value = 0
+  diffError.value = ''
+  diffMobileShowDetail.value = false
 
   try {
     const { host, port } = getGatewayAddress()
@@ -8931,12 +8977,12 @@ async function viewDiff(agent) {
 
     if (!response.ok) {
       console.warn(`[DIFF] Failed to fetch diff for agent ${agent.agent_id}:`, response.status)
-      diffContent.value = '<div class="diff-error">获取 diff 失败</div>'
+      diffError.value = '获取 diff 失败'
       return
     }
 
     const result = await response.json()
-    
+
     // 使用后端返回的结构化数据，添加数据验证
     if (result.files && Array.isArray(result.files) && result.files.length > 0) {
       // 验证并过滤有效的文件数据
@@ -8950,18 +8996,12 @@ async function viewDiff(agent) {
                  ['equal', 'insert', 'delete', 'replace'].includes(row.type)
         })
       })
-      
-      if (validFiles.length > 0) {
-        diffContent.value = validFiles.map(f => renderSideBySideDiff(f)).join('')
-      } else {
-        diffContent.value = '<div class="diff-empty">暂无有效变更数据</div>'
-      }
-    } else {
-      diffContent.value = '<div class="diff-empty">暂无变更</div>'
+
+      diffFiles.value = validFiles
     }
   } catch (error) {
     console.error('[DIFF] Error fetching diff:', error)
-    diffContent.value = '<div class="diff-error">获取 diff 失败: ' + escapeHtml(error.message) + '</div>'
+    diffError.value = '获取 diff 失败: ' + (error.message || '')
   } finally {
     diffLoading.value = false
   }
@@ -13760,6 +13800,11 @@ function handleGlobalKeydown(event) {
     }
     // 弹出面板（diff/rules/tools/缓存/重命名/权限管理）：Esc 关闭
     if (showDiffModal.value) {
+      // 移动端详情态：Esc 先退回文件列表，再按一次才关闭弹窗
+      if (diffMobileShowDetail.value) {
+        diffMobileShowDetail.value = false
+        return
+      }
       showDiffModal.value = false
       return
     }
@@ -18481,6 +18526,134 @@ body::-webkit-scrollbar {
   font-size: 16px;
   font-weight: 600;
   color: #e6edf3;
+}
+
+.diff-modal-count {
+  font-size: 13px;
+  font-weight: 400;
+  color: #8ba3b8;
+}
+
+/* 左侧文件列表 + 右侧 diff 对比 */
+.diff-modal-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.diff-file-list {
+  flex: 0 0 280px;
+  width: 280px;
+  overflow: auto;
+  padding: 8px;
+  background: var(--color-bg-secondary);
+  border-right: 0.5px solid var(--color-border-subtle);
+}
+
+.diff-file-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--color-text-primary);
+}
+
+.diff-file-item:hover,
+.diff-file-item.active {
+  background: var(--color-accent-subtle);
+}
+
+.diff-file-item-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diff-file-item-stats {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+  font-size: 12px;
+  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
+}
+
+.diff-file-view {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 20px;
+  background: var(--color-bg-tertiary);
+}
+
+/* 移动端返回按钮：仅窄屏显示 */
+.diff-mobile-back {
+  display: none;
+}
+
+/* 移动端：两级导航（文件列表 <-> 单文件 diff），避免左侧列表挤占屏幕 */
+@media (max-width: 768px) {
+  .diff-modal-overlay {
+    padding: 0;
+  }
+  .diff-modal {
+    max-width: 100vw;
+    width: 100vw;
+    height: var(--app-height, 100vh);
+    max-height: var(--app-height, 100vh);
+    border-radius: 0;
+  }
+  .diff-modal-body {
+    position: relative;
+  }
+  .diff-file-list {
+    flex: 1 1 auto;
+    width: 100%;
+    border-right: none;
+  }
+  .diff-file-view {
+    display: none;
+    padding: 12px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  }
+  /* 进入详情态：隐藏文件列表，全屏展示 diff */
+  .diff-modal-body.mobile-detail .diff-file-list {
+    display: none;
+  }
+  .diff-modal-body.mobile-detail .diff-file-view {
+    display: block;
+  }
+  .diff-mobile-back {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 8px 10px;
+    border: none;
+    border-radius: 8px;
+    background: var(--color-accent-subtle);
+    color: var(--color-text-primary);
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .diff-mobile-back-icon {
+    font-size: 18px;
+    line-height: 1;
+  }
+  .diff-mobile-back-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+  }
 }
 
 .diff-modal-content {
