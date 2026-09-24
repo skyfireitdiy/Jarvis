@@ -80,6 +80,63 @@ export const ACTIONS = [
     run: (ctx) => ctx.toggleEditorPanel && ctx.toggleEditorPanel(),
   },
   {
+    // 全局动作：快速抵达编辑器侧边栏的「内容搜索」（编辑器未打开时不响应）
+    id: "open-editor-global-search",
+    label: "搜索文件内容",
+    // 实际由 App.vue 的 Ctrl+Shift+F 分支执行；此处仅作展示，不参与 ctrl+alt 统一分发
+    shortcut: "Ctrl+Shift+F",
+    condition: "需编辑器面板已打开",
+    en: "Search File Contents",
+    group: "界面",
+    icon: "🔎",
+    keywords: [
+      "全局搜索",
+      "内容搜索",
+      "搜索",
+      "查找",
+      "search",
+      "content",
+      "global",
+      "find",
+    ],
+    run: (ctx) => ctx.openEditorGlobalSearch && ctx.openEditorGlobalSearch(),
+  },
+  {
+    // 全局动作：快速抵达编辑器侧边栏的「文件名搜索」（编辑器未打开时不响应）
+    id: "open-editor-file-search",
+    label: "搜索文件名",
+    // 实际由 App.vue 的 Ctrl+Shift+P 分支执行；此处仅作展示，不参与 ctrl+alt 统一分发
+    shortcut: "Ctrl+Shift+P",
+    condition: "需编辑器面板已打开",
+    en: "Search File Names",
+    group: "界面",
+    icon: "🗂️",
+    keywords: [
+      "文件名搜索",
+      "按名称查找",
+      "搜索",
+      "查找",
+      "search",
+      "filename",
+      "file",
+      "find",
+    ],
+    run: (ctx) => ctx.openEditorFileSearch && ctx.openEditorFileSearch(),
+  },
+  {
+    // 全局动作：快速抵达编辑器侧边栏的目录树（编辑器未打开时不响应）
+    id: "open-editor-file-tree",
+    label: "目录树",
+    // 实际由 App.vue 的 Ctrl+Shift+E 分支执行；此处仅作展示，不参与 ctrl+alt 统一分发
+    shortcut: "Ctrl+Shift+E",
+    condition: "需编辑器面板已打开",
+    en: "File Tree",
+    group: "界面",
+    icon: "📁",
+    keywords: ["目录树", "文件树", "资源管理器", "file", "tree", "explorer"],
+    run: (ctx) => ctx.openEditorFileTree && ctx.openEditorFileTree(),
+  },
+  {
     id: "current-toggle-auto-scroll",
     label: "切换自动滚动",
     shortcut: "Ctrl+Alt+S",

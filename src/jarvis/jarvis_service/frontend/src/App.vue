@@ -311,16 +311,18 @@
                     <div v-if="!(fileTreeState.get(agent.agent_id)?.length > 0)" class="editor-file-tree-empty">
                       当前工作目录下暂无可显示内容
                     </div>
-                    <div v-else class="editor-file-tree-list">
+                    <div v-else class="editor-file-tree-list" tabindex="0" :data-agent-id="agent.agent_id" @keydown="handleFileTreeKeydown($event, agent.agent_id)">
                       <div
                         v-for="visibleNode in getVisibleFileTreeNodes(agent.agent_id)"
                         :key="visibleNode.node.path"
                         class="tree-node editor-tree-node"
+                        :data-node-path="visibleNode.node.path"
                       >
                         <div
                           class="tree-node-content"
+                          :class="{ 'keyboard-selected': fileTreeSelectedAgentId === agent.agent_id && fileTreeSelectedPath === visibleNode.node.path }"
                           :style="{ paddingLeft: `${8 + visibleNode.depth * 20}px` }"
-                          @click.stop="handleFileTreeNodeClick(agent.agent_id, visibleNode.node)"
+                          @click.stop="selectFileTreeNode(agent.agent_id, visibleNode.node); handleFileTreeNodeClick(agent.agent_id, visibleNode.node)"
                           @contextmenu.prevent.stop="openFileTreeContextMenu(agent, visibleNode.node, $event)"
                         >
                           <span
@@ -384,16 +386,18 @@
                           <div v-if="!(fileTreeState.get(agent.agent_id)?.length > 0)" class="editor-file-tree-empty">
                             当前工作目录下暂无可显示内容
                           </div>
-                          <div v-else class="editor-file-tree-list">
+                          <div v-else class="editor-file-tree-list" tabindex="0" :data-agent-id="agent.agent_id" @keydown="handleFileTreeKeydown($event, agent.agent_id)">
                             <div
                               v-for="visibleNode in getVisibleFileTreeNodes(agent.agent_id)"
                               :key="visibleNode.node.path"
                               class="tree-node editor-tree-node"
+                              :data-node-path="visibleNode.node.path"
                             >
                               <div
                                 class="tree-node-content"
+                                :class="{ 'keyboard-selected': fileTreeSelectedAgentId === agent.agent_id && fileTreeSelectedPath === visibleNode.node.path }"
                                 :style="{ paddingLeft: `${8 + visibleNode.depth * 20}px` }"
-                                @click.stop="handleFileTreeNodeClick(agent.agent_id, visibleNode.node)"
+                                @click.stop="selectFileTreeNode(agent.agent_id, visibleNode.node); handleFileTreeNodeClick(agent.agent_id, visibleNode.node)"
                                 @contextmenu.prevent.stop="openFileTreeContextMenu(agent, visibleNode.node, $event)"
                               >
                                 <span
@@ -758,16 +762,18 @@
                   <div v-if="!(fileTreeState.get(agent.agent_id)?.length > 0)" class="editor-file-tree-empty">
                     当前工作目录下暂无可显示内容
                   </div>
-                  <div v-else class="editor-file-tree-list">
+                  <div v-else class="editor-file-tree-list" tabindex="0" :data-agent-id="agent.agent_id" @keydown="handleFileTreeKeydown($event, agent.agent_id)">
                     <div
                       v-for="visibleNode in getVisibleFileTreeNodes(agent.agent_id)"
                       :key="visibleNode.node.path"
                       class="tree-node editor-tree-node"
+                      :data-node-path="visibleNode.node.path"
                     >
                       <div
                         class="tree-node-content"
+                        :class="{ 'keyboard-selected': fileTreeSelectedAgentId === agent.agent_id && fileTreeSelectedPath === visibleNode.node.path }"
                         :style="{ paddingLeft: `${8 + visibleNode.depth * 20}px` }"
-                        @click.stop="handleFileTreeNodeClick(agent.agent_id, visibleNode.node)"
+                        @click.stop="selectFileTreeNode(agent.agent_id, visibleNode.node); handleFileTreeNodeClick(agent.agent_id, visibleNode.node)"
                       >
                         <span
                           v-if="visibleNode.node.type === 'directory'"
@@ -829,16 +835,18 @@
                         <div v-if="!(fileTreeState.get(agent.agent_id)?.length > 0)" class="editor-file-tree-empty">
                           当前工作目录下暂无可显示内容
                         </div>
-                        <div v-else class="editor-file-tree-list">
+                        <div v-else class="editor-file-tree-list" tabindex="0" :data-agent-id="agent.agent_id" @keydown="handleFileTreeKeydown($event, agent.agent_id)">
                           <div
                             v-for="visibleNode in getVisibleFileTreeNodes(agent.agent_id)"
                             :key="visibleNode.node.path"
                             class="tree-node editor-tree-node"
+                            :data-node-path="visibleNode.node.path"
                           >
                             <div
                               class="tree-node-content"
+                              :class="{ 'keyboard-selected': fileTreeSelectedAgentId === agent.agent_id && fileTreeSelectedPath === visibleNode.node.path }"
                               :style="{ paddingLeft: `${8 + visibleNode.depth * 20}px` }"
-                              @click.stop="handleFileTreeNodeClick(agent.agent_id, visibleNode.node)"
+                              @click.stop="selectFileTreeNode(agent.agent_id, visibleNode.node); handleFileTreeNodeClick(agent.agent_id, visibleNode.node)"
                             >
                               <span
                                 v-if="visibleNode.node.type === 'directory'"
@@ -2685,6 +2693,9 @@ const fileTreeExpanded = ref(new Map())     // 每个 Agent 的展开状态：ag
 const fileTreeLoading = ref(new Map())      // 每个 Agent 的加载状态：agent_id -> Set(loadingPaths)
 const expandedAgents = ref(new Set())       // 编辑器目录树中展开的 Agent 集合
 const selectedAgentId = ref(null)         // 编辑器目录树中选中的 Agent ID
+// 编辑器目录树键盘操作：当前光标选中的节点（绝对路径）及其所属 Agent
+const fileTreeSelectedPath = ref(null)
+const fileTreeSelectedAgentId = ref(null)
 const showStoppedAgents = ref(false)      // 是否显示已停止的 Agent
 const stoppedNodeCollapseState = ref(new Map()) // 已停止 Agent 节点分组的折叠状态：nodeId -> boolean (true表示折叠)
 
@@ -3993,6 +4004,79 @@ async function handleFileTreeNodeClick(agentId, node) {
   }
 
   await openEditorFile(node.path, agentId)
+}
+
+// ===== 编辑器目录树键盘操作 =====
+// 点击节点时同步光标选中态，使后续方向键从该节点继续移动
+function selectFileTreeNode(agentId, node) {
+  fileTreeSelectedAgentId.value = agentId
+  fileTreeSelectedPath.value = node.path
+}
+
+// 将光标选中节点滚动到可视区域内
+function scrollFileTreeNodeIntoView(path) {
+  nextTick(() => {
+    const el = document.querySelector(`.editor-tree-node[data-node-path="${CSS.escape(path)}"]`)
+    if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' })
+  })
+}
+
+// 聚焦目录树容器，使方向键/回车可立即生效（优先当前选中 Agent 的树，否则第一个可见的树）
+function focusFileTreeContainer() {
+  nextTick(() => {
+    const agentId = selectedAgentId.value
+    let el = agentId
+      ? document.querySelector(`.editor-file-tree-list[data-agent-id="${CSS.escape(agentId)}"]`)
+      : null
+    if (!el) el = document.querySelector('.editor-file-tree-list')
+    if (el) el.focus()
+  })
+}
+
+// 切到编辑器侧边栏的全局搜索并聚焦输入框（mode 为 'content' 内容搜索 / 'filename' 文件名搜索）
+function openEditorGlobalSearch(mode = 'content') {
+  if (!showEditorPanel.value) return
+  setEditorSidebarView('search')
+  setGlobalSearchMode(mode)
+  nextTick(() => {
+    const input = document.querySelector('.editor-global-search-input')
+    if (input) input.focus()
+  })
+}
+
+// 在当前 Agent 的可见节点列表中按方向移动光标
+function moveFileTreeSelection(agentId, delta) {
+  const nodes = getVisibleFileTreeNodes(agentId)
+  if (!nodes.length) return
+  const currentPath = fileTreeSelectedAgentId.value === agentId ? fileTreeSelectedPath.value : null
+  let index = nodes.findIndex((item) => item.node.path === currentPath)
+  if (index === -1) {
+    index = delta > 0 ? 0 : nodes.length - 1
+  } else {
+    index = Math.min(nodes.length - 1, Math.max(0, index + delta))
+  }
+  const target = nodes[index].node
+  fileTreeSelectedAgentId.value = agentId
+  fileTreeSelectedPath.value = target.path
+  scrollFileTreeNodeIntoView(target.path)
+}
+
+// 目录树容器键盘事件：上下移动光标，回车展开/折叠目录或打开文件
+async function handleFileTreeKeydown(event, agentId) {
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault()
+    moveFileTreeSelection(agentId, event.key === 'ArrowDown' ? 1 : -1)
+    return
+  }
+  if (event.key === 'Enter') {
+    const path = fileTreeSelectedAgentId.value === agentId ? fileTreeSelectedPath.value : null
+    if (!path) return
+    const nodes = getVisibleFileTreeNodes(agentId)
+    const target = nodes.find((item) => item.node.path === path)
+    if (!target) return
+    event.preventDefault()
+    await handleFileTreeNodeClick(agentId, target.node)
+  }
 }
 
 // ===== 编辑器目录树右键菜单 =====
@@ -6763,6 +6847,16 @@ const commandPaletteCtx = computed(() => ({
     } else {
       showEditorPanel.value = true
     }
+  },
+  // 全局：快速抵达编辑器侧边栏的「内容搜索」（与 Ctrl+Shift+F 分支行为一致，编辑器未打开时不响应）
+  openEditorGlobalSearch: () => openEditorGlobalSearch('content'),
+  // 全局：快速抵达编辑器侧边栏的「文件名搜索」（与 Ctrl+Shift+P 分支行为一致，编辑器未打开时不响应）
+  openEditorFileSearch: () => openEditorGlobalSearch('filename'),
+  // 全局：快速抵达编辑器侧边栏的目录树（与 Ctrl+Shift+E 分支行为一致，编辑器未打开时不响应）
+  openEditorFileTree: () => {
+    if (!showEditorPanel.value) return
+    setEditorSidebarView('files')
+    focusFileTreeContainer()
   },
   toggleCurrentAutoScroll,
   toggleCurrentAutoRead,
@@ -14331,8 +14425,39 @@ function handleGlobalKeydown(event) {
     return
   }
 
+  // Ctrl/Cmd + Shift + F 快速抵达编辑器侧边栏的「内容搜索」（编辑器未打开时不响应）
+  if (isModifierPressed && !event.altKey && event.shiftKey && event.code === 'KeyF') {
+    if (!showEditorPanel.value) return
+    // 输入框内保留默认行为（避免打断输入）
+    if (isEditableElement(event.target)) return
+    event.preventDefault()
+    openEditorGlobalSearch('content')
+    return
+  }
+
+  // Ctrl/Cmd + Shift + P 快速抵达编辑器侧边栏的「文件名搜索」（编辑器未打开时不响应）
+  if (isModifierPressed && !event.altKey && event.shiftKey && event.code === 'KeyP') {
+    if (!showEditorPanel.value) return
+    // 输入框内保留默认行为（避免打断输入）
+    if (isEditableElement(event.target)) return
+    event.preventDefault()
+    openEditorGlobalSearch('filename')
+    return
+  }
+
+  // Ctrl/Cmd + Shift + E 快速抵达编辑器侧边栏的目录树（编辑器未打开时不响应）
+  if (isModifierPressed && !event.altKey && event.shiftKey && event.code === 'KeyE') {
+    if (!showEditorPanel.value) return
+    // 输入框内保留默认行为（避免打断输入）
+    if (isEditableElement(event.target)) return
+    event.preventDefault()
+    setEditorSidebarView('files')
+    focusFileTreeContainer()
+    return
+  }
+
   // Ctrl/Cmd + E 打开/隐藏编辑器面板
-  if (isModifierPressed && !event.altKey && event.code === 'KeyE') {
+  if (isModifierPressed && !event.altKey && !event.shiftKey && event.code === 'KeyE') {
     event.preventDefault()
     if (showEditorPanel.value) {
       closeEditorPanel()
@@ -16700,6 +16825,18 @@ body::-webkit-scrollbar {
 
 .tree-node-content:hover {
   background: var(--color-bg-hover);
+}
+
+/* 目录树键盘操作：光标选中节点高亮 */
+.tree-node-content.keyboard-selected {
+  background: var(--color-bg-active, rgba(64, 128, 255, 0.18));
+  outline: 1px solid var(--color-accent, rgba(64, 128, 255, 0.6));
+  outline-offset: -1px;
+}
+
+/* 目录树列表容器可聚焦以接收键盘事件，但不显示默认描边 */
+.editor-file-tree-list:focus {
+  outline: none;
 }
 
 .tree-node-icon {
