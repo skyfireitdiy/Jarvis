@@ -3879,6 +3879,9 @@ async function handleFileTreeNodeClick(agentId, node) {
 // node 为目录节点；node 为 null 时表示作用对象是该 Agent 的工作目录根
 const fileTreeContextMenu = ref({ visible: false, x: 0, y: 0, agentId: '', node: null })
 
+// 目录树应用内剪贴板：{ mode: 'copy'|'cut', agentId, path, name, kind, content?, children? }
+const fileTreeClipboard = ref(null)
+
 // 通用输入弹窗状态（如新建文件/文件夹命名）
 const inputPrompt = ref({
   visible: false,
@@ -3931,6 +3934,13 @@ function getFileTreeContextTargetPath() {
   return getFileTreeContextDirPath()
 }
 
+// 菜单作用目录对应的树节点：目录节点返回自身，文件节点/根返回 null（表示工作目录根）
+function getFileTreeContextDirNode() {
+  const menu = fileTreeContextMenu.value
+  if (menu.node && menu.node.type === 'directory') return menu.node
+  return null
+}
+
 // 绝对路径转相对 working_dir 的路径（不在工作目录内时返回空串）
 function toWorkingDirRelativePath(agentId, absPath) {
   const agent = agentList.value.find(a => a.agent_id === agentId)
@@ -3965,7 +3975,7 @@ async function copyTextToClipboard(text) {
 function openFileTreeContextMenu(agent, node, event) {
   if (!agent || !event) return
   const MENU_W = 220
-  const MENU_H = 220
+  const MENU_H = 360
   let x = event.clientX
   let y = event.clientY
   if (x + MENU_W > window.innerWidth) x = Math.max(window.innerWidth - MENU_W, 0)
@@ -3987,11 +3997,15 @@ function openFileTreeContextMenu(agent, node, event) {
 const fileTreeContextActions = computed(() => {
   const hasAgent = Boolean(fileTreeContextMenu.value.agentId)
   const hasNode = Boolean(fileTreeContextMenu.value.node)
+  const canPaste = hasAgent && Boolean(fileTreeClipboard.value)
   return [
     { id: 'new-file', label: '新建文件', icon: '📄', enabled: hasAgent },
     { id: 'new-folder', label: '新建文件夹', icon: '📁', enabled: hasAgent },
     { id: 'find-in-folder', label: '在当前目录下查找', icon: '🔍', enabled: hasAgent },
     { id: 'refresh', label: '刷新', icon: '🔄', enabled: hasAgent },
+    { id: 'copy', label: '复制', icon: '📑', enabled: hasNode },
+    { id: 'cut', label: '剪切', icon: '✂️', enabled: hasNode },
+    { id: 'paste', label: '粘贴', icon: '📥', enabled: canPaste },
     { id: 'copy-path', label: '复制路径', icon: '📋', enabled: hasAgent },
     { id: 'copy-relative-path', label: '复制相对路径', icon: '🔗', enabled: hasAgent },
     { id: 'rename', label: '重命名', icon: '✏️', enabled: hasNode },
@@ -4056,6 +4070,21 @@ async function runFileTreeContextAction(action) {
 
   if (action.id === 'refresh') {
     await refreshFileTreeDir(agent.agent_id, menu.node)
+    return
+  }
+
+  if (action.id === 'copy' || action.id === 'cut') {
+    const node = menu.node
+    if (!node || !node.path) return
+    await setFileTreeClipboard(action.id === 'cut' ? 'cut' : 'copy', agent.agent_id, node)
+    return
+  }
+
+  if (action.id === 'paste') {
+    const destDir = getFileTreeContextDirPath()
+    if (!destDir) return
+    await pasteFileTreeClipboard(agent.agent_id, destDir)
+    await refreshFileTreeDir(agent.agent_id, getFileTreeContextDirNode())
     return
   }
 
@@ -4214,6 +4243,140 @@ async function renameFileOrDirectory(agentId, absPath, newAbsPath) {
   const result = await response.json()
   if (!response.ok || !result.success) {
     throw new Error(result.error?.message || '重命名失败')
+  }
+  return result.data
+}
+
+// ===== 目录树复制/剪切/粘贴 =====
+
+// 列出目录下的直接子项（复用 directories 接口）
+async function listDirectoryEntries(agentId, dirPath) {
+  const { host, port } = getGatewayAddress()
+  const agent = agentList.value.find(a => a.agent_id === agentId)
+  if (!agent) throw new Error(`找不到Agent: ${agentId}`)
+  if (!agent.node_id) throw new Error(`Agent没有node_id: ${agentId}`)
+  const targetNodeId = String(agent.node_id).trim()
+  const response = await fetchWithAuth(
+    buildNodeHttpUrl(host, port, targetNodeId, `directories?path=${encodeURIComponent(dirPath)}`)
+  )
+  const result = await response.json()
+  if (!response.ok || !result.success) {
+    throw new Error(result.error?.message || '读取目录失败')
+  }
+  return result.data.items || []
+}
+
+// 递归收集目录内容（文件读取内容，目录保留结构）
+async function collectDirectorySnapshot(agentId, dirPath) {
+  const entries = await listDirectoryEntries(agentId, dirPath)
+  const children = []
+  for (const entry of entries) {
+    if (entry.type === 'directory') {
+      children.push({
+        name: entry.name,
+        kind: 'directory',
+        children: await collectDirectorySnapshot(agentId, entry.path),
+      })
+    } else {
+      const content = await fetchFileContent(entry.path, agentId)
+      children.push({ name: entry.name, kind: 'file', content })
+    }
+  }
+  return children
+}
+
+// 把剪贴板节点写入目标目录（文件写入内容，目录递归重建）
+async function writeClipboardNode(agentId, destDir, node) {
+  const absPath = `${String(destDir).replace(/\/$/, '')}/${node.name}`
+  if (node.kind === 'directory') {
+    await createFileOrDirectory(agentId, absPath, 'directory')
+    for (const child of node.children || []) {
+      await writeClipboardNode(agentId, absPath, child)
+    }
+    return
+  }
+  await writeFileContent(agentId, absPath, node.content ?? '')
+}
+
+// 在目标目录中生成不冲突的名称：name.ext -> name (副本).ext -> name (副本 2).ext
+async function resolvePasteName(agentId, destDir, name) {
+  const existing = new Set((await listDirectoryEntries(agentId, destDir)).map(i => i.name))
+  if (!existing.has(name)) return name
+  const dotIndex = name.lastIndexOf('.')
+  const hasExt = dotIndex > 0
+  const base = hasExt ? name.slice(0, dotIndex) : name
+  const ext = hasExt ? name.slice(dotIndex) : ''
+  let candidate = `${base} (副本)${ext}`
+  let counter = 2
+  while (existing.has(candidate)) {
+    candidate = `${base} (副本 ${counter})${ext}`
+    counter++
+  }
+  return candidate
+}
+
+// 复制/剪切：把节点内容存入应用内剪贴板
+async function setFileTreeClipboard(mode, agentId, node) {
+  if (!node || !node.path) return
+  const kind = node.type === 'directory' ? 'directory' : 'file'
+  try {
+    if (kind === 'directory') {
+      const children = await collectDirectorySnapshot(agentId, node.path)
+      fileTreeClipboard.value = { mode, agentId, path: node.path, name: node.name, kind, children }
+    } else {
+      const content = await fetchFileContent(node.path, agentId)
+      fileTreeClipboard.value = { mode, agentId, path: node.path, name: node.name, kind, content }
+    }
+    showToast(mode === 'cut' ? '已剪切，可在目标目录粘贴' : '已复制，可在目标目录粘贴', 'success')
+  } catch (error) {
+    showToast(error.message || '复制失败', 'error')
+  }
+}
+
+// 粘贴：把剪贴板内容写入目标目录
+async function pasteFileTreeClipboard(agentId, destDir) {
+  const clip = fileTreeClipboard.value
+  if (!clip) return
+  if (clip.agentId !== agentId) {
+    showToast('暂不支持跨 Agent 粘贴', 'error')
+    return
+  }
+  const normalizedDest = String(destDir).replace(/\/+$/, '')
+  const sourceParent = String(clip.path).replace(/\/+$/, '').split('/').slice(0, -1).join('/') || '/'
+  if (clip.mode === 'cut' && sourceParent === normalizedDest) {
+    showToast('源与目标目录相同，无需粘贴', 'info')
+    return
+  }
+  try {
+    if (clip.mode === 'cut') {
+      const targetPath = `${normalizedDest}/${clip.name}`
+      await renameFileOrDirectory(agentId, clip.path, targetPath)
+      fileTreeClipboard.value = null
+      showToast('已移动', 'success')
+    } else {
+      const finalName = await resolvePasteName(agentId, normalizedDest, clip.name)
+      await writeClipboardNode(agentId, normalizedDest, { ...clip, name: finalName })
+      showToast('已粘贴', 'success')
+    }
+  } catch (error) {
+    showToast(error.message || '粘贴失败', 'error')
+  }
+}
+
+// 写入文件内容（粘贴用，覆盖目标路径）
+async function writeFileContent(agentId, absPath, content) {
+  const { host, port } = getGatewayAddress()
+  const agent = agentList.value.find(a => a.agent_id === agentId)
+  if (!agent) throw new Error(`找不到Agent: ${agentId}`)
+  if (!agent.node_id) throw new Error(`Agent没有node_id: ${agentId}`)
+  const targetNodeId = String(agent.node_id).trim()
+  const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, 'file-write'), {
+    method: 'POST',
+    body: JSON.stringify({ path: absPath, content, node_id: targetNodeId })
+  })
+  const result = await response.json()
+  if (!response.ok || !result.success) {
+    throw new Error(result.error?.message || '写入文件失败')
   }
   return result.data
 }
