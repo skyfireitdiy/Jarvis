@@ -328,34 +328,58 @@
     },
     "lsp": {
       "type": "object",
-      "description": "LSP（语言服务器协议）配置。用户配置会与内置默认语言配置合并，同名语言以用户配置为准",
+      "description": "LSP（语言服务器协议）配置。jarvis-lsp 命令行与 Web 编辑器（Monaco）共用此配置，是唯一配置来源。用户配置会与内置默认语言配置合并，同名语言以用户配置为准",
       "properties": {
         "languages": {
           "type": "object",
-          "description": "按语言名定义的 LSP 配置，会覆盖内置的同名语言配置",
+          "description": "按语言名定义的 LSP 配置，会整体覆盖内置的同名语言配置。新增语言只需在此增加一项，无需修改代码",
           "additionalProperties": {
             "type": "object",
             "properties": {
               "command": {
                 "type": "string",
-                "description": "语言服务器启动命令"
+                "description": "语言服务器启动命令（可执行文件名或绝对路径）。参数请放在 args 中，不要写在同一字符串里"
               },
               "args": {
                 "type": "array",
-                "description": "语言服务器启动参数列表",
+                "description": "语言服务器启动参数列表，如 [\"--stdio\"]",
                 "items": {
                   "type": "string"
-                }
+                },
+                "default": []
               },
               "file_extensions": {
                 "type": "array",
-                "description": "该语言对应的文件扩展名列表",
+                "description": "该语言对应的文件扩展名列表，如 [\".py\", \".pyi\"]，用于按扩展名匹配语言",
                 "items": {
                   "type": "string"
-                }
+                },
+                "default": []
+              },
+              "monaco_language": {
+                "type": "string",
+                "description": "对应 Monaco 编辑器的语言 id，如 python / typescript / rust。不填时默认取语言名"
+              },
+              "root_markers": {
+                "type": "array",
+                "description": "用于确定 workspace 根目录的标记文件，如 [\"pyproject.toml\", \".git\"]",
+                "items": {
+                  "type": "string"
+                },
+                "default": []
+              },
+              "initialization_options": {
+                "type": "object",
+                "description": "传给 LSP initialize 请求的初始化选项",
+                "default": {}
+              },
+              "install_hint": {
+                "type": "string",
+                "description": "语言服务器未安装时展示给用户的提示文案，如 \"pip install python-lsp-server\"",
+                "default": ""
               }
             },
-            "required": ["command", "args", "file_extensions"]
+            "required": ["command"]
           }
         }
       },

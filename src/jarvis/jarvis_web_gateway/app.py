@@ -3189,7 +3189,7 @@ def create_app(
         await node_connection_manager.handle_node_websocket(websocket)
 
     # ------------------------------------------------------------------
-    # LSP 语言服务器桥接（插件化：新增语言只需在 lsp_servers/ 丢清单 JSON）
+    # LSP 语言服务器桥接（配置来自 ~/.jarvis/config.yaml 的 lsp.languages 段）
     # ------------------------------------------------------------------
     from jarvis.jarvis_web_gateway.lsp_bridge import (
         LspProcessPool,

@@ -1,55 +1,75 @@
-# 为 Monaco 编辑器扩展 LSP 语言支持
+# 为编辑器扩展 LSP 语言支持
 
-本文说明如何为 Web 界面的 Monaco 编辑器新增一种语言的 LSP（Language Server Protocol）支持。
+本文说明如何通过配置为 Jarvis 的编辑器新增一种语言的 LSP（Language Server Protocol）支持。
 
-**核心机制：丢清单即扩展。** 新增一种语言只需在清单目录放入一个 JSON 文件，**无需修改任何核心代码**（后端桥接、前端客户端、App.vue 均不用动）。
+**核心机制：改配置即扩展。** 新增一种语言只需在 `~/.jarvis/config.yaml` 的
+`lsp.languages` 段增加一项，**无需修改任何代码**。
 
 ## 整体架构
 
+Jarvis 有两处使用 LSP，它们**共用同一份配置**：
+
 ```text
-浏览器 (Monaco 编辑器)
-    │  自建轻量 LSP 客户端（原生 WebSocket + JSON-RPC）
-    ▼
-WS  /api/lsp/{server_id}?root=<workspace根目录>      ← 网关桥接，语言无感知，纯转发
-    │  Content-Length 分帧
-    ▼
-语言服务器子进程 (stdio)                              ← 命令来自清单
+~/.jarvis/config.yaml  →  lsp.languages  ← 唯一配置来源
+                             │
+              ┌──────────────┴──────────────┐
+              ▼                             ▼
+  jarvis-lsp（CLI / 守护进程）      Web 网关（Monaco 编辑器）
+  hover / 定义 / 引用 / 诊断         hover / 补全 / 诊断
+              │                             │
+              │                    WS /api/lsp/{语言}?root=<workspace>
+              │                             │（网关桥接，语言无感知，纯转发）
+              │                             ▼
+              └────────────► 语言服务器子进程（stdio）
 ```
 
-- **清单（manifest）**：描述一种语言服务器如何启动、对应哪个 Monaco 语言、匹配哪些扩展名。
-- **清单扫描器**：`src/jarvis/jarvis_web_gateway/lsp_registry.py`，扫描两个目录并合并。
-- **WS 桥接**：`src/jarvis/jarvis_web_gateway/lsp_bridge.py` + `app.py` 的 `GET /api/lsp/servers` 与 `WS /api/lsp/{server_id}`。对语言完全无感知，只做 WebSocket ↔ 子进程 stdio 的 JSON-RPC 转发。
-- **前端客户端**：`src/jarvis/jarvis_service/frontend/src/lsp/registry.js`（拉清单、建索引）与 `manager.js`（连接、文档同步、注册 hover/completion provider、诊断）。
+- **配置读取层**：`src/jarvis/jarvis_lsp/config.py` 的 `LSPConfigReader`，
+  两处共用，避免配置漂移。
+- **Web 网关转换**：`src/jarvis/jarvis_web_gateway/lsp_registry.py` 把配置转换为
+  网关内部 spec 结构。
+- **WS 桥接**：`src/jarvis/jarvis_web_gateway/lsp_bridge.py` + `app.py` 的
+  `GET /api/lsp/servers` 与 `WS /api/lsp/{语言}`，对语言完全无感知，只做
+  WebSocket ↔ 子进程 stdio 的 JSON-RPC 转发。
+- **前端客户端**：`src/jarvis/jarvis_service/frontend/src/lsp/registry.js`（拉清单、建索引）
+  与 `manager.js`（连接、文档同步、注册 hover/completion provider、诊断）。
 
-## 清单目录与优先级
+## 配置位置
 
-扫描两个目录，**按 `id` 去重，用户目录覆盖内置目录**：
+配置位于 `~/.jarvis/config.yaml` 的 `lsp.languages` 段：
 
-| 目录 | 路径                                         | 用途                                             |
-| ---- | -------------------------------------------- | ------------------------------------------------ |
-| 内置 | `src/jarvis/jarvis_web_gateway/lsp_servers/` | 随代码分发，开箱即用（python / typescript / go） |
-| 用户 | `{数据目录}/lsp_servers/`                    | 用户自行扩展，同名 `id` 覆盖内置                 |
+```yaml
+lsp:
+  languages:
+    python:
+      command: pylsp
+      args: []
+      file_extensions: [".py", ".pyi"]
+      monaco_language: python
+      root_markers: ["pyproject.toml", "setup.py", ".git"]
+      install_hint: "pip install python-lsp-server"
+```
 
-数据目录由 `jarvis.jarvis_utils.config.get_data_dir()` 决定，通常是 `~/.jarvis/`。用户目录不存在时会被忽略，不会报错。
+**内置默认**：代码内置了 13 种语言的默认配置（python / go / typescript /
+javascript / rust / c / cpp / lua / bash / ruby / php / html / css），
+开箱即用。用户配置会**整体覆盖**同名语言的默认项，未配置的语言沿用默认。
 
-覆盖的典型用途：内置 `python.json` 用 `pylsp`，若你想换成 `pyright`，只需在用户目录放一个同 `id` 的 `python.json`，无需改动内置文件。
+## 字段说明
 
-## 清单字段说明
+| 字段                     | 类型         | 必填 | 默认值   | 说明                                                            |
+| ------------------------ | ------------ | ---- | -------- | --------------------------------------------------------------- |
+| `command`                | string       | ✅   | —        | 启动命令（可执行文件名或绝对路径）。参数放 `args`，不要写在一起 |
+| `args`                   | list[string] |      | `[]`     | 启动参数，如 `["--stdio"]`                                      |
+| `file_extensions`        | list[string] |      | `[]`     | 文件扩展名，如 `[".py", ".pyi"]`，用于按扩展名匹配语言          |
+| `monaco_language`        | string       |      | 取语言名 | 对应 Monaco 语言 id，如 `python`、`typescript`                  |
+| `root_markers`           | list[string] |      | `[]`     | 用于确定 workspace 根的标记文件，如 `["Cargo.toml", ".git"]`    |
+| `initialization_options` | object       |      | `{}`     | 传给 LSP `initialize` 的初始化选项                              |
+| `install_hint`           | string       |      | `""`     | 服务器未安装时展示给用户的提示文案                              |
 
-| 字段                    | 类型         | 必填 | 说明                                                                                 |
-| ----------------------- | ------------ | ---- | ------------------------------------------------------------------------------------ |
-| `id`                    | string       | ✅   | 语言服务器唯一标识，如 `"python"`。同时用于 WS 路径 `/api/lsp/{id}`，须全局唯一      |
-| `monacoLanguage`        | string       | ✅   | 对应 Monaco 语言 id，如 `"python"`、`"typescript"`。前端据此把编辑器语言与服务器关联 |
-| `command`               | list[string] | ✅   | 启动命令，**必须是列表**（如 `["pylsp"]`），禁止写成字符串，以避免 shell 解析        |
-| `extensions`            | list[string] |      | 文件扩展名，如 `[".py", ".pyi"]`。语言 id 不可靠时用作备用匹配                       |
-| `args`                  | list[string] |      | 附加参数，如 `["--stdio"]`                                                           |
-| `rootMarkers`           | list[string] |      | 用于确定 workspace 根的标记文件，如 `["pyproject.toml", ".git"]`                     |
-| `initializationOptions` | object       |      | 传给 LSP `initialize` 的初始化选项                                                   |
-| `installHint`           | string       |      | 服务器未安装时展示给用户的提示文案                                                   |
+语言名（`languages` 下的 key）即服务器 id，也是 WS 路径 `/api/lsp/{语言}` 中的取值，
+**大小写不敏感**。
 
-加载后每个清单会额外带一个 `_source` 字段（`"builtin"` 或 `"user"`），用于区分来源。
-
-**容错**：非法 JSON、缺必填字段、字段类型错误的清单会被跳过并记录 `logging.warning`，**不会中断其他清单的加载**。
+**容错**：`command` 缺失、字段类型错误的语言项会被跳过并记录 `logging.warning`，
+**不会影响其他语言**。
 
 ## 完整示例：新增 Rust 支持（rust-analyzer）
 
@@ -57,98 +77,77 @@ WS  /api/lsp/{server_id}?root=<workspace根目录>      ← 网关桥接，语�
 
 ```bash
 rustup component add rust-analyzer
-# 或
-rustup component add rust-src
+rust-analyzer --version    # 确认可执行
 ```
 
-确认可执行：
+### 步骤 2：修改配置
+
+编辑 `~/.jarvis/config.yaml`，在 `lsp.languages` 下增加：
+
+```yaml
+lsp:
+  languages:
+    rust:
+      command: rust-analyzer
+      args: []
+      file_extensions: [".rs"]
+      monaco_language: rust
+      root_markers: ["Cargo.toml", "Cargo.lock", ".git"]
+      install_hint: "rustup component add rust-analyzer"
+```
+
+### 步骤 3：确认被识别
 
 ```bash
-rust-analyzer --version
-```
-
-### 步骤 2：编写清单
-
-在用户目录创建 `{数据目录}/lsp_servers/rust.json`（例如 `~/.jarvis/lsp_servers/rust.json`）：
-
-```json
-{
-  "id": "rust",
-  "monacoLanguage": "rust",
-  "extensions": [".rs"],
-  "command": ["rust-analyzer"],
-  "args": [],
-  "rootMarkers": ["Cargo.toml", "Cargo.lock", ".git"],
-  "initializationOptions": {},
-  "installHint": "rustup component add rust-analyzer"
-}
-```
-
-目录不存在时先创建：
-
-```bash
-mkdir -p ~/.jarvis/lsp_servers
-```
-
-### 步骤 3：确认服务器被识别
-
-重启网关（清单每次调用都会重新扫描，无需改代码；但前端有缓存，需刷新页面），然后：
-
-```bash
-curl -s -H "Authorization: Bearer <你的token>" \
-  http://127.0.0.1:8000/api/lsp/servers | python -m json.tool
-```
-
-应能在返回的 `servers` 列表中看到：
-
-```json
-{
-  "id": "rust",
-  "monacoLanguage": "rust",
-  "extensions": [".rs"],
-  "installHint": "rustup component add rust-analyzer",
-  "source": "user"
-}
-```
-
-### 步骤 4：验证
-
-在 Web 界面打开一个 `.rs` 文件，将鼠标悬停在符号上应出现类型/文档提示，输入时应出现补全建议。若语言服务器未安装，编辑器仍可正常使用（仅无 LSP 增强），控制台会打印一条降级提示。
-
-## 降级行为
-
-设计原则：**LSP 是增强，不是依赖**。任何环节失败都不会影响编辑器基本功能（打开、编辑、保存、多标签、语法高亮）。
-
-| 场景                          | 行为                                                                                             |
-| ----------------------------- | ------------------------------------------------------------------------------------------------ |
-| 语言服务器未安装 / 命令不存在 | 后端返回 `SERVER_START_FAILED`（含 `installHint`）；前端 `console.warn` 一条降级提示，编辑器正常 |
-| WS 连接失败 / 超时            | 前端 `console.warn`，静默降级为仅语法高亮                                                        |
-| 清单 JSON 非法或缺字段        | 后端跳过该清单并记录 warning，其他语言不受影响                                                   |
-| 清单拉取失败                  | 前端降级为空映射，所有语言退化为仅语法高亮                                                       |
-| 非 master 节点的文件          | 当前仅支持 master 本地 LSP，非 master 文件跳过（已知限制）                                       |
-
-## 调试方法
-
-### 1. 确认清单是否被识别
-
-```bash
-# 直接调用扫描器（无需起网关）
 cd /home/skyfire/code/Jarvis
 .venv/bin/python -c "
 from jarvis.jarvis_web_gateway.lsp_registry import load_lsp_server_specs
-for sid, spec in sorted(load_lsp_server_specs().items()):
-    print(f\"{sid:12} source={spec['_source']:8} command={spec['command']}\")
+for sid, s in sorted(load_lsp_server_specs().items()):
+    print(f'{sid:12} monaco={s[\"monacoLanguage\"]:12} command={s[\"command\"]}')
 "
 ```
 
-若你的清单没出现，检查：JSON 是否合法、`id`/`monacoLanguage`/`command` 是否齐全、`command` 是否为列表。
+应能看到 `rust` 一行。若没有，检查 YAML 缩进、`command` 是否为字符串。
+
+### 步骤 4：生效
+
+- **jarvis-lsp**：下次调用即生效（每次读取配置）。
+- **Web 编辑器**：重启网关（配置在启动时加载），并刷新浏览器页面。
+
+然后在 Web 界面打开一个 `.rs` 文件，悬停符号应出现类型/文档提示，输入时应出现补全建议。
+
+## 降级行为
+
+设计原则：**LSP 是增强，不是依赖**。任何环节失败都不会影响编辑器基本功能
+（打开、编辑、保存、多标签、语法高亮）。
+
+| 场景                          | 行为                                                                                              |
+| ----------------------------- | ------------------------------------------------------------------------------------------------- |
+| 语言服务器未安装 / 命令不存在 | 后端返回 `SERVER_START_FAILED`（含 `install_hint`）；前端 `console.warn` 一条降级提示，编辑器正常 |
+| WS 连接失败 / 超时            | 前端 `console.warn`，静默降级为仅语法高亮                                                         |
+| 配置项缺 `command` / 类型错误 | 后端跳过该项并记录 warning，其他语言不受影响                                                      |
+| 清单拉取失败                  | 前端降级为空映射，所有语言退化为仅语法高亮                                                        |
+| 非 master 节点的文件          | 当前仅支持 master 本地 LSP，非 master 文件跳过（已知限制）                                        |
+
+## 调试方法
+
+### 1. 确认配置是否被识别
+
+```bash
+cd /home/skyfire/code/Jarvis
+.venv/bin/python -c "
+from jarvis.jarvis_lsp.config import LSPConfigReader
+r = LSPConfigReader()
+for name, cfg in sorted(r.load_config().languages.items()):
+    print(f'{name:12} command={cfg.command:30} args={cfg.args} ext={cfg.file_extensions}')
+"
+```
 
 ### 2. 查看桥接日志
 
 语言服务器进程的启动、stderr、退出都会打到网关日志，关键词前缀为 `[lsp_bridge]`：
 
 ```bash
-# 网关前台运行时直接观察；后台运行时查日志文件
 grep "\[lsp_bridge\]" <网关日志文件>
 ```
 
@@ -180,16 +179,19 @@ websocat -H="Sec-WebSocket-Protocol: jarvis-ws,jarvis-token.<urlencoded-token>" 
 
 ## 已知限制
 
-1. **仅支持 master 本地**：文件读写走 `/api/node/{nodeId}/...`，但 LSP 桥接注册在 master 本地。非 master 节点的文件会跳过 LSP（跨节点 WS 转发是独立传输层问题）。
-2. **workspace root 取文件所在目录**：未向上查找 `rootMarkers`，因此在同一项目的不同子目录打开文件时可能各起一个语言服务器进程。
+1. **仅支持 master 本地**：文件读写走 `/api/node/{nodeId}/...`，但 LSP 桥接注册在 master 本地。
+   非 master 节点的文件会跳过 LSP（跨节点 WS 转发是独立传输层问题）。
+2. **workspace root 取文件所在目录**：未向上查找 `root_markers`，因此在同一项目的不同子目录
+   打开文件时可能各起一个语言服务器进程。
 3. **未实现 `didSave`**：当前同步 didOpen / didChange / didClose，未发送 didSave。
 
 ## 相关源码
 
-| 文件                                                     | 职责                                              |
-| -------------------------------------------------------- | ------------------------------------------------- |
-| `src/jarvis/jarvis_web_gateway/lsp_registry.py`          | 清单扫描、校验、双目录合并                        |
-| `src/jarvis/jarvis_web_gateway/lsp_bridge.py`            | LSP 分帧编解码、进程池、workspace root 解析       |
-| `src/jarvis/jarvis_web_gateway/app.py`                   | `GET /api/lsp/servers`、`WS /api/lsp/{server_id}` |
-| `src/jarvis/jarvis_service/frontend/src/lsp/registry.js` | 前端拉清单、建语言/扩展名索引                     |
-| `src/jarvis/jarvis_service/frontend/src/lsp/manager.js`  | 自建轻量 LSP 客户端、文档同步、语言特性 provider  |
+| 文件                                                     | 职责                                                            |
+| -------------------------------------------------------- | --------------------------------------------------------------- |
+| `src/jarvis/jarvis_lsp/config.py`                        | **配置读取层（唯一来源）**，内置默认语言，jarvis-lsp 与网关共用 |
+| `src/jarvis/jarvis_web_gateway/lsp_registry.py`          | 把配置转换为网关 spec 结构                                      |
+| `src/jarvis/jarvis_web_gateway/lsp_bridge.py`            | LSP 分帧编解码、进程池、workspace root 解析                     |
+| `src/jarvis/jarvis_web_gateway/app.py`                   | `GET /api/lsp/servers`、`WS /api/lsp/{server_id}`               |
+| `src/jarvis/jarvis_service/frontend/src/lsp/registry.js` | 前端拉清单、建语言/扩展名索引                                   |
+| `src/jarvis/jarvis_service/frontend/src/lsp/manager.js`  | 自建轻量 LSP 客户端、文档同步、语言特性 provider                |
