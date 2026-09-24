@@ -2,14 +2,14 @@
  * LSP 语言服务器清单注册表。
  *
  * 数据全部来自后端 `GET /api/lsp/servers`，前端不做任何语言硬编码：
- * 新增语言只需在后端 `lsp_servers/` 丢一个清单 JSON，本文件无需改动。
+ * 新增语言只需在 `~/.jarvis/config.yaml` 的 `lsp.languages` 段增加一项，本文件无需改动。
  *
  * 清单字段（后端返回）：
  *   id            语言服务器唯一标识，如 "python"
  *   monacoLanguage 对应的 Monaco 语言 id，如 "python"
  *   extensions    文件扩展名列表，如 [".py", ".pyi"]
  *   installHint   服务器未安装时的提示文案
- *   source        来源，"builtin" | "user"
+ *   source        来源，固定为 "config"
  */
 
 /** @type {Map<string, object>} monacoLanguage -> serverSpec */
@@ -55,12 +55,8 @@ export async function loadLspServers(
       const byExt = new Map();
       for (const spec of servers) {
         if (!spec || !spec.id || !spec.monacoLanguage) continue;
-        // 同一语言出现多个服务器时，user 来源优先（与后端覆盖语义一致）
-        const existing = byLang.get(spec.monacoLanguage);
-        if (
-          !existing ||
-          (spec.source === "user" && existing.source !== "user")
-        ) {
+        // 后端已按语言名去重，同一 monacoLanguage 只保留首个
+        if (!byLang.has(spec.monacoLanguage)) {
           byLang.set(spec.monacoLanguage, spec);
         }
         for (const ext of spec.extensions || []) {

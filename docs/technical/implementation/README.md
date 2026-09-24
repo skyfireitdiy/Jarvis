@@ -18,9 +18,9 @@
 
 ### LSP 语言支持相关
 
-- **[为 Monaco 编辑器扩展 LSP 语言支持](./lsp_language_extension.md)**
-  - 说明"丢清单即扩展"的 LSP 语言支持机制
-  - 包括清单字段、双目录优先级、新增语言完整示例（Rust）、降级行为与调试方法
+- **[为编辑器扩展 LSP 语言支持](./lsp_language_extension.md)**
+  - 说明"改配置即扩展"的 LSP 语言支持机制（`~/.jarvis/config.yaml` 的 `lsp.languages` 为唯一配置来源）
+  - 包括字段说明、新增语言完整示例（Rust）、降级行为与调试方法
   - 适合需要为编辑器新增语言支持或排查 LSP 问题的开发者
 
 ## 目录说明
