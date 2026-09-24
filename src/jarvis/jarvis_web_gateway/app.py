@@ -374,6 +374,35 @@ GLOBAL_SEARCH_MAX_RESULTS_LIMIT = 500
 GLOBAL_SEARCH_COMMAND_TIMEOUT_SECONDS = 30
 GLOBAL_SEARCH_MAX_LINE_LENGTH = 2000
 GLOBAL_SEARCH_MAX_GLOB_LENGTH = 500
+FILE_SEARCH_DEFAULT_MAX_RESULTS = 200
+FILE_SEARCH_MAX_RESULTS_LIMIT = 1000
+
+
+def _fuzzy_match_score(query: str, target: str) -> Optional[int]:
+    """对 target 做模糊匹配：query 的字符需按顺序出现在 target 中。
+
+    返回匹配得分（越小越优），不匹配返回 None。
+    评分规则：优先连续匹配、优先起始位置靠前、优先整体更短的目标。
+    """
+    if not query:
+        return None
+    query_lower = query.lower()
+    target_lower = target.lower()
+    score = 0
+    target_index = 0
+    previous_match_index = -1
+    for char in query_lower:
+        found = target_lower.find(char, target_index)
+        if found == -1:
+            return None
+        if previous_match_index != -1 and found == previous_match_index + 1:
+            score -= 2  # 连续匹配加分
+        score += found - target_index  # 跳过的字符越多扣分越多
+        previous_match_index = found
+        target_index = found + 1
+    score += previous_match_index + 1  # 匹配结束位置越靠后越差
+    score += len(target_lower) // 4  # 目标越长略差
+    return score
 
 
 def set_status_update_callback(callback: Optional[Callable[[str], None]]) -> None:
@@ -6726,6 +6755,220 @@ def create_app(
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
+    @app.post("/api/file-search/{agent_id}", dependencies=[Depends(verify_token)])
+    async def file_search(agent_id: str, request: Dict[str, Any]) -> Dict[str, Any]:
+        """在 Agent 工作目录内按文件名模糊搜索。"""
+        try:
+            resolved_target_node = str(request.get("node_id") or "").strip()
+            if not resolved_target_node:
+                route = node_runtime.agent_route_registry.get(agent_id)
+                if route is not None:
+                    resolved_target_node = str(route.node_id or "").strip()
+
+            if resolved_target_node and resolved_target_node not in (
+                node_runtime.local_node_id,
+                "master",
+            ):
+                forward_body = dict(request)
+                forward_body.pop("node_id", None)
+                response = await node_connection_manager.send_request_to_node(
+                    resolved_target_node,
+                    NODE_HTTP_PROXY_REQUEST,
+                    {
+                        "method": "POST",
+                        "path": f"file-search/{agent_id}",
+                        "query": "",
+                        "headers": {"content-type": "application/json"},
+                        "body": json.dumps(forward_body),
+                    },
+                )
+                payload = response.get("payload") or {}
+                if not payload.get("success"):
+                    error = payload.get("error") or {}
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": error.get("code", "FILE_SEARCH_FAILED"),
+                            "message": error.get(
+                                "message", "Remote file search failed"
+                            ),
+                        },
+                    }
+                body = payload.get("body") or "{}"
+                return cast(Dict[str, Any], json.loads(body))
+
+            agent = agent_manager.get_agent(agent_id)
+            if not agent:
+                return {
+                    "success": False,
+                    "error": {"code": "AGENT_NOT_FOUND", "message": "Agent not found"},
+                }
+
+            raw_query = request.get("query", "")
+            query = str(raw_query).strip() if raw_query is not None else ""
+            if not query:
+                return {
+                    "success": False,
+                    "error": {"code": "INVALID_QUERY", "message": "query is required"},
+                }
+            if len(query) > GLOBAL_SEARCH_MAX_QUERY_LENGTH:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_QUERY",
+                        "message": f"query length must be <= {GLOBAL_SEARCH_MAX_QUERY_LENGTH}",
+                    },
+                }
+
+            case_sensitive = bool(request.get("case_sensitive", False))
+            raw_max_results = request.get(
+                "max_results", FILE_SEARCH_DEFAULT_MAX_RESULTS
+            )
+            try:
+                max_results = int(raw_max_results)
+            except (TypeError, ValueError):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_QUERY",
+                        "message": "max_results must be an integer",
+                    },
+                }
+            if max_results < 1 or max_results > FILE_SEARCH_MAX_RESULTS_LIMIT:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_QUERY",
+                        "message": f"max_results must be between 1 and {FILE_SEARCH_MAX_RESULTS_LIMIT}",
+                    },
+                }
+
+            raw_file_glob = request.get("file_glob", "")
+            file_glob = str(raw_file_glob).strip() if raw_file_glob is not None else ""
+            if len(file_glob) > GLOBAL_SEARCH_MAX_GLOB_LENGTH:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_QUERY",
+                        "message": f"file_glob length must be <= {GLOBAL_SEARCH_MAX_GLOB_LENGTH}",
+                    },
+                }
+            file_glob_patterns = [
+                item.strip()
+                for item in file_glob.split(",")
+                if isinstance(item, str) and item.strip()
+            ]
+
+            working_dir = pathlib.Path(agent.working_dir).resolve()
+            if not working_dir.exists() or not working_dir.is_dir():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "WORKING_DIR_NOT_FOUND",
+                        "message": f"Working directory not found: {working_dir}",
+                    },
+                }
+
+            rg_command = [
+                "rg",
+                "--files",
+                "--hidden",
+                "--glob",
+                "!.git",
+                "--glob",
+                "!node_modules",
+                "--glob",
+                "!__pycache__",
+                "--glob",
+                "!.venv",
+                "--glob",
+                "!venv",
+                "--glob",
+                "!dist",
+                "--glob",
+                "!build",
+            ]
+            for glob_pattern in file_glob_patterns:
+                rg_command.extend(["--glob", glob_pattern])
+            rg_command.append(str(working_dir))
+
+            try:
+                result = subprocess.run(
+                    rg_command,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=GLOBAL_SEARCH_COMMAND_TIMEOUT_SECONDS,
+                    cwd=str(working_dir),
+                )
+            except FileNotFoundError:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "SEARCH_FAILED",
+                        "message": "ripgrep (rg) is not available",
+                    },
+                }
+            except subprocess.TimeoutExpired:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "SEARCH_TIMEOUT",
+                        "message": f"Search timed out after {GLOBAL_SEARCH_COMMAND_TIMEOUT_SECONDS} seconds",
+                    },
+                }
+
+            if result.returncode not in (0, 1):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "SEARCH_FAILED",
+                        "message": result.stderr.strip() or "Search command failed",
+                    },
+                }
+
+            scored_results = []
+            for line in result.stdout.splitlines():
+                file_path_str = line.strip()
+                if not file_path_str:
+                    continue
+                try:
+                    absolute_path = pathlib.Path(file_path_str).resolve()
+                    relative_path = absolute_path.relative_to(working_dir)
+                except (ValueError, OSError):
+                    continue
+                name = relative_path.name
+                score = _fuzzy_match_score(
+                    query if case_sensitive else query.lower(),
+                    name if case_sensitive else name.lower(),
+                )
+                if score is None:
+                    continue
+                scored_results.append((score, str(relative_path), name))
+
+            scored_results.sort(key=lambda item: (item[0], item[1]))
+            limited = scored_results[:max_results]
+            structured_results = [
+                {"file_path": file_path, "name": name} for _, file_path, name in limited
+            ]
+
+            return {
+                "success": True,
+                "data": {
+                    "query": query,
+                    "file_glob": file_glob,
+                    "total_files": len(scored_results),
+                    "results": structured_results,
+                },
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
     def _validate_absolute_file_path(file_path: str) -> pathlib.Path:
         if not file_path:
             raise ValueError("Path is required")
@@ -7762,6 +8005,11 @@ def create_app(
         ):
             agent_id = normalized_path[len("/global-search/") :].strip("/")
             result = await global_search(agent_id, payload)
+        elif (
+            normalized_path.startswith("/file-search/") and normalized_method == "POST"
+        ):
+            agent_id = normalized_path[len("/file-search/") :].strip("/")
+            result = await file_search(agent_id, payload)
         elif normalized_method == "GET" and normalized_path == "/model-groups":
             result = await get_model_groups()
         elif normalized_path.startswith("/agents/") and "/" not in normalized_path[
