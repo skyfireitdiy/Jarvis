@@ -46,12 +46,26 @@
       @deleteGroup="deleteAgentGroup"
       @startResize="startAgentSidebarResize"
       @editAccess="editAgentAccess"
+    />
+
+    <!-- 主宠物挂件：全局浮动宠物（放技能/拖拽/贴边），长按可一句话创建 Agent -->
+    <PetWidget
+      ref="petWidgetRef"
+      :isConnected="!!socket && !showConnectModal"
+      :windowWidth="windowWidth"
+      :agentList="agentList"
+      :agentStatuses="agentStatuses"
+      :isWaitingInput="isWaitingInput"
+      :currentAgentId="currentAgentId"
+      :nodes="availableNodeOptions"
+      :getStatusClass="getStatusClass"
       @petSyncStatus="petSyncAllStatus"
       @petInterruptCurrent="petInterruptCurrent"
       @petGotoWaiting="petGotoWaitingAgent"
       @petToggleSidebar="toggleAgentSidebar"
       @petOpenTopology="openTopologyOverlay"
       @petOpenCommandPalette="openCommandPalette()"
+      @openQuickCreate="openQuickCreateAgent"
     />
 
     <!-- 全局工具条：常驻右上角，承载原顶栏的全部入口（不随面板开关消失；登录界面不显示） -->
@@ -108,20 +122,8 @@
       <span class="global-toolbar-tab-grip"></span>
     </div>
 
-    <!-- 悬浮入口：一句话创建 Agent（移动端无键盘，快捷键/命令面板不便触发；可拖动避开控件） -->
-    <button
-      v-if="!showConnectModal"
-      ref="quickCreateFabElRef"
-      class="quick-create-fab"
-      :class="{ 'is-dragging': isDraggingQuickCreateFab }"
-      :style="quickCreateFabStyle"
-      :disabled="!socket"
-      title="一句话创建 Agent (Ctrl+Alt+N)｜可拖动"
-      @pointerdown.stop.prevent="startDragQuickCreateFab($event)"
-      @click.stop="onQuickCreateFabClick()"
-    >
-      ⚡
-    </button>
+
+    <!-- 主内容区 -->
 
     <!-- 主内容区 -->
     <div class="main-content-wrapper">
@@ -1317,6 +1319,7 @@ import BufferPanel from './components/BufferPanel.vue'
 import DirectoryDialog from './components/DirectoryDialog.vue'
 import SessionDialog from './components/SessionDialog.vue'
 import AgentSidebar from './components/AgentSidebar.vue'
+import PetWidget from './components/PetWidget.vue'
 import CompletionsModal from './components/CompletionsModal.vue'
 import TerminalPanel from './components/TerminalPanel.vue'
 import ChatPanel from './components/ChatPanel.vue'
@@ -1824,132 +1827,6 @@ function handleToolbarResize() {
   globalToolbarPos.value = { x, y: clampedY }
 }
 
-// ===== 悬浮入口（一句话创建 Agent）拖拽 + 位置持久化 =====
-// 未拖动过时使用右下角默认位置（null），拖动后记录绝对坐标
-const QUICK_CREATE_FAB_STORAGE_KEY = 'jarvis_quick_create_fab_pos'
-const QUICK_CREATE_FAB_SIZE = 48 // 与 .quick-create-fab 尺寸保持一致（移动端 56，仅用于边界估算）
-const quickCreateFabElRef = ref(null)
-const quickCreateFabPos = ref(loadQuickCreateFabPos())
-const isDraggingQuickCreateFab = ref(false)
-const quickCreateFabDragOffset = ref({ x: 0, y: 0 })
-// 区分"点击"与"拖动"：拖动超过阈值后抬手不再触发打开弹窗
-const QUICK_CREATE_FAB_DRAG_THRESHOLD = 4
-let quickCreateFabMoved = false
-
-function loadQuickCreateFabPos() {
-  try {
-    const savedValue = localStorage.getItem(QUICK_CREATE_FAB_STORAGE_KEY)
-    if (!savedValue) return null
-    const parsedValue = JSON.parse(savedValue)
-    if (typeof parsedValue?.x !== 'number' || typeof parsedValue?.y !== 'number') {
-      return null
-    }
-    return { x: parsedValue.x, y: parsedValue.y }
-  } catch {
-    return null
-  }
-}
-
-function saveQuickCreateFabPos() {
-  try {
-    if (quickCreateFabPos.value) {
-      localStorage.setItem(QUICK_CREATE_FAB_STORAGE_KEY, JSON.stringify(quickCreateFabPos.value))
-    } else {
-      localStorage.removeItem(QUICK_CREATE_FAB_STORAGE_KEY)
-    }
-  } catch {
-    /* 隐私模式下写入失败可忽略 */
-  }
-}
-
-// 悬浮入口实际尺寸（移动端媒体查询下更大，需实测）
-function measureQuickCreateFab() {
-  const el = quickCreateFabElRef.value
-  return {
-    width: el?.offsetWidth || QUICK_CREATE_FAB_SIZE,
-    height: el?.offsetHeight || QUICK_CREATE_FAB_SIZE,
-  }
-}
-
-// 拖动过则用绝对坐标；否则回落到右下角默认位置（由 CSS 控制）
-const quickCreateFabStyle = computed(() => {
-  const pos = quickCreateFabPos.value
-  if (!pos) return {}
-  return {
-    left: `${pos.x}px`,
-    top: `${pos.y}px`,
-    right: 'auto',
-    bottom: 'auto',
-  }
-})
-
-function startDragQuickCreateFab(event) {
-  // 仅响应主指针（鼠标左键 / 单指触摸）
-  if (event.button !== undefined && event.button !== 0) return
-  const el = event.currentTarget
-  if (!el) return
-  isDraggingQuickCreateFab.value = true
-  quickCreateFabMoved = false
-  const rect = el.getBoundingClientRect()
-  quickCreateFabDragOffset.value = {
-    x: event.clientX - rect.left,
-    y: event.clientY - rect.top,
-  }
-  // 首次拖动时把当前位置固定下来，避免从 CSS 默认位置跳到绝对坐标
-  if (!quickCreateFabPos.value) {
-    quickCreateFabPos.value = { x: rect.left, y: rect.top }
-  }
-  document.addEventListener('pointermove', onDragQuickCreateFab)
-  document.addEventListener('pointerup', stopDragQuickCreateFab)
-  document.addEventListener('pointercancel', stopDragQuickCreateFab)
-  event.preventDefault()
-}
-
-function onDragQuickCreateFab(event) {
-  if (!isDraggingQuickCreateFab.value) return
-  const { width, height } = measureQuickCreateFab()
-  const maxX = Math.max(0, window.innerWidth - width)
-  const maxY = Math.max(0, window.innerHeight - height)
-  const nextX = clamp(event.clientX - quickCreateFabDragOffset.value.x, 0, maxX)
-  const nextY = clamp(event.clientY - quickCreateFabDragOffset.value.y, 0, maxY)
-  if (Math.abs(nextX - quickCreateFabPos.value.x) > QUICK_CREATE_FAB_DRAG_THRESHOLD
-    || Math.abs(nextY - quickCreateFabPos.value.y) > QUICK_CREATE_FAB_DRAG_THRESHOLD) {
-    quickCreateFabMoved = true
-  }
-  quickCreateFabPos.value = { x: nextX, y: nextY }
-  event.preventDefault()
-}
-
-function stopDragQuickCreateFab() {
-  document.removeEventListener('pointermove', onDragQuickCreateFab)
-  document.removeEventListener('pointerup', stopDragQuickCreateFab)
-  document.removeEventListener('pointercancel', stopDragQuickCreateFab)
-  if (!isDraggingQuickCreateFab.value) return
-  isDraggingQuickCreateFab.value = false
-  saveQuickCreateFabPos()
-}
-
-// 点击悬浮入口：拖动过则不触发（避免拖完误开弹窗）
-function onQuickCreateFabClick() {
-  if (quickCreateFabMoved) {
-    quickCreateFabMoved = false
-    return
-  }
-  openQuickCreateAgent()
-}
-
-// 窗口尺寸变化时校正悬浮入口位置，避免越界跑出可视区
-function handleQuickCreateFabResize() {
-  if (!quickCreateFabPos.value) return
-  const { width, height } = measureQuickCreateFab()
-  const maxX = Math.max(0, window.innerWidth - width)
-  const maxY = Math.max(0, window.innerHeight - height)
-  quickCreateFabPos.value = {
-    x: clamp(quickCreateFabPos.value.x, 0, maxX),
-    y: clamp(quickCreateFabPos.value.y, 0, maxY),
-  }
-  saveQuickCreateFabPos()
-}
 
 // 拖拽相关函数
 function startDragSidebar(event) {
@@ -2406,6 +2283,7 @@ const showAdminPanel = ref(false) // 管理面板
 const adminPanelRef = ref(null) // 管理面板组件引用（用于命令面板定位到系统配置）
 const showAgentSidebar = ref(false)    // Agent 侧边栏（默认收起）
 const agentSidebarRef = ref(null)     // Agent 侧边栏组件引用（用于调用宠物显隐）
+const petWidgetRef = ref(null)        // 主宠物挂件组件引用（用于调用宠物显隐）
 const showTerminalPanel = ref(false)  // 终端面板
 const showChatPanel = ref(false)     // 聊天室面板
 const showEditorPanel = ref(false)    // 编辑器浮动面板
@@ -5627,9 +5505,9 @@ function openAgentListPalette() {
   openCommandPalette('a>')
 }
 
-// 切换宠物显示/隐藏（命令面板触发，代理到 AgentSidebar 内部逻辑）
+// 切换宠物显示/隐藏（命令面板触发，代理到 PetWidget 内部逻辑）
 function togglePetVisibility() {
-  agentSidebarRef.value?.togglePet?.()
+  petWidgetRef.value?.togglePet?.()
 }
 
 // ===== 当前 Agent 菜单动作（命令面板「当前 Agent」组）=====
@@ -5840,7 +5718,7 @@ const WELCOME_TOUR_STEPS = [
     icon: '🧰',
     title: '右上角工具条',
     desc: '右上角常驻一条工具条：📋 打开 Agent 侧边栏（Ctrl+A）、💬 打开聊天室、💻 打开终端面板、⌘ 打开命令面板（Ctrl+P）、⚙ 打开设置；管理员还会看到 🛡️ 管理入口。',
-    hint: '工具条可拖动（拖到屏幕左/右边缘会自动收起，露出窄边条点击即可展开）；左下角还有 ⚡ 悬浮按钮，可用一句话快速创建 Agent（Ctrl+Alt+N）。',
+    hint: '工具条可拖动（拖到屏幕左/右边缘会自动收起，露出窄边条点击即可展开）；长按左下角的主宠物，可用一句话快速创建 Agent（Ctrl+Alt+N）。',
   },
   {
     id: 'welcome-command-palette',
@@ -5909,17 +5787,17 @@ function LOBBY_TOUR_STEPS() {
       icon: '➕',
       title: '创建 Agent',
       desc: '点击右上角 📋 打开 Agent 侧边栏（也可按 Ctrl+A），用其中的「➕」创建 Agent（也可按 Ctrl+N），选择节点、Agent 类型与工作目录即可创建；还可以双击大厅中的节点，直接在指定节点上创建。',
-      hint: '代码 Agent（jca）擅长读代码、改代码、跑验证；通用 Agent（jvs）适合分析、规划与执行。左下角 ⚡ 悬浮按钮可用一句话快速创建 Agent（Ctrl+Alt+N）。',
+      hint: '代码 Agent（jca）擅长读代码、改代码、跑验证；通用 Agent（jvs）适合分析、规划与执行。长按左下角的主宠物可用一句话快速创建 Agent（Ctrl+Alt+N）。',
       target: '.global-toolbar',
       placement: 'bottom',
     },
     {
       id: 'lobby-quick-create',
-      icon: '⚡',
+      icon: '🐾',
       title: '一句话创建 Agent',
-      desc: '点击左下角 ⚡ 悬浮按钮（或按 Ctrl+Alt+N），输入一句话描述任务，回车即可创建 Agent 并立即开始执行；除任务外全部使用默认参数，适合快速起一个任务。',
-      hint: '⚡ 按钮可拖动避开控件；需要自定义节点、类型、工作目录等参数时，改用「➕」的完整创建窗口。',
-      target: '.quick-create-fab',
+      desc: '长按左下角的主宠物（或按 Ctrl+Alt+N），输入一句话描述任务，回车即可创建 Agent 并立即开始执行；除任务外全部使用默认参数，适合快速起一个任务。',
+      hint: '长按主宠物约 0.6 秒即可触发；需要自定义节点、类型、工作目录等参数时，改用「➕」的完整创建窗口。',
+      target: '.pet-float',
       placement: 'top',
     },
     {
@@ -14372,7 +14250,6 @@ onMounted(() => {
     saveTerminalPanelRect()
     layoutCodeMirrorEditor()
     handleToolbarResize()
-    handleQuickCreateFabResize()
 
     const activeSession = terminalSessions.value.find(session => session.terminal_id === activeTerminalId.value)
     if (activeSession && activeSession.fitAddon && activeSession.terminal) {
@@ -14850,53 +14727,6 @@ body::-webkit-scrollbar {
   transition: none;
 }
 
-/* 悬浮入口：一句话创建 Agent（右下角，移动端可点） */
-.quick-create-fab {
-  position: fixed;
-  right: max(16px, env(safe-area-inset-right, 0px));
-  bottom: max(16px, env(safe-area-inset-bottom, 0px));
-  z-index: 10000;
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border-radius: 50%;
-  border: 1px solid rgba(32, 200, 255, 0.35);
-  background: rgba(11, 20, 36, 0.82);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 4px 20px rgba(0, 120, 190, 0.25);
-  color: #7ddcff;
-  font-size: 22px;
-  line-height: 1;
-  cursor: grab;
-  touch-action: none;
-  user-select: none;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
-}
-
-.quick-create-fab.is-dragging {
-  cursor: grabbing;
-  transition: none;
-}
-
-.quick-create-fab:hover:not(:disabled) {
-  background: rgba(20, 40, 66, 0.95);
-  border-color: rgba(32, 200, 255, 0.6);
-  transform: translateY(-2px);
-}
-
-.quick-create-fab:active:not(:disabled) {
-  transform: translateY(0);
-}
-
-.quick-create-fab:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 /* 拖动把手：仅此处可拖动工具条 */
 .global-toolbar-handle {
   display: flex;
@@ -14952,14 +14782,6 @@ body::-webkit-scrollbar {
   .global-toolbar-tab-grip {
     width: 14px;
     height: 3px;
-  }
-  /* 悬浮入口：移动端加大触摸区，避开底部安全区 */
-  .quick-create-fab {
-    width: 56px;
-    height: 56px;
-    font-size: 26px;
-    right: max(12px, env(safe-area-inset-right, 0px));
-    bottom: max(20px, env(safe-area-inset-bottom, 0px));
   }
 }
 

@@ -155,6 +155,7 @@ const emit = defineEmits([
   'petToggleSidebar',
   'petOpenTopology',
   'petOpenCommandPalette',
+  'openQuickCreate',
 ])
 
 // ==================== 宠物挂件 ====================
@@ -631,6 +632,11 @@ let petSpeechTimer = 0   // 台词气泡
 let petHideTimer = 0     // 隐藏定时器（兼容保留）
 let petPettingFxTimer = 0      // 摸头爱心循环
 
+// 长按触发一句话创建 Agent：按住主宠物 600ms 未移动即触发
+const PET_LONG_PRESS_MS = 600
+let petLongPressTimer = 0      // 长按判定定时器
+let petLongPressFired = false  // 本次手势已触发长按（抑制随后的单击/双击）
+
 // ==================== 宠物环形菜单 ====================
 let petMenuLongPressTimer = 0               // 还原按钮长按判定
 
@@ -639,10 +645,18 @@ function onPetPointerDown(e) {
   stopPetWalk()
   petDragging = true
   petMoved = false
+  petLongPressFired = false
   petStartX = e.clientX
   petStartY = e.clientY
   petOriginX = petPos.value.x
   petOriginY = petPos.value.y
+  // 启动长按判定：600ms 内未移动（未变拖拽）则触发一句话创建 Agent
+  clearTimeout(petLongPressTimer)
+  petLongPressTimer = window.setTimeout(() => {
+    petLongPressTimer = 0
+    petLongPressFired = true
+    emit('openQuickCreate')
+  }, PET_LONG_PRESS_MS)
   e.target.setPointerCapture?.(e.pointerId)
   e.preventDefault()
 }
@@ -656,6 +670,11 @@ function onPetPointerMove(e) {
   if (!petMoved && Math.hypot(dx, dy) > 5) {
     petMoved = true
     petDrag.value = true
+    // 已判定为拖拽：取消长按触发，避免拖动过程中误开一句话创建
+    if (petLongPressTimer) {
+      clearTimeout(petLongPressTimer)
+      petLongPressTimer = 0
+    }
     if (petPetting.value) stopPetting()
   }
   if (petMoved) {
@@ -666,6 +685,8 @@ function onPetPointerMove(e) {
 function onPetPointerUp(e) {
   if (!petDragging) return
   petDragging = false
+  clearTimeout(petLongPressTimer)
+  petLongPressTimer = 0
   e.target.releasePointerCapture?.(e.pointerId)
   if (petMoved) {
     petDrag.value = false
@@ -674,6 +695,11 @@ function onPetPointerUp(e) {
     return
   }
   petDrag.value = false
+  // 长按已触发一句话创建：本次抬手不再响应单击/双击
+  if (petLongPressFired) {
+    petLongPressFired = false
+    return
+  }
   // 单击 / 双击判定
   if (petClickTimer) {
     // 300ms 内第二次：双击 → 撒花庆祝并唤起命令面板（与右键行为互换）
@@ -1693,6 +1719,7 @@ watch(petPowerSaveActive, (active) => {
 onUnmounted(() => {
   document.removeEventListener('mousemove', onPetMouseMove)
   window.removeEventListener('resize', onPetResize)
+  clearTimeout(petLongPressTimer)
   clearTimeout(petMenuLongPressTimer)
   clearTimeout(petActTimer)
   clearTimeout(petClickTimer)
