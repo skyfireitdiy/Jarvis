@@ -3919,9 +3919,46 @@ function closeFileTreeContextMenu() {
 // 菜单作用目录的绝对路径：目录节点用 node.path，根用 agent.working_dir
 function getFileTreeContextDirPath() {
   const menu = fileTreeContextMenu.value
-  if (menu.node && menu.node.path) return menu.node.path
+  if (menu.node && menu.node.type === 'directory' && menu.node.path) return menu.node.path
   const agent = agentList.value.find(a => a.agent_id === menu.agentId)
   return agent?.working_dir || ''
+}
+
+// 菜单作用节点的绝对路径：文件节点用 node.path，目录/根用目录路径
+function getFileTreeContextTargetPath() {
+  const menu = fileTreeContextMenu.value
+  if (menu.node && menu.node.type === 'file' && menu.node.path) return menu.node.path
+  return getFileTreeContextDirPath()
+}
+
+// 绝对路径转相对 working_dir 的路径（不在工作目录内时返回空串）
+function toWorkingDirRelativePath(agentId, absPath) {
+  const agent = agentList.value.find(a => a.agent_id === agentId)
+  const workingDir = String(agent?.working_dir || '').replace(/\/+$/, '')
+  const normalized = String(absPath || '').replace(/\/+$/, '')
+  if (!workingDir || !normalized) return ''
+  if (normalized === workingDir) return ''
+  if (!normalized.startsWith(workingDir + '/')) return ''
+  return normalized.slice(workingDir.length + 1)
+}
+
+// 复制文本到剪贴板（优先 Clipboard API，非安全上下文回退 execCommand）
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text)
+    return
+  }
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  document.body.appendChild(textarea)
+  textarea.select()
+  try {
+    if (!document.execCommand('copy')) throw new Error('copy failed')
+  } finally {
+    document.body.removeChild(textarea)
+  }
 }
 
 // 在目录树节点/工作目录根上右键：就地弹出菜单（视口坐标 + 边界收敛）
@@ -3938,7 +3975,7 @@ function openFileTreeContextMenu(agent, node, event) {
     x,
     y,
     agentId: agent.agent_id,
-    node: node && node.type === 'directory' ? node : null,
+    node: node || null,
   }
   // 点击菜单外部时关闭（一次性监听，避免常驻 document 监听）
   nextTick(() => {
@@ -3949,12 +3986,16 @@ function openFileTreeContextMenu(agent, node, event) {
 // 目录树右键菜单项
 const fileTreeContextActions = computed(() => {
   const hasAgent = Boolean(fileTreeContextMenu.value.agentId)
+  const hasNode = Boolean(fileTreeContextMenu.value.node)
   return [
     { id: 'new-file', label: '新建文件', icon: '📄', enabled: hasAgent },
     { id: 'new-folder', label: '新建文件夹', icon: '📁', enabled: hasAgent },
     { id: 'find-in-folder', label: '在当前目录下查找', icon: '🔍', enabled: hasAgent },
     { id: 'refresh', label: '刷新', icon: '🔄', enabled: hasAgent },
     { id: 'copy-path', label: '复制路径', icon: '📋', enabled: hasAgent },
+    { id: 'copy-relative-path', label: '复制相对路径', icon: '🔗', enabled: hasAgent },
+    { id: 'rename', label: '重命名', icon: '✏️', enabled: hasNode },
+    { id: 'delete', label: '删除', icon: '🗑️', enabled: hasNode },
   ]
 })
 
@@ -4019,14 +4060,78 @@ async function runFileTreeContextAction(action) {
   }
 
   if (action.id === 'copy-path') {
-    const dirPath = getFileTreeContextDirPath()
-    if (!dirPath) return
+    const targetPath = getFileTreeContextTargetPath()
+    if (!targetPath) return
     try {
-      await navigator.clipboard.writeText(dirPath)
+      await copyTextToClipboard(targetPath)
       showToast('路径已复制', 'success')
     } catch (error) {
       showToast('复制路径失败', 'error')
     }
+    return
+  }
+
+  if (action.id === 'copy-relative-path') {
+    const targetPath = getFileTreeContextTargetPath()
+    if (!targetPath) return
+    const relativePath = toWorkingDirRelativePath(agent.agent_id, targetPath)
+    if (!relativePath) {
+      showToast('该路径不在工作目录内，无法生成相对路径', 'error')
+      return
+    }
+    try {
+      await copyTextToClipboard(relativePath)
+      showToast('相对路径已复制', 'success')
+    } catch (error) {
+      showToast('复制相对路径失败', 'error')
+    }
+    return
+  }
+
+  if (action.id === 'rename') {
+    const node = menu.node
+    if (!node || !node.path) return
+    const isDir = node.type === 'directory'
+    const parentPath = String(node.path).replace(/\/+$/, '').split('/').slice(0, -1).join('/') || '/'
+    openInputPrompt({
+      title: `重命名${isDir ? '文件夹' : '文件'}`,
+      label: '新名称',
+      placeholder: `请输入新的${isDir ? '文件夹' : '文件'}名称`,
+      value: node.name || '',
+      onConfirm: (rawName) => {
+        const trimmedName = String(rawName || '').trim()
+        if (!trimmedName) return '名称不能为空'
+        if (trimmedName.includes('/') || trimmedName.includes('\\')) return '名称不能包含路径分隔符'
+        if (trimmedName === node.name) return null
+        const newAbsPath = `${parentPath.replace(/\/$/, '')}/${trimmedName}`
+        renameFileOrDirectory(agent.agent_id, node.path, newAbsPath)
+          .then(() => refreshFileTreeDir(agent.agent_id, menu.node))
+          .then(() => showToast('重命名成功', 'success'))
+          .catch((error) => showToast(error.message || '重命名失败', 'error'))
+        return null
+      },
+    })
+    return
+  }
+
+  if (action.id === 'delete') {
+    const node = menu.node
+    if (!node || !node.path) return
+    const isDir = node.type === 'directory'
+    const confirmMessage = isDir
+      ? `确定要删除文件夹 "${node.name}" 及其全部内容吗？此操作不可恢复。`
+      : `确定要删除文件 "${node.name}" 吗？此操作不可恢复。`
+    showConfirm(
+      confirmMessage,
+      () => {
+        deleteFileOrDirectory(agent.agent_id, node.path, isDir)
+          .then(() => refreshFileTreeDir(agent.agent_id, menu.node))
+          .then(() => showToast('已删除', 'success'))
+          .catch((error) => showToast(error.message || '删除失败', 'error'))
+      },
+      () => {},
+      false
+    )
   }
 }
 
@@ -4065,6 +4170,50 @@ async function createFileOrDirectory(agentId, absPath, kind) {
   const result = await response.json()
   if (!response.ok || !result.success) {
     throw new Error(result.error?.message || '创建失败')
+  }
+  return result.data
+}
+
+// 调用后端删除文件/目录接口（目录需 recursive 才可递归删除）
+async function deleteFileOrDirectory(agentId, absPath, recursive = false) {
+  const { host, port } = getGatewayAddress()
+  const agent = agentList.value.find(a => a.agent_id === agentId)
+  if (!agent) {
+    throw new Error(`找不到Agent: ${agentId}`)
+  }
+  if (!agent.node_id) {
+    throw new Error(`Agent没有node_id: ${agentId}`)
+  }
+  const targetNodeId = String(agent.node_id).trim()
+  const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, 'file-delete'), {
+    method: 'POST',
+    body: JSON.stringify({ path: absPath, recursive, node_id: targetNodeId })
+  })
+  const result = await response.json()
+  if (!response.ok || !result.success) {
+    throw new Error(result.error?.message || '删除失败')
+  }
+  return result.data
+}
+
+// 调用后端重命名/移动文件/目录接口（不覆盖已存在路径）
+async function renameFileOrDirectory(agentId, absPath, newAbsPath) {
+  const { host, port } = getGatewayAddress()
+  const agent = agentList.value.find(a => a.agent_id === agentId)
+  if (!agent) {
+    throw new Error(`找不到Agent: ${agentId}`)
+  }
+  if (!agent.node_id) {
+    throw new Error(`Agent没有node_id: ${agentId}`)
+  }
+  const targetNodeId = String(agent.node_id).trim()
+  const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, 'file-rename'), {
+    method: 'POST',
+    body: JSON.stringify({ path: absPath, new_path: newAbsPath, node_id: targetNodeId })
+  })
+  const result = await response.json()
+  if (!response.ok || !result.success) {
+    throw new Error(result.error?.message || '重命名失败')
   }
   return result.data
 }

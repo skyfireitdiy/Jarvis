@@ -7423,6 +7423,165 @@ def create_app(
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
+    async def _handle_file_delete_request(payload: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            file_path = str(payload.get("path", "")).strip()
+            if not file_path:
+                return {
+                    "success": False,
+                    "error": {"code": "INVALID_PATH", "message": "Path is required"},
+                }
+
+            target_path = pathlib.Path(file_path)
+            if not target_path.is_absolute():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_PATH",
+                        "message": "Path must be absolute",
+                    },
+                }
+
+            target_path = target_path.resolve(strict=False)
+            if not target_path.exists():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "NOT_FOUND",
+                        "message": f"Path does not exist: {target_path}",
+                    },
+                }
+
+            recursive = bool(payload.get("recursive", False))
+            kind = "file"
+            if target_path.is_dir():
+                kind = "directory"
+                if recursive:
+                    shutil.rmtree(target_path)
+                else:
+                    try:
+                        target_path.rmdir()
+                    except OSError:
+                        return {
+                            "success": False,
+                            "error": {
+                                "code": "DIRECTORY_NOT_EMPTY",
+                                "message": f"Directory is not empty: {target_path}",
+                            },
+                        }
+            else:
+                target_path.unlink()
+
+            return {
+                "success": True,
+                "data": {"path": str(target_path), "kind": kind},
+            }
+        except PermissionError:
+            return {
+                "success": False,
+                "error": {"code": "PERMISSION_DENIED", "message": "Permission denied"},
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    async def _handle_file_rename_request(payload: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            old_path = str(payload.get("path", "")).strip()
+            new_path = str(payload.get("new_path", "")).strip()
+            if not old_path or not new_path:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_PATH",
+                        "message": "Both path and new_path are required",
+                    },
+                }
+
+            source_path = pathlib.Path(old_path)
+            target_path = pathlib.Path(new_path)
+            if not source_path.is_absolute() or not target_path.is_absolute():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_PATH",
+                        "message": "Paths must be absolute",
+                    },
+                }
+
+            source_path = source_path.resolve(strict=False)
+            target_path = target_path.resolve(strict=False)
+            if not source_path.exists():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "NOT_FOUND",
+                        "message": f"Path does not exist: {source_path}",
+                    },
+                }
+
+            if source_path == target_path:
+                return {
+                    "success": True,
+                    "data": {
+                        "path": str(source_path),
+                        "new_path": str(target_path),
+                        "kind": "directory" if source_path.is_dir() else "file",
+                    },
+                }
+
+            if target_path.exists():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "ALREADY_EXISTS",
+                        "message": f"Path already exists: {target_path}",
+                    },
+                }
+
+            parent_directory = target_path.parent
+            if not parent_directory.exists():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "PARENT_DIRECTORY_NOT_FOUND",
+                        "message": f"Parent directory does not exist: {parent_directory}",
+                    },
+                }
+
+            if not parent_directory.is_dir():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "PARENT_NOT_A_DIRECTORY",
+                        "message": f"Parent path is not a directory: {parent_directory}",
+                    },
+                }
+
+            kind = "directory" if source_path.is_dir() else "file"
+            source_path.rename(target_path)
+
+            return {
+                "success": True,
+                "data": {
+                    "path": str(source_path),
+                    "new_path": str(target_path),
+                    "kind": kind,
+                },
+            }
+        except PermissionError:
+            return {
+                "success": False,
+                "error": {"code": "PERMISSION_DENIED", "message": "Permission denied"},
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
     async def _handle_directories_request(payload: Dict[str, Any]) -> Dict[str, Any]:
         import pathlib
 
@@ -7569,6 +7728,10 @@ def create_app(
             result = await _handle_file_write_request(payload)
         elif normalized_method == "POST" and normalized_path == "/file-create":
             result = await _handle_file_create_request(payload)
+        elif normalized_method == "POST" and normalized_path == "/file-delete":
+            result = await _handle_file_delete_request(payload)
+        elif normalized_method == "POST" and normalized_path == "/file-rename":
+            result = await _handle_file_rename_request(payload)
         elif normalized_method == "POST" and normalized_path == "/upload":
             # 权限校验：file:upload
             # 节点访问校验：仅在 master 上执行。
@@ -7809,6 +7972,16 @@ def create_app(
     async def create_file_or_directory(request: Dict[str, Any]) -> Dict[str, Any]:
         """创建指定绝对路径的文件或目录（不覆盖已存在路径）。"""
         return await _handle_file_create_request(request)
+
+    @app.post("/api/file-delete", dependencies=[Depends(verify_token)])
+    async def delete_file_or_directory(request: Dict[str, Any]) -> Dict[str, Any]:
+        """删除指定绝对路径的文件或目录（目录需 recursive 才可递归删除）。"""
+        return await _handle_file_delete_request(request)
+
+    @app.post("/api/file-rename", dependencies=[Depends(verify_token)])
+    async def rename_file_or_directory(request: Dict[str, Any]) -> Dict[str, Any]:
+        """重命名/移动指定绝对路径的文件或目录（不覆盖已存在路径）。"""
+        return await _handle_file_rename_request(request)
 
     @app.post("/api/data/{key}", dependencies=[Depends(verify_token)])
     async def save_data_api(key: str, request: Dict[str, Any]) -> Dict[str, Any]:
