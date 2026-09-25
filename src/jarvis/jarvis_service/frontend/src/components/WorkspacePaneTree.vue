@@ -54,8 +54,8 @@
     <div class="workspace-pane-leaf-header">
       <span class="workspace-pane-leaf-title">{{ getTitle ? getTitle(node) : (node.view === 'session' ? '会话' : '文件') }}</span>
       <div class="workspace-pane-leaf-actions">
-        <button class="workspace-pane-leaf-btn" title="左右分" @click.stop="$emit('split', node.id, 'row')">◫</button>
-        <button class="workspace-pane-leaf-btn" title="上下分" @click.stop="$emit('split', node.id, 'column')">⬓</button>
+        <button v-if="canSplit" class="workspace-pane-leaf-btn" title="左右分" @click.stop="$emit('split', node.id, 'row')">◫</button>
+        <button v-if="canSplit" class="workspace-pane-leaf-btn" title="上下分" @click.stop="$emit('split', node.id, 'column')">⬓</button>
         <button
           v-if="canClose"
           class="workspace-pane-leaf-btn"
@@ -77,6 +77,7 @@ const props = defineProps({
   node: { type: Object, required: true },
   activePaneId: { type: String, default: null },
   canClose: { type: Boolean, default: true },
+  canSplit: { type: Boolean, default: true },
   getTitle: { type: Function, default: null },
 })
 

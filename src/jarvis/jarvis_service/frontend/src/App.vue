@@ -61,8 +61,8 @@
         @activateTab="activateWorkspaceTab"
         @closeTab="closeWorkspaceTab"
         @toggleEditable="toggleWorkspaceEditable"
-        @setSidebarView="setWorkspaceSidebarView"
-        @setMainView="setWorkspaceMainView"
+        @setSidebarView="toggleWorkspaceSidebarView"
+        @setMainView="toggleWorkspaceMainView"
         @startResize="startWorkspacePanelResize"
         @toggleDiffSideBySide="toggleGitDiffSideBySide"
         @toggleDiffShowFull="toggleGitDiffShowFull"
@@ -457,6 +457,7 @@
           <WorkspacePaneTree
             :node="workspacePaneTree"
             :activePaneId="activePaneId"
+            :canSplit="windowWidth > 768"
             :getTitle="getWorkspacePaneTitle"
             @activate="activateWorkspacePane"
             @split="splitWorkspacePane"
@@ -975,8 +976,8 @@
       @activateTab="activateWorkspaceTab"
       @closeTab="closeWorkspaceTab"
       @toggleEditable="toggleWorkspaceEditable"
-      @setSidebarView="setWorkspaceSidebarView"
-      @setMainView="setWorkspaceMainView"
+      @setSidebarView="toggleWorkspaceSidebarView"
+      @setMainView="toggleWorkspaceMainView"
       @startResize="startWorkspacePanelResize"
       @toggleDiffSideBySide="toggleGitDiffSideBySide"
       @toggleDiffShowFull="toggleGitDiffShowFull"
@@ -2933,6 +2934,8 @@ const isWorkspaceSplit = computed(() => workspacePaneCount.value > 1)
 // （切分时会把当前主视图固化到原 pane，新 pane 为文件，见 splitWorkspacePane；
 //  chat/terminal 是 host 单例，新 pane 一律为 file，不会出现两个 pane 争抢同一 host）。
 const canSplitWorkspacePane = computed(() => {
+  // 移动端不支持分割（分割条拖拽与多 pane 布局在窄屏不可用），隐藏分屏按钮
+  if (windowWidth.value <= 768) return false
   if (isWorkspaceSplit.value) return false
   return ['file', 'session', 'chat', 'terminal'].includes(workspaceMainView.value)
 })
@@ -4439,6 +4442,24 @@ function setWorkspaceSidebarView(view) {
   nextTick(() => {
     layoutMonacoEditor()
   })
+}
+
+// 活动栏按钮点击：已打开该侧边栏视图时再次点击则收起，否则切换到该视图。
+function toggleWorkspaceSidebarView(view) {
+  if (showWorkspaceSidebar.value && workspaceSidebarView.value === view) {
+    closeWorkspaceSidebar()
+    return
+  }
+  setWorkspaceSidebarView(view)
+}
+
+// 活动栏按钮点击（聊天室/终端）：已打开该主视图时再次点击则回到文件视图。
+function toggleWorkspaceMainView(view) {
+  if (workspaceMainView.value === view) {
+    setWorkspaceMainView('file')
+    return
+  }
+  setWorkspaceMainView(view)
 }
 
 // 切换编辑器主区域视图（file / chat / terminal）

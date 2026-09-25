@@ -36,7 +36,6 @@
       <span class="workspace-toolbar-status" v-if="activeTab?.loading">加载中...</span>
       <span class="workspace-toolbar-status error" v-else-if="activeTab?.error">{{ activeTab.error }}</span>
       <span class="workspace-toolbar-status" v-else-if="activeTab">{{ activeTab.isDirty ? '未保存修改' : '已保存' }}</span>
-      <span class="workspace-toolbar-status" v-else>点击文件树中的文件打开编辑器</span>
       <div class="workspace-toolbar-spacer"></div>
       <button
         v-if="canSplit"
