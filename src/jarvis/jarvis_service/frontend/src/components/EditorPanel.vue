@@ -93,6 +93,12 @@
         </button>
         <button
           class="editor-activity-button"
+          :class="{ active: showSidebar && sidebarView === 'agents' }"
+          @click="$emit('setSidebarView', 'agents')"
+          title="Agent 列表"
+        >📋</button>
+        <button
+          class="editor-activity-button"
           :class="{ active: mainView === 'chat' }"
           @click="$emit('setMainView', 'chat')"
           title="聊天室"
@@ -103,6 +109,12 @@
           @click="$emit('setMainView', 'terminal')"
           title="终端"
         >⌨️</button>
+        <button
+          class="editor-activity-button"
+          :class="{ active: mainView === 'session' }"
+          @click="$emit('setMainView', 'session')"
+          title="会话"
+        >🗂</button>
       </div>
       <slot name="sidebar"></slot>
       <div class="editor-panel-content editor-panel-content-main">

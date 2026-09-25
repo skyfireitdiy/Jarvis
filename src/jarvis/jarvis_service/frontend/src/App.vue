@@ -135,7 +135,7 @@
       <SessionPanel
         :ref="(el) => setSessionPanelRef(panel.id, el)"
         v-for="panel in panels"
-        v-show="!sessionDetachedPanels.has(panel.id)"
+        v-show="!sessionDetachedPanels.has(panel.id) && !(editorHostsSession && panel.id === editorSessionPanel?.id)"
         :key="panel.id"
         :embedded="!sessionDetachedPanels.has(panel.id)"
         :agent="getPanelAgent(panel)"
@@ -190,6 +190,7 @@
         @update:selectedNodeId="selectedTerminalNodeId = $event"
         @createTerminal="createTerminalForSelectedNode"
         @close="showTerminalPanel = false"
+        @detach="detachPanel('terminal')"
         @switch="switchTerminal"
         @closeTerminal="closeTerminal"
         @setHostRef="setTerminalHostRef"
@@ -221,6 +222,7 @@
         @focus="focusWindow"
         @startMove="startChatPanelMove"
         @close="showChatPanel = false"
+        @detach="detachPanel('chat')"
         @createRoom="createChatRoom"
         @joinRoom="joinChatRoom"
         @sendMessage="sendChatMessage"
@@ -279,11 +281,58 @@
           <aside v-if="showEditorSidebar" class="editor-sidebar" :style="{ width: editorSidebarWidth + 'px' }">
             <div class="editor-sidebar-resize-handle" @mousedown="startEditorSidebarResize($event)"></div>
             <div class="editor-sidebar-header">
-              <span class="editor-sidebar-title">{{ editorSidebarView === 'search' ? '全局搜索' : (editorSidebarView === 'git' ? 'Git' : '目录树') }}</span>
+              <span class="editor-sidebar-title">{{ editorSidebarView === 'search' ? '全局搜索' : (editorSidebarView === 'git' ? 'Git' : (editorSidebarView === 'agents' ? 'Agent 列表' : '目录树')) }}</span>
               <button class="icon-btn-small editor-sidebar-close-mobile" @click="closeEditorSidebar" title="关闭侧边栏">✕</button>
               <button class="icon-btn-small editor-sidebar-close-desktop" @click="closeEditorSidebar" title="关闭侧边栏">✕</button>
             </div>
-            <div v-if="editorSidebarView === 'files'" class="editor-sidebar-content">
+            <div v-if="editorSidebarView === 'agents'" class="editor-sidebar-content editor-sidebar-agents">
+              <AgentSidebar
+                :visible="true"
+                :embedded="true"
+                :resizeState="{ active: false }"
+                :sidebarStyle="{ width: '100%' }"
+                :isBatchMode="isBatchMode"
+                :displayGroups="agentDisplayGroups"
+                :currentAgentId="currentAgentId"
+                :selectedCount="selectedAgents.size"
+                :agentList="agentList"
+                :windowWidth="windowWidth"
+                :isAllSelected="isAllSelected"
+                :agentStatuses="agentStatuses"
+                :getStatusClass="getStatusClass"
+                :getStatusText="getStatusText"
+                :getNodeLabel="getAgentNodeLabel"
+                :getNodeDisplayLabel="getAgentNodeDisplayLabel"
+                :getProxyNodeLabel="getAgentProxyNodeLabel"
+                :getWorkingDirDisplay="getWorkingDirDisplay"
+                :isSelected="isAgentSelected"
+                :isWaitingInput="isWaitingInput"
+                :agentGroups="agentGroups"
+                :nodes="availableNodeOptions"
+                :currentUserId="auth.userInfo?.user_id || ''"
+                :currentUserName="auth.userInfo?.display_name || auth.userInfo?.username || ''"
+                :isConnected="!!socket && !showConnectModal"
+                @close="setEditorSidebarView('files')"
+                @toggleBatchMode="toggleBatchMode"
+                @createAgent="openCreateAgentModal"
+                @agentClick="onEditorSidebarAgentClick"
+                @agentContextMenu="onSidebarAgentContextMenu"
+                @toggleSelectAgent="toggleSelectAgent"
+                @renameAgent="renameAgent"
+                @copyAgent="copyAgent"
+                @deleteAgent="deleteAgent"
+                @regenerateAgent="regenerateAgent"
+                @toggleSelectAll="toggleSelectAll"
+                @batchCopy="batchCopyAgents"
+                @batchDelete="batchDeleteAgents"
+                @addToGroup="addSelectedToGroup"
+                @createGroupWithAgents="createGroupWithAgents"
+                @renameGroup="renameAgentGroup"
+                @deleteGroup="deleteAgentGroup"
+                @editAccess="editAgentAccess"
+              />
+            </div>
+            <div v-else-if="editorSidebarView === 'files'" class="editor-sidebar-content">
               <div class="editor-file-tree-panel">
                 <!-- 活跃 Agent 节点列表 -->
                 <div
@@ -629,6 +678,7 @@
               @focus="focusWindow"
               @startMove="startChatPanelMove"
               @close="setEditorMainView('file')"
+              @detach="detachPanel('chat')"
               @createRoom="createChatRoom"
               @joinRoom="joinChatRoom"
               @sendMessage="sendChatMessage"
@@ -661,11 +711,56 @@
               @update:selectedNodeId="selectedTerminalNodeId = $event"
               @createTerminal="createTerminalForSelectedNode"
               @close="setEditorMainView('file')"
+              @detach="detachPanel('terminal')"
               @switch="switchTerminal"
               @closeTerminal="closeTerminal"
               @setHostRef="setTerminalHostRef"
               @startResize="startTerminalPanelResize"
             />
+          </div>
+          <div v-else-if="editorMainView === 'session'" class="editor-main-embed-view">
+            <SessionPanel
+              v-if="editorSessionPanel"
+              :embedded="true"
+              :agent="getPanelAgent(editorSessionPanel)"
+              :messages="getPanelMessages(editorSessionPanel)"
+              :input-text="getPanelInputText(editorSessionPanel)"
+              :input-mode="getPanelInputMode(editorSessionPanel)"
+              :input-tip="getPanelInputTip(editorSessionPanel)"
+              :is-password="getPanelInputPassword(editorSessionPanel)"
+              :is-input-disabled="getPanelInputDisabled(editorSessionPanel)"
+              :is-waiting-multi-disabled="getPanelWaitingMultiDisabled(editorSessionPanel)"
+              :has-buffered-input="getPanelHasBufferedInput(editorSessionPanel)"
+              :agent-status="getPanelAgentStatus(editorSessionPanel)"
+              :active="editorSessionPanel.id === activePanelId"
+              :confirm-data="getPanelConfirmData(editorSessionPanel)"
+              :interaction="{ active: false }"
+              :resizeDirections="[]"
+              :panelStyle="{}"
+              @confirm="handlePanelConfirm(editorSessionPanel)"
+              @cancel-confirm="handlePanelCancelConfirm(editorSessionPanel)"
+              @activate="activatePanel(editorSessionPanel.id)"
+              @close-agent="closeAgentInPanel(editorSessionPanel.id)"
+              @close-panel="setEditorMainView('file')"
+              @send="sendFromPanel(editorSessionPanel)"
+              @complete="completeFromPanel(editorSessionPanel)"
+              @open-completions="openCompletionsFromPanel(editorSessionPanel)"
+              @input-change="handlePanelInputChange(editorSessionPanel, $event)"
+              @keydown="handlePanelKeydown(editorSessionPanel, $event)"
+              @paste="handlePanelPaste(editorSessionPanel, $event)"
+              @show-buffer="showBufferPanel = true"
+              @clear-buffer="clearBufferFromPanel(editorSessionPanel)"
+              @set-output-list="setPanelOutputList(editorSessionPanel, $event)"
+              @set-terminal-ref="(executionId, el, agentId) => setPanelTerminalRef(editorSessionPanel, executionId, el, agentId)"
+              @show-toast="showToast"
+              @detach="detachPanel('session', editorSessionPanel.id)"
+              @context-menu="onPanelContextMenu(editorSessionPanel, $event)"
+            />
+            <div v-else class="editor-session-placeholder">
+              <div class="editor-placeholder-icon">🗂</div>
+              <div class="editor-placeholder-title">尚未选择会话</div>
+              <div class="editor-placeholder-text">在左侧「Agent 列表」中点击一个 Agent，即可在此查看其会话。</div>
+            </div>
           </div>
         </template>
       </EditorPanel>
@@ -786,6 +881,7 @@
       @update:selectedNodeId="selectedTerminalNodeId = $event"
       @createTerminal="createTerminalForSelectedNode"
       @close="showTerminalPanel = false"
+      @detach="detachPanel('terminal')"
       @switch="switchTerminal"
       @closeTerminal="closeTerminal"
       @setHostRef="setTerminalHostRef"
@@ -816,6 +912,7 @@
       @focus="focusWindow"
       @startMove="startChatPanelMove"
       @close="showChatPanel = false"
+      @detach="detachPanel('chat')"
       @createRoom="createChatRoom"
       @joinRoom="joinChatRoom"
       @sendMessage="sendChatMessage"
@@ -873,7 +970,7 @@
         <aside v-if="showEditorSidebar" class="editor-sidebar" :style="{ width: editorSidebarWidth + 'px' }">
           <div class="editor-sidebar-resize-handle" @mousedown="startEditorSidebarResize($event)"></div>
           <div class="editor-sidebar-header">
-            <span class="editor-sidebar-title">{{ editorSidebarView === 'search' ? '全局搜索' : (editorSidebarView === 'git' ? 'Git' : '目录树') }}</span>
+            <span class="editor-sidebar-title">{{ editorSidebarView === 'search' ? '全局搜索' : (editorSidebarView === 'git' ? 'Git' : (editorSidebarView === 'agents' ? 'Agent 列表' : '目录树')) }}</span>
             <button class="icon-btn-small editor-sidebar-close-mobile" @click="closeEditorSidebar" title="关闭侧边栏">✕</button>
             <button class="icon-btn-small editor-sidebar-close-desktop" @click="closeEditorSidebar" title="关闭侧边栏">✕</button>
           </div>
@@ -1027,6 +1124,53 @@
               </div>
             </div>
 
+          </div>
+          <div v-else-if="editorSidebarView === 'agents'" class="editor-sidebar-content editor-sidebar-agents">
+            <AgentSidebar
+              :visible="true"
+              :embedded="true"
+              :resizeState="{ active: false }"
+              :sidebarStyle="{ width: '100%' }"
+              :isBatchMode="isBatchMode"
+              :displayGroups="agentDisplayGroups"
+              :currentAgentId="currentAgentId"
+              :selectedCount="selectedAgents.size"
+              :agentList="agentList"
+              :windowWidth="windowWidth"
+              :isAllSelected="isAllSelected"
+              :agentStatuses="agentStatuses"
+              :getStatusClass="getStatusClass"
+              :getStatusText="getStatusText"
+              :getNodeLabel="getAgentNodeLabel"
+              :getNodeDisplayLabel="getAgentNodeDisplayLabel"
+              :getProxyNodeLabel="getAgentProxyNodeLabel"
+              :getWorkingDirDisplay="getWorkingDirDisplay"
+              :isSelected="isAgentSelected"
+              :isWaitingInput="isWaitingInput"
+              :agentGroups="agentGroups"
+              :nodes="availableNodeOptions"
+              :currentUserId="auth.userInfo?.user_id || ''"
+              :currentUserName="auth.userInfo?.display_name || auth.userInfo?.username || ''"
+              :isConnected="!!socket && !showConnectModal"
+              @close="setEditorSidebarView('files')"
+              @toggleBatchMode="toggleBatchMode"
+              @createAgent="openCreateAgentModal"
+              @agentClick="onEditorSidebarAgentClick"
+              @agentContextMenu="onSidebarAgentContextMenu"
+              @toggleSelectAgent="toggleSelectAgent"
+              @renameAgent="renameAgent"
+              @copyAgent="copyAgent"
+              @deleteAgent="deleteAgent"
+              @regenerateAgent="regenerateAgent"
+              @toggleSelectAll="toggleSelectAll"
+              @batchCopy="batchCopyAgents"
+              @batchDelete="batchDeleteAgents"
+              @addToGroup="addSelectedToGroup"
+              @createGroupWithAgents="createGroupWithAgents"
+              @renameGroup="renameAgentGroup"
+              @deleteGroup="deleteAgentGroup"
+              @editAccess="editAgentAccess"
+            />
           </div>
           <div v-else-if="editorSidebarView === 'search'" class="editor-sidebar-content">
             <div class="editor-global-search-panel">
@@ -1220,6 +1364,7 @@
             @focus="focusWindow"
             @startMove="startChatPanelMove"
             @close="setEditorMainView('file')"
+            @detach="detachPanel('chat')"
             @createRoom="createChatRoom"
             @joinRoom="joinChatRoom"
             @sendMessage="sendChatMessage"
@@ -1252,11 +1397,56 @@
             @update:selectedNodeId="selectedTerminalNodeId = $event"
             @createTerminal="createTerminalForSelectedNode"
             @close="setEditorMainView('file')"
+            @detach="detachPanel('terminal')"
             @switch="switchTerminal"
             @closeTerminal="closeTerminal"
             @setHostRef="setTerminalHostRef"
             @startResize="startTerminalPanelResize"
           />
+        </div>
+        <div v-else-if="editorMainView === 'session'" class="editor-main-embed-view">
+          <SessionPanel
+            v-if="editorSessionPanel"
+            :embedded="true"
+            :agent="getPanelAgent(editorSessionPanel)"
+            :messages="getPanelMessages(editorSessionPanel)"
+            :input-text="getPanelInputText(editorSessionPanel)"
+            :input-mode="getPanelInputMode(editorSessionPanel)"
+            :input-tip="getPanelInputTip(editorSessionPanel)"
+            :is-password="getPanelInputPassword(editorSessionPanel)"
+            :is-input-disabled="getPanelInputDisabled(editorSessionPanel)"
+            :is-waiting-multi-disabled="getPanelWaitingMultiDisabled(editorSessionPanel)"
+            :has-buffered-input="getPanelHasBufferedInput(editorSessionPanel)"
+            :agent-status="getPanelAgentStatus(editorSessionPanel)"
+            :active="editorSessionPanel.id === activePanelId"
+            :confirm-data="getPanelConfirmData(editorSessionPanel)"
+            :interaction="{ active: false }"
+            :resizeDirections="[]"
+            :panelStyle="{}"
+            @confirm="handlePanelConfirm(editorSessionPanel)"
+            @cancel-confirm="handlePanelCancelConfirm(editorSessionPanel)"
+            @activate="activatePanel(editorSessionPanel.id)"
+            @close-agent="closeAgentInPanel(editorSessionPanel.id)"
+            @close-panel="setEditorMainView('file')"
+            @send="sendFromPanel(editorSessionPanel)"
+            @complete="completeFromPanel(editorSessionPanel)"
+            @open-completions="openCompletionsFromPanel(editorSessionPanel)"
+            @input-change="handlePanelInputChange(editorSessionPanel, $event)"
+            @keydown="handlePanelKeydown(editorSessionPanel, $event)"
+            @paste="handlePanelPaste(editorSessionPanel, $event)"
+            @show-buffer="showBufferPanel = true"
+            @clear-buffer="clearBufferFromPanel(editorSessionPanel)"
+            @set-output-list="setPanelOutputList(editorSessionPanel, $event)"
+            @set-terminal-ref="(executionId, el, agentId) => setPanelTerminalRef(editorSessionPanel, executionId, el, agentId)"
+            @show-toast="showToast"
+            @detach="detachPanel('session', editorSessionPanel.id)"
+            @context-menu="onPanelContextMenu(editorSessionPanel, $event)"
+          />
+          <div v-else class="editor-session-placeholder">
+            <div class="editor-placeholder-icon">🗂</div>
+            <div class="editor-placeholder-title">尚未选择会话</div>
+            <div class="editor-placeholder-text">在左侧「Agent 列表」中点击一个 Agent，即可在此查看其会话。</div>
+          </div>
         </div>
       </template>
     </EditorPanel>
@@ -5984,6 +6174,21 @@ function getPanelHistoryState(panel) {
 // 编辑器主区域是否正在承载聊天室 / 终端（此时独立面板让位，避免同一状态被两个实例争抢）
 const editorHostsChat = computed(() => showEditorPanel.value && editorMainView.value === 'chat')
 const editorHostsTerminal = computed(() => showEditorPanel.value && editorMainView.value === 'terminal')
+// 编辑器主区域是否正在承载会话面板（此时网格中对应 panel 让位，避免同一 xterm host 被两实例争抢）
+const editorHostsSession = computed(() => showEditorPanel.value && editorMainView.value === 'session')
+// 编辑器主区域会话视图当前显示的 panel（由编辑器侧边栏 Agent 列表点击决定）
+const editorSessionPanelId = ref(null)
+// 编辑器会话视图对应的 panel：优先取记录的面板，回退到当前激活/首个已绑定 Agent 的面板
+const editorSessionPanel = computed(() => {
+  if (!editorHostsSession.value) return null
+  const byId = editorSessionPanelId.value
+    ? panels.value.find(p => p.id === editorSessionPanelId.value)
+    : null
+  if (byId) return byId
+  const active = panels.value.find(p => p.id === activePanelId.value && p.agentId)
+  if (active) return active
+  return panels.value.find(p => p.agentId) || null
+})
 
 // 内嵌面板数量（非 detach 且可见的面板）
 const embeddedPanelCount = computed(() => {
@@ -5992,8 +6197,11 @@ const embeddedPanelCount = computed(() => {
   if (showTerminalPanel.value && !terminalDetached.value && !editorHostsTerminal.value) count++
   if (showChatPanel.value && !chatDetached.value && !editorHostsChat.value) count++
   if (showEditorPanel.value && !editorDetached.value) count++
-  // 内嵌 SessionPanel 数量 = 总面板数 - 已 detach 的面板数
-  count += panels.value.filter(p => !sessionDetachedPanels.value.has(p.id)).length
+  // 内嵌 SessionPanel 数量 = 总面板数 - 已 detach 的面板数 - 被编辑器主区域承载的面板数
+  const hostedPanelId = editorSessionPanel.value?.id
+  count += panels.value.filter(p =>
+    !sessionDetachedPanels.value.has(p.id) && !(editorHostsSession.value && p.id === hostedPanelId)
+  ).length
   return count
 })
 
@@ -7009,6 +7217,22 @@ function handleAgentItemClick(agent, event) {
   } else {
     // 正常模式下，在 Panel 中打开 agent
     openAgentInPanel(agent)
+  }
+}
+
+// 编辑器侧边栏 Agent 列表点击：把该 Agent 的会话显示到编辑器主区域（一次一个）
+function onEditorSidebarAgentClick(agent) {
+  if (isBatchMode.value) {
+    toggleSelectAgent(agent.agent_id)
+    return
+  }
+  // 复用既有 Panel 机制绑定 Agent（已在某 Panel 则激活，否则新建/复用激活 Panel）
+  openAgentInPanel(agent)
+  // 记录并切换到编辑器会话视图
+  const panel = panels.value.find(p => p.agentId === agent.agent_id)
+  if (panel) {
+    editorSessionPanelId.value = panel.id
+    setEditorMainView('session')
   }
 }
 
@@ -16695,6 +16919,26 @@ body::-webkit-scrollbar {
 .editor-main-embed-view > * {
   flex: 1;
   min-height: 0;
+}
+
+/* 编辑器会话视图：未选择会话时的占位 */
+.editor-session-placeholder {
+  margin: auto;
+  text-align: center;
+  color: #8ba3b8;
+  max-width: 280px;
+  padding: 24px;
+}
+
+/* 编辑器侧边栏内嵌 Agent 列表：占满侧边栏 */
+.editor-sidebar-agents {
+  overflow: hidden;
+}
+
+.editor-sidebar-agents :deep(.agent-sidebar) {
+  width: 100%;
+  border-right: none;
+  background: transparent;
 }
 
 .editor-sidebar-resize-handle {

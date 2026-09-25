@@ -10,7 +10,7 @@
         <button class="icon-btn" :class="{ active: isBatchMode }" @click="$emit('toggleBatchMode')" title="批量选择模式">☑</button>
         <button class="icon-btn" @click="openManageGroups" title="管理分组">📁</button>
         <button class="icon-btn" @click="$emit('createAgent')" title="创建新 Agent">➕</button>
-        <button class="icon-btn" @click="$emit('close')" title="关闭侧边栏">✕</button>
+        <button v-if="!embedded" class="icon-btn" @click="$emit('close')" title="关闭侧边栏">✕</button>
       </div>
     </div>
     <div class="agent-list">
@@ -118,7 +118,7 @@
       </div>
     </div>
     <div
-      v-if="visible && windowWidth > 768"
+      v-if="visible && windowWidth > 768 && !embedded"
       class="agent-sidebar-resize-handle"
       @mousedown="$emit('startResize', $event)"
     ></div>
@@ -313,7 +313,9 @@ const props = defineProps({
   nodes: { type: Array, default: () => [] },
   currentUserId: { type: String, default: '' },
   currentUserName: { type: String, default: '' },
-  isConnected: { type: Boolean, default: true }
+  isConnected: { type: Boolean, default: true },
+  // 嵌入编辑器侧边栏时为 true：隐藏自身关闭按钮与宽度调整手柄，由宿主统一管理
+  embedded: { type: Boolean, default: false }
 })
 
 // 分组弹窗状态
