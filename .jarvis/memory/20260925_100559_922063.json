@@ -1,0 +1,15 @@
+{
+  "id": "20260925_100559_922063",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "frontend",
+    "App.vue",
+    "panel-grid",
+    "embeddedPanelCount",
+    "布局"
+  ],
+  "content": "Jarvis 前端「点左右分后编辑器只占半宽、右侧空白」根因与修复：App.vue 的 embeddedPanelCount 原先把 panels 里未被编辑器承载的 SessionPanel 也算进去（count = 编辑器1 + 泄漏的session panel1 = 2），而 panel-grid 在未分割时实际只有一个 in-flow 子项（EditorPanel），于是 getPanelLayout() 返回 grid-template-columns:'1fr 1fr' → 编辑器只占第一列（948/1920），右半空白。触发场景：编辑器内部分割树从 localStorage 恢复后，承载 session 的 pane 变成 file pane，editorHostedPanel 返回 null，该 panel 泄漏进计数。修复：embeddedPanelCount 改为只统计网格真实顶层子项——isWorkspaceSplit ? 1 : (showEditorPanel && !editorDetached ? 1 : 0)。关键事实：会话/终端/聊天面板一律只在 EditorPanel 内部或作为浮动面板渲染，绝不是 panel-grid 的直接子项，任何网格布局计数都不能把它们算进去。验证：bundle index-Bx-nfeXW.js，编辑器宽 1904/1920、gridCols 单列、点左右分后两 pane 各 784px 并排、无 longtask、无 console 错误、maxHosts=0。",
+  "created_at": "2026-09-25T10:05:59.922113",
+  "updated_at": "2026-09-25T10:05:59.922119"
+}

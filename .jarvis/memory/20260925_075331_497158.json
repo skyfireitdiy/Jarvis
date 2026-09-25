@@ -1,0 +1,8 @@
+{
+  "id": "20260925_075331_497158",
+  "type": "project_long_term",
+  "tags": ["jarvis", "editor", "split-pane", "editor-tabs", "task-36", "fix"],
+  "content": "task-36 收尾 + .editor-tabs 位置修复（已完成并真机验证）。\n\n【阶段3收尾】关闭编辑器后所有状态归零（editorPanel/leaves/tabs/monaco 全 0），无残留。\n\n【.editor-tabs 位置修复】用户诉求：文件标签栏原本横跨整个工作区顶部（宽 1556px，x=355），应改为渲染在各 pane 内部顶部。\n改动（2 文件）：\n1) EditorPanel.vue 约 122 行：顶层 .editor-tabs 的 v-if 增加 `!$slots['pane-tree']` 条件——未分割时仍走老路径（零回归），分割时不再渲染。\n2) App.vue #pane-content 的 `pane.view === 'file'` 分支：新增 `.editor-tabs.editor-pane-tabs`（v-if editorTabs.length>0），渲染在 Monaco 容器之前；tab 点击 `activateEditorPane(pane.id); activateEditorTab(tab.path)`，关闭 `closeEditorTab(tab.path)`。\n3) App.vue CSS：新增 `.editor-pane-content-slot > .editor-pane-tabs { flex: 0 0 auto; border-bottom: 1px solid var(--color-border-subtle); }`（因 `.editor-pane-content-slot > * { flex:1 }` 会把标签栏撑满，需覆盖为固定高度）。\n\n【真机验证证据（jvs-ai.cn，vite build 15.79s）】\n- 未分割（打开 README.md）：单个 .editor-tabs（无 editor-pane-tabs 类），inPane=false，宽 1556px x=355 —— 原顶部位置，零回归。\n- 分割后：2 leaves，每个 file pane 各有 .editor-tabs.editor-pane-tabs 且 inPane=true；左 pane leaf x=355 w=778 → tabs x=356 w=776；右 pane leaf x=1137 w=778 → tabs x=1138 w=776；两 pane 的 tabsTop === bodyTop(139)，即标签栏精确位于各 pane body 顶部，不再横跨全宽。\n- 点击非激活 pane 的 tab → 该 pane 变激活（active 转移），monaco 恒 1。\n- 关闭最后一个 tab → 两 pane 标签栏消失（tabs=0），激活 pane 显示文件占位，monaco=0。\n- 关闭 pane → 分割 collapse（split/leaves=0）。\n- 全程 longtask=0、Vue 警告=0（本轮连 xterm 噪声都未出现）。\n\n【关键点】tabs 是全局编辑器状态（editorTabs/activeEditorTabPath），所以每个 file pane 显示相同标签；Monaco 单实例只渲染激活 pane。tab 点击先激活 pane 再切文件。",
+  "created_at": "2026-09-25T07:53:31.497194",
+  "updated_at": "2026-09-25T07:53:31.497200"
+}

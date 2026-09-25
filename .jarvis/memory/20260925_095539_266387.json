@@ -1,0 +1,8 @@
+{
+  "id": "20260925_095539_266387",
+  "type": "project_long_term",
+  "tags": ["jarvis", "frontend", "editor", "panel", "bugfix"],
+  "content": "Jarvis 前端：内嵌 Panel 只在编辑器内部渲染（editorHostedPanel/editorSessionPanel），因此任何把 Agent 打开到 Panel 的入口都必须同时设置 editorSessionPanelId + setEditorMainView('session')，否则 Panel 无宿主不可见。openAgentInPanel(App.vue ~6896) 的 existingPanel 分支与桌面兜底分支已补上这两行（commit abcce25/ebf5138）。验证：宠物大厅双击 .lobby-pet → .editor-panel=true 且 .session-panel=1（修复前=0），hosts=0，无 console 错误。",
+  "created_at": "2026-09-25T09:55:39.266420",
+  "updated_at": "2026-09-25T09:55:39.266426"
+}

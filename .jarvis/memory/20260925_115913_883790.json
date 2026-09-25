@@ -1,0 +1,8 @@
+{
+  "id": "20260925_115913_883790",
+  "type": "project_long_term",
+  "tags": ["jarvis", "frontend", "editor-pane", "App.vue"],
+  "content": "Jarvis 前端编辑器分割 pane 标签独立机制（App.vue）：editorPaneTabs = Map<paneId, path[]> 记录每个 pane 自己的标签列表，getPaneTabs(paneId) 据此从全局 editorTabs 映射出 tab 对象；打开文件/点标签时 addPaneTab(activePaneId, path) 显式登记；closeEditorTab(path, paneId) 已分割时只从该 pane 移除，若 path 仍被其他 pane 引用则 return（不销毁 model、不动全局 tabs）。\n\n坑：曾加过一个 watch([editorPaneTree, editorTabs.length]) 用「全局标签」给 Map 中无键的 file pane 补种，导致新 pane 凭空出现其他 pane 的标签（同一文件同时出现在两个 pane 顶部）。已删除该 watch（commit 2025433）。正确语义：新 pane 一律从空开始，标签只在显式打开/点击时登记。",
+  "created_at": "2026-09-25T11:59:13.883830",
+  "updated_at": "2026-09-25T11:59:13.883838"
+}

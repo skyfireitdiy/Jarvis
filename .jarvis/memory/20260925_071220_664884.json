@@ -1,0 +1,8 @@
+{
+  "id": "20260925_071220_664884",
+  "type": "project_long_term",
+  "tags": ["jarvis", "editor", "split-pane", "task-35", "verification"],
+  "content": "Jarvis 编辑器自由分割 阶段2(task-35) 验证结论（2026-09-25）：\n1. 拖拽调比例【功能正常】。此前误判为「不工作」是测量伪影：在同一次 evaluate 里 dispatch mousemove 后立即读 getComputedStyle().flexBasis，Vue 的 DOM 更新在微任务/nextTick 才 flush，所以读到旧值。必须在【下一次独立 evaluate】读取，才看到 flex 已更新。实测：拖 200px → ratio 0.577→0.4486（200/1556=0.1285 精确吻合）；拖超界 → clamp 到 85%/15%。比例写在 .editor-pane-split-child 的 inline style（flex: 0 0 X%），不是 .editor-pane-leaf（leaf 是 flex:1，flexBasis 恒 0%）。\n2. editorPaneResizing ref 未绑定到任何 DOM class（模板里没用），不能用 .editor-pane-resizing 判断拖拽是否激活。\n3. 全部回归通过：关闭 3→2→1（最后一个关闭时 collapse 回未分割原路径）、移动端守卫(windowWidth<=768 时点分屏无 pane)、setEditorMainView('terminal') 会 collapseEditorPanes 收起分割、未分割打开文件走 #main-view 零回归。\n4. session 路由到激活 pane 已验证：左 pane 激活时点编辑器侧边栏 Agent → 左 pane 标题=Agent名、sessionWraps=1、Monaco=0；去重：右 pane 激活时点同一 Agent → 焦点回到左 pane、sessionWraps 恒 1。\n5. 注意：AgentSidebar(主侧边栏) 的 .agent-item 点击打开的是顶层 panel-grid 的 session-panel-embedded（既有行为），不是编辑器 pane 路由；编辑器 pane 路由只由编辑器侧边栏(📋 Agent 列表 activity view)里的 .agent-item 触发。\n6. 无 Vue 警告、无 longtask、console 干净。\n7. 测试环境坑：windowWidth 可能残留 700，验证前必须 window.dispatchEvent(new Event('resize'))；覆盖/删除 window.innerWidth 后要 reload 才能恢复原生 getter。\n最终 bundle: index-8k9JSoIY.js（探针移除后 hash 与探针前一致，证明源码回到干净状态）。",
+  "created_at": "2026-09-25T07:12:20.664930",
+  "updated_at": "2026-09-25T07:12:20.664937"
+}

@@ -1,0 +1,15 @@
+{
+  "id": "20260925_120812_800689",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "frontend",
+    "editor-pane",
+    "App.vue",
+    "EditorPanel.vue",
+    "bugfix"
+  ],
+  "content": "Jarvis 前端编辑器分割 pane 三个 bug 修复（App.vue / EditorPanel.vue，bundle index-BwhS1xRj.js）：\n\n1) 「打开文件后点左右分，两个 pane 都看不到文件」：未分割时文件由单实例 cmEditorView 承载，editorViewPanes 无记录；splitEditorPane 只固化 editorPaneTabs 没设 editorViewPanes，导致两个 pane 的实例都 applyEditorViewModel → setModel(null)。修复：splitEditorPane 里若 target.view==='file' 且 editorViewPanes 无该 pane，则 editorViewPanes.set(target.id, activeEditorTabPath)。\n\n2) 「关一个 pane 的标签，另一个 pane 被污染」：closeEditorTab(path, paneId) 的 pane 分支处理完后仍走全局清理，全局清理的 wasActive 分支会 activateEditorTab(nextTab) 把别的 pane 的文件绑到该 pane。修复：加 closedFromPane 标志，pane 分支进入全局清理时跳过 activateEditorTab，只把 session.activeTabPath 修正为仍存在的标签。\n\n3) 保存/只读按钮从顶部工具栏移到每个 pane 内：App.vue #pane-content 的 file pane 标签栏右侧加 .editor-pane-actions（💾 savePaneEditorFile(pane.id) + 🔒 toggleEditorEditable()）；EditorPanel.vue 顶部保存按钮与只读按钮加 v-if=\"!$slots['pane-tree']\" 在已分割时隐藏。isEditorEditable 仍是全局开关（非 per-pane）。\n\n关键事实：editorViewPanes = Map<paneId, path> 是每个 pane 的模型绑定来源，任何改变 pane 文件归属的路径都必须同步维护它。",
+  "created_at": "2026-09-25T12:08:12.800733",
+  "updated_at": "2026-09-25T12:08:12.800740"
+}

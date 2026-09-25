@@ -1,0 +1,8 @@
+{
+  "id": "20260925_073147_496957",
+  "type": "project_long_term",
+  "tags": ["jarvis", "editor-split", "task-36", "stage3"],
+  "content": "task-36（阶段3：terminal/chat 接入 pane）代码已完成并 build 通过（npx vite build 14.99s）。改动：App.vue 中 ①createEditorPaneLeaf 注释扩展 view 到 chat/terminal；②新增 findEditorPaneByView(view, exceptPaneId)；③setActivePaneView 支持 chat/terminal（先卸载其他 pane 同类型承载）；④getEditorPaneTitle 加 chat/terminal；⑤setEditorMainView 在 isEditorSplit 时 chat/terminal 走 setActivePaneView；⑥editorHostsChat/editorHostsTerminal 改为 split 时看 findEditorPaneByView；⑦editorHostedPanel 在 split 时仅当有 pane 承载该 panel 才让位；⑧#pane-content 插槽新增 chat/terminal 分支（复用 #main-view 完整接线）；⑨splitEditorPane 新 leaf 一律 file；⑩新增 .editor-pane-embed-wrap CSS。真机验证（jvs-ai.cn）：分割后编辑器活动栏 ⌨️ 把终端放进激活 pane，终端执行 echo split-test-1 输出 split-test-1；终端 pane + session pane 共存时 .terminal-host 分别为 1（独立终端）与 0/1（执行终端），无重复；chat 替换终端 pane 后 terminalHosts 恒 1，终端会话内容保留；关闭终端 pane 后 collapse，终端 host 回到 grid 且内容保留；未分割回归（编辑器 ⌨️/💬 走 editor-main-embed-view）正常。遗留噪声：[independent-terminal] Failed to dispose old terminal ... addon not loaded（既有噪声）。",
+  "created_at": "2026-09-25T07:31:47.496992",
+  "updated_at": "2026-09-25T07:31:47.496998"
+}

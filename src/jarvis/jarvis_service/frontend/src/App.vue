@@ -1,53 +1,5 @@
 <template>
   <div class="app" :class="{ 'not-connected': showConnectModal }">
-<!-- Agent 侧边栏 -->
-    <AgentSidebar
-      ref="agentSidebarRef"
-      :visible="showAgentSidebar"
-      :resizeState="agentSidebarResizeState"
-      :sidebarStyle="agentSidebarStyle"
-      :isBatchMode="isBatchMode"
-      :displayGroups="agentDisplayGroups"
-      :currentAgentId="currentAgentId"
-      :selectedCount="selectedAgents.size"
-      :agentList="agentList"
-      :windowWidth="windowWidth"
-      :isAllSelected="isAllSelected"
-      :agentStatuses="agentStatuses"
-      :getStatusClass="getStatusClass"
-      :getStatusText="getStatusText"
-      :getNodeLabel="getAgentNodeLabel"
-      :getNodeDisplayLabel="getAgentNodeDisplayLabel"
-      :getProxyNodeLabel="getAgentProxyNodeLabel"
-      :getWorkingDirDisplay="getWorkingDirDisplay"
-      :isSelected="isAgentSelected"
-      :isWaitingInput="isWaitingInput"
-      :agentGroups="agentGroups"
-      :nodes="availableNodeOptions"
-      :currentUserId="auth.userInfo?.user_id || ''"
-      :currentUserName="auth.userInfo?.display_name || auth.userInfo?.username || ''"
-      :isConnected="!!socket && !showConnectModal"
-      @close="showAgentSidebar = false"
-      @toggleBatchMode="toggleBatchMode"
-      @createAgent="openCreateAgentModal"
-      @agentClick="handleAgentItemClick"
-      @agentContextMenu="onSidebarAgentContextMenu"
-      @toggleSelectAgent="toggleSelectAgent"
-      @renameAgent="renameAgent"
-      @copyAgent="copyAgent"
-      @deleteAgent="deleteAgent"
-      @regenerateAgent="regenerateAgent"
-      @toggleSelectAll="toggleSelectAll"
-      @batchCopy="batchCopyAgents"
-      @batchDelete="batchDeleteAgents"
-      @addToGroup="addSelectedToGroup"
-      @createGroupWithAgents="createGroupWithAgents"
-      @renameGroup="renameAgentGroup"
-      @deleteGroup="deleteAgentGroup"
-      @startResize="startAgentSidebarResize"
-      @editAccess="editAgentAccess"
-    />
-
     <!-- 主宠物挂件：全局浮动宠物（放技能/拖拽/贴边），长按可一句话创建 Agent -->
     <PetWidget
       ref="petWidgetRef"
@@ -62,7 +14,7 @@
       @petSyncStatus="petSyncAllStatus"
       @petInterruptCurrent="petInterruptCurrent"
       @petGotoWaiting="petGotoWaitingAgent"
-      @petToggleSidebar="toggleAgentSidebar"
+      @petToggleSidebar="openEditorAgentList"
       @petOpenTopology="openTopologyOverlay"
       @petOpenCommandPalette="openCommandPalette()"
       @openQuickCreate="openQuickCreateAgent"
@@ -84,9 +36,6 @@
       @pointerleave="onToolbarPointerLeave"
     >
       <span class="global-toolbar-handle" title="拖动工具条（拖到屏幕边缘可自动隐藏）" @pointerdown="startDragToolbar($event)">⠿</span>
-      <button class="icon-btn" @click="toggleAgentSidebar()" title="Agent 侧边栏 (Ctrl+A)">
-        📋
-      </button>
       <button class="icon-btn chat-btn-wrapper" @click="toggleChatPanel()" :disabled="!socket" title="聊天室 (Ctrl+Alt+H)">
         💬
         <span v-if="chatUnreadCount > 0" class="chat-unread-badge">{{ chatUnreadCount > 99 ? '99+' : chatUnreadCount }}</span>
@@ -132,111 +81,7 @@
     <div class="main-content-wrapper">
     <!-- Panel 网格布局 -->
     <main class="panel-grid" :style="panelGridStyle">
-      <SessionPanel
-        :ref="(el) => setSessionPanelRef(panel.id, el)"
-        v-for="panel in panels"
-        v-show="!sessionDetachedPanels.has(panel.id) && panel.id !== editorHostedPanel?.id"
-        :key="panel.id"
-        :embedded="!sessionDetachedPanels.has(panel.id)"
-        :suppress-terminal="panel.id === editorHostedPanel?.id"
-        :agent="getPanelAgent(panel)"
-        :messages="getPanelMessages(panel)"
-        :input-text="getPanelInputText(panel)"
-        :input-mode="getPanelInputMode(panel)"
-        :input-tip="getPanelInputTip(panel)"
-        :is-password="getPanelInputPassword(panel)"
-        :is-input-disabled="getPanelInputDisabled(panel)"
-        :is-waiting-multi-disabled="getPanelWaitingMultiDisabled(panel)"
-        :has-buffered-input="getPanelHasBufferedInput(panel)"
-        :agent-status="getPanelAgentStatus(panel)"
-        :active="panel.id === activePanelId"
-        :confirm-data="getPanelConfirmData(panel)"
-        @confirm="handlePanelConfirm(panel)"
-        @cancel-confirm="handlePanelCancelConfirm(panel)"
-        @activate="activatePanel(panel.id)"
-        @close-agent="closeAgentInPanel(panel.id)"
-        @close-panel="closePanel(panel.id)"
-        @send="sendFromPanel(panel)"
-        @complete="completeFromPanel(panel)"
-        @open-completions="openCompletionsFromPanel(panel)"
-        @input-change="handlePanelInputChange(panel, $event)"
-        @keydown="handlePanelKeydown(panel, $event)"
-        @paste="handlePanelPaste(panel, $event)"
-        @show-buffer="showBufferPanel = true"
-        @clear-buffer="clearBufferFromPanel(panel)"
-        @set-output-list="setPanelOutputList(panel, $event)"
-        @set-terminal-ref="(executionId, el, agentId) => setPanelTerminalRef(panel, executionId, el, agentId)"
-        @show-toast="showToast"
-        @detach="detachPanel('session', panel.id)"
-        @context-menu="onPanelContextMenu(panel, $event)"
-      />
-
-      <!-- 内嵌终端面板（编辑器主区域正在显示终端时让位，避免同一 xterm host 被两个实例争抢） -->
-      <TerminalPanel
-        v-if="showTerminalPanel && !terminalDetached && !editorHostsTerminal"
-        :visible="showTerminalPanel"
-        :active="activeWindow === 'terminal'"
-        :interaction="terminalPanelInteraction"
-        :panelStyle="terminalPanelStyle"
-        :nodeOptions="filteredNodeOptionsForCreateAgent"
-        :selectedNodeId="selectedTerminalNodeId"
-        :socket="socket"
-        :sessions="terminalSessions"
-        :activeId="activeTerminalId"
-        :resizeDirections="terminalResizeDirections"
-        :formatNodeLabel="formatNodeOptionLabel"
-        :embedded="true"
-        @focus="focusWindow"
-        @startMove="startTerminalPanelMove"
-        @update:selectedNodeId="selectedTerminalNodeId = $event"
-        @createTerminal="createTerminalForSelectedNode"
-        @close="showTerminalPanel = false"
-        @detach="detachPanel('terminal')"
-        @switch="switchTerminal"
-        @closeTerminal="closeTerminal"
-        @setHostRef="setTerminalHostRef"
-        @startResize="startTerminalPanelResize"
-      />
-
-      <!-- 内嵌聊天室面板（编辑器主区域正在显示聊天室时让位） -->
-      <ChatPanel
-        v-if="showChatPanel && !chatDetached && !editorHostsChat"
-        :visible="showChatPanel"
-        :interaction="chatPanelInteraction"
-        :panelStyle="chatPanelStyle"
-        :socket="socket"
-        :rooms="chatRooms"
-        :clients="chatClients"
-        :roomMembers="chatRoomMembers"
-        :myClientId="myClientId"
-        :isAdmin="auth.userInfo?.is_admin"
-        :currentUserId="auth.userInfo?.user_id"
-        :activeRoomId="activeChatRoomId"
-        :activePrivateId="activePrivateClientId"
-        :resizeDirections="chatResizeDirections"
-        :unreadCount="chatUnreadCount" :unreadMap="chatUnreadMap" :joinedRooms="chatJoinedRooms"
-        :myName="chatName"
-        :collapsed="chatPanelCollapsed"
-        :sidebarWidth="chatSidebarWidth"
-        :messages="activePrivateClientId ? (chatMessages['private_' + activePrivateClientId] || []) : (chatMessages[activeChatRoomId] || [])"
-        :embedded="true"
-        @focus="focusWindow"
-        @startMove="startChatPanelMove"
-        @close="showChatPanel = false"
-        @detach="detachPanel('chat')"
-        @createRoom="createChatRoom"
-        @joinRoom="joinChatRoom"
-        @sendMessage="sendChatMessage"
-        @selectPrivate="selectPrivateClient"
-        @startResize="startChatPanelResize"
-        @toggleCollapse="toggleChatPanelCollapse"
-        @leaveRoom="leaveChatRoom"
-        @deleteRoom="deleteChatRoom"
-        @renameRoom="renameChatRoom"
-        @startSidebarResize="startChatSidebarResize"
-        @clearMessages="clearChatMessages"
-      />
-
+      <!-- 唯一容器：编辑器面板（所有 panel 都在编辑器内部打开，不再平铺渲染） -->
       <!-- 内嵌编辑器面板 -->
       <EditorPanel
         v-if="showEditorPanel && !editorDetached"
@@ -259,6 +104,7 @@
         :resizeDirections="editorResizeDirections"
         :embedded="true"
         :diff="editorDiff"
+        :canSplit="canSplitEditorPane"
         @focus="focusWindow('editor')"
         @startMove="startEditorPanelMove"
         @toggleMaximize="toggleEditorMaximize"
@@ -276,6 +122,7 @@
         @diffNavNext="navigateGitDiff('next')"
         @selectAgent="selectEditorAgent"
         @closeDiff="closeEditorDiff"
+        @splitPane="onEditorSplitRequest($event)"
         @detach="detachPanel('editor')"
       >
         <template #sidebar>
@@ -653,6 +500,182 @@
             </div>
           </aside>
         </template>
+        <!-- 自由分割：仅在已分割（>1 个 leaf）时提供 pane-tree 插槽，
+             未分割时该插槽不存在，EditorPanel 走原有渲染路径（零回归）。 -->
+        <template v-if="isEditorSplit" #pane-tree>
+          <EditorPaneTree
+            :node="editorPaneTree"
+            :activePaneId="activePaneId"
+            :getTitle="getEditorPaneTitle"
+            @activate="activateEditorPane"
+            @split="splitEditorPane"
+            @close="closeEditorPane"
+            @startResize="startEditorPaneResize"
+          >
+            <template #pane-content="{ pane, active }">
+              <div class="editor-pane-content-slot">
+                <template v-if="pane.view === 'file'">
+                  <!-- 文件标签：渲染在本 pane 内部顶部（不再横跨整个工作区）。
+                       已分割时每个 pane 用自己独立的标签列表（getPaneTabs），
+                       关闭某个 pane 的标签不会影响其他 pane。 -->
+                  <div v-if="getPaneTabs(pane.id).length > 0" class="editor-tabs editor-pane-tabs" @mousedown="activateEditorPane(pane.id)">
+                    <div
+                      v-for="tab in getPaneTabs(pane.id)"
+                      :key="tab.path"
+                      class="editor-tab"
+                      :class="{ active: editorViewPanes.get(pane.id) === tab.path }"
+                      @click="activateEditorPane(pane.id); activateEditorTab(tab.path)"
+                    >
+                      <span class="editor-tab-name">{{ tab.name }}</span>
+                      <span v-if="tab.isDirty" class="editor-tab-dirty">●</span>
+                      <button class="editor-tab-close" @click.stop="closeEditorTab(tab.path, pane.id)">✕</button>
+                    </div>
+                    <!-- 每个 pane 自己的保存 / 只读开关：作用于本 pane 当前文件 -->
+                    <div class="editor-pane-actions">
+                      <button
+                        class="editor-pane-action"
+                        :disabled="!editorViewPanes.get(pane.id)"
+                        @click.stop="savePaneEditorFile(pane.id)"
+                        title="保存本区域文件"
+                      >💾</button>
+                      <button
+                        class="editor-pane-action"
+                        :class="{ editable: isEditorEditable }"
+                        :disabled="!editorViewPanes.get(pane.id)"
+                        @click.stop="toggleEditorEditable()"
+                        :title="isEditorEditable ? '切换到只读模式' : '切换到编辑模式'"
+                      >{{ isEditorEditable ? '🔓' : '🔒' }}</button>
+                    </div>
+                  </div>
+                  <!-- Monaco 多实例：每个 file pane 各渲染一个真实编辑器容器（可编辑），
+                       非激活 pane 只是没有焦点，不再是只读快照。 -->
+                  <div
+                    :ref="el => setSplitEditorContainerRef(pane.id, el)"
+                    :data-pane-id="pane.id"
+                    class="editor-monaco-container"
+                    @mousedown="activateEditorPane(pane.id)"
+                  ></div>
+                </template>
+                <template v-else-if="pane.view === 'chat'">
+                  <!-- chat leaf：复用编辑器主区域 chat 的完整接线（host 单例，至多一个 pane 承载） -->
+                  <div class="editor-pane-embed-wrap" @mousedown="activateEditorPane(pane.id)">
+                    <ChatPanel
+                      :visible="true"
+                      :interaction="chatPanelInteraction"
+                      :panelStyle="{}"
+                      :socket="socket"
+                      :rooms="chatRooms"
+                      :clients="chatClients"
+                      :roomMembers="chatRoomMembers"
+                      :myClientId="myClientId"
+                      :isAdmin="auth.userInfo?.is_admin"
+                      :currentUserId="auth.userInfo?.user_id"
+                      :activeRoomId="activeChatRoomId"
+                      :activePrivateId="activePrivateClientId"
+                      :resizeDirections="[]"
+                      :unreadCount="chatUnreadCount" :unreadMap="chatUnreadMap" :joinedRooms="chatJoinedRooms"
+                      :myName="chatName"
+                      :collapsed="chatPanelCollapsed"
+                      :sidebarWidth="chatSidebarWidth"
+                      :messages="activePrivateClientId ? (chatMessages['private_' + activePrivateClientId] || []) : (chatMessages[activeChatRoomId] || [])"
+                      :embedded="true"
+                      @focus="focusWindow"
+                      @startMove="startChatPanelMove"
+                      @close="setActivePaneView('file')"
+                      @detach="detachPanel('chat')"
+                      @createRoom="createChatRoom"
+                      @joinRoom="joinChatRoom"
+                      @sendMessage="sendChatMessage"
+                      @selectPrivate="selectPrivateClient"
+                      @startResize="startChatPanelResize"
+                      @toggleCollapse="toggleChatPanelCollapse"
+                      @leaveRoom="leaveChatRoom"
+                      @deleteRoom="deleteChatRoom"
+                      @renameRoom="renameChatRoom"
+                      @startSidebarResize="startChatSidebarResize"
+                      @clearMessages="clearChatMessages"
+                    />
+                  </div>
+                </template>
+                <template v-else-if="pane.view === 'terminal'">
+                  <!-- terminal leaf：复用编辑器主区域 terminal 的完整接线（host 单例，至多一个 pane 承载） -->
+                  <div class="editor-pane-embed-wrap" @mousedown="activateEditorPane(pane.id)">
+                    <TerminalPanel
+                      :visible="true"
+                      :active="isPaneActive(pane)"
+                      :interaction="terminalPanelInteraction"
+                      :panelStyle="{}"
+                      :nodeOptions="filteredNodeOptionsForCreateAgent"
+                      :selectedNodeId="selectedTerminalNodeId"
+                      :socket="socket"
+                      :sessions="terminalSessions"
+                      :activeId="activeTerminalId"
+                      :resizeDirections="[]"
+                      :formatNodeLabel="formatNodeOptionLabel"
+                      :embedded="true"
+                      @focus="focusWindow"
+                      @startMove="startTerminalPanelMove"
+                      @update:selectedNodeId="selectedTerminalNodeId = $event"
+                      @createTerminal="createTerminalForSelectedNode"
+                      @close="setActivePaneView('file')"
+                      @detach="detachPanel('terminal')"
+                      @switch="switchTerminal"
+                      @closeTerminal="closeTerminal"
+                      @setHostRef="setTerminalHostRef"
+                      @startResize="startTerminalPanelResize"
+                    />
+                  </div>
+                </template>
+                <template v-else>
+                  <!-- session leaf：渲染真实会话面板（复用与 #main-view 相同的接线） -->
+                  <div v-if="getPanePanel(pane)" class="editor-pane-session-wrap" @mousedown="activateEditorPane(pane.id)">
+                    <SessionPanel
+                      :embedded="true"
+                      :agent="getPanelAgent(getPanePanel(pane))"
+                      :messages="getPanelMessages(getPanePanel(pane))"
+                      :input-text="getPanelInputText(getPanePanel(pane))"
+                      :input-mode="getPanelInputMode(getPanePanel(pane))"
+                      :input-tip="getPanelInputTip(getPanePanel(pane))"
+                      :is-password="getPanelInputPassword(getPanePanel(pane))"
+                      :is-input-disabled="getPanelInputDisabled(getPanePanel(pane))"
+                      :is-waiting-multi-disabled="getPanelWaitingMultiDisabled(getPanePanel(pane))"
+                      :has-buffered-input="getPanelHasBufferedInput(getPanePanel(pane))"
+                      :agent-status="getPanelAgentStatus(getPanePanel(pane))"
+                      :active="isPaneActive(pane)"
+                      :confirm-data="getPanelConfirmData(getPanePanel(pane))"
+                      :interaction="{ active: false }"
+                      :resizeDirections="[]"
+                      :panelStyle="{}"
+                      @confirm="handlePanelConfirm(getPanePanel(pane))"
+                      @cancel-confirm="handlePanelCancelConfirm(getPanePanel(pane))"
+                      @activate="activateEditorPane(pane.id)"
+                      @close-agent="closeAgentInPanel(getPanePanel(pane).id)"
+                      @close-panel="setActivePaneView('file')"
+                      @send="sendFromPanel(getPanePanel(pane))"
+                      @complete="completeFromPanel(getPanePanel(pane))"
+                      @open-completions="openCompletionsFromPanel(getPanePanel(pane))"
+                      @input-change="handlePanelInputChange(getPanePanel(pane), $event)"
+                      @keydown="handlePanelKeydown(getPanePanel(pane), $event)"
+                      @paste="handlePanelPaste(getPanePanel(pane), $event)"
+                      @show-buffer="showBufferPanel = true"
+                      @clear-buffer="clearBufferFromPanel(getPanePanel(pane))"
+                      @set-output-list="setPanelOutputList(getPanePanel(pane), $event)"
+                      @set-terminal-ref="(executionId, el, agentId) => setPanelTerminalRef(getPanePanel(pane), executionId, el, agentId)"
+                      @show-toast="showToast"
+                      @detach="detachPanel('session', getPanePanel(pane).id)"
+                      @context-menu="onPanelContextMenu(getPanePanel(pane), $event)"
+                    />
+                  </div>
+                  <div v-else class="editor-pane-placeholder" @click="activateEditorPane(pane.id)">
+                    <div class="editor-placeholder-icon">🗂</div>
+                    <div class="editor-placeholder-title">空会话区域</div>
+                    <div class="editor-placeholder-text">在左侧「Agent 列表」中点击一个 Agent，即可在此区域打开会话。</div>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </EditorPaneTree>
+        </template>
         <!-- 编辑器主区域视图：聊天室 / 终端（嵌入模式，复用独立面板组件与状态） -->
         <template #main-view>
           <div v-if="editorMainView === 'chat'" class="editor-main-embed-view">
@@ -948,6 +971,7 @@
       :mainView="editorMainView"
       :resizeDirections="editorResizeDirections"
       :diff="editorDiff"
+      :canSplit="canSplitEditorPane"
       @focus="focusWindow('editor')"
       @startMove="startEditorPanelMove"
       @toggleMaximize="toggleEditorMaximize"
@@ -965,6 +989,7 @@
       @diffNavNext="navigateGitDiff('next')"
       @selectAgent="selectEditorAgent"
       @closeDiff="closeEditorDiff"
+      @splitPane="splitEditorPane(activePaneId, $event)"
       @detach="detachPanel('editor')"
     >
       <template #sidebar>
@@ -1933,6 +1958,7 @@ import CompletionsModal from './components/CompletionsModal.vue'
 import TerminalPanel from './components/TerminalPanel.vue'
 import ChatPanel from './components/ChatPanel.vue'
 import EditorPanel from './components/EditorPanel.vue'
+import EditorPaneTree from './components/EditorPaneTree.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import CreateAgentModal from './components/CreateAgentModal.vue'
@@ -2881,12 +2907,14 @@ const showConnectModal = ref(true)  // 首次打开显示欢迎界面
 const showSettingsModal = ref(false) // 设置弹窗
 const showAdminPanel = ref(false) // 管理面板
 const adminPanelRef = ref(null) // 管理面板组件引用（用于命令面板定位到系统配置）
-const showAgentSidebar = ref(false)    // Agent 侧边栏（默认收起）
-const agentSidebarRef = ref(null)     // Agent 侧边栏组件引用（用于调用宠物显隐）
 const petWidgetRef = ref(null)        // 主宠物挂件组件引用（用于调用宠物显隐）
 const showTerminalPanel = ref(false)  // 终端面板
 const showChatPanel = ref(false)     // 聊天室面板
-const showEditorPanel = ref(false)    // 编辑器浮动面板
+// 编辑器面板：唯一容器，默认打开。初始值取决于是否已有 Agent：
+// 无 Agent 时保持关闭，露出宠物大厅（空状态）作为欢迎页；有 Agent 时打开编辑器承载会话。
+const showEditorPanel = ref(false)
+// 是否已因「首次拉取到 Agent」自动打开过编辑器（只自动打开一次，之后尊重用户手动关闭）
+let editorAutoOpened = false
 const terminalDetached = ref(false)  // 终端面板是否已分离为浮动模式
 const chatDetached = ref(false)     // 聊天室面板是否已分离为浮动模式
 const editorDetached = ref(false)   // 编辑器面板是否已分离为浮动模式
@@ -2929,36 +2957,10 @@ const rulesLoadedContent = ref('')    // 已加载规则的具体内容
 const BASE_Z_INDEX = 1000
 const ACTIVE_Z_INDEX = 1100
 
-const AGENT_SIDEBAR_DEFAULT_WIDTH = 320
-const AGENT_SIDEBAR_MIN_WIDTH = 240
-const AGENT_SIDEBAR_MAX_WIDTH = 560
-const AGENT_SIDEBAR_STORAGE_KEY = 'jarvis_agent_sidebar_width'
 const EDITOR_SIDEBAR_DEFAULT_WIDTH = 320
 const EDITOR_SIDEBAR_MIN_WIDTH = 200
 const EDITOR_SIDEBAR_MAX_WIDTH = 560
 const EDITOR_SIDEBAR_STORAGE_KEY = 'jarvis_editor_sidebar_width'
-
-function normalizeAgentSidebarWidth(width) {
-  return clamp(width, AGENT_SIDEBAR_MIN_WIDTH, AGENT_SIDEBAR_MAX_WIDTH)
-}
-
-function loadAgentSidebarWidth() {
-  const savedValue = localStorage.getItem(AGENT_SIDEBAR_STORAGE_KEY)
-  if (!savedValue) {
-    return AGENT_SIDEBAR_DEFAULT_WIDTH
-  }
-
-  const parsedWidth = Number(savedValue)
-  if (!Number.isFinite(parsedWidth)) {
-    return AGENT_SIDEBAR_DEFAULT_WIDTH
-  }
-
-  return normalizeAgentSidebarWidth(parsedWidth)
-}
-
-function saveAgentSidebarWidth() {
-  localStorage.setItem(AGENT_SIDEBAR_STORAGE_KEY, String(agentSidebarWidth.value))
-}
 
 function normalizeEditorSidebarWidth(width) {
   return clamp(width, EDITOR_SIDEBAR_MIN_WIDTH, EDITOR_SIDEBAR_MAX_WIDTH)
@@ -2982,12 +2984,6 @@ function saveEditorSidebarWidth() {
   localStorage.setItem(EDITOR_SIDEBAR_STORAGE_KEY, String(editorSidebarWidth.value))
 }
 
-const agentSidebarWidth = ref(loadAgentSidebarWidth())
-const agentSidebarResizeState = ref({
-  active: false,
-  startX: 0,
-  startWidth: AGENT_SIDEBAR_DEFAULT_WIDTH,
-})
 const editorSidebarWidth = ref(loadEditorSidebarWidth())
 const editorSidebarResizeState = ref({
   active: false,
@@ -3054,7 +3050,41 @@ const editorPanelInteraction = ref({
   startHeight: 0,
 })
 const editorPanelRef = ref(null)
-const editorContainerRef = computed(() => editorPanelRef.value?.editorContainerRef || null)
+// 自由分割：每个 file pane 各有一个 Monaco 容器（paneId -> hostEl）。
+// 注意：容器的 ref 回调在 Vue 渲染提交阶段执行，可能晚于 splitEditorPane 里的 nextTick，
+// 因此这里在容器挂载后主动调度一次实例补齐（scheduleEditorLayout 用 rAF 合并），
+// 不能只依赖调用方在 nextTick 里调 remountMonacoEditor。
+const splitEditorContainerRefs = ref(new Map())
+function setSplitEditorContainerRef(paneId, el) {
+  if (!paneId) return
+  if (el) {
+    if (splitEditorContainerRefs.value.get(paneId) === el) return
+    splitEditorContainerRefs.value.set(paneId, el)
+  } else {
+    if (!splitEditorContainerRefs.value.has(paneId)) return
+    splitEditorContainerRefs.value.delete(paneId)
+  }
+  triggerRef(splitEditorContainerRefs)
+  // 容器挂载/卸载后主动补齐实例。此处不判断 isEditorSplit：ref 回调可能早于
+  // editorPaneTree 变更引起的 computed 重算，判断会漏掉「首次分割」这一次。
+  scheduleEditorLayout()
+}
+// 激活 pane 的 Monaco 容器；激活 pane 非 file 时回退到任一 file pane 容器，
+// 保证「打开文件」等操作仍有可用容器。优先取文档中真实挂载的元素（ref 元素可能是
+// 渲染中间态，已脱离文档）。
+const splitEditorContainerRef = computed(() => {
+  const active = splitEditorContainerRefs.value.get(activePaneId.value)
+  if (active && active.isConnected) return active
+  for (const paneId of splitEditorContainerRefs.value.keys()) {
+    const live = document.querySelector(`.editor-monaco-container[data-pane-id="${paneId}"]`)
+    if (live && live.isConnected) return live
+  }
+  if (active) return active
+  for (const [, hostEl] of splitEditorContainerRefs.value) return hostEl
+  return null
+})
+// 未分割时仍由 EditorPanel 内部渲染并通过 expose 暴露 editorContainerRef。
+const editorContainerRef = computed(() => splitEditorContainerRef.value || editorPanelRef.value?.editorContainerRef || null)
 // 编辑器多实例管理（类似 terminalSessions）
 const editorSessions = ref([])  // [{ agent_id, agent_name, tabs: [], activeTabPath: null, editorModels: new Map(), cmEditorView: null }]
 const activeEditorSessionId = ref(null)  // 当前激活的编辑器会话 agent_id
@@ -3093,6 +3123,478 @@ const showEditorSidebar = ref(true)
 const editorSidebarView = ref('files')
 // 编辑器主区域视图：'file' 显示代码编辑器/diff，'chat' 显示聊天室，'terminal' 显示终端
 const editorMainView = ref('file')
+
+// ===== 编辑器主工作区「自由分割」（VS Code split 同款）=====
+// 布局模型：树形节点
+//   split: { type:'split', direction:'row'|'column', ratio:number, children:[node, node] }
+//   leaf : { type:'leaf', id:string, view:'file'|'session'|'chat'|'terminal', sessionPanelId:string|null }
+// 阶段3 起 chat / terminal 也可作为 leaf 的 view（host 单例：同一时刻只允许一个 pane 承载）。
+const EDITOR_PANE_MIN_RATIO = 0.15
+const EDITOR_PANE_MAX_RATIO = 0.85
+let editorPaneSeq = 0
+function createEditorPaneLeaf(view = 'file', sessionPanelId = null) {
+  editorPaneSeq += 1
+  return { type: 'leaf', id: `pane-${editorPaneSeq}`, view, sessionPanelId }
+}
+// 根默认单 leaf：未分割时行为与改动前完全一致
+const editorPaneTree = ref(createEditorPaneLeaf('file'))
+const activePaneId = ref(editorPaneTree.value.id)
+// 是否已发生分割（>1 个 leaf）。未分割时模板走原有渲染路径，保证零回归。
+const editorPaneCount = computed(() => {
+  let count = 0
+  const walk = (node) => {
+    if (!node) return
+    if (node.type === 'leaf') {
+      count += 1
+      return
+    }
+    ;(node.children || []).forEach(walk)
+  }
+  walk(editorPaneTree.value)
+  return count
+})
+const isEditorSplit = computed(() => editorPaneCount.value > 1)
+// 是否显示「分屏」按钮：未分割时，文件视图与「会话视图」都允许切分
+// （会话视图切分时会把当前会话固化到原 pane，新 pane 为文件，见 splitEditorPane）。
+const canSplitEditorPane = computed(() => {
+  if (isEditorSplit.value) return false
+  return editorMainView.value === 'file' || editorMainView.value === 'session'
+})
+const activePane = computed(() => findEditorPaneById(editorPaneTree.value, activePaneId.value))
+function findEditorPaneById(node, paneId) {
+  if (!node) return null
+  if (node.type === 'leaf') return node.id === paneId ? node : null
+  for (const child of node.children || []) {
+    const found = findEditorPaneById(child, paneId)
+    if (found) return found
+  }
+  return null
+}
+// 找到某个 leaf 的父 split 节点
+function findEditorPaneParent(node, paneId) {
+  if (!node || node.type === 'leaf') return null
+  for (const child of node.children || []) {
+    if (child.type === 'leaf' && child.id === paneId) return node
+    const found = findEditorPaneParent(child, paneId)
+    if (found) return found
+  }
+  return null
+}
+function activateEditorPane(paneId) {
+  if (!findEditorPaneById(editorPaneTree.value, paneId)) return
+  if (activePaneId.value === paneId) return
+  activePaneId.value = paneId
+  // 激活 pane 会切换 Monaco 容器（只有激活 pane 渲染真实容器），需重建视图
+  nextTick(() => {
+    remountMonacoEditor()
+  })
+}
+// 编辑器工具栏「分屏」按钮的入口：对「激活 pane」执行分割。
+// 单独包一层是为了避免模板里直接传 activePaneId 带来的作用域歧义。
+function onEditorSplitRequest(direction) {
+  splitEditorPane(activePaneId.value, direction)
+}
+// 以 direction 方向切分指定 leaf：把该 leaf 替换为 split，原 leaf 保留在首位，
+// 新 leaf 成为激活 pane。
+// 注意：session / chat / terminal leaf 不能把承载内容复制给新 leaf（否则同一 Panel 或同一
+// host 单例被两个 pane 承载，xterm / chat 状态会争抢），因此切分时新 leaf 一律为 file leaf。
+function splitEditorPane(paneId, direction) {
+  if (windowWidth.value <= 768) return
+  const parent = findEditorPaneParent(editorPaneTree.value, paneId)
+  const target = findEditorPaneById(editorPaneTree.value, paneId)
+  if (!target) return
+  // 未分割时 pane 树的 leaf.view 恒为 file，会话/聊天/终端内容实际由 editorMainView 承载。
+  // 切分后 #main-view 会被 #pane-tree 取代（EditorPanel 内二者互斥），若不先把当前主视图
+  // 固化到目标 leaf，内容会「凭空消失」。故此处把 editorMainView 迁移到 target。
+  if (!isEditorSplit.value && editorMainView.value !== 'file') {
+    if (editorMainView.value === 'session' && editorSessionPanelId.value) {
+      target.view = 'session'
+      target.sessionPanelId = editorSessionPanelId.value
+    } else if (editorMainView.value === 'chat' || editorMainView.value === 'terminal') {
+      target.view = editorMainView.value
+      target.sessionPanelId = null
+    }
+    editorMainView.value = 'file'
+  }
+  const newLeaf = createEditorPaneLeaf('file')
+  const splitNode = {
+    type: 'split',
+    direction: direction === 'column' ? 'column' : 'row',
+    ratio: 0.5,
+    children: [target, newLeaf],
+  }
+  if (!parent) {
+    editorPaneTree.value = splitNode
+  } else {
+    const index = parent.children.indexOf(target)
+    parent.children.splice(index, 1, splitNode)
+  }
+  // 首次分割：把当前全局标签列表固化到「原 pane」，新 pane 从空开始。
+  // 这样两个 pane 的标签栏各自独立，互不影响。
+  if (!editorPaneTabs.has(target.id)) {
+    editorPaneTabs.set(target.id, editorTabs.value.map(t => t.path))
+    editorPaneTabsVersion.value += 1
+  }
+  // 未分割时文件内容由单实例 cmEditorView 承载，editorViewPanes 没有记录；
+  // 分割后每个 pane 的实例都按 editorViewPanes 绑定模型，若不在这里把当前文件
+  // 绑到原 pane，两个 pane 都会 setModel(null) → 都看不到文件。
+  if (target.view === 'file' && !editorViewPanes.has(target.id)) {
+    const currentPath = activeEditorTabPath.value
+    if (currentPath) editorViewPanes.set(target.id, currentPath)
+  }
+  activePaneId.value = newLeaf.id
+  persistEditorPaneLayout()
+  nextTick(() => {
+    remountMonacoEditor()
+    layoutGitDiffEditor()
+  })
+}
+// 关闭指定 leaf：兄弟节点顶替；仅剩一个 leaf 时不允许关闭。
+function closeEditorPane(paneId) {
+  if (editorPaneCount.value <= 1) return
+  const parent = findEditorPaneParent(editorPaneTree.value, paneId)
+  if (!parent) return
+  const index = parent.children.findIndex(child => child.type === 'leaf' && child.id === paneId)
+  if (index < 0) return
+  parent.children.splice(index, 1)
+  // 该 pane 的独立标签列表一并丢弃（其文件若仍被其他 pane 引用则保持）
+  editorPaneTabs.delete(paneId)
+  editorPaneTabsVersion.value += 1
+  // 父节点只剩一个 child 时，用该 child 顶替父节点（压缩冗余层级）
+  if (parent.children.length === 1) {
+    const only = parent.children[0]
+    if (parent === editorPaneTree.value) {
+      editorPaneTree.value = only
+    } else {
+      // 在树上定位 parent 并替换为 only
+      const replaceNode = (node) => {
+        if (!node || node.type === 'leaf') return false
+        const idx = node.children.indexOf(parent)
+        if (idx >= 0) {
+          node.children.splice(idx, 1, only)
+          return true
+        }
+        return (node.children || []).some(replaceNode)
+      }
+      replaceNode(editorPaneTree.value)
+    }
+  }
+  if (!findEditorPaneById(editorPaneTree.value, activePaneId.value)) {
+    activePaneId.value = findFirstEditorPaneId(editorPaneTree.value)
+  }
+  persistEditorPaneLayout()
+  nextTick(() => {
+    remountMonacoEditor()
+    layoutGitDiffEditor()
+  })
+}
+function findFirstEditorPaneId(node) {
+  if (!node) return null
+  if (node.type === 'leaf') return node.id
+  for (const child of node.children || []) {
+    const found = findFirstEditorPaneId(child)
+    if (found) return found
+  }
+  return null
+}
+// 收起所有分割，回到单个 file leaf（切到 chat/terminal 或需要重置时调用）
+function collapseEditorPanes() {
+  const leaf = createEditorPaneLeaf('file')
+  editorPaneTree.value = leaf
+  activePaneId.value = leaf.id
+  // 收起分割：回到全局标签栏，清空各 pane 的独立列表
+  editorPaneTabs.clear()
+  editorPaneTabsVersion.value += 1
+}
+
+// ===== 阶段2：左侧点击路由到「激活 pane」=====
+// 设计：每个 leaf 持有自己的 view（'file' | 'session'）与 sessionPanelId。
+// 左侧点击（文件树 / Agent 列表 / 搜索结果）在已分割时改写「激活 pane」的 view，
+// 未分割时走原有 editorMainView 路径（保证零回归）。
+// 约束：同一个 sessionPanelId 不允许同时出现在两个 pane 中（终端 host 单例，会争抢），
+// 因此路由到 session 时会先把其他 pane 上相同的 sessionPanelId 清空。
+
+// 找出除 exceptPaneId 之外、正在承载指定 sessionPanelId 的 leaf（用于去重）
+function findEditorPaneBySessionPanelId(sessionPanelId, exceptPaneId = null) {
+  if (!sessionPanelId) return null
+  let found = null
+  const walk = (node) => {
+    if (!node || found) return
+    if (node.type === 'leaf') {
+      if (node.id !== exceptPaneId && node.view === 'session' && node.sessionPanelId === sessionPanelId) {
+        found = node
+      }
+      return
+    }
+    ;(node.children || []).forEach(walk)
+  }
+  walk(editorPaneTree.value)
+  return found
+}
+
+// 找出除 exceptPaneId 之外、正在承载指定 view（chat / terminal）的 leaf。
+// host 单例：同一时刻只允许一个 pane 承载 chat / terminal，切换前需先卸载旧的。
+function findEditorPaneByView(view, exceptPaneId = null) {
+  let found = null
+  const walk = (node) => {
+    if (!node || found) return
+    if (node.type === 'leaf') {
+      if (node.id !== exceptPaneId && node.view === view) found = node
+      return
+    }
+    ;(node.children || []).forEach(walk)
+  }
+  walk(editorPaneTree.value)
+  return found
+}
+// 把「激活 pane」的视图切换为 view（file / session / chat / terminal）。
+// 返回是否成功改写（未分割或没有激活 pane 时返回 false，调用方回退到旧路径）。
+function setActivePaneView(view, sessionPanelId = null) {
+  if (!isEditorSplit.value) return false
+  let pane = activePane.value
+  if (!pane) return false
+  if (view === 'session') {
+    if (!sessionPanelId) return false
+    // 同一 panel 不允许同时被两个 pane 承载：清掉其他 pane 上的相同 panel
+    const duplicated = findEditorPaneBySessionPanelId(sessionPanelId, pane.id)
+    if (duplicated) {
+      duplicated.view = 'file'
+      duplicated.sessionPanelId = null
+    }
+    // 需求：Panel 一律落在「激活 pane」里（不再重定向到其他空闲 file pane）。
+    // 若激活 pane 已承载另一个 session panel，则关闭旧 panel，让新 panel 覆盖它。
+    if (pane.view === 'session' && pane.sessionPanelId && pane.sessionPanelId !== sessionPanelId) {
+      const oldPanelId = pane.sessionPanelId
+      const oldPanel = panels.value.find(p => p.id === oldPanelId)
+      if (oldPanel) closePanel(oldPanelId)
+    }
+  } else if (view === 'chat' || view === 'terminal') {
+    // host 单例：先卸载其他 pane 上同类型的承载，再交给激活 pane
+    const duplicated = findEditorPaneByView(view, pane.id)
+    if (duplicated) {
+      duplicated.view = 'file'
+      duplicated.sessionPanelId = null
+    }
+  }
+  pane.view = view
+  pane.sessionPanelId = view === 'session' ? sessionPanelId : null
+  persistEditorPaneLayout()
+  // 切换激活 pane 的内容类型后，Monaco 容器可能被替换/移除，需要重建视图
+  nextTick(() => {
+    remountMonacoEditor()
+    layoutGitDiffEditor()
+  })
+  return true
+}
+
+// pane 标题：file 显示当前文件名（仅激活 pane，因为 Monaco 单实例只渲染激活 pane），
+// session 显示 Agent 名（找不到时回退到通用文案）
+function getEditorPaneTitle(pane) {
+  if (!pane) return ''
+  if (pane.view === 'chat') return '聊天室'
+  if (pane.view === 'terminal') return '终端'
+  if (pane.view === 'session') {
+    const panel = panels.value.find(p => p.id === pane.sessionPanelId)
+    const agent = panel ? getPanelAgent(panel) : null
+    return agent ? (agent.name || agent.agent_id) : '会话'
+  }
+  // 每个 file pane 都有独立编辑器实例，标题显示该 pane 自己绑定的文件
+  const panePath = editorViewPanes.get(pane.id) || (pane.id === activePaneId.value ? activeEditorTabPath.value : null)
+  if (panePath) return panePath.split('/').pop() || panePath
+  return '文件'
+}
+
+// 非激活 file pane 的只读预览文本：取当前激活文件的内容，截断到合理长度，
+// 避免大文件把 DOM 撑爆（只读快照仅用于「让用户看到内容还在」，不追求完整）。
+const EDITOR_PANE_PREVIEW_MAX_CHARS = 20000
+function getEditorPreviewText() {
+  const path = activeEditorTabPath.value
+  if (!path) return ''
+  const modelData = editorModels.get(path)
+  const content = modelData?.content ?? activeEditorTab.value?.content ?? ''
+  if (content.length <= EDITOR_PANE_PREVIEW_MAX_CHARS) return content
+  return `${content.slice(0, EDITOR_PANE_PREVIEW_MAX_CHARS)}\n\n…（预览已截断，激活后可查看完整内容）`
+}
+
+// pane 承载的 Panel 对象（session leaf 用）
+function getPanePanel(pane) {
+  if (!pane || pane.view !== 'session' || !pane.sessionPanelId) return null
+  return panels.value.find(p => p.id === pane.sessionPanelId) || null
+}
+
+// pane 是否应被视为「激活」（用于 SessionPanel 的 active 态）
+function isPaneActive(pane) {
+  return !!pane && pane.id === activePaneId.value
+}
+// 拖拽分隔条调整比例（限 0.15~0.85）
+// 说明：split 节点是 editorPaneTree 内的可变对象，拖拽时直接改它的 ratio，
+// 由 Vue 的深层响应式驱动重渲染；拖拽期间不调用 layout()，结束后才重排一次，避免尺寸震荡。
+let editorPaneResizeContext = null
+const editorPaneResizing = ref(false)
+function startEditorPaneResize(event, splitNode) {
+  if (windowWidth.value <= 768) return
+  const containerEl = event.currentTarget?.parentElement
+  const rect = containerEl?.getBoundingClientRect?.() || { width: 0, height: 0 }
+  const containerSize = splitNode.direction === 'row' ? rect.width : rect.height
+  if (!containerSize) return
+  editorPaneResizeContext = {
+    splitNode,
+    direction: splitNode.direction,
+    startPos: splitNode.direction === 'row' ? event.clientX : event.clientY,
+    startRatio: splitNode.ratio,
+    containerSize,
+  }
+  editorPaneResizing.value = true
+  document.addEventListener('mousemove', onEditorPaneResize)
+  document.addEventListener('mouseup', stopEditorPaneResize)
+  event.preventDefault()
+  event.stopPropagation()
+}
+function onEditorPaneResize(event) {
+  const ctx = editorPaneResizeContext
+  if (!ctx) return
+  const current = ctx.direction === 'row' ? event.clientX : event.clientY
+  const delta = current - ctx.startPos
+  const nextRatio = ctx.startRatio + delta / ctx.containerSize
+  ctx.splitNode.ratio = clamp(nextRatio, EDITOR_PANE_MIN_RATIO, EDITOR_PANE_MAX_RATIO)
+}
+function stopEditorPaneResize() {
+  const wasActive = !!editorPaneResizeContext
+  editorPaneResizeContext = null
+  editorPaneResizing.value = false
+  document.removeEventListener('mousemove', onEditorPaneResize)
+  document.removeEventListener('mouseup', stopEditorPaneResize)
+  if (wasActive) {
+    persistEditorPaneLayout()
+    nextTick(() => {
+      layoutMonacoEditor()
+      layoutGitDiffEditor()
+    })
+  }
+}
+
+// ===== 阶段4：布局持久化（localStorage）+ 合法性校验 =====
+// 设计：把 editorPaneTree 序列化到 localStorage；刷新后恢复。
+// 任何解析/校验失败都回退到默认单 leaf，绝不因脏数据导致白屏。
+const EDITOR_PANE_LAYOUT_KEY = 'jarvis_editor_pane_layout'
+
+// 递归校验并规范化一个节点；非法返回 null（调用方据此回退）
+function sanitizeEditorPaneNode(raw) {
+  if (!raw || typeof raw !== 'object') return null
+  if (raw.type === 'split') {
+    if (raw.direction !== 'row' && raw.direction !== 'column') return null
+    if (!Array.isArray(raw.children) || raw.children.length !== 2) return null
+    const left = sanitizeEditorPaneNode(raw.children[0])
+    const right = sanitizeEditorPaneNode(raw.children[1])
+    if (!left || !right) return null
+    let ratio = Number(raw.ratio)
+    if (!Number.isFinite(ratio)) ratio = 0.5
+    ratio = clamp(ratio, EDITOR_PANE_MIN_RATIO, EDITOR_PANE_MAX_RATIO)
+    return { type: 'split', direction: raw.direction, ratio, children: [left, right] }
+  }
+  if (raw.type === 'leaf') {
+    const validViews = ['file', 'session', 'chat', 'terminal']
+    if (!validViews.includes(raw.view)) return null
+    if (typeof raw.id !== 'string' || !raw.id) return null
+    let sessionPanelId = raw.sessionPanelId
+    if (raw.view === 'session') {
+      // sessionPanelId 必须真实存在；否则回退为 file leaf（避免指向已不存在的 Panel）
+      if (!sessionPanelId || !panels.value.some(p => p.id === sessionPanelId)) {
+        return { type: 'leaf', id: raw.id, view: 'file', sessionPanelId: null }
+      }
+    } else {
+      sessionPanelId = null
+    }
+    return { type: 'leaf', id: raw.id, view: raw.view, sessionPanelId }
+  }
+  return null
+}
+
+// 校验整棵树：必须是合法节点，且 leaf 数 >= 1；chat/terminal 至多各一个（host 单例约束）
+function sanitizeEditorPaneTree(raw) {
+  const node = sanitizeEditorPaneNode(raw)
+  if (!node) return null
+  const leafIds = new Set()
+  const viewCount = { chat: 0, terminal: 0 }
+  let valid = true
+  const walk = (n) => {
+    if (!valid || !n) return
+    if (n.type === 'leaf') {
+      if (leafIds.has(n.id)) { valid = false; return }
+      leafIds.add(n.id)
+      if (n.view === 'chat' || n.view === 'terminal') {
+        viewCount[n.view] += 1
+        if (viewCount[n.view] > 1) { valid = false; return }
+      }
+      return
+    }
+    ;(n.children || []).forEach(walk)
+  }
+  walk(node)
+  if (!valid || leafIds.size < 1) return null
+  return node
+}
+
+// 同步 editorPaneSeq，避免恢复后新建 leaf 的 id 与已有 id 冲突
+function syncEditorPaneSeq(tree) {
+  let maxSeq = 0
+  const walk = (n) => {
+    if (!n) return
+    if (n.type === 'leaf') {
+      const m = /^pane-(\d+)$/.exec(n.id)
+      if (m) maxSeq = Math.max(maxSeq, parseInt(m[1], 10))
+      return
+    }
+    ;(n.children || []).forEach(walk)
+  }
+  walk(tree)
+  editorPaneSeq = Math.max(editorPaneSeq, maxSeq)
+}
+
+// 写入 localStorage（失败静默，不影响功能）
+function persistEditorPaneLayout() {
+  try {
+    const tree = editorPaneTree.value
+    // 未分割时不写（等价于清空），避免把默认态持久化成「已分割」的错觉
+    if (!tree || editorPaneCount.value <= 1) {
+      localStorage.removeItem(EDITOR_PANE_LAYOUT_KEY)
+      return
+    }
+    const payload = { version: 1, activePaneId: activePaneId.value, tree }
+    localStorage.setItem(EDITOR_PANE_LAYOUT_KEY, JSON.stringify(payload))
+  } catch (e) {
+    // 忽略：localStorage 不可用（隐私模式 / 配额满）时静默降级
+  }
+}
+
+// 从 localStorage 恢复（setup 阶段调用）；失败回退默认单 leaf
+function restoreEditorPaneLayout() {
+  let raw = null
+  try {
+    raw = localStorage.getItem(EDITOR_PANE_LAYOUT_KEY)
+  } catch (e) {
+    return
+  }
+  if (!raw) return
+  let parsed = null
+  try {
+    parsed = JSON.parse(raw)
+  } catch (e) {
+    try { localStorage.removeItem(EDITOR_PANE_LAYOUT_KEY) } catch (e2) {}
+    return
+  }
+  const tree = sanitizeEditorPaneTree(parsed && parsed.tree)
+  if (!tree) {
+    try { localStorage.removeItem(EDITOR_PANE_LAYOUT_KEY) } catch (e) {}
+    return
+  }
+  editorPaneTree.value = tree
+  syncEditorPaneSeq(tree)
+  const wantActive = parsed && parsed.activePaneId
+  activePaneId.value = findEditorPaneById(tree, wantActive)
+    ? wantActive
+    : findFirstEditorPaneId(tree)
+}
 const windowWidth = ref(window.innerWidth)  // 窗口宽度，用于响应式检测
 const showCreateAgentModal = ref(false) // 创建 Agent 弹窗
 const showQuickCreateAgentModal = ref(false) // 一句话创建 Agent 弹窗
@@ -3224,17 +3726,6 @@ const sidebarPosition = ref({ x: 20, y: 100 }) // 侧边栏浮动位置
 const isDraggingSidebar = ref(false) // 是否正在拖拽侧边栏
 const dragOffset = ref({ x: 0, y: 0 }) // 拖拽偏移量
 
-const agentSidebarStyle = computed(() => {
-  if (!showAgentSidebar.value) {
-    return {}
-  }
-
-  if (windowWidth.value <= 768) {
-    return { width: '100vw' }
-  }
-
-  return { width: `${agentSidebarWidth.value}px` }
-})
 
 const editorPanelStyle = computed(() => {
   if (windowWidth.value <= 768) {
@@ -3263,51 +3754,6 @@ const activeEditorTab = computed(() => {
 function clamp(value, min, max) {
   if (max < min) return min
   return Math.min(Math.max(value, min), max)
-}
-
-function ensureAgentSidebarWidthInBounds() {
-  agentSidebarWidth.value = normalizeAgentSidebarWidth(agentSidebarWidth.value)
-}
-
-function startAgentSidebarResize(event) {
-  if (windowWidth.value <= 768 || !showAgentSidebar.value) return
-
-  agentSidebarResizeState.value = {
-    active: true,
-    startX: event.clientX,
-    startWidth: agentSidebarWidth.value,
-  }
-
-  document.addEventListener('mousemove', onAgentSidebarResize)
-  document.addEventListener('mouseup', stopAgentSidebarResize)
-  event.preventDefault()
-  event.stopPropagation()
-}
-
-function onAgentSidebarResize(event) {
-  if (!agentSidebarResizeState.value.active) return
-
-  const deltaX = event.clientX - agentSidebarResizeState.value.startX
-  const nextWidth = agentSidebarResizeState.value.startWidth + deltaX
-  agentSidebarWidth.value = normalizeAgentSidebarWidth(nextWidth)
-}
-
-function stopAgentSidebarResize() {
-  if (!agentSidebarResizeState.value.active) {
-    document.removeEventListener('mousemove', onAgentSidebarResize)
-    document.removeEventListener('mouseup', stopAgentSidebarResize)
-    return
-  }
-
-  agentSidebarResizeState.value = {
-    active: false,
-    startX: 0,
-    startWidth: agentSidebarWidth.value,
-  }
-
-  document.removeEventListener('mousemove', onAgentSidebarResize)
-  document.removeEventListener('mouseup', stopAgentSidebarResize)
-  saveAgentSidebarWidth()
 }
 
 function startEditorSidebarResize(event) {
@@ -3640,9 +4086,68 @@ monaco.editor.defineTheme('blueDark', {
 // 其余语言为词法级高亮；文件读写仍走网关远端接口。
 const EDITOR_TAB_SIZE = 4
 
-function ensureMonacoEditor() {
-  if (cmEditorView || !editorContainerRef.value) return
-  cmEditorView = monaco.editor.create(editorContainerRef.value, {
+// ===== 自由分割：每个 file pane 一个独立 Monaco 实例 =====
+// 设计要点（避免「多实例互相触发 layout 导致主线程卡死」）：
+// 1) 实例创建/销毁只发生在 pane 容器集合真正变化时（ensureMonacoEditor 内做集合差分）；
+// 2) 容器尺寸变化由 Monaco 自身的 automaticLayout(ResizeObserver) 处理，本文件不额外挂
+//    ResizeObserver，也不在 resize 回调里对每个实例调 layout()，避免「layout → 尺寸变化 →
+//    再 layout」的震荡；
+// 3) 显式 layout() 一律经 scheduleEditorLayout() 用 rAF 合并，同一帧内多次调用只执行一次。
+const editorViews = new Map()  // paneId -> monaco editor instance
+const editorViewPanes = new Map()  // paneId -> 该 pane 当前绑定的文件 path
+// 已分割时每个 pane 独立的标签列表（paneId -> path[]）。未分割时该 Map 为空，
+// 标签栏仍由全局 editorTabs 驱动，保证未分割路径零回归。
+// 目的：分割后两个 pane 的标签栏互不影响（关闭一个 pane 的标签不会连带关闭另一个）。
+const editorPaneTabs = new Map()  // paneId -> path[]
+const editorPaneTabsVersion = ref(0)  // 触发依赖 editorPaneTabs 的模板/计算属性重算
+
+function getPaneTabs(paneId) {
+  if (!paneId) return []
+  const paths = editorPaneTabs.get(paneId)
+  if (!paths || paths.length === 0) return []
+  const all = editorTabs.value
+  return paths.map(p => all.find(t => t.path === p)).filter(Boolean)
+}
+
+// 该 path 是否仍被某个 pane 的标签列表引用（用于判断关闭标签时能否真正释放模型）
+function isPathReferencedByAnyPane(path) {
+  for (const paths of editorPaneTabs.values()) {
+    if (paths.includes(path)) return true
+  }
+  return false
+}
+
+// 已分割时把 path 加入指定 pane 的标签列表（去重）
+function addPaneTab(paneId, path) {
+  if (!paneId || !path) return
+  const paths = editorPaneTabs.get(paneId) || []
+  if (!paths.includes(path)) {
+    paths.push(path)
+    editorPaneTabs.set(paneId, paths)
+    editorPaneTabsVersion.value += 1
+  }
+}
+
+// 从指定 pane 的标签列表移除 path
+function removePaneTab(paneId, path) {
+  const paths = editorPaneTabs.get(paneId)
+  if (!paths) return
+  const index = paths.indexOf(path)
+  if (index === -1) return
+  paths.splice(index, 1)
+  editorPaneTabsVersion.value += 1
+}
+
+// 当前激活 pane 的 Monaco 实例（激活 pane 非 file 时回退到任一实例）
+function getActiveEditorView() {
+  const active = editorViews.get(activePaneId.value)
+  if (active) return active
+  for (const [, view] of editorViews) return view
+  return null
+}
+
+function buildEditorOptions() {
+  return {
     model: null,
     theme: 'blueDark',
     fontFamily: EDITOR_FONT_FAMILY,
@@ -3668,22 +4173,200 @@ function ensureMonacoEditor() {
     tabCompletion: 'on',
     readOnly: !isEditorEditable.value,
     readOnlyMessage: { value: '编辑器当前为只读，点击工具栏解锁后可编辑' },
-  })
-  cmEditorView.onDidChangeModelContent(() => {
-    const path = activeEditorTabPath.value
+  }
+}
+
+// 内容变更 → 回写该文件对应的 tab（模型上记录了 path，多 pane 打开同一文件时天然同步）
+function bindEditorViewEvents(view) {
+  view.onDidChangeModelContent(() => {
+    const model = view.getModel()
+    if (!model) return
+    const path = model.__jarvisPath
     if (!path) return
     const tab = getEditorTabByPath(path)
     if (!tab) return
-    const model = cmEditorView.getModel()
-    if (!model) return
     tab.content = model.getValue()
     tab.isDirty = tab.content !== tab.originalContent
   })
 }
 
+// 把某个 pane 的实例绑定到它自己记录的文件；无文件则保持空编辑器（新 pane 为空）
+function applyEditorViewModel(paneId, view) {
+  const path = editorViewPanes.get(paneId)
+  if (!path) {
+    if (view.getModel()) view.setModel(null)
+    view.updateOptions({ readOnly: !isEditorEditable.value })
+    return
+  }
+  const modelData = editorModels.get(path)
+  if (!modelData) {
+    editorViewPanes.delete(paneId)
+    if (view.getModel()) view.setModel(null)
+    return
+  }
+  let model = modelData.model
+  if (!model || model.isDisposed()) {
+    model = monaco.editor.createModel(modelData.content, modelData.language, monaco.Uri.file(path))
+    model.__jarvisPath = path
+    modelData.model = model
+  }
+  if (view.getModel() !== model) view.setModel(model)
+  view.updateOptions({ readOnly: !isEditorEditable.value })
+}
+
+// 未分割时，Monaco 容器由 EditorPanel 内部渲染（editorContainerRef），沿用单实例路径。
+function ensureSingleMonacoEditor() {
+  if (cmEditorView || !editorContainerRef.value) return
+  cmEditorView = monaco.editor.create(editorContainerRef.value, buildEditorOptions())
+  bindEditorViewEvents(cmEditorView)
+}
+
+// 已分割时，为每个 file pane 的容器建立/复用实例；容器集合变化时才创建或销毁。
+// 关键：ref 回调拿到的元素可能是「渲染中间态」元素（Vue 随后会替换掉它），把实例建在
+// 这种脱离文档的元素上会导致编辑器 DOM 永久悬空（容器里看不到编辑器）。因此这里不直接
+// 使用 ref 元素，而是按 data-pane-id 从文档中解析「当前真实挂载」的容器。
+function resolveSplitEditorContainer(paneId) {
+  const live = document.querySelector(`.editor-monaco-container[data-pane-id="${paneId}"]`)
+  if (live && live.isConnected) return live
+  const refEl = splitEditorContainerRefs.value.get(paneId)
+  return refEl && refEl.isConnected ? refEl : null
+}
+
+function ensureSplitMonacoEditors() {
+  if (typeof window !== 'undefined') {
+    window.__dbgEnsure = {
+      split: isEditorSplit.value,
+      refKeys: [...splitEditorContainerRefs.value.keys()],
+      viewKeys: [...editorViews.keys()],
+      domPanes: [...document.querySelectorAll('.editor-monaco-container')].map(e => e.dataset.paneId),
+      resolved: [...splitEditorContainerRefs.value.keys()].map(id => {
+        const c = resolveSplitEditorContainer(id)
+        return { id, has: !!c, connected: !!c?.isConnected, inDoc: c ? document.contains(c) : false }
+      }),
+    }
+  }
+  for (const paneId of [...splitEditorContainerRefs.value.keys()]) {
+    const container = resolveSplitEditorContainer(paneId)
+    // 容器尚未真正入文档时不要创建实例，等下一次调度（ref 回调 / rAF）补齐。
+    if (!container) continue
+    let view = editorViews.get(paneId)
+    // 失效判定只看「宿主容器元素是否被替换」：Monaco 的编辑器 DOM 是异步挂载的，
+    // getDomNode() 在无 model 时返回 null，创建后立刻 querySelector 也拿不到根节点，
+    // 因此任何基于「实例 DOM 是否在容器里」的判断都会误判并导致反复 dispose/create。
+    // 容器元素本身被 Vue 替换（pane 重建）时，才需要销毁旧实例、在新容器上重建。
+    if (view && view.__jarvisContainer !== container) {
+      view.dispose()
+      editorViews.delete(paneId)
+      view = null
+    }
+    if (!view) {
+      view = monaco.editor.create(container, buildEditorOptions())
+      view.__jarvisContainer = container
+      bindEditorViewEvents(view)
+      editorViews.set(paneId, view)
+    }
+    applyEditorViewModel(paneId, view)
+  }
+  // 清理已消失 pane 的实例
+  for (const [paneId, view] of [...editorViews]) {
+    if (!splitEditorContainerRefs.value.has(paneId)) {
+      view.dispose()
+      editorViews.delete(paneId)
+      editorViewPanes.delete(paneId)
+    }
+  }
+}
+
+function ensureMonacoEditor() {
+  if (isEditorSplit.value) {
+    ensureSplitMonacoEditors()
+    return
+  }
+  ensureSingleMonacoEditor()
+}
+
+// 每次 DOM 提交后（激活 pane / 分割树变化 / 标签变化）都重新补齐一次实例：
+// Vue 在 patch 时可能清掉容器里「它不认识的」Monaco DOM，导致实例 DOM 脱离文档；
+// 这里在 post flush 阶段检测并重建，保证每个 file pane 始终有可见的编辑器。
+watch(
+  [activePaneId, editorPaneTree, () => editorTabs.value.length, activeEditorTabPath],
+  () => {
+    if (isEditorSplit.value) scheduleEditorLayout()
+  },
+  { flush: 'post', immediate: true },
+)
+
+// 已分割时每个 pane 的标签列表由「打开文件 / 点击标签」时显式登记（addPaneTab），
+// 新 pane 一律从空开始；不在这里用全局标签兜底补种，否则新 pane 会凭空出现
+// 其他 pane 的标签（同一文件同时出现在两个 pane 顶部）。
+
+// 显式 layout 合并到下一帧，避免同一帧内对多个实例反复 layout 造成尺寸震荡。
+// 另外做有限次重试：ref 回调触发时容器可能尚未真正入文档（Vue 可能在插入前调用 ref），
+// 此时建不了实例；等下一帧/下一个 tick 容器入文档后再补一次，避免「首次分割无实例」。
+let editorLayoutScheduled = false
+let editorLayoutRetries = 0
+const EDITOR_LAYOUT_MAX_RETRIES = 8
+function scheduleEditorLayout() {
+  if (editorLayoutScheduled) return
+  editorLayoutScheduled = true
+  requestAnimationFrame(() => {
+    editorLayoutScheduled = false
+    layoutMonacoEditor()
+    if (isEditorSplit.value && editorLayoutRetries < EDITOR_LAYOUT_MAX_RETRIES) {
+      const pending = [...splitEditorContainerRefs.value.keys()].some((paneId) => {
+        const container = resolveSplitEditorContainer(paneId)
+        if (!container) return false
+        const view = editorViews.get(paneId)
+        return !view || view.__jarvisContainer !== container
+      })
+      if (pending) {
+        editorLayoutRetries += 1
+        scheduleEditorLayout()
+        return
+      }
+    }
+    editorLayoutRetries = 0
+  })
+}
+
 function layoutMonacoEditor() {
+  if (isEditorSplit.value) {
+    ensureSplitMonacoEditors()
+    for (const [, view] of editorViews) {
+      if (view.getContainerDomNode?.()?.isConnected) view.layout()
+    }
+    return
+  }
+  if (!cmEditorView) return
+  // 容器可能已被替换（如自由分割收起、主区域切走再切回文件视图）：旧视图仍挂在
+  // 已脱离文档的 DOM 上，此时 layout() 无效且内容不可见，需重建视图再排布。
+  const container = editorContainerRef.value
+  const domNode = cmEditorView.getDomNode?.()
+  if (container && (!domNode || !domNode.isConnected || domNode.parentElement !== container)) {
+    remountMonacoEditor()
+    return
+  }
+  cmEditorView.layout()
+}
+
+// 自由分割：Monaco 视图绑定在具体 DOM 容器上，分割/激活/关闭 pane 时容器会被替换，
+// 旧容器随 DOM 卸载后视图即失效。此处在容器变化后重建视图并恢复当前标签。
+// 说明：模型（editorModels）与内容不受影响，仅重建视图层。
+function remountMonacoEditor() {
+  if (isEditorSplit.value) {
+    // 已分割：按容器集合差分补齐/复用实例（容器未变则复用，不会重建）
+    ensureSplitMonacoEditors()
+    return
+  }
+  if (!editorContainerRef.value) return
+  const currentPath = activeEditorTabPath.value
   if (cmEditorView) {
-    cmEditorView.layout()
+    cmEditorView.dispose()
+    cmEditorView = null
+  }
+  ensureSingleMonacoEditor()
+  if (currentPath && cmEditorView) {
+    activateEditorTab(currentPath)
   }
 }
 
@@ -3691,21 +4374,38 @@ function activateEditorTab(path) {
   const session = activeEditorSession.value
   if (session) session.activeTabPath = path
   const modelData = editorModels.get(path)
-  if (cmEditorView && modelData) {
-    let model = modelData.model
-    if (!model || model.isDisposed()) {
-      model = monaco.editor.createModel(modelData.content, modelData.language, monaco.Uri.file(path))
-      modelData.model = model
+  if (!modelData) return
+  let model = modelData.model
+  if (!model || model.isDisposed()) {
+    model = monaco.editor.createModel(modelData.content, modelData.language, monaco.Uri.file(path))
+    model.__jarvisPath = path
+    modelData.model = model
+  }
+  if (isEditorSplit.value) {
+    // 只把「激活 pane」绑定到该文件；其他 pane 保持各自内容（新 pane 为空）
+    ensureSplitMonacoEditors()
+    const activeView = editorViews.get(activePaneId.value)
+    if (activeView) {
+      // 该文件登记到激活 pane 的标签列表（点击标签/打开文件都走这里）
+      addPaneTab(activePaneId.value, path)
+      editorViewPanes.set(activePaneId.value, path)
+      if (activeView.getModel() !== model) activeView.setModel(model)
+      activeView.updateOptions({ readOnly: !isEditorEditable.value })
+      nextTick(() => {
+        scheduleEditorLayout()
+        activeView.focus()
+      })
     }
+  } else if (cmEditorView) {
     cmEditorView.setModel(model)
     cmEditorView.updateOptions({ readOnly: !isEditorEditable.value })
     nextTick(() => {
       layoutMonacoEditor()
       cmEditorView.focus()
     })
-    // 模型就绪后尝试接入 LSP（失败静默降级，不影响编辑器）
-    activateLspForModel(path, modelData)
   }
+  // 模型就绪后尝试接入 LSP（失败静默降级，不影响编辑器）
+  activateLspForModel(path, modelData)
 }
 
 // ---------------------------------------------------------------------------
@@ -3884,6 +4584,22 @@ function setEditorSidebarView(view) {
 // 切换编辑器主区域视图（file / chat / terminal）
 function setEditorMainView(view) {
   if (editorMainView.value === view) return
+  // 自由分割模式：pane 树本身承载 file/session 内容，主区域视图恒为 file，
+  // 因此这里不改 editorMainView、也不收起分割（会话显示在各自的 pane 中）。
+  if (isEditorSplit.value) {
+    if (view === 'file') return
+    if (view === 'session') return
+    // chat / terminal：交给「激活 pane」承载（host 单例，setActivePaneView 会先卸载其他 pane 上的同类型承载）
+    if (setActivePaneView(view)) return
+    collapseEditorPanes()
+    editorMainView.value = view
+    return
+  }
+  // 自由分割只在「文件视图」下有意义：切到 chat/terminal 时先收起分割，
+  // 否则 pane 树仍会渲染，chat/terminal 内容无处显示。
+  if (view !== 'file' && isEditorSplit.value) {
+    collapseEditorPanes()
+  }
   editorMainView.value = view
   // 切回文件视图时重排 Monaco；切到 chat/terminal 时无需处理编辑器
   if (view === 'file') {
@@ -4017,7 +4733,8 @@ async function openGlobalSearchResult(filePath, lineNumber, matchStart = 0, matc
   await openEditorFile(absolutePath, currentAgentId.value)
   await nextTick()
   const modelData = editorModels.get(absolutePath)
-  if (!cmEditorView || !modelData) {
+  const view = getActiveEditorView()
+  if (!view || !modelData) {
     return
   }
 
@@ -4026,10 +4743,10 @@ async function openGlobalSearchResult(filePath, lineNumber, matchStart = 0, matc
   const col = Number(matchStart || 0) + 1
   const endCol = Math.max(col, Number(matchEnd || matchStart || 0) + 1)
 
-  cmEditorView.revealLineInCenter(line)
-  cmEditorView.setSelection(new monaco.Selection(line, col, line, endCol))
-  cmEditorView.setPosition({ lineNumber: line, column: col })
-  cmEditorView.focus()
+  view.revealLineInCenter(line)
+  view.setSelection(new monaco.Selection(line, col, line, endCol))
+  view.setPosition({ lineNumber: line, column: col })
+  view.focus()
 }
 
 async function fetchFileContent(path, agentId = null) {
@@ -4107,12 +4824,10 @@ async function refreshEditorTabFromRemote(path, showAutoRefreshToast = false) {
   const modelData = editorModels.get(path)
   if (modelData && modelData.content !== content) {
     modelData.content = content
-    // 如果当前激活的标签是这个文件，更新编辑器内容
-    if (activeEditorTabPath.value === path && cmEditorView) {
-      const model = cmEditorView.getModel()
-      if (model && !model.isDisposed()) {
-        model.setValue(content)
-      }
+    // 模型是共享的：直接更新 model 内容，所有打开该文件的 pane 都会同步
+    const model = modelData.model
+    if (model && !model.isDisposed()) {
+      model.setValue(content)
     }
   }
 
@@ -4181,6 +4896,9 @@ async function openEditorFile(path, agentId = null) {
   if (!path) return
 
   showEditorPanel.value = true
+  // 自由分割模式：把「激活 pane」切换到 file 视图（若该 pane 原本是会话，则替换为文件）。
+  // 未分割时 setActivePaneView 返回 false，走下方原有路径（零回归）。
+  setActivePaneView('file')
   // 打开文件属于「文件视图」：若主区域当前停在 chat/terminal/session，需先切回文件视图，
   // 否则文件（及 diff）会被这些内容挡住。
   showEditorFileView()
@@ -4192,6 +4910,8 @@ async function openEditorFile(path, agentId = null) {
 
   const existingTab = getEditorTabByPath(path)
   if (existingTab) {
+    // 已分割：把该文件登记到「激活 pane」的标签列表（同一文件可同时出现在多个 pane）
+    if (isEditorSplit.value) addPaneTab(activePaneId.value, path)
     activateEditorTab(path)
     return
   }
@@ -4222,6 +4942,8 @@ async function openEditorFile(path, agentId = null) {
   const activeSession = activeEditorSession.value
   activeSession.tabs.push(tab)
   activeSession.activeTabPath = path
+  // 已分割：新文件登记到「激活 pane」的标签列表
+  if (isEditorSplit.value) addPaneTab(activePaneId.value, path)
 
   try {
     const [content, fileStat] = await Promise.all([
@@ -4305,10 +5027,20 @@ async function saveActiveEditorTab() {
   await saveEditorTab(activeEditorTab.value.path)
 }
 
+// 保存指定 pane 当前绑定的文件（每个 pane 内的保存按钮调用）
+async function savePaneEditorFile(paneId) {
+  const path = editorViewPanes.get(paneId)
+  if (!path) return
+  await saveEditorTab(path)
+}
+
 function toggleEditorEditable() {
   isEditorEditable.value = !isEditorEditable.value
   if (cmEditorView) {
     cmEditorView.updateOptions({ readOnly: !isEditorEditable.value })
+  }
+  for (const [, view] of editorViews) {
+    view.updateOptions({ readOnly: !isEditorEditable.value })
   }
 }
 
@@ -4334,6 +5066,15 @@ function resetEditorHostedPanelState() {
   if (editorHostsTerminal.value) showTerminalPanel.value = false
   if (editorHostsChat.value) showChatPanel.value = false
   editorMainView.value = 'file'
+  // 关闭编辑器时一并收起自由分割，避免下次打开残留多 pane 布局
+  if (isEditorSplit.value) collapseEditorPanes()
+  // 内嵌会话 Panel 只在编辑器内部渲染：编辑器关闭后它们失去宿主，
+  // 若继续留在 panels 中会既不可见、又让 hasNoPanel 恒为 false（宠物大厅不显示）。
+  // 因此关闭编辑器时一并关闭所有非 detach 的会话 Panel（detach 的浮动面板保留）。
+  for (const panel of [...panels.value]) {
+    if (!sessionDetachedPanels.value.has(panel.id)) closePanel(panel.id)
+  }
+  editorSessionPanelId.value = null
 }
 
 async function closeEditorPanel() {
@@ -4457,13 +5198,35 @@ function confirmCloseDirtyEditorTab(path) {
   })
 }
 
-async function closeEditorTab(path) {
+async function closeEditorTab(path, paneId = null) {
   const tab = getEditorTabByPath(path)
   if (!tab) return
 
   if (tab.isDirty) {
     const confirmed = await confirmCloseDirtyEditorTab(path)
     if (!confirmed) return
+  }
+
+  // 已分割且指定了 pane：只从该 pane 的标签列表移除。
+  // 若该文件仍被其他 pane 引用，则不销毁模型、也不从全局 tabs 移除，
+  // 其他 pane 的编辑器保持原样（这正是「关闭一个 pane 的标签不影响另一个」的关键）。
+  let closedFromPane = false
+  if (paneId && isEditorSplit.value) {
+    closedFromPane = true
+    removePaneTab(paneId, path)
+    const panePaths = editorPaneTabs.get(paneId) || []
+    if (editorViewPanes.get(paneId) === path) {
+      const nextPath = panePaths[panePaths.length - 1] || null
+      if (nextPath) {
+        activateEditorTab(nextPath)
+      } else {
+        editorViewPanes.delete(paneId)
+        const view = editorViews.get(paneId)
+        if (view) view.setModel(null)
+      }
+    }
+    if (isPathReferencedByAnyPane(path)) return
+    // 没有其他 pane 引用该文件：继续走下方全局清理（释放模型 / LSP / 全局 tab）
   }
 
   const session = activeEditorSession.value
@@ -4487,16 +5250,26 @@ async function closeEditorTab(path) {
 
   if (wasActive) {
     const nextTab = session.tabs[index] || session.tabs[index - 1] || null
-    if (nextTab) {
+    // 从某个 pane 关闭标签时，该 pane 的「下一个标签 / 清空」已在上面处理完毕；
+    // 这里若再激活全局下一个标签，会把别的 pane 的文件错误地绑到该 pane 上。
+    if (closedFromPane) {
+      // 该 pane 的视图已在上方处理；这里只把全局「激活文件」修正为仍存在的标签，
+      // 避免它继续指向已删除的 path。
+      session.activeTabPath = nextTab ? nextTab.path : null
+    } else if (nextTab) {
       activateEditorTab(nextTab.path)
     } else {
       session.activeTabPath = null
       // 不销毁编辑器实例，保留编辑器和容器 DOM，
       // 否则 v-if/v-else 切换会导致 editorContainerRef 消失，
       // 后续打开文件时无法重新创建编辑器。
-      // 仅清空模型即可。
+      // 仅清空模型即可（所有 pane 的实例一并清空）。
       if (cmEditorView) {
         cmEditorView.setModel(null)
+      }
+      for (const [pid, view] of editorViews) {
+        view.setModel(null)
+        editorViewPanes.delete(pid)
       }
     }
   }
@@ -5932,8 +6705,46 @@ function activatePanel(panelId) {
   }
 }
 
+// 已分割时把 Agent 打开到「激活 pane」中（需求：新建 Panel 落在激活区域；
+// 若该区域已有 Panel，则关闭旧的、新的覆盖）。返回 true 表示已处理。
+// 说明：只操作激活 pane，绝不动其他 pane 承载的 Panel（否则会把别的区域的会话清掉）。
+function openAgentInActivePane(agent) {
+  const activePaneLeaf = activePane.value
+  if (!activePaneLeaf) return false
+  // 激活 pane 已承载的 Panel：就地覆盖（清掉旧 Agent 的 Panel 级状态）
+  const hostedPanel = activePaneLeaf.view === 'session' && activePaneLeaf.sessionPanelId
+    ? panels.value.find(p => p.id === activePaneLeaf.sessionPanelId)
+    : null
+  let targetPanel = hostedPanel
+  if (targetPanel) {
+    if (targetPanel.agentId && targetPanel.agentId !== agent.agent_id) {
+      closeAgentInPanel(targetPanel.id)
+    }
+  } else {
+    if (panels.value.length >= MAX_PANELS) {
+      showToast(`最多支持 ${MAX_PANELS} 个 Panel`, 'warning')
+      return true
+    }
+    targetPanel = {
+      id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      agentId: null
+    }
+    panels.value.push(targetPanel)
+  }
+  targetPanel.agentId = agent.agent_id
+  activePanelId.value = targetPanel.id
+  editorSessionPanelId.value = targetPanel.id
+  setActivePaneView('session', targetPanel.id)
+  switchAgent(agent)
+  nextTick(() => maybeStartTour('panel'))
+  return true
+}
+
 // 在 Panel 中打开 Agent（替代 switchAgent）
 function openAgentInPanel(agent, panelId = null) {
+  // 所有内嵌 Panel 都只在编辑器内部渲染：从宠物大厅等入口打开 Agent 时，
+  // 必须确保编辑器处于打开状态，否则 Panel 会失去宿主而不可见。
+  showEditorPanel.value = true
   // 移动端不支持多 Panel，直接切换
   if (windowWidth.value <= 768) {
     // 从大厅进入 Panel 时推送一条历史状态，使移动端返回键能关闭 Panel 回到大厅
@@ -5953,10 +6764,45 @@ function openAgentInPanel(agent, panelId = null) {
     switchAgent(agent)
     return
   }
+  // 编辑器已内部分割：把 Agent 路由到「激活 pane」中打开（与工作区分割分支对称）。
+  // 否则 Panel 会作为 panel-grid 的整格子项渲染到编辑器外面，用户感知为「Agent 的 panel 跑出编辑器」。
+  if (isEditorSplit.value) {
+    const existingPanel = panels.value.find(p => p.agentId === agent.agent_id)
+    if (existingPanel) {
+      const hostingPane = findEditorPaneBySessionPanelId(existingPanel.id)
+      if (hostingPane) {
+        activateEditorPane(hostingPane.id)
+      } else {
+        setActivePaneView('session', existingPanel.id)
+      }
+      activePanelId.value = existingPanel.id
+      switchAgent(agent)
+      editorSessionPanelId.value = existingPanel.id
+      return
+    }
+    // 显式指定 panelId（如命令面板）：直接把它放到激活 pane。
+    if (panelId) {
+      const targetPanel = panels.value.find(p => p.id === panelId)
+      if (targetPanel) {
+        targetPanel.agentId = agent.agent_id
+        activePanelId.value = targetPanel.id
+        editorSessionPanelId.value = targetPanel.id
+        setActivePaneView('session', targetPanel.id)
+        switchAgent(agent)
+        return
+      }
+    }
+    // 需求：新建的 Panel 落在「激活 pane」里；若该 pane 已有 Panel，则关闭旧的、新的覆盖。
+    openAgentInActivePane(agent)
+    return
+  }
   // 如果该 Agent 已在某个 Panel 中打开，直接激活该 Panel
   const existingPanel = panels.value.find(p => p.agentId === agent.agent_id)
   if (existingPanel) {
     activePanelId.value = existingPanel.id
+    // 该 Panel 可能尚未被编辑器主区域承载（例如从宠物大厅进入），补上会话视图归属
+    editorSessionPanelId.value = existingPanel.id
+    setEditorMainView('session')
     switchAgent(agent)
     return
   }
@@ -5981,6 +6827,10 @@ function openAgentInPanel(agent, panelId = null) {
   }
   targetPanel.agentId = agent.agent_id
   activePanelId.value = targetPanel.id
+  // 内嵌 Panel 只在编辑器内部渲染：把该 Panel 交给编辑器主区域的会话视图承载，
+  // 否则 Panel 会失去宿主而不可见（编辑器停在文件视图）。
+  editorSessionPanelId.value = targetPanel.id
+  setEditorMainView('session')
   // 切换当前 Agent
   switchAgent(agent)
   // 首次打开对话面板时展示 Panel 场景引导（等 Panel 挂载后再触发，确保高亮目标存在）
@@ -6198,8 +7048,22 @@ function getPanelHistoryState(panel) {
 }
 
 // 编辑器主区域是否正在承载聊天室 / 终端（此时独立面板让位，避免同一状态被两个实例争抢）
-const editorHostsChat = computed(() => showEditorPanel.value && editorMainView.value === 'chat')
-const editorHostsTerminal = computed(() => showEditorPanel.value && editorMainView.value === 'terminal')
+// 两种承载方式：① 未分割时 editorMainView === 'chat'/'terminal'；
+//              ② 已分割时某个 pane 的 view === 'chat'/'terminal'（host 单例，至多一个）。
+const editorHostsChat = computed(() =>
+  showEditorPanel.value && (
+    isEditorSplit.value
+      ? !!findEditorPaneByView('chat')
+      : editorMainView.value === 'chat'
+  )
+)
+const editorHostsTerminal = computed(() =>
+  showEditorPanel.value && (
+    isEditorSplit.value
+      ? !!findEditorPaneByView('terminal')
+      : editorMainView.value === 'terminal'
+  )
+)
 // 编辑器主区域是否正在承载会话面板（此时网格中对应 panel 让位，避免同一 xterm host 被两实例争抢）
 const editorHostsSession = computed(() => showEditorPanel.value && editorMainView.value === 'session')
 // 编辑器主区域会话视图当前显示的 panel（由编辑器侧边栏 Agent 列表点击决定）
@@ -6209,6 +7073,13 @@ const editorSessionPanelId = ref(null)
 // 该 panel 会「凭空」出现在网格里，把布局挤乱（用户期望的是替换，而非并存）。
 const editorHostedPanel = computed(() => {
   if (!showEditorPanel.value || !editorSessionPanelId.value) return null
+  // 自由分割模式：panel 由某个 pane 承载时才让它从网格让位；
+  // 若没有任何 pane 承载它（例如承载它的 pane 被切成了 file/chat/terminal），
+  // 则回到网格渲染，避免 panel「凭空消失」。
+  if (isEditorSplit.value) {
+    const hostingPane = findEditorPaneBySessionPanelId(editorSessionPanelId.value)
+    if (!hostingPane) return null
+  }
   return panels.value.find(p => p.id === editorSessionPanelId.value) || null
 })
 // 编辑器会话视图对应的 panel：优先取记录的面板，回退到当前激活/首个已绑定 Agent 的面板
@@ -6221,19 +7092,13 @@ const editorSessionPanel = computed(() => {
   return panels.value.find(p => p.agentId) || null
 })
 
-// 内嵌面板数量（非 detach 且可见的面板）
+// 网格内实际渲染的顶层子项数量（用于 panel-grid 的列/行布局）。
+// 注意：会话/终端/聊天面板一律只在编辑器面板内部渲染（或作为浮动面板），
+// 它们不是 panel-grid 的直接子项，因此绝不能计入网格布局，否则会出现
+// 「网格被切成两列、但只有一个子项」→ 编辑器只占半宽、右侧空白的现象。
 const embeddedPanelCount = computed(() => {
-  let count = 0
-  // 被编辑器主区域承载的终端/聊天面板不参与网格布局（模板中不会渲染独立实例）
-  if (showTerminalPanel.value && !terminalDetached.value && !editorHostsTerminal.value) count++
-  if (showChatPanel.value && !chatDetached.value && !editorHostsChat.value) count++
-  if (showEditorPanel.value && !editorDetached.value) count++
-  // 内嵌 SessionPanel 数量 = 总面板数 - 已 detach 的面板数 - 被编辑器承载的面板数
-  const hostedPanelId = editorHostedPanel.value?.id
-  count += panels.value.filter(p =>
-    !sessionDetachedPanels.value.has(p.id) && p.id !== hostedPanelId
-  ).length
-  return count
+  // 网格唯一子项是编辑器面板（未打开时为空状态）
+  return showEditorPanel.value && !editorDetached.value ? 1 : 0
 })
 
 // 当前是否没有任何可见的内嵌 Panel（用于展示空状态欢迎背景）
@@ -6248,11 +7113,6 @@ const agentListLoaded = ref(false)
 watch([hasNoPanel, agentListLoaded], ([noPanel, loaded]) => {
   if (noPanel && loaded) maybeStartTour('lobby')
 }, { immediate: true })
-
-// 首次打开 Agent 侧边栏时展示侧边栏场景引导
-watch(showAgentSidebar, (visible) => {
-  if (visible) maybeStartTour('sidebar')
-})
 
 // 获取 Panel 的布局样式
 function getPanelLayout() {
@@ -7240,16 +8100,6 @@ function toggleBatchMode() {
   }
 }
 
-// 处理 Agent item 点击事件
-function handleAgentItemClick(agent, event) {
-  if (isBatchMode.value) {
-    // 多选模式下，点击整个 item 只切换选择状态，不切换 agent
-    toggleSelectAgent(agent.agent_id)
-  } else {
-    // 正常模式下，在 Panel 中打开 agent
-    openAgentInPanel(agent)
-  }
-}
 
 // 编辑器侧边栏 Agent 列表点击：把该 Agent 的会话显示到编辑器主区域（一次一个）
 // 编辑器会话视图是单会话的：切换 Agent 时复用同一个 Panel 覆盖 agentId，
@@ -7272,10 +8122,26 @@ function onEditorSidebarAgentClick(agent) {
   // 该 Agent 已在某个 Panel 中：直接显示那个 Panel（不新建）
   const existingPanel = panels.value.find(p => p.agentId === agent.agent_id)
   if (existingPanel) {
+    // 自由分割模式：优先把「激活 pane」切到该 Panel；若该 Panel 已被别的 pane 承载，
+    // 则聚焦到那个 pane（避免同一 panel 出现在两个 pane 中）。
+    if (isEditorSplit.value) {
+      const hostingPane = findEditorPaneBySessionPanelId(existingPanel.id)
+      if (hostingPane) {
+        activateEditorPane(hostingPane.id)
+      } else {
+        setActivePaneView('session', existingPanel.id)
+      }
+    }
     activePanelId.value = existingPanel.id
     switchAgent(agent)
     editorSessionPanelId.value = existingPanel.id
     setEditorMainView('session')
+    return
+  }
+  // 自由分割模式：把 Agent 打开到「激活 pane」中（若该区域已有 Panel 则覆盖），
+  // 绝不复用其他 pane 承载的 Panel，否则会把那个区域的会话清掉。
+  if (isEditorSplit.value) {
+    openAgentInActivePane(agent)
     return
   }
   // 否则复用编辑器当前承载的 Panel（没有则回退到激活 Panel / 新建）
@@ -7293,6 +8159,8 @@ function onEditorSidebarAgentClick(agent) {
     closeAgentInPanel(targetPanel.id)
   }
   targetPanel.agentId = agent.agent_id
+  // 自由分割模式：把「激活 pane」切到 session 视图并承载该 Panel
+  setActivePaneView('session', targetPanel.id)
   activePanelId.value = targetPanel.id
   switchAgent(agent)
   editorSessionPanelId.value = targetPanel.id
@@ -7583,7 +8451,7 @@ const WELCOME_TOUR_STEPS = [
     id: 'welcome-toolbar',
     icon: '🧰',
     title: '右上角工具条',
-    desc: '右上角常驻一条工具条：📋 打开 Agent 侧边栏（Ctrl+A）、💬 打开聊天室、💻 打开终端面板、⌘ 打开命令面板（Ctrl+P）、⚙ 打开设置；管理员还会看到 🛡️ 管理入口。',
+    desc: '右上角常驻一条工具条：💬 打开聊天室、💻 打开终端面板、⌘ 打开命令面板（Ctrl+P）、⚙ 打开设置；管理员还会看到 🛡️ 管理入口。Agent 列表在编辑器面板的侧边栏中（Ctrl+A 打开）。',
     hint: '工具条可拖动（拖到屏幕左/右边缘会自动收起，露出窄边条点击即可展开）；长按左下角的主宠物，可用一句话快速创建 Agent（Ctrl+Alt+N）。',
   },
   {
@@ -7591,7 +8459,7 @@ const WELCOME_TOUR_STEPS = [
     icon: '⌘',
     title: '命令面板',
     desc: '按 Ctrl+P（Mac 为 ⌘+P）或点工具条的 ⌘ 打开命令面板：动作按分组排列（当前 Agent、执行、界面、网关、管理、账号、节点、大厅等），输入关键词即可搜索，回车执行。',
-    hint: '很多动作带快捷键（如 Ctrl+N 新建 Agent、Ctrl+A 侧边栏、Ctrl+Alt+K 中断当前 Agent）；命令面板是「几乎所有操作」的统一入口，记不住快捷键时用它最方便。',
+    hint: '很多动作带快捷键（如 Ctrl+N 新建 Agent、Ctrl+A 打开编辑器侧边栏的 Agent 列表、Ctrl+Alt+K 中断当前 Agent）；命令面板是「几乎所有操作」的统一入口，记不住快捷键时用它最方便。',
   },
   {
     id: 'welcome-more',
@@ -7604,7 +8472,7 @@ const WELCOME_TOUR_STEPS = [
     id: 'welcome-start',
     icon: '🚀',
     title: '开始使用',
-    desc: '点击右上角 📋 打开 Agent 侧边栏，用其中的「➕」创建第一个 Agent（也可按 Ctrl+N）；双击宠物打开对话面板，在底部输入框描述需求后发送（单行模式按 Enter，或按 Ctrl+Enter / Ctrl+D）。',
+    desc: '按 Ctrl+A 打开编辑器面板侧边栏的 Agent 列表，用其中的「➕」创建第一个 Agent（也可按 Ctrl+N）；双击宠物打开对话面板，在底部输入框描述需求后发送（单行模式按 Enter，或按 Ctrl+Enter / Ctrl+D）。',
     hint: '随时可在命令面板（Ctrl+P）里搜索「引导」重新查看，或搜索「重置新手引导」让各场景引导重新触发。',
   },
 ]
@@ -7652,7 +8520,7 @@ function LOBBY_TOUR_STEPS() {
       id: 'lobby-create',
       icon: '➕',
       title: '创建 Agent',
-      desc: '点击右上角 📋 打开 Agent 侧边栏（也可按 Ctrl+A），用其中的「➕」创建 Agent（也可按 Ctrl+N），选择节点、Agent 类型与工作目录即可创建；还可以双击大厅中的节点，直接在指定节点上创建。',
+      desc: '按 Ctrl+A 打开编辑器面板侧边栏的 Agent 列表，用其中的「➕」创建 Agent（也可按 Ctrl+N），选择节点、Agent 类型与工作目录即可创建；还可以双击大厅中的节点，直接在指定节点上创建。',
       hint: '代码 Agent（jca）擅长读代码、改代码、跑验证；通用 Agent（jvs）适合分析、规划与执行。长按左下角的主宠物可用一句话快速创建 Agent（Ctrl+Alt+N）。',
       target: '.global-toolbar',
       placement: 'bottom',
@@ -7702,8 +8570,8 @@ function AGENT_TOUR_STEPS() {
     {
       id: 'agent-sidebar',
       icon: '📋',
-      title: 'Agent 侧边栏',
-      desc: '点击右上角的 📋 打开侧边栏，可查看全部 Agent、批量选择、按节点或自定义分组浏览。',
+      title: 'Agent 列表',
+      desc: '按 Ctrl+A 打开编辑器面板侧边栏的 Agent 列表，可查看全部 Agent、批量选择、按节点或自定义分组浏览。',
       hint: '侧边栏中可批量复制、批量删除、加入分组；单个 Agent 的重命名/复制/权限管理/无损重生/删除在命令面板（Ctrl+P）的「当前 Agent」组中。',
       target: '.global-toolbar',
       placement: 'bottom',
@@ -7721,7 +8589,7 @@ function AGENT_TOUR_STEPS() {
       id: 'agent-groups',
       icon: '🗂',
       title: '自定义分组',
-      desc: 'Agent 多了以后，可在侧边栏的「管理分组」中把 Agent 归入自定义分组，分组可折叠，便于按项目或用途归类。',
+      desc: 'Agent 多了以后，可在编辑器侧边栏的「管理分组」中把 Agent 归入自定义分组，分组可折叠，便于按项目或用途归类。',
       hint: 'Agent 停止后会自动从分组中移除，避免分组里堆积无效条目。',
       target: '.global-toolbar',
       placement: 'bottom',
@@ -7789,16 +8657,16 @@ function PANEL_TOUR_STEPS() {
   ]
 }
 
-// 侧边栏场景：首次打开 Agent 侧边栏后展示
+// 侧边栏场景：首次打开编辑器内的 Agent 列表视图后展示
 function SIDEBAR_TOUR_STEPS() {
   return [
     {
       id: 'sidebar-list',
       icon: '📋',
       title: 'Agent 列表',
-      desc: '侧边栏按节点与自定义分组列出全部 Agent，每项显示类型、名称、状态与工作目录；点击即可在面板中打开它。',
+      desc: '编辑器侧边栏按节点与自定义分组列出全部 Agent，每项显示类型、名称、状态与工作目录；点击即可在编辑器中打开它。',
       hint: '等待输入的 Agent 会高亮闪烁，提醒你及时处理。',
-      target: '.agent-sidebar',
+      target: '.editor-sidebar-agents',
       placement: 'right',
     },
     {
@@ -7807,7 +8675,7 @@ function SIDEBAR_TOUR_STEPS() {
       title: 'Agent 右键菜单',
       desc: '在任一 Agent 项上右键，可就地执行查看变更、创建终端、打开编辑器、重命名、复制、权限管理、无损重生、删除等操作，无需先打开面板。',
       hint: '菜单内容与命令面板（Ctrl+P）的「当前 Agent」组一致，作用于被右键的那个 Agent。',
-      target: '.agent-item',
+      target: '.editor-sidebar-agents .agent-item',
       placement: 'right',
     },
     {
@@ -7816,7 +8684,7 @@ function SIDEBAR_TOUR_STEPS() {
       title: '批量操作',
       desc: '点击侧边栏顶部的「☑」进入批量选择模式，可勾选多个 Agent 后批量复制、加入分组或删除。',
       hint: '批量删除不可恢复，操作前请确认选中的 Agent。',
-      target: '.agent-sidebar',
+      target: '.editor-sidebar-agents',
       placement: 'right',
     },
     {
@@ -7825,7 +8693,7 @@ function SIDEBAR_TOUR_STEPS() {
       title: '管理分组',
       desc: '点击侧边栏顶部的「📁」可重命名或删除自定义分组；分组可折叠，便于按项目或用途归类 Agent。',
       hint: 'Agent 停止后会自动从分组中移除，避免分组里堆积无效条目。',
-      target: '.agent-sidebar',
+      target: '.editor-sidebar-agents',
       placement: 'right',
     },
   ]
@@ -7872,8 +8740,8 @@ function finishTour() {
 function startOnboarding(tourId = 'welcome') {
   clearOnboardingTimer()
   activeTourId.value = tourId
-  // 侧边栏场景需先展开侧边栏，否则引导目标不可见
-  if (tourId === 'sidebar') showAgentSidebar.value = true
+  // 侧边栏场景需先打开编辑器并切到 Agent 列表视图，否则引导目标不可见
+  if (tourId === 'sidebar') openEditorAgentList()
 }
 // 命令面板上下文：统一暴露宠物菜单与命令面板共用的动作回调
 const commandPaletteCtx = computed(() => ({
@@ -7896,11 +8764,11 @@ const commandPaletteCtx = computed(() => ({
   openAdminRestartService: () => openAdminSystemAction('restart'),
   openAdminSyncConfig: () => openAdminSystemAction('sync-config'),
   openAdminNodeSecret: () => openAdminSystemAction('node-secret'),
-  toggleAgentSidebar,
+  openEditorAgentList,
   toggleTerminalPanel,
   toggleChatPanel,
-  // 打开侧边栏的「管理分组」弹窗（重命名 / 删除）
-  manageGroups: () => { agentSidebarRef.value?.openManageGroups?.() },
+  // 打开编辑器侧边栏的「管理分组」弹窗（重命名 / 删除）
+  manageGroups: () => { editorPanelRef.value?.openManageGroups?.() },
   openTopology: openTopologyOverlay,
   openSettings: () => { showSettingsModal.value = true },
   openDocs: openDocs,
@@ -10524,6 +11392,13 @@ async function fetchAgentList() {
       // 主动同步在线 agent 的执行状态（如等待输入），
       // 避免因错过 WebSocket 推送导致状态停留在 running。
       syncOnlineAgentStatuses()
+
+      // 首次拉取到 Agent 后自动打开编辑器（唯一容器），让用户直接进入工作区；
+      // 无 Agent 时保持关闭，露出宠物大厅作为欢迎页。
+      if (!editorAutoOpened && agentList.value.length > 0) {
+        editorAutoOpened = true
+        showEditorPanel.value = true
+      }
     }
     
     // 更新当前 Agent 状态
@@ -11092,8 +11967,6 @@ async function saveAgentAccess() {
 
 // 删除 Agent
 async function deleteAgent(agentId) {
-  // 隐藏 agent 侧边栏，避免遮挡确认对话框（仅移动端）
-  if (windowWidth.value <= 768) showAgentSidebar.value = false
   showConfirm(
     '确认删除该 Agent？删除后将无法恢复，且会清除所有历史记录。',
     async () => {
@@ -11163,8 +12036,6 @@ async function deleteAgent(agentId) {
 // 无损重生 Agent - 保存会话 → 删除 → 重建 → 恢复会话
 async function regenerateAgent(agent) {
   if (!agent || !agent.agent_id) return
-  // 隐藏 agent 侧边栏，避免遮挡确认对话框（仅移动端）
-  if (windowWidth.value <= 768) showAgentSidebar.value = false
   showConfirm(
     `确认无损重生 Agent「${agent.name || agent.agent_id}」？\n\n将保存当前会话后删除并重建，配置（模型组/工具组/任务等）将保留。`,
     async () => {
@@ -11270,8 +12141,6 @@ async function batchDeleteAgents() {
     showToast('请先选择要删除的 Agent', 'warning')
     return
   }
-  // 隐藏 agent 侧边栏，避免遮挡确认对话框（仅移动端）
-  if (windowWidth.value <= 768) showAgentSidebar.value = false
   showConfirm(
     `确认删除选中的 ${selectedIds.length} 个 Agent？删除后将无法恢复，且会清除所有历史记录。`,
     async () => {
@@ -11672,11 +12541,6 @@ function onLobbyComplete(agentId) {
 async function switchAgent(agent) {
   // 递增切换代数，使旧的switchAgent操作失效
   const thisGeneration = ++switchGeneration.value
-
-  // 移动端：切换 agent 后自动隐藏侧边栏（放在最前面，确保无论什么情况都执行）
-  if (windowWidth.value <= 768) {
-    showAgentSidebar.value = false
-  }
 
   // 如果 Agent 已停止，不触发任何网络活动（不查询状态、不连接 WebSocket）
   if (agent.status === 'stopped') {
@@ -15575,18 +16439,17 @@ function handleGlobalKeydown(event) {
     return
   }
 
-  // Ctrl + A 打开/隐藏 Agent 侧边栏
+  // Ctrl + A 打开编辑器面板的「Agent 列表」视图（原全局 Agent 侧边栏）
   if (event.ctrlKey && !event.altKey && event.key === 'a') {
     // 如果在输入框中，不触发快捷键（允许默认的全选行为）
     const tagName = event.target.tagName.toLowerCase()
     if (tagName === 'textarea' || tagName === 'input') {
       return
     }
-    
+
     event.preventDefault()
-    
-    // 切换 Agent 侧边栏显示状态
-    showAgentSidebar.value = !showAgentSidebar.value
+
+    openEditorAgentList()
   }
   
   // Ctrl + ` 打开/隐藏终端面板
@@ -15641,11 +16504,30 @@ function handleGlobalKeydown(event) {
     }
   }
 
+  // Ctrl/Cmd + \ 左右分割当前激活 pane；Ctrl/Cmd + Shift + \ 上下分割
+  // 仅在编辑器已打开（file 视图）且非移动端时生效；未分割时先分割激活 pane。
+  if (isModifierPressed && !event.altKey && event.code === 'Backslash') {
+    if (editorMainView.value === 'file' && windowWidth.value > 768) {
+      event.preventDefault()
+      splitEditorPane(activePaneId.value, event.shiftKey ? 'column' : 'row')
+      return
+    }
+  }
+
   // Ctrl/Cmd + W 关闭当前焦点所在的面板（需拦截浏览器原生关闭标签页行为）
   // 焦点在面板内（终端/编辑器/聊天/会话面板）时优先关闭该面板；
   // 焦点不在任何面板内（即处于宠物大厅）且有激活宠物时，改为「隐藏该 Agent 输出并取消选中」
   if (isModifierPressed && !event.altKey && event.code === 'KeyW') {
     event.preventDefault()
+    // 编辑器处于分割态且焦点在编辑器工作区内：Ctrl+W 优先关闭「激活 pane」（VS Code 语义）
+    if (isEditorSplit.value && editorMainView.value === 'file' && windowWidth.value > 768) {
+      const editorZone = getFocusedZoneKey()
+      const namedKey = getNamedPanelFocusKey()
+      if (editorZone === 'editor' || namedKey === 'editor') {
+        closeEditorPane(activePaneId.value)
+        return
+      }
+    }
     // 命名面板（terminal/editor/chat）内：即使焦点未落在可聚焦元素上（仅鼠标点击过面板），
     // 也应关闭该面板，而不是被大厅逻辑拦截
     if (!getFocusedZoneKey() && !getNamedPanelFocusKey()) {
@@ -15733,10 +16615,7 @@ function handleGlobalKeydown(event) {
       showMobileMenu.value = false
     }
     
-    // ESC 键也关闭Agent侧边栏和终端面板（移动端）
-    if (showAgentSidebar.value && windowWidth.value <= 768) {
-      showAgentSidebar.value = false
-    }
+    // ESC 键也关闭终端面板（移动端）
     if (showTerminalPanel.value && windowWidth.value <= 768) {
       showTerminalPanel.value = false
     }
@@ -15847,8 +16726,9 @@ function getFocusZones() {
       focus: () => {
         focusWindow('editor')
         nextTick(() => {
-          if (cmEditorView) {
-            cmEditorView.focus()
+          const view = getActiveEditorView()
+          if (view) {
+            view.focus()
             return
           }
           // 无编辑器内容时，回退聚焦编辑器内首个可聚焦控件（如活动栏按钮），
@@ -16012,13 +16892,15 @@ const pushOverlayState = () => {
   }
 }
 
-// 打开/关闭Agent侧边栏（移动端处理history）
-const toggleAgentSidebar = () => {
-  const newState = !showAgentSidebar.value
-  showAgentSidebar.value = newState
-  if (newState && windowWidth.value <= 768) {
-    pushOverlayState()
+// 打开编辑器面板并切到「Agent 列表」视图（原全局 Agent 侧边栏的唯一入口）
+const openEditorAgentList = () => {
+  if (!showEditorPanel.value) {
+    showEditorPanel.value = true
+    if (windowWidth.value <= 768) {
+      pushOverlayState()
+    }
   }
+  setEditorSidebarView('agents')
 }
 
 // 打开/关闭终端面板（移动端处理history）
@@ -16142,6 +17024,8 @@ watch(
 )
 
 onMounted(() => {
+  // 阶段4：恢复上次的编辑器分割布局（非法数据自动回退默认单 leaf）
+  restoreEditorPaneLayout()
   // 不再在页面加载时创建终端，改为动态创建
 
   // 启动心跳机制
@@ -16185,17 +17069,19 @@ onMounted(() => {
   handleResize = () => {
     windowWidth.value = window.innerWidth
     updateViewportHeight()
-    ensureAgentSidebarWidthInBounds()
     ensureEditorPanelInViewport()
     ensureTerminalPanelInViewport()
     sessionDetachedPanels.value.forEach(panelId => {
       ensureSessionPanelInViewport(panelId)
       saveSessionPanelRect(panelId)
     })
-    saveAgentSidebarWidth()
     saveEditorPanelRect()
     saveTerminalPanelRect()
-    layoutMonacoEditor()
+    // 已分割时每个 Monaco 实例自带 automaticLayout(ResizeObserver)，会自行跟随容器尺寸，
+    // 此处不再逐个 layout()（否则 resize → layout → 尺寸变化 → 再 layout 会形成震荡）。
+    if (!isEditorSplit.value) {
+      layoutMonacoEditor()
+    }
     // 视口跨过移动端断点时，diff 的并排/内联需重新应用（Monaco 不会自动跟随）
     if (gitDiffEditor) {
       gitDiffEditor.updateOptions({
@@ -16239,8 +17125,6 @@ onMounted(() => {
         cancelSessionDialog()
       } else if (showDirDialog.value) {
         cancelDirDialog()
-      } else if (showAgentSidebar.value && windowWidth.value <= 768) {
-        showAgentSidebar.value = false
       } else if (showTerminalPanel.value && windowWidth.value <= 768) {
         showTerminalPanel.value = false
       } else if (showMobileMenu.value) {
@@ -16295,7 +17179,6 @@ onUnmounted(() => {
     heartbeatTimer = null
   }
   
-  stopAgentSidebarResize()
   stopEditorPanelInteraction()
   stopEditorFileHeartbeat()
   window.visualViewport?.removeEventListener('resize', visualViewportResizeHandler)
@@ -16304,6 +17187,11 @@ onUnmounted(() => {
     cmEditorView.dispose()
     cmEditorView = null
   }
+  for (const [, view] of editorViews) {
+    view.dispose()
+  }
+  editorViews.clear()
+  editorViewPanes.clear()
   for (const modelData of editorModels.values()) {
     if (modelData.model && !modelData.model.isDisposed()) {
       modelData.model.dispose()
@@ -16994,6 +17882,157 @@ body::-webkit-scrollbar {
 }
 
 .editor-main-embed-view > * {
+  flex: 1;
+  min-height: 0;
+}
+
+/* 自由分割：每个 pane 的内容容器（撑满 leaf body） */
+.editor-pane-content-slot {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-pane-content-slot > * {
+  flex: 1;
+  min-height: 0;
+}
+
+/* 自由分割：file pane 内部的标签栏固定高度，不参与 flex 撑满 */
+.editor-pane-content-slot > .editor-pane-tabs {
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+/* 自由分割：每个 pane 自己的保存 / 只读按钮，固定在标签栏右侧不随标签滚动 */
+.editor-pane-actions {
+  position: sticky;
+  right: 0;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: 6px;
+  background: var(--color-bg-secondary, #1e1e1e);
+}
+
+.editor-pane-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.editor-pane-action:hover:not(:disabled) {
+  background: var(--color-bg-hover, rgba(255, 255, 255, 0.08));
+}
+
+.editor-pane-action.editable {
+  color: var(--color-accent, #4a9eff);
+}
+
+.editor-pane-action:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* 自由分割：非激活 pane 的占位 */
+.editor-pane-placeholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px;
+  color: var(--color-text-secondary);
+  text-align: center;
+  cursor: pointer;
+}
+/* 自由分割：非激活 file pane 的只读预览（内容可见但不可编辑，避免误以为编辑器消失） */
+.editor-pane-preview {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--color-bg-secondary);
+}
+.editor-pane-preview-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-primary);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.editor-pane-preview-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.editor-pane-preview-hint {
+  flex: 0 0 auto;
+  opacity: 0.7;
+}
+.editor-pane-preview-body {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 8px 10px;
+  overflow: auto;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--color-text-secondary);
+  white-space: pre;
+  tab-size: 4;
+  user-select: text;
+}
+
+/* 自由分割：session leaf 内的会话面板容器 */
+.editor-pane-session-wrap {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.editor-pane-session-wrap > * {
+  flex: 1;
+  min-height: 0;
+}
+
+/* 自由分割：chat / terminal leaf 内的面板容器（与 session leaf 同型） */
+.editor-pane-embed-wrap {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.editor-pane-embed-wrap > * {
   flex: 1;
   min-height: 0;
 }
@@ -18501,6 +19540,8 @@ body::-webkit-scrollbar {
   box-sizing: border-box;
   min-height: 0;
   min-width: 0;
+  /* 「分屏」入口以本容器为定位上下文 */
+  position: relative;
 }
 
 /* 空状态：无任何可见 Panel 时的欢迎背景特效 */

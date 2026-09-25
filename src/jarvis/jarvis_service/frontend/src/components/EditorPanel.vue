@@ -29,7 +29,7 @@
         <span v-if="activeTab" class="editor-panel-subtitle">{{ activeTab.path }}</span>
       </div>
       <div class="editor-panel-actions">
-        <button class="icon-btn" @click.stop="$emit('save')" :disabled="!activeTab || activeTab.loading" title="保存文件">💾</button>
+        <button v-if="!$slots['pane-tree']" class="icon-btn" @click.stop="$emit('save')" :disabled="!activeTab || activeTab.loading" title="保存文件">💾</button>
         <button class="icon-btn maximize-btn" @click="$emit('toggleMaximize')" :title="isMaximized ? '还原' : '最大化'">
           {{ isMaximized ? '🗗' : '🗖' }}
         </button>
@@ -44,7 +44,25 @@
       <span class="editor-toolbar-status" v-else>点击文件树中的文件打开编辑器</span>
       <div class="editor-toolbar-spacer"></div>
       <button
-        v-if="tabs.length > 0"
+        v-if="canSplit"
+        class="editor-edit-toggle"
+        @click="$emit('splitPane', 'row')"
+        title="左右分屏"
+      >
+        <span class="editor-edit-toggle-icon">◫</span>
+        <span class="editor-edit-toggle-text">左右分</span>
+      </button>
+      <button
+        v-if="canSplit"
+        class="editor-edit-toggle"
+        @click="$emit('splitPane', 'column')"
+        title="上下分屏"
+      >
+        <span class="editor-edit-toggle-icon">⬓</span>
+        <span class="editor-edit-toggle-text">上下分</span>
+      </button>
+      <button
+        v-if="tabs.length > 0 && !$slots['pane-tree']"
         class="editor-edit-toggle"
         :class="{ 'editable': isEditable }"
         @click="$emit('toggleEditable')"
@@ -99,8 +117,10 @@
       </div>
       <slot name="sidebar"></slot>
       <div class="editor-panel-content editor-panel-content-main">
-        <!-- 文件标签：只属于「文件视图」，放在主区域顶部（不横跨活动栏/侧边栏） -->
-        <div class="editor-tabs" v-if="mainView === 'file' && tabs.length > 0">
+        <!-- 文件标签：只属于「文件视图」，放在主区域顶部（不横跨活动栏/侧边栏）。
+             自由分割模式下改由各 file pane 内部渲染（见 App.vue #pane-content），
+             此处不再渲染，避免标签栏横跨整个工作区宽度。 -->
+        <div class="editor-tabs" v-if="!$slots['pane-tree'] && mainView === 'file' && tabs.length > 0">
           <div
             v-for="tab in tabs"
             :key="tab.path"
@@ -113,6 +133,10 @@
             <button class="editor-tab-close" @click.stop="$emit('closeTab', tab.path)">✕</button>
           </div>
         </div>
+        <!-- 自由分割模式：由 App.vue 提供整棵 pane 树（含每个 leaf 的内容），
+             此时不再渲染原有的单视图内容，避免两套渲染路径并存。 -->
+        <slot name="pane-tree"></slot>
+        <template v-if="!$slots['pane-tree']">
         <slot name="main-view"></slot>
         <div v-show="mainView === 'file'" class="editor-main-file-view">
           <div v-if="diff" class="editor-diff-view">
@@ -141,6 +165,7 @@
           </div>
           <div v-else ref="editorContainerRef" class="editor-monaco-container"></div>
         </div>
+        </template>
       </div>
     </div>
     <div
@@ -173,7 +198,8 @@ const props = defineProps({
   sidebarView: String,
   mainView: { type: String, default: 'file' },
   resizeDirections: Array,
-  diff: Object
+  diff: Object,
+  canSplit: { type: Boolean, default: false }
 })
 
 const emit = defineEmits([
@@ -195,7 +221,8 @@ const emit = defineEmits([
   'toggleDiffShowFull',
   'diffNavPrev',
   'diffNavNext',
-  'selectAgent'
+  'selectAgent',
+  'splitPane'
 ])
 
 const editorContainerRef = ref(null)
