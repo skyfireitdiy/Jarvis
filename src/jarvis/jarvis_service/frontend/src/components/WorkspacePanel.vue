@@ -109,6 +109,22 @@
           @click="$emit('setMainView', 'terminal')"
           title="终端"
         >⌨️</button>
+        <button
+          class="workspace-activity-button"
+          @click="$emit('openSettings')"
+          title="设置 (Ctrl+Alt+,)"
+        >⚙</button>
+        <button
+          class="workspace-activity-button"
+          @click="$emit('openDocs')"
+          title="使用文档 (Ctrl+Alt+Shift+H)"
+        >❓</button>
+        <button
+          v-if="isAdmin"
+          class="workspace-activity-button"
+          @click="$emit('openAdmin')"
+          title="管理 (Ctrl+Alt+Shift+A)"
+        >🛡️</button>
       </div>
       <slot name="sidebar"></slot>
       <div class="workspace-panel-content workspace-panel-content-main">
@@ -194,7 +210,8 @@ const props = defineProps({
   mainView: { type: String, default: 'file' },
   resizeDirections: Array,
   diff: Object,
-  canSplit: { type: Boolean, default: false }
+  canSplit: { type: Boolean, default: false },
+  isAdmin: { type: Boolean, default: false }
 })
 
 const emit = defineEmits([
@@ -217,7 +234,10 @@ const emit = defineEmits([
   'diffNavPrev',
   'diffNavNext',
   'selectAgent',
-  'splitPane'
+  'splitPane',
+  'openSettings',
+  'openDocs',
+  'openAdmin'
 ])
 
 const editorContainerRef = ref(null)

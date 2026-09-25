@@ -20,60 +20,7 @@
       @openQuickCreate="openQuickCreateAgent"
     />
 
-    <!-- 全局工具条：常驻右上角，承载原顶栏的全部入口（不随面板开关消失；登录界面不显示） -->
-    <div
-      v-if="!showConnectModal"
-      class="global-toolbar"
-      ref="toolbarElRef"
-      :class="{
-        'is-dragging': isDraggingToolbar,
-        'is-collapsed': toolbarCollapsed,
-        'edge-left': toolbarEdge === 'left',
-        'edge-right': toolbarEdge === 'right',
-      }"
-      :style="globalToolbarStyle"
-      @pointerenter="onToolbarPointerEnter"
-      @pointerleave="onToolbarPointerLeave"
-    >
-      <span class="global-toolbar-handle" title="拖动工具条（拖到屏幕边缘可自动隐藏）" @pointerdown="startDragToolbar($event)">⠿</span>
-      <button class="icon-btn chat-btn-wrapper" @click="toggleChatPanel()" :disabled="!socket" title="聊天室 (Ctrl+Alt+H)">
-        💬
-        <span v-if="chatUnreadCount > 0" class="chat-unread-badge">{{ chatUnreadCount > 99 ? '99+' : chatUnreadCount }}</span>
-      </button>
-      <button class="icon-btn" @click="toggleTerminalPanel()" :disabled="!socket" title="终端面板 (Ctrl+`)">
-        💻
-      </button>
-      <button class="icon-btn" @click="toggleWorkspacePanel()" :disabled="!socket" title="编辑器 (Ctrl+E)">
-        📝
-      </button>
-      <button class="icon-btn" @click="openCommandPalette()" title="命令面板 (Ctrl+P)">
-        ⌘
-      </button>
-      <button class="icon-btn" @click="showSettingsModal = true; pushOverlayState()" :disabled="!socket" title="设置 (Ctrl+Alt+,)">
-        ⚙
-      </button>
-      <button class="icon-btn" @click="openDocs()" title="使用文档 (Ctrl+Alt+Shift+H)">
-        ❓
-      </button>
-      <button class="icon-btn" v-if="auth.userInfo?.is_admin" @click="showAdminPanel = true; pushOverlayState()" :disabled="!socket" title="管理 (Ctrl+Alt+Shift+A)">
-        🛡️
-      </button>
-    </div>
-
-    <!-- 贴边收起后露出的窄边条：点击/触摸展开工具条（不含任何按钮，避免误触；登录界面不显示） -->
-    <div
-      v-if="!showConnectModal && toolbarCollapsed && toolbarEdge"
-      class="global-toolbar-tab"
-      :class="toolbarEdge === 'left' ? 'edge-left' : 'edge-right'"
-      :style="globalToolbarTabStyle"
-      title="展开工具条"
-      @pointerenter="onToolbarPointerEnter"
-      @pointerdown.stop.prevent="expandToolbar()"
-      @click.stop.prevent="expandToolbar()"
-    >
-      <span class="global-toolbar-tab-grip"></span>
-    </div>
-
+    <!-- 主内容区 -->
 
     <!-- 主内容区 -->
 
@@ -105,6 +52,7 @@
         :embedded="true"
         :diff="workspaceDiff"
         :canSplit="canSplitWorkspacePane"
+        :isAdmin="!!auth.userInfo?.is_admin"
         @focus="focusWindow('workspace')"
         @startMove="startWorkspacePanelMove"
         @toggleMaximize="toggleWorkspaceMaximize"
@@ -123,6 +71,9 @@
         @selectAgent="selectWorkspaceAgent"
         @closeDiff="closeWorkspaceDiff"
         @splitPane="onWorkspaceSplitRequest($event)"
+        @openSettings="showSettingsModal = true; pushOverlayState()"
+        @openDocs="openDocs()"
+        @openAdmin="showAdminPanel = true; pushOverlayState()"
         @detach="detachPanel('workspace')"
       >
         <template #sidebar>
@@ -1015,6 +966,7 @@
       :resizeDirections="workspaceResizeDirections"
       :diff="workspaceDiff"
       :canSplit="canSplitWorkspacePane"
+      :isAdmin="!!auth.userInfo?.is_admin"
       @focus="focusWindow('workspace')"
       @startMove="startWorkspacePanelMove"
       @toggleMaximize="toggleWorkspaceMaximize"
@@ -1033,6 +985,9 @@
       @selectAgent="selectWorkspaceAgent"
       @closeDiff="closeWorkspaceDiff"
       @splitPane="splitWorkspacePane(activePaneId, $event)"
+      @openSettings="showSettingsModal = true; pushOverlayState()"
+      @openDocs="openDocs()"
+      @openAdmin="showAdminPanel = true; pushOverlayState()"
       @detach="detachPanel('workspace')"
     >
       <template #sidebar>
@@ -2280,232 +2235,7 @@ function getTerminalStyle(terminalContent) {
   }
 }
 
-// 全局工具条拖拽 + 贴边隐藏：位置持久化到 localStorage，null 表示使用默认（右上角）
-const GLOBAL_TOOLBAR_STORAGE_KEY = 'jarvis_global_toolbar_pos'
-const GLOBAL_TOOLBAR_EDGE_SNAP = 24 // 距屏幕边缘多少像素内视为贴边
-// 注意：toolbarEdge / toolbarCollapsed 必须在 loadGlobalToolbarPos() 调用前声明，
-// 否则其内部恢复贴边态时会因 TDZ 抛 ReferenceError，导致位置持久化失效
-const toolbarEdge = ref(null) // 'left' | 'right' | null，贴边方向
-const toolbarCollapsed = ref(false) // 贴边后是否已收起
-const globalToolbarPos = ref(loadGlobalToolbarPos())
-const isDraggingToolbar = ref(false)
-const toolbarDragOffset = ref({ x: 0, y: 0 })
-let toolbarCollapseTimer = null
 
-function loadGlobalToolbarPos() {
-  try {
-    const savedValue = localStorage.getItem(GLOBAL_TOOLBAR_STORAGE_KEY)
-    if (!savedValue) return null
-    const parsedValue = JSON.parse(savedValue)
-    if (typeof parsedValue?.x !== 'number' || typeof parsedValue?.y !== 'number') {
-      return null
-    }
-    // 恢复贴边状态（旧数据无该字段时视为常驻）
-    if (parsedValue.edge === 'left' || parsedValue.edge === 'right') {
-      toolbarEdge.value = parsedValue.edge
-      toolbarCollapsed.value = true
-    }
-    return { x: parsedValue.x, y: parsedValue.y }
-  } catch {
-    return null
-  }
-}
-
-function saveGlobalToolbarPos() {
-  if (globalToolbarPos.value) {
-    localStorage.setItem(GLOBAL_TOOLBAR_STORAGE_KEY, JSON.stringify({
-      ...globalToolbarPos.value,
-      edge: toolbarEdge.value,
-    }))
-  } else {
-    localStorage.removeItem(GLOBAL_TOOLBAR_STORAGE_KEY)
-  }
-}
-
-const globalToolbarStyle = computed(() => {
-  if (!globalToolbarPos.value) return {}
-  return {
-    left: `${globalToolbarPos.value.x}px`,
-    top: `${globalToolbarPos.value.y}px`,
-    right: 'auto',
-  }
-})
-
-// 工具条实际宽度（用于贴边吸附与拖动边界计算）
-const toolbarElRef = ref(null)
-const toolbarWidth = ref(0)
-// 工具条实际高度（移动端为纵向布局，纵向拖动边界需按实测高度计算）
-const toolbarHeight = ref(0)
-
-function measureToolbarWidth() {
-  const width = toolbarElRef.value?.offsetWidth || 0
-  if (width > 0) toolbarWidth.value = width
-  return width
-}
-
-function measureToolbarHeight() {
-  const height = toolbarElRef.value?.offsetHeight || 0
-  if (height > 0) toolbarHeight.value = height
-  return height
-}
-
-// 收起后露出的窄边条位置：与工具条同高，贴在被吸附的那一侧
-const globalToolbarTabStyle = computed(() => {
-  const pos = globalToolbarPos.value
-  if (!pos) return {}
-  return {
-    top: `${pos.y}px`,
-  }
-})
-
-// 点击/触摸窄边条：展开工具条
-// 触摸设备没有 hover，展开后手指抬起会立即触发 pointerleave 导致刚展开就收起，
-// 因此点击唤出后进入一段锁定期，期间忽略 pointerleave 的自动收起。
-const TOOLBAR_EXPAND_LOCK_MS = 2500
-let toolbarExpandLockUntil = 0
-
-function expandToolbar() {
-  if (toolbarCollapseTimer) {
-    clearTimeout(toolbarCollapseTimer)
-    toolbarCollapseTimer = null
-  }
-  toolbarExpandLockUntil = Date.now() + TOOLBAR_EXPAND_LOCK_MS
-  toolbarCollapsed.value = false
-  // 触摸/点击唤出后重新测量尺寸，保证后续拖动边界正确
-  nextTick(() => {
-    measureToolbarWidth()
-    measureToolbarHeight()
-  })
-}
-
-function startDragToolbar(event) {
-  // 仅响应主指针（鼠标左键 / 单指触摸）
-  if (event.button !== undefined && event.button !== 0) return
-  const toolbarEl = event.currentTarget?.parentElement
-  if (!toolbarEl) return
-  isDraggingToolbar.value = true
-  toolbarCollapsed.value = false
-  toolbarEdge.value = null
-  // 收起态带有 translateX 位移，需等展开渲染完成后再取真实位置，避免拖动起点跳变
-  nextTick(() => {
-    const rect = toolbarEl.getBoundingClientRect()
-    toolbarDragOffset.value = {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    }
-  })
-  // 使用 Pointer Events，同时覆盖鼠标与触摸
-  document.addEventListener('pointermove', onDragToolbar)
-  document.addEventListener('pointerup', stopDragToolbar)
-  document.addEventListener('pointercancel', stopDragToolbar)
-  event.preventDefault()
-  event.stopPropagation()
-}
-
-function onDragToolbar(event) {
-  if (!isDraggingToolbar.value) return
-  const width = toolbarWidth.value || measureToolbarWidth()
-  const height = toolbarHeight.value || measureToolbarHeight()
-  const maxX = Math.max(0, window.innerWidth - width)
-  const maxY = Math.max(0, window.innerHeight - height)
-  globalToolbarPos.value = {
-    x: clamp(event.clientX - toolbarDragOffset.value.x, 0, maxX),
-    y: clamp(event.clientY - toolbarDragOffset.value.y, 0, maxY),
-  }
-  event.preventDefault()
-}
-
-function stopDragToolbar() {
-  document.removeEventListener('pointermove', onDragToolbar)
-  document.removeEventListener('pointerup', stopDragToolbar)
-  document.removeEventListener('pointercancel', stopDragToolbar)
-  if (!isDraggingToolbar.value) return
-  isDraggingToolbar.value = false
-  snapToolbarToEdge()
-  saveGlobalToolbarPos()
-}
-
-// 松手后判断是否贴边：靠左/靠右则吸附并自动收起
-function snapToolbarToEdge() {
-  const pos = globalToolbarPos.value
-  if (!pos) return
-  const width = toolbarWidth.value || measureToolbarWidth()
-  const maxX = Math.max(0, window.innerWidth - width)
-  // 距目标边缘在阈值内即视为贴边
-  const nearLeft = pos.x <= GLOBAL_TOOLBAR_EDGE_SNAP
-  const nearRight = pos.x >= maxX - GLOBAL_TOOLBAR_EDGE_SNAP
-  if (nearLeft) {
-    toolbarEdge.value = 'left'
-    globalToolbarPos.value = { x: 0, y: pos.y }
-    toolbarCollapsed.value = true
-  } else if (nearRight) {
-    toolbarEdge.value = 'right'
-    globalToolbarPos.value = { x: maxX, y: pos.y }
-    toolbarCollapsed.value = true
-  } else {
-    toolbarEdge.value = null
-    toolbarCollapsed.value = false
-  }
-}
-
-// 鼠标/触摸移入工具条：展开
-function onToolbarPointerEnter() {
-  if (toolbarCollapseTimer) {
-    clearTimeout(toolbarCollapseTimer)
-    toolbarCollapseTimer = null
-  }
-  if (toolbarEdge.value) {
-    toolbarCollapsed.value = false
-  }
-}
-
-// 移出工具条：贴边状态下延迟收起
-function onToolbarPointerLeave() {
-  if (!toolbarEdge.value) return
-  // 点击唤出后的锁定期内不自动收起，避免触摸设备刚展开就被收起
-  if (Date.now() < toolbarExpandLockUntil) return
-  if (toolbarCollapseTimer) clearTimeout(toolbarCollapseTimer)
-  toolbarCollapseTimer = setTimeout(() => {
-    toolbarCollapseTimer = null
-    if (toolbarEdge.value) toolbarCollapsed.value = true
-  }, 400)
-}
-
-// 窗口尺寸变化时，重新校正工具条位置；若越界则恢复到侧边隐藏状态
-function handleToolbarResize() {
-  if (!globalToolbarPos.value) return
-  const width = toolbarWidth.value || measureToolbarWidth()
-  const height = toolbarHeight.value || measureToolbarHeight()
-  const maxX = Math.max(0, window.innerWidth - width)
-  const maxY = Math.max(0, window.innerHeight - height)
-  const { x, y } = globalToolbarPos.value
-  const clampedY = clamp(y, 0, maxY)
-
-  if (toolbarEdge.value === 'right') {
-    globalToolbarPos.value = { x: maxX, y: clampedY }
-    return
-  }
-  if (toolbarEdge.value === 'left') {
-    globalToolbarPos.value = { x: 0, y: clampedY }
-    return
-  }
-
-  // 常驻态：若因屏幕变小导致越界（跑出可视区），吸附到最近的侧边并收起
-  const overflowX = x < 0 || x > maxX
-  const overflowY = y < 0 || y > maxY
-  if (overflowX || overflowY) {
-    toolbarEdge.value = x + width / 2 < window.innerWidth / 2 ? 'left' : 'right'
-    globalToolbarPos.value = {
-      x: toolbarEdge.value === 'left' ? 0 : maxX,
-      y: clampedY,
-    }
-    toolbarCollapsed.value = true
-    saveGlobalToolbarPos()
-    return
-  }
-
-  globalToolbarPos.value = { x, y: clampedY }
-}
 
 
 // 拖拽相关函数
@@ -8923,7 +8653,7 @@ function LOBBY_TOUR_STEPS() {
       title: '创建 Agent',
       desc: '按 Ctrl+A 打开编辑器面板侧边栏的 Agent 列表，用其中的「➕」创建 Agent（也可按 Ctrl+N），选择节点、Agent 类型与工作目录即可创建；还可以双击大厅中的节点，直接在指定节点上创建。',
       hint: '代码 Agent（jca）擅长读代码、改代码、跑验证；通用 Agent（jvs）适合分析、规划与执行。长按左下角的主宠物可用一句话快速创建 Agent（Ctrl+Alt+N）。',
-      target: '.global-toolbar',
+      target: '.workspace-activity-bar',
       placement: 'bottom',
     },
     {
@@ -8965,7 +8695,7 @@ function AGENT_TOUR_STEPS() {
       title: 'Agent 状态',
       desc: '宠物与面板上的颜色表示 Agent 状态：运行中、等待输入、等待确认、空闲、已停止。等待输入时会高亮提醒你处理。',
       hint: '命令面板中的「奔赴等待输入的 Agent」可一键跳到最需要你的那只宠物。',
-      target: '.global-toolbar',
+      target: '.workspace-activity-bar',
       placement: 'bottom',
     },
     {
@@ -8974,7 +8704,7 @@ function AGENT_TOUR_STEPS() {
       title: 'Agent 列表',
       desc: '按 Ctrl+A 打开编辑器面板侧边栏的 Agent 列表，可查看全部 Agent、批量选择、按节点或自定义分组浏览。',
       hint: '侧边栏中可批量复制、批量删除、加入分组；单个 Agent 的重命名/复制/权限管理/无损重生/删除在命令面板（Ctrl+P）的「当前 Agent」组中。',
-      target: '.global-toolbar',
+      target: '.workspace-activity-bar',
       placement: 'bottom',
     },
     {
@@ -8983,7 +8713,7 @@ function AGENT_TOUR_STEPS() {
       title: '管理单个 Agent',
       desc: '在命令面板（Ctrl+P）的「当前 Agent」组中：重命名可改显示名；复制会按同样配置再建一个；权限管理控制谁能读、谁能交互；无损重生保留会话重建进程；删除则彻底移除。',
       hint: '「无损重生」与「权限管理」仅对 Agent 属主可见；「人工介入」可随时中断当前 Agent 并接管。',
-      target: '.global-toolbar',
+      target: '.workspace-activity-bar',
       placement: 'bottom',
     },
     {
@@ -8992,7 +8722,7 @@ function AGENT_TOUR_STEPS() {
       title: '自定义分组',
       desc: 'Agent 多了以后，可在编辑器侧边栏的「管理分组」中把 Agent 归入自定义分组，分组可折叠，便于按项目或用途归类。',
       hint: 'Agent 停止后会自动从分组中移除，避免分组里堆积无效条目。',
-      target: '.global-toolbar',
+      target: '.workspace-activity-bar',
       placement: 'bottom',
     },
   ]
@@ -17491,7 +17221,6 @@ onMounted(() => {
       })
       gitDiffEditor.layout()
     }
-    handleToolbarResize()
 
     const activeSession = terminalSessions.value.find(session => session.terminal_id === activeTerminalId.value)
     if (activeSession && activeSession.fitAddon && activeSession.terminal) {
@@ -17500,13 +17229,6 @@ onMounted(() => {
     }
   }
   window.addEventListener('resize', handleResize)
-
-  // 挂载后测量工具条实际宽高，并按贴边状态校正位置（避免恢复的位置越界）
-  nextTick(() => {
-    measureToolbarWidth()
-    measureToolbarHeight()
-    handleToolbarResize()
-  })
 
   window.addEventListener('beforeunload', handleBeforeUnload)
   
@@ -17614,12 +17336,6 @@ onUnmounted(() => {
   // 移除窗口resize监听
   window.removeEventListener('resize', handleResize)
 
-  // 清理工具条贴边收起定时器
-  if (toolbarCollapseTimer) {
-    clearTimeout(toolbarCollapseTimer)
-    toolbarCollapseTimer = null
-  }
-  
   // 移除beforeunload监听
   window.removeEventListener('beforeunload', handleBeforeUnload)
   
@@ -17895,149 +17611,6 @@ body::-webkit-scrollbar {
   min-width: 0; /* 防止 flex 子元素溢出 */
 }
 
-/* 全局工具条：常驻右上角，承载原顶栏入口 */
-.global-toolbar {
-  position: fixed;
-  top: 10px;
-  right: 12px;
-  /* 置于最上层：高于面板(1100/2000)、弹窗(3000)、右键菜单与 Toast(9999) */
-  z-index: 10000;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 6px;
-  border-radius: 999px;
-  background: rgba(11, 20, 36, 0.78);
-  border: 1px solid rgba(32, 200, 255, 0.18);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 4px 20px rgba(0, 120, 190, 0.12);
-  transition: transform 0.22s ease, opacity 0.22s ease;
-}
-
-/* 贴边收起：工具条整体移出屏幕，由独立的窄边条负责唤出 */
-.global-toolbar.is-collapsed {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.global-toolbar.is-collapsed.edge-left {
-  transform: translateX(-100%);
-}
-
-.global-toolbar.is-collapsed.edge-right {
-  transform: translateX(100%);
-}
-
-/* 贴边收起后露出的窄边条：纯触发区，不含按钮 */
-.global-toolbar-tab {
-  position: fixed;
-  z-index: 10000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 44px;
-  border-radius: 8px;
-  background: rgba(11, 20, 36, 0.78);
-  border: 1px solid rgba(32, 200, 255, 0.18);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 4px 20px rgba(0, 120, 190, 0.12);
-  cursor: pointer;
-  touch-action: none;
-  transition: background 0.15s ease, border-color 0.15s ease;
-}
-
-.global-toolbar-tab.edge-left {
-  left: 0;
-  border-left: none;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-}
-
-.global-toolbar-tab.edge-right {
-  right: 0;
-  border-right: none;
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
-.global-toolbar-tab:hover {
-  background: rgba(20, 40, 66, 0.92);
-  border-color: rgba(32, 200, 255, 0.45);
-}
-
-.global-toolbar-tab-grip {
-  width: 3px;
-  height: 20px;
-  border-radius: 2px;
-  background: rgba(120, 220, 255, 0.7);
-}
-
-.global-toolbar.is-dragging {
-  user-select: none;
-  cursor: grabbing;
-  transition: none;
-}
-
-/* 拖动把手：仅此处可拖动工具条 */
-.global-toolbar-handle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 28px;
-  margin-right: 2px;
-  border-radius: 6px;
-  color: rgba(160, 200, 230, 0.55);
-  font-size: 14px;
-  line-height: 1;
-  cursor: grab;
-  user-select: none;
-  touch-action: none;
-  transition: color 0.15s ease, background 0.15s ease;
-}
-
-.global-toolbar-handle:hover {
-  color: rgba(120, 220, 255, 0.95);
-  background: rgba(32, 200, 255, 0.12);
-}
-
-.global-toolbar-handle:active {
-  cursor: grabbing;
-}
-
-/* 移动端：改为纵向排列，缩小按钮，避免横向占满屏幕顶部 */
-@media (max-width: 768px) {
-  .global-toolbar {
-    top: max(8px, env(safe-area-inset-top, 0px));
-    right: max(8px, env(safe-area-inset-right, 0px));
-    flex-direction: column;
-    gap: 2px;
-    padding: 4px 3px;
-  }
-  .global-toolbar .icon-btn {
-    width: 36px;
-    height: 36px;
-    font-size: 16px;
-  }
-  .global-toolbar-handle {
-    width: 28px;
-    height: 16px;
-    margin-right: 0;
-    font-size: 12px;
-  }
-  /* 纵向工具条的贴边窄边条：加大触摸区，便于触摸唤出 */
-  .global-toolbar-tab {
-    width: 28px;
-    height: 48px;
-  }
-  .global-toolbar-tab-grip {
-    width: 14px;
-    height: 3px;
-  }
-}
 
 .workspace-panel {
   position: fixed;
