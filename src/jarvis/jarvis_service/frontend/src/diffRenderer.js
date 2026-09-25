@@ -50,6 +50,17 @@ export function getLanguageFromFilename(filename) {
   return langMap[ext] || "plaintext";
 }
 
+// highlight.js 无内置 vue 支持（与 App.vue 的 marked 渲染保持一致，退回 xml）
+const HLJS_LANGUAGE_ALIAS = {
+  vue: "xml",
+};
+
+// 归一化为 highlight.js 实际注册的语言 id；未注册时返回空串（调用方降级纯文本）
+function resolveHljsLanguage(language) {
+  const normalized = HLJS_LANGUAGE_ALIAS[language] || language;
+  return hljs.getLanguage(normalized) ? normalized : "";
+}
+
 /**
  * HTML转义
  * @param {string} text - 需要转义的文本
@@ -79,8 +90,13 @@ function isMobileViewport() {
 function renderLineContent(line, language) {
   if (line === null || line === undefined) return "";
   const leadingSpaces = line.match(/^(\s*)/)[0];
+  const hljsLanguage = resolveHljsLanguage(language);
+  if (!hljsLanguage) {
+    // highlight.js 未注册该语言：直接降级纯文本，避免其内部反复告警
+    return "&nbsp;".repeat(leadingSpaces.length) + escapeHtml(line);
+  }
   try {
-    const highlighted = hljs.highlight(line, { language }).value;
+    const highlighted = hljs.highlight(line, { language: hljsLanguage }).value;
     return (
       "&nbsp;".repeat(leadingSpaces.length) + highlighted.replace(/^(\s+)/, "")
     );
