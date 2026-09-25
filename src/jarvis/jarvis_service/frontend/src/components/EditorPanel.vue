@@ -37,19 +37,6 @@
         <button class="icon-btn" @click="$emit('close')" title="关闭编辑器">✕</button>
       </div>
     </div>
-    <div class="editor-tabs" v-if="tabs.length > 0">
-      <div
-        v-for="tab in tabs"
-        :key="tab.path"
-        class="editor-tab"
-        :class="{ active: activeTabPath === tab.path }"
-        @click="$emit('activateTab', tab.path)"
-      >
-        <span class="editor-tab-name">{{ tab.name }}</span>
-        <span v-if="tab.isDirty" class="editor-tab-dirty">●</span>
-        <button class="editor-tab-close" @click.stop="$emit('closeTab', tab.path)">✕</button>
-      </div>
-    </div>
     <div class="editor-panel-toolbar">
       <span class="editor-toolbar-status" v-if="activeTab?.loading">加载中...</span>
       <span class="editor-toolbar-status error" v-else-if="activeTab?.error">{{ activeTab.error }}</span>
@@ -112,6 +99,20 @@
       </div>
       <slot name="sidebar"></slot>
       <div class="editor-panel-content editor-panel-content-main">
+        <!-- 文件标签：只属于「文件视图」，放在主区域顶部（不横跨活动栏/侧边栏） -->
+        <div class="editor-tabs" v-if="mainView === 'file' && tabs.length > 0">
+          <div
+            v-for="tab in tabs"
+            :key="tab.path"
+            class="editor-tab"
+            :class="{ active: activeTabPath === tab.path }"
+            @click="$emit('activateTab', tab.path)"
+          >
+            <span class="editor-tab-name">{{ tab.name }}</span>
+            <span v-if="tab.isDirty" class="editor-tab-dirty">●</span>
+            <button class="editor-tab-close" @click.stop="$emit('closeTab', tab.path)">✕</button>
+          </div>
+        </div>
         <slot name="main-view"></slot>
         <div v-show="mainView === 'file'" class="editor-main-file-view">
           <div v-if="diff" class="editor-diff-view">
@@ -296,6 +297,7 @@ defineExpose({
   padding: 4px 4px 0;
   background: var(--color-bg-primary);
   overflow-x: auto;
+  flex-shrink: 0;
 }
 
 .editor-tab {
@@ -457,7 +459,9 @@ defineExpose({
 }
 
 .editor-panel-content-main {
-  overflow: auto;
+  /* 标签固定在顶部，内容区各自滚动（Monaco/diff/嵌入视图内部都有自己的滚动容器），
+     因此这里不整体滚动，避免标签随内容一起滚走。 */
+  overflow: hidden;
 }
 
 /* 主区域文件视图：占满主区域，内部仍由 diff / 占位 / Monaco 容器各自撑开 */
