@@ -270,6 +270,9 @@
         @setSidebarView="setEditorSidebarView"
         @startResize="startEditorPanelResize"
         @toggleDiffSideBySide="toggleGitDiffSideBySide"
+        @toggleDiffShowFull="toggleGitDiffShowFull"
+        @diffNavPrev="navigateGitDiff('prev')"
+        @diffNavNext="navigateGitDiff('next')"
         @closeDiff="closeEditorDiff"
         @detach="detachPanel('editor')"
       >
@@ -797,6 +800,9 @@
       @setSidebarView="setEditorSidebarView"
       @startResize="startEditorPanelResize"
       @toggleDiffSideBySide="toggleGitDiffSideBySide"
+      @toggleDiffShowFull="toggleGitDiffShowFull"
+      @diffNavPrev="navigateGitDiff('prev')"
+      @diffNavNext="navigateGitDiff('next')"
       @closeDiff="closeEditorDiff"
       @detach="detachPanel('editor')"
     >
@@ -1614,7 +1620,7 @@ import CreateAgentModal from './components/CreateAgentModal.vue'
 import QuickCreateAgentModal from './components/QuickCreateAgentModal.vue'
 import SessionPanel from './components/SessionPanel.vue'
 import { renderSideBySideDiff, escapeHtml } from './diffRenderer.js'
-import { parseUnifiedDiff } from './gitDiffParser.js'
+import { parseUnifiedDiff, extractDiffContext } from './gitDiffParser.js'
 import RenameAgentModal from './components/RenameAgentModal.vue'
 import InputPromptModal from './components/InputPromptModal.vue'
 import AdminPanel from './components/AdminPanel.vue'
@@ -4233,6 +4239,8 @@ const gitDiffTruncated = ref(false)
 const editorDiff = ref(null)
 // Monaco DiffEditor：并排/内联切换（桌面默认并排；移动端屏幕窄，默认内联）
 const gitDiffSideBySide = ref(window.innerWidth > 768)
+// diff 显示范围：false=只显示变更上下文区域（默认），true=显示文件全文
+const gitDiffShowFull = ref(false)
 
 // 当前是否处于窄屏（移动端）：diff 强制内联，避免并排两栏在窄屏上被裁掉
 function isNarrowGitDiffViewport() {
@@ -4374,6 +4382,7 @@ async function viewGitFileDiff(commitHash, filePath) {
     error: '',
     truncated: false,
     sideBySide: gitDiffSideBySide.value,
+    showFull: gitDiffShowFull.value,
   }
   try {
     // diff 文本仅用于「已截断」提示与降级；正文由两份全文提供
@@ -4499,6 +4508,14 @@ async function renderGitDiffMonaco(filePath) {
       oldText = parsed.oldText
       newText = parsed.newText
     }
+    // 默认只显示变更上下文区域：丢弃 hunk 之间的未变更代码，避免大段空白
+    if (!gitDiffShowFull.value && gitDiffText.value) {
+      const context = extractDiffContext(gitDiffText.value)
+      if (context.oldText || context.newText) {
+        oldText = context.oldText
+        newText = context.newText
+      }
+    }
     disposeGitDiffModels()
     gitDiffOriginalModel = monaco.editor.createModel(oldText, language)
     gitDiffModifiedModel = monaco.editor.createModel(newText, language)
@@ -4520,6 +4537,53 @@ function toggleGitDiffSideBySide() {
   if (gitDiffEditor) {
     gitDiffEditor.updateOptions({ renderSideBySide: gitDiffSideBySide.value && !isNarrowGitDiffViewport() })
   }
+}
+
+// 全文 / 仅变更上下文区域切换（默认仅上下文）
+async function toggleGitDiffShowFull() {
+  gitDiffShowFull.value = !gitDiffShowFull.value
+  if (editorDiff.value) editorDiff.value.showFull = gitDiffShowFull.value
+  if (editorDiff.value?.filePath) {
+    await renderGitDiffMonaco(editorDiff.value.filePath)
+  }
+}
+
+// 跳转到上一个 / 下一个差异（Monaco DiffEditor 内置导航）
+// direction: 'prev' | 'next'
+function navigateGitDiff(direction) {
+  if (!gitDiffEditor) return
+  const target = direction === 'prev' ? 'previous' : 'next'
+  // 优先使用 Monaco 内置导航（会同时滚动 original/modified 两侧）
+  if (typeof gitDiffEditor.goToDiff === 'function') {
+    gitDiffEditor.goToDiff(target)
+    return
+  }
+  // 兜底：老版本 Monaco 无 goToDiff 时，按变更块行号自行定位
+  const changes = gitDiffEditor.getLineChanges?.() || []
+  if (!changes.length) return
+  const modifiedEditor = gitDiffEditor.getModifiedEditor?.()
+  const originalEditor = gitDiffEditor.getOriginalEditor?.()
+  const visibleTop = Math.min(
+    modifiedEditor?.getVisibleRanges?.()[0]?.startLineNumber ?? Number.MAX_SAFE_INTEGER,
+    originalEditor?.getVisibleRanges?.()[0]?.startLineNumber ?? Number.MAX_SAFE_INTEGER,
+  )
+  const anchors = changes
+    .map(change => ({
+      line: change.modifiedStartLineNumber || change.originalStartLineNumber || 0,
+    }))
+    .filter(item => item.line > 0)
+    .sort((a, b) => a.line - b.line)
+  if (!anchors.length) return
+  let anchor = null
+  if (direction === 'next') {
+    anchor = anchors.find(item => item.line > visibleTop) || anchors[0]
+  } else {
+    const before = anchors.filter(item => item.line < visibleTop)
+    anchor = before.length ? before[before.length - 1] : anchors[anchors.length - 1]
+  }
+  if (!anchor) return
+  modifiedEditor?.revealLineInCenterIfOutsideViewport?.(anchor.line)
+  originalEditor?.revealLineInCenterIfOutsideViewport?.(anchor.line)
 }
 
 // 侧栏尺寸/视图变化时重排（复用主编辑器的 layout 时机）
@@ -20115,6 +20179,10 @@ body::-webkit-scrollbar {
   /* 移动端 diff 视图：主区域全屏，头部按钮放大点击区 */
   .editor-diff-toggle,
   .editor-diff-close {
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+  .editor-diff-nav {
     padding: 4px 10px;
     font-size: 12px;
   }

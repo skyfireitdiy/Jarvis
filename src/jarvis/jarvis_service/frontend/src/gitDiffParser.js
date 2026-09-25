@@ -211,3 +211,122 @@ export function parseUnifiedDiff(diffText, options = {}) {
     isDeletedFile,
   };
 }
+
+/**
+ * 从 unified diff 中提取「变更上下文区域」：只保留各 hunk 的内容
+ * （上下文行 + 增删行），丢弃 hunk 之间的文件头与未变更的大段代码。
+ *
+ * 与 parseUnifiedDiff 的区别：parseUnifiedDiff 会为 hunk 之间的行号间隙
+ * 补空行以对齐绝对行号，从而在全文模式下产生大段空白；本函数只取 hunk
+ * 主体，因此左右两侧文本紧凑，适合「只显示 diff 上下文」的阅读模式。
+ *
+ * @param {string} diffText - `git show`/`git diff` 输出的 unified diff 文本
+ * @returns {{ oldText: string, newText: string, isNewFile: boolean, isDeletedFile: boolean }}
+ */
+export function extractDiffContext(diffText) {
+  const empty = {
+    oldText: "",
+    newText: "",
+    isNewFile: false,
+    isDeletedFile: false,
+  };
+  if (!diffText || typeof diffText !== "string") return empty;
+
+  const lines = diffText.split("\n");
+  const oldLines = [];
+  const newLines = [];
+
+  let isNewFile = false;
+  let isDeletedFile = false;
+  let inHunk = false;
+  let oldRemaining = 0;
+  let newRemaining = 0;
+  let oldWritten = 0;
+  let newWritten = 0;
+
+  // hunk 收尾：diff 被截断导致行数不足时补空行，保持左右对齐
+  const closeHunk = () => {
+    if (!inHunk) return;
+    while (oldWritten < oldRemaining) {
+      oldLines.push("");
+      oldWritten += 1;
+    }
+    while (newWritten < newRemaining) {
+      newLines.push("");
+      newWritten += 1;
+    }
+    inHunk = false;
+  };
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+
+    if (line.startsWith("new file mode ")) {
+      isNewFile = true;
+      continue;
+    }
+    if (line.startsWith("deleted file mode ")) {
+      isDeletedFile = true;
+      continue;
+    }
+    if (line.startsWith("--- ")) {
+      if (line.slice(4).trim() === "/dev/null") isNewFile = true;
+      continue;
+    }
+    if (line.startsWith("+++ ")) {
+      if (line.slice(4).trim() === "/dev/null") isDeletedFile = true;
+      continue;
+    }
+
+    if (line.startsWith("@@")) {
+      closeHunk();
+      const match = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(line);
+      if (match) {
+        oldRemaining = match[2] === undefined ? 1 : Number(match[2]);
+        newRemaining = match[4] === undefined ? 1 : Number(match[4]);
+        oldWritten = 0;
+        newWritten = 0;
+        inHunk = true;
+      }
+      continue;
+    }
+
+    // "\ No newline at end of file"：忽略
+    if (line.startsWith("\\")) continue;
+
+    if (!inHunk) continue;
+
+    const marker = line.charAt(0);
+    const content = line.slice(1);
+
+    if (marker === " ") {
+      oldLines.push(content);
+      newLines.push(content);
+      oldWritten += 1;
+      newWritten += 1;
+    } else if (marker === "-") {
+      oldLines.push(content);
+      oldWritten += 1;
+    } else if (marker === "+") {
+      newLines.push(content);
+      newWritten += 1;
+    } else if (line === "") {
+      oldLines.push("");
+      newLines.push("");
+      oldWritten += 1;
+      newWritten += 1;
+    }
+  }
+
+  closeHunk();
+
+  if (oldLines.length && oldLines[oldLines.length - 1] === "") oldLines.pop();
+  if (newLines.length && newLines[newLines.length - 1] === "") newLines.pop();
+
+  return {
+    oldText: oldLines.join("\n"),
+    newText: newLines.join("\n"),
+    isNewFile,
+    isDeletedFile,
+  };
+}
