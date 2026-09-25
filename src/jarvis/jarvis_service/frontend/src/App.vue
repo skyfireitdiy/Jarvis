@@ -249,6 +249,8 @@
         :interaction="editorPanelInteraction"
         :panelStyle="editorPanelStyle"
         :agentName="activeEditorSession?.agent_name"
+        :agents="activeAgents"
+        :activeAgentId="activeEditorSessionId"
         :activeTab="activeEditorTab"
         :activeTabPath="activeEditorTabPath"
         :tabs="editorTabs"
@@ -273,6 +275,7 @@
         @toggleDiffShowFull="toggleGitDiffShowFull"
         @diffNavPrev="navigateGitDiff('prev')"
         @diffNavNext="navigateGitDiff('next')"
+        @selectAgent="selectEditorAgent"
         @closeDiff="closeEditorDiff"
         @detach="detachPanel('editor')"
       >
@@ -780,6 +783,8 @@
       :interaction="editorPanelInteraction"
       :panelStyle="editorPanelStyle"
       :agentName="activeEditorSession?.agent_name"
+      :agents="activeAgents"
+      :activeAgentId="activeEditorSessionId"
       :activeTab="activeEditorTab"
       :activeTabPath="activeEditorTabPath"
       :tabs="editorTabs"
@@ -803,6 +808,7 @@
       @toggleDiffShowFull="toggleGitDiffShowFull"
       @diffNavPrev="navigateGitDiff('prev')"
       @diffNavNext="navigateGitDiff('next')"
+      @selectAgent="selectEditorAgent"
       @closeDiff="closeEditorDiff"
       @detach="detachPanel('editor')"
     >
@@ -4064,6 +4070,14 @@ function createEditorForAgent(agent) {
 
 }
 
+// 编辑器面板下拉框选择 Agent
+function selectEditorAgent(agentId) {
+  if (!agentId) return
+  const agent = agentList.value.find(a => a.agent_id === agentId)
+  if (!agent) return
+  createEditorForAgent(agent)
+}
+
 // 关闭编辑器会话
 async function closeEditorSession(agentId) {
   const sessionIndex = editorSessions.value.findIndex(s => s.agent_id === agentId)
@@ -4364,8 +4378,7 @@ async function toggleGitCommitDetail(commit) {
 }
 
 // 查看某文件在某提交中的 diff
-// 实现方式：并行取「父版本全文」与「当前版本全文」，直接喂给 Monaco DiffEditor。
-// 这样左右两侧都是完整文件，行号即文件的绝对行号（而非 diff 内的相对行号）。
+// 默认只显示变更上下文区域，因此先只请求 diff 文本（快），全文按需懒加载。
 async function viewGitFileDiff(commitHash, filePath) {
   const workingDir = getGitWorkingDir()
   if (!workingDir) return
@@ -4374,6 +4387,9 @@ async function viewGitFileDiff(commitHash, filePath) {
   gitDiffError.value = ''
   gitDiffTruncated.value = false
   gitDiffLoading.value = true
+  // 清掉上一份文件的全文缓存变量，避免在「仅上下文」模式下误用旧全文
+  gitDiffOldText = ''
+  gitDiffNewText = ''
   // 切到主区域显示 diff（侧栏只保留文件列表）
   editorDiff.value = {
     commitHash,
@@ -4385,18 +4401,15 @@ async function viewGitFileDiff(commitHash, filePath) {
     showFull: gitDiffShowFull.value,
   }
   try {
-    // diff 文本仅用于「已截断」提示与降级；正文由两份全文提供
-    const [diffData, newData, oldData] = await Promise.all([
-      callGitApi('git/diff', { path: workingDir, hash: commitHash, file: filePath }),
-      callGitApi('git/file-content', { path: workingDir, ref: commitHash, file: filePath }),
-      // 父版本：新增文件时父版本不存在，后端返回 NOT_FOUND，按空文件处理
-      callGitApi('git/file-content', { path: workingDir, ref: `${commitHash}^`, file: filePath })
-        .catch(() => ({ content: '', truncated: false })),
-    ])
+    // 仅请求 diff 文本；全文（父版本/当前版本）在用户点击「全文」时再懒加载
+    const diffData = await callGitApi('git/diff', { path: workingDir, hash: commitHash, file: filePath })
     gitDiffText.value = diffData.diff || ''
-    gitDiffTruncated.value = Boolean(diffData.truncated || newData.truncated || oldData.truncated)
-    gitDiffOldText = oldData.content || ''
-    gitDiffNewText = newData.content || ''
+    gitDiffTruncated.value = Boolean(diffData.truncated)
+    // 若当前处于「全文」模式（全局开关），则同时懒加载两侧全文，保证行号为绝对行号
+    if (gitDiffShowFull.value) {
+      const entry = await ensureGitDiffFullText(commitHash, filePath)
+      if (entry) gitDiffTruncated.value = Boolean(gitDiffTruncated.value || entry.truncated)
+    }
     if (editorDiff.value) {
       editorDiff.value.truncated = gitDiffTruncated.value
       editorDiff.value.loading = false
@@ -4412,6 +4425,35 @@ async function viewGitFileDiff(commitHash, filePath) {
   } finally {
     gitDiffLoading.value = false
   }
+}
+
+// 懒加载某文件在某提交中的两侧全文（父版本 / 当前版本），带缓存
+const gitDiffFullTextCache = new Map() // key: `${commitHash}|${filePath}` -> { oldText, newText, truncated }
+async function ensureGitDiffFullText(commitHash, filePath) {
+  const key = `${commitHash}|${filePath}`
+  const cached = gitDiffFullTextCache.get(key)
+  if (cached) {
+    gitDiffOldText = cached.oldText
+    gitDiffNewText = cached.newText
+    return cached
+  }
+  const workingDir = getGitWorkingDir()
+  if (!workingDir) return null
+  const [newData, oldData] = await Promise.all([
+    callGitApi('git/file-content', { path: workingDir, ref: commitHash, file: filePath }),
+    // 父版本：新增文件时父版本不存在，后端返回 NOT_FOUND，按空文件处理
+    callGitApi('git/file-content', { path: workingDir, ref: `${commitHash}^`, file: filePath })
+      .catch(() => ({ content: '', truncated: false })),
+  ])
+  const entry = {
+    oldText: oldData.content || '',
+    newText: newData.content || '',
+    truncated: Boolean(newData.truncated || oldData.truncated),
+  }
+  gitDiffFullTextCache.set(key, entry)
+  gitDiffOldText = entry.oldText
+  gitDiffNewText = entry.newText
+  return entry
 }
 
 // 关闭主区域 diff 视图，回到文件内容
@@ -4447,6 +4489,7 @@ function disposeGitDiffEditor() {
   disposeGitDiffModels()
   gitDiffOldText = ''
   gitDiffNewText = ''
+  gitDiffFullTextCache.clear()
   if (gitDiffEditor) {
     gitDiffEditor.dispose()
     gitDiffEditor = null
@@ -4543,9 +4586,33 @@ function toggleGitDiffSideBySide() {
 async function toggleGitDiffShowFull() {
   gitDiffShowFull.value = !gitDiffShowFull.value
   if (editorDiff.value) editorDiff.value.showFull = gitDiffShowFull.value
-  if (editorDiff.value?.filePath) {
-    await renderGitDiffMonaco(editorDiff.value.filePath)
+  if (!editorDiff.value?.filePath) return
+  // 切到「全文」时按需拉取两侧全文（首次较慢，之后走缓存）
+  if (gitDiffShowFull.value) {
+    const { commitHash, filePath } = editorDiff.value
+    const key = `${commitHash}|${filePath}`
+    if (!gitDiffFullTextCache.has(key)) {
+      editorDiff.value.loading = true
+      try {
+        const entry = await ensureGitDiffFullText(commitHash, filePath)
+        if (entry) {
+          gitDiffTruncated.value = Boolean(gitDiffTruncated.value || entry.truncated)
+          editorDiff.value.truncated = gitDiffTruncated.value
+        }
+      } catch (error) {
+        gitDiffError.value = error.message || '获取文件全文失败'
+        editorDiff.value.error = gitDiffError.value
+        editorDiff.value.loading = false
+        return
+      } finally {
+        if (editorDiff.value) editorDiff.value.loading = false
+      }
+    } else {
+      await ensureGitDiffFullText(commitHash, filePath)
+    }
+    await nextTick()
   }
+  await renderGitDiffMonaco(editorDiff.value.filePath)
 }
 
 // 跳转到上一个 / 下一个差异（Monaco DiffEditor 内置导航）

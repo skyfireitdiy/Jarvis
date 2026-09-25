@@ -13,6 +13,19 @@
     >
       <div class="editor-panel-title-group">
         <h3>编辑器 - {{ agentName || '未选择 Agent' }}</h3>
+        <select
+          v-if="agents && agents.length"
+          class="editor-agent-select"
+          :value="activeAgentId || ''"
+          title="选择 Agent"
+          @mousedown.stop
+          @change="$emit('selectAgent', $event.target.value)"
+        >
+          <option value="" disabled>选择 Agent</option>
+          <option v-for="agent in agents" :key="agent.agent_id" :value="agent.agent_id">
+            {{ agent.name || agent.agent_id }}
+          </option>
+        </select>
         <span v-if="activeTab" class="editor-panel-subtitle">{{ activeTab.path }}</span>
       </div>
       <div class="editor-panel-actions">
@@ -127,6 +140,8 @@ const props = defineProps({
   interaction: Object,
   panelStyle: Object,
   agentName: String,
+  agents: Array,
+  activeAgentId: String,
   activeTab: Object,
   activeTabPath: String,
   tabs: Array,
@@ -155,7 +170,8 @@ const emit = defineEmits([
   'closeSidebar',
   'toggleDiffShowFull',
   'diffNavPrev',
-  'diffNavNext'
+  'diffNavNext',
+  'selectAgent'
 ])
 
 const editorContainerRef = ref(null)
@@ -231,6 +247,17 @@ defineExpose({
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 320px;
+}
+
+.editor-agent-select {
+  max-width: 220px;
+  font-size: 12px;
+  padding: 2px 4px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 4px;
+  background: var(--color-bg-secondary, var(--color-bg-primary));
+  color: var(--color-text-primary);
+  cursor: pointer;
 }
 
 .editor-panel-actions {
