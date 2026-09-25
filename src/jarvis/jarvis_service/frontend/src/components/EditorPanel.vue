@@ -146,7 +146,8 @@ const emit = defineEmits([
   'setSidebarView',
   'startResize',
   'toggleDiffSideBySide',
-  'closeDiff'
+  'closeDiff',
+  'closeSidebar'
 ])
 
 const editorContainerRef = ref(null)
