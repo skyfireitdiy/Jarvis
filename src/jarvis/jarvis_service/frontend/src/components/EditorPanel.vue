@@ -68,6 +68,16 @@
           @click="$emit('setSidebarView', 'search')"
           title="全局搜索"
         >🔎</button>
+        <button
+          class="editor-activity-button"
+          :class="{ active: showSidebar && sidebarView === 'git' }"
+          @click="$emit('setSidebarView', 'git')"
+          title="Git"
+        >
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
+            <path d="M15.698 7.287 8.712.302a1.03 1.03 0 0 0-1.457 0l-1.45 1.45 1.84 1.84a1.223 1.223 0 0 1 1.55 1.56l1.773 1.774a1.224 1.224 0 0 1 1.267 2.025 1.226 1.226 0 0 1-2.002-1.334L8.58 5.963v4.353a1.228 1.228 0 1 1-1.008-.036V5.887a1.228 1.228 0 0 1-.666-1.608L5.093 2.466l-4.45 4.45a1.03 1.03 0 0 0 0 1.457l6.986 6.986a1.03 1.03 0 0 0 1.457 0l6.612-6.612a1.03 1.03 0 0 0 0-1.46z"/>
+          </svg>
+        </button>
       </div>
       <slot name="sidebar"></slot>
       <div class="editor-panel-content editor-panel-content-main">

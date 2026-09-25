@@ -271,7 +271,7 @@
           <aside v-if="showEditorSidebar" class="editor-sidebar" :style="{ width: editorSidebarWidth + 'px' }">
             <div class="editor-sidebar-resize-handle" @mousedown="startEditorSidebarResize($event)"></div>
             <div class="editor-sidebar-header">
-              <span class="editor-sidebar-title">{{ editorSidebarView === 'search' ? '全局搜索' : '目录树' }}</span>
+              <span class="editor-sidebar-title">{{ editorSidebarView === 'search' ? '全局搜索' : (editorSidebarView === 'git' ? 'Git' : '目录树') }}</span>
               <button class="icon-btn-small" @click="closeEditorSidebar" title="关闭侧边栏">✕</button>
             </div>
             <div v-if="editorSidebarView === 'files'" class="editor-sidebar-content">
@@ -428,7 +428,7 @@
                 </div>
               </div>
             </div>
-            <div v-else class="editor-sidebar-content">
+            <div v-else-if="editorSidebarView === 'search'" class="editor-sidebar-content">
               <div class="editor-global-search-panel">
                 <div class="editor-global-search-mode-tabs">
                   <button
@@ -519,6 +519,86 @@
                     </button>
                   </div>
                 </template>
+              </div>
+            </div>
+            <div v-else class="editor-sidebar-content">
+              <div class="editor-git-panel">
+                <div class="editor-git-toolbar">
+                  <span class="editor-git-branch" :title="gitCurrentBranch || '未知分支'">
+                    <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.492 2.492 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25Zm-6 0a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Zm8.25-.75a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5ZM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z"/></svg>
+                    <span class="editor-git-branch-name">{{ gitCurrentBranch || '无分支' }}</span>
+                  </span>
+                  <button class="icon-btn-small" @click="refreshGitView" :disabled="gitLogLoading" title="刷新">⟳</button>
+                </div>
+                <div class="editor-git-summary">
+                  <span v-if="gitLogLoading && !gitLog.length">加载中...</span>
+                  <span v-else-if="gitLogError" class="error">{{ gitLogError }}</span>
+                  <span v-else>{{ gitLog.length }} 个提交<span v-if="gitBranches.length"> · {{ gitBranches.length }} 分支</span><span v-if="gitTags.length"> · {{ gitTags.length }} 标签</span></span>
+                </div>
+                <div class="editor-git-commit-list">
+                  <template v-for="(commit, index) in gitLog" :key="commit.hash">
+                    <div
+                      class="editor-git-commit"
+                      :class="{ selected: gitSelectedCommit === commit.hash }"
+                      @click="toggleGitCommitDetail(commit)"
+                    >
+                      <div class="editor-git-graph">
+                        <svg viewBox="0 0 20 40" width="20" height="40" aria-hidden="true">
+                          <line x1="10" y1="0" x2="10" y2="40" stroke="currentColor" stroke-width="1.5" class="git-graph-line" />
+                          <circle cx="10" cy="20" :r="commit.parents && commit.parents.length > 1 ? 5 : 4" class="git-graph-dot" :class="{ 'git-graph-merge': commit.parents && commit.parents.length > 1 }" />
+                        </svg>
+                      </div>
+                      <div class="editor-git-commit-body">
+                        <div class="editor-git-commit-subject" :title="commit.subject">{{ commit.subject }}</div>
+                        <div class="editor-git-commit-meta">
+                          <span class="editor-git-refs" v-if="commit.refs && commit.refs.length">
+                            <span v-for="ref in commit.refs" :key="ref" class="git-ref" :class="gitRefClass(ref)">{{ ref }}</span>
+                          </span>
+                          <span class="editor-git-author">{{ commit.author }}</span>
+                          <span class="editor-git-hash">{{ shortGitHash(commit.hash) }}</span>
+                          <span class="editor-git-time">{{ formatGitRelativeTime(commit.date) }}</span>
+                        </div>
+                        <div v-if="gitSelectedCommit === commit.hash" class="editor-git-commit-detail" @click.stop>
+                          <div v-if="gitCommitDetailLoading" class="editor-git-detail-empty">加载文件列表...</div>
+                          <div v-else-if="!gitCommitFiles.length" class="editor-git-detail-empty">无文件变更</div>
+                          <template v-else>
+                            <div class="editor-git-detail-summary">共 {{ gitCommitFiles.length }} 个文件变更</div>
+                            <button
+                              v-for="file in gitCommitFiles"
+                              :key="file.path"
+                              class="editor-git-file"
+                              :class="{ active: gitSelectedFile === file.path }"
+                              @click="viewGitFileDiff(commit.hash, file.path)"
+                            >
+                              <span class="editor-git-file-status" :class="'git-status-' + gitFileStatus(file)">{{ gitFileStatus(file) }}</span>
+                              <span class="editor-git-file-path" :title="file.path">{{ file.path }}</span>
+                              <span class="editor-git-file-stat">
+                                <span v-if="file.additions" class="git-add-stat">+{{ file.additions }}</span>
+                                <span v-if="file.deletions" class="git-del-stat">-{{ file.deletions }}</span>
+                              </span>
+                            </button>
+                            <div v-if="gitSelectedFile" class="editor-git-diff">
+                              <div class="editor-git-diff-header">
+                                <span class="editor-git-diff-title" :title="gitSelectedFile">{{ gitSelectedFile }}</span>
+                                <span v-if="gitDiffTruncated" class="editor-git-diff-truncated">（已截断）</span>
+                                <button class="editor-git-diff-toggle" @click="toggleGitDiffSideBySide">{{ gitDiffSideBySide ? '内联' : '并排' }}</button>
+                              </div>
+                              <div v-if="gitDiffLoading" class="editor-git-detail-empty">加载 diff...</div>
+                              <div v-else-if="gitDiffError" class="editor-git-detail-empty error">{{ gitDiffError }}</div>
+                              <div v-else ref="gitDiffContainerRef" class="editor-git-diff-monaco"></div>
+                            </div>
+                          </template>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                  <div v-if="!gitLogLoading && !gitLogError && !gitLog.length" class="editor-git-empty">暂无提交记录</div>
+                  <button
+                    v-if="gitLogHasMore && !gitLogLoading"
+                    class="editor-git-load-more"
+                    @click="fetchGitLog(true)"
+                  >加载更多</button>
+                </div>
               </div>
             </div>
           </aside>
@@ -723,7 +803,7 @@
         <aside v-if="showEditorSidebar" class="editor-sidebar" :style="{ width: editorSidebarWidth + 'px' }">
           <div class="editor-sidebar-resize-handle" @mousedown="startEditorSidebarResize($event)"></div>
           <div class="editor-sidebar-header">
-            <span class="editor-sidebar-title">{{ editorSidebarView === 'search' ? '全局搜索' : '目录树' }}</span>
+            <span class="editor-sidebar-title">{{ editorSidebarView === 'search' ? '全局搜索' : (editorSidebarView === 'git' ? 'Git' : '目录树') }}</span>
             <button class="icon-btn-small" @click="closeEditorSidebar" title="关闭侧边栏">✕</button>
           </div>
           <div v-if="editorSidebarView === 'files'" class="editor-sidebar-content">
@@ -877,7 +957,7 @@
             </div>
 
           </div>
-          <div v-else class="editor-sidebar-content">
+          <div v-else-if="editorSidebarView === 'search'" class="editor-sidebar-content">
             <div class="editor-global-search-panel">
               <div class="editor-global-search-mode-tabs">
                 <button
@@ -968,6 +1048,86 @@
                   </button>
                 </div>
               </template>
+            </div>
+          </div>
+          <div v-else class="editor-sidebar-content">
+            <div class="editor-git-panel">
+              <div class="editor-git-toolbar">
+                <span class="editor-git-branch" :title="gitCurrentBranch || '未知分支'">
+                  <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.492 2.492 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25Zm-6 0a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Zm8.25-.75a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5ZM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z"/></svg>
+                  <span class="editor-git-branch-name">{{ gitCurrentBranch || '无分支' }}</span>
+                </span>
+                <button class="icon-btn-small" @click="refreshGitView" :disabled="gitLogLoading" title="刷新">⟳</button>
+              </div>
+              <div class="editor-git-summary">
+                <span v-if="gitLogLoading && !gitLog.length">加载中...</span>
+                <span v-else-if="gitLogError" class="error">{{ gitLogError }}</span>
+                <span v-else>{{ gitLog.length }} 个提交<span v-if="gitBranches.length"> · {{ gitBranches.length }} 分支</span><span v-if="gitTags.length"> · {{ gitTags.length }} 标签</span></span>
+              </div>
+              <div class="editor-git-commit-list">
+                <template v-for="(commit, index) in gitLog" :key="commit.hash">
+                  <div
+                    class="editor-git-commit"
+                    :class="{ selected: gitSelectedCommit === commit.hash }"
+                    @click="toggleGitCommitDetail(commit)"
+                  >
+                    <div class="editor-git-graph">
+                      <svg viewBox="0 0 20 40" width="20" height="40" aria-hidden="true">
+                        <line x1="10" y1="0" x2="10" y2="40" stroke="currentColor" stroke-width="1.5" class="git-graph-line" />
+                        <circle cx="10" cy="20" :r="commit.parents && commit.parents.length > 1 ? 5 : 4" class="git-graph-dot" :class="{ 'git-graph-merge': commit.parents && commit.parents.length > 1 }" />
+                      </svg>
+                    </div>
+                    <div class="editor-git-commit-body">
+                      <div class="editor-git-commit-subject" :title="commit.subject">{{ commit.subject }}</div>
+                      <div class="editor-git-commit-meta">
+                        <span class="editor-git-refs" v-if="commit.refs && commit.refs.length">
+                          <span v-for="ref in commit.refs" :key="ref" class="git-ref" :class="gitRefClass(ref)">{{ ref }}</span>
+                        </span>
+                        <span class="editor-git-author">{{ commit.author }}</span>
+                        <span class="editor-git-hash">{{ shortGitHash(commit.hash) }}</span>
+                        <span class="editor-git-time">{{ formatGitRelativeTime(commit.date) }}</span>
+                      </div>
+                      <div v-if="gitSelectedCommit === commit.hash" class="editor-git-commit-detail" @click.stop>
+                        <div v-if="gitCommitDetailLoading" class="editor-git-detail-empty">加载文件列表...</div>
+                        <div v-else-if="!gitCommitFiles.length" class="editor-git-detail-empty">无文件变更</div>
+                        <template v-else>
+                          <div class="editor-git-detail-summary">共 {{ gitCommitFiles.length }} 个文件变更</div>
+                          <button
+                            v-for="file in gitCommitFiles"
+                            :key="file.path"
+                            class="editor-git-file"
+                            :class="{ active: gitSelectedFile === file.path }"
+                            @click="viewGitFileDiff(commit.hash, file.path)"
+                          >
+                            <span class="editor-git-file-status" :class="'git-status-' + gitFileStatus(file)">{{ gitFileStatus(file) }}</span>
+                            <span class="editor-git-file-path" :title="file.path">{{ file.path }}</span>
+                            <span class="editor-git-file-stat">
+                              <span v-if="file.additions" class="git-add-stat">+{{ file.additions }}</span>
+                              <span v-if="file.deletions" class="git-del-stat">-{{ file.deletions }}</span>
+                            </span>
+                          </button>
+                          <div v-if="gitSelectedFile" class="editor-git-diff">
+                            <div class="editor-git-diff-header">
+                              <span class="editor-git-diff-title" :title="gitSelectedFile">{{ gitSelectedFile }}</span>
+                              <span v-if="gitDiffTruncated" class="editor-git-diff-truncated">（已截断）</span>
+                              <button class="editor-git-diff-toggle" @click="toggleGitDiffSideBySide">{{ gitDiffSideBySide ? '内联' : '并排' }}</button>
+                            </div>
+                            <div v-if="gitDiffLoading" class="editor-git-detail-empty">加载 diff...</div>
+                            <div v-else-if="gitDiffError" class="editor-git-detail-empty error">{{ gitDiffError }}</div>
+                            <div v-else ref="gitDiffContainerRef" class="editor-git-diff-monaco"></div>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+                <div v-if="!gitLogLoading && !gitLogError && !gitLog.length" class="editor-git-empty">暂无提交记录</div>
+                <button
+                  v-if="gitLogHasMore && !gitLogLoading"
+                  class="editor-git-load-more"
+                  @click="fetchGitLog(true)"
+                >加载更多</button>
+              </div>
             </div>
           </div>
         </aside>
@@ -1461,6 +1621,7 @@ import CreateAgentModal from './components/CreateAgentModal.vue'
 import QuickCreateAgentModal from './components/QuickCreateAgentModal.vue'
 import SessionPanel from './components/SessionPanel.vue'
 import { renderSideBySideDiff, escapeHtml } from './diffRenderer.js'
+import { parseUnifiedDiff } from './gitDiffParser.js'
 import RenameAgentModal from './components/RenameAgentModal.vue'
 import InputPromptModal from './components/InputPromptModal.vue'
 import AdminPanel from './components/AdminPanel.vue'
@@ -3430,6 +3591,17 @@ function setEditorSidebarView(view) {
     })
     return
   }
+  if (view === 'git') {
+    // 切到 Git 视图时自动拉取提交历史与分支（仅首次或数据为空时）
+    nextTick(() => {
+      layoutMonacoEditor()
+      layoutGitDiffEditor()
+      if (!gitLog.value.length && !gitLogLoading.value) {
+        refreshGitView()
+      }
+    })
+    return
+  }
   nextTick(() => {
     layoutMonacoEditor()
   })
@@ -3445,6 +3617,8 @@ function toggleEditorSearchSidebar() {
 
 function closeEditorSidebar() {
   showEditorSidebar.value = false
+  // 侧栏收起后 diff 容器会被销毁，释放 Monaco diff 实例避免泄漏
+  disposeGitDiffEditor()
   nextTick(() => {
     layoutMonacoEditor()
   })
@@ -3852,6 +4026,8 @@ async function closeEditorPanel() {
   }
 
   showEditorPanel.value = false
+  // 面板收起后 Git diff 容器随之销毁，释放 Monaco diff 实例
+  disposeGitDiffEditor()
 }
 
 // 为 Agent 创建/打开编辑器会话
@@ -4042,6 +4218,302 @@ function openEditorGlobalSearch(mode = 'content') {
     const input = document.querySelector('.editor-global-search-input')
     if (input) input.focus()
   })
+}
+
+// ===== 编辑器侧边栏 Git 视图（只读：提交历史/详情/diff/分支） =====
+const gitLog = ref([])                 // 提交列表
+const gitLogLoading = ref(false)
+const gitLogError = ref('')
+const gitLogHasMore = ref(false)
+const gitBranches = ref([])            // 分支列表
+const gitTags = ref([])                // tag 列表
+const gitCurrentBranch = ref('')       // 当前分支
+const gitSelectedCommit = ref(null)    // 展开详情的提交 hash
+const gitCommitFiles = ref([])         // 该提交的文件变更列表
+const gitCommitDetailLoading = ref(false)
+const gitSelectedFile = ref(null)      // 当前查看 diff 的文件路径
+const gitDiffText = ref('')
+const gitDiffLoading = ref(false)
+const gitDiffError = ref('')
+const gitDiffTruncated = ref(false)
+// Monaco DiffEditor：并排/内联切换（默认并排）
+const gitDiffSideBySide = ref(true)
+const GIT_LOG_PAGE_SIZE = 100
+
+// 取 Git 目标 Agent 的 node_id（与搜索视图一致，用当前 Agent）
+function getGitTargetNodeId() {
+  const agent = agentList.value.find(a => a.agent_id === currentAgentId.value)
+  return String(agent?.node_id || '').trim()
+}
+
+// 取 Git 工作目录（当前 Agent 的 working_dir）
+function getGitWorkingDir() {
+  const agent = agentList.value.find(a => a.agent_id === currentAgentId.value)
+  return String(agent?.working_dir || '').trim()
+}
+
+// 调用后端 Git 只读接口
+async function callGitApi(apiPath, payload) {
+  const { host, port } = getGatewayAddress()
+  const targetNodeId = getGitTargetNodeId() || 'master'
+  const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, apiPath), {
+    method: 'POST',
+    body: JSON.stringify({ ...payload, node_id: targetNodeId }),
+  })
+  const result = await response.json()
+  if (!response.ok || !result.success || !result.data) {
+    throw new Error(result.error?.message || 'Git 请求失败')
+  }
+  return result.data
+}
+
+// 拉取提交历史
+async function fetchGitLog(append = false) {
+  const workingDir = getGitWorkingDir()
+  if (!workingDir) {
+    gitLogError.value = '当前 Agent 没有工作目录'
+    gitLog.value = []
+    return
+  }
+  gitLogLoading.value = true
+  gitLogError.value = ''
+  try {
+    const skip = append ? gitLog.value.length : 0
+    const data = await callGitApi('git/log', {
+      path: workingDir,
+      limit: GIT_LOG_PAGE_SIZE,
+      skip,
+    })
+    const commits = Array.isArray(data.commits) ? data.commits : []
+    gitLog.value = append ? [...gitLog.value, ...commits] : commits
+    gitLogHasMore.value = Boolean(data.has_more)
+  } catch (error) {
+    gitLogError.value = error.message || '获取提交历史失败'
+    if (!append) gitLog.value = []
+  } finally {
+    gitLogLoading.value = false
+  }
+}
+
+// 拉取分支/tag 列表
+async function fetchGitBranches() {
+  const workingDir = getGitWorkingDir()
+  if (!workingDir) return
+  try {
+    const data = await callGitApi('git/branches', { path: workingDir })
+    gitBranches.value = Array.isArray(data.branches) ? data.branches : []
+    gitTags.value = Array.isArray(data.tags) ? data.tags : []
+    gitCurrentBranch.value = data.current || ''
+  } catch (error) {
+    // 分支信息失败不阻塞提交历史展示
+    gitBranches.value = []
+    gitTags.value = []
+    gitCurrentBranch.value = ''
+  }
+}
+
+// 刷新 Git 视图（历史 + 分支）
+async function refreshGitView() {
+  gitSelectedCommit.value = null
+  gitCommitFiles.value = []
+  gitSelectedFile.value = null
+  gitDiffText.value = ''
+  gitDiffError.value = ''
+  disposeGitDiffEditor()
+  await Promise.all([fetchGitLog(false), fetchGitBranches()])
+}
+
+// 展开某提交的详情（文件变更列表）
+async function toggleGitCommitDetail(commit) {
+  if (gitSelectedCommit.value === commit.hash) {
+    gitSelectedCommit.value = null
+    gitCommitFiles.value = []
+    gitSelectedFile.value = null
+    gitDiffText.value = ''
+    disposeGitDiffEditor()
+    return
+  }
+  gitSelectedCommit.value = commit.hash
+  gitCommitFiles.value = []
+  gitSelectedFile.value = null
+  gitDiffText.value = ''
+  gitDiffError.value = ''
+  disposeGitDiffEditor()
+  const workingDir = getGitWorkingDir()
+  if (!workingDir) return
+  gitCommitDetailLoading.value = true
+  try {
+    const data = await callGitApi('git/commit-detail', { path: workingDir, hash: commit.hash })
+    gitCommitFiles.value = Array.isArray(data.files) ? data.files : []
+  } catch (error) {
+    gitDiffError.value = error.message || '获取提交详情失败'
+  } finally {
+    gitCommitDetailLoading.value = false
+  }
+}
+
+// 查看某文件在某提交中的 diff
+// 实现方式：并行取「父版本全文」与「当前版本全文」，直接喂给 Monaco DiffEditor。
+// 这样左右两侧都是完整文件，行号即文件的绝对行号（而非 diff 内的相对行号）。
+async function viewGitFileDiff(commitHash, filePath) {
+  const workingDir = getGitWorkingDir()
+  if (!workingDir) return
+  gitSelectedFile.value = filePath
+  gitDiffText.value = ''
+  gitDiffError.value = ''
+  gitDiffTruncated.value = false
+  gitDiffLoading.value = true
+  try {
+    // diff 文本仅用于「已截断」提示与降级；正文由两份全文提供
+    const [diffData, newData, oldData] = await Promise.all([
+      callGitApi('git/diff', { path: workingDir, hash: commitHash, file: filePath }),
+      callGitApi('git/file-content', { path: workingDir, ref: commitHash, file: filePath }),
+      // 父版本：新增文件时父版本不存在，后端返回 NOT_FOUND，按空文件处理
+      callGitApi('git/file-content', { path: workingDir, ref: `${commitHash}^`, file: filePath })
+        .catch(() => ({ content: '', truncated: false })),
+    ])
+    gitDiffText.value = diffData.diff || ''
+    gitDiffTruncated.value = Boolean(diffData.truncated || newData.truncated || oldData.truncated)
+    gitDiffOldText = oldData.content || ''
+    gitDiffNewText = newData.content || ''
+    await nextTick()
+    renderGitDiffMonaco(filePath)
+  } catch (error) {
+    gitDiffError.value = error.message || '获取 diff 失败'
+  } finally {
+    gitDiffLoading.value = false
+  }
+}
+
+// ===== Git diff 的 Monaco DiffEditor（只读）=====
+// 说明：优先使用「父版本全文 / 当前版本全文」两份完整文件渲染，
+// 这样行号即文件绝对行号；若全文不可得则降级为解析 unified diff。
+// 实例独立于主编辑器 cmEditorView。
+const gitDiffContainerRef = ref(null)
+let gitDiffEditor = null
+let gitDiffOriginalModel = null
+let gitDiffModifiedModel = null
+// 两侧全文（由 git/file-content 提供）
+let gitDiffOldText = ''
+let gitDiffNewText = ''
+
+// 释放当前 diff 的两个 model（编辑器实例复用，不销毁）
+function disposeGitDiffModels() {
+  if (gitDiffOriginalModel && !gitDiffOriginalModel.isDisposed()) gitDiffOriginalModel.dispose()
+  if (gitDiffModifiedModel && !gitDiffModifiedModel.isDisposed()) gitDiffModifiedModel.dispose()
+  gitDiffOriginalModel = null
+  gitDiffModifiedModel = null
+}
+
+// 彻底释放 diff 编辑器（模板 v-if 收起或组件卸载时调用）
+function disposeGitDiffEditor() {
+  disposeGitDiffModels()
+  gitDiffOldText = ''
+  gitDiffNewText = ''
+  if (gitDiffEditor) {
+    gitDiffEditor.dispose()
+    gitDiffEditor = null
+  }
+}
+
+// 确保 diff 编辑器实例存在（复用，不重复创建）
+function ensureGitDiffEditor() {
+  if (gitDiffEditor || !gitDiffContainerRef.value) return
+  gitDiffEditor = monaco.editor.createDiffEditor(gitDiffContainerRef.value, {
+    theme: 'blueDark',
+    fontFamily: EDITOR_FONT_FAMILY,
+    fontSize: 12,
+    lineHeight: 18,
+    readOnly: true,
+    originalEditable: false,
+    automaticLayout: true,
+    renderSideBySide: gitDiffSideBySide.value,
+    // 侧栏很窄，Monaco 默认会在空间不足时强制切到内联视图，
+    // 导致「并排」按钮点了没效果，因此显式关闭该自动降级。
+    useInlineViewWhenSpaceIsLimited: false,
+    // 侧栏较窄，关掉 minimap 与多余装饰，避免挤压内容
+    minimap: { enabled: false },
+    scrollBeyondLastLine: false,
+    renderOverviewRuler: false,
+    renderWhitespace: 'selection',
+    smoothScrolling: true,
+    folding: false,
+    lineNumbersMinChars: 3,
+    wordWrap: 'off',
+  })
+}
+
+// 用当前两侧全文渲染 diff（失败静默降级，不影响提交列表）
+function renderGitDiffMonaco(filePath) {
+  if (!gitDiffContainerRef.value) return
+  try {
+    ensureGitDiffEditor()
+    if (!gitDiffEditor) return
+    const language = getLanguageExtension(getLanguageFromFilename(filePath))
+    // 优先用全文（绝对行号）；全文缺失时降级解析 unified diff
+    let oldText = gitDiffOldText
+    let newText = gitDiffNewText
+    if (!oldText && !newText) {
+      const parsed = parseUnifiedDiff(gitDiffText.value, { absoluteLineNumbers: true })
+      oldText = parsed.oldText
+      newText = parsed.newText
+    }
+    disposeGitDiffModels()
+    gitDiffOriginalModel = monaco.editor.createModel(oldText, language)
+    gitDiffModifiedModel = monaco.editor.createModel(newText, language)
+    gitDiffEditor.setModel({ original: gitDiffOriginalModel, modified: gitDiffModifiedModel })
+    gitDiffEditor.updateOptions({ renderSideBySide: gitDiffSideBySide.value })
+    gitDiffEditor.layout()
+  } catch (error) {
+    console.warn('[GIT] render diff with monaco failed:', error)
+  }
+}
+
+// 并排 / 内联切换
+function toggleGitDiffSideBySide() {
+  gitDiffSideBySide.value = !gitDiffSideBySide.value
+  if (gitDiffEditor) {
+    gitDiffEditor.updateOptions({ renderSideBySide: gitDiffSideBySide.value })
+  }
+}
+
+// 侧栏尺寸/视图变化时重排（复用主编辑器的 layout 时机）
+function layoutGitDiffEditor() {
+  if (gitDiffEditor) gitDiffEditor.layout()
+}
+
+// 提交信息中的 refs 标签：区分 HEAD/分支/tag 样式
+function gitRefClass(ref) {
+  if (ref.startsWith('HEAD')) return 'git-ref-head'
+  if (ref.startsWith('tag:')) return 'git-ref-tag'
+  return 'git-ref-branch'
+}
+
+// 由增删行数推断文件变更状态（后端只返回增删统计，无 status）
+function gitFileStatus(file) {
+  const additions = Number(file?.additions) || 0
+  const deletions = Number(file?.deletions) || 0
+  if (additions > 0 && deletions === 0) return 'A'
+  if (deletions > 0 && additions === 0) return 'D'
+  return 'M'
+}
+
+// 提交相对时间（如 3 分钟前）
+function formatGitRelativeTime(isoDate) {
+  const time = Date.parse(isoDate)
+  if (!time) return ''
+  const diffSeconds = Math.floor((Date.now() - time) / 1000)
+  if (diffSeconds < 60) return '刚刚'
+  if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)} 分钟前`
+  if (diffSeconds < 86400) return `${Math.floor(diffSeconds / 3600)} 小时前`
+  if (diffSeconds < 2592000) return `${Math.floor(diffSeconds / 86400)} 天前`
+  if (diffSeconds < 31536000) return `${Math.floor(diffSeconds / 2592000)} 个月前`
+  return `${Math.floor(diffSeconds / 31536000)} 年前`
+}
+
+// 短 hash（前 7 位）
+function shortGitHash(hash) {
+  return String(hash || '').slice(0, 7)
 }
 
 // 在当前 Agent 的可见节点列表中按方向移动光标
@@ -5246,6 +5718,12 @@ function detachPanel(type, panelId = null) {
     chatDetached.value = !chatDetached.value
   } else if (type === 'editor') {
     editorDetached.value = !editorDetached.value
+    // 嵌入/浮动切换会重建 EditorPanel，释放旧容器上的 diff 实例；
+    // 若仍有选中的文件，等新容器挂载后重新渲染，避免出现空白 diff。
+    disposeGitDiffEditor()
+    if (gitSelectedFile.value && !gitDiffLoading.value && !gitDiffError.value) {
+      nextTick(() => renderGitDiffMonaco(gitSelectedFile.value))
+    }
   } else if (type === 'session' && panelId) {
     if (sessionDetachedPanels.value.has(panelId)) {
       sessionDetachedPanels.value.delete(panelId)
@@ -15189,6 +15667,8 @@ onUnmounted(() => {
     }
   }
   editorModels.clear()
+  // 释放 Git diff 的 Monaco 实例
+  disposeGitDiffEditor()
   // 释放全部 LSP 连接，避免 WS 泄漏
   disposeAllLspClients()
   lspBindings.clear()
@@ -16227,6 +16707,336 @@ body::-webkit-scrollbar {
 .editor-global-search-text mark {
   background: rgba(255, 133, 32, 0.32);
   color: #ff8520;
+}
+
+/* ===== 编辑器侧边栏 Git 视图 ===== */
+.editor-git-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  font-size: 12px;
+}
+
+.editor-git-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-color, #2a2a2a);
+}
+
+.editor-git-branch {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  color: var(--text-secondary, #b0b0b0);
+}
+
+.editor-git-branch-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.editor-git-summary {
+  padding: 4px 8px;
+  color: var(--text-secondary, #888);
+  font-size: 11px;
+}
+
+.editor-git-summary .error {
+  color: #ff5f56;
+}
+
+.editor-git-commit-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.editor-git-commit {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  padding: 2px 8px 2px 2px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+}
+
+.editor-git-commit:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.editor-git-commit.selected {
+  background: rgba(255, 133, 32, 0.10);
+  border-left-color: #ff8520;
+}
+
+.editor-git-graph {
+  flex: 0 0 20px;
+  display: flex;
+  justify-content: center;
+  color: #6a9fd8;
+}
+
+.git-graph-line {
+  opacity: 0.5;
+}
+
+.git-graph-dot {
+  fill: #6a9fd8;
+  stroke: #1e1e1e;
+  stroke-width: 1.5;
+}
+
+.git-graph-dot.git-graph-merge {
+  fill: #d8a06a;
+}
+
+.editor-git-commit-body {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 0;
+}
+
+.editor-git-commit-subject {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary, #e0e0e0);
+}
+
+.editor-git-commit-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+}
+
+.editor-git-refs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.git-ref {
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 10px;
+  line-height: 15px;
+  white-space: nowrap;
+}
+
+.git-ref-head {
+  background: rgba(255, 133, 32, 0.22);
+  color: #ff8520;
+}
+
+.git-ref-branch {
+  background: rgba(106, 159, 216, 0.22);
+  color: #6a9fd8;
+}
+
+.git-ref-tag {
+  background: rgba(120, 200, 120, 0.22);
+  color: #7ec87e;
+}
+
+.editor-git-author {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.editor-git-hash {
+  font-family: var(--mono-font, monospace);
+  color: #c0a060;
+}
+
+.editor-git-commit-detail {
+  margin-top: 6px;
+  padding: 4px 0 2px;
+  border-top: 1px dashed var(--border-color, #2a2a2a);
+  cursor: default;
+}
+
+.editor-git-detail-summary,
+.editor-git-detail-empty {
+  padding: 2px 0;
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+}
+
+.editor-git-detail-empty.error {
+  color: #ff5f56;
+}
+
+.editor-git-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 3px 4px;
+  background: none;
+  border: none;
+  border-radius: 3px;
+  color: var(--text-primary, #d0d0d0);
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.editor-git-file:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.editor-git-file.active {
+  background: rgba(255, 133, 32, 0.14);
+}
+
+.editor-git-file-status {
+  flex: 0 0 14px;
+  text-align: center;
+  font-weight: 700;
+  font-family: var(--mono-font, monospace);
+}
+
+.git-status-A { color: #7ec87e; }
+.git-status-M { color: #d8a06a; }
+.git-status-D { color: #ff5f56; }
+.git-status-R { color: #6a9fd8; }
+
+.editor-git-file-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+.editor-git-file-stat {
+  flex: 0 0 auto;
+  font-family: var(--mono-font, monospace);
+  font-size: 10px;
+}
+
+.git-add-stat { color: #7ec87e; }
+.git-del-stat { color: #ff5f56; }
+
+.editor-git-diff {
+  margin-top: 6px;
+  border: 1px solid var(--border-color, #2a2a2a);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.editor-git-diff-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 11px;
+  font-family: var(--mono-font, monospace);
+  color: var(--text-secondary, #b0b0b0);
+  overflow: hidden;
+}
+
+.editor-git-diff-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-git-diff-toggle {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-color, #2a2a2a);
+  border-radius: 3px;
+  color: var(--text-secondary, #b0b0b0);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.editor-git-diff-toggle:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--text-primary, #d0d0d0);
+}
+
+.editor-git-diff-truncated {
+  flex: 0 0 auto;
+  color: #ff8520;
+  font-size: 10px;
+}
+
+.editor-git-diff-monaco {
+  height: 320px;
+  background: #0d1b2a;
+}
+
+.editor-git-diff-body {
+  margin: 0;
+  padding: 4px 0;
+  max-height: 340px;
+  overflow: auto;
+  background: #1a1a1a;
+  font-family: var(--mono-font, monospace);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.editor-git-diff-body code {
+  display: block;
+}
+
+.git-diff-line {
+  display: block;
+  padding: 0 6px;
+  white-space: pre;
+  color: #c8c8c8;
+}
+
+.git-diff-add { background: rgba(80, 180, 80, 0.14); color: #9ee09e; }
+.git-diff-del { background: rgba(220, 80, 80, 0.14); color: #ff9e9e; }
+.git-diff-hunk { color: #6a9fd8; }
+.git-diff-meta { color: #888; }
+
+.editor-git-empty {
+  padding: 12px 8px;
+  text-align: center;
+  color: var(--text-secondary, #888);
+  font-size: 11px;
+}
+
+.editor-git-load-more {
+  display: block;
+  width: calc(100% - 16px);
+  margin: 6px 8px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-color, #2a2a2a);
+  border-radius: 4px;
+  color: var(--text-primary, #d0d0d0);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.editor-git-load-more:hover {
+  background: rgba(255, 255, 255, 0.10);
 }
 
 .editor-panel-content {
