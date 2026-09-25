@@ -4236,8 +4236,8 @@ const gitDiffText = ref('')
 const gitDiffLoading = ref(false)
 const gitDiffError = ref('')
 const gitDiffTruncated = ref(false)
-// Monaco DiffEditor：并排/内联切换（默认并排）
-const gitDiffSideBySide = ref(true)
+// Monaco DiffEditor：并排/内联切换（桌面默认并排；移动端屏幕窄，默认内联）
+const gitDiffSideBySide = ref(window.innerWidth > 768)
 const GIT_LOG_PAGE_SIZE = 100
 
 // 取 Git 目标 Agent 的 node_id（与搜索视图一致，用当前 Agent）
@@ -4429,8 +4429,9 @@ function ensureGitDiffEditor() {
     automaticLayout: true,
     renderSideBySide: gitDiffSideBySide.value,
     // 侧栏很窄，Monaco 默认会在空间不足时强制切到内联视图，
-    // 导致「并排」按钮点了没效果，因此显式关闭该自动降级。
-    useInlineViewWhenSpaceIsLimited: false,
+    // 导致「并排」按钮点了没效果，因此桌面端显式关闭该自动降级；
+    // 移动端屏幕窄，反而需要它兜底（用户仍可手动切回并排）。
+    useInlineViewWhenSpaceIsLimited: window.innerWidth <= 768,
     // 侧栏较窄，关掉 minimap 与多余装饰，避免挤压内容
     minimap: { enabled: false },
     scrollBeyondLastLine: false,
@@ -20061,6 +20062,49 @@ body::-webkit-scrollbar {
   .session-panel {
     border-radius: 0 !important;
     border: none !important;
+  }
+  /* ========== 编辑器侧边栏 / Git 视图移动端适配 ========== */
+  /* 移动端编辑器面板已全屏，侧栏不能再按桌面宽度（200~560px）挤压主编辑区 */
+  .editor-sidebar {
+    min-width: 0;
+    max-width: none;
+    width: 100% !important;
+    border-right: none;
+  }
+  /* 移动端无鼠标，隐藏拖拽调宽手柄（JS 侧也已按 768px 拦截） */
+  .editor-sidebar-resize-handle {
+    display: none;
+  }
+  .editor-sidebar-header {
+    padding: 8px 10px;
+  }
+  /* Git 提交列表：移动端可读性优先，适当放大字号与点击区域 */
+  .editor-git-panel {
+    font-size: 13px;
+  }
+  .editor-git-commit {
+    padding: 6px 8px 6px 2px;
+  }
+  .editor-git-commit-subject {
+    font-size: 13px;
+  }
+  .editor-git-commit-meta {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+  .editor-git-file {
+    padding: 6px 4px;
+    font-size: 12px;
+  }
+  /* 移动端 diff 容器撑满可用高度，避免固定 320px 在长屏上过矮、
+     又让内联 diff 有足够纵向空间阅读 */
+  .editor-git-diff-monaco {
+    height: 60vh;
+    min-height: 240px;
+  }
+  .editor-git-diff-toggle {
+    padding: 4px 10px;
+    font-size: 11px;
   }
 }
 

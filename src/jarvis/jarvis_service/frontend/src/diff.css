@@ -64,6 +64,15 @@
   width: calc(50% - 50px);
 }
 
+/* 内联 diff（移动端）：单列展示，行号列固定宽度，内容列占满剩余空间 */
+.diff-inline .diff-table colgroup col:nth-child(1) {
+  width: 44px;
+}
+
+.diff-inline .diff-table colgroup col:nth-child(2) {
+  width: calc(100% - 44px);
+}
+
 .diff-row {
 }
 
