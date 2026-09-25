@@ -7875,6 +7875,16 @@ def create_app(
             has_more = len(records) > limit
             records = records[:limit]
 
+            # 仅在首页（skip==0）统计实际提交总数，供前端展示真实数量
+            total = None
+            if skip == 0:
+                count_result = _run_git(["rev-list", "--count", "HEAD"], repo_path)
+                if count_result.get("success"):
+                    try:
+                        total = int(count_result["data"]["stdout"].strip())
+                    except (TypeError, ValueError):
+                        total = None
+
             commits = []
             for record in records:
                 parts = record.split("\x1f")
@@ -7896,7 +7906,7 @@ def create_app(
 
             return {
                 "success": True,
-                "data": {"commits": commits, "has_more": has_more},
+                "data": {"commits": commits, "has_more": has_more, "total": total},
             }
         except Exception as e:  # noqa: BLE001
             logger.exception("[GIT] git log failed: %r", e)

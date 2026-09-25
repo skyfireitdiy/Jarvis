@@ -546,7 +546,7 @@
                 <div class="editor-git-summary">
                   <span v-if="gitLogLoading && !gitLog.length">加载中...</span>
                   <span v-else-if="gitLogError" class="error">{{ gitLogError }}</span>
-                  <span v-else>{{ gitLog.length }} 个提交<span v-if="gitBranches.length"> · {{ gitBranches.length }} 分支</span><span v-if="gitTags.length"> · {{ gitTags.length }} 标签</span></span>
+                  <span v-else>{{ gitLogTotal !== null ? gitLogTotal : gitLog.length }} 个提交<span v-if="gitBranches.length"> · {{ gitBranches.length }} 分支</span><span v-if="gitTags.length"> · {{ gitTags.length }} 标签</span></span>
                 </div>
                 <div class="editor-git-commit-list">
                   <template v-for="(commit, index) in gitLog" :key="commit.hash">
@@ -4238,6 +4238,7 @@ const gitLog = ref([])                 // 提交列表
 const gitLogLoading = ref(false)
 const gitLogError = ref('')
 const gitLogHasMore = ref(false)
+const gitLogTotal = ref(null)          // 仓库实际提交总数（后端 rev-list --count，首页返回）
 const gitBranches = ref([])            // 分支列表
 const gitTags = ref([])                // tag 列表
 const gitCurrentBranch = ref('')       // 当前分支
@@ -4304,6 +4305,7 @@ async function fetchGitLog(append = false) {
   if (!workingDir) {
     gitLogError.value = '当前 Agent 没有工作目录'
     gitLog.value = []
+    gitLogTotal.value = null
     return
   }
   gitLogLoading.value = true
@@ -4318,9 +4320,15 @@ async function fetchGitLog(append = false) {
     const commits = Array.isArray(data.commits) ? data.commits : []
     gitLog.value = append ? [...gitLog.value, ...commits] : commits
     gitLogHasMore.value = Boolean(data.has_more)
+    if (typeof data.total === 'number') {
+      gitLogTotal.value = data.total
+    }
   } catch (error) {
     gitLogError.value = error.message || '获取提交历史失败'
-    if (!append) gitLog.value = []
+    if (!append) {
+      gitLog.value = []
+      gitLogTotal.value = null
+    }
   } finally {
     gitLogLoading.value = false
   }
