@@ -4114,12 +4114,22 @@ function confirmCloseEditorPanel() {
   })
 }
 
+// 编辑器主区域正承载终端/聊天时，对应独立面板的显示状态是被内嵌取代的遗留值；
+// 关闭编辑器前需复位，否则独立面板会「凭空」浮现（如编辑器内新建终端后关闭编辑器）。
+// 同时复位主区域视图，避免下次打开编辑器直接进入终端/聊天视图。
+function resetEditorHostedPanelState() {
+  if (editorHostsTerminal.value) showTerminalPanel.value = false
+  if (editorHostsChat.value) showChatPanel.value = false
+  editorMainView.value = 'file'
+}
+
 async function closeEditorPanel() {
   if (hasDirtyEditorTabs()) {
     const confirmed = await confirmCloseEditorPanel()
     if (!confirmed) return
   }
 
+  resetEditorHostedPanelState()
   showEditorPanel.value = false
   // 面板收起后 Git diff 容器随之销毁，释放 Monaco diff 实例并清空 diff 视图
   editorDiff.value = null
@@ -4206,6 +4216,8 @@ async function closeEditorSession(agentId) {
   if (activeEditorSessionId.value === agentId) {
     activeEditorSessionId.value = editorSessions.value.length > 0 ? editorSessions.value[0].agent_id : null
     if (!activeEditorSessionId.value) {
+      // 与 closeEditorPanel 一致：编辑器承载终端/聊天时，关闭编辑器需一并收起其独立面板状态
+      resetEditorHostedPanelState()
       showEditorPanel.value = false
     }
   }
@@ -7185,6 +7197,7 @@ function closeFocusedPanel() {
   if (key === 'terminal') {
     showTerminalPanel.value = false
   } else if (key === 'editor') {
+    resetEditorHostedPanelState()
     showEditorPanel.value = false
   } else if (key === 'chat') {
     showChatPanel.value = false
