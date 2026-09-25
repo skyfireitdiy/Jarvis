@@ -135,9 +135,10 @@
       <SessionPanel
         :ref="(el) => setSessionPanelRef(panel.id, el)"
         v-for="panel in panels"
-        v-show="!sessionDetachedPanels.has(panel.id) && !(editorHostsSession && panel.id === editorSessionPanel?.id)"
+        v-show="!sessionDetachedPanels.has(panel.id) && panel.id !== editorHostedPanel?.id"
         :key="panel.id"
         :embedded="!sessionDetachedPanels.has(panel.id)"
+        :suppress-terminal="panel.id === editorHostedPanel?.id"
         :agent="getPanelAgent(panel)"
         :messages="getPanelMessages(panel)"
         :input-text="getPanelInputText(panel)"
@@ -806,7 +807,7 @@
     <template v-for="panel in panels" :key="'floating-' + panel.id">
       <SessionPanel
         :ref="(el) => setSessionPanelRef(panel.id, el)"
-        v-if="sessionDetachedPanels.has(panel.id)"
+        v-if="sessionDetachedPanels.has(panel.id) && panel.id !== editorHostedPanel?.id"
         :embedded="false"
         :agent="getPanelAgent(panel)"
         :messages="getPanelMessages(panel)"
@@ -6178,12 +6179,17 @@ const editorHostsTerminal = computed(() => showEditorPanel.value && editorMainVi
 const editorHostsSession = computed(() => showEditorPanel.value && editorMainView.value === 'session')
 // 编辑器主区域会话视图当前显示的 panel（由编辑器侧边栏 Agent 列表点击决定）
 const editorSessionPanelId = ref(null)
+// 编辑器当前占用的 panel：只要编辑器面板打开且已选定 panel，就让它从网格让位。
+// 不随主区域视图（file/chat/terminal/session）变化而回到网格，否则点 chat/终端时
+// 该 panel 会「凭空」出现在网格里，把布局挤乱（用户期望的是替换，而非并存）。
+const editorHostedPanel = computed(() => {
+  if (!showEditorPanel.value || !editorSessionPanelId.value) return null
+  return panels.value.find(p => p.id === editorSessionPanelId.value) || null
+})
 // 编辑器会话视图对应的 panel：优先取记录的面板，回退到当前激活/首个已绑定 Agent 的面板
 const editorSessionPanel = computed(() => {
   if (!editorHostsSession.value) return null
-  const byId = editorSessionPanelId.value
-    ? panels.value.find(p => p.id === editorSessionPanelId.value)
-    : null
+  const byId = editorHostedPanel.value
   if (byId) return byId
   const active = panels.value.find(p => p.id === activePanelId.value && p.agentId)
   if (active) return active
@@ -6197,10 +6203,10 @@ const embeddedPanelCount = computed(() => {
   if (showTerminalPanel.value && !terminalDetached.value && !editorHostsTerminal.value) count++
   if (showChatPanel.value && !chatDetached.value && !editorHostsChat.value) count++
   if (showEditorPanel.value && !editorDetached.value) count++
-  // 内嵌 SessionPanel 数量 = 总面板数 - 已 detach 的面板数 - 被编辑器主区域承载的面板数
-  const hostedPanelId = editorSessionPanel.value?.id
+  // 内嵌 SessionPanel 数量 = 总面板数 - 已 detach 的面板数 - 被编辑器承载的面板数
+  const hostedPanelId = editorHostedPanel.value?.id
   count += panels.value.filter(p =>
-    !sessionDetachedPanels.value.has(p.id) && !(editorHostsSession.value && p.id === hostedPanelId)
+    !sessionDetachedPanels.value.has(p.id) && p.id !== hostedPanelId
   ).length
   return count
 })
@@ -13932,6 +13938,11 @@ function setTerminalRef(executionId, el, agentId = null) {
       syncTerminalSize(executionId, termInfo)
     }
   } else {
+    // 元素卸载回调：仅当当前 host 已脱离文档（或本就为空）时才清理，
+    // 避免被编辑器承载的 grid 实例卸载时误清理编辑器内仍存活的同一终端
+    if (termInfo && termInfo.hostEl && termInfo.hostEl.isConnected) {
+      return
+    }
     terminalHosts.value.delete(executionSessionKey)
     if (termInfo?.resizeObserver) {
       termInfo.resizeObserver.disconnect()
