@@ -366,7 +366,7 @@ def build_browser_extension_zip(extension_dir: str) -> bytes:
     return buffer.getvalue()
 
 
-MAX_FILE_SIZE_BYTES = 1024 * 1024
+MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
 BINARY_FILE_SAMPLE_SIZE = 4096
 GLOBAL_SEARCH_MAX_QUERY_LENGTH = 200
 GLOBAL_SEARCH_DEFAULT_MAX_RESULTS = 100
@@ -7282,7 +7282,7 @@ def create_app(
                     "success": False,
                     "error": {
                         "code": "FILE_TOO_LARGE",
-                        "message": "File size exceeds 1MB limit",
+                        "message": "File size exceeds 10MB limit",
                     },
                 }
 
@@ -7422,7 +7422,7 @@ def create_app(
                     "success": False,
                     "error": {
                         "code": "FILE_TOO_LARGE",
-                        "message": "File size exceeds 1MB limit",
+                        "message": "File size exceeds 10MB limit",
                     },
                 }
 
@@ -7509,7 +7509,7 @@ def create_app(
                     "success": False,
                     "error": {
                         "code": "FILE_TOO_LARGE",
-                        "message": "File size exceeds 1MB limit",
+                        "message": "File size exceeds 10MB limit",
                     },
                 }
 
