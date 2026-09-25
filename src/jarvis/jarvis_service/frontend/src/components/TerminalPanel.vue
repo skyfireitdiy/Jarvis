@@ -6,7 +6,7 @@
     :style="panelStyle"
     @mousedown="$emit('focus', 'terminal')"
   >
-    <div class="terminal-panel-header" @mousedown="!embedded && $emit('startMove', $event)" @dblclick.stop="!embedded && $emit('toggleMaximize')">
+    <div class="terminal-panel-header" @mousedown="!embedded && $emit('startMove', $event)">
       <div class="terminal-panel-title-group">
         <h3>终端</h3>
       </div>
@@ -24,10 +24,6 @@
           </option>
         </select>
         <button class="icon-btn" @click="$emit('createTerminal')" :disabled="!socket" title="新建终端">➕</button>
-        <button class="icon-btn" @click="$emit('toggleMaximize')" :title="isMaximized ? '还原' : '最大化'">
-          {{ isMaximized ? '🗗' : '🗖' }}
-        </button>
-        <button class="icon-btn" @click="$emit('detach')" :title="embedded ? '分离为浮动窗口' : '嵌入主界面'">⧉</button>
         <button class="icon-btn" @click="$emit('close')" title="关闭面板">✕</button>
       </div>
     </div>
@@ -82,7 +78,6 @@ const props = defineProps({
   nodeOptions: Array,
   selectedNodeId: String,
   socket: [Object, null],
-  isMaximized: Boolean,
   sessions: Array,
   activeId: String,
   resizeDirections: Array,
@@ -92,8 +87,6 @@ const props = defineProps({
 const emit = defineEmits([
   'focus',
   'startMove',
-  'toggleMaximize',
-  'detach',
   'update:selectedNodeId',
   'createTerminal',
   'close',
