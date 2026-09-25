@@ -278,7 +278,8 @@
             <div class="editor-sidebar-resize-handle" @mousedown="startEditorSidebarResize($event)"></div>
             <div class="editor-sidebar-header">
               <span class="editor-sidebar-title">{{ editorSidebarView === 'search' ? '全局搜索' : (editorSidebarView === 'git' ? 'Git' : '目录树') }}</span>
-              <button class="icon-btn-small" @click="closeEditorSidebar" title="关闭侧边栏">✕</button>
+              <button class="icon-btn-small editor-sidebar-close-mobile" @click="closeEditorSidebar" title="关闭侧边栏">✕</button>
+              <button class="icon-btn-small editor-sidebar-close-desktop" @click="closeEditorSidebar" title="关闭侧边栏">✕</button>
             </div>
             <div v-if="editorSidebarView === 'files'" class="editor-sidebar-content">
               <div class="editor-file-tree-panel">
@@ -804,7 +805,8 @@
           <div class="editor-sidebar-resize-handle" @mousedown="startEditorSidebarResize($event)"></div>
           <div class="editor-sidebar-header">
             <span class="editor-sidebar-title">{{ editorSidebarView === 'search' ? '全局搜索' : (editorSidebarView === 'git' ? 'Git' : '目录树') }}</span>
-            <button class="icon-btn-small" @click="closeEditorSidebar" title="关闭侧边栏">✕</button>
+            <button class="icon-btn-small editor-sidebar-close-mobile" @click="closeEditorSidebar" title="关闭侧边栏">✕</button>
+            <button class="icon-btn-small editor-sidebar-close-desktop" @click="closeEditorSidebar" title="关闭侧边栏">✕</button>
           </div>
           <div v-if="editorSidebarView === 'files'" class="editor-sidebar-content">
             <div class="editor-file-tree-panel">
@@ -16439,6 +16441,11 @@ body::-webkit-scrollbar {
   color: var(--color-text-primary);
 }
 
+/* 移动端专用关闭按钮：桌面端隐藏（桌面端用原有按钮，两者行为一致） */
+.editor-sidebar-close-mobile {
+  display: none;
+}
+
 .editor-sidebar-content {
   flex: 1;
   min-height: 0;
@@ -20052,12 +20059,24 @@ body::-webkit-scrollbar {
     border: none !important;
   }
   /* ========== 编辑器侧边栏 / Git 视图移动端适配 ========== */
-  /* 移动端编辑器面板已全屏，侧栏不能再按桌面宽度（200~560px）挤压主编辑区 */
+  /* 移动端编辑器面板已全屏，侧栏改为底部抽屉（占 55% 高度），
+     这样打开侧栏时仍能看到上方主区域的 diff / 编辑器内容，
+     且点「✕」可随时收起侧栏查看完整主区域 */
   .editor-sidebar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    z-index: 20;
+    height: 55%;
     min-width: 0;
     max-width: none;
     width: 100% !important;
     border-right: none;
+    border-top: 1px solid var(--color-border-subtle);
+    background: var(--color-bg-secondary);
+    box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.35);
   }
   /* 移动端无鼠标，隐藏拖拽调宽手柄（JS 侧也已按 768px 拦截） */
   .editor-sidebar-resize-handle {
@@ -20065,6 +20084,15 @@ body::-webkit-scrollbar {
   }
   .editor-sidebar-header {
     padding: 8px 10px;
+  }
+  /* 移动端显示专用关闭按钮，并放大点击区 */
+  .editor-sidebar-close-mobile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+    min-height: 36px;
+    font-size: 16px;
   }
   /* Git 提交列表：移动端可读性优先，适当放大字号与点击区域 */
   .editor-git-panel {
