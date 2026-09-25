@@ -6,17 +6,13 @@
     :style="panelStyle"
     @mousedown="$emit('focus', 'chat')"
   >
-    <div class="chat-panel-header" @mousedown="!embedded && $emit('startMove', $event)" @dblclick.stop="!embedded && $emit('toggleMaximize')">
+    <div class="chat-panel-header" @mousedown="!embedded && $emit('startMove', $event)">
       <div class="chat-panel-title-group">
         <h3>聊天室</h3>
         <span v-if="unreadCount > 0" class="chat-unread-badge">{{ unreadCount }}</span>
       </div>
       <span class="chat-username">{{ myName }}</span>
       <div class="chat-panel-actions">
-        <button class="icon-btn" @click="$emit('toggleMaximize')" :title="isMaximized ? '还原' : '最大化'">
-          {{ isMaximized ? '🗗' : '🗖' }}
-        </button>
-        <button class="icon-btn" @click="$emit('detach')" :title="embedded ? '分离为浮动窗口' : '嵌入主界面'">⧉</button>
         <button class="icon-btn" @click="$emit('close')" title="关闭面板">✕</button>
       </div>
     </div>
@@ -209,7 +205,6 @@ const props = defineProps({
   interaction: Object,
   panelStyle: Object,
   socket: [Object, null],
-  isMaximized: Boolean,
   rooms: Array,
   messages: Array,
   clients: Array,
@@ -231,8 +226,6 @@ const props = defineProps({
 const emit = defineEmits([
   'focus',
   'startMove',
-  'toggleMaximize',
-  'detach',
   'close',
   'createRoom',
   'joinRoom',

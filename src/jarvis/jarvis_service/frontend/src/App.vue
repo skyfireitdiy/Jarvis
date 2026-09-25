@@ -170,9 +170,9 @@
         @context-menu="onPanelContextMenu(panel, $event)"
       />
 
-      <!-- 内嵌终端面板 -->
+      <!-- 内嵌终端面板（编辑器主区域正在显示终端时让位，避免同一 xterm host 被两个实例争抢） -->
       <TerminalPanel
-        v-if="showTerminalPanel && !terminalDetached"
+        v-if="showTerminalPanel && !terminalDetached && !editorHostsTerminal"
         :visible="showTerminalPanel"
         :active="activeWindow === 'terminal'"
         :interaction="terminalPanelInteraction"
@@ -180,7 +180,6 @@
         :nodeOptions="filteredNodeOptionsForCreateAgent"
         :selectedNodeId="selectedTerminalNodeId"
         :socket="socket"
-        :isMaximized="isTerminalMaximized"
         :sessions="terminalSessions"
         :activeId="activeTerminalId"
         :resizeDirections="terminalResizeDirections"
@@ -188,7 +187,6 @@
         :embedded="true"
         @focus="focusWindow"
         @startMove="startTerminalPanelMove"
-        @toggleMaximize="toggleTerminalMaximize"
         @update:selectedNodeId="selectedTerminalNodeId = $event"
         @createTerminal="createTerminalForSelectedNode"
         @close="showTerminalPanel = false"
@@ -196,17 +194,15 @@
         @closeTerminal="closeTerminal"
         @setHostRef="setTerminalHostRef"
         @startResize="startTerminalPanelResize"
-        @detach="detachPanel('terminal')"
       />
 
-      <!-- 内嵌聊天室面板 -->
+      <!-- 内嵌聊天室面板（编辑器主区域正在显示聊天室时让位） -->
       <ChatPanel
-        v-if="showChatPanel && !chatDetached"
+        v-if="showChatPanel && !chatDetached && !editorHostsChat"
         :visible="showChatPanel"
         :interaction="chatPanelInteraction"
         :panelStyle="chatPanelStyle"
         :socket="socket"
-        :isMaximized="isChatMaximized"
         :rooms="chatRooms"
         :clients="chatClients"
         :roomMembers="chatRoomMembers"
@@ -224,7 +220,6 @@
         :embedded="true"
         @focus="focusWindow"
         @startMove="startChatPanelMove"
-        @toggleMaximize="toggleChatMaximize"
         @close="showChatPanel = false"
         @createRoom="createChatRoom"
         @joinRoom="joinChatRoom"
@@ -237,7 +232,6 @@
         @renameRoom="renameChatRoom"
         @startSidebarResize="startChatSidebarResize"
         @clearMessages="clearChatMessages"
-        @detach="detachPanel('chat')"
       />
 
       <!-- 内嵌编辑器面板 -->
@@ -258,6 +252,7 @@
         :isEditable="isEditorEditable"
         :showSidebar="showEditorSidebar"
         :sidebarView="editorSidebarView"
+        :mainView="editorMainView"
         :resizeDirections="editorResizeDirections"
         :embedded="true"
         :diff="editorDiff"
@@ -270,6 +265,7 @@
         @closeTab="closeEditorTab"
         @toggleEditable="toggleEditorEditable"
         @setSidebarView="setEditorSidebarView"
+        @setMainView="setEditorMainView"
         @startResize="startEditorPanelResize"
         @toggleDiffSideBySide="toggleGitDiffSideBySide"
         @toggleDiffShowFull="toggleGitDiffShowFull"
@@ -607,6 +603,71 @@
             </div>
           </aside>
         </template>
+        <!-- 编辑器主区域视图：聊天室 / 终端（嵌入模式，复用独立面板组件与状态） -->
+        <template #main-view>
+          <div v-if="editorMainView === 'chat'" class="editor-main-embed-view">
+            <ChatPanel
+              :visible="true"
+              :interaction="chatPanelInteraction"
+              :panelStyle="{}"
+              :socket="socket"
+              :rooms="chatRooms"
+              :clients="chatClients"
+              :roomMembers="chatRoomMembers"
+              :myClientId="myClientId"
+              :isAdmin="auth.userInfo?.is_admin"
+              :currentUserId="auth.userInfo?.user_id"
+              :activeRoomId="activeChatRoomId"
+              :activePrivateId="activePrivateClientId"
+              :resizeDirections="[]"
+              :unreadCount="chatUnreadCount" :unreadMap="chatUnreadMap" :joinedRooms="chatJoinedRooms"
+              :myName="chatName"
+              :collapsed="chatPanelCollapsed"
+              :sidebarWidth="chatSidebarWidth"
+              :messages="activePrivateClientId ? (chatMessages['private_' + activePrivateClientId] || []) : (chatMessages[activeChatRoomId] || [])"
+              :embedded="true"
+              @focus="focusWindow"
+              @startMove="startChatPanelMove"
+              @close="setEditorMainView('file')"
+              @createRoom="createChatRoom"
+              @joinRoom="joinChatRoom"
+              @sendMessage="sendChatMessage"
+              @selectPrivate="selectPrivateClient"
+              @startResize="startChatPanelResize"
+              @toggleCollapse="toggleChatPanelCollapse"
+              @leaveRoom="leaveChatRoom"
+              @deleteRoom="deleteChatRoom"
+              @renameRoom="renameChatRoom"
+              @startSidebarResize="startChatSidebarResize"
+              @clearMessages="clearChatMessages"
+            />
+          </div>
+          <div v-else-if="editorMainView === 'terminal'" class="editor-main-embed-view">
+            <TerminalPanel
+              :visible="true"
+              :active="activeWindow === 'terminal'"
+              :interaction="terminalPanelInteraction"
+              :panelStyle="{}"
+              :nodeOptions="filteredNodeOptionsForCreateAgent"
+              :selectedNodeId="selectedTerminalNodeId"
+              :socket="socket"
+              :sessions="terminalSessions"
+              :activeId="activeTerminalId"
+              :resizeDirections="[]"
+              :formatNodeLabel="formatNodeOptionLabel"
+              :embedded="true"
+              @focus="focusWindow"
+              @startMove="startTerminalPanelMove"
+              @update:selectedNodeId="selectedTerminalNodeId = $event"
+              @createTerminal="createTerminalForSelectedNode"
+              @close="setEditorMainView('file')"
+              @switch="switchTerminal"
+              @closeTerminal="closeTerminal"
+              @setHostRef="setTerminalHostRef"
+              @startResize="startTerminalPanelResize"
+            />
+          </div>
+        </template>
       </EditorPanel>
 
       <!-- 空状态：无任何可见 Panel 时的宠物大厅（所有 Agent 的迷你宠物自由游动） -->
@@ -708,7 +769,7 @@
 
 <!-- 终端面板（浮动模式） -->
     <TerminalPanel
-      v-if="terminalDetached"
+      v-if="terminalDetached && !editorHostsTerminal"
       :visible="showTerminalPanel"
       :active="activeWindow === 'terminal'"
       :interaction="terminalPanelInteraction"
@@ -716,14 +777,12 @@
       :nodeOptions="filteredNodeOptionsForCreateAgent"
       :selectedNodeId="selectedTerminalNodeId"
       :socket="socket"
-      :isMaximized="isTerminalMaximized"
       :sessions="terminalSessions"
       :activeId="activeTerminalId"
       :resizeDirections="terminalResizeDirections"
       :formatNodeLabel="formatNodeOptionLabel"
       @focus="focusWindow"
       @startMove="startTerminalPanelMove"
-      @toggleMaximize="toggleTerminalMaximize"
       @update:selectedNodeId="selectedTerminalNodeId = $event"
       @createTerminal="createTerminalForSelectedNode"
       @close="showTerminalPanel = false"
@@ -731,17 +790,15 @@
       @closeTerminal="closeTerminal"
       @setHostRef="setTerminalHostRef"
       @startResize="startTerminalPanelResize"
-      @detach="detachPanel('terminal')"
     />
 
     <!-- 聊天室面板（浮动模式） -->
     <ChatPanel
-      v-if="chatDetached"
+      v-if="chatDetached && !editorHostsChat"
       :visible="showChatPanel"
       :interaction="chatPanelInteraction"
       :panelStyle="chatPanelStyle"
       :socket="socket"
-      :isMaximized="isChatMaximized"
       :rooms="chatRooms"
       :clients="chatClients"
       :roomMembers="chatRoomMembers"
@@ -758,7 +815,6 @@
       :messages="activePrivateClientId ? (chatMessages['private_' + activePrivateClientId] || []) : (chatMessages[activeChatRoomId] || [])"
       @focus="focusWindow"
       @startMove="startChatPanelMove"
-      @toggleMaximize="toggleChatMaximize"
       @close="showChatPanel = false"
       @createRoom="createChatRoom"
       @joinRoom="joinChatRoom"
@@ -771,7 +827,6 @@
       @renameRoom="renameChatRoom"
       @startSidebarResize="startChatSidebarResize"
       @clearMessages="clearChatMessages"
-      @detach="detachPanel('chat')"
     />
 
     <!-- 浮动编辑器面板 -->
@@ -792,6 +847,7 @@
       :isEditable="isEditorEditable"
       :showSidebar="showEditorSidebar"
       :sidebarView="editorSidebarView"
+      :mainView="editorMainView"
       :resizeDirections="editorResizeDirections"
       :diff="editorDiff"
       @focus="focusWindow('editor')"
@@ -803,6 +859,7 @@
       @closeTab="closeEditorTab"
       @toggleEditable="toggleEditorEditable"
       @setSidebarView="setEditorSidebarView"
+      @setMainView="setEditorMainView"
       @startResize="startEditorPanelResize"
       @toggleDiffSideBySide="toggleGitDiffSideBySide"
       @toggleDiffShowFull="toggleGitDiffShowFull"
@@ -1136,6 +1193,71 @@
             </div>
           </div>
         </aside>
+      </template>
+      <!-- 编辑器主区域视图：聊天室 / 终端（浮动模式同样支持） -->
+      <template #main-view>
+        <div v-if="editorMainView === 'chat'" class="editor-main-embed-view">
+          <ChatPanel
+            :visible="true"
+            :interaction="chatPanelInteraction"
+            :panelStyle="{}"
+            :socket="socket"
+            :rooms="chatRooms"
+            :clients="chatClients"
+            :roomMembers="chatRoomMembers"
+            :myClientId="myClientId"
+            :isAdmin="auth.userInfo?.is_admin"
+            :currentUserId="auth.userInfo?.user_id"
+            :activeRoomId="activeChatRoomId"
+            :activePrivateId="activePrivateClientId"
+            :resizeDirections="[]"
+            :unreadCount="chatUnreadCount" :unreadMap="chatUnreadMap" :joinedRooms="chatJoinedRooms"
+            :myName="chatName"
+            :collapsed="chatPanelCollapsed"
+            :sidebarWidth="chatSidebarWidth"
+            :messages="activePrivateClientId ? (chatMessages['private_' + activePrivateClientId] || []) : (chatMessages[activeChatRoomId] || [])"
+            :embedded="true"
+            @focus="focusWindow"
+            @startMove="startChatPanelMove"
+            @close="setEditorMainView('file')"
+            @createRoom="createChatRoom"
+            @joinRoom="joinChatRoom"
+            @sendMessage="sendChatMessage"
+            @selectPrivate="selectPrivateClient"
+            @startResize="startChatPanelResize"
+            @toggleCollapse="toggleChatPanelCollapse"
+            @leaveRoom="leaveChatRoom"
+            @deleteRoom="deleteChatRoom"
+            @renameRoom="renameChatRoom"
+            @startSidebarResize="startChatSidebarResize"
+            @clearMessages="clearChatMessages"
+          />
+        </div>
+        <div v-else-if="editorMainView === 'terminal'" class="editor-main-embed-view">
+          <TerminalPanel
+            :visible="true"
+            :active="activeWindow === 'terminal'"
+            :interaction="terminalPanelInteraction"
+            :panelStyle="{}"
+            :nodeOptions="filteredNodeOptionsForCreateAgent"
+            :selectedNodeId="selectedTerminalNodeId"
+            :socket="socket"
+            :sessions="terminalSessions"
+            :activeId="activeTerminalId"
+            :resizeDirections="[]"
+            :formatNodeLabel="formatNodeOptionLabel"
+            :embedded="true"
+            @focus="focusWindow"
+            @startMove="startTerminalPanelMove"
+            @update:selectedNodeId="selectedTerminalNodeId = $event"
+            @createTerminal="createTerminalForSelectedNode"
+            @close="setEditorMainView('file')"
+            @switch="switchTerminal"
+            @closeTerminal="closeTerminal"
+            @setHostRef="setTerminalHostRef"
+            @startResize="startTerminalPanelResize"
+          />
+        </div>
       </template>
     </EditorPanel>
 
@@ -2689,11 +2811,7 @@ const PANEL_DRAG_ACTIVATION_DISTANCE = 4
 
 // 窗口最大化状态
 const isEditorMaximized = ref(false)
-const isTerminalMaximized = ref(false)
-const isChatMaximized = ref(false)
 const editorPanelRectBeforeMaximize = ref(null)
-const terminalPanelRectBeforeMaximize = ref(null)
-const chatPanelRectBeforeMaximize = ref(null)
 
 function getDefaultEditorPanelRect() {
   return {
@@ -2782,6 +2900,8 @@ const globalSearchMode = ref('content')
 const fileSearchResults = ref([])
 const showEditorSidebar = ref(true)
 const editorSidebarView = ref('files')
+// 编辑器主区域视图：'file' 显示代码编辑器/diff，'chat' 显示聊天室，'terminal' 显示终端
+const editorMainView = ref('file')
 const windowWidth = ref(window.innerWidth)  // 窗口宽度，用于响应式检测
 const showCreateAgentModal = ref(false) // 创建 Agent 弹窗
 const showQuickCreateAgentModal = ref(false) // 一句话创建 Agent 弹窗
@@ -3067,48 +3187,6 @@ function toggleEditorMaximize() {
   nextTick(() => {
     layoutMonacoEditor()
   })
-}
-
-// 终端窗口最大化/还原
-function toggleTerminalMaximize() {
-  if (isTerminalMaximized.value) {
-    // 还原
-    if (terminalPanelRectBeforeMaximize.value) {
-      terminalPanelRect.value = { ...terminalPanelRectBeforeMaximize.value }
-    }
-    isTerminalMaximized.value = false
-  } else {
-    // 最大化
-    terminalPanelRectBeforeMaximize.value = { ...terminalPanelRect.value }
-    terminalPanelRect.value = {
-      top: 0,
-      left: 0,
-      width: window.innerWidth,
-      height: window.innerHeight,
-    }
-    isTerminalMaximized.value = true
-  }
-}
-
-// 聊天室窗口最大化/还原
-function toggleChatMaximize() {
-  if (isChatMaximized.value) {
-    // 还原
-    if (chatPanelRectBeforeMaximize.value) {
-      chatPanelRect.value = { ...chatPanelRectBeforeMaximize.value }
-    }
-    isChatMaximized.value = false
-  } else {
-    // 最大化
-    chatPanelRectBeforeMaximize.value = { ...chatPanelRect.value }
-    chatPanelRect.value = {
-      top: 0,
-      left: 0,
-      width: window.innerWidth,
-      height: window.innerHeight,
-    }
-    isChatMaximized.value = true
-  }
 }
 
 function toggleChatPanelCollapse() {
@@ -3610,6 +3688,19 @@ function setEditorSidebarView(view) {
   nextTick(() => {
     layoutMonacoEditor()
   })
+}
+
+// 切换编辑器主区域视图（file / chat / terminal）
+function setEditorMainView(view) {
+  if (editorMainView.value === view) return
+  editorMainView.value = view
+  // 切回文件视图时重排 Monaco；切到 chat/terminal 时无需处理编辑器
+  if (view === 'file') {
+    nextTick(() => {
+      layoutMonacoEditor()
+      layoutGitDiffEditor()
+    })
+  }
 }
 
 function toggleEditorSearchSidebar() {
@@ -5891,6 +5982,9 @@ const embeddedPanelCount = computed(() => {
 
 // 当前是否没有任何可见的内嵌 Panel（用于展示空状态欢迎背景）
 const hasNoPanel = computed(() => embeddedPanelCount.value === 0)
+// 编辑器主区域是否正在承载聊天室 / 终端（此时独立面板让位，避免同一状态被两个实例争抢）
+const editorHostsChat = computed(() => showEditorPanel.value && editorMainView.value === 'chat')
+const editorHostsTerminal = computed(() => showEditorPanel.value && editorMainView.value === 'terminal')
 
 // 是否已完成首次 Agent 列表拉取（无论成功失败）。
 // 声明位置需早于下方 immediate watch（否则 watch 立即求值会命中 TDZ）。
@@ -14706,6 +14800,11 @@ function stopChatPanelInteraction() {
 
 // 聊天室功能方法
 function toggleChatPanel() {
+  // 编辑器主区域正在显示聊天室时，顶栏按钮语义为「收起」：切回文件视图
+  if (editorHostsChat.value) {
+    setEditorMainView('file')
+    return
+  }
   showChatPanel.value = !showChatPanel.value
   if (showChatPanel.value) {
     focusWindow('chat')
@@ -15609,6 +15708,11 @@ const toggleAgentSidebar = () => {
 
 // 打开/关闭终端面板（移动端处理history）
 const toggleTerminalPanel = () => {
+  // 编辑器主区域正在显示终端时，顶栏按钮语义为「收起」：切回文件视图
+  if (editorHostsTerminal.value) {
+    setEditorMainView('file')
+    return
+  }
   const newState = !showTerminalPanel.value
   showTerminalPanel.value = newState
   if (newState && windowWidth.value <= 768) {
@@ -16563,6 +16667,20 @@ body::-webkit-scrollbar {
   border-right: 1px solid var(--color-border-subtle);
   background: transparent;
   flex-shrink: 0;
+}
+
+/* 编辑器主区域嵌入的聊天室 / 终端视图：撑满主区域 */
+.editor-main-embed-view {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-main-embed-view > * {
+  flex: 1;
+  min-height: 0;
 }
 
 .editor-sidebar-resize-handle {

@@ -91,34 +91,49 @@
             <path d="M15.698 7.287 8.712.302a1.03 1.03 0 0 0-1.457 0l-1.45 1.45 1.84 1.84a1.223 1.223 0 0 1 1.55 1.56l1.773 1.774a1.224 1.224 0 0 1 1.267 2.025 1.226 1.226 0 0 1-2.002-1.334L8.58 5.963v4.353a1.228 1.228 0 1 1-1.008-.036V5.887a1.228 1.228 0 0 1-.666-1.608L5.093 2.466l-4.45 4.45a1.03 1.03 0 0 0 0 1.457l6.986 6.986a1.03 1.03 0 0 0 1.457 0l6.612-6.612a1.03 1.03 0 0 0 0-1.46z"/>
           </svg>
         </button>
+        <button
+          class="editor-activity-button"
+          :class="{ active: mainView === 'chat' }"
+          @click="$emit('setMainView', 'chat')"
+          title="聊天室"
+        >💬</button>
+        <button
+          class="editor-activity-button"
+          :class="{ active: mainView === 'terminal' }"
+          @click="$emit('setMainView', 'terminal')"
+          title="终端"
+        >⌨️</button>
       </div>
       <slot name="sidebar"></slot>
       <div class="editor-panel-content editor-panel-content-main">
-        <div v-if="diff" class="editor-diff-view">
-          <div class="editor-diff-header">
-            <span class="editor-diff-title" :title="diff.filePath">{{ diff.filePath }}</span>
-            <span v-if="diff.commitHash" class="editor-diff-hash">{{ diff.commitHash.slice(0, 7) }}</span>
-            <span v-if="diff.truncated" class="editor-diff-truncated">（已截断）</span>
-            <button class="editor-diff-nav" @click="$emit('diffNavPrev')" title="上一个差异">▲</button>
-            <button class="editor-diff-nav" @click="$emit('diffNavNext')" title="下一个差异">▼</button>
-            <button class="editor-diff-toggle" @click="$emit('toggleDiffShowFull')" :title="diff.showFull ? '只显示变更上下文区域' : '显示文件全文'">
-              {{ diff.showFull ? '仅上下文' : '全文' }}
-            </button>
-            <button class="editor-diff-toggle" @click="$emit('toggleDiffSideBySide')">
-              {{ diff.sideBySide ? '内联' : '并排' }}
-            </button>
-            <button class="editor-diff-close" @click="$emit('closeDiff')" title="关闭 diff">✕</button>
+        <slot name="main-view"></slot>
+        <div v-show="mainView === 'file'" class="editor-main-file-view">
+          <div v-if="diff" class="editor-diff-view">
+            <div class="editor-diff-header">
+              <span class="editor-diff-title" :title="diff.filePath">{{ diff.filePath }}</span>
+              <span v-if="diff.commitHash" class="editor-diff-hash">{{ diff.commitHash.slice(0, 7) }}</span>
+              <span v-if="diff.truncated" class="editor-diff-truncated">（已截断）</span>
+              <button class="editor-diff-nav" @click="$emit('diffNavPrev')" title="上一个差异">▲</button>
+              <button class="editor-diff-nav" @click="$emit('diffNavNext')" title="下一个差异">▼</button>
+              <button class="editor-diff-toggle" @click="$emit('toggleDiffShowFull')" :title="diff.showFull ? '只显示变更上下文区域' : '显示文件全文'">
+                {{ diff.showFull ? '仅上下文' : '全文' }}
+              </button>
+              <button class="editor-diff-toggle" @click="$emit('toggleDiffSideBySide')">
+                {{ diff.sideBySide ? '内联' : '并排' }}
+              </button>
+              <button class="editor-diff-close" @click="$emit('closeDiff')" title="关闭 diff">✕</button>
+            </div>
+            <div v-if="diff.loading" class="editor-diff-status">加载 diff...</div>
+            <div v-else-if="diff.error" class="editor-diff-status error">{{ diff.error }}</div>
+            <div v-else ref="diffContainerRef" class="editor-diff-monaco"></div>
           </div>
-          <div v-if="diff.loading" class="editor-diff-status">加载 diff...</div>
-          <div v-else-if="diff.error" class="editor-diff-status error">{{ diff.error }}</div>
-          <div v-else ref="diffContainerRef" class="editor-diff-monaco"></div>
+          <div v-else-if="tabs.length === 0" class="editor-placeholder">
+            <div class="editor-placeholder-icon">📝</div>
+            <div class="editor-placeholder-title">点击文件树中的文件打开代码编辑器</div>
+            <div class="editor-placeholder-text">支持 Monaco 语法高亮、智能提示、代码折叠、多标签切换与保存。</div>
+          </div>
+          <div v-else ref="editorContainerRef" class="editor-monaco-container"></div>
         </div>
-        <div v-else-if="tabs.length === 0" class="editor-placeholder">
-          <div class="editor-placeholder-icon">📝</div>
-          <div class="editor-placeholder-title">点击文件树中的文件打开代码编辑器</div>
-          <div class="editor-placeholder-text">支持 Monaco 语法高亮、智能提示、代码折叠、多标签切换与保存。</div>
-        </div>
-        <div v-else ref="editorContainerRef" class="editor-monaco-container"></div>
       </div>
     </div>
     <div
@@ -149,6 +164,7 @@ const props = defineProps({
   isEditable: Boolean,
   showSidebar: Boolean,
   sidebarView: String,
+  mainView: { type: String, default: 'file' },
   resizeDirections: Array,
   diff: Object
 })
@@ -164,6 +180,7 @@ const emit = defineEmits([
   'closeTab',
   'toggleEditable',
   'setSidebarView',
+  'setMainView',
   'startResize',
   'toggleDiffSideBySide',
   'closeDiff',
@@ -435,6 +452,15 @@ defineExpose({
 
 .editor-panel-content-main {
   overflow: auto;
+}
+
+/* 主区域文件视图：占满主区域，内部仍由 diff / 占位 / Monaco 容器各自撑开 */
+.editor-main-file-view {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .editor-placeholder {
