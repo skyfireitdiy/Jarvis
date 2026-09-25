@@ -1,22 +1,21 @@
 <template>
   <aside
     v-show="visible"
-    class="editor-panel"
-    :class="{ 'editor-panel-dragging': interaction.active, 'editor-panel-active': active, 'editor-panel-embedded': embedded }"
+    class="workspace-panel"
+    :class="{ 'workspace-panel-dragging': interaction.active, 'workspace-panel-active': active, 'workspace-panel-embedded': embedded }"
     :style="panelStyle"
-    @mousedown="$emit('focus', 'editor')"
+    @mousedown="$emit('focus', 'workspace')"
   >
     <div
-      class="editor-panel-header"
+      class="workspace-panel-header"
       @mousedown="!embedded && $emit('startMove', $event)"
-      @dblclick.stop="!embedded && $emit('toggleMaximize')"
     >
-      <div class="editor-panel-title-group">
+      <div class="workspace-panel-title-group">
         <h3>工作区</h3>
-        <span v-if="agents && agents.length" class="editor-agent-label">当前 Agent</span>
+        <span v-if="agents && agents.length" class="workspace-agent-label">当前 Agent</span>
         <select
           v-if="agents && agents.length"
-          class="editor-agent-select"
+          class="workspace-agent-select"
           :value="activeAgentId || ''"
           title="选择 Agent"
           @mousedown.stop
@@ -28,64 +27,62 @@
           </option>
         </select>
       </div>
-      <div class="editor-panel-actions">
+      <div class="workspace-panel-actions">
         <button v-if="!$slots['pane-tree']" class="icon-btn" @click.stop="$emit('save')" :disabled="!activeTab || activeTab.loading" title="保存文件">💾</button>
-        <button class="icon-btn maximize-btn" @click="$emit('toggleMaximize')" :title="isMaximized ? '还原' : '最大化'">
-          {{ isMaximized ? '🗗' : '🗖' }}
-        </button>
+        <button class="icon-btn close-btn" @click.stop="$emit('close')" title="关闭">✕</button>
       </div>
     </div>
-    <div class="editor-panel-toolbar">
-      <span class="editor-toolbar-status" v-if="activeTab?.loading">加载中...</span>
-      <span class="editor-toolbar-status error" v-else-if="activeTab?.error">{{ activeTab.error }}</span>
-      <span class="editor-toolbar-status" v-else-if="activeTab">{{ activeTab.isDirty ? '未保存修改' : '已保存' }}</span>
-      <span class="editor-toolbar-status" v-else>点击文件树中的文件打开编辑器</span>
-      <div class="editor-toolbar-spacer"></div>
+    <div class="workspace-panel-toolbar">
+      <span class="workspace-toolbar-status" v-if="activeTab?.loading">加载中...</span>
+      <span class="workspace-toolbar-status error" v-else-if="activeTab?.error">{{ activeTab.error }}</span>
+      <span class="workspace-toolbar-status" v-else-if="activeTab">{{ activeTab.isDirty ? '未保存修改' : '已保存' }}</span>
+      <span class="workspace-toolbar-status" v-else>点击文件树中的文件打开编辑器</span>
+      <div class="workspace-toolbar-spacer"></div>
       <button
         v-if="canSplit"
-        class="editor-edit-toggle"
+        class="workspace-edit-toggle"
         @click="$emit('splitPane', 'row')"
         title="左右分屏"
       >
-        <span class="editor-edit-toggle-icon">◫</span>
-        <span class="editor-edit-toggle-text">左右分</span>
+        <span class="workspace-edit-toggle-icon">◫</span>
+        <span class="workspace-edit-toggle-text">左右分</span>
       </button>
       <button
         v-if="canSplit"
-        class="editor-edit-toggle"
+        class="workspace-edit-toggle"
         @click="$emit('splitPane', 'column')"
         title="上下分屏"
       >
-        <span class="editor-edit-toggle-icon">⬓</span>
-        <span class="editor-edit-toggle-text">上下分</span>
+        <span class="workspace-edit-toggle-icon">⬓</span>
+        <span class="workspace-edit-toggle-text">上下分</span>
       </button>
       <button
         v-if="tabs.length > 0 && !$slots['pane-tree']"
-        class="editor-edit-toggle"
+        class="workspace-edit-toggle"
         :class="{ 'editable': isEditable }"
         @click="$emit('toggleEditable')"
         :title="isEditable ? '切换到只读模式' : '切换到编辑模式'"
       >
-        <span class="editor-edit-toggle-icon">{{ isEditable ? '🔓' : '🔒' }}</span>
-        <span class="editor-edit-toggle-text">{{ isEditable ? '可编辑' : '只读' }}</span>
+        <span class="workspace-edit-toggle-icon">{{ isEditable ? '🔓' : '🔒' }}</span>
+        <span class="workspace-edit-toggle-text">{{ isEditable ? '可编辑' : '只读' }}</span>
       </button>
     </div>
-    <div class="editor-workspace">
-      <div class="editor-activity-bar">
+    <div class="workspace-main">
+      <div class="workspace-activity-bar">
         <button
-          class="editor-activity-button"
+          class="workspace-activity-button"
           :class="{ active: showSidebar && sidebarView === 'files' }"
           @click="$emit('setSidebarView', 'files')"
           title="目录树"
         >📁</button>
         <button
-          class="editor-activity-button"
+          class="workspace-activity-button"
           :class="{ active: showSidebar && sidebarView === 'search' }"
           @click="$emit('setSidebarView', 'search')"
           title="全局搜索"
         >🔎</button>
         <button
-          class="editor-activity-button"
+          class="workspace-activity-button"
           :class="{ active: showSidebar && sidebarView === 'git' }"
           @click="$emit('setSidebarView', 'git')"
           title="Git"
@@ -95,40 +92,40 @@
           </svg>
         </button>
         <button
-          class="editor-activity-button"
+          class="workspace-activity-button"
           :class="{ active: showSidebar && sidebarView === 'agents' }"
           @click="$emit('setSidebarView', 'agents')"
           title="Agent 列表"
         >📋</button>
         <button
-          class="editor-activity-button"
+          class="workspace-activity-button"
           :class="{ active: mainView === 'chat' }"
           @click="$emit('setMainView', 'chat')"
           title="聊天室"
         >💬</button>
         <button
-          class="editor-activity-button"
+          class="workspace-activity-button"
           :class="{ active: mainView === 'terminal' }"
           @click="$emit('setMainView', 'terminal')"
           title="终端"
         >⌨️</button>
       </div>
       <slot name="sidebar"></slot>
-      <div class="editor-panel-content editor-panel-content-main">
+      <div class="workspace-panel-content workspace-panel-content-main">
         <!-- 文件标签：只属于「文件视图」，放在主区域顶部（不横跨活动栏/侧边栏）。
              自由分割模式下改由各 file pane 内部渲染（见 App.vue #pane-content），
              此处不再渲染，避免标签栏横跨整个工作区宽度。 -->
-        <div class="editor-tabs" v-if="!$slots['pane-tree'] && mainView === 'file' && tabs.length > 0">
+        <div class="workspace-tabs" v-if="!$slots['pane-tree'] && mainView === 'file' && tabs.length > 0">
           <div
             v-for="tab in tabs"
             :key="tab.path"
-            class="editor-tab"
+            class="workspace-tab"
             :class="{ active: activeTabPath === tab.path }"
             @click="$emit('activateTab', tab.path)"
           >
-            <span class="editor-tab-name">{{ tab.name }}</span>
-            <span v-if="tab.isDirty" class="editor-tab-dirty">●</span>
-            <button class="editor-tab-close" @click.stop="$emit('closeTab', tab.path)">✕</button>
+            <span class="workspace-tab-name">{{ tab.name }}</span>
+            <span v-if="tab.isDirty" class="workspace-tab-dirty">●</span>
+            <button class="workspace-tab-close" @click.stop="$emit('closeTab', tab.path)">✕</button>
           </div>
         </div>
         <!-- 自由分割模式：由 App.vue 提供整棵 pane 树（含每个 leaf 的内容），
@@ -136,32 +133,32 @@
         <slot name="pane-tree"></slot>
         <template v-if="!$slots['pane-tree']">
         <slot name="main-view"></slot>
-        <div v-show="mainView === 'file'" class="editor-main-file-view">
-          <div v-if="diff" class="editor-diff-view">
-            <div class="editor-diff-header">
-              <span class="editor-diff-title" :title="diff.filePath">{{ diff.filePath }}</span>
-              <span v-if="diff.commitHash" class="editor-diff-hash">{{ diff.commitHash.slice(0, 7) }}</span>
-              <span v-if="diff.truncated" class="editor-diff-truncated">（已截断）</span>
-              <button class="editor-diff-nav" @click="$emit('diffNavPrev')" title="上一个差异">▲</button>
-              <button class="editor-diff-nav" @click="$emit('diffNavNext')" title="下一个差异">▼</button>
-              <button class="editor-diff-toggle" @click="$emit('toggleDiffShowFull')" :title="diff.showFull ? '只显示变更上下文区域' : '显示文件全文'">
+        <div v-show="mainView === 'file'" class="workspace-main-file-view">
+          <div v-if="diff" class="workspace-diff-view">
+            <div class="workspace-diff-header">
+              <span class="workspace-diff-title" :title="diff.filePath">{{ diff.filePath }}</span>
+              <span v-if="diff.commitHash" class="workspace-diff-hash">{{ diff.commitHash.slice(0, 7) }}</span>
+              <span v-if="diff.truncated" class="workspace-diff-truncated">（已截断）</span>
+              <button class="workspace-diff-nav" @click="$emit('diffNavPrev')" title="上一个差异">▲</button>
+              <button class="workspace-diff-nav" @click="$emit('diffNavNext')" title="下一个差异">▼</button>
+              <button class="workspace-diff-toggle" @click="$emit('toggleDiffShowFull')" :title="diff.showFull ? '只显示变更上下文区域' : '显示文件全文'">
                 {{ diff.showFull ? '仅上下文' : '全文' }}
               </button>
-              <button class="editor-diff-toggle" @click="$emit('toggleDiffSideBySide')">
+              <button class="workspace-diff-toggle" @click="$emit('toggleDiffSideBySide')">
                 {{ diff.sideBySide ? '内联' : '并排' }}
               </button>
-              <button class="editor-diff-close" @click="$emit('closeDiff')" title="关闭 diff">✕</button>
+              <button class="workspace-diff-close" @click="$emit('closeDiff')" title="关闭 diff">✕</button>
             </div>
-            <div v-if="diff.loading" class="editor-diff-status">加载 diff...</div>
-            <div v-else-if="diff.error" class="editor-diff-status error">{{ diff.error }}</div>
-            <div v-else ref="diffContainerRef" class="editor-diff-monaco"></div>
+            <div v-if="diff.loading" class="workspace-diff-status">加载 diff...</div>
+            <div v-else-if="diff.error" class="workspace-diff-status error">{{ diff.error }}</div>
+            <div v-else ref="diffContainerRef" class="workspace-diff-monaco"></div>
           </div>
-          <div v-else-if="tabs.length === 0" class="editor-placeholder">
-            <div class="editor-placeholder-icon">📝</div>
-            <div class="editor-placeholder-title">点击文件树中的文件打开代码编辑器</div>
-            <div class="editor-placeholder-text">支持 Monaco 语法高亮、智能提示、代码折叠、多标签切换与保存。</div>
+          <div v-else-if="tabs.length === 0" class="workspace-placeholder">
+            <div class="workspace-placeholder-icon">📝</div>
+            <div class="workspace-placeholder-title">点击文件树中的文件打开代码编辑器</div>
+            <div class="workspace-placeholder-text">支持 Monaco 语法高亮、智能提示、代码折叠、多标签切换与保存。</div>
           </div>
-          <div v-else ref="editorContainerRef" class="editor-monaco-container"></div>
+          <div v-else ref="editorContainerRef" class="workspace-monaco-container"></div>
         </div>
         </template>
       </div>
@@ -169,7 +166,7 @@
     <div
       v-for="direction in resizeDirections"
       :key="direction"
-      :class="['editor-resize-handle', `editor-resize-${direction}`]"
+      :class="['workspace-resize-handle', `workspace-resize-${direction}`]"
       @mousedown="$emit('startResize', $event, direction)"
     ></div>
   </aside>
@@ -233,7 +230,7 @@ defineExpose({
 </script>
 
 <style scoped>
-.editor-panel {
+.workspace-panel {
   position: fixed;
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border-subtle);
@@ -246,16 +243,16 @@ defineExpose({
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.editor-panel-active {
+.workspace-panel-active {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 1px var(--color-accent), 0 0 12px rgba(32, 200, 255, 0.15);
 }
 
-.editor-panel-dragging {
+.workspace-panel-dragging {
   transition: none;
 }
 
-.editor-panel-embedded {
+.workspace-panel-embedded {
   position: relative !important;
   width: 100% !important;
   height: 100% !important;
@@ -264,7 +261,7 @@ defineExpose({
   border-radius: 4px;
 }
 
-.editor-panel-header {
+.workspace-panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -276,27 +273,27 @@ defineExpose({
   min-height: 28px;
 }
 
-.editor-panel-title-group {
+.workspace-panel-title-group {
   min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.editor-panel-header h3 {
+.workspace-panel-header h3 {
   margin: 0;
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
 }
 
-.editor-agent-label {
+.workspace-agent-label {
   font-size: 11px;
   color: var(--color-text-secondary);
   white-space: nowrap;
 }
 
-.editor-agent-select {
+.workspace-agent-select {
   max-width: 220px;
   font-size: 12px;
   padding: 2px 4px;
@@ -307,13 +304,35 @@ defineExpose({
   cursor: pointer;
 }
 
-.editor-panel-actions {
+.workspace-panel-actions {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.editor-tabs {
+.workspace-panel-actions .close-btn {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-hover);
+  border: none;
+  border-radius: var(--tile-radius-xs);
+  color: #8ba3b8;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.workspace-panel-actions .close-btn:hover {
+  background: var(--color-bg-tertiary);
+  color: #e6edf3;
+}
+
+.workspace-tabs {
   display: flex;
   align-items: stretch;
   gap: 2px;
@@ -323,7 +342,7 @@ defineExpose({
   flex-shrink: 0;
 }
 
-.editor-tab {
+.workspace-tab {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -340,23 +359,23 @@ defineExpose({
   line-height: 1.2;
 }
 
-.editor-tab.active {
+.workspace-tab.active {
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
 }
 
-.editor-tab-name {
+.workspace-tab-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.editor-tab-dirty {
+.workspace-tab-dirty {
   color: #ff8520;
   font-size: 10px;
 }
 
-.editor-tab-close {
+.workspace-tab-close {
   border: none;
   background: transparent;
   color: inherit;
@@ -366,7 +385,7 @@ defineExpose({
   padding: 0;
 }
 
-.editor-panel-toolbar {
+.workspace-panel-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -378,20 +397,20 @@ defineExpose({
   background: var(--color-bg-secondary);
 }
 
-.editor-toolbar-status {
+.workspace-toolbar-status {
   font-size: 12px;
   color: var(--color-text-secondary);
 }
 
-.editor-toolbar-status.error {
+.workspace-toolbar-status.error {
   color: var(--color-error);
 }
 
-.editor-toolbar-spacer {
+.workspace-toolbar-spacer {
   flex: 1;
 }
 
-.editor-edit-toggle {
+.workspace-edit-toggle {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -407,40 +426,40 @@ defineExpose({
 
 }
 
-.editor-edit-toggle:hover {
+.workspace-edit-toggle:hover {
   background: var(--color-bg-hover);
 }
 
-.editor-edit-toggle:active {
+.workspace-edit-toggle:active {
   transform: scale(0.96);
 }
 
-.editor-edit-toggle.editable {
+.workspace-edit-toggle.editable {
   background: rgba(54, 255, 124, 0.15);
   color: var(--color-success);
 }
 
-.editor-edit-toggle.editable:hover {
+.workspace-edit-toggle.editable:hover {
   background: rgba(54, 255, 124, 0.25);
 }
 
-.editor-edit-toggle-icon {
+.workspace-edit-toggle-icon {
   font-size: 12px;
 }
 
-.editor-edit-toggle-text {
+.workspace-edit-toggle-text {
   font-size: 11px;
   letter-spacing: 0.02em;
 }
 
-.editor-workspace {
+.workspace-main {
   flex: 1;
   min-height: 0;
   display: flex;
   background: var(--color-bg-primary);
 }
 
-.editor-activity-bar {
+.workspace-activity-bar {
   width: 44px;
   display: flex;
   flex-direction: column;
@@ -451,7 +470,7 @@ defineExpose({
   background: var(--color-bg-primary);
 }
 
-.editor-activity-button {
+.workspace-activity-button {
   width: 32px;
   height: 32px;
   display: flex;
@@ -467,28 +486,28 @@ defineExpose({
   transition: all 0.15s ease-out;
 }
 
-.editor-activity-button:hover,
-.editor-activity-button.active {
+.workspace-activity-button:hover,
+.workspace-activity-button.active {
   color: var(--color-text-primary);
   background: var(--color-accent-subtle);
   border-color: var(--color-border-active);
 }
 
-.editor-panel-content {
+.workspace-panel-content {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
-.editor-panel-content-main {
+.workspace-panel-content-main {
   /* 标签固定在顶部，内容区各自滚动（Monaco/diff/嵌入视图内部都有自己的滚动容器），
      因此这里不整体滚动，避免标签随内容一起滚走。 */
   overflow: hidden;
 }
 
 /* 主区域文件视图：占满主区域，内部仍由 diff / 占位 / Monaco 容器各自撑开 */
-.editor-main-file-view {
+.workspace-main-file-view {
   flex: 1;
   min-height: 0;
   min-width: 0;
@@ -496,7 +515,7 @@ defineExpose({
   flex-direction: column;
 }
 
-.editor-placeholder {
+.workspace-placeholder {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -508,30 +527,30 @@ defineExpose({
   text-align: center;
 }
 
-.editor-placeholder-icon {
+.workspace-placeholder-icon {
   font-size: 48px;
   opacity: 0.6;
 }
 
-.editor-placeholder-title {
+.workspace-placeholder-title {
   font-size: 16px;
   font-weight: 500;
   color: var(--color-text-primary);
 }
 
-.editor-placeholder-text {
+.workspace-placeholder-text {
   font-size: 13px;
   line-height: 1.6;
   max-width: 320px;
 }
 
-.editor-monaco-container {
+.workspace-monaco-container {
   flex: 1;
   min-height: 0;
   overflow: hidden;
 }
 
-.editor-diff-view {
+.workspace-diff-view {
   flex: 1;
   min-height: 0;
   min-width: 0;
@@ -540,7 +559,7 @@ defineExpose({
   overflow: hidden;
 }
 
-.editor-diff-header {
+.workspace-diff-header {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -551,7 +570,7 @@ defineExpose({
   flex-shrink: 0;
 }
 
-.editor-diff-title {
+.workspace-diff-title {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -560,17 +579,17 @@ defineExpose({
   color: var(--color-text-primary);
 }
 
-.editor-diff-hash {
+.workspace-diff-hash {
   color: var(--color-text-secondary);
   font-family: monospace;
 }
 
-.editor-diff-truncated {
+.workspace-diff-truncated {
   color: var(--color-warning, #e6a23c);
 }
 
-.editor-diff-toggle,
-.editor-diff-close {
+.workspace-diff-toggle,
+.workspace-diff-close {
   flex-shrink: 0;
   padding: 2px 8px;
   border: 1px solid var(--color-border);
@@ -581,13 +600,13 @@ defineExpose({
   cursor: pointer;
 }
 
-.editor-diff-toggle:hover,
-.editor-diff-close:hover {
+.workspace-diff-toggle:hover,
+.workspace-diff-close:hover {
   color: var(--color-text-primary);
   border-color: var(--color-text-secondary);
 }
 
-.editor-diff-nav {
+.workspace-diff-nav {
   flex-shrink: 0;
   padding: 2px 6px;
   border: 1px solid var(--color-border);
@@ -599,12 +618,12 @@ defineExpose({
   cursor: pointer;
 }
 
-.editor-diff-nav:hover {
+.workspace-diff-nav:hover {
   color: var(--color-text-primary);
   border-color: var(--color-text-secondary);
 }
 
-.editor-diff-status {
+.workspace-diff-status {
   flex: 1;
   display: flex;
   align-items: center;
@@ -614,82 +633,82 @@ defineExpose({
   font-size: 13px;
 }
 
-.editor-diff-status.error {
+.workspace-diff-status.error {
   color: var(--color-danger, #f56c6c);
 }
 
-.editor-diff-monaco {
+.workspace-diff-monaco {
   flex: 1;
   min-height: 0;
   min-width: 0;
   overflow: hidden;
 }
 
-.editor-resize-handle {
+.workspace-resize-handle {
   position: absolute;
   background: transparent;
   z-index: 10;
 }
 
-.editor-resize-n,
-.editor-resize-s {
+.workspace-resize-n,
+.workspace-resize-s {
   left: 10px;
   right: 10px;
   height: 6px;
   cursor: ns-resize;
 }
 
-.editor-resize-n {
+.workspace-resize-n {
   top: 0;
 }
 
-.editor-resize-s {
+.workspace-resize-s {
   bottom: 0;
 }
 
-.editor-resize-e,
-.editor-resize-w {
+.workspace-resize-e,
+.workspace-resize-w {
   top: 10px;
   bottom: 10px;
   width: 6px;
   cursor: ew-resize;
 }
 
-.editor-resize-e {
+.workspace-resize-e {
   right: 0;
 }
 
-.editor-resize-w {
+.workspace-resize-w {
   left: 0;
 }
 
-.editor-resize-ne,
-.editor-resize-nw,
-.editor-resize-se,
-.editor-resize-sw {
+.workspace-resize-ne,
+.workspace-resize-nw,
+.workspace-resize-se,
+.workspace-resize-sw {
   width: 14px;
   height: 14px;
 }
 
-.editor-resize-ne {
+.workspace-resize-ne {
   top: 0;
   right: 0;
   cursor: nesw-resize;
 }
 
-.editor-resize-nw {
+.workspace-resize-nw {
   top: 0;
   left: 0;
   cursor: nwse-resize;
 }
 
-.editor-resize-se {
+.workspace-resize-se {
   bottom: 0;
   right: 0;
   cursor: nwse-resize;
 }
 
-.editor-resize-sw {
+.workspace-resize-sw {
   bottom: 0;
   left: 0;
   cursor: nesw-resize;

@@ -287,7 +287,7 @@ function canStealFocus() {
   if (tagName === 'input' || tagName === 'textarea' || active.isContentEditable) return false
   // 焦点在其它面板区域（会话面板/终端/编辑器/聊天室）内时，说明用户已主动把焦点放到该区域，
   // 轮询刷新状态不应把焦点抢回输入框（否则方向键导航会被立刻打断）
-  const otherPanel = active.closest && active.closest('.session-panel, .terminal-panel, .editor-panel, .chat-panel')
+  const otherPanel = active.closest && active.closest('.session-panel, .terminal-panel, .workspace-panel, .chat-panel')
   const selfPanel = currentEl && currentEl.closest ? currentEl.closest('.session-panel') : null
   if (otherPanel && otherPanel !== selfPanel) return false
   return true

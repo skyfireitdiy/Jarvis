@@ -613,7 +613,7 @@ button:disabled {
   opacity: 0.6 !important;
 }
 
-.editor-agent-node.stopped {
+.workspace-agent-node.stopped {
   opacity: 0.6 !important;
   box-shadow: none !important;
 }

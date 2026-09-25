@@ -1,0 +1,8 @@
+{
+  "id": "20260925_130925_092104",
+  "type": "project_long_term",
+  "tags": ["jarvis", "frontend", "workspace-pane", "split", "App.vue"],
+  "content": "Jarvis 前端工作区分割（App.vue）关键语义与修复（bundle index-DzcbwpaG.js）：\n\n1) pane leaf 的 view 取值：'file'|'session'|'chat'|'terminal'|'diff'|'empty'。新 split 出来的 pane 一律 view='empty'（中性空白，标题「空区域」，渲染 .workspace-pane-placeholder，不渲染 Monaco 容器）。用户明确要求新 pane「不应有任何属性，空才对」。\n\n2) 未分割态与已分割态的互斥：WorkspacePanel.vue 内 <slot name=\"pane-tree\">（App.vue 中 v-if=\"isWorkspaceSplit\"）与 <template v-if=\"!$slots['pane-tree']\">（含 #main-view 插槽）互斥。未分割时内容由 workspaceMainView（file/chat/terminal/session）承载；已分割时由各 pane 的 view 承载。\n\n3) 状态迁移必须双向：splitWorkspacePane 把 workspaceMainView（session/chat/terminal）与单例 workspaceDiff 固化到 target leaf 并置 workspaceMainView='file'；closeWorkspacePane 末尾必须反向迁移——关闭后若回到未分割（只剩一个 leaf），把该 leaf 的 view 迁回 workspaceMainView（session→workspaceSessionPanelId+mainView='session'；chat/terminal→对应值；diff→恢复 workspaceDiff 单例并 disposeDiffEditorForPane；empty→'file'）。否则内容「凭空消失」。\n\n4) canSplitWorkspacePane 支持 file/session/chat/terminal（chat/terminal 是 host 单例，新 leaf 恒为 empty，不会争抢 host）。\n\n5) 把 pane 清空的地方统一用 view='empty'（setActivePaneView 的 duplicated 清理、closePaneDiff、closeWorkspacePane 的 diff 回迁），不要用 'file'，否则清空后看起来像「文件」。\n\n6) sanitizeWorkspacePaneNode 的 validViews 需含 'empty'；localStorage 旧布局（新 leaf 曾是 file）不迁移，恢复后仍是 file，属预期。",
+  "created_at": "2026-09-25T13:09:25.092132",
+  "updated_at": "2026-09-25T13:09:25.092138"
+}
