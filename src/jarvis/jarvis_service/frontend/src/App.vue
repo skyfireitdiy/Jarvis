@@ -11887,7 +11887,7 @@ function safeSerialize(value) {
   } else {
     text = String(value)
   }
-  if (text.length > 1048576) text = text.slice(0, 1048576) + '...[truncated]'
+  if (text.length > 10 * 1024 * 1024) text = text.slice(0, 10 * 1024 * 1024) + '...[truncated]'
   return text
 }
 
