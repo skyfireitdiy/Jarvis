@@ -1,0 +1,8 @@
+{
+  "id": "20260925_050204_392849",
+  "type": "project_long_term",
+  "tags": ["部署", "前端", "dist", "vite", "jvs-ai.cn"],
+  "content": "Jarvis 前端部署链路：jvs-ai.cn(443) nginx proxy_pass http://127.0.0.1:5173，5173 是 vite preview 服务 src/jarvis/jarvis_service/frontend/dist/（dist 被 gitignore）。改前端源码后需在该 frontend 目录执行 npx vite build（约15s）重新生成 dist，线上才生效，用户需硬刷新。当前 bundle: index-DpBE9D35.js。",
+  "created_at": "2026-09-25T05:02:04.392873",
+  "updated_at": "2026-09-25T05:02:04.392878"
+}

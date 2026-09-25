@@ -65,8 +65,9 @@
               >{{ isSpeaking(item) ? '⏹' : '🔈' }}</button>
             </div>
           </div>
-          <!-- 终端嵌入 -->
-          <div v-if="item.output_type === 'execution' && item.execution_id && !item.is_finished && !item.terminal_content" class="terminal-wrapper">
+          <!-- 终端嵌入：suppressTerminal 为真时（该 panel 已被编辑器主区域承载）不渲染，
+               避免同一 execution 出现两个 xterm host 互相争抢导致反复销毁重建 -->
+          <div v-if="!suppressTerminal && item.output_type === 'execution' && item.execution_id && !item.is_finished && !item.terminal_content" class="terminal-wrapper">
             <div :ref="el => setTerminalRef(item.execution_id, el, item.agent_id)" class="terminal-host"></div>
           </div>
           <!-- 终端内容（历史记录）：仅在没有 xterm 实例时渲染（已结束，或运行中但 terminal_content 已落盘），
@@ -216,6 +217,9 @@ const props = defineProps({
   interaction: { type: Object, default: null },
   resizeDirections: { type: Array, default: () => [] },
   panelStyle: { type: Object, default: null },
+  // 该 panel 已被编辑器主区域承载时置为 true：不渲染内嵌 xterm host，
+  // 避免与编辑器内的同一 execution 终端争抢 host 元素
+  suppressTerminal: { type: Boolean, default: false },
 })
 
 const emit = defineEmits([

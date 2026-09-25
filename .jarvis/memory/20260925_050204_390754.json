@@ -1,0 +1,8 @@
+{
+  "id": "20260925_050204_390754",
+  "type": "project_long_term",
+  "tags": ["前端", "编辑器", "终端", "卡死", "App.vue", "SessionPanel"],
+  "content": "Jarvis 前端「打开编辑器整页卡死」根因与修复：同一 SessionPanel 同时存在 grid 实例与编辑器内嵌实例，两者都通过 @set-terminal-ref → setPanelTerminalRef(App.vue) → setTerminalRef(App.vue) 传各自 host 元素。setTerminalRef 中 needsRebuild = !!termInfo.terminal && termInfo.hostEl !== el 导致两实例交替传 host → 反复 dispose+init 终端；两个 ResizeObserver 互相触发 fit() → 尺寸震荡 → ResizeObserver 无限回调 → 主线程同步阻塞（现象：page.get_info/console/debugger 全超时）。\n修复方案（已提交，commit 16b7faf 附近）：\n1) App.vue grid 版 SessionPanel 的 v-show 改为 !sessionDetachedPanels.has(panel.id) && panel.id !== editorHostedPanel?.id；\n2) 新增 computed editorHostedPanel（只依赖 showEditorPanel && editorSessionPanelId，不依赖 editorMainView）；\n3) SessionPanel.vue 新增 prop suppressTerminal，终端 host 的 v-if 加 !suppressTerminal；grid 实例传 :suppress-terminal=\"panel.id === editorHostedPanel?.id\"，编辑器内嵌实例与 detached 实例不传；\n4) setTerminalRef 的 el=null 卸载回调加守卫 if (termInfo && termInfo.hostEl && termInfo.hostEl.isConnected) return，避免被抑制的 grid 实例卸载时误清理编辑器内仍存活的终端。\n验证：真实执行期间 .terminal-host 数量 0→1 恒为 1（maxHosts=1），无 longtask、无 Vue 递归警告、无卡死。",
+  "created_at": "2026-09-25T05:02:04.390786",
+  "updated_at": "2026-09-25T05:02:04.390792"
+}
