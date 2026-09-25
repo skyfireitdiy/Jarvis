@@ -24,6 +24,7 @@
           </option>
         </select>
         <button class="icon-btn" @click="$emit('createTerminal')" :disabled="!socket" title="新建终端">➕</button>
+        <button class="icon-btn" @click="$emit('detach')" :title="embedded ? '分离为浮动窗口' : '嵌入主界面'">⧉</button>
         <button class="icon-btn" @click="$emit('close')" title="关闭面板">✕</button>
       </div>
     </div>
@@ -90,6 +91,7 @@ const emit = defineEmits([
   'update:selectedNodeId',
   'createTerminal',
   'close',
+  'detach',
   'switch',
   'closeTerminal',
   'setHostRef',
