@@ -7741,6 +7741,433 @@ def create_app(
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
+    # --- Git 只读接口（查看提交历史/详情/diff/分支） ---
+    GIT_COMMAND_TIMEOUT_SECONDS = 30
+    GIT_LOG_MAX_LIMIT = 500
+
+    def _resolve_git_repo_path(payload: Dict[str, Any]) -> Dict[str, Any]:
+        """校验并解析 git 命令的工作目录（必须为存在的绝对路径目录）。"""
+        import pathlib
+
+        raw_path = str(payload.get("path", "")).strip()
+        if not raw_path:
+            return {
+                "success": False,
+                "error": {"code": "INVALID_PATH", "message": "Path is required"},
+            }
+        target_path = pathlib.Path(raw_path).expanduser()
+        if not target_path.is_absolute():
+            return {
+                "success": False,
+                "error": {
+                    "code": "INVALID_PATH",
+                    "message": "Path must be absolute",
+                },
+            }
+        target_path = target_path.resolve()
+        if not target_path.exists():
+            return {
+                "success": False,
+                "error": {
+                    "code": "NOT_FOUND",
+                    "message": f"Path does not exist: {raw_path}",
+                },
+            }
+        if not target_path.is_dir():
+            return {
+                "success": False,
+                "error": {
+                    "code": "NOT_A_DIRECTORY",
+                    "message": f"Path is not a directory: {raw_path}",
+                },
+            }
+        return {"success": True, "data": {"path": target_path}}
+
+    def _run_git(args: List[str], repo_path: "pathlib.Path") -> Dict[str, Any]:
+        """在指定目录非交互执行 git 命令，统一处理异常与错误。"""
+        import subprocess
+
+        try:
+            completed = subprocess.run(
+                ["git", *args],
+                cwd=str(repo_path),
+                capture_output=True,
+                text=True,
+                timeout=GIT_COMMAND_TIMEOUT_SECONDS,
+            )
+        except FileNotFoundError:
+            return {
+                "success": False,
+                "error": {
+                    "code": "GIT_NOT_AVAILABLE",
+                    "message": "git executable not found",
+                },
+            }
+        except subprocess.TimeoutExpired:
+            return {
+                "success": False,
+                "error": {
+                    "code": "GIT_TIMEOUT",
+                    "message": "git command timed out",
+                },
+            }
+        except Exception as e:  # noqa: BLE001
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+        if completed.returncode != 0:
+            stderr = (completed.stderr or "").strip()
+            if "not a git repository" in stderr.lower():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "NOT_A_GIT_REPO",
+                        "message": stderr or "Not a git repository",
+                    },
+                }
+            return {
+                "success": False,
+                "error": {
+                    "code": "GIT_COMMAND_FAILED",
+                    "message": stderr or "git command failed",
+                },
+            }
+        return {"success": True, "data": {"stdout": completed.stdout or ""}}
+
+    async def _handle_git_log_request(payload: Dict[str, Any]) -> Dict[str, Any]:
+        """获取提交历史列表（含 parents/作者/时间/refs）。"""
+        try:
+            resolved = _resolve_git_repo_path(payload)
+            if not resolved.get("success"):
+                return resolved
+            repo_path = resolved["data"]["path"]
+
+            try:
+                limit = int(payload.get("limit", 100))
+            except (TypeError, ValueError):
+                limit = 100
+            limit = max(1, min(limit, GIT_LOG_MAX_LIMIT))
+            try:
+                skip = int(payload.get("skip", 0))
+            except (TypeError, ValueError):
+                skip = 0
+            skip = max(0, skip)
+
+            # 多取一条用于判断是否还有更多
+            fmt = "%H%x1f%P%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%D"
+            result = _run_git(
+                [
+                    "log",
+                    f"--pretty=format:{fmt}",
+                    f"--skip={skip}",
+                    "-n",
+                    str(limit + 1),
+                ],
+                repo_path,
+            )
+            if not result.get("success"):
+                return result
+
+            raw = result["data"]["stdout"]
+            records = [line for line in raw.split("\n") if line.strip()]
+            has_more = len(records) > limit
+            records = records[:limit]
+
+            commits = []
+            for record in records:
+                parts = record.split("\x1f")
+                while len(parts) < 7:
+                    parts.append("")
+                refs_raw = parts[6].strip()
+                refs = [r.strip() for r in refs_raw.split(",") if r.strip()]
+                commits.append(
+                    {
+                        "hash": parts[0],
+                        "parents": [p for p in parts[1].split() if p],
+                        "author": parts[2],
+                        "email": parts[3],
+                        "date": parts[4],
+                        "subject": parts[5],
+                        "refs": refs,
+                    }
+                )
+
+            return {
+                "success": True,
+                "data": {"commits": commits, "has_more": has_more},
+            }
+        except Exception as e:  # noqa: BLE001
+            logger.exception("[GIT] git log failed: %r", e)
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    async def _handle_git_commit_detail_request(
+        payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """获取某次提交的元信息与文件变更列表（含增删统计）。"""
+        try:
+            resolved = _resolve_git_repo_path(payload)
+            if not resolved.get("success"):
+                return resolved
+            repo_path = resolved["data"]["path"]
+
+            commit_hash = str(payload.get("hash", "")).strip()
+            if not commit_hash:
+                return {
+                    "success": False,
+                    "error": {"code": "INVALID_HASH", "message": "Hash is required"},
+                }
+
+            fmt = "%H%x1f%P%x1f%an%x1f%ae%x1f%aI%x1f%s"
+            result = _run_git(
+                [
+                    "show",
+                    "--numstat",
+                    f"--pretty=format:{fmt}",
+                    "--no-renames",
+                    commit_hash,
+                ],
+                repo_path,
+            )
+            if not result.get("success"):
+                return result
+
+            raw = result["data"]["stdout"]
+            lines = raw.split("\n")
+            if not lines:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "COMMIT_NOT_FOUND",
+                        "message": f"Commit not found: {commit_hash}",
+                    },
+                }
+
+            header_parts = lines[0].split("\x1f")
+            while len(header_parts) < 6:
+                header_parts.append("")
+            commit = {
+                "hash": header_parts[0],
+                "parents": [p for p in header_parts[1].split() if p],
+                "author": header_parts[2],
+                "email": header_parts[3],
+                "date": header_parts[4],
+                "subject": header_parts[5],
+            }
+
+            files = []
+            for line in lines[1:]:
+                if not line.strip():
+                    continue
+                fields = line.split("\t")
+                if len(fields) < 3:
+                    continue
+                additions_raw, deletions_raw, file_path = (
+                    fields[0],
+                    fields[1],
+                    "\t".join(fields[2:]),
+                )
+                is_binary = additions_raw == "-" or deletions_raw == "-"
+                try:
+                    additions = 0 if is_binary else int(additions_raw)
+                    deletions = 0 if is_binary else int(deletions_raw)
+                except ValueError:
+                    additions, deletions, is_binary = 0, 0, True
+                files.append(
+                    {
+                        "path": file_path,
+                        "additions": additions,
+                        "deletions": deletions,
+                        "binary": is_binary,
+                    }
+                )
+
+            return {
+                "success": True,
+                "data": {"commit": commit, "files": files},
+            }
+        except Exception as e:  # noqa: BLE001
+            logger.exception("[GIT] git commit-detail failed: %r", e)
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    async def _handle_git_diff_request(payload: Dict[str, Any]) -> Dict[str, Any]:
+        """获取某文件在某次提交中的 diff 文本。"""
+        try:
+            resolved = _resolve_git_repo_path(payload)
+            if not resolved.get("success"):
+                return resolved
+            repo_path = resolved["data"]["path"]
+
+            commit_hash = str(payload.get("hash", "")).strip()
+            if not commit_hash:
+                return {
+                    "success": False,
+                    "error": {"code": "INVALID_HASH", "message": "Hash is required"},
+                }
+            file_path = str(payload.get("file", "")).strip()
+            if not file_path:
+                return {
+                    "success": False,
+                    "error": {"code": "INVALID_FILE", "message": "File is required"},
+                }
+
+            result = _run_git(
+                [
+                    "show",
+                    "--no-renames",
+                    "--format=",
+                    commit_hash,
+                    "--",
+                    file_path,
+                ],
+                repo_path,
+            )
+            if not result.get("success"):
+                return result
+
+            # 不截断：完整返回 diff 文本（truncated 恒为 False，保留字段以兼容前端）
+            return {
+                "success": True,
+                "data": {"diff": result["data"]["stdout"], "truncated": False},
+            }
+        except Exception as e:  # noqa: BLE001
+            logger.exception("[GIT] git diff failed: %r", e)
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    async def _handle_git_file_content_request(
+        payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """获取某文件在指定提交（或指定 revision）中的完整内容（只读）。
+
+        用于前端展示「文件全文 + 绝对行号」的 diff：
+        - ref 为提交号时，返回该提交版本的全文（新版本）
+        - ref 为 "<hash>^" 等 revision 时，返回对应版本全文（旧版本）
+        """
+        try:
+            resolved = _resolve_git_repo_path(payload)
+            if not resolved.get("success"):
+                return resolved
+            repo_path = resolved["data"]["path"]
+
+            revision = str(payload.get("ref", "")).strip()
+            if not revision:
+                return {
+                    "success": False,
+                    "error": {"code": "INVALID_REF", "message": "Ref is required"},
+                }
+            file_path = str(payload.get("file", "")).strip()
+            if not file_path:
+                return {
+                    "success": False,
+                    "error": {"code": "INVALID_FILE", "message": "File is required"},
+                }
+            # `git show <rev>:<path>` 不支持 `--` 分隔，故对路径做基本防护，
+            # 避免以 '-' 开头被当作选项解析。
+            if file_path.startswith("-"):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_FILE",
+                        "message": "File path must not start with '-'",
+                    },
+                }
+
+            result = _run_git(["show", f"{revision}:{file_path}"], repo_path)
+            if not result.get("success"):
+                error = result.get("error") or {}
+                # 该版本下文件不存在（如新增文件的父版本）属正常情况，
+                # 归一化为 NOT_FOUND，便于前端按「空文件」处理。
+                if error.get("code") == "GIT_COMMAND_FAILED":
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "NOT_FOUND",
+                            "message": error.get("message")
+                            or "File not found at given revision",
+                        },
+                    }
+                return result
+
+            # 不截断：完整返回文件内容（truncated 恒为 False，保留字段以兼容前端）
+            return {
+                "success": True,
+                "data": {"content": result["data"]["stdout"], "truncated": False},
+            }
+        except Exception as e:  # noqa: BLE001
+            logger.exception("[GIT] git file-content failed: %r", e)
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    async def _handle_git_branches_request(payload: Dict[str, Any]) -> Dict[str, Any]:
+        """获取本地/远程分支与 tag 列表，以及当前分支。"""
+        try:
+            resolved = _resolve_git_repo_path(payload)
+            if not resolved.get("success"):
+                return resolved
+            repo_path = resolved["data"]["path"]
+
+            branch_result = _run_git(
+                [
+                    "for-each-ref",
+                    "--format=%(refname:short)%00%(objectname:short)",
+                    "refs/heads",
+                    "refs/remotes",
+                ],
+                repo_path,
+            )
+            if not branch_result.get("success"):
+                return branch_result
+
+            branches = []
+            for line in branch_result["data"]["stdout"].split("\n"):
+                if not line.strip():
+                    continue
+                # git --format 仅支持 %00 等少数转义，故用 NUL 作为字段分隔符
+                parts = line.split("\x00")
+                name = parts[0].strip()
+                short_hash = parts[1].strip() if len(parts) > 1 else ""
+                if not name:
+                    continue
+                is_remote = name.startswith("remotes/") or name.startswith("origin/")
+                branches.append({"name": name, "hash": short_hash, "remote": is_remote})
+
+            tag_result = _run_git(["tag", "--format=%(refname:short)"], repo_path)
+            tags = []
+            if tag_result.get("success"):
+                tags = [
+                    {"name": t.strip()}
+                    for t in tag_result["data"]["stdout"].split("\n")
+                    if t.strip()
+                ]
+
+            current = ""
+            head_result = _run_git(["rev-parse", "--abbrev-ref", "HEAD"], repo_path)
+            if head_result.get("success"):
+                current = head_result["data"]["stdout"].strip()
+
+            return {
+                "success": True,
+                "data": {"current": current, "branches": branches, "tags": tags},
+            }
+        except Exception as e:  # noqa: BLE001
+            logger.exception("[GIT] git branches failed: %r", e)
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
     async def _handle_directories_request(payload: Dict[str, Any]) -> Dict[str, Any]:
         import pathlib
 
@@ -7891,6 +8318,16 @@ def create_app(
             result = await _handle_file_delete_request(payload)
         elif normalized_method == "POST" and normalized_path == "/file-rename":
             result = await _handle_file_rename_request(payload)
+        elif normalized_method == "POST" and normalized_path == "/git/log":
+            result = await _handle_git_log_request(payload)
+        elif normalized_method == "POST" and normalized_path == "/git/commit-detail":
+            result = await _handle_git_commit_detail_request(payload)
+        elif normalized_method == "POST" and normalized_path == "/git/diff":
+            result = await _handle_git_diff_request(payload)
+        elif normalized_method == "POST" and normalized_path == "/git/branches":
+            result = await _handle_git_branches_request(payload)
+        elif normalized_method == "POST" and normalized_path == "/git/file-content":
+            result = await _handle_git_file_content_request(payload)
         elif normalized_method == "POST" and normalized_path == "/upload":
             # 权限校验：file:upload
             # 节点访问校验：仅在 master 上执行。
@@ -8260,6 +8697,125 @@ def create_app(
                 "success": False,
                 "error": {"code": "INTERNAL_ERROR", "message": repr(e)},
             }
+
+    # HTTP API：Git 只读接口（提交历史/详情/diff/分支）
+    async def _forward_git_request_to_node(
+        node_id: str, api_path: str, payload: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """若目标节点非本地/master，则转发请求；否则返回 None 表示本地处理。
+
+        返回 None 表示需要本地处理；返回 dict 表示已得到最终响应。
+        请求常量复用 NODE_HTTP_PROXY_REQUEST（与 /api/node/{id}/... 代理一致）。
+        """
+        resolved_node_id = str(node_id or "").strip()
+        target_node_id = resolved_node_id or node_runtime.local_node_id
+        if target_node_id in (node_runtime.local_node_id, "master"):
+            return None
+
+        node_info = node_runtime.node_registry.get(target_node_id)
+        if node_info is None:
+            return {
+                "success": False,
+                "error": {
+                    "code": "NODE_NOT_FOUND",
+                    "message": f"Node not found: {target_node_id}",
+                },
+            }
+        if node_info.status != "online":
+            return {
+                "success": False,
+                "error": {
+                    "code": "NODE_OFFLINE",
+                    "message": f"Node is offline: {target_node_id}",
+                },
+            }
+
+        response = await node_connection_manager.send_request_to_node(
+            target_node_id,
+            NODE_HTTP_PROXY_REQUEST,
+            {
+                "method": "POST",
+                "path": api_path,
+                "headers": {},
+                "body": json.dumps(
+                    {k: v for k, v in payload.items() if not k.startswith("_")}
+                ),
+            },
+        )
+        response_payload = response.get("payload") or {}
+        body_text = response_payload.get("body")
+        if body_text:
+            try:
+                parsed = json.loads(body_text)
+                if isinstance(parsed, dict):
+                    return parsed
+            except json.JSONDecodeError:
+                pass
+        return {
+            "success": False,
+            "error": {
+                "code": "REMOTE_GIT_FAILED",
+                "message": "Remote git request failed",
+            },
+        }
+
+    @app.post("/api/git/log", dependencies=[Depends(verify_token)])
+    async def git_log(request: Dict[str, Any]) -> Dict[str, Any]:
+        """获取提交历史列表（只读）。"""
+        payload = dict(request or {})
+        node_id = str(payload.get("node_id") or "")
+        forwarded = await _forward_git_request_to_node(node_id, "/api/git/log", payload)
+        if forwarded is not None:
+            return forwarded
+        return await _handle_git_log_request(payload)
+
+    @app.post("/api/git/commit-detail", dependencies=[Depends(verify_token)])
+    async def git_commit_detail(request: Dict[str, Any]) -> Dict[str, Any]:
+        """获取某次提交的元信息与文件变更列表（只读）。"""
+        payload = dict(request or {})
+        node_id = str(payload.get("node_id") or "")
+        forwarded = await _forward_git_request_to_node(
+            node_id, "/api/git/commit-detail", payload
+        )
+        if forwarded is not None:
+            return forwarded
+        return await _handle_git_commit_detail_request(payload)
+
+    @app.post("/api/git/diff", dependencies=[Depends(verify_token)])
+    async def git_diff(request: Dict[str, Any]) -> Dict[str, Any]:
+        """获取某文件在某次提交中的 diff 文本（只读）。"""
+        payload = dict(request or {})
+        node_id = str(payload.get("node_id") or "")
+        forwarded = await _forward_git_request_to_node(
+            node_id, "/api/git/diff", payload
+        )
+        if forwarded is not None:
+            return forwarded
+        return await _handle_git_diff_request(payload)
+
+    @app.post("/api/git/branches", dependencies=[Depends(verify_token)])
+    async def git_branches(request: Dict[str, Any]) -> Dict[str, Any]:
+        """获取分支与 tag 列表（只读）。"""
+        payload = dict(request or {})
+        node_id = str(payload.get("node_id") or "")
+        forwarded = await _forward_git_request_to_node(
+            node_id, "/api/git/branches", payload
+        )
+        if forwarded is not None:
+            return forwarded
+        return await _handle_git_branches_request(payload)
+
+    @app.post("/api/git/file-content", dependencies=[Depends(verify_token)])
+    async def git_file_content(request: Dict[str, Any]) -> Dict[str, Any]:
+        """获取某文件在指定提交/revision 中的完整内容（只读）。"""
+        payload = dict(request or {})
+        node_id = str(payload.get("node_id") or "")
+        forwarded = await _forward_git_request_to_node(
+            node_id, "/api/git/file-content", payload
+        )
+        if forwarded is not None:
+            return forwarded
+        return await _handle_git_file_content_request(payload)
 
     # HTTP API：创建终端会话
     @app.post("/api/terminals", dependencies=[Depends(verify_token)])
