@@ -3894,6 +3894,20 @@ function setEditorMainView(view) {
   }
 }
 
+// 让主区域回到「文件视图」（打开文件 / 打开 diff 时调用）。
+// 主区域的 file/chat/terminal/session 四种内容是互斥的，打开文件类内容必须先切回文件视图，
+// 否则会被 chat/terminal/session 内容挡住（editorMainView 与 editorDiff 状态需协调）。
+function showEditorFileView() {
+  if (editorMainView.value !== 'file') {
+    editorMainView.value = 'file'
+  }
+  // 切回后容器尺寸可能变化，重排 Monaco（含 diff），确保内容正确渲染
+  nextTick(() => {
+    layoutMonacoEditor()
+    layoutGitDiffEditor()
+  })
+}
+
 function toggleEditorSearchSidebar() {
   if (showEditorSidebar.value && editorSidebarView.value === 'search') {
     closeEditorSidebar()
@@ -4167,6 +4181,14 @@ async function openEditorFile(path, agentId = null) {
   if (!path) return
 
   showEditorPanel.value = true
+  // 打开文件属于「文件视图」：若主区域当前停在 chat/terminal/session，需先切回文件视图，
+  // 否则文件（及 diff）会被这些内容挡住。
+  showEditorFileView()
+  // 打开文件意味着退出 diff 模式：否则 file 视图会优先渲染残留的 diff，
+  // 用户点了文件却看不到文件内容。
+  if (editorDiff.value) {
+    closeEditorDiff()
+  }
 
   const existingTab = getEditorTabByPath(path)
   if (existingTab) {
@@ -4709,6 +4731,9 @@ async function viewGitFileDiff(commitHash, filePath) {
   // 清掉上一份文件的全文缓存变量，避免在「仅上下文」模式下误用旧全文
   gitDiffOldText = ''
   gitDiffNewText = ''
+  // diff 属于「文件视图」：若主区域当前停在 chat/terminal/session，需先切回文件视图，
+  // 否则 diff 会被这些内容挡住（editorMainView 与 editorDiff 两个状态需协调）。
+  showEditorFileView()
   // 切到主区域显示 diff（侧栏只保留文件列表）
   editorDiff.value = {
     commitHash,
@@ -15970,10 +15995,10 @@ function moveFocusInDirection(dir) {
 // 移动端历史管理变量
 let historyStateCount = 0
 
-// 监听页面刷新/跳转，如果连接到gateway则提示用户
+// 监听页面刷新/跳转：仅当存在集成终端（独立终端会话）时提示用户，
+// 因为终端里的进程状态无法在刷新后恢复。仅连接网关不会有需要保存的状态。
 const handleBeforeUnload = (e) => {
-  if (socket.value) {
-    // 有socket连接，提示用户
+  if (terminalSessions.value.length > 0) {
     e.preventDefault()
     e.returnValue = '' // Chrome需要returnValue
   }
