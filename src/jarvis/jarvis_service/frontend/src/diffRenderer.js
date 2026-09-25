@@ -63,6 +63,140 @@ export function escapeHtml(text) {
 }
 
 /**
+ * 当前是否处于移动端视口（与全局断点保持一致：<= 768px）
+ * @returns {boolean}
+ */
+function isMobileViewport() {
+  return typeof window !== "undefined" && window.innerWidth <= 768;
+}
+
+/**
+ * 渲染单行内容（保留缩进 + 语法高亮，失败降级纯文本）
+ * @param {string} line - 行内容
+ * @param {string} language - 语言类型
+ * @returns {string} 渲染后的 HTML 片段
+ */
+function renderLineContent(line, language) {
+  if (line === null || line === undefined) return "";
+  const leadingSpaces = line.match(/^(\s*)/)[0];
+  try {
+    const highlighted = hljs.highlight(line, { language }).value;
+    return (
+      "&nbsp;".repeat(leadingSpaces.length) + highlighted.replace(/^(\s+)/, "")
+    );
+  } catch (e) {
+    // 如果语法高亮不支持该语言，降级为纯文本显示
+    console.warn("[highlight.js] Language not supported:", language, e);
+    return "&nbsp;".repeat(leadingSpaces.length) + escapeHtml(line);
+  }
+}
+
+/**
+ * 渲染移动端内联 diff（单列，不并排）
+ *
+ * 行映射规则（保证信息不丢失）：
+ * - equal：显示新行号 + 新内容
+ * - delete：显示旧行号 + 旧内容（红底）
+ * - insert：显示新行号 + 新内容（绿底）
+ * - replace：先输出一行旧内容（红底），再输出一行新内容（绿底）
+ *
+ * @param {Object} diffData - diff数据对象
+ * @returns {string} 渲染后的HTML
+ */
+export function renderInlineDiff(diffData) {
+  if (!diffData || !diffData.rows) {
+    return '<div class="diff-error">No diff data</div>';
+  }
+
+  const { file_path, additions, deletions, rows } = diffData;
+  const language = getLanguageFromFilename(file_path);
+
+  let html = '<div class="diff-side-by-side diff-inline">';
+
+  // 标题
+  html += '<div class="diff-header">';
+  html += `<span class="diff-file-path">📝 ${escapeHtml(file_path || "Unknown")}</span>`;
+  html += `<span class="diff-stats">[<span class="diff-additions">+${additions}</span> / <span class="diff-deletions">-${deletions}</span>]</span>`;
+  html += "</div>";
+
+  html += '<table class="diff-table">';
+  html += "<colgroup><col><col></colgroup>";
+
+  let lastOldLineNum = 0;
+  let lastNewLineNum = 0;
+
+  const appendSeparator = () => {
+    html += '<tr class="diff-separator"><td colspan="2"></td></tr>';
+  };
+
+  const appendLine = (lineNum, content, contentClass) => {
+    html += '<tr class="diff-row">';
+    html += `<td class="diff-line-num">${escapeHtml(String(lineNum || ""))}</td>`;
+    html += `<td class="diff-content ${contentClass}"><code>${content}</code></td>`;
+    html += "</tr>";
+  };
+
+  rows.forEach((row, index) => {
+    const { type, old_line_num, old_line, new_line_num, new_line } = row;
+
+    // 行号不连续时插入分界线（与并排渲染保持一致）
+    if (index > 0) {
+      const isOldLineGap =
+        old_line_num && lastOldLineNum && old_line_num - lastOldLineNum > 1;
+      const isNewLineGap =
+        new_line_num && lastNewLineNum && new_line_num - lastNewLineNum > 1;
+      if (isOldLineGap || isNewLineGap) {
+        appendSeparator();
+      }
+    }
+
+    if (old_line_num) lastOldLineNum = old_line_num;
+    if (new_line_num) lastNewLineNum = new_line_num;
+
+    if (type === "delete") {
+      appendLine(
+        old_line_num,
+        renderLineContent(old_line, language),
+        "diff-deleted",
+      );
+      return;
+    }
+
+    if (type === "insert") {
+      appendLine(
+        new_line_num,
+        renderLineContent(new_line, language),
+        "diff-added",
+      );
+      return;
+    }
+
+    if (type === "replace") {
+      // 替换行：先旧后新，各自独立一行，避免并排挤压
+      appendLine(
+        old_line_num,
+        renderLineContent(old_line, language),
+        "diff-deleted",
+      );
+      appendLine(
+        new_line_num,
+        renderLineContent(new_line, language),
+        "diff-added",
+      );
+      return;
+    }
+
+    // equal：显示新行号 + 新内容
+    appendLine(new_line_num, renderLineContent(new_line, language), "");
+  });
+
+  html += "</table>";
+  html += "</div>";
+
+  return html;
+}
+
+/**
  * 渲染side-by-side diff
  * @param {Object} diffData - diff数据对象
  * @returns {string} 渲染后的HTML
@@ -70,6 +204,11 @@ export function escapeHtml(text) {
 export function renderSideBySideDiff(diffData) {
   if (!diffData || !diffData.rows) {
     return '<div class="diff-error">No diff data</div>';
+  }
+
+  // 移动端屏幕窄，并排两列每列仅百余像素不可读，改用单列内联渲染
+  if (isMobileViewport()) {
+    return renderInlineDiff(diffData);
   }
 
   const { file_path, additions, deletions, rows } = diffData;
