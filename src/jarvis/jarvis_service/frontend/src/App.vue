@@ -4958,16 +4958,26 @@ function resetWorkspaceHostedPanelState() {
   workspaceSessionPanelId.value = null
 }
 
+// 「关闭编辑器」只是隐藏：保留主区域视图、自由分割布局、会话 Panel 与 diff 数据，
+// 使再次打开时恢复关闭前的状态。这里只做「避免独立终端/聊天面板凭空浮现」的必要清理
+// （编辑器内嵌承载时，独立面板的显示状态是被取代的遗留值，关闭编辑器后需复位）。
+// 注意：必须在 showWorkspacePanel 置 false 之前调用，否则 workspaceHosts* 已为 false，
+// 独立面板不会被收起。
+function hideWorkspaceHostedPanelState() {
+  if (workspaceHostsTerminal.value) showTerminalPanel.value = false
+  if (workspaceHostsChat.value) showChatPanel.value = false
+}
+
 async function closeWorkspacePanel() {
   if (hasDirtyWorkspaceTabs()) {
     const confirmed = await confirmCloseWorkspacePanel()
     if (!confirmed) return
   }
 
-  resetWorkspaceHostedPanelState()
+  hideWorkspaceHostedPanelState()
   showWorkspacePanel.value = false
-  // 面板收起后 Git diff 容器随之销毁，释放 Monaco diff 实例并清空 diff 视图
-  workspaceDiff.value = null
+  // 面板收起后 Git diff 容器随之销毁，释放 Monaco diff 实例；但保留 workspaceDiff 数据，
+  // 再次打开编辑器时按该数据重新渲染，恢复关闭前的 diff 视图。
   disposeGitDiffEditor()
 }
 
@@ -6756,6 +6766,21 @@ function closePanel(panelId) {
     sessionDetachedPanels.value.delete(panelId)
     triggerRef(sessionDetachedPanels)
   }
+  // 若被关闭的 Panel 正被编辑器承载，需清理悬空引用，否则编辑器会指向一个已不存在的
+  // Panel（会话视图空白）。已分割时把承载它的 pane 清空为 empty；未分割时回退到文件视图。
+  if (workspaceSessionPanelId.value === panelId) {
+    workspaceSessionPanelId.value = null
+    if (isWorkspaceSplit.value) {
+      const hostingPane = findWorkspacePaneBySessionPanelId(panelId)
+      if (hostingPane) {
+        hostingPane.view = 'empty'
+        hostingPane.sessionPanelId = null
+        persistWorkspacePaneLayout()
+      }
+    } else if (workspaceMainView.value === 'session') {
+      workspaceMainView.value = 'file'
+    }
+  }
   // 如果关闭的是当前激活的 Panel，激活相邻 Panel
   if (activePanelId.value === panelId) {
     if (panels.value.length > 0) {
@@ -8508,8 +8533,10 @@ function closeFocusedPanel() {
   if (key === 'terminal') {
     showTerminalPanel.value = false
   } else if (key === 'workspace') {
-    resetWorkspaceHostedPanelState()
+    // 与 closeWorkspacePanel 一致：关闭只是隐藏，保留状态以便再次打开时恢复
+    hideWorkspaceHostedPanelState()
     showWorkspacePanel.value = false
+    disposeGitDiffEditor()
   } else if (key === 'chat') {
     showChatPanel.value = false
   } else if (key.startsWith('session:')) {
@@ -17093,6 +17120,11 @@ watch(showWorkspacePanel, async (visible) => {
       activateWorkspaceTab(activeWorkspaceTabPath.value)
     }
     nextTick(() => layoutMonacoEditor())
+    // 关闭编辑器只是隐藏：diff 数据被保留，容器重建后按原数据重新渲染，
+    // 恢复关闭前的 diff 视图（实例已在关闭时释放）。
+    if (workspaceDiff.value?.filePath && !workspaceDiff.value.loading) {
+      nextTick(() => renderGitDiffMonaco(workspaceDiff.value.filePath))
+    }
   } else {
     stopWorkspacePanelInteraction()
   }
