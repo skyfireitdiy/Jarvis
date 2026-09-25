@@ -4262,16 +4262,25 @@ function isNarrowGitDiffViewport() {
 }
 const GIT_LOG_PAGE_SIZE = 100
 
-// 取 Git 目标 Agent 的 node_id（与搜索视图一致，用当前 Agent）
-function getGitTargetNodeId() {
-  const agent = agentList.value.find(a => a.agent_id === currentAgentId.value)
-  return String(agent?.node_id || '').trim()
+// Git 视图作用的目标 Agent：优先编辑器面板下拉框选中的 Agent（activeEditorSession），
+// 回退到全局当前 Agent。这样在面板顶部切换 Agent 后，Git 视图会跟随该 Agent 的工作目录。
+function getGitTargetAgent() {
+  const editorAgent = activeEditorSession.value?.agent
+  if (editorAgent) {
+    // 会话内缓存的 agent 对象可能过期，优先按 agent_id 取最新的列表项
+    return agentList.value.find(a => a.agent_id === editorAgent.agent_id) || editorAgent
+  }
+  return agentList.value.find(a => a.agent_id === currentAgentId.value) || null
 }
 
-// 取 Git 工作目录（当前 Agent 的 working_dir）
+// 取 Git 目标 Agent 的 node_id
+function getGitTargetNodeId() {
+  return String(getGitTargetAgent()?.node_id || '').trim()
+}
+
+// 取 Git 工作目录（目标 Agent 的 working_dir）
 function getGitWorkingDir() {
-  const agent = agentList.value.find(a => a.agent_id === currentAgentId.value)
-  return String(agent?.working_dir || '').trim()
+  return String(getGitTargetAgent()?.working_dir || '').trim()
 }
 
 // 调用后端 Git 只读接口
@@ -4333,6 +4342,14 @@ async function fetchGitBranches() {
     gitCurrentBranch.value = ''
   }
 }
+
+// 编辑器面板切换 Agent 时，若当前停留在 Git 视图，则按新 Agent 的工作目录重新拉取
+watch(activeEditorSessionId, () => {
+  if (!showEditorPanel.value || editorSidebarView.value !== 'git') return
+  nextTick(() => {
+    refreshGitView()
+  })
+})
 
 // 刷新 Git 视图（历史 + 分支）
 async function refreshGitView() {
@@ -4498,8 +4515,17 @@ function disposeGitDiffEditor() {
 
 // 确保 diff 编辑器实例存在（复用，不重复创建）
 function ensureGitDiffEditor() {
-  if (gitDiffEditor || !gitDiffContainerRef.value) return
-  gitDiffEditor = monaco.editor.createDiffEditor(gitDiffContainerRef.value, {
+  const container = gitDiffContainerRef.value
+  if (!container) return
+  // 切换文件时 loading 态会让容器被 v-if 卸载，随后重建为新的 DOM 节点；
+  // 旧实例仍挂在已脱离文档的旧节点上，必须销毁重建，否则渲染不可见。
+  if (gitDiffEditor && gitDiffEditor.getContainerDomNode() !== container) {
+    disposeGitDiffModels()
+    gitDiffEditor.dispose()
+    gitDiffEditor = null
+  }
+  if (gitDiffEditor) return
+  gitDiffEditor = monaco.editor.createDiffEditor(container, {
     theme: 'blueDark',
     fontFamily: EDITOR_FONT_FAMILY,
     fontSize: 12,
