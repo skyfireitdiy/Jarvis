@@ -12,7 +12,8 @@
       @dblclick.stop="!embedded && $emit('toggleMaximize')"
     >
       <div class="editor-panel-title-group">
-        <h3>编辑器 - {{ agentName || '未选择 Agent' }}</h3>
+        <h3>工作区</h3>
+        <span v-if="agents && agents.length" class="editor-agent-label">当前 Agent</span>
         <select
           v-if="agents && agents.length"
           class="editor-agent-select"
@@ -26,15 +27,12 @@
             {{ agent.name || agent.agent_id }}
           </option>
         </select>
-        <span v-if="activeTab" class="editor-panel-subtitle">{{ activeTab.path }}</span>
       </div>
       <div class="editor-panel-actions">
         <button v-if="!$slots['pane-tree']" class="icon-btn" @click.stop="$emit('save')" :disabled="!activeTab || activeTab.loading" title="保存文件">💾</button>
         <button class="icon-btn maximize-btn" @click="$emit('toggleMaximize')" :title="isMaximized ? '还原' : '最大化'">
           {{ isMaximized ? '🗗' : '🗖' }}
         </button>
-        <button class="icon-btn" @click="$emit('detach')" :title="embedded ? '分离为浮动窗口' : '嵌入主界面'">⧉</button>
-        <button class="icon-btn" @click="$emit('close')" title="关闭编辑器">✕</button>
       </div>
     </div>
     <div class="editor-panel-toolbar">
@@ -270,34 +268,32 @@ defineExpose({
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 10px;
+  padding: 4px 10px;
   border-bottom: 1px solid var(--color-border-subtle);
   background: var(--color-bg-primary);
   cursor: move;
   gap: 8px;
-  min-height: 32px;
+  min-height: 28px;
 }
 
 .editor-panel-title-group {
   min-width: 0;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 8px;
 }
 
 .editor-panel-header h3 {
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
-.editor-panel-subtitle {
+.editor-agent-label {
   font-size: 11px;
   color: var(--color-text-secondary);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 320px;
 }
 
 .editor-agent-select {

@@ -556,6 +556,40 @@
                     @mousedown="activateEditorPane(pane.id)"
                   ></div>
                 </template>
+                <template v-else-if="pane.view === 'diff'">
+                  <!-- diff leaf：Git 提交文件 diff 作为独立 pane 内容（每个 pane 一个独立 DiffEditor 实例） -->
+                  <div class="editor-pane-diff-wrap" @mousedown="activateEditorPane(pane.id)">
+                    <div v-if="pane.diff" class="editor-diff-view">
+                      <div class="editor-diff-header">
+                        <span class="editor-diff-title" :title="pane.diff.filePath">{{ pane.diff.filePath }}</span>
+                        <span v-if="pane.diff.commitHash" class="editor-diff-hash">{{ pane.diff.commitHash.slice(0, 7) }}</span>
+                        <span v-if="pane.diff.truncated" class="editor-diff-truncated">（已截断）</span>
+                        <button class="editor-diff-nav" @click.stop="navigatePaneDiff(pane.id, 'prev')" title="上一个差异">▲</button>
+                        <button class="editor-diff-nav" @click.stop="navigatePaneDiff(pane.id, 'next')" title="下一个差异">▼</button>
+                        <button class="editor-diff-toggle" @click.stop="togglePaneDiffShowFull(pane.id)" :title="pane.diff.showFull ? '只显示变更上下文区域' : '显示文件全文'">
+                          {{ pane.diff.showFull ? '仅上下文' : '全文' }}
+                        </button>
+                        <button class="editor-diff-toggle" @click.stop="togglePaneDiffSideBySide(pane.id)">
+                          {{ pane.diff.sideBySide ? '内联' : '并排' }}
+                        </button>
+                        <button class="editor-diff-close" @click.stop="closePaneDiff(pane.id)" title="关闭 diff">✕</button>
+                      </div>
+                      <div v-if="pane.diff.loading" class="editor-diff-status">加载 diff...</div>
+                      <div v-else-if="pane.diff.error" class="editor-diff-status error">{{ pane.diff.error }}</div>
+                      <div
+                        v-else
+                        :ref="el => setDiffContainerRef(pane.id, el)"
+                        :data-diff-pane-id="pane.id"
+                        class="editor-diff-monaco"
+                      ></div>
+                    </div>
+                    <div v-else class="editor-pane-placeholder" @click="activateEditorPane(pane.id)">
+                      <div class="editor-placeholder-icon">🧾</div>
+                      <div class="editor-placeholder-title">空 diff 区域</div>
+                      <div class="editor-placeholder-text">在左侧「Git」视图中点击提交里的文件，即可在此区域查看 diff。</div>
+                    </div>
+                  </div>
+                </template>
                 <template v-else-if="pane.view === 'chat'">
                   <!-- chat leaf：复用编辑器主区域 chat 的完整接线（host 单例，至多一个 pane 承载） -->
                   <div class="editor-pane-embed-wrap" @mousedown="activateEditorPane(pane.id)">
@@ -3127,8 +3161,10 @@ const editorMainView = ref('file')
 // ===== 编辑器主工作区「自由分割」（VS Code split 同款）=====
 // 布局模型：树形节点
 //   split: { type:'split', direction:'row'|'column', ratio:number, children:[node, node] }
-//   leaf : { type:'leaf', id:string, view:'file'|'session'|'chat'|'terminal', sessionPanelId:string|null }
+//   leaf : { type:'leaf', id:string, view:'file'|'session'|'chat'|'terminal'|'diff', sessionPanelId:string|null, diff?:object }
 // 阶段3 起 chat / terminal 也可作为 leaf 的 view（host 单例：同一时刻只允许一个 pane 承载）。
+// diff 作为 leaf 的 view：每个 diff pane 一个独立 Monaco DiffEditor 实例（可多实例，无 host 单例约束），
+// diff 数据（commitHash/filePath 等）挂在 leaf.diff 上，不参与持久化（刷新后降级为 file）。
 const EDITOR_PANE_MIN_RATIO = 0.15
 const EDITOR_PANE_MAX_RATIO = 0.85
 let editorPaneSeq = 0
@@ -3260,6 +3296,8 @@ function closeEditorPane(paneId) {
   // 该 pane 的独立标签列表一并丢弃（其文件若仍被其他 pane 引用则保持）
   editorPaneTabs.delete(paneId)
   editorPaneTabsVersion.value += 1
+  // 该 pane 若承载 diff，释放其独立 diff 实例
+  disposeDiffEditorForPane(paneId)
   // 父节点只剩一个 child 时，用该 child 顶替父节点（压缩冗余层级）
   if (parent.children.length === 1) {
     const only = parent.children[0]
@@ -3305,6 +3343,8 @@ function collapseEditorPanes() {
   // 收起分割：回到全局标签栏，清空各 pane 的独立列表
   editorPaneTabs.clear()
   editorPaneTabsVersion.value += 1
+  // 收起分割：释放所有 diff pane 的独立实例
+  disposeAllDiffEditors()
 }
 
 // ===== 阶段2：左侧点击路由到「激活 pane」=====
@@ -3347,7 +3387,7 @@ function findEditorPaneByView(view, exceptPaneId = null) {
   walk(editorPaneTree.value)
   return found
 }
-// 把「激活 pane」的视图切换为 view（file / session / chat / terminal）。
+// 把「激活 pane」的视图切换为 view（file / session / chat / terminal / diff）。
 // 返回是否成功改写（未分割或没有激活 pane 时返回 false，调用方回退到旧路径）。
 function setActivePaneView(view, sessionPanelId = null) {
   if (!isEditorSplit.value) return false
@@ -3376,6 +3416,11 @@ function setActivePaneView(view, sessionPanelId = null) {
       duplicated.sessionPanelId = null
     }
   }
+  // 从 diff 切走时释放该 pane 的 diff 实例（diff 数据一并清空）
+  if (pane.view === 'diff' && view !== 'diff') {
+    disposeDiffEditorForPane(pane.id)
+    pane.diff = null
+  }
   pane.view = view
   pane.sessionPanelId = view === 'session' ? sessionPanelId : null
   persistEditorPaneLayout()
@@ -3393,6 +3438,10 @@ function getEditorPaneTitle(pane) {
   if (!pane) return ''
   if (pane.view === 'chat') return '聊天室'
   if (pane.view === 'terminal') return '终端'
+  if (pane.view === 'diff') {
+    const path = pane.diff?.filePath
+    return path ? `diff: ${path.split('/').pop() || path}` : 'diff'
+  }
   if (pane.view === 'session') {
     const panel = panels.value.find(p => p.id === pane.sessionPanelId)
     const agent = panel ? getPanelAgent(panel) : null
@@ -3493,9 +3542,13 @@ function sanitizeEditorPaneNode(raw) {
     return { type: 'split', direction: raw.direction, ratio, children: [left, right] }
   }
   if (raw.type === 'leaf') {
-    const validViews = ['file', 'session', 'chat', 'terminal']
+    const validViews = ['file', 'session', 'chat', 'terminal', 'diff']
     if (!validViews.includes(raw.view)) return null
     if (typeof raw.id !== 'string' || !raw.id) return null
+    // diff 数据不持久化（commitHash 可能失效、diff 文本体积大）：恢复时一律降级为 file leaf
+    if (raw.view === 'diff') {
+      return { type: 'leaf', id: raw.id, view: 'file', sessionPanelId: null }
+    }
     let sessionPanelId = raw.sessionPanelId
     if (raw.view === 'session') {
       // sessionPanelId 必须真实存在；否则回退为 file leaf（避免指向已不存在的 Panel）
@@ -4095,6 +4148,32 @@ const EDITOR_TAB_SIZE = 4
 // 3) 显式 layout() 一律经 scheduleEditorLayout() 用 rAF 合并，同一帧内多次调用只执行一次。
 const editorViews = new Map()  // paneId -> monaco editor instance
 const editorViewPanes = new Map()  // paneId -> 该 pane 当前绑定的文件 path
+// 自由分割：每个 diff pane 一个独立 Monaco DiffEditor 实例（paneId -> { editor, originalModel, modifiedModel, oldText, newText }）。
+// 与未分割时的单例 gitDiffEditor 并存：未分割走单例路径，已分割走这里（多实例，互不干扰）。
+const diffEditorViews = new Map()
+const diffContainerRefs = ref(new Map())  // paneId -> 容器元素
+function setDiffContainerRef(paneId, el) {
+  if (!paneId) return
+  if (el) {
+    if (diffContainerRefs.value.get(paneId) === el) return
+    diffContainerRefs.value.set(paneId, el)
+  } else {
+    if (!diffContainerRefs.value.has(paneId)) return
+    diffContainerRefs.value.delete(paneId)
+  }
+  triggerRef(diffContainerRefs)
+  nextTick(() => {
+    renderDiffForPane(paneId)
+    scheduleDiffLayout()
+  })
+}
+// 按 data-diff-pane-id 从文档解析「当前真实挂载」的容器（ref 元素可能是渲染中间态）
+function resolveDiffContainer(paneId) {
+  const live = document.querySelector(`.editor-diff-monaco[data-diff-pane-id="${paneId}"]`)
+  if (live && live.isConnected) return live
+  const refEl = diffContainerRefs.value.get(paneId)
+  return refEl && refEl.isConnected ? refEl : null
+}
 // 已分割时每个 pane 独立的标签列表（paneId -> path[]）。未分割时该 Map 为空，
 // 标签栏仍由全局 editorTabs 驱动，保证未分割路径零回归。
 // 目的：分割后两个 pane 的标签栏互不影响（关闭一个 pane 的标签不会连带关闭另一个）。
@@ -5504,6 +5583,22 @@ async function viewGitFileDiff(commitHash, filePath) {
   // 清掉上一份文件的全文缓存变量，避免在「仅上下文」模式下误用旧全文
   gitDiffOldText = ''
   gitDiffNewText = ''
+  // 已分割：diff 作为「激活 pane」的一种内容类型打开（与 file/session/chat/terminal 同等处理），
+  // 每个 pane 一个独立 DiffEditor 实例，互不干扰。
+  if (isEditorSplit.value) {
+    const pane = activePane.value
+    if (pane) {
+      // 从 diff 切到 diff（换文件）时先释放旧实例，避免复用旧 model
+      disposeDiffEditorForPane(pane.id)
+      pane.view = 'diff'
+      pane.sessionPanelId = null
+      persistEditorPaneLayout()
+      gitDiffLoading.value = false
+      await loadDiffForPane(pane.id, commitHash, filePath)
+      return
+    }
+  }
+  // 未分割：沿用原有单例路径（零回归）
   // diff 属于「文件视图」：若主区域当前停在 chat/terminal/session，需先切回文件视图，
   // 否则 diff 会被这些内容挡住（editorMainView 与 editorDiff 两个状态需协调）。
   showEditorFileView()
@@ -5782,6 +5877,226 @@ function navigateGitDiff(direction) {
 // 侧栏尺寸/视图变化时重排（复用主编辑器的 layout 时机）
 function layoutGitDiffEditor() {
   if (gitDiffEditor) gitDiffEditor.layout()
+  for (const [, entry] of diffEditorViews) {
+    if (entry.editor && entry.editor.getContainerDomNode?.()?.isConnected) entry.editor.layout()
+  }
+}
+
+// ===== 自由分割：diff pane 的多实例管理 =====
+// 每个 diff pane 一个独立 Monaco DiffEditor；diff 数据挂在 leaf.diff 上（commitHash/filePath/loading/error/truncated/sideBySide/showFull）。
+// 与未分割时的单例路径完全隔离：这里只操作 diffEditorViews，不碰 gitDiffEditor / editorDiff。
+
+// 释放某个 diff pane 的实例与 model
+function disposeDiffEditorForPane(paneId) {
+  const entry = diffEditorViews.get(paneId)
+  if (!entry) return
+  if (entry.originalModel && !entry.originalModel.isDisposed()) entry.originalModel.dispose()
+  if (entry.modifiedModel && !entry.modifiedModel.isDisposed()) entry.modifiedModel.dispose()
+  if (entry.editor) entry.editor.dispose()
+  diffEditorViews.delete(paneId)
+}
+
+// 释放所有 diff pane 实例（收起分割 / 关闭编辑器时调用）
+function disposeAllDiffEditors() {
+  for (const paneId of [...diffEditorViews.keys()]) disposeDiffEditorForPane(paneId)
+  diffContainerRefs.value.clear()
+  triggerRef(diffContainerRefs)
+}
+
+// 确保某个 diff pane 的编辑器实例存在（容器被替换时销毁重建）
+function ensureDiffEditorForPane(paneId) {
+  const container = resolveDiffContainer(paneId)
+  if (!container) return null
+  let entry = diffEditorViews.get(paneId)
+  if (entry && entry.editor && entry.editor.getContainerDomNode() !== container) {
+    disposeDiffEditorForPane(paneId)
+    entry = null
+  }
+  if (entry) return entry
+  const editor = monaco.editor.createDiffEditor(container, {
+    theme: 'blueDark',
+    fontFamily: EDITOR_FONT_FAMILY,
+    fontSize: 12,
+    lineHeight: 18,
+    readOnly: true,
+    originalEditable: false,
+    automaticLayout: true,
+    renderSideBySide: gitDiffSideBySide.value && !isNarrowGitDiffViewport(),
+    useInlineViewWhenSpaceIsLimited: isNarrowGitDiffViewport(),
+    minimap: { enabled: false },
+    scrollBeyondLastLine: false,
+    renderOverviewRuler: false,
+    renderWhitespace: 'selection',
+    smoothScrolling: true,
+    folding: false,
+    lineNumbersMinChars: 3,
+    wordWrap: isNarrowGitDiffViewport() ? 'on' : 'off',
+  })
+  entry = { editor, originalModel: null, modifiedModel: null, oldText: '', newText: '' }
+  diffEditorViews.set(paneId, entry)
+  return entry
+}
+
+// 用该 pane 的 diff 数据渲染 Monaco（容器未就绪时轮询等待）
+async function renderDiffForPane(paneId) {
+  const pane = findEditorPaneById(editorPaneTree.value, paneId)
+  if (!pane || pane.view !== 'diff' || !pane.diff) return
+  let container = resolveDiffContainer(paneId)
+  for (let i = 0; !container && i < 10; i++) {
+    await new Promise(resolve => setTimeout(resolve, 50))
+    container = resolveDiffContainer(paneId)
+  }
+  if (!container) return
+  // 等待期间 pane 可能已切走/关闭
+  const current = findEditorPaneById(editorPaneTree.value, paneId)
+  if (!current || current.view !== 'diff' || !current.diff) return
+  const diff = current.diff
+  try {
+    const entry = ensureDiffEditorForPane(paneId)
+    if (!entry) return
+    const language = getLanguageExtension(getLanguageFromFilename(diff.filePath))
+    let oldText = entry.oldText
+    let newText = entry.newText
+    if (!oldText && !newText) {
+      const parsed = parseUnifiedDiff(diff.diffText || '', { absoluteLineNumbers: true })
+      oldText = parsed.oldText
+      newText = parsed.newText
+    }
+    // 默认只显示变更上下文区域
+    if (!diff.showFull && diff.diffText) {
+      const context = extractDiffContext(diff.diffText)
+      if (context.oldText || context.newText) {
+        oldText = context.oldText
+        newText = context.newText
+      }
+    }
+    if (entry.originalModel && !entry.originalModel.isDisposed()) entry.originalModel.dispose()
+    if (entry.modifiedModel && !entry.modifiedModel.isDisposed()) entry.modifiedModel.dispose()
+    entry.originalModel = monaco.editor.createModel(oldText, language)
+    entry.modifiedModel = monaco.editor.createModel(newText, language)
+    entry.editor.setModel({ original: entry.originalModel, modified: entry.modifiedModel })
+    entry.editor.updateOptions({ renderSideBySide: diff.sideBySide && !isNarrowGitDiffViewport() })
+    entry.editor.layout()
+  } catch (error) {
+    console.warn('[GIT] render pane diff with monaco failed:', error)
+    diff.error = `diff 渲染失败：${error?.message || error}`
+  }
+}
+
+// 为某个 pane 加载并渲染 diff（写 leaf.diff 后调用）
+async function loadDiffForPane(paneId, commitHash, filePath) {
+  const pane = findEditorPaneById(editorPaneTree.value, paneId)
+  if (!pane || pane.view !== 'diff') return
+  const workingDir = getGitWorkingDir()
+  if (!workingDir) return
+  pane.diff = {
+    commitHash,
+    filePath,
+    diffText: '',
+    loading: true,
+    error: '',
+    truncated: false,
+    sideBySide: gitDiffSideBySide.value,
+    showFull: gitDiffShowFull.value,
+  }
+  try {
+    const diffData = await callGitApi('git/diff', { path: workingDir, hash: commitHash, file: filePath })
+    // 等待期间 pane 可能已切走/关闭
+    const current = findEditorPaneById(editorPaneTree.value, paneId)
+    if (!current || current.view !== 'diff' || !current.diff) return
+    current.diff.diffText = diffData.diff || ''
+    current.diff.truncated = Boolean(diffData.truncated)
+    if (current.diff.showFull) {
+      const entry = await ensureGitDiffFullText(commitHash, filePath)
+      if (entry) current.diff.truncated = Boolean(current.diff.truncated || entry.truncated)
+      const e = diffEditorViews.get(paneId)
+      if (e) { e.oldText = gitDiffOldText; e.newText = gitDiffNewText }
+    }
+    current.diff.loading = false
+    await nextTick()
+    await renderDiffForPane(paneId)
+  } catch (error) {
+    const current = findEditorPaneById(editorPaneTree.value, paneId)
+    if (current && current.diff) {
+      current.diff.loading = false
+      current.diff.error = error.message || '获取 diff 失败'
+    }
+  }
+}
+
+// diff pane 内切换「并排 / 内联」
+function togglePaneDiffSideBySide(paneId) {
+  const pane = findEditorPaneById(editorPaneTree.value, paneId)
+  if (!pane || !pane.diff) return
+  pane.diff.sideBySide = !pane.diff.sideBySide
+  const entry = diffEditorViews.get(paneId)
+  if (entry) entry.editor.updateOptions({ renderSideBySide: pane.diff.sideBySide && !isNarrowGitDiffViewport() })
+}
+
+// diff pane 内切换「全文 / 仅上下文」
+async function togglePaneDiffShowFull(paneId) {
+  const pane = findEditorPaneById(editorPaneTree.value, paneId)
+  if (!pane || !pane.diff) return
+  pane.diff.showFull = !pane.diff.showFull
+  const entry = diffEditorViews.get(paneId)
+  if (pane.diff.showFull) {
+    const { commitHash, filePath } = pane.diff
+    const key = `${commitHash}|${filePath}`
+    if (!gitDiffFullTextCache.has(key)) {
+      pane.diff.loading = true
+      try {
+        const full = await ensureGitDiffFullText(commitHash, filePath)
+        if (full) pane.diff.truncated = Boolean(pane.diff.truncated || full.truncated)
+      } catch (error) {
+        pane.diff.error = error.message || '获取文件全文失败'
+        pane.diff.loading = false
+        return
+      } finally {
+        pane.diff.loading = false
+      }
+    } else {
+      await ensureGitDiffFullText(commitHash, filePath)
+    }
+    if (entry) { entry.oldText = gitDiffOldText; entry.newText = gitDiffNewText }
+    await nextTick()
+  } else if (entry) {
+    // 切回「仅上下文」：清掉全文缓存变量，避免误用旧全文
+    entry.oldText = ''
+    entry.newText = ''
+  }
+  await renderDiffForPane(paneId)
+}
+
+// diff pane 内跳转上一个 / 下一个差异
+function navigatePaneDiff(paneId, direction) {
+  const entry = diffEditorViews.get(paneId)
+  if (!entry || !entry.editor) return
+  const target = direction === 'prev' ? 'previous' : 'next'
+  if (typeof entry.editor.goToDiff === 'function') entry.editor.goToDiff(target)
+}
+
+// 关闭某个 diff pane 的 diff（回到空 file pane）
+function closePaneDiff(paneId) {
+  const pane = findEditorPaneById(editorPaneTree.value, paneId)
+  if (!pane) return
+  disposeDiffEditorForPane(paneId)
+  pane.diff = null
+  pane.view = 'file'
+  persistEditorPaneLayout()
+  nextTick(() => scheduleEditorLayout())
+}
+
+// 显式 layout 合并到下一帧，避免同一帧内对多个 diff 实例反复 layout 造成尺寸震荡
+let diffLayoutScheduled = false
+function scheduleDiffLayout() {
+  if (diffLayoutScheduled) return
+  diffLayoutScheduled = true
+  requestAnimationFrame(() => {
+    diffLayoutScheduled = false
+    for (const [, entry] of diffEditorViews) {
+      if (entry.editor && entry.editor.getContainerDomNode?.()?.isConnected) entry.editor.layout()
+    }
+  })
 }
 
 // 提交信息中的 refs 标签：区分 HEAD/分支/tag 样式
@@ -7140,6 +7455,16 @@ function detachPanel(type, panelId = null) {
     disposeGitDiffEditor()
     if (diffFilePath && !gitDiffLoading.value && !gitDiffError.value) {
       nextTick(() => renderGitDiffMonaco(diffFilePath))
+    }
+    // 已分割时 diff 由各 pane 的独立实例承载：容器随 EditorPanel 重建而失效，
+    // 需释放旧实例并在新容器挂载后按各 pane 的 diff 数据重新渲染。
+    if (isEditorSplit.value) {
+      const paneIds = [...diffEditorViews.keys()]
+      for (const paneId of paneIds) disposeDiffEditorForPane(paneId)
+      nextTick(() => {
+        for (const paneId of paneIds) renderDiffForPane(paneId)
+        scheduleDiffLayout()
+      })
     }
   } else if (type === 'session' && panelId) {
     if (sessionDetachedPanels.value.has(panelId)) {
@@ -17664,34 +17989,32 @@ body::-webkit-scrollbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 10px;
+  padding: 4px 10px;
   border-bottom: 1px solid var(--color-border-subtle);
   background: transparent;
   cursor: move;
   gap: 8px;
-  min-height: 32px;
+  min-height: 28px;
 }
 
 .editor-panel-title-group {
   min-width: 0;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 8px;
 }
 
 .editor-panel-header h3 {
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
-.editor-panel-subtitle {
+.editor-agent-label {
   font-size: 11px;
   color: var(--color-text-secondary);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 320px;
 }
 
 .editor-panel-actions {
@@ -18037,6 +18360,111 @@ body::-webkit-scrollbar {
   min-height: 0;
 }
 
+/* 自由分割：diff leaf 内的容器（与 session/chat/terminal leaf 同型） */
+.editor-pane-diff-wrap {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* diff pane 内的 diff 视图（与 EditorPanel.vue 的 .editor-diff-* 同款，此处为 App.vue 作用域副本） */
+.editor-pane-diff-wrap .editor-diff-view {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.editor-pane-diff-wrap .editor-diff-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.editor-pane-diff-wrap .editor-diff-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-primary);
+}
+
+.editor-pane-diff-wrap .editor-diff-hash {
+  color: var(--color-text-secondary);
+  font-family: monospace;
+}
+
+.editor-pane-diff-wrap .editor-diff-truncated {
+  color: var(--color-warning, #e6a23c);
+}
+
+.editor-pane-diff-wrap .editor-diff-toggle,
+.editor-pane-diff-wrap .editor-diff-close {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.editor-pane-diff-wrap .editor-diff-toggle:hover,
+.editor-pane-diff-wrap .editor-diff-close:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-text-secondary);
+}
+
+.editor-pane-diff-wrap .editor-diff-nav {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.editor-pane-diff-wrap .editor-diff-nav:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-text-secondary);
+}
+
+.editor-pane-diff-wrap .editor-diff-status {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.editor-pane-diff-wrap .editor-diff-status.error {
+  color: var(--color-danger, #f56c6c);
+}
+
+.editor-pane-diff-wrap .editor-diff-monaco {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
 /* 编辑器会话视图：未选择会话时的占位 */
 .editor-session-placeholder {
   margin: auto;
@@ -18088,7 +18516,8 @@ body::-webkit-scrollbar {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 4px 10px;
+  min-height: 28px;
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
@@ -21495,11 +21924,7 @@ body::-webkit-scrollbar {
 
   .editor-panel-header {
     cursor: default;
-    padding: 10px 12px;
-  }
-
-  .editor-panel-subtitle {
-    max-width: none;
+    padding: 6px 10px;
   }
 
   .editor-panel-toolbar {

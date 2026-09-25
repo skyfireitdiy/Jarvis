@@ -6,17 +6,7 @@
     :style="panelStyle"
     @mousedown="$emit('focus', 'chat')"
   >
-    <div class="chat-panel-header" @mousedown="!embedded && $emit('startMove', $event)">
-      <div class="chat-panel-title-group">
-        <h3>聊天室</h3>
-        <span v-if="unreadCount > 0" class="chat-unread-badge">{{ unreadCount }}</span>
-      </div>
-      <span class="chat-username">{{ myName }}</span>
-      <div class="chat-panel-actions">
-        <button class="icon-btn" @click="$emit('detach')" :title="embedded ? '分离为浮动窗口' : '嵌入主界面'">⧉</button>
-        <button class="icon-btn" @click="$emit('close')" title="关闭面板">✕</button>
-      </div>
-    </div>
+    <!-- 聊天室标题栏已移除：面板标题由外层 pane 头部承载，界面更紧凑 -->
 
     <!-- 主体区域：侧边栏 + 消息区 横向排列 -->
     <div class="chat-body">

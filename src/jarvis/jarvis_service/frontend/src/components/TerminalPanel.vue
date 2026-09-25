@@ -7,8 +7,18 @@
     @mousedown="$emit('focus', 'terminal')"
   >
     <div class="terminal-panel-header" @mousedown="!embedded && $emit('startMove', $event)">
-      <div class="terminal-panel-title-group">
-        <h3>终端</h3>
+      <!-- 终端标签栏与标题栏合一：标签在左，节点选择与新建恒靠右 -->
+      <div class="terminal-tabs" v-if="sessions.length > 0">
+        <div
+          v-for="session in sessions"
+          :key="session.terminal_id"
+          class="terminal-tab"
+          :class="{ active: activeId === session.terminal_id }"
+          @click="$emit('switch', session.terminal_id)"
+        >
+          <span class="terminal-tab-title">{{ session.interpreter }}</span>
+          <button class="terminal-tab-close" @click.stop="$emit('closeTerminal', session.terminal_id)">✕</button>
+        </div>
       </div>
       <div class="terminal-panel-actions">
         <select
@@ -23,23 +33,7 @@
             {{ formatNodeLabel(node) }}
           </option>
         </select>
-        <button class="icon-btn" @click="$emit('createTerminal')" :disabled="!socket" title="新建终端">➕</button>
-        <button class="icon-btn" @click="$emit('detach')" :title="embedded ? '分离为浮动窗口' : '嵌入主界面'">⧉</button>
-        <button class="icon-btn" @click="$emit('close')" title="关闭面板">✕</button>
-      </div>
-    </div>
-
-    <!-- 终端标签栏 -->
-    <div class="terminal-tabs" v-if="sessions.length > 0">
-      <div
-        v-for="session in sessions"
-        :key="session.terminal_id"
-        class="terminal-tab"
-        :class="{ active: activeId === session.terminal_id }"
-        @click="$emit('switch', session.terminal_id)"
-      >
-        <span class="terminal-tab-title">{{ session.interpreter }}</span>
-        <button class="terminal-tab-close" @click.stop="$emit('closeTerminal', session.terminal_id)">✕</button>
+        <button class="terminal-create-btn" @click="$emit('createTerminal')" :disabled="!socket" title="新建终端">➕</button>
       </div>
     </div>
 
@@ -100,37 +94,6 @@ const emit = defineEmits([
 </script>
 
 <style scoped>
-.icon-btn {
-  background: var(--color-bg-tertiary);
-  border: none;
-  border-radius: var(--tile-radius);
-  font-size: 18px;
-  cursor: pointer;
-  padding: 0;
-  color: var(--color-text-secondary);
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.icon-btn:hover:not(:disabled) {
-  background: var(--color-bg-hover);
-  color: var(--color-text-primary);
-  transform: translateY(-1px);
-}
-
-.icon-btn:active:not(:disabled) {
-  transform: translateY(0);
-}
-
-.icon-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 .terminal-panel {
   position: fixed;
   background: rgba(9, 16, 28, 0.86);
@@ -166,9 +129,10 @@ const emit = defineEmits([
 
 .terminal-panel-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
-  padding: 6px 10px;
+  gap: 6px;
+  padding: 2px 6px;
   background:
     linear-gradient(160deg, rgba(32, 200, 255, 0.10) 0%, transparent 46%),
     var(--color-bg-tertiary);
@@ -176,33 +140,19 @@ const emit = defineEmits([
   border-left: 2px solid var(--color-accent);
   border-radius: var(--tile-radius-xs) var(--tile-radius-xs) 0 0;
   cursor: move;
-  min-height: 32px;
-}
-
-.terminal-panel-header h3 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
-.terminal-panel-title-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
+  min-height: 24px;
 }
 
 .terminal-node-select {
-  height: 32px;
-  min-width: 168px;
-  max-width: 240px;
-  padding: 0 32px 0 12px;
+  height: 24px;
+  min-width: 140px;
+  max-width: 220px;
+  padding: 0 24px 0 8px;
   border: none;
   border-radius: var(--tile-radius-xs);
   background: var(--color-bg-tertiary);
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: 12px;
   outline: none;
   transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
@@ -225,28 +175,66 @@ const emit = defineEmits([
 
 .terminal-panel-actions {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
+/* 新建终端按钮：与紧凑标题栏同高、同配色 */
+.terminal-create-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--tile-radius-xs);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.terminal-create-btn:hover:not(:disabled) {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.terminal-create-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 标签栏与标题栏合一：不再单独占一行 */
 .terminal-tabs {
   display: flex;
+  align-items: center;
   gap: 2px;
-  padding: 4px;
-  background: var(--color-bg-primary);
-  border-bottom: 1px solid var(--color-border-subtle);
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  background: transparent;
+  border-bottom: none;
 }
 
 .terminal-tab {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  padding: 3px 8px;
   background: var(--color-bg-secondary);
   border: 1px solid transparent;
   border-radius: var(--tile-radius-xs);
   font-size: 12px;
   color: var(--color-text-secondary);
   cursor: pointer;
+  white-space: nowrap;
   transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
