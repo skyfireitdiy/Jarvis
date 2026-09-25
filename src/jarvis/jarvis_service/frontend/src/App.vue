@@ -14,7 +14,7 @@
       @petSyncStatus="petSyncAllStatus"
       @petInterruptCurrent="petInterruptCurrent"
       @petGotoWaiting="petGotoWaitingAgent"
-      @petToggleSidebar="openEditorAgentList"
+      @petToggleSidebar="openWorkspaceAgentList"
       @petOpenTopology="openTopologyOverlay"
       @petOpenCommandPalette="openCommandPalette()"
       @openQuickCreate="openQuickCreateAgent"
@@ -43,7 +43,7 @@
       <button class="icon-btn" @click="toggleTerminalPanel()" :disabled="!socket" title="终端面板 (Ctrl+`)">
         💻
       </button>
-      <button class="icon-btn" @click="toggleEditorPanel()" :disabled="!socket" title="编辑器 (Ctrl+E)">
+      <button class="icon-btn" @click="toggleWorkspacePanel()" :disabled="!socket" title="编辑器 (Ctrl+E)">
         📝
       </button>
       <button class="icon-btn" @click="openCommandPalette()" title="命令面板 (Ctrl+P)">
@@ -83,57 +83,57 @@
     <main class="panel-grid" :style="panelGridStyle">
       <!-- 唯一容器：编辑器面板（所有 panel 都在编辑器内部打开，不再平铺渲染） -->
       <!-- 内嵌编辑器面板 -->
-      <EditorPanel
-        v-if="showEditorPanel && !editorDetached"
-        ref="editorPanelRef"
-        :visible="showEditorPanel"
-        :active="activeWindow === 'editor'"
-        :interaction="editorPanelInteraction"
-        :panelStyle="editorPanelStyle"
-        :agentName="activeEditorSession?.agent_name"
+      <WorkspacePanel
+        v-if="showWorkspacePanel && !workspaceDetached"
+        ref="workspacePanelRef"
+        :visible="showWorkspacePanel"
+        :active="activeWindow === 'workspace'"
+        :interaction="workspacePanelInteraction"
+        :panelStyle="workspacePanelStyle"
+        :agentName="activeWorkspaceSession?.agent_name"
         :agents="activeAgents"
-        :activeAgentId="activeEditorSessionId"
-        :activeTab="activeEditorTab"
-        :activeTabPath="activeEditorTabPath"
-        :tabs="editorTabs"
-        :isMaximized="isEditorMaximized"
-        :isEditable="isEditorEditable"
-        :showSidebar="showEditorSidebar"
-        :sidebarView="editorSidebarView"
-        :mainView="editorMainView"
-        :resizeDirections="editorResizeDirections"
+        :activeAgentId="activeWorkspaceSessionId"
+        :activeTab="activeWorkspaceTab"
+        :activeTabPath="activeWorkspaceTabPath"
+        :tabs="workspaceTabs"
+        :isMaximized="isWorkspaceMaximized"
+        :isEditable="isWorkspaceEditable"
+        :showSidebar="showWorkspaceSidebar"
+        :sidebarView="workspaceSidebarView"
+        :mainView="workspaceMainView"
+        :resizeDirections="workspaceResizeDirections"
         :embedded="true"
-        :diff="editorDiff"
-        :canSplit="canSplitEditorPane"
-        @focus="focusWindow('editor')"
-        @startMove="startEditorPanelMove"
-        @toggleMaximize="toggleEditorMaximize"
-        @save="saveActiveEditorTab"
-        @close="closeEditorPanel"
-        @activateTab="activateEditorTab"
-        @closeTab="closeEditorTab"
-        @toggleEditable="toggleEditorEditable"
-        @setSidebarView="setEditorSidebarView"
-        @setMainView="setEditorMainView"
-        @startResize="startEditorPanelResize"
+        :diff="workspaceDiff"
+        :canSplit="canSplitWorkspacePane"
+        @focus="focusWindow('workspace')"
+        @startMove="startWorkspacePanelMove"
+        @toggleMaximize="toggleWorkspaceMaximize"
+        @save="saveActiveWorkspaceTab"
+        @close="closeWorkspacePanel"
+        @activateTab="activateWorkspaceTab"
+        @closeTab="closeWorkspaceTab"
+        @toggleEditable="toggleWorkspaceEditable"
+        @setSidebarView="setWorkspaceSidebarView"
+        @setMainView="setWorkspaceMainView"
+        @startResize="startWorkspacePanelResize"
         @toggleDiffSideBySide="toggleGitDiffSideBySide"
         @toggleDiffShowFull="toggleGitDiffShowFull"
         @diffNavPrev="navigateGitDiff('prev')"
         @diffNavNext="navigateGitDiff('next')"
-        @selectAgent="selectEditorAgent"
-        @closeDiff="closeEditorDiff"
-        @splitPane="onEditorSplitRequest($event)"
-        @detach="detachPanel('editor')"
+        @selectAgent="selectWorkspaceAgent"
+        @closeDiff="closeWorkspaceDiff"
+        @splitPane="onWorkspaceSplitRequest($event)"
+        @detach="detachPanel('workspace')"
       >
         <template #sidebar>
-          <aside v-if="showEditorSidebar" class="editor-sidebar" :style="{ width: editorSidebarWidth + 'px' }">
-            <div class="editor-sidebar-resize-handle" @mousedown="startEditorSidebarResize($event)"></div>
-            <div class="editor-sidebar-header">
-              <span class="editor-sidebar-title">{{ editorSidebarView === 'search' ? '全局搜索' : (editorSidebarView === 'git' ? 'Git' : (editorSidebarView === 'agents' ? 'Agent 列表' : '目录树')) }}</span>
-              <button class="icon-btn-small editor-sidebar-close-mobile" @click="closeEditorSidebar" title="关闭侧边栏">✕</button>
-              <button class="icon-btn-small editor-sidebar-close-desktop" @click="closeEditorSidebar" title="关闭侧边栏">✕</button>
+          <aside v-if="showWorkspaceSidebar" class="workspace-sidebar" :style="{ width: workspaceSidebarWidth + 'px' }">
+            <div class="workspace-sidebar-resize-handle" @mousedown="startWorkspaceSidebarResize($event)"></div>
+            <div class="workspace-sidebar-header">
+              <span class="workspace-sidebar-title">{{ workspaceSidebarView === 'search' ? '全局搜索' : (workspaceSidebarView === 'git' ? 'Git' : (workspaceSidebarView === 'agents' ? 'Agent 列表' : '目录树')) }}</span>
+              <button class="icon-btn-small workspace-sidebar-close-mobile" @click="closeWorkspaceSidebar" title="关闭侧边栏">✕</button>
+              <button class="icon-btn-small workspace-sidebar-close-desktop" @click="closeWorkspaceSidebar" title="关闭侧边栏">✕</button>
             </div>
-            <div v-if="editorSidebarView === 'agents'" class="editor-sidebar-content editor-sidebar-agents">
+            <div v-if="workspaceSidebarView === 'agents'" class="workspace-sidebar-content workspace-sidebar-agents">
               <AgentSidebar
                 :visible="true"
                 :embedded="true"
@@ -160,10 +160,10 @@
                 :currentUserId="auth.userInfo?.user_id || ''"
                 :currentUserName="auth.userInfo?.display_name || auth.userInfo?.username || ''"
                 :isConnected="!!socket && !showConnectModal"
-                @close="setEditorSidebarView('files')"
+                @close="setWorkspaceSidebarView('files')"
                 @toggleBatchMode="toggleBatchMode"
                 @createAgent="openCreateAgentModal"
-                @agentClick="onEditorSidebarAgentClick"
+                @agentClick="onWorkspaceSidebarAgentClick"
                 @agentContextMenu="onSidebarAgentContextMenu"
                 @toggleSelectAgent="toggleSelectAgent"
                 @renameAgent="renameAgent"
@@ -180,13 +180,13 @@
                 @editAccess="editAgentAccess"
               />
             </div>
-            <div v-else-if="editorSidebarView === 'files'" class="editor-sidebar-content">
-              <div class="editor-file-tree-panel">
+            <div v-else-if="workspaceSidebarView === 'files'" class="workspace-sidebar-content">
+              <div class="workspace-file-tree-panel">
                 <!-- 活跃 Agent 节点列表 -->
                 <div
                   v-for="agent in activeAgents"
                   :key="agent.agent_id"
-                  class="editor-agent-node"
+                  class="workspace-agent-node"
                   :class="{
                     'selected': selectedAgentId === agent.agent_id,
                     'waiting-input': isWaitingInput(agent)
@@ -208,20 +208,20 @@
                   <!-- Agent 的文件树 -->
                   <div v-if="expandedAgents.has(agent.agent_id)" class="agent-file-tree">
                     <div
-                      class="editor-file-tree-root"
-                      @click.stop="ensureEditorSidebarFileTree(agent)"
+                      class="workspace-file-tree-root"
+                      @click.stop="ensureWorkspaceSidebarFileTree(agent)"
                       @contextmenu.prevent.stop="openFileTreeContextMenu(agent, null, $event)"
                     >
                       {{ getWorkingDirDisplay(agent.working_dir) }}
                     </div>
-                    <div v-if="!(fileTreeState.get(agent.agent_id)?.length > 0)" class="editor-file-tree-empty">
+                    <div v-if="!(fileTreeState.get(agent.agent_id)?.length > 0)" class="workspace-file-tree-empty">
                       当前工作目录下暂无可显示内容
                     </div>
-                    <div v-else class="editor-file-tree-list" tabindex="0" :data-agent-id="agent.agent_id" @keydown="handleFileTreeKeydown($event, agent.agent_id)">
+                    <div v-else class="workspace-file-tree-list" tabindex="0" :data-agent-id="agent.agent_id" @keydown="handleFileTreeKeydown($event, agent.agent_id)">
                       <div
                         v-for="visibleNode in getVisibleFileTreeNodes(agent.agent_id)"
                         :key="visibleNode.node.path"
-                        class="tree-node editor-tree-node"
+                        class="tree-node workspace-tree-node"
                         :data-node-path="visibleNode.node.path"
                       >
                         <div
@@ -264,7 +264,7 @@
                       <div
                         v-for="agent in agents"
                         :key="agent.agent_id"
-                        class="editor-agent-node stopped"
+                        class="workspace-agent-node stopped"
                         :class="{ 'selected': selectedAgentId === agent.agent_id }"
                       >
                         <div
@@ -283,20 +283,20 @@
                         <!-- Agent 的文件树 -->
                         <div v-if="expandedAgents.has(agent.agent_id)" class="agent-file-tree">
                           <div
-                            class="editor-file-tree-root"
-                            @click.stop="ensureEditorSidebarFileTree(agent)"
+                            class="workspace-file-tree-root"
+                            @click.stop="ensureWorkspaceSidebarFileTree(agent)"
                             @contextmenu.prevent.stop="openFileTreeContextMenu(agent, null, $event)"
                           >
                             {{ getWorkingDirDisplay(agent.working_dir) }}
                           </div>
-                          <div v-if="!(fileTreeState.get(agent.agent_id)?.length > 0)" class="editor-file-tree-empty">
+                          <div v-if="!(fileTreeState.get(agent.agent_id)?.length > 0)" class="workspace-file-tree-empty">
                             当前工作目录下暂无可显示内容
                           </div>
-                          <div v-else class="editor-file-tree-list" tabindex="0" :data-agent-id="agent.agent_id" @keydown="handleFileTreeKeydown($event, agent.agent_id)">
+                          <div v-else class="workspace-file-tree-list" tabindex="0" :data-agent-id="agent.agent_id" @keydown="handleFileTreeKeydown($event, agent.agent_id)">
                             <div
                               v-for="visibleNode in getVisibleFileTreeNodes(agent.agent_id)"
                               :key="visibleNode.node.path"
-                              class="tree-node editor-tree-node"
+                              class="tree-node workspace-tree-node"
                               :data-node-path="visibleNode.node.path"
                             >
                               <div
@@ -329,22 +329,22 @@
                   </div>
                 </template>
                 <!-- 无 Agent 提示 -->
-                <div v-if="agentList.length === 0" class="editor-file-tree-empty">
+                <div v-if="agentList.length === 0" class="workspace-file-tree-empty">
                   暂无 Agent，请先创建 Agent
                 </div>
               </div>
             </div>
-            <div v-else-if="editorSidebarView === 'search'" class="editor-sidebar-content">
-              <div class="editor-global-search-panel">
-                <div class="editor-global-search-mode-tabs">
+            <div v-else-if="workspaceSidebarView === 'search'" class="workspace-sidebar-content">
+              <div class="workspace-global-search-panel">
+                <div class="workspace-global-search-mode-tabs">
                   <button
-                    class="editor-global-search-mode-tab"
+                    class="workspace-global-search-mode-tab"
                     :class="{ active: globalSearchMode === 'content' }"
                     :disabled="globalSearchLoading"
                     @click="setGlobalSearchMode('content')"
                   >内容</button>
                   <button
-                    class="editor-global-search-mode-tab"
+                    class="workspace-global-search-mode-tab"
                     :class="{ active: globalSearchMode === 'filename' }"
                     :disabled="globalSearchLoading"
                     @click="setGlobalSearchMode('filename')"
@@ -352,7 +352,7 @@
                 </div>
                 <input
                   v-model="globalSearchQuery"
-                  class="editor-global-search-input"
+                  class="workspace-global-search-input"
                   type="text"
                   :placeholder="globalSearchMode === 'filename' ? '按文件名模糊搜索...' : '全局搜索文件内容...'"
                   :disabled="globalSearchLoading || !currentAgentId"
@@ -360,29 +360,29 @@
                 >
                 <input
                   v-model="globalSearchFileGlob"
-                  class="editor-global-search-input editor-global-search-glob-input"
+                  class="workspace-global-search-input workspace-global-search-glob-input"
                   type="text"
                   placeholder="文件过滤，如 *.py,!tests/**"
                   :disabled="globalSearchLoading || !currentAgentId"
                   @keydown.enter.prevent="runGlobalSearch"
                 >
-                <div class="editor-global-search-toolbar">
-                  <label class="editor-global-search-toggle">
+                <div class="workspace-global-search-toolbar">
+                  <label class="workspace-global-search-toggle">
                     <input v-model="globalSearchCaseSensitive" type="checkbox">
                     <span>区分大小写</span>
                   </label>
-                  <label v-if="globalSearchMode === 'content'" class="editor-global-search-toggle">
+                  <label v-if="globalSearchMode === 'content'" class="workspace-global-search-toggle">
                     <input v-model="globalSearchWholeWord" type="checkbox">
                     <span>全词匹配</span>
                   </label>
-                  <div class="editor-global-search-actions">
-                    <button class="icon-btn editor-global-search-btn" @click="runGlobalSearch" :disabled="globalSearchLoading || !currentAgentId || !globalSearchQuery.trim()" :title="globalSearchMode === 'filename' ? '文件名搜索' : '全局搜索'">🔍</button>
-                    <button class="icon-btn editor-global-search-btn" @click="clearGlobalSearch" :disabled="globalSearchLoading" title="清空搜索">✕</button>
+                  <div class="workspace-global-search-actions">
+                    <button class="icon-btn workspace-global-search-btn" @click="runGlobalSearch" :disabled="globalSearchLoading || !currentAgentId || !globalSearchQuery.trim()" :title="globalSearchMode === 'filename' ? '文件名搜索' : '全局搜索'">🔍</button>
+                    <button class="icon-btn workspace-global-search-btn" @click="clearGlobalSearch" :disabled="globalSearchLoading" title="清空搜索">✕</button>
                   </div>
                 </div>
               </div>
-              <div class="editor-global-search-results">
-                <div class="editor-global-search-summary">
+              <div class="workspace-global-search-results">
+                <div class="workspace-global-search-summary">
                   <span v-if="globalSearchLoading">搜索中...</span>
                   <span v-else-if="globalSearchError" class="error">{{ globalSearchError }}</span>
                   <span v-else-if="globalSearchExecuted && globalSearchMode === 'filename'">找到 {{ fileSearchResults.length }} 个文件（共扫描 {{ globalSearchTotalFiles }} 个）</span>
@@ -390,36 +390,36 @@
                   <span v-else>{{ globalSearchMode === 'filename' ? '输入关键词并回车，可按文件名模糊搜索' : '输入关键词并回车，可在当前 Agent 工作目录中全局搜索' }}</span>
                 </div>
                 <template v-if="globalSearchMode === 'filename'">
-                  <div v-if="!globalSearchLoading && globalSearchExecuted && fileSearchResults.length === 0 && !globalSearchError" class="editor-global-search-empty">
+                  <div v-if="!globalSearchLoading && globalSearchExecuted && fileSearchResults.length === 0 && !globalSearchError" class="workspace-global-search-empty">
                     未找到匹配文件
                   </div>
                   <button
                     v-for="result in fileSearchResults"
                     :key="result.file_path"
-                    class="editor-global-search-file-result"
+                    class="workspace-global-search-file-result"
                     @click="openFileSearchResult(result.file_path)"
                   >
-                    <span class="editor-global-search-file-result-name">{{ result.name }}</span>
-                    <span class="editor-global-search-file-result-path">{{ result.file_path }}</span>
+                    <span class="workspace-global-search-file-result-name">{{ result.name }}</span>
+                    <span class="workspace-global-search-file-result-path">{{ result.file_path }}</span>
                   </button>
                 </template>
                 <template v-else>
-                  <div v-if="!globalSearchLoading && globalSearchExecuted && globalSearchResults.length === 0 && !globalSearchError" class="editor-global-search-empty">
+                  <div v-if="!globalSearchLoading && globalSearchExecuted && globalSearchResults.length === 0 && !globalSearchError" class="workspace-global-search-empty">
                     未找到匹配结果
                   </div>
-                  <div v-for="result in globalSearchResults" :key="result.file_path" class="editor-global-search-file-group">
-                    <div class="editor-global-search-file-path" @click="openEditorFile(resolveAgentRelativePath(result.file_path))">
+                  <div v-for="result in globalSearchResults" :key="result.file_path" class="workspace-global-search-file-group">
+                    <div class="workspace-global-search-file-path" @click="openWorkspaceFile(resolveAgentRelativePath(result.file_path))">
                       {{ result.file_path }}
-                      <span class="editor-global-search-file-count">({{ result.matches.length }})</span>
+                      <span class="workspace-global-search-file-count">({{ result.matches.length }})</span>
                     </div>
                     <button
                       v-for="match in result.matches"
                       :key="`${result.file_path}:${match.line_number}:${match.match_start}`"
-                      class="editor-global-search-match"
+                      class="workspace-global-search-match"
                       @click="openGlobalSearchResult(result.file_path, match.line_number, match.match_start, match.match_end)"
                     >
-                      <span class="editor-global-search-line">{{ match.line_number }}</span>
-                      <span class="editor-global-search-text">
+                      <span class="workspace-global-search-line">{{ match.line_number }}</span>
+                      <span class="workspace-global-search-text">
                         {{ match.line_content.slice(0, match.match_start) }}<mark>{{ match.line_content.slice(match.match_start, match.match_end) }}</mark>{{ match.line_content.slice(match.match_end) }}
                       </span>
                     </button>
@@ -427,58 +427,58 @@
                 </template>
               </div>
             </div>
-            <div v-else class="editor-sidebar-content">
-              <div class="editor-git-panel">
-                <div class="editor-git-toolbar">
-                  <span class="editor-git-branch" :title="gitCurrentBranch || '未知分支'">
+            <div v-else class="workspace-sidebar-content">
+              <div class="workspace-git-panel">
+                <div class="workspace-git-toolbar">
+                  <span class="workspace-git-branch" :title="gitCurrentBranch || '未知分支'">
                     <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.492 2.492 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25Zm-6 0a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Zm8.25-.75a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5ZM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z"/></svg>
-                    <span class="editor-git-branch-name">{{ gitCurrentBranch || '无分支' }}</span>
+                    <span class="workspace-git-branch-name">{{ gitCurrentBranch || '无分支' }}</span>
                   </span>
                   <button class="icon-btn-small" @click="refreshGitView" :disabled="gitLogLoading" title="刷新">⟳</button>
                 </div>
-                <div class="editor-git-summary">
+                <div class="workspace-git-summary">
                   <span v-if="gitLogLoading && !gitLog.length">加载中...</span>
                   <span v-else-if="gitLogError" class="error">{{ gitLogError }}</span>
                   <span v-else>{{ gitLogTotal !== null ? gitLogTotal : gitLog.length }} 个提交<span v-if="gitBranches.length"> · {{ gitBranches.length }} 分支</span><span v-if="gitTags.length"> · {{ gitTags.length }} 标签</span></span>
                 </div>
-                <div class="editor-git-commit-list">
+                <div class="workspace-git-commit-list">
                   <template v-for="(commit, index) in gitLog" :key="commit.hash">
                     <div
-                      class="editor-git-commit"
+                      class="workspace-git-commit"
                       :class="{ selected: gitSelectedCommit === commit.hash }"
                       @click="toggleGitCommitDetail(commit)"
                     >
-                      <div class="editor-git-graph">
+                      <div class="workspace-git-graph">
                         <svg viewBox="0 0 20 40" width="20" height="40" aria-hidden="true">
                           <line x1="10" y1="0" x2="10" y2="40" stroke="currentColor" stroke-width="1.5" class="git-graph-line" />
                           <circle cx="10" cy="20" :r="commit.parents && commit.parents.length > 1 ? 5 : 4" class="git-graph-dot" :class="{ 'git-graph-merge': commit.parents && commit.parents.length > 1 }" />
                         </svg>
                       </div>
-                      <div class="editor-git-commit-body">
-                        <div class="editor-git-commit-subject" :title="commit.subject">{{ commit.subject }}</div>
-                        <div class="editor-git-commit-meta">
-                          <span class="editor-git-refs" v-if="commit.refs && commit.refs.length">
+                      <div class="workspace-git-commit-body">
+                        <div class="workspace-git-commit-subject" :title="commit.subject">{{ commit.subject }}</div>
+                        <div class="workspace-git-commit-meta">
+                          <span class="workspace-git-refs" v-if="commit.refs && commit.refs.length">
                             <span v-for="ref in commit.refs" :key="ref" class="git-ref" :class="gitRefClass(ref)">{{ ref }}</span>
                           </span>
-                          <span class="editor-git-author">{{ commit.author }}</span>
-                          <span class="editor-git-hash">{{ shortGitHash(commit.hash) }}</span>
-                          <span class="editor-git-time">{{ formatGitRelativeTime(commit.date) }}</span>
+                          <span class="workspace-git-author">{{ commit.author }}</span>
+                          <span class="workspace-git-hash">{{ shortGitHash(commit.hash) }}</span>
+                          <span class="workspace-git-time">{{ formatGitRelativeTime(commit.date) }}</span>
                         </div>
-                        <div v-if="gitSelectedCommit === commit.hash" class="editor-git-commit-detail" @click.stop>
-                          <div v-if="gitCommitDetailLoading" class="editor-git-detail-empty">加载文件列表...</div>
-                          <div v-else-if="!gitCommitFiles.length" class="editor-git-detail-empty">无文件变更</div>
+                        <div v-if="gitSelectedCommit === commit.hash" class="workspace-git-commit-detail" @click.stop>
+                          <div v-if="gitCommitDetailLoading" class="workspace-git-detail-empty">加载文件列表...</div>
+                          <div v-else-if="!gitCommitFiles.length" class="workspace-git-detail-empty">无文件变更</div>
                           <template v-else>
-                            <div class="editor-git-detail-summary">共 {{ gitCommitFiles.length }} 个文件变更</div>
+                            <div class="workspace-git-detail-summary">共 {{ gitCommitFiles.length }} 个文件变更</div>
                             <button
                               v-for="file in gitCommitFiles"
                               :key="file.path"
-                              class="editor-git-file"
+                              class="workspace-git-file"
                               :class="{ active: gitSelectedFile === file.path }"
                               @click="viewGitFileDiff(commit.hash, file.path)"
                             >
-                              <span class="editor-git-file-status" :class="'git-status-' + gitFileStatus(file)">{{ gitFileStatus(file) }}</span>
-                              <span class="editor-git-file-path" :title="file.path">{{ file.path }}</span>
-                              <span class="editor-git-file-stat">
+                              <span class="workspace-git-file-status" :class="'git-status-' + gitFileStatus(file)">{{ gitFileStatus(file) }}</span>
+                              <span class="workspace-git-file-path" :title="file.path">{{ file.path }}</span>
+                              <span class="workspace-git-file-stat">
                                 <span v-if="file.additions" class="git-add-stat">+{{ file.additions }}</span>
                                 <span v-if="file.deletions" class="git-del-stat">-{{ file.deletions }}</span>
                               </span>
@@ -489,10 +489,10 @@
                       </div>
                     </div>
                   </template>
-                  <div v-if="!gitLogLoading && !gitLogError && !gitLog.length" class="editor-git-empty">暂无提交记录</div>
+                  <div v-if="!gitLogLoading && !gitLogError && !gitLog.length" class="workspace-git-empty">暂无提交记录</div>
                   <button
                     v-if="gitLogHasMore && !gitLogLoading"
-                    class="editor-git-load-more"
+                    class="workspace-git-load-more"
                     @click="fetchGitLog(true)"
                   >加载更多</button>
                 </div>
@@ -501,98 +501,107 @@
           </aside>
         </template>
         <!-- 自由分割：仅在已分割（>1 个 leaf）时提供 pane-tree 插槽，
-             未分割时该插槽不存在，EditorPanel 走原有渲染路径（零回归）。 -->
-        <template v-if="isEditorSplit" #pane-tree>
-          <EditorPaneTree
-            :node="editorPaneTree"
+             未分割时该插槽不存在，WorkspacePanel 走原有渲染路径（零回归）。 -->
+        <template v-if="isWorkspaceSplit" #pane-tree>
+          <WorkspacePaneTree
+            :node="workspacePaneTree"
             :activePaneId="activePaneId"
-            :getTitle="getEditorPaneTitle"
-            @activate="activateEditorPane"
-            @split="splitEditorPane"
-            @close="closeEditorPane"
-            @startResize="startEditorPaneResize"
+            :getTitle="getWorkspacePaneTitle"
+            @activate="activateWorkspacePane"
+            @split="splitWorkspacePane"
+            @close="closeWorkspacePane"
+            @startResize="startWorkspacePaneResize"
           >
             <template #pane-content="{ pane, active }">
-              <div class="editor-pane-content-slot">
-                <template v-if="pane.view === 'file'">
+              <div class="workspace-pane-content-slot">
+                <template v-if="pane.view === 'empty'">
+                  <!-- 空 pane：新分割出来的区域不带任何属性（既非文件也非会话），
+                       仅显示中性占位，等待用户显式打开文件/会话。 -->
+                  <div class="workspace-pane-placeholder" @click="activateWorkspacePane(pane.id)">
+                    <div class="workspace-placeholder-icon">▢</div>
+                    <div class="workspace-placeholder-title">空区域</div>
+                    <div class="workspace-placeholder-text">在左侧打开文件或点击 Agent，即可在此区域显示内容。</div>
+                  </div>
+                </template>
+                <template v-else-if="pane.view === 'file'">
                   <!-- 文件标签：渲染在本 pane 内部顶部（不再横跨整个工作区）。
                        已分割时每个 pane 用自己独立的标签列表（getPaneTabs），
                        关闭某个 pane 的标签不会影响其他 pane。 -->
-                  <div v-if="getPaneTabs(pane.id).length > 0" class="editor-tabs editor-pane-tabs" @mousedown="activateEditorPane(pane.id)">
+                  <div v-if="getPaneTabs(pane.id).length > 0" class="workspace-tabs workspace-pane-tabs" @mousedown="activateWorkspacePane(pane.id)">
                     <div
                       v-for="tab in getPaneTabs(pane.id)"
                       :key="tab.path"
-                      class="editor-tab"
-                      :class="{ active: editorViewPanes.get(pane.id) === tab.path }"
-                      @click="activateEditorPane(pane.id); activateEditorTab(tab.path)"
+                      class="workspace-tab"
+                      :class="{ active: workspaceViewPanes.get(pane.id) === tab.path }"
+                      @click="activateWorkspacePane(pane.id); activateWorkspaceTab(tab.path)"
                     >
-                      <span class="editor-tab-name">{{ tab.name }}</span>
-                      <span v-if="tab.isDirty" class="editor-tab-dirty">●</span>
-                      <button class="editor-tab-close" @click.stop="closeEditorTab(tab.path, pane.id)">✕</button>
+                      <span class="workspace-tab-name">{{ tab.name }}</span>
+                      <span v-if="tab.isDirty" class="workspace-tab-dirty">●</span>
+                      <button class="workspace-tab-close" @click.stop="closeWorkspaceTab(tab.path, pane.id)">✕</button>
                     </div>
                     <!-- 每个 pane 自己的保存 / 只读开关：作用于本 pane 当前文件 -->
-                    <div class="editor-pane-actions">
+                    <div class="workspace-pane-actions">
                       <button
-                        class="editor-pane-action"
-                        :disabled="!editorViewPanes.get(pane.id)"
-                        @click.stop="savePaneEditorFile(pane.id)"
+                        class="workspace-pane-action"
+                        :disabled="!workspaceViewPanes.get(pane.id)"
+                        @click.stop="savePaneWorkspaceFile(pane.id)"
                         title="保存本区域文件"
                       >💾</button>
                       <button
-                        class="editor-pane-action"
-                        :class="{ editable: isEditorEditable }"
-                        :disabled="!editorViewPanes.get(pane.id)"
-                        @click.stop="toggleEditorEditable()"
-                        :title="isEditorEditable ? '切换到只读模式' : '切换到编辑模式'"
-                      >{{ isEditorEditable ? '🔓' : '🔒' }}</button>
+                        class="workspace-pane-action"
+                        :class="{ editable: isWorkspaceEditable }"
+                        :disabled="!workspaceViewPanes.get(pane.id)"
+                        @click.stop="toggleWorkspaceEditable()"
+                        :title="isWorkspaceEditable ? '切换到只读模式' : '切换到编辑模式'"
+                      >{{ isWorkspaceEditable ? '🔓' : '🔒' }}</button>
                     </div>
                   </div>
                   <!-- Monaco 多实例：每个 file pane 各渲染一个真实编辑器容器（可编辑），
                        非激活 pane 只是没有焦点，不再是只读快照。 -->
                   <div
-                    :ref="el => setSplitEditorContainerRef(pane.id, el)"
+                    :ref="el => setSplitWorkspaceContainerRef(pane.id, el)"
                     :data-pane-id="pane.id"
-                    class="editor-monaco-container"
-                    @mousedown="activateEditorPane(pane.id)"
+                    class="workspace-monaco-container"
+                    @mousedown="activateWorkspacePane(pane.id)"
                   ></div>
                 </template>
                 <template v-else-if="pane.view === 'diff'">
                   <!-- diff leaf：Git 提交文件 diff 作为独立 pane 内容（每个 pane 一个独立 DiffEditor 实例） -->
-                  <div class="editor-pane-diff-wrap" @mousedown="activateEditorPane(pane.id)">
-                    <div v-if="pane.diff" class="editor-diff-view">
-                      <div class="editor-diff-header">
-                        <span class="editor-diff-title" :title="pane.diff.filePath">{{ pane.diff.filePath }}</span>
-                        <span v-if="pane.diff.commitHash" class="editor-diff-hash">{{ pane.diff.commitHash.slice(0, 7) }}</span>
-                        <span v-if="pane.diff.truncated" class="editor-diff-truncated">（已截断）</span>
-                        <button class="editor-diff-nav" @click.stop="navigatePaneDiff(pane.id, 'prev')" title="上一个差异">▲</button>
-                        <button class="editor-diff-nav" @click.stop="navigatePaneDiff(pane.id, 'next')" title="下一个差异">▼</button>
-                        <button class="editor-diff-toggle" @click.stop="togglePaneDiffShowFull(pane.id)" :title="pane.diff.showFull ? '只显示变更上下文区域' : '显示文件全文'">
+                  <div class="workspace-pane-diff-wrap" @mousedown="activateWorkspacePane(pane.id)">
+                    <div v-if="pane.diff" class="workspace-diff-view">
+                      <div class="workspace-diff-header">
+                        <span class="workspace-diff-title" :title="pane.diff.filePath">{{ pane.diff.filePath }}</span>
+                        <span v-if="pane.diff.commitHash" class="workspace-diff-hash">{{ pane.diff.commitHash.slice(0, 7) }}</span>
+                        <span v-if="pane.diff.truncated" class="workspace-diff-truncated">（已截断）</span>
+                        <button class="workspace-diff-nav" @click.stop="navigatePaneDiff(pane.id, 'prev')" title="上一个差异">▲</button>
+                        <button class="workspace-diff-nav" @click.stop="navigatePaneDiff(pane.id, 'next')" title="下一个差异">▼</button>
+                        <button class="workspace-diff-toggle" @click.stop="togglePaneDiffShowFull(pane.id)" :title="pane.diff.showFull ? '只显示变更上下文区域' : '显示文件全文'">
                           {{ pane.diff.showFull ? '仅上下文' : '全文' }}
                         </button>
-                        <button class="editor-diff-toggle" @click.stop="togglePaneDiffSideBySide(pane.id)">
+                        <button class="workspace-diff-toggle" @click.stop="togglePaneDiffSideBySide(pane.id)">
                           {{ pane.diff.sideBySide ? '内联' : '并排' }}
                         </button>
-                        <button class="editor-diff-close" @click.stop="closePaneDiff(pane.id)" title="关闭 diff">✕</button>
+                        <button class="workspace-diff-close" @click.stop="closePaneDiff(pane.id)" title="关闭 diff">✕</button>
                       </div>
-                      <div v-if="pane.diff.loading" class="editor-diff-status">加载 diff...</div>
-                      <div v-else-if="pane.diff.error" class="editor-diff-status error">{{ pane.diff.error }}</div>
+                      <div v-if="pane.diff.loading" class="workspace-diff-status">加载 diff...</div>
+                      <div v-else-if="pane.diff.error" class="workspace-diff-status error">{{ pane.diff.error }}</div>
                       <div
                         v-else
                         :ref="el => setDiffContainerRef(pane.id, el)"
                         :data-diff-pane-id="pane.id"
-                        class="editor-diff-monaco"
+                        class="workspace-diff-monaco"
                       ></div>
                     </div>
-                    <div v-else class="editor-pane-placeholder" @click="activateEditorPane(pane.id)">
-                      <div class="editor-placeholder-icon">🧾</div>
-                      <div class="editor-placeholder-title">空 diff 区域</div>
-                      <div class="editor-placeholder-text">在左侧「Git」视图中点击提交里的文件，即可在此区域查看 diff。</div>
+                    <div v-else class="workspace-pane-placeholder" @click="activateWorkspacePane(pane.id)">
+                      <div class="workspace-placeholder-icon">🧾</div>
+                      <div class="workspace-placeholder-title">空 diff 区域</div>
+                      <div class="workspace-placeholder-text">在左侧「Git」视图中点击提交里的文件，即可在此区域查看 diff。</div>
                     </div>
                   </div>
                 </template>
                 <template v-else-if="pane.view === 'chat'">
                   <!-- chat leaf：复用编辑器主区域 chat 的完整接线（host 单例，至多一个 pane 承载） -->
-                  <div class="editor-pane-embed-wrap" @mousedown="activateEditorPane(pane.id)">
+                  <div class="workspace-pane-embed-wrap" @mousedown="activateWorkspacePane(pane.id)">
                     <ChatPanel
                       :visible="true"
                       :interaction="chatPanelInteraction"
@@ -633,7 +642,7 @@
                 </template>
                 <template v-else-if="pane.view === 'terminal'">
                   <!-- terminal leaf：复用编辑器主区域 terminal 的完整接线（host 单例，至多一个 pane 承载） -->
-                  <div class="editor-pane-embed-wrap" @mousedown="activateEditorPane(pane.id)">
+                  <div class="workspace-pane-embed-wrap" @mousedown="activateWorkspacePane(pane.id)">
                     <TerminalPanel
                       :visible="true"
                       :active="isPaneActive(pane)"
@@ -662,7 +671,7 @@
                 </template>
                 <template v-else>
                   <!-- session leaf：渲染真实会话面板（复用与 #main-view 相同的接线） -->
-                  <div v-if="getPanePanel(pane)" class="editor-pane-session-wrap" @mousedown="activateEditorPane(pane.id)">
+                  <div v-if="getPanePanel(pane)" class="workspace-pane-session-wrap" @mousedown="activateWorkspacePane(pane.id)">
                     <SessionPanel
                       :embedded="true"
                       :agent="getPanelAgent(getPanePanel(pane))"
@@ -682,7 +691,7 @@
                       :panelStyle="{}"
                       @confirm="handlePanelConfirm(getPanePanel(pane))"
                       @cancel-confirm="handlePanelCancelConfirm(getPanePanel(pane))"
-                      @activate="activateEditorPane(pane.id)"
+                      @activate="activateWorkspacePane(pane.id)"
                       @close-agent="closeAgentInPanel(getPanePanel(pane).id)"
                       @close-panel="setActivePaneView('file')"
                       @send="sendFromPanel(getPanePanel(pane))"
@@ -700,19 +709,19 @@
                       @context-menu="onPanelContextMenu(getPanePanel(pane), $event)"
                     />
                   </div>
-                  <div v-else class="editor-pane-placeholder" @click="activateEditorPane(pane.id)">
-                    <div class="editor-placeholder-icon">🗂</div>
-                    <div class="editor-placeholder-title">空会话区域</div>
-                    <div class="editor-placeholder-text">在左侧「Agent 列表」中点击一个 Agent，即可在此区域打开会话。</div>
+                  <div v-else class="workspace-pane-placeholder" @click="activateWorkspacePane(pane.id)">
+                    <div class="workspace-placeholder-icon">🗂</div>
+                    <div class="workspace-placeholder-title">空会话区域</div>
+                    <div class="workspace-placeholder-text">在左侧「Agent 列表」中点击一个 Agent，即可在此区域打开会话。</div>
                   </div>
                 </template>
               </div>
             </template>
-          </EditorPaneTree>
+          </WorkspacePaneTree>
         </template>
         <!-- 编辑器主区域视图：聊天室 / 终端（嵌入模式，复用独立面板组件与状态） -->
         <template #main-view>
-          <div v-if="editorMainView === 'chat'" class="editor-main-embed-view">
+          <div v-if="workspaceMainView === 'chat'" class="workspace-main-embed-view">
             <ChatPanel
               :visible="true"
               :interaction="chatPanelInteraction"
@@ -735,7 +744,7 @@
               :embedded="true"
               @focus="focusWindow"
               @startMove="startChatPanelMove"
-              @close="setEditorMainView('file')"
+              @close="setWorkspaceMainView('file')"
               @detach="detachPanel('chat')"
               @createRoom="createChatRoom"
               @joinRoom="joinChatRoom"
@@ -750,7 +759,7 @@
               @clearMessages="clearChatMessages"
             />
           </div>
-          <div v-else-if="editorMainView === 'terminal'" class="editor-main-embed-view">
+          <div v-else-if="workspaceMainView === 'terminal'" class="workspace-main-embed-view">
             <TerminalPanel
               :visible="true"
               :active="activeWindow === 'terminal'"
@@ -768,7 +777,7 @@
               @startMove="startTerminalPanelMove"
               @update:selectedNodeId="selectedTerminalNodeId = $event"
               @createTerminal="createTerminalForSelectedNode"
-              @close="setEditorMainView('file')"
+              @close="setWorkspaceMainView('file')"
               @detach="detachPanel('terminal')"
               @switch="switchTerminal"
               @closeTerminal="closeTerminal"
@@ -776,52 +785,52 @@
               @startResize="startTerminalPanelResize"
             />
           </div>
-          <div v-else-if="editorMainView === 'session'" class="editor-main-embed-view">
+          <div v-else-if="workspaceMainView === 'session'" class="workspace-main-embed-view">
             <SessionPanel
-              v-if="editorSessionPanel"
+              v-if="workspaceSessionPanel"
               :embedded="true"
-              :agent="getPanelAgent(editorSessionPanel)"
-              :messages="getPanelMessages(editorSessionPanel)"
-              :input-text="getPanelInputText(editorSessionPanel)"
-              :input-mode="getPanelInputMode(editorSessionPanel)"
-              :input-tip="getPanelInputTip(editorSessionPanel)"
-              :is-password="getPanelInputPassword(editorSessionPanel)"
-              :is-input-disabled="getPanelInputDisabled(editorSessionPanel)"
-              :is-waiting-multi-disabled="getPanelWaitingMultiDisabled(editorSessionPanel)"
-              :has-buffered-input="getPanelHasBufferedInput(editorSessionPanel)"
-              :agent-status="getPanelAgentStatus(editorSessionPanel)"
-              :active="editorSessionPanel.id === activePanelId"
-              :confirm-data="getPanelConfirmData(editorSessionPanel)"
+              :agent="getPanelAgent(workspaceSessionPanel)"
+              :messages="getPanelMessages(workspaceSessionPanel)"
+              :input-text="getPanelInputText(workspaceSessionPanel)"
+              :input-mode="getPanelInputMode(workspaceSessionPanel)"
+              :input-tip="getPanelInputTip(workspaceSessionPanel)"
+              :is-password="getPanelInputPassword(workspaceSessionPanel)"
+              :is-input-disabled="getPanelInputDisabled(workspaceSessionPanel)"
+              :is-waiting-multi-disabled="getPanelWaitingMultiDisabled(workspaceSessionPanel)"
+              :has-buffered-input="getPanelHasBufferedInput(workspaceSessionPanel)"
+              :agent-status="getPanelAgentStatus(workspaceSessionPanel)"
+              :active="workspaceSessionPanel.id === activePanelId"
+              :confirm-data="getPanelConfirmData(workspaceSessionPanel)"
               :interaction="{ active: false }"
               :resizeDirections="[]"
               :panelStyle="{}"
-              @confirm="handlePanelConfirm(editorSessionPanel)"
-              @cancel-confirm="handlePanelCancelConfirm(editorSessionPanel)"
-              @activate="activatePanel(editorSessionPanel.id)"
-              @close-agent="closeAgentInPanel(editorSessionPanel.id)"
-              @close-panel="setEditorMainView('file')"
-              @send="sendFromPanel(editorSessionPanel)"
-              @complete="completeFromPanel(editorSessionPanel)"
-              @open-completions="openCompletionsFromPanel(editorSessionPanel)"
-              @input-change="handlePanelInputChange(editorSessionPanel, $event)"
-              @keydown="handlePanelKeydown(editorSessionPanel, $event)"
-              @paste="handlePanelPaste(editorSessionPanel, $event)"
+              @confirm="handlePanelConfirm(workspaceSessionPanel)"
+              @cancel-confirm="handlePanelCancelConfirm(workspaceSessionPanel)"
+              @activate="activatePanel(workspaceSessionPanel.id)"
+              @close-agent="closeAgentInPanel(workspaceSessionPanel.id)"
+              @close-panel="setWorkspaceMainView('file')"
+              @send="sendFromPanel(workspaceSessionPanel)"
+              @complete="completeFromPanel(workspaceSessionPanel)"
+              @open-completions="openCompletionsFromPanel(workspaceSessionPanel)"
+              @input-change="handlePanelInputChange(workspaceSessionPanel, $event)"
+              @keydown="handlePanelKeydown(workspaceSessionPanel, $event)"
+              @paste="handlePanelPaste(workspaceSessionPanel, $event)"
               @show-buffer="showBufferPanel = true"
-              @clear-buffer="clearBufferFromPanel(editorSessionPanel)"
-              @set-output-list="setPanelOutputList(editorSessionPanel, $event)"
-              @set-terminal-ref="(executionId, el, agentId) => setPanelTerminalRef(editorSessionPanel, executionId, el, agentId)"
+              @clear-buffer="clearBufferFromPanel(workspaceSessionPanel)"
+              @set-output-list="setPanelOutputList(workspaceSessionPanel, $event)"
+              @set-terminal-ref="(executionId, el, agentId) => setPanelTerminalRef(workspaceSessionPanel, executionId, el, agentId)"
               @show-toast="showToast"
-              @detach="detachPanel('session', editorSessionPanel.id)"
-              @context-menu="onPanelContextMenu(editorSessionPanel, $event)"
+              @detach="detachPanel('session', workspaceSessionPanel.id)"
+              @context-menu="onPanelContextMenu(workspaceSessionPanel, $event)"
             />
-            <div v-else class="editor-session-placeholder">
-              <div class="editor-placeholder-icon">🗂</div>
-              <div class="editor-placeholder-title">尚未选择会话</div>
-              <div class="editor-placeholder-text">在左侧「Agent 列表」中点击一个 Agent，即可在此查看其会话。</div>
+            <div v-else class="workspace-session-placeholder">
+              <div class="workspace-placeholder-icon">🗂</div>
+              <div class="workspace-placeholder-title">尚未选择会话</div>
+              <div class="workspace-placeholder-text">在左侧「Agent 列表」中点击一个 Agent，即可在此查看其会话。</div>
             </div>
           </div>
         </template>
-      </EditorPanel>
+      </WorkspacePanel>
 
       <!-- 空状态：无任何可见 Panel 时的宠物大厅（所有 Agent 的迷你宠物自由游动） -->
       <div v-if="hasNoPanel" class="empty-stage">
@@ -864,7 +873,7 @@
     <template v-for="panel in panels" :key="'floating-' + panel.id">
       <SessionPanel
         :ref="(el) => setSessionPanelRef(panel.id, el)"
-        v-if="sessionDetachedPanels.has(panel.id) && panel.id !== editorHostedPanel?.id"
+        v-if="sessionDetachedPanels.has(panel.id) && panel.id !== workspaceHostedPanel?.id"
         :embedded="false"
         :agent="getPanelAgent(panel)"
         :messages="getPanelMessages(panel)"
@@ -904,7 +913,7 @@
         @viewRules="viewRules(getPanelAgent(panel))"
         @viewTools="viewTools(getPanelAgent(panel))"
         @createTerminal="createTerminalForAgent(getPanelAgent(panel))"
-        @openEditor="createEditorForAgent(getPanelAgent(panel))"
+        @openWorkspace="createWorkspaceForAgent(getPanelAgent(panel))"
         @context-menu="onPanelContextMenu(panel, $event)"
       />
     </template>
@@ -922,7 +931,7 @@
 
 <!-- 终端面板（浮动模式） -->
     <TerminalPanel
-      v-if="terminalDetached && !editorHostsTerminal"
+      v-if="terminalDetached && !workspaceHostsTerminal"
       :visible="showTerminalPanel"
       :active="activeWindow === 'terminal'"
       :interaction="terminalPanelInteraction"
@@ -948,7 +957,7 @@
 
     <!-- 聊天室面板（浮动模式） -->
     <ChatPanel
-      v-if="chatDetached && !editorHostsChat"
+      v-if="chatDetached && !workspaceHostsChat"
       :visible="showChatPanel"
       :interaction="chatPanelInteraction"
       :panelStyle="chatPanelStyle"
@@ -985,62 +994,62 @@
     />
 
     <!-- 浮动编辑器面板 -->
-    <EditorPanel
-      v-if="editorDetached"
-      ref="editorPanelRef"
-      :visible="showEditorPanel"
-      :active="activeWindow === 'editor'"
-      :interaction="editorPanelInteraction"
-      :panelStyle="editorPanelStyle"
-      :agentName="activeEditorSession?.agent_name"
+    <WorkspacePanel
+      v-if="workspaceDetached"
+      ref="workspacePanelRef"
+      :visible="showWorkspacePanel"
+      :active="activeWindow === 'workspace'"
+      :interaction="workspacePanelInteraction"
+      :panelStyle="workspacePanelStyle"
+      :agentName="activeWorkspaceSession?.agent_name"
       :agents="activeAgents"
-      :activeAgentId="activeEditorSessionId"
-      :activeTab="activeEditorTab"
-      :activeTabPath="activeEditorTabPath"
-      :tabs="editorTabs"
-      :isMaximized="isEditorMaximized"
-      :isEditable="isEditorEditable"
-      :showSidebar="showEditorSidebar"
-      :sidebarView="editorSidebarView"
-      :mainView="editorMainView"
-      :resizeDirections="editorResizeDirections"
-      :diff="editorDiff"
-      :canSplit="canSplitEditorPane"
-      @focus="focusWindow('editor')"
-      @startMove="startEditorPanelMove"
-      @toggleMaximize="toggleEditorMaximize"
-      @save="saveActiveEditorTab"
-      @close="closeEditorPanel"
-      @activateTab="activateEditorTab"
-      @closeTab="closeEditorTab"
-      @toggleEditable="toggleEditorEditable"
-      @setSidebarView="setEditorSidebarView"
-      @setMainView="setEditorMainView"
-      @startResize="startEditorPanelResize"
+      :activeAgentId="activeWorkspaceSessionId"
+      :activeTab="activeWorkspaceTab"
+      :activeTabPath="activeWorkspaceTabPath"
+      :tabs="workspaceTabs"
+      :isMaximized="isWorkspaceMaximized"
+      :isEditable="isWorkspaceEditable"
+      :showSidebar="showWorkspaceSidebar"
+      :sidebarView="workspaceSidebarView"
+      :mainView="workspaceMainView"
+      :resizeDirections="workspaceResizeDirections"
+      :diff="workspaceDiff"
+      :canSplit="canSplitWorkspacePane"
+      @focus="focusWindow('workspace')"
+      @startMove="startWorkspacePanelMove"
+      @toggleMaximize="toggleWorkspaceMaximize"
+      @save="saveActiveWorkspaceTab"
+      @close="closeWorkspacePanel"
+      @activateTab="activateWorkspaceTab"
+      @closeTab="closeWorkspaceTab"
+      @toggleEditable="toggleWorkspaceEditable"
+      @setSidebarView="setWorkspaceSidebarView"
+      @setMainView="setWorkspaceMainView"
+      @startResize="startWorkspacePanelResize"
       @toggleDiffSideBySide="toggleGitDiffSideBySide"
       @toggleDiffShowFull="toggleGitDiffShowFull"
       @diffNavPrev="navigateGitDiff('prev')"
       @diffNavNext="navigateGitDiff('next')"
-      @selectAgent="selectEditorAgent"
-      @closeDiff="closeEditorDiff"
-      @splitPane="splitEditorPane(activePaneId, $event)"
-      @detach="detachPanel('editor')"
+      @selectAgent="selectWorkspaceAgent"
+      @closeDiff="closeWorkspaceDiff"
+      @splitPane="splitWorkspacePane(activePaneId, $event)"
+      @detach="detachPanel('workspace')"
     >
       <template #sidebar>
-        <aside v-if="showEditorSidebar" class="editor-sidebar" :style="{ width: editorSidebarWidth + 'px' }">
-          <div class="editor-sidebar-resize-handle" @mousedown="startEditorSidebarResize($event)"></div>
-          <div class="editor-sidebar-header">
-            <span class="editor-sidebar-title">{{ editorSidebarView === 'search' ? '全局搜索' : (editorSidebarView === 'git' ? 'Git' : (editorSidebarView === 'agents' ? 'Agent 列表' : '目录树')) }}</span>
-            <button class="icon-btn-small editor-sidebar-close-mobile" @click="closeEditorSidebar" title="关闭侧边栏">✕</button>
-            <button class="icon-btn-small editor-sidebar-close-desktop" @click="closeEditorSidebar" title="关闭侧边栏">✕</button>
+        <aside v-if="showWorkspaceSidebar" class="workspace-sidebar" :style="{ width: workspaceSidebarWidth + 'px' }">
+          <div class="workspace-sidebar-resize-handle" @mousedown="startWorkspaceSidebarResize($event)"></div>
+          <div class="workspace-sidebar-header">
+            <span class="workspace-sidebar-title">{{ workspaceSidebarView === 'search' ? '全局搜索' : (workspaceSidebarView === 'git' ? 'Git' : (workspaceSidebarView === 'agents' ? 'Agent 列表' : '目录树')) }}</span>
+            <button class="icon-btn-small workspace-sidebar-close-mobile" @click="closeWorkspaceSidebar" title="关闭侧边栏">✕</button>
+            <button class="icon-btn-small workspace-sidebar-close-desktop" @click="closeWorkspaceSidebar" title="关闭侧边栏">✕</button>
           </div>
-          <div v-if="editorSidebarView === 'files'" class="editor-sidebar-content">
-            <div class="editor-file-tree-panel">
+          <div v-if="workspaceSidebarView === 'files'" class="workspace-sidebar-content">
+            <div class="workspace-file-tree-panel">
               <!-- 活跃 Agent 节点列表 -->
               <div
                 v-for="agent in activeAgents"
                 :key="agent.agent_id"
-                class="editor-agent-node"
+                class="workspace-agent-node"
                 :class="{ 
                   'selected': selectedAgentId === agent.agent_id,
                   'waiting-input': isWaitingInput(agent)
@@ -1062,19 +1071,19 @@
                 <!-- Agent 的文件树 -->
                 <div v-if="expandedAgents.has(agent.agent_id)" class="agent-file-tree">
                   <div
-                    class="editor-file-tree-root"
-                    @click.stop="ensureEditorSidebarFileTree(agent)"
+                    class="workspace-file-tree-root"
+                    @click.stop="ensureWorkspaceSidebarFileTree(agent)"
                   >
                     {{ getWorkingDirDisplay(agent.working_dir) }}
                   </div>
-                  <div v-if="!(fileTreeState.get(agent.agent_id)?.length > 0)" class="editor-file-tree-empty">
+                  <div v-if="!(fileTreeState.get(agent.agent_id)?.length > 0)" class="workspace-file-tree-empty">
                     当前工作目录下暂无可显示内容
                   </div>
-                  <div v-else class="editor-file-tree-list" tabindex="0" :data-agent-id="agent.agent_id" @keydown="handleFileTreeKeydown($event, agent.agent_id)">
+                  <div v-else class="workspace-file-tree-list" tabindex="0" :data-agent-id="agent.agent_id" @keydown="handleFileTreeKeydown($event, agent.agent_id)">
                     <div
                       v-for="visibleNode in getVisibleFileTreeNodes(agent.agent_id)"
                       :key="visibleNode.node.path"
-                      class="tree-node editor-tree-node"
+                      class="tree-node workspace-tree-node"
                       :data-node-path="visibleNode.node.path"
                     >
                       <div
@@ -1116,7 +1125,7 @@
                     <div
                       v-for="agent in agents"
                       :key="agent.agent_id"
-                      class="editor-agent-node stopped"
+                      class="workspace-agent-node stopped"
                       :class="{ 'selected': selectedAgentId === agent.agent_id }"
                     >
                       <div
@@ -1135,19 +1144,19 @@
                       <!-- Agent 的文件树 -->
                       <div v-if="expandedAgents.has(agent.agent_id)" class="agent-file-tree">
                         <div
-                          class="editor-file-tree-root"
-                          @click.stop="ensureEditorSidebarFileTree(agent)"
+                          class="workspace-file-tree-root"
+                          @click.stop="ensureWorkspaceSidebarFileTree(agent)"
                         >
                           {{ getWorkingDirDisplay(agent.working_dir) }}
                         </div>
-                        <div v-if="!(fileTreeState.get(agent.agent_id)?.length > 0)" class="editor-file-tree-empty">
+                        <div v-if="!(fileTreeState.get(agent.agent_id)?.length > 0)" class="workspace-file-tree-empty">
                           当前工作目录下暂无可显示内容
                         </div>
-                        <div v-else class="editor-file-tree-list" tabindex="0" :data-agent-id="agent.agent_id" @keydown="handleFileTreeKeydown($event, agent.agent_id)">
+                        <div v-else class="workspace-file-tree-list" tabindex="0" :data-agent-id="agent.agent_id" @keydown="handleFileTreeKeydown($event, agent.agent_id)">
                           <div
                             v-for="visibleNode in getVisibleFileTreeNodes(agent.agent_id)"
                             :key="visibleNode.node.path"
-                            class="tree-node editor-tree-node"
+                            class="tree-node workspace-tree-node"
                             :data-node-path="visibleNode.node.path"
                           >
                             <div
@@ -1179,13 +1188,13 @@
                 </div>
               </template>
               <!-- 无 Agent 提示 -->
-              <div v-if="agentList.length === 0" class="editor-file-tree-empty">
+              <div v-if="agentList.length === 0" class="workspace-file-tree-empty">
                 暂无 Agent，请先创建 Agent
               </div>
             </div>
 
           </div>
-          <div v-else-if="editorSidebarView === 'agents'" class="editor-sidebar-content editor-sidebar-agents">
+          <div v-else-if="workspaceSidebarView === 'agents'" class="workspace-sidebar-content workspace-sidebar-agents">
             <AgentSidebar
               :visible="true"
               :embedded="true"
@@ -1212,10 +1221,10 @@
               :currentUserId="auth.userInfo?.user_id || ''"
               :currentUserName="auth.userInfo?.display_name || auth.userInfo?.username || ''"
               :isConnected="!!socket && !showConnectModal"
-              @close="setEditorSidebarView('files')"
+              @close="setWorkspaceSidebarView('files')"
               @toggleBatchMode="toggleBatchMode"
               @createAgent="openCreateAgentModal"
-              @agentClick="onEditorSidebarAgentClick"
+              @agentClick="onWorkspaceSidebarAgentClick"
               @agentContextMenu="onSidebarAgentContextMenu"
               @toggleSelectAgent="toggleSelectAgent"
               @renameAgent="renameAgent"
@@ -1232,17 +1241,17 @@
               @editAccess="editAgentAccess"
             />
           </div>
-          <div v-else-if="editorSidebarView === 'search'" class="editor-sidebar-content">
-            <div class="editor-global-search-panel">
-              <div class="editor-global-search-mode-tabs">
+          <div v-else-if="workspaceSidebarView === 'search'" class="workspace-sidebar-content">
+            <div class="workspace-global-search-panel">
+              <div class="workspace-global-search-mode-tabs">
                 <button
-                  class="editor-global-search-mode-tab"
+                  class="workspace-global-search-mode-tab"
                   :class="{ active: globalSearchMode === 'content' }"
                   :disabled="globalSearchLoading"
                   @click="setGlobalSearchMode('content')"
                 >内容</button>
                 <button
-                  class="editor-global-search-mode-tab"
+                  class="workspace-global-search-mode-tab"
                   :class="{ active: globalSearchMode === 'filename' }"
                   :disabled="globalSearchLoading"
                   @click="setGlobalSearchMode('filename')"
@@ -1250,7 +1259,7 @@
               </div>
               <input
                 v-model="globalSearchQuery"
-                class="editor-global-search-input"
+                class="workspace-global-search-input"
                 type="text"
                 :placeholder="globalSearchMode === 'filename' ? '按文件名模糊搜索...' : '全局搜索文件内容...'"
                 :disabled="globalSearchLoading || !currentAgentId"
@@ -1258,29 +1267,29 @@
               >
               <input
                 v-model="globalSearchFileGlob"
-                class="editor-global-search-input editor-global-search-glob-input"
+                class="workspace-global-search-input workspace-global-search-glob-input"
                 type="text"
                 placeholder="文件过滤，如 *.py,!tests/**"
                 :disabled="globalSearchLoading || !currentAgentId"
                 @keydown.enter.prevent="runGlobalSearch"
               >
-              <div class="editor-global-search-toolbar">
-                <label class="editor-global-search-toggle">
+              <div class="workspace-global-search-toolbar">
+                <label class="workspace-global-search-toggle">
                   <input v-model="globalSearchCaseSensitive" type="checkbox">
                   <span>区分大小写</span>
                 </label>
-                <label v-if="globalSearchMode === 'content'" class="editor-global-search-toggle">
+                <label v-if="globalSearchMode === 'content'" class="workspace-global-search-toggle">
                   <input v-model="globalSearchWholeWord" type="checkbox">
                   <span>全词匹配</span>
                 </label>
-                <div class="editor-global-search-actions">
-                  <button class="icon-btn editor-global-search-btn" @click="runGlobalSearch" :disabled="globalSearchLoading || !currentAgentId || !globalSearchQuery.trim()" :title="globalSearchMode === 'filename' ? '文件名搜索' : '全局搜索'">🔍</button>
-                  <button class="icon-btn editor-global-search-btn" @click="clearGlobalSearch" :disabled="globalSearchLoading" title="清空搜索">✕</button>
+                <div class="workspace-global-search-actions">
+                  <button class="icon-btn workspace-global-search-btn" @click="runGlobalSearch" :disabled="globalSearchLoading || !currentAgentId || !globalSearchQuery.trim()" :title="globalSearchMode === 'filename' ? '文件名搜索' : '全局搜索'">🔍</button>
+                  <button class="icon-btn workspace-global-search-btn" @click="clearGlobalSearch" :disabled="globalSearchLoading" title="清空搜索">✕</button>
                 </div>
               </div>
             </div>
-            <div class="editor-global-search-results">
-              <div class="editor-global-search-summary">
+            <div class="workspace-global-search-results">
+              <div class="workspace-global-search-summary">
                 <span v-if="globalSearchLoading">搜索中...</span>
                 <span v-else-if="globalSearchError" class="error">{{ globalSearchError }}</span>
                 <span v-else-if="globalSearchExecuted && globalSearchMode === 'filename'">找到 {{ fileSearchResults.length }} 个文件（共扫描 {{ globalSearchTotalFiles }} 个）</span>
@@ -1288,36 +1297,36 @@
                 <span v-else>{{ globalSearchMode === 'filename' ? '输入关键词并回车，可按文件名模糊搜索' : '输入关键词并回车，可在当前 Agent 工作目录中全局搜索' }}</span>
               </div>
               <template v-if="globalSearchMode === 'filename'">
-                <div v-if="!globalSearchLoading && globalSearchExecuted && fileSearchResults.length === 0 && !globalSearchError" class="editor-global-search-empty">
+                <div v-if="!globalSearchLoading && globalSearchExecuted && fileSearchResults.length === 0 && !globalSearchError" class="workspace-global-search-empty">
                   未找到匹配文件
                 </div>
                 <button
                   v-for="result in fileSearchResults"
                   :key="result.file_path"
-                  class="editor-global-search-file-result"
+                  class="workspace-global-search-file-result"
                   @click="openFileSearchResult(result.file_path)"
                 >
-                  <span class="editor-global-search-file-result-name">{{ result.name }}</span>
-                  <span class="editor-global-search-file-result-path">{{ result.file_path }}</span>
+                  <span class="workspace-global-search-file-result-name">{{ result.name }}</span>
+                  <span class="workspace-global-search-file-result-path">{{ result.file_path }}</span>
                 </button>
               </template>
               <template v-else>
-                <div v-if="!globalSearchLoading && globalSearchExecuted && globalSearchResults.length === 0 && !globalSearchError" class="editor-global-search-empty">
+                <div v-if="!globalSearchLoading && globalSearchExecuted && globalSearchResults.length === 0 && !globalSearchError" class="workspace-global-search-empty">
                   未找到匹配结果
                 </div>
-                <div v-for="result in globalSearchResults" :key="result.file_path" class="editor-global-search-file-group">
-                  <div class="editor-global-search-file-path" @click="openEditorFile(resolveAgentRelativePath(result.file_path))">
+                <div v-for="result in globalSearchResults" :key="result.file_path" class="workspace-global-search-file-group">
+                  <div class="workspace-global-search-file-path" @click="openWorkspaceFile(resolveAgentRelativePath(result.file_path))">
                     {{ result.file_path }}
-                    <span class="editor-global-search-file-count">({{ result.matches.length }})</span>
+                    <span class="workspace-global-search-file-count">({{ result.matches.length }})</span>
                   </div>
                   <button
                     v-for="match in result.matches"
                     :key="`${result.file_path}:${match.line_number}:${match.match_start}`"
-                    class="editor-global-search-match"
+                    class="workspace-global-search-match"
                     @click="openGlobalSearchResult(result.file_path, match.line_number, match.match_start, match.match_end)"
                   >
-                    <span class="editor-global-search-line">{{ match.line_number }}</span>
-                    <span class="editor-global-search-text">
+                    <span class="workspace-global-search-line">{{ match.line_number }}</span>
+                    <span class="workspace-global-search-text">
                       {{ match.line_content.slice(0, match.match_start) }}<mark>{{ match.line_content.slice(match.match_start, match.match_end) }}</mark>{{ match.line_content.slice(match.match_end) }}
                     </span>
                   </button>
@@ -1325,58 +1334,58 @@
               </template>
             </div>
           </div>
-          <div v-else class="editor-sidebar-content">
-            <div class="editor-git-panel">
-              <div class="editor-git-toolbar">
-                <span class="editor-git-branch" :title="gitCurrentBranch || '未知分支'">
+          <div v-else class="workspace-sidebar-content">
+            <div class="workspace-git-panel">
+              <div class="workspace-git-toolbar">
+                <span class="workspace-git-branch" :title="gitCurrentBranch || '未知分支'">
                   <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.492 2.492 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25Zm-6 0a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Zm8.25-.75a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5ZM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z"/></svg>
-                  <span class="editor-git-branch-name">{{ gitCurrentBranch || '无分支' }}</span>
+                  <span class="workspace-git-branch-name">{{ gitCurrentBranch || '无分支' }}</span>
                 </span>
                 <button class="icon-btn-small" @click="refreshGitView" :disabled="gitLogLoading" title="刷新">⟳</button>
               </div>
-              <div class="editor-git-summary">
+              <div class="workspace-git-summary">
                 <span v-if="gitLogLoading && !gitLog.length">加载中...</span>
                 <span v-else-if="gitLogError" class="error">{{ gitLogError }}</span>
                 <span v-else>{{ gitLog.length }} 个提交<span v-if="gitBranches.length"> · {{ gitBranches.length }} 分支</span><span v-if="gitTags.length"> · {{ gitTags.length }} 标签</span></span>
               </div>
-              <div class="editor-git-commit-list">
+              <div class="workspace-git-commit-list">
                 <template v-for="(commit, index) in gitLog" :key="commit.hash">
                   <div
-                    class="editor-git-commit"
+                    class="workspace-git-commit"
                     :class="{ selected: gitSelectedCommit === commit.hash }"
                     @click="toggleGitCommitDetail(commit)"
                   >
-                    <div class="editor-git-graph">
+                    <div class="workspace-git-graph">
                       <svg viewBox="0 0 20 40" width="20" height="40" aria-hidden="true">
                         <line x1="10" y1="0" x2="10" y2="40" stroke="currentColor" stroke-width="1.5" class="git-graph-line" />
                         <circle cx="10" cy="20" :r="commit.parents && commit.parents.length > 1 ? 5 : 4" class="git-graph-dot" :class="{ 'git-graph-merge': commit.parents && commit.parents.length > 1 }" />
                       </svg>
                     </div>
-                    <div class="editor-git-commit-body">
-                      <div class="editor-git-commit-subject" :title="commit.subject">{{ commit.subject }}</div>
-                      <div class="editor-git-commit-meta">
-                        <span class="editor-git-refs" v-if="commit.refs && commit.refs.length">
+                    <div class="workspace-git-commit-body">
+                      <div class="workspace-git-commit-subject" :title="commit.subject">{{ commit.subject }}</div>
+                      <div class="workspace-git-commit-meta">
+                        <span class="workspace-git-refs" v-if="commit.refs && commit.refs.length">
                           <span v-for="ref in commit.refs" :key="ref" class="git-ref" :class="gitRefClass(ref)">{{ ref }}</span>
                         </span>
-                        <span class="editor-git-author">{{ commit.author }}</span>
-                        <span class="editor-git-hash">{{ shortGitHash(commit.hash) }}</span>
-                        <span class="editor-git-time">{{ formatGitRelativeTime(commit.date) }}</span>
+                        <span class="workspace-git-author">{{ commit.author }}</span>
+                        <span class="workspace-git-hash">{{ shortGitHash(commit.hash) }}</span>
+                        <span class="workspace-git-time">{{ formatGitRelativeTime(commit.date) }}</span>
                       </div>
-                      <div v-if="gitSelectedCommit === commit.hash" class="editor-git-commit-detail" @click.stop>
-                        <div v-if="gitCommitDetailLoading" class="editor-git-detail-empty">加载文件列表...</div>
-                        <div v-else-if="!gitCommitFiles.length" class="editor-git-detail-empty">无文件变更</div>
+                      <div v-if="gitSelectedCommit === commit.hash" class="workspace-git-commit-detail" @click.stop>
+                        <div v-if="gitCommitDetailLoading" class="workspace-git-detail-empty">加载文件列表...</div>
+                        <div v-else-if="!gitCommitFiles.length" class="workspace-git-detail-empty">无文件变更</div>
                         <template v-else>
-                          <div class="editor-git-detail-summary">共 {{ gitCommitFiles.length }} 个文件变更</div>
+                          <div class="workspace-git-detail-summary">共 {{ gitCommitFiles.length }} 个文件变更</div>
                           <button
                             v-for="file in gitCommitFiles"
                             :key="file.path"
-                            class="editor-git-file"
+                            class="workspace-git-file"
                             :class="{ active: gitSelectedFile === file.path }"
                             @click="viewGitFileDiff(commit.hash, file.path)"
                           >
-                            <span class="editor-git-file-status" :class="'git-status-' + gitFileStatus(file)">{{ gitFileStatus(file) }}</span>
-                            <span class="editor-git-file-path" :title="file.path">{{ file.path }}</span>
-                            <span class="editor-git-file-stat">
+                            <span class="workspace-git-file-status" :class="'git-status-' + gitFileStatus(file)">{{ gitFileStatus(file) }}</span>
+                            <span class="workspace-git-file-path" :title="file.path">{{ file.path }}</span>
+                            <span class="workspace-git-file-stat">
                               <span v-if="file.additions" class="git-add-stat">+{{ file.additions }}</span>
                               <span v-if="file.deletions" class="git-del-stat">-{{ file.deletions }}</span>
                             </span>
@@ -1387,10 +1396,10 @@
                     </div>
                   </div>
                 </template>
-                <div v-if="!gitLogLoading && !gitLogError && !gitLog.length" class="editor-git-empty">暂无提交记录</div>
+                <div v-if="!gitLogLoading && !gitLogError && !gitLog.length" class="workspace-git-empty">暂无提交记录</div>
                 <button
                   v-if="gitLogHasMore && !gitLogLoading"
-                  class="editor-git-load-more"
+                  class="workspace-git-load-more"
                   @click="fetchGitLog(true)"
                 >加载更多</button>
               </div>
@@ -1400,7 +1409,7 @@
       </template>
       <!-- 编辑器主区域视图：聊天室 / 终端（浮动模式同样支持） -->
       <template #main-view>
-        <div v-if="editorMainView === 'chat'" class="editor-main-embed-view">
+        <div v-if="workspaceMainView === 'chat'" class="workspace-main-embed-view">
           <ChatPanel
             :visible="true"
             :interaction="chatPanelInteraction"
@@ -1423,7 +1432,7 @@
             :embedded="true"
             @focus="focusWindow"
             @startMove="startChatPanelMove"
-            @close="setEditorMainView('file')"
+            @close="setWorkspaceMainView('file')"
             @detach="detachPanel('chat')"
             @createRoom="createChatRoom"
             @joinRoom="joinChatRoom"
@@ -1438,7 +1447,7 @@
             @clearMessages="clearChatMessages"
           />
         </div>
-        <div v-else-if="editorMainView === 'terminal'" class="editor-main-embed-view">
+        <div v-else-if="workspaceMainView === 'terminal'" class="workspace-main-embed-view">
           <TerminalPanel
             :visible="true"
             :active="activeWindow === 'terminal'"
@@ -1456,7 +1465,7 @@
             @startMove="startTerminalPanelMove"
             @update:selectedNodeId="selectedTerminalNodeId = $event"
             @createTerminal="createTerminalForSelectedNode"
-            @close="setEditorMainView('file')"
+            @close="setWorkspaceMainView('file')"
             @detach="detachPanel('terminal')"
             @switch="switchTerminal"
             @closeTerminal="closeTerminal"
@@ -1464,52 +1473,52 @@
             @startResize="startTerminalPanelResize"
           />
         </div>
-        <div v-else-if="editorMainView === 'session'" class="editor-main-embed-view">
+        <div v-else-if="workspaceMainView === 'session'" class="workspace-main-embed-view">
           <SessionPanel
-            v-if="editorSessionPanel"
+            v-if="workspaceSessionPanel"
             :embedded="true"
-            :agent="getPanelAgent(editorSessionPanel)"
-            :messages="getPanelMessages(editorSessionPanel)"
-            :input-text="getPanelInputText(editorSessionPanel)"
-            :input-mode="getPanelInputMode(editorSessionPanel)"
-            :input-tip="getPanelInputTip(editorSessionPanel)"
-            :is-password="getPanelInputPassword(editorSessionPanel)"
-            :is-input-disabled="getPanelInputDisabled(editorSessionPanel)"
-            :is-waiting-multi-disabled="getPanelWaitingMultiDisabled(editorSessionPanel)"
-            :has-buffered-input="getPanelHasBufferedInput(editorSessionPanel)"
-            :agent-status="getPanelAgentStatus(editorSessionPanel)"
-            :active="editorSessionPanel.id === activePanelId"
-            :confirm-data="getPanelConfirmData(editorSessionPanel)"
+            :agent="getPanelAgent(workspaceSessionPanel)"
+            :messages="getPanelMessages(workspaceSessionPanel)"
+            :input-text="getPanelInputText(workspaceSessionPanel)"
+            :input-mode="getPanelInputMode(workspaceSessionPanel)"
+            :input-tip="getPanelInputTip(workspaceSessionPanel)"
+            :is-password="getPanelInputPassword(workspaceSessionPanel)"
+            :is-input-disabled="getPanelInputDisabled(workspaceSessionPanel)"
+            :is-waiting-multi-disabled="getPanelWaitingMultiDisabled(workspaceSessionPanel)"
+            :has-buffered-input="getPanelHasBufferedInput(workspaceSessionPanel)"
+            :agent-status="getPanelAgentStatus(workspaceSessionPanel)"
+            :active="workspaceSessionPanel.id === activePanelId"
+            :confirm-data="getPanelConfirmData(workspaceSessionPanel)"
             :interaction="{ active: false }"
             :resizeDirections="[]"
             :panelStyle="{}"
-            @confirm="handlePanelConfirm(editorSessionPanel)"
-            @cancel-confirm="handlePanelCancelConfirm(editorSessionPanel)"
-            @activate="activatePanel(editorSessionPanel.id)"
-            @close-agent="closeAgentInPanel(editorSessionPanel.id)"
-            @close-panel="setEditorMainView('file')"
-            @send="sendFromPanel(editorSessionPanel)"
-            @complete="completeFromPanel(editorSessionPanel)"
-            @open-completions="openCompletionsFromPanel(editorSessionPanel)"
-            @input-change="handlePanelInputChange(editorSessionPanel, $event)"
-            @keydown="handlePanelKeydown(editorSessionPanel, $event)"
-            @paste="handlePanelPaste(editorSessionPanel, $event)"
+            @confirm="handlePanelConfirm(workspaceSessionPanel)"
+            @cancel-confirm="handlePanelCancelConfirm(workspaceSessionPanel)"
+            @activate="activatePanel(workspaceSessionPanel.id)"
+            @close-agent="closeAgentInPanel(workspaceSessionPanel.id)"
+            @close-panel="setWorkspaceMainView('file')"
+            @send="sendFromPanel(workspaceSessionPanel)"
+            @complete="completeFromPanel(workspaceSessionPanel)"
+            @open-completions="openCompletionsFromPanel(workspaceSessionPanel)"
+            @input-change="handlePanelInputChange(workspaceSessionPanel, $event)"
+            @keydown="handlePanelKeydown(workspaceSessionPanel, $event)"
+            @paste="handlePanelPaste(workspaceSessionPanel, $event)"
             @show-buffer="showBufferPanel = true"
-            @clear-buffer="clearBufferFromPanel(editorSessionPanel)"
-            @set-output-list="setPanelOutputList(editorSessionPanel, $event)"
-            @set-terminal-ref="(executionId, el, agentId) => setPanelTerminalRef(editorSessionPanel, executionId, el, agentId)"
+            @clear-buffer="clearBufferFromPanel(workspaceSessionPanel)"
+            @set-output-list="setPanelOutputList(workspaceSessionPanel, $event)"
+            @set-terminal-ref="(executionId, el, agentId) => setPanelTerminalRef(workspaceSessionPanel, executionId, el, agentId)"
             @show-toast="showToast"
-            @detach="detachPanel('session', editorSessionPanel.id)"
-            @context-menu="onPanelContextMenu(editorSessionPanel, $event)"
+            @detach="detachPanel('session', workspaceSessionPanel.id)"
+            @context-menu="onPanelContextMenu(workspaceSessionPanel, $event)"
           />
-          <div v-else class="editor-session-placeholder">
-            <div class="editor-placeholder-icon">🗂</div>
-            <div class="editor-placeholder-title">尚未选择会话</div>
-            <div class="editor-placeholder-text">在左侧「Agent 列表」中点击一个 Agent，即可在此查看其会话。</div>
+          <div v-else class="workspace-session-placeholder">
+            <div class="workspace-placeholder-icon">🗂</div>
+            <div class="workspace-placeholder-title">尚未选择会话</div>
+            <div class="workspace-placeholder-text">在左侧「Agent 列表」中点击一个 Agent，即可在此查看其会话。</div>
           </div>
         </div>
       </template>
-    </EditorPanel>
+    </WorkspacePanel>
 
     <!-- 底部输入区 -->
 
@@ -1991,8 +2000,8 @@ import PetWidget from './components/PetWidget.vue'
 import CompletionsModal from './components/CompletionsModal.vue'
 import TerminalPanel from './components/TerminalPanel.vue'
 import ChatPanel from './components/ChatPanel.vue'
-import EditorPanel from './components/EditorPanel.vue'
-import EditorPaneTree from './components/EditorPaneTree.vue'
+import WorkspacePanel from './components/WorkspacePanel.vue'
+import WorkspacePaneTree from './components/WorkspacePaneTree.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import CreateAgentModal from './components/CreateAgentModal.vue'
@@ -2946,12 +2955,12 @@ const showTerminalPanel = ref(false)  // 终端面板
 const showChatPanel = ref(false)     // 聊天室面板
 // 编辑器面板：唯一容器，默认打开。初始值取决于是否已有 Agent：
 // 无 Agent 时保持关闭，露出宠物大厅（空状态）作为欢迎页；有 Agent 时打开编辑器承载会话。
-const showEditorPanel = ref(false)
+const showWorkspacePanel = ref(false)
 // 是否已因「首次拉取到 Agent」自动打开过编辑器（只自动打开一次，之后尊重用户手动关闭）
-let editorAutoOpened = false
+let workspaceAutoOpened = false
 const terminalDetached = ref(false)  // 终端面板是否已分离为浮动模式
 const chatDetached = ref(false)     // 聊天室面板是否已分离为浮动模式
-const editorDetached = ref(false)   // 编辑器面板是否已分离为浮动模式
+const workspaceDetached = ref(false)   // 编辑器面板是否已分离为浮动模式
 const sessionDetachedPanels = ref(new Set())  // 已分离为浮动模式的 SessionPanel ID 集合
 const sessionPanelRefs = new Map()  // panelId -> SessionPanel 组件实例
 
@@ -2964,7 +2973,7 @@ function setSessionPanelRef(panelId, el) {
 }
 
 const showMobileMenu = ref(false)     // 移动端菜单
-const activeWindow = ref(null)        // 当前焦点窗口: 'terminal' | 'editor' | 'chat' | 'session' | null
+const activeWindow = ref(null)        // 当前焦点窗口: 'terminal' | 'workspace' | 'chat' | 'session' | null
 
 // Diff 浮动窗口状态
 const showDiffModal = ref(false)      // 显示diff浮动窗口
@@ -2994,13 +3003,13 @@ const ACTIVE_Z_INDEX = 1100
 const EDITOR_SIDEBAR_DEFAULT_WIDTH = 320
 const EDITOR_SIDEBAR_MIN_WIDTH = 200
 const EDITOR_SIDEBAR_MAX_WIDTH = 560
-const EDITOR_SIDEBAR_STORAGE_KEY = 'jarvis_editor_sidebar_width'
+const EDITOR_SIDEBAR_STORAGE_KEY = 'jarvis_workspace_sidebar_width'
 
-function normalizeEditorSidebarWidth(width) {
+function normalizeWorkspaceSidebarWidth(width) {
   return clamp(width, EDITOR_SIDEBAR_MIN_WIDTH, EDITOR_SIDEBAR_MAX_WIDTH)
 }
 
-function loadEditorSidebarWidth() {
+function loadWorkspaceSidebarWidth() {
   const savedValue = localStorage.getItem(EDITOR_SIDEBAR_STORAGE_KEY)
   if (!savedValue) {
     return EDITOR_SIDEBAR_DEFAULT_WIDTH
@@ -3011,30 +3020,30 @@ function loadEditorSidebarWidth() {
     return EDITOR_SIDEBAR_DEFAULT_WIDTH
   }
 
-  return normalizeEditorSidebarWidth(parsedWidth)
+  return normalizeWorkspaceSidebarWidth(parsedWidth)
 }
 
-function saveEditorSidebarWidth() {
-  localStorage.setItem(EDITOR_SIDEBAR_STORAGE_KEY, String(editorSidebarWidth.value))
+function saveWorkspaceSidebarWidth() {
+  localStorage.setItem(EDITOR_SIDEBAR_STORAGE_KEY, String(workspaceSidebarWidth.value))
 }
 
-const editorSidebarWidth = ref(loadEditorSidebarWidth())
-const editorSidebarResizeState = ref({
+const workspaceSidebarWidth = ref(loadWorkspaceSidebarWidth())
+const workspaceSidebarResizeState = ref({
   active: false,
   startX: 0,
   startWidth: EDITOR_SIDEBAR_DEFAULT_WIDTH,
 })
 const EDITOR_PANEL_MIN_WIDTH = 360
 const EDITOR_PANEL_MIN_HEIGHT = 260
-const EDITOR_PANEL_STORAGE_KEY = 'jarvis_editor_panel_rect'
-const editorResizeDirections = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']
+const EDITOR_PANEL_STORAGE_KEY = 'jarvis_workspace_panel_rect'
+const workspaceResizeDirections = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']
 const PANEL_DRAG_ACTIVATION_DISTANCE = 4
 
 // 窗口最大化状态
-const isEditorMaximized = ref(false)
-const editorPanelRectBeforeMaximize = ref(null)
+const isWorkspaceMaximized = ref(false)
+const workspacePanelRectBeforeMaximize = ref(null)
 
-function getDefaultEditorPanelRect() {
+function getDefaultWorkspacePanelRect() {
   return {
     top: 88,
     left: Math.max(window.innerWidth - 824, 16),
@@ -3043,11 +3052,11 @@ function getDefaultEditorPanelRect() {
   }
 }
 
-function loadEditorPanelRect() {
-  const defaultEditorPanelRect = getDefaultEditorPanelRect()
+function loadWorkspacePanelRect() {
+  const defaultWorkspacePanelRect = getDefaultWorkspacePanelRect()
   const savedValue = localStorage.getItem(EDITOR_PANEL_STORAGE_KEY)
   if (!savedValue) {
-    return defaultEditorPanelRect
+    return defaultWorkspacePanelRect
   }
 
   try {
@@ -3058,21 +3067,21 @@ function loadEditorPanelRect() {
       typeof parsedValue.width !== 'number' ||
       typeof parsedValue.height !== 'number'
     ) {
-      return defaultEditorPanelRect
+      return defaultWorkspacePanelRect
     }
 
     return parsedValue
   } catch {
-    return defaultEditorPanelRect
+    return defaultWorkspacePanelRect
   }
 }
 
-function saveEditorPanelRect() {
-  localStorage.setItem(EDITOR_PANEL_STORAGE_KEY, JSON.stringify(editorPanelRect.value))
+function saveWorkspacePanelRect() {
+  localStorage.setItem(EDITOR_PANEL_STORAGE_KEY, JSON.stringify(workspacePanelRect.value))
 }
 
-const editorPanelRect = ref(loadEditorPanelRect())
-const editorPanelInteraction = ref({
+const workspacePanelRect = ref(loadWorkspacePanelRect())
+const workspacePanelInteraction = ref({
   active: false,
   mode: null,
   direction: null,
@@ -3083,62 +3092,62 @@ const editorPanelInteraction = ref({
   startWidth: 0,
   startHeight: 0,
 })
-const editorPanelRef = ref(null)
+const workspacePanelRef = ref(null)
 // 自由分割：每个 file pane 各有一个 Monaco 容器（paneId -> hostEl）。
-// 注意：容器的 ref 回调在 Vue 渲染提交阶段执行，可能晚于 splitEditorPane 里的 nextTick，
-// 因此这里在容器挂载后主动调度一次实例补齐（scheduleEditorLayout 用 rAF 合并），
+// 注意：容器的 ref 回调在 Vue 渲染提交阶段执行，可能晚于 splitWorkspacePane 里的 nextTick，
+// 因此这里在容器挂载后主动调度一次实例补齐（scheduleWorkspaceLayout 用 rAF 合并），
 // 不能只依赖调用方在 nextTick 里调 remountMonacoEditor。
-const splitEditorContainerRefs = ref(new Map())
-function setSplitEditorContainerRef(paneId, el) {
+const splitWorkspaceContainerRefs = ref(new Map())
+function setSplitWorkspaceContainerRef(paneId, el) {
   if (!paneId) return
   if (el) {
-    if (splitEditorContainerRefs.value.get(paneId) === el) return
-    splitEditorContainerRefs.value.set(paneId, el)
+    if (splitWorkspaceContainerRefs.value.get(paneId) === el) return
+    splitWorkspaceContainerRefs.value.set(paneId, el)
   } else {
-    if (!splitEditorContainerRefs.value.has(paneId)) return
-    splitEditorContainerRefs.value.delete(paneId)
+    if (!splitWorkspaceContainerRefs.value.has(paneId)) return
+    splitWorkspaceContainerRefs.value.delete(paneId)
   }
-  triggerRef(splitEditorContainerRefs)
-  // 容器挂载/卸载后主动补齐实例。此处不判断 isEditorSplit：ref 回调可能早于
-  // editorPaneTree 变更引起的 computed 重算，判断会漏掉「首次分割」这一次。
-  scheduleEditorLayout()
+  triggerRef(splitWorkspaceContainerRefs)
+  // 容器挂载/卸载后主动补齐实例。此处不判断 isWorkspaceSplit：ref 回调可能早于
+  // workspacePaneTree 变更引起的 computed 重算，判断会漏掉「首次分割」这一次。
+  scheduleWorkspaceLayout()
 }
 // 激活 pane 的 Monaco 容器；激活 pane 非 file 时回退到任一 file pane 容器，
 // 保证「打开文件」等操作仍有可用容器。优先取文档中真实挂载的元素（ref 元素可能是
 // 渲染中间态，已脱离文档）。
-const splitEditorContainerRef = computed(() => {
-  const active = splitEditorContainerRefs.value.get(activePaneId.value)
+const splitWorkspaceContainerRef = computed(() => {
+  const active = splitWorkspaceContainerRefs.value.get(activePaneId.value)
   if (active && active.isConnected) return active
-  for (const paneId of splitEditorContainerRefs.value.keys()) {
-    const live = document.querySelector(`.editor-monaco-container[data-pane-id="${paneId}"]`)
+  for (const paneId of splitWorkspaceContainerRefs.value.keys()) {
+    const live = document.querySelector(`.workspace-monaco-container[data-pane-id="${paneId}"]`)
     if (live && live.isConnected) return live
   }
   if (active) return active
-  for (const [, hostEl] of splitEditorContainerRefs.value) return hostEl
+  for (const [, hostEl] of splitWorkspaceContainerRefs.value) return hostEl
   return null
 })
-// 未分割时仍由 EditorPanel 内部渲染并通过 expose 暴露 editorContainerRef。
-const editorContainerRef = computed(() => splitEditorContainerRef.value || editorPanelRef.value?.editorContainerRef || null)
+// 未分割时仍由 WorkspacePanel 内部渲染并通过 expose 暴露 editorContainerRef。
+const editorContainerRef = computed(() => splitWorkspaceContainerRef.value || workspacePanelRef.value?.editorContainerRef || null)
 // 编辑器多实例管理（类似 terminalSessions）
-const editorSessions = ref([])  // [{ agent_id, agent_name, tabs: [], activeTabPath: null, editorModels: new Map(), cmEditorView: null }]
-const activeEditorSessionId = ref(null)  // 当前激活的编辑器会话 agent_id
+const workspaceSessions = ref([])  // [{ agent_id, agent_name, tabs: [], activeTabPath: null, editorModels: new Map(), cmEditorView: null }]
+const activeWorkspaceSessionId = ref(null)  // 当前激活的编辑器会话 agent_id
 
 // 保持向后兼容的计算属性
-const editorTabs = computed(() => {
-  const session = editorSessions.value.find(s => s.agent_id === activeEditorSessionId.value)
+const workspaceTabs = computed(() => {
+  const session = workspaceSessions.value.find(s => s.agent_id === activeWorkspaceSessionId.value)
   return session ? session.tabs : []
 })
-const activeEditorTabPath = computed(() => {
-  const session = editorSessions.value.find(s => s.agent_id === activeEditorSessionId.value)
+const activeWorkspaceTabPath = computed(() => {
+  const session = workspaceSessions.value.find(s => s.agent_id === activeWorkspaceSessionId.value)
   return session ? session.activeTabPath : null
 })
-const activeEditorSession = computed(() => {
-  return editorSessions.value.find(s => s.agent_id === activeEditorSessionId.value) || null
+const activeWorkspaceSession = computed(() => {
+  return workspaceSessions.value.find(s => s.agent_id === activeWorkspaceSessionId.value) || null
 })
 const editorModels = new Map() // path -> { model: ITextModel, content: string, language: string }
 let cmEditorView = null // Monaco editor instance（保留变量名以兼容既有引用）
-let editorFileHeartbeatTimer = null
-const isEditorEditable = ref(false)  // 编辑器可编辑开关，默认只读
+let workspaceFileHeartbeatTimer = null
+const isWorkspaceEditable = ref(false)  // 编辑器可编辑开关，默认只读
 const EDITOR_FILE_HEARTBEAT_INTERVAL = 3000
 const globalSearchQuery = ref('')
 const globalSearchFileGlob = ref('')
@@ -3153,10 +3162,10 @@ const globalSearchExecuted = ref(false)
 // 搜索模式：'content' 搜文件内容，'filename' 按文件名模糊搜索
 const globalSearchMode = ref('content')
 const fileSearchResults = ref([])
-const showEditorSidebar = ref(true)
-const editorSidebarView = ref('files')
+const showWorkspaceSidebar = ref(true)
+const workspaceSidebarView = ref('files')
 // 编辑器主区域视图：'file' 显示代码编辑器/diff，'chat' 显示聊天室，'terminal' 显示终端
-const editorMainView = ref('file')
+const workspaceMainView = ref('file')
 
 // ===== 编辑器主工作区「自由分割」（VS Code split 同款）=====
 // 布局模型：树形节点
@@ -3167,16 +3176,16 @@ const editorMainView = ref('file')
 // diff 数据（commitHash/filePath 等）挂在 leaf.diff 上，不参与持久化（刷新后降级为 file）。
 const EDITOR_PANE_MIN_RATIO = 0.15
 const EDITOR_PANE_MAX_RATIO = 0.85
-let editorPaneSeq = 0
-function createEditorPaneLeaf(view = 'file', sessionPanelId = null) {
-  editorPaneSeq += 1
-  return { type: 'leaf', id: `pane-${editorPaneSeq}`, view, sessionPanelId }
+let workspacePaneSeq = 0
+function createWorkspacePaneLeaf(view = 'file', sessionPanelId = null) {
+  workspacePaneSeq += 1
+  return { type: 'leaf', id: `pane-${workspacePaneSeq}`, view, sessionPanelId }
 }
 // 根默认单 leaf：未分割时行为与改动前完全一致
-const editorPaneTree = ref(createEditorPaneLeaf('file'))
-const activePaneId = ref(editorPaneTree.value.id)
+const workspacePaneTree = ref(createWorkspacePaneLeaf('file'))
+const activePaneId = ref(workspacePaneTree.value.id)
 // 是否已发生分割（>1 个 leaf）。未分割时模板走原有渲染路径，保证零回归。
-const editorPaneCount = computed(() => {
+const workspacePaneCount = computed(() => {
   let count = 0
   const walk = (node) => {
     if (!node) return
@@ -3186,38 +3195,39 @@ const editorPaneCount = computed(() => {
     }
     ;(node.children || []).forEach(walk)
   }
-  walk(editorPaneTree.value)
+  walk(workspacePaneTree.value)
   return count
 })
-const isEditorSplit = computed(() => editorPaneCount.value > 1)
-// 是否显示「分屏」按钮：未分割时，文件视图与「会话视图」都允许切分
-// （会话视图切分时会把当前会话固化到原 pane，新 pane 为文件，见 splitEditorPane）。
-const canSplitEditorPane = computed(() => {
-  if (isEditorSplit.value) return false
-  return editorMainView.value === 'file' || editorMainView.value === 'session'
+const isWorkspaceSplit = computed(() => workspacePaneCount.value > 1)
+// 是否显示「分屏」按钮：未分割时，文件视图与会话/聊天/终端视图都允许切分
+// （切分时会把当前主视图固化到原 pane，新 pane 为文件，见 splitWorkspacePane；
+//  chat/terminal 是 host 单例，新 pane 一律为 file，不会出现两个 pane 争抢同一 host）。
+const canSplitWorkspacePane = computed(() => {
+  if (isWorkspaceSplit.value) return false
+  return ['file', 'session', 'chat', 'terminal'].includes(workspaceMainView.value)
 })
-const activePane = computed(() => findEditorPaneById(editorPaneTree.value, activePaneId.value))
-function findEditorPaneById(node, paneId) {
+const activePane = computed(() => findWorkspacePaneById(workspacePaneTree.value, activePaneId.value))
+function findWorkspacePaneById(node, paneId) {
   if (!node) return null
   if (node.type === 'leaf') return node.id === paneId ? node : null
   for (const child of node.children || []) {
-    const found = findEditorPaneById(child, paneId)
+    const found = findWorkspacePaneById(child, paneId)
     if (found) return found
   }
   return null
 }
 // 找到某个 leaf 的父 split 节点
-function findEditorPaneParent(node, paneId) {
+function findWorkspacePaneParent(node, paneId) {
   if (!node || node.type === 'leaf') return null
   for (const child of node.children || []) {
     if (child.type === 'leaf' && child.id === paneId) return node
-    const found = findEditorPaneParent(child, paneId)
+    const found = findWorkspacePaneParent(child, paneId)
     if (found) return found
   }
   return null
 }
-function activateEditorPane(paneId) {
-  if (!findEditorPaneById(editorPaneTree.value, paneId)) return
+function activateWorkspacePane(paneId) {
+  if (!findWorkspacePaneById(workspacePaneTree.value, paneId)) return
   if (activePaneId.value === paneId) return
   activePaneId.value = paneId
   // 激活 pane 会切换 Monaco 容器（只有激活 pane 渲染真实容器），需重建视图
@@ -3227,32 +3237,53 @@ function activateEditorPane(paneId) {
 }
 // 编辑器工具栏「分屏」按钮的入口：对「激活 pane」执行分割。
 // 单独包一层是为了避免模板里直接传 activePaneId 带来的作用域歧义。
-function onEditorSplitRequest(direction) {
-  splitEditorPane(activePaneId.value, direction)
+function onWorkspaceSplitRequest(direction) {
+  splitWorkspacePane(activePaneId.value, direction)
 }
 // 以 direction 方向切分指定 leaf：把该 leaf 替换为 split，原 leaf 保留在首位，
 // 新 leaf 成为激活 pane。
 // 注意：session / chat / terminal leaf 不能把承载内容复制给新 leaf（否则同一 Panel 或同一
 // host 单例被两个 pane 承载，xterm / chat 状态会争抢），因此切分时新 leaf 一律为 file leaf。
-function splitEditorPane(paneId, direction) {
+function splitWorkspacePane(paneId, direction) {
   if (windowWidth.value <= 768) return
-  const parent = findEditorPaneParent(editorPaneTree.value, paneId)
-  const target = findEditorPaneById(editorPaneTree.value, paneId)
+  const parent = findWorkspacePaneParent(workspacePaneTree.value, paneId)
+  const target = findWorkspacePaneById(workspacePaneTree.value, paneId)
   if (!target) return
-  // 未分割时 pane 树的 leaf.view 恒为 file，会话/聊天/终端内容实际由 editorMainView 承载。
-  // 切分后 #main-view 会被 #pane-tree 取代（EditorPanel 内二者互斥），若不先把当前主视图
-  // 固化到目标 leaf，内容会「凭空消失」。故此处把 editorMainView 迁移到 target。
-  if (!isEditorSplit.value && editorMainView.value !== 'file') {
-    if (editorMainView.value === 'session' && editorSessionPanelId.value) {
+  // 未分割时 pane 树的 leaf.view 恒为 file，会话/聊天/终端内容实际由 workspaceMainView 承载。
+  // 切分后 #main-view 会被 #pane-tree 取代（WorkspacePanel 内二者互斥），若不先把当前主视图
+  // 固化到目标 leaf，内容会「凭空消失」。故此处把 workspaceMainView 迁移到 target。
+  if (!isWorkspaceSplit.value && workspaceMainView.value !== 'file') {
+    if (workspaceMainView.value === 'session' && workspaceSessionPanelId.value) {
       target.view = 'session'
-      target.sessionPanelId = editorSessionPanelId.value
-    } else if (editorMainView.value === 'chat' || editorMainView.value === 'terminal') {
-      target.view = editorMainView.value
+      target.sessionPanelId = workspaceSessionPanelId.value
+    } else if (workspaceMainView.value === 'chat' || workspaceMainView.value === 'terminal') {
+      target.view = workspaceMainView.value
       target.sessionPanelId = null
     }
-    editorMainView.value = 'file'
+    workspaceMainView.value = 'file'
   }
-  const newLeaf = createEditorPaneLeaf('file')
+  // 未分割时的 diff 由单例 workspaceDiff + gitDiffEditor 承载（leaf.view 仍是 file）。
+  // 切分后 #main-view 被 #pane-tree 取代，若不把 diff 迁移到目标 leaf，两个 pane 都会是空的。
+  if (!isWorkspaceSplit.value && workspaceDiff.value) {
+    target.view = 'diff'
+    target.sessionPanelId = null
+    target.diff = {
+      commitHash: workspaceDiff.value.commitHash,
+      filePath: workspaceDiff.value.filePath,
+      diffText: gitDiffText.value,
+      loading: false,
+      error: workspaceDiff.value.error || '',
+      truncated: Boolean(workspaceDiff.value.truncated),
+      sideBySide: workspaceDiff.value.sideBySide,
+      showFull: workspaceDiff.value.showFull,
+    }
+    // 释放单例实例与状态，避免与 pane 实例并存（同一 diff 只应有一个宿主）
+    workspaceDiff.value = null
+    disposeGitDiffEditor()
+  }
+  // 新 pane 一律为「空」leaf：不带 file/session/chat/terminal 任何属性，
+  // 用户需显式打开文件/会话才会赋予内容（避免新 pane 凭空显示文件或会话）。
+  const newLeaf = createWorkspacePaneLeaf('empty')
   const splitNode = {
     type: 'split',
     direction: direction === 'column' ? 'column' : 'row',
@@ -3260,49 +3291,49 @@ function splitEditorPane(paneId, direction) {
     children: [target, newLeaf],
   }
   if (!parent) {
-    editorPaneTree.value = splitNode
+    workspacePaneTree.value = splitNode
   } else {
     const index = parent.children.indexOf(target)
     parent.children.splice(index, 1, splitNode)
   }
   // 首次分割：把当前全局标签列表固化到「原 pane」，新 pane 从空开始。
   // 这样两个 pane 的标签栏各自独立，互不影响。
-  if (!editorPaneTabs.has(target.id)) {
-    editorPaneTabs.set(target.id, editorTabs.value.map(t => t.path))
-    editorPaneTabsVersion.value += 1
+  if (!workspacePaneTabs.has(target.id)) {
+    workspacePaneTabs.set(target.id, workspaceTabs.value.map(t => t.path))
+    workspacePaneTabsVersion.value += 1
   }
-  // 未分割时文件内容由单实例 cmEditorView 承载，editorViewPanes 没有记录；
-  // 分割后每个 pane 的实例都按 editorViewPanes 绑定模型，若不在这里把当前文件
+  // 未分割时文件内容由单实例 cmEditorView 承载，workspaceViewPanes 没有记录；
+  // 分割后每个 pane 的实例都按 workspaceViewPanes 绑定模型，若不在这里把当前文件
   // 绑到原 pane，两个 pane 都会 setModel(null) → 都看不到文件。
-  if (target.view === 'file' && !editorViewPanes.has(target.id)) {
-    const currentPath = activeEditorTabPath.value
-    if (currentPath) editorViewPanes.set(target.id, currentPath)
+  if (target.view === 'file' && !workspaceViewPanes.has(target.id)) {
+    const currentPath = activeWorkspaceTabPath.value
+    if (currentPath) workspaceViewPanes.set(target.id, currentPath)
   }
   activePaneId.value = newLeaf.id
-  persistEditorPaneLayout()
+  persistWorkspacePaneLayout()
   nextTick(() => {
     remountMonacoEditor()
     layoutGitDiffEditor()
   })
 }
 // 关闭指定 leaf：兄弟节点顶替；仅剩一个 leaf 时不允许关闭。
-function closeEditorPane(paneId) {
-  if (editorPaneCount.value <= 1) return
-  const parent = findEditorPaneParent(editorPaneTree.value, paneId)
+function closeWorkspacePane(paneId) {
+  if (workspacePaneCount.value <= 1) return
+  const parent = findWorkspacePaneParent(workspacePaneTree.value, paneId)
   if (!parent) return
   const index = parent.children.findIndex(child => child.type === 'leaf' && child.id === paneId)
   if (index < 0) return
   parent.children.splice(index, 1)
   // 该 pane 的独立标签列表一并丢弃（其文件若仍被其他 pane 引用则保持）
-  editorPaneTabs.delete(paneId)
-  editorPaneTabsVersion.value += 1
+  workspacePaneTabs.delete(paneId)
+  workspacePaneTabsVersion.value += 1
   // 该 pane 若承载 diff，释放其独立 diff 实例
   disposeDiffEditorForPane(paneId)
   // 父节点只剩一个 child 时，用该 child 顶替父节点（压缩冗余层级）
   if (parent.children.length === 1) {
     const only = parent.children[0]
-    if (parent === editorPaneTree.value) {
-      editorPaneTree.value = only
+    if (parent === workspacePaneTree.value) {
+      workspacePaneTree.value = only
     } else {
       // 在树上定位 parent 并替换为 only
       const replaceNode = (node) => {
@@ -3314,35 +3345,66 @@ function closeEditorPane(paneId) {
         }
         return (node.children || []).some(replaceNode)
       }
-      replaceNode(editorPaneTree.value)
+      replaceNode(workspacePaneTree.value)
     }
   }
-  if (!findEditorPaneById(editorPaneTree.value, activePaneId.value)) {
-    activePaneId.value = findFirstEditorPaneId(editorPaneTree.value)
+  if (!findWorkspacePaneById(workspacePaneTree.value, activePaneId.value)) {
+    activePaneId.value = findFirstWorkspacePaneId(workspacePaneTree.value)
   }
-  persistEditorPaneLayout()
+  // 关闭后若回到未分割（只剩一个 leaf），#pane-tree 会被 #main-view 取代，
+  // 而 workspaceMainView 在 splitWorkspacePane 时已被置为 'file'。此时必须把唯一 leaf
+  // 承载的内容迁回 workspaceMainView，否则该内容（会话/聊天/终端/diff）会「凭空消失」。
+  if (!isWorkspaceSplit.value) {
+    const only = workspacePaneTree.value
+    if (only && only.type === 'leaf') {
+      if (only.view === 'session' && only.sessionPanelId) {
+        workspaceSessionPanelId.value = only.sessionPanelId
+        workspaceMainView.value = 'session'
+      } else if (only.view === 'chat' || only.view === 'terminal') {
+        workspaceMainView.value = only.view
+      } else if (only.view === 'diff' && only.diff) {
+        workspaceDiff.value = {
+          commitHash: only.diff.commitHash,
+          filePath: only.diff.filePath,
+          loading: false,
+          error: only.diff.error || '',
+          truncated: Boolean(only.diff.truncated),
+          sideBySide: only.diff.sideBySide,
+          showFull: only.diff.showFull,
+        }
+        gitDiffText.value = only.diff.diffText || ''
+        disposeDiffEditorForPane(only.id)
+        only.diff = null
+        only.view = 'empty'
+        workspaceMainView.value = 'file'
+      } else {
+        workspaceMainView.value = 'file'
+      }
+    }
+  }
+  persistWorkspacePaneLayout()
   nextTick(() => {
     remountMonacoEditor()
     layoutGitDiffEditor()
   })
 }
-function findFirstEditorPaneId(node) {
+function findFirstWorkspacePaneId(node) {
   if (!node) return null
   if (node.type === 'leaf') return node.id
   for (const child of node.children || []) {
-    const found = findFirstEditorPaneId(child)
+    const found = findFirstWorkspacePaneId(child)
     if (found) return found
   }
   return null
 }
 // 收起所有分割，回到单个 file leaf（切到 chat/terminal 或需要重置时调用）
-function collapseEditorPanes() {
-  const leaf = createEditorPaneLeaf('file')
-  editorPaneTree.value = leaf
+function collapseWorkspacePanes() {
+  const leaf = createWorkspacePaneLeaf('file')
+  workspacePaneTree.value = leaf
   activePaneId.value = leaf.id
   // 收起分割：回到全局标签栏，清空各 pane 的独立列表
-  editorPaneTabs.clear()
-  editorPaneTabsVersion.value += 1
+  workspacePaneTabs.clear()
+  workspacePaneTabsVersion.value += 1
   // 收起分割：释放所有 diff pane 的独立实例
   disposeAllDiffEditors()
 }
@@ -3350,12 +3412,12 @@ function collapseEditorPanes() {
 // ===== 阶段2：左侧点击路由到「激活 pane」=====
 // 设计：每个 leaf 持有自己的 view（'file' | 'session'）与 sessionPanelId。
 // 左侧点击（文件树 / Agent 列表 / 搜索结果）在已分割时改写「激活 pane」的 view，
-// 未分割时走原有 editorMainView 路径（保证零回归）。
+// 未分割时走原有 workspaceMainView 路径（保证零回归）。
 // 约束：同一个 sessionPanelId 不允许同时出现在两个 pane 中（终端 host 单例，会争抢），
 // 因此路由到 session 时会先把其他 pane 上相同的 sessionPanelId 清空。
 
 // 找出除 exceptPaneId 之外、正在承载指定 sessionPanelId 的 leaf（用于去重）
-function findEditorPaneBySessionPanelId(sessionPanelId, exceptPaneId = null) {
+function findWorkspacePaneBySessionPanelId(sessionPanelId, exceptPaneId = null) {
   if (!sessionPanelId) return null
   let found = null
   const walk = (node) => {
@@ -3368,13 +3430,13 @@ function findEditorPaneBySessionPanelId(sessionPanelId, exceptPaneId = null) {
     }
     ;(node.children || []).forEach(walk)
   }
-  walk(editorPaneTree.value)
+  walk(workspacePaneTree.value)
   return found
 }
 
 // 找出除 exceptPaneId 之外、正在承载指定 view（chat / terminal）的 leaf。
 // host 单例：同一时刻只允许一个 pane 承载 chat / terminal，切换前需先卸载旧的。
-function findEditorPaneByView(view, exceptPaneId = null) {
+function findWorkspacePaneByView(view, exceptPaneId = null) {
   let found = null
   const walk = (node) => {
     if (!node || found) return
@@ -3384,21 +3446,21 @@ function findEditorPaneByView(view, exceptPaneId = null) {
     }
     ;(node.children || []).forEach(walk)
   }
-  walk(editorPaneTree.value)
+  walk(workspacePaneTree.value)
   return found
 }
 // 把「激活 pane」的视图切换为 view（file / session / chat / terminal / diff）。
 // 返回是否成功改写（未分割或没有激活 pane 时返回 false，调用方回退到旧路径）。
 function setActivePaneView(view, sessionPanelId = null) {
-  if (!isEditorSplit.value) return false
+  if (!isWorkspaceSplit.value) return false
   let pane = activePane.value
   if (!pane) return false
   if (view === 'session') {
     if (!sessionPanelId) return false
     // 同一 panel 不允许同时被两个 pane 承载：清掉其他 pane 上的相同 panel
-    const duplicated = findEditorPaneBySessionPanelId(sessionPanelId, pane.id)
+    const duplicated = findWorkspacePaneBySessionPanelId(sessionPanelId, pane.id)
     if (duplicated) {
-      duplicated.view = 'file'
+      duplicated.view = 'empty'
       duplicated.sessionPanelId = null
     }
     // 需求：Panel 一律落在「激活 pane」里（不再重定向到其他空闲 file pane）。
@@ -3410,9 +3472,9 @@ function setActivePaneView(view, sessionPanelId = null) {
     }
   } else if (view === 'chat' || view === 'terminal') {
     // host 单例：先卸载其他 pane 上同类型的承载，再交给激活 pane
-    const duplicated = findEditorPaneByView(view, pane.id)
+    const duplicated = findWorkspacePaneByView(view, pane.id)
     if (duplicated) {
-      duplicated.view = 'file'
+      duplicated.view = 'empty'
       duplicated.sessionPanelId = null
     }
   }
@@ -3423,7 +3485,7 @@ function setActivePaneView(view, sessionPanelId = null) {
   }
   pane.view = view
   pane.sessionPanelId = view === 'session' ? sessionPanelId : null
-  persistEditorPaneLayout()
+  persistWorkspacePaneLayout()
   // 切换激活 pane 的内容类型后，Monaco 容器可能被替换/移除，需要重建视图
   nextTick(() => {
     remountMonacoEditor()
@@ -3434,8 +3496,9 @@ function setActivePaneView(view, sessionPanelId = null) {
 
 // pane 标题：file 显示当前文件名（仅激活 pane，因为 Monaco 单实例只渲染激活 pane），
 // session 显示 Agent 名（找不到时回退到通用文案）
-function getEditorPaneTitle(pane) {
+function getWorkspacePaneTitle(pane) {
   if (!pane) return ''
+  if (pane.view === 'empty') return '空区域'
   if (pane.view === 'chat') return '聊天室'
   if (pane.view === 'terminal') return '终端'
   if (pane.view === 'diff') {
@@ -3448,7 +3511,7 @@ function getEditorPaneTitle(pane) {
     return agent ? (agent.name || agent.agent_id) : '会话'
   }
   // 每个 file pane 都有独立编辑器实例，标题显示该 pane 自己绑定的文件
-  const panePath = editorViewPanes.get(pane.id) || (pane.id === activePaneId.value ? activeEditorTabPath.value : null)
+  const panePath = workspaceViewPanes.get(pane.id) || (pane.id === activePaneId.value ? activeWorkspaceTabPath.value : null)
   if (panePath) return panePath.split('/').pop() || panePath
   return '文件'
 }
@@ -3456,11 +3519,11 @@ function getEditorPaneTitle(pane) {
 // 非激活 file pane 的只读预览文本：取当前激活文件的内容，截断到合理长度，
 // 避免大文件把 DOM 撑爆（只读快照仅用于「让用户看到内容还在」，不追求完整）。
 const EDITOR_PANE_PREVIEW_MAX_CHARS = 20000
-function getEditorPreviewText() {
-  const path = activeEditorTabPath.value
+function getWorkspacePreviewText() {
+  const path = activeWorkspaceTabPath.value
   if (!path) return ''
   const modelData = editorModels.get(path)
-  const content = modelData?.content ?? activeEditorTab.value?.content ?? ''
+  const content = modelData?.content ?? activeWorkspaceTab.value?.content ?? ''
   if (content.length <= EDITOR_PANE_PREVIEW_MAX_CHARS) return content
   return `${content.slice(0, EDITOR_PANE_PREVIEW_MAX_CHARS)}\n\n…（预览已截断，激活后可查看完整内容）`
 }
@@ -3476,45 +3539,45 @@ function isPaneActive(pane) {
   return !!pane && pane.id === activePaneId.value
 }
 // 拖拽分隔条调整比例（限 0.15~0.85）
-// 说明：split 节点是 editorPaneTree 内的可变对象，拖拽时直接改它的 ratio，
+// 说明：split 节点是 workspacePaneTree 内的可变对象，拖拽时直接改它的 ratio，
 // 由 Vue 的深层响应式驱动重渲染；拖拽期间不调用 layout()，结束后才重排一次，避免尺寸震荡。
-let editorPaneResizeContext = null
-const editorPaneResizing = ref(false)
-function startEditorPaneResize(event, splitNode) {
+let workspacePaneResizeContext = null
+const workspacePaneResizing = ref(false)
+function startWorkspacePaneResize(event, splitNode) {
   if (windowWidth.value <= 768) return
   const containerEl = event.currentTarget?.parentElement
   const rect = containerEl?.getBoundingClientRect?.() || { width: 0, height: 0 }
   const containerSize = splitNode.direction === 'row' ? rect.width : rect.height
   if (!containerSize) return
-  editorPaneResizeContext = {
+  workspacePaneResizeContext = {
     splitNode,
     direction: splitNode.direction,
     startPos: splitNode.direction === 'row' ? event.clientX : event.clientY,
     startRatio: splitNode.ratio,
     containerSize,
   }
-  editorPaneResizing.value = true
-  document.addEventListener('mousemove', onEditorPaneResize)
-  document.addEventListener('mouseup', stopEditorPaneResize)
+  workspacePaneResizing.value = true
+  document.addEventListener('mousemove', onWorkspacePaneResize)
+  document.addEventListener('mouseup', stopWorkspacePaneResize)
   event.preventDefault()
   event.stopPropagation()
 }
-function onEditorPaneResize(event) {
-  const ctx = editorPaneResizeContext
+function onWorkspacePaneResize(event) {
+  const ctx = workspacePaneResizeContext
   if (!ctx) return
   const current = ctx.direction === 'row' ? event.clientX : event.clientY
   const delta = current - ctx.startPos
   const nextRatio = ctx.startRatio + delta / ctx.containerSize
   ctx.splitNode.ratio = clamp(nextRatio, EDITOR_PANE_MIN_RATIO, EDITOR_PANE_MAX_RATIO)
 }
-function stopEditorPaneResize() {
-  const wasActive = !!editorPaneResizeContext
-  editorPaneResizeContext = null
-  editorPaneResizing.value = false
-  document.removeEventListener('mousemove', onEditorPaneResize)
-  document.removeEventListener('mouseup', stopEditorPaneResize)
+function stopWorkspacePaneResize() {
+  const wasActive = !!workspacePaneResizeContext
+  workspacePaneResizeContext = null
+  workspacePaneResizing.value = false
+  document.removeEventListener('mousemove', onWorkspacePaneResize)
+  document.removeEventListener('mouseup', stopWorkspacePaneResize)
   if (wasActive) {
-    persistEditorPaneLayout()
+    persistWorkspacePaneLayout()
     nextTick(() => {
       layoutMonacoEditor()
       layoutGitDiffEditor()
@@ -3523,18 +3586,18 @@ function stopEditorPaneResize() {
 }
 
 // ===== 阶段4：布局持久化（localStorage）+ 合法性校验 =====
-// 设计：把 editorPaneTree 序列化到 localStorage；刷新后恢复。
+// 设计：把 workspacePaneTree 序列化到 localStorage；刷新后恢复。
 // 任何解析/校验失败都回退到默认单 leaf，绝不因脏数据导致白屏。
-const EDITOR_PANE_LAYOUT_KEY = 'jarvis_editor_pane_layout'
+const EDITOR_PANE_LAYOUT_KEY = 'jarvis_workspace_pane_layout'
 
 // 递归校验并规范化一个节点；非法返回 null（调用方据此回退）
-function sanitizeEditorPaneNode(raw) {
+function sanitizeWorkspacePaneNode(raw) {
   if (!raw || typeof raw !== 'object') return null
   if (raw.type === 'split') {
     if (raw.direction !== 'row' && raw.direction !== 'column') return null
     if (!Array.isArray(raw.children) || raw.children.length !== 2) return null
-    const left = sanitizeEditorPaneNode(raw.children[0])
-    const right = sanitizeEditorPaneNode(raw.children[1])
+    const left = sanitizeWorkspacePaneNode(raw.children[0])
+    const right = sanitizeWorkspacePaneNode(raw.children[1])
     if (!left || !right) return null
     let ratio = Number(raw.ratio)
     if (!Number.isFinite(ratio)) ratio = 0.5
@@ -3542,7 +3605,7 @@ function sanitizeEditorPaneNode(raw) {
     return { type: 'split', direction: raw.direction, ratio, children: [left, right] }
   }
   if (raw.type === 'leaf') {
-    const validViews = ['file', 'session', 'chat', 'terminal', 'diff']
+    const validViews = ['file', 'session', 'chat', 'terminal', 'diff', 'empty']
     if (!validViews.includes(raw.view)) return null
     if (typeof raw.id !== 'string' || !raw.id) return null
     // diff 数据不持久化（commitHash 可能失效、diff 文本体积大）：恢复时一律降级为 file leaf
@@ -3564,8 +3627,8 @@ function sanitizeEditorPaneNode(raw) {
 }
 
 // 校验整棵树：必须是合法节点，且 leaf 数 >= 1；chat/terminal 至多各一个（host 单例约束）
-function sanitizeEditorPaneTree(raw) {
-  const node = sanitizeEditorPaneNode(raw)
+function sanitizeWorkspacePaneTree(raw) {
+  const node = sanitizeWorkspacePaneNode(raw)
   if (!node) return null
   const leafIds = new Set()
   const viewCount = { chat: 0, terminal: 0 }
@@ -3588,8 +3651,8 @@ function sanitizeEditorPaneTree(raw) {
   return node
 }
 
-// 同步 editorPaneSeq，避免恢复后新建 leaf 的 id 与已有 id 冲突
-function syncEditorPaneSeq(tree) {
+// 同步 workspacePaneSeq，避免恢复后新建 leaf 的 id 与已有 id 冲突
+function syncWorkspacePaneSeq(tree) {
   let maxSeq = 0
   const walk = (n) => {
     if (!n) return
@@ -3601,15 +3664,15 @@ function syncEditorPaneSeq(tree) {
     ;(n.children || []).forEach(walk)
   }
   walk(tree)
-  editorPaneSeq = Math.max(editorPaneSeq, maxSeq)
+  workspacePaneSeq = Math.max(workspacePaneSeq, maxSeq)
 }
 
 // 写入 localStorage（失败静默，不影响功能）
-function persistEditorPaneLayout() {
+function persistWorkspacePaneLayout() {
   try {
-    const tree = editorPaneTree.value
+    const tree = workspacePaneTree.value
     // 未分割时不写（等价于清空），避免把默认态持久化成「已分割」的错觉
-    if (!tree || editorPaneCount.value <= 1) {
+    if (!tree || workspacePaneCount.value <= 1) {
       localStorage.removeItem(EDITOR_PANE_LAYOUT_KEY)
       return
     }
@@ -3621,7 +3684,7 @@ function persistEditorPaneLayout() {
 }
 
 // 从 localStorage 恢复（setup 阶段调用）；失败回退默认单 leaf
-function restoreEditorPaneLayout() {
+function restoreWorkspacePaneLayout() {
   let raw = null
   try {
     raw = localStorage.getItem(EDITOR_PANE_LAYOUT_KEY)
@@ -3636,17 +3699,17 @@ function restoreEditorPaneLayout() {
     try { localStorage.removeItem(EDITOR_PANE_LAYOUT_KEY) } catch (e2) {}
     return
   }
-  const tree = sanitizeEditorPaneTree(parsed && parsed.tree)
+  const tree = sanitizeWorkspacePaneTree(parsed && parsed.tree)
   if (!tree) {
     try { localStorage.removeItem(EDITOR_PANE_LAYOUT_KEY) } catch (e) {}
     return
   }
-  editorPaneTree.value = tree
-  syncEditorPaneSeq(tree)
+  workspacePaneTree.value = tree
+  syncWorkspacePaneSeq(tree)
   const wantActive = parsed && parsed.activePaneId
-  activePaneId.value = findEditorPaneById(tree, wantActive)
+  activePaneId.value = findWorkspacePaneById(tree, wantActive)
     ? wantActive
-    : findFirstEditorPaneId(tree)
+    : findFirstWorkspacePaneId(tree)
 }
 const windowWidth = ref(window.innerWidth)  // 窗口宽度，用于响应式检测
 const showCreateAgentModal = ref(false) // 创建 Agent 弹窗
@@ -3780,7 +3843,7 @@ const isDraggingSidebar = ref(false) // 是否正在拖拽侧边栏
 const dragOffset = ref({ x: 0, y: 0 }) // 拖拽偏移量
 
 
-const editorPanelStyle = computed(() => {
+const workspacePanelStyle = computed(() => {
   if (windowWidth.value <= 768) {
     return {
       top: '0',
@@ -3792,16 +3855,16 @@ const editorPanelStyle = computed(() => {
   }
 
   return {
-    top: `${editorPanelRect.value.top}px`,
-    left: `${editorPanelRect.value.left}px`,
-    width: `${editorPanelRect.value.width}px`,
-    height: `${editorPanelRect.value.height}px`,
-    zIndex: activeWindow.value === 'editor' ? ACTIVE_Z_INDEX : BASE_Z_INDEX,
+    top: `${workspacePanelRect.value.top}px`,
+    left: `${workspacePanelRect.value.left}px`,
+    width: `${workspacePanelRect.value.width}px`,
+    height: `${workspacePanelRect.value.height}px`,
+    zIndex: activeWindow.value === 'workspace' ? ACTIVE_Z_INDEX : BASE_Z_INDEX,
   }
 })
 
-const activeEditorTab = computed(() => {
-  return editorTabs.value.find(tab => tab.path === activeEditorTabPath.value) || null
+const activeWorkspaceTab = computed(() => {
+  return workspaceTabs.value.find(tab => tab.path === activeWorkspaceTabPath.value) || null
 })
 
 function clamp(value, min, max) {
@@ -3809,45 +3872,45 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max)
 }
 
-function startEditorSidebarResize(event) {
-  if (windowWidth.value <= 768 || !showEditorSidebar.value) return
+function startWorkspaceSidebarResize(event) {
+  if (windowWidth.value <= 768 || !showWorkspaceSidebar.value) return
 
-  editorSidebarResizeState.value = {
+  workspaceSidebarResizeState.value = {
     active: true,
     startX: event.clientX,
-    startWidth: editorSidebarWidth.value,
+    startWidth: workspaceSidebarWidth.value,
   }
 
-  document.addEventListener('mousemove', onEditorSidebarResize)
-  document.addEventListener('mouseup', stopEditorSidebarResize)
+  document.addEventListener('mousemove', onWorkspaceSidebarResize)
+  document.addEventListener('mouseup', stopWorkspaceSidebarResize)
   event.preventDefault()
   event.stopPropagation()
 }
 
-function onEditorSidebarResize(event) {
-  if (!editorSidebarResizeState.value.active) return
+function onWorkspaceSidebarResize(event) {
+  if (!workspaceSidebarResizeState.value.active) return
 
-  const deltaX = event.clientX - editorSidebarResizeState.value.startX
-  const nextWidth = editorSidebarResizeState.value.startWidth + deltaX
-  editorSidebarWidth.value = normalizeEditorSidebarWidth(nextWidth)
+  const deltaX = event.clientX - workspaceSidebarResizeState.value.startX
+  const nextWidth = workspaceSidebarResizeState.value.startWidth + deltaX
+  workspaceSidebarWidth.value = normalizeWorkspaceSidebarWidth(nextWidth)
 }
 
-function stopEditorSidebarResize() {
-  if (!editorSidebarResizeState.value.active) {
-    document.removeEventListener('mousemove', onEditorSidebarResize)
-    document.removeEventListener('mouseup', stopEditorSidebarResize)
+function stopWorkspaceSidebarResize() {
+  if (!workspaceSidebarResizeState.value.active) {
+    document.removeEventListener('mousemove', onWorkspaceSidebarResize)
+    document.removeEventListener('mouseup', stopWorkspaceSidebarResize)
     return
   }
 
-  editorSidebarResizeState.value = {
+  workspaceSidebarResizeState.value = {
     active: false,
     startX: 0,
-    startWidth: editorSidebarWidth.value,
+    startWidth: workspaceSidebarWidth.value,
   }
 
-  document.removeEventListener('mousemove', onEditorSidebarResize)
-  document.removeEventListener('mouseup', stopEditorSidebarResize)
-  saveEditorSidebarWidth()
+  document.removeEventListener('mousemove', onWorkspaceSidebarResize)
+  document.removeEventListener('mouseup', stopWorkspaceSidebarResize)
+  saveWorkspaceSidebarWidth()
 }
 
 // 设置焦点窗口
@@ -3856,23 +3919,23 @@ function focusWindow(windowType) {
 }
 
 // 编辑器窗口最大化/还原
-function toggleEditorMaximize() {
-  if (isEditorMaximized.value) {
+function toggleWorkspaceMaximize() {
+  if (isWorkspaceMaximized.value) {
     // 还原
-    if (editorPanelRectBeforeMaximize.value) {
-      editorPanelRect.value = { ...editorPanelRectBeforeMaximize.value }
+    if (workspacePanelRectBeforeMaximize.value) {
+      workspacePanelRect.value = { ...workspacePanelRectBeforeMaximize.value }
     }
-    isEditorMaximized.value = false
+    isWorkspaceMaximized.value = false
   } else {
     // 最大化
-    editorPanelRectBeforeMaximize.value = { ...editorPanelRect.value }
-    editorPanelRect.value = {
+    workspacePanelRectBeforeMaximize.value = { ...workspacePanelRect.value }
+    workspacePanelRect.value = {
       top: 0,
       left: 0,
       width: window.innerWidth,
       height: window.innerHeight,
     }
-    isEditorMaximized.value = true
+    isWorkspaceMaximized.value = true
   }
   nextTick(() => {
     layoutMonacoEditor()
@@ -3883,7 +3946,7 @@ function toggleChatPanelCollapse() {
   chatPanelCollapsed.value = !chatPanelCollapsed.value
 }
 
-function getEditorPanelBounds() {
+function getWorkspacePanelBounds() {
   const HEADER_HEIGHT = 32 // 标题栏高度
   const MIN_VISIBLE_WIDTH = 100 // 至少保留100px面板宽度可见
   return {
@@ -3896,102 +3959,102 @@ function getEditorPanelBounds() {
   }
 }
 
-function ensureEditorPanelInViewport() {
+function ensureWorkspacePanelInViewport() {
   const HEADER_HEIGHT = 32 // 标题栏高度
   const MIN_VISIBLE_WIDTH = 100 // 至少保留100px面板宽度可见
   const maxWidth = Math.max(window.innerWidth, EDITOR_PANEL_MIN_WIDTH)
   const maxHeight = Math.max(window.innerHeight, EDITOR_PANEL_MIN_HEIGHT)
 
-  editorPanelRect.value.width = clamp(editorPanelRect.value.width, EDITOR_PANEL_MIN_WIDTH, maxWidth)
-  editorPanelRect.value.height = clamp(editorPanelRect.value.height, EDITOR_PANEL_MIN_HEIGHT, maxHeight)
+  workspacePanelRect.value.width = clamp(workspacePanelRect.value.width, EDITOR_PANEL_MIN_WIDTH, maxWidth)
+  workspacePanelRect.value.height = clamp(workspacePanelRect.value.height, EDITOR_PANEL_MIN_HEIGHT, maxHeight)
 
   // 标题栏不能移出窗口
-  editorPanelRect.value.left = clamp(
-    editorPanelRect.value.left,
+  workspacePanelRect.value.left = clamp(
+    workspacePanelRect.value.left,
     0, // 标题栏不能拖到窗口左侧之外
     window.innerWidth - MIN_VISIBLE_WIDTH // 保留至少100px面板宽度可见
   )
-  editorPanelRect.value.top = clamp(
-    editorPanelRect.value.top,
+  workspacePanelRect.value.top = clamp(
+    workspacePanelRect.value.top,
     0, // 标题栏不能拖到窗口顶部之外
     window.innerHeight - HEADER_HEIGHT // 保留标题栏高度可见
   )
 }
 
-function startEditorPanelMove(event) {
+function startWorkspacePanelMove(event) {
   if (windowWidth.value <= 768) return
-  if (event.target.closest('.editor-panel-actions')) return
+  if (event.target.closest('.workspace-panel-actions')) return
 
-  focusWindow('editor')
+  focusWindow('workspace')
 
-  editorPanelInteraction.value = {
+  workspacePanelInteraction.value = {
     active: false,
     mode: 'move',
     direction: null,
     startX: event.clientX,
     startY: event.clientY,
-    startTop: editorPanelRect.value.top,
-    startLeft: editorPanelRect.value.left,
-    startWidth: editorPanelRect.value.width,
-    startHeight: editorPanelRect.value.height,
+    startTop: workspacePanelRect.value.top,
+    startLeft: workspacePanelRect.value.left,
+    startWidth: workspacePanelRect.value.width,
+    startHeight: workspacePanelRect.value.height,
   }
 
-  document.addEventListener('mousemove', onEditorPanelPointerMove)
-  document.addEventListener('mouseup', stopEditorPanelInteraction)
+  document.addEventListener('mousemove', onWorkspacePanelPointerMove)
+  document.addEventListener('mouseup', stopWorkspacePanelInteraction)
 }
 
-function startEditorPanelResize(event, direction) {
+function startWorkspacePanelResize(event, direction) {
   if (windowWidth.value <= 768) return
 
-  editorPanelInteraction.value = {
+  workspacePanelInteraction.value = {
     active: true,
     mode: 'resize',
     direction,
     startX: event.clientX,
     startY: event.clientY,
-    startTop: editorPanelRect.value.top,
-    startLeft: editorPanelRect.value.left,
-    startWidth: editorPanelRect.value.width,
-    startHeight: editorPanelRect.value.height,
+    startTop: workspacePanelRect.value.top,
+    startLeft: workspacePanelRect.value.left,
+    startWidth: workspacePanelRect.value.width,
+    startHeight: workspacePanelRect.value.height,
   }
 
-  document.addEventListener('mousemove', onEditorPanelPointerMove)
-  document.addEventListener('mouseup', stopEditorPanelInteraction)
+  document.addEventListener('mousemove', onWorkspacePanelPointerMove)
+  document.addEventListener('mouseup', stopWorkspacePanelInteraction)
   event.preventDefault()
   event.stopPropagation()
 }
 
-function onEditorPanelPointerMove(event) {
-  const deltaX = event.clientX - editorPanelInteraction.value.startX
-  const deltaY = event.clientY - editorPanelInteraction.value.startY
+function onWorkspacePanelPointerMove(event) {
+  const deltaX = event.clientX - workspacePanelInteraction.value.startX
+  const deltaY = event.clientY - workspacePanelInteraction.value.startY
 
-  if (editorPanelInteraction.value.mode === 'move' && !editorPanelInteraction.value.active) {
+  if (workspacePanelInteraction.value.mode === 'move' && !workspacePanelInteraction.value.active) {
     const dragDistance = Math.hypot(deltaX, deltaY)
     if (dragDistance < PANEL_DRAG_ACTIVATION_DISTANCE) {
       return
     }
 
-    editorPanelInteraction.value = {
-      ...editorPanelInteraction.value,
+    workspacePanelInteraction.value = {
+      ...workspacePanelInteraction.value,
       active: true,
     }
     event.preventDefault()
   }
 
-  if (!editorPanelInteraction.value.active) return
+  if (!workspacePanelInteraction.value.active) return
 
-  if (editorPanelInteraction.value.mode === 'move') {
-    const bounds = getEditorPanelBounds()
-    editorPanelRect.value.left = clamp(editorPanelInteraction.value.startLeft + deltaX, bounds.minLeft, bounds.maxLeft)
-    editorPanelRect.value.top = clamp(editorPanelInteraction.value.startTop + deltaY, bounds.minTop, bounds.maxTop)
+  if (workspacePanelInteraction.value.mode === 'move') {
+    const bounds = getWorkspacePanelBounds()
+    workspacePanelRect.value.left = clamp(workspacePanelInteraction.value.startLeft + deltaX, bounds.minLeft, bounds.maxLeft)
+    workspacePanelRect.value.top = clamp(workspacePanelInteraction.value.startTop + deltaY, bounds.minTop, bounds.maxTop)
     return
   }
 
-  const direction = editorPanelInteraction.value.direction || ''
-  const startLeft = editorPanelInteraction.value.startLeft
-  const startTop = editorPanelInteraction.value.startTop
-  const startWidth = editorPanelInteraction.value.startWidth
-  const startHeight = editorPanelInteraction.value.startHeight
+  const direction = workspacePanelInteraction.value.direction || ''
+  const startLeft = workspacePanelInteraction.value.startLeft
+  const startTop = workspacePanelInteraction.value.startTop
+  const startWidth = workspacePanelInteraction.value.startWidth
+  const startHeight = workspacePanelInteraction.value.startHeight
 
   let nextLeft = startLeft
   let nextTop = startTop
@@ -4026,14 +4089,14 @@ function onEditorPanelPointerMove(event) {
     nextHeight = Math.max(EDITOR_PANEL_MIN_HEIGHT, window.innerHeight - nextTop)
   }
 
-  editorPanelRect.value.left = clamp(nextLeft, 0, Math.max(window.innerWidth - nextWidth, 0))
-  editorPanelRect.value.top = clamp(nextTop, 0, Math.max(window.innerHeight - nextHeight, 0))
-  editorPanelRect.value.width = clamp(nextWidth, EDITOR_PANEL_MIN_WIDTH, Math.max(window.innerWidth - editorPanelRect.value.left, EDITOR_PANEL_MIN_WIDTH))
-  editorPanelRect.value.height = clamp(nextHeight, EDITOR_PANEL_MIN_HEIGHT, Math.max(window.innerHeight - editorPanelRect.value.top, EDITOR_PANEL_MIN_HEIGHT))
+  workspacePanelRect.value.left = clamp(nextLeft, 0, Math.max(window.innerWidth - nextWidth, 0))
+  workspacePanelRect.value.top = clamp(nextTop, 0, Math.max(window.innerHeight - nextHeight, 0))
+  workspacePanelRect.value.width = clamp(nextWidth, EDITOR_PANEL_MIN_WIDTH, Math.max(window.innerWidth - workspacePanelRect.value.left, EDITOR_PANEL_MIN_WIDTH))
+  workspacePanelRect.value.height = clamp(nextHeight, EDITOR_PANEL_MIN_HEIGHT, Math.max(window.innerHeight - workspacePanelRect.value.top, EDITOR_PANEL_MIN_HEIGHT))
 }
 
-function stopEditorPanelInteraction() {
-  editorPanelInteraction.value = {
+function stopWorkspacePanelInteraction() {
+  workspacePanelInteraction.value = {
     active: false,
     mode: null,
     direction: null,
@@ -4045,30 +4108,30 @@ function stopEditorPanelInteraction() {
     startHeight: 0,
   }
 
-  document.removeEventListener('mousemove', onEditorPanelPointerMove)
-  document.removeEventListener('mouseup', stopEditorPanelInteraction)
-  saveEditorPanelRect()
+  document.removeEventListener('mousemove', onWorkspacePanelPointerMove)
+  document.removeEventListener('mouseup', stopWorkspacePanelInteraction)
+  saveWorkspacePanelRect()
 }
 
-function getEditorTabByPath(path) {
-  return editorTabs.value.find(tab => tab.path === path) || null
+function getWorkspaceTabByPath(path) {
+  return workspaceTabs.value.find(tab => tab.path === path) || null
 }
 
-function syncEditorTabDirtyState(path, value) {
-  const tab = getEditorTabByPath(path)
+function syncWorkspaceTabDirtyState(path, value) {
+  const tab = getWorkspaceTabByPath(path)
   if (tab) {
     tab.isDirty = value
   }
 }
 
-function updateEditorTabFileStat(tab, fileStat = {}) {
+function updateWorkspaceTabFileStat(tab, fileStat = {}) {
   if (!tab) return
   tab.mtimeNs = fileStat.mtime_ns ?? null
   tab.fileSize = fileStat.size ?? null
 }
 
-function markEditorTabExternalModified(path, value) {
-  const tab = getEditorTabByPath(path)
+function markWorkspaceTabExternalModified(path, value) {
+  const tab = getWorkspaceTabByPath(path)
   if (tab) {
     tab.externalModified = value
   }
@@ -4145,9 +4208,9 @@ const EDITOR_TAB_SIZE = 4
 // 2) 容器尺寸变化由 Monaco 自身的 automaticLayout(ResizeObserver) 处理，本文件不额外挂
 //    ResizeObserver，也不在 resize 回调里对每个实例调 layout()，避免「layout → 尺寸变化 →
 //    再 layout」的震荡；
-// 3) 显式 layout() 一律经 scheduleEditorLayout() 用 rAF 合并，同一帧内多次调用只执行一次。
+// 3) 显式 layout() 一律经 scheduleWorkspaceLayout() 用 rAF 合并，同一帧内多次调用只执行一次。
 const editorViews = new Map()  // paneId -> monaco editor instance
-const editorViewPanes = new Map()  // paneId -> 该 pane 当前绑定的文件 path
+const workspaceViewPanes = new Map()  // paneId -> 该 pane 当前绑定的文件 path
 // 自由分割：每个 diff pane 一个独立 Monaco DiffEditor 实例（paneId -> { editor, originalModel, modifiedModel, oldText, newText }）。
 // 与未分割时的单例 gitDiffEditor 并存：未分割走单例路径，已分割走这里（多实例，互不干扰）。
 const diffEditorViews = new Map()
@@ -4169,28 +4232,28 @@ function setDiffContainerRef(paneId, el) {
 }
 // 按 data-diff-pane-id 从文档解析「当前真实挂载」的容器（ref 元素可能是渲染中间态）
 function resolveDiffContainer(paneId) {
-  const live = document.querySelector(`.editor-diff-monaco[data-diff-pane-id="${paneId}"]`)
+  const live = document.querySelector(`.workspace-diff-monaco[data-diff-pane-id="${paneId}"]`)
   if (live && live.isConnected) return live
   const refEl = diffContainerRefs.value.get(paneId)
   return refEl && refEl.isConnected ? refEl : null
 }
 // 已分割时每个 pane 独立的标签列表（paneId -> path[]）。未分割时该 Map 为空，
-// 标签栏仍由全局 editorTabs 驱动，保证未分割路径零回归。
+// 标签栏仍由全局 workspaceTabs 驱动，保证未分割路径零回归。
 // 目的：分割后两个 pane 的标签栏互不影响（关闭一个 pane 的标签不会连带关闭另一个）。
-const editorPaneTabs = new Map()  // paneId -> path[]
-const editorPaneTabsVersion = ref(0)  // 触发依赖 editorPaneTabs 的模板/计算属性重算
+const workspacePaneTabs = new Map()  // paneId -> path[]
+const workspacePaneTabsVersion = ref(0)  // 触发依赖 workspacePaneTabs 的模板/计算属性重算
 
 function getPaneTabs(paneId) {
   if (!paneId) return []
-  const paths = editorPaneTabs.get(paneId)
+  const paths = workspacePaneTabs.get(paneId)
   if (!paths || paths.length === 0) return []
-  const all = editorTabs.value
+  const all = workspaceTabs.value
   return paths.map(p => all.find(t => t.path === p)).filter(Boolean)
 }
 
 // 该 path 是否仍被某个 pane 的标签列表引用（用于判断关闭标签时能否真正释放模型）
 function isPathReferencedByAnyPane(path) {
-  for (const paths of editorPaneTabs.values()) {
+  for (const paths of workspacePaneTabs.values()) {
     if (paths.includes(path)) return true
   }
   return false
@@ -4199,26 +4262,26 @@ function isPathReferencedByAnyPane(path) {
 // 已分割时把 path 加入指定 pane 的标签列表（去重）
 function addPaneTab(paneId, path) {
   if (!paneId || !path) return
-  const paths = editorPaneTabs.get(paneId) || []
+  const paths = workspacePaneTabs.get(paneId) || []
   if (!paths.includes(path)) {
     paths.push(path)
-    editorPaneTabs.set(paneId, paths)
-    editorPaneTabsVersion.value += 1
+    workspacePaneTabs.set(paneId, paths)
+    workspacePaneTabsVersion.value += 1
   }
 }
 
 // 从指定 pane 的标签列表移除 path
 function removePaneTab(paneId, path) {
-  const paths = editorPaneTabs.get(paneId)
+  const paths = workspacePaneTabs.get(paneId)
   if (!paths) return
   const index = paths.indexOf(path)
   if (index === -1) return
   paths.splice(index, 1)
-  editorPaneTabsVersion.value += 1
+  workspacePaneTabsVersion.value += 1
 }
 
 // 当前激活 pane 的 Monaco 实例（激活 pane 非 file 时回退到任一实例）
-function getActiveEditorView() {
+function getActiveWorkspaceView() {
   const active = editorViews.get(activePaneId.value)
   if (active) return active
   for (const [, view] of editorViews) return view
@@ -4250,19 +4313,19 @@ function buildEditorOptions() {
     quickSuggestions: { other: true, comments: false, strings: true },
     suggestOnTriggerCharacters: true,
     tabCompletion: 'on',
-    readOnly: !isEditorEditable.value,
+    readOnly: !isWorkspaceEditable.value,
     readOnlyMessage: { value: '编辑器当前为只读，点击工具栏解锁后可编辑' },
   }
 }
 
 // 内容变更 → 回写该文件对应的 tab（模型上记录了 path，多 pane 打开同一文件时天然同步）
-function bindEditorViewEvents(view) {
+function bindWorkspaceViewEvents(view) {
   view.onDidChangeModelContent(() => {
     const model = view.getModel()
     if (!model) return
     const path = model.__jarvisPath
     if (!path) return
-    const tab = getEditorTabByPath(path)
+    const tab = getWorkspaceTabByPath(path)
     if (!tab) return
     tab.content = model.getValue()
     tab.isDirty = tab.content !== tab.originalContent
@@ -4271,15 +4334,15 @@ function bindEditorViewEvents(view) {
 
 // 把某个 pane 的实例绑定到它自己记录的文件；无文件则保持空编辑器（新 pane 为空）
 function applyEditorViewModel(paneId, view) {
-  const path = editorViewPanes.get(paneId)
+  const path = workspaceViewPanes.get(paneId)
   if (!path) {
     if (view.getModel()) view.setModel(null)
-    view.updateOptions({ readOnly: !isEditorEditable.value })
+    view.updateOptions({ readOnly: !isWorkspaceEditable.value })
     return
   }
   const modelData = editorModels.get(path)
   if (!modelData) {
-    editorViewPanes.delete(paneId)
+    workspaceViewPanes.delete(paneId)
     if (view.getModel()) view.setModel(null)
     return
   }
@@ -4290,42 +4353,30 @@ function applyEditorViewModel(paneId, view) {
     modelData.model = model
   }
   if (view.getModel() !== model) view.setModel(model)
-  view.updateOptions({ readOnly: !isEditorEditable.value })
+  view.updateOptions({ readOnly: !isWorkspaceEditable.value })
 }
 
-// 未分割时，Monaco 容器由 EditorPanel 内部渲染（editorContainerRef），沿用单实例路径。
+// 未分割时，Monaco 容器由 WorkspacePanel 内部渲染（editorContainerRef），沿用单实例路径。
 function ensureSingleMonacoEditor() {
   if (cmEditorView || !editorContainerRef.value) return
   cmEditorView = monaco.editor.create(editorContainerRef.value, buildEditorOptions())
-  bindEditorViewEvents(cmEditorView)
+  bindWorkspaceViewEvents(cmEditorView)
 }
 
 // 已分割时，为每个 file pane 的容器建立/复用实例；容器集合变化时才创建或销毁。
 // 关键：ref 回调拿到的元素可能是「渲染中间态」元素（Vue 随后会替换掉它），把实例建在
 // 这种脱离文档的元素上会导致编辑器 DOM 永久悬空（容器里看不到编辑器）。因此这里不直接
 // 使用 ref 元素，而是按 data-pane-id 从文档中解析「当前真实挂载」的容器。
-function resolveSplitEditorContainer(paneId) {
-  const live = document.querySelector(`.editor-monaco-container[data-pane-id="${paneId}"]`)
+function resolveSplitWorkspaceContainer(paneId) {
+  const live = document.querySelector(`.workspace-monaco-container[data-pane-id="${paneId}"]`)
   if (live && live.isConnected) return live
-  const refEl = splitEditorContainerRefs.value.get(paneId)
+  const refEl = splitWorkspaceContainerRefs.value.get(paneId)
   return refEl && refEl.isConnected ? refEl : null
 }
 
 function ensureSplitMonacoEditors() {
-  if (typeof window !== 'undefined') {
-    window.__dbgEnsure = {
-      split: isEditorSplit.value,
-      refKeys: [...splitEditorContainerRefs.value.keys()],
-      viewKeys: [...editorViews.keys()],
-      domPanes: [...document.querySelectorAll('.editor-monaco-container')].map(e => e.dataset.paneId),
-      resolved: [...splitEditorContainerRefs.value.keys()].map(id => {
-        const c = resolveSplitEditorContainer(id)
-        return { id, has: !!c, connected: !!c?.isConnected, inDoc: c ? document.contains(c) : false }
-      }),
-    }
-  }
-  for (const paneId of [...splitEditorContainerRefs.value.keys()]) {
-    const container = resolveSplitEditorContainer(paneId)
+  for (const paneId of [...splitWorkspaceContainerRefs.value.keys()]) {
+    const container = resolveSplitWorkspaceContainer(paneId)
     // 容器尚未真正入文档时不要创建实例，等下一次调度（ref 回调 / rAF）补齐。
     if (!container) continue
     let view = editorViews.get(paneId)
@@ -4341,23 +4392,23 @@ function ensureSplitMonacoEditors() {
     if (!view) {
       view = monaco.editor.create(container, buildEditorOptions())
       view.__jarvisContainer = container
-      bindEditorViewEvents(view)
+      bindWorkspaceViewEvents(view)
       editorViews.set(paneId, view)
     }
     applyEditorViewModel(paneId, view)
   }
   // 清理已消失 pane 的实例
   for (const [paneId, view] of [...editorViews]) {
-    if (!splitEditorContainerRefs.value.has(paneId)) {
+    if (!splitWorkspaceContainerRefs.value.has(paneId)) {
       view.dispose()
       editorViews.delete(paneId)
-      editorViewPanes.delete(paneId)
+      workspaceViewPanes.delete(paneId)
     }
   }
 }
 
 function ensureMonacoEditor() {
-  if (isEditorSplit.value) {
+  if (isWorkspaceSplit.value) {
     ensureSplitMonacoEditors()
     return
   }
@@ -4368,9 +4419,9 @@ function ensureMonacoEditor() {
 // Vue 在 patch 时可能清掉容器里「它不认识的」Monaco DOM，导致实例 DOM 脱离文档；
 // 这里在 post flush 阶段检测并重建，保证每个 file pane 始终有可见的编辑器。
 watch(
-  [activePaneId, editorPaneTree, () => editorTabs.value.length, activeEditorTabPath],
+  [activePaneId, workspacePaneTree, () => workspaceTabs.value.length, activeWorkspaceTabPath],
   () => {
-    if (isEditorSplit.value) scheduleEditorLayout()
+    if (isWorkspaceSplit.value) scheduleWorkspaceLayout()
   },
   { flush: 'post', immediate: true },
 )
@@ -4382,34 +4433,34 @@ watch(
 // 显式 layout 合并到下一帧，避免同一帧内对多个实例反复 layout 造成尺寸震荡。
 // 另外做有限次重试：ref 回调触发时容器可能尚未真正入文档（Vue 可能在插入前调用 ref），
 // 此时建不了实例；等下一帧/下一个 tick 容器入文档后再补一次，避免「首次分割无实例」。
-let editorLayoutScheduled = false
-let editorLayoutRetries = 0
+let workspaceLayoutScheduled = false
+let workspaceLayoutRetries = 0
 const EDITOR_LAYOUT_MAX_RETRIES = 8
-function scheduleEditorLayout() {
-  if (editorLayoutScheduled) return
-  editorLayoutScheduled = true
+function scheduleWorkspaceLayout() {
+  if (workspaceLayoutScheduled) return
+  workspaceLayoutScheduled = true
   requestAnimationFrame(() => {
-    editorLayoutScheduled = false
+    workspaceLayoutScheduled = false
     layoutMonacoEditor()
-    if (isEditorSplit.value && editorLayoutRetries < EDITOR_LAYOUT_MAX_RETRIES) {
-      const pending = [...splitEditorContainerRefs.value.keys()].some((paneId) => {
-        const container = resolveSplitEditorContainer(paneId)
+    if (isWorkspaceSplit.value && workspaceLayoutRetries < EDITOR_LAYOUT_MAX_RETRIES) {
+      const pending = [...splitWorkspaceContainerRefs.value.keys()].some((paneId) => {
+        const container = resolveSplitWorkspaceContainer(paneId)
         if (!container) return false
         const view = editorViews.get(paneId)
         return !view || view.__jarvisContainer !== container
       })
       if (pending) {
-        editorLayoutRetries += 1
-        scheduleEditorLayout()
+        workspaceLayoutRetries += 1
+        scheduleWorkspaceLayout()
         return
       }
     }
-    editorLayoutRetries = 0
+    workspaceLayoutRetries = 0
   })
 }
 
 function layoutMonacoEditor() {
-  if (isEditorSplit.value) {
+  if (isWorkspaceSplit.value) {
     ensureSplitMonacoEditors()
     for (const [, view] of editorViews) {
       if (view.getContainerDomNode?.()?.isConnected) view.layout()
@@ -4432,25 +4483,25 @@ function layoutMonacoEditor() {
 // 旧容器随 DOM 卸载后视图即失效。此处在容器变化后重建视图并恢复当前标签。
 // 说明：模型（editorModels）与内容不受影响，仅重建视图层。
 function remountMonacoEditor() {
-  if (isEditorSplit.value) {
+  if (isWorkspaceSplit.value) {
     // 已分割：按容器集合差分补齐/复用实例（容器未变则复用，不会重建）
     ensureSplitMonacoEditors()
     return
   }
   if (!editorContainerRef.value) return
-  const currentPath = activeEditorTabPath.value
+  const currentPath = activeWorkspaceTabPath.value
   if (cmEditorView) {
     cmEditorView.dispose()
     cmEditorView = null
   }
   ensureSingleMonacoEditor()
   if (currentPath && cmEditorView) {
-    activateEditorTab(currentPath)
+    activateWorkspaceTab(currentPath)
   }
 }
 
-function activateEditorTab(path) {
-  const session = activeEditorSession.value
+function activateWorkspaceTab(path) {
+  const session = activeWorkspaceSession.value
   if (session) session.activeTabPath = path
   const modelData = editorModels.get(path)
   if (!modelData) return
@@ -4460,24 +4511,24 @@ function activateEditorTab(path) {
     model.__jarvisPath = path
     modelData.model = model
   }
-  if (isEditorSplit.value) {
+  if (isWorkspaceSplit.value) {
     // 只把「激活 pane」绑定到该文件；其他 pane 保持各自内容（新 pane 为空）
     ensureSplitMonacoEditors()
     const activeView = editorViews.get(activePaneId.value)
     if (activeView) {
       // 该文件登记到激活 pane 的标签列表（点击标签/打开文件都走这里）
       addPaneTab(activePaneId.value, path)
-      editorViewPanes.set(activePaneId.value, path)
+      workspaceViewPanes.set(activePaneId.value, path)
       if (activeView.getModel() !== model) activeView.setModel(model)
-      activeView.updateOptions({ readOnly: !isEditorEditable.value })
+      activeView.updateOptions({ readOnly: !isWorkspaceEditable.value })
       nextTick(() => {
-        scheduleEditorLayout()
+        scheduleWorkspaceLayout()
         activeView.focus()
       })
     }
   } else if (cmEditorView) {
     cmEditorView.setModel(model)
-    cmEditorView.updateOptions({ readOnly: !isEditorEditable.value })
+    cmEditorView.updateOptions({ readOnly: !isWorkspaceEditable.value })
     nextTick(() => {
       layoutMonacoEditor()
       cmEditorView.focus()
@@ -4519,7 +4570,7 @@ const lspBindings = new Map()
 async function activateLspForModel(path, modelData) {
   if (!path || !modelData || !modelData.model) return
   // 只读预览、非 master 节点：不接入
-  if (getEditorTargetNodeId() !== 'master') return
+  if (getWorkspaceTargetNodeId() !== 'master') return
 
   await ensureLspRegistry()
 
@@ -4620,13 +4671,13 @@ async function fetchFileSearchResults(agentId, payload) {
   return result.data
 }
 
-const hasEditorSidebarFileTree = computed(() => {
-  const agentId = activeEditorSessionId.value
+const hasWorkspaceSidebarFileTree = computed(() => {
+  const agentId = activeWorkspaceSessionId.value
   if (!agentId) return false
   return getVisibleFileTreeNodes(agentId).length > 0
 })
 
-async function ensureEditorSidebarFileTree(agent = activeEditorSession.value?.agent) {
+async function ensureWorkspaceSidebarFileTree(agent = activeWorkspaceSession.value?.agent) {
   if (!agent?.agent_id || !agent.working_dir) return
   const treeNodes = fileTreeState.value.get(agent.agent_id) || []
   if (treeNodes.length === 0) {
@@ -4634,12 +4685,12 @@ async function ensureEditorSidebarFileTree(agent = activeEditorSession.value?.ag
   }
 }
 
-function setEditorSidebarView(view) {
-  editorSidebarView.value = view
-  showEditorSidebar.value = true
+function setWorkspaceSidebarView(view) {
+  workspaceSidebarView.value = view
+  showWorkspaceSidebar.value = true
   if (view === 'files') {
     nextTick(() => {
-      ensureEditorSidebarFileTree()
+      ensureWorkspaceSidebarFileTree()
       layoutMonacoEditor()
     })
     return
@@ -4661,25 +4712,25 @@ function setEditorSidebarView(view) {
 }
 
 // 切换编辑器主区域视图（file / chat / terminal）
-function setEditorMainView(view) {
-  if (editorMainView.value === view) return
+function setWorkspaceMainView(view) {
+  if (workspaceMainView.value === view) return
   // 自由分割模式：pane 树本身承载 file/session 内容，主区域视图恒为 file，
-  // 因此这里不改 editorMainView、也不收起分割（会话显示在各自的 pane 中）。
-  if (isEditorSplit.value) {
+  // 因此这里不改 workspaceMainView、也不收起分割（会话显示在各自的 pane 中）。
+  if (isWorkspaceSplit.value) {
     if (view === 'file') return
     if (view === 'session') return
     // chat / terminal：交给「激活 pane」承载（host 单例，setActivePaneView 会先卸载其他 pane 上的同类型承载）
     if (setActivePaneView(view)) return
-    collapseEditorPanes()
-    editorMainView.value = view
+    collapseWorkspacePanes()
+    workspaceMainView.value = view
     return
   }
   // 自由分割只在「文件视图」下有意义：切到 chat/terminal 时先收起分割，
   // 否则 pane 树仍会渲染，chat/terminal 内容无处显示。
-  if (view !== 'file' && isEditorSplit.value) {
-    collapseEditorPanes()
+  if (view !== 'file' && isWorkspaceSplit.value) {
+    collapseWorkspacePanes()
   }
-  editorMainView.value = view
+  workspaceMainView.value = view
   // 切回文件视图时重排 Monaco；切到 chat/terminal 时无需处理编辑器
   if (view === 'file') {
     nextTick(() => {
@@ -4691,10 +4742,10 @@ function setEditorMainView(view) {
 
 // 让主区域回到「文件视图」（打开文件 / 打开 diff 时调用）。
 // 主区域的 file/chat/terminal/session 四种内容是互斥的，打开文件类内容必须先切回文件视图，
-// 否则会被 chat/terminal/session 内容挡住（editorMainView 与 editorDiff 状态需协调）。
-function showEditorFileView() {
-  if (editorMainView.value !== 'file') {
-    editorMainView.value = 'file'
+// 否则会被 chat/terminal/session 内容挡住（workspaceMainView 与 workspaceDiff 状态需协调）。
+function showWorkspaceFileView() {
+  if (workspaceMainView.value !== 'file') {
+    workspaceMainView.value = 'file'
   }
   // 切回后容器尺寸可能变化，重排 Monaco（含 diff），确保内容正确渲染
   nextTick(() => {
@@ -4703,16 +4754,16 @@ function showEditorFileView() {
   })
 }
 
-function toggleEditorSearchSidebar() {
-  if (showEditorSidebar.value && editorSidebarView.value === 'search') {
-    closeEditorSidebar()
+function toggleWorkspaceSearchSidebar() {
+  if (showWorkspaceSidebar.value && workspaceSidebarView.value === 'search') {
+    closeWorkspaceSidebar()
     return
   }
-  setEditorSidebarView('search')
+  setWorkspaceSidebarView('search')
 }
 
-function closeEditorSidebar() {
-  showEditorSidebar.value = false
+function closeWorkspaceSidebar() {
+  showWorkspaceSidebar.value = false
   // 侧栏收起不影响主区域 diff，仅重排主编辑器
   nextTick(() => {
     layoutMonacoEditor()
@@ -4744,11 +4795,11 @@ async function runGlobalSearch() {
     globalSearchExecuted.value = false
     globalSearchResults.value = []
     fileSearchResults.value = []
-    setEditorSidebarView('search')
+    setWorkspaceSidebarView('search')
     return
   }
 
-  setEditorSidebarView('search')
+  setWorkspaceSidebarView('search')
   globalSearchLoading.value = true
   globalSearchError.value = ''
   globalSearchExecuted.value = false
@@ -4803,16 +4854,16 @@ function setGlobalSearchMode(mode) {
 }
 
 function openFileSearchResult(filePath) {
-  openEditorFile(resolveAgentRelativePath(filePath), currentAgentId.value)
+  openWorkspaceFile(resolveAgentRelativePath(filePath), currentAgentId.value)
 }
 
 async function openGlobalSearchResult(filePath, lineNumber, matchStart = 0, matchEnd = matchStart) {
   const absolutePath = resolveAgentRelativePath(filePath)
   // 使用当前Agent的agentId
-  await openEditorFile(absolutePath, currentAgentId.value)
+  await openWorkspaceFile(absolutePath, currentAgentId.value)
   await nextTick()
   const modelData = editorModels.get(absolutePath)
-  const view = getActiveEditorView()
+  const view = getActiveWorkspaceView()
   if (!view || !modelData) {
     return
   }
@@ -4842,7 +4893,7 @@ async function fetchFileContent(path, agentId = null) {
     }
     targetNodeId = String(agent.node_id).trim()
   } else {
-    targetNodeId = getEditorTargetNodeId()
+    targetNodeId = getWorkspaceTargetNodeId()
   }
   const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, 'file-content'), {
     method: 'POST',
@@ -4870,7 +4921,7 @@ async function fetchFileStat(path, agentId = null) {
     }
     targetNodeId = String(agent.node_id).trim()
   } else {
-    targetNodeId = getEditorTargetNodeId()
+    targetNodeId = getWorkspaceTargetNodeId()
   }
   const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, 'file-stat'), {
     method: 'POST',
@@ -4884,8 +4935,8 @@ async function fetchFileStat(path, agentId = null) {
   return result.data
 }
 
-async function refreshEditorTabFromRemote(path, showAutoRefreshToast = false) {
-  const tab = getEditorTabByPath(path)
+async function refreshWorkspaceTabFromRemote(path, showAutoRefreshToast = false) {
+  const tab = getWorkspaceTabByPath(path)
   if (!tab) return
 
   const [content, fileStat] = await Promise.all([
@@ -4898,7 +4949,7 @@ async function refreshEditorTabFromRemote(path, showAutoRefreshToast = false) {
   tab.isDirty = false
   tab.error = ''
   tab.externalModified = false
-  updateEditorTabFileStat(tab, fileStat)
+  updateWorkspaceTabFileStat(tab, fileStat)
 
   const modelData = editorModels.get(path)
   if (modelData && modelData.content !== content) {
@@ -4915,10 +4966,10 @@ async function refreshEditorTabFromRemote(path, showAutoRefreshToast = false) {
   }
 }
 
-async function checkActiveEditorFileHeartbeat() {
-  if (!showEditorPanel.value) return
+async function checkActiveWorkspaceFileHeartbeat() {
+  if (!showWorkspacePanel.value) return
 
-  const tab = activeEditorTab.value
+  const tab = activeWorkspaceTab.value
   if (!tab || tab.loading || !tab.path) return
 
   try {
@@ -4946,52 +4997,52 @@ async function checkActiveEditorFileHeartbeat() {
       return
     }
 
-    await refreshEditorTabFromRemote(tab.path, true)
+    await refreshWorkspaceTabFromRemote(tab.path, true)
   } catch (error) {
     console.error('[EDITOR] File heartbeat check failed:', error)
   }
 }
 
-function stopEditorFileHeartbeat() {
-  if (editorFileHeartbeatTimer) {
-    clearInterval(editorFileHeartbeatTimer)
-    editorFileHeartbeatTimer = null
+function stopWorkspaceFileHeartbeat() {
+  if (workspaceFileHeartbeatTimer) {
+    clearInterval(workspaceFileHeartbeatTimer)
+    workspaceFileHeartbeatTimer = null
   }
 }
 
-function startEditorFileHeartbeat() {
-  stopEditorFileHeartbeat()
+function startWorkspaceFileHeartbeat() {
+  stopWorkspaceFileHeartbeat()
 
-  if (!showEditorPanel.value || !activeEditorTab.value) {
+  if (!showWorkspacePanel.value || !activeWorkspaceTab.value) {
     return
   }
 
-  editorFileHeartbeatTimer = setInterval(() => {
-    checkActiveEditorFileHeartbeat()
+  workspaceFileHeartbeatTimer = setInterval(() => {
+    checkActiveWorkspaceFileHeartbeat()
   }, EDITOR_FILE_HEARTBEAT_INTERVAL)
 }
 
-async function openEditorFile(path, agentId = null) {
+async function openWorkspaceFile(path, agentId = null) {
   if (!path) return
 
-  showEditorPanel.value = true
+  showWorkspacePanel.value = true
   // 自由分割模式：把「激活 pane」切换到 file 视图（若该 pane 原本是会话，则替换为文件）。
   // 未分割时 setActivePaneView 返回 false，走下方原有路径（零回归）。
   setActivePaneView('file')
   // 打开文件属于「文件视图」：若主区域当前停在 chat/terminal/session，需先切回文件视图，
   // 否则文件（及 diff）会被这些内容挡住。
-  showEditorFileView()
+  showWorkspaceFileView()
   // 打开文件意味着退出 diff 模式：否则 file 视图会优先渲染残留的 diff，
   // 用户点了文件却看不到文件内容。
-  if (editorDiff.value) {
-    closeEditorDiff()
+  if (workspaceDiff.value) {
+    closeWorkspaceDiff()
   }
 
-  const existingTab = getEditorTabByPath(path)
+  const existingTab = getWorkspaceTabByPath(path)
   if (existingTab) {
     // 已分割：把该文件登记到「激活 pane」的标签列表（同一文件可同时出现在多个 pane）
-    if (isEditorSplit.value) addPaneTab(activePaneId.value, path)
-    activateEditorTab(path)
+    if (isWorkspaceSplit.value) addPaneTab(activePaneId.value, path)
+    activateWorkspaceTab(path)
     return
   }
 
@@ -5008,21 +5059,21 @@ async function openEditorFile(path, agentId = null) {
     mtimeNs: null,
     fileSize: null,
   }
-  const session = activeEditorSession.value
+  const session = activeWorkspaceSession.value
   if (!session) {
-    // 编辑器面板可能通过 Ctrl+E / 命令面板打开（只设 showEditorPanel，未创建会话）。
+    // 编辑器面板可能通过 Ctrl+E / 命令面板打开（只设 showWorkspacePanel，未创建会话）。
     // 此时按传入的 agentId 或当前 Agent 补建会话，避免点击文件静默无反应。
     const targetAgent = (agentId && agentList.value.find(a => a.agent_id === agentId))
       || getCurrentAgentOrNull()
     if (!targetAgent) return
-    createEditorForAgent(targetAgent)
-    if (!activeEditorSession.value) return
+    createWorkspaceForAgent(targetAgent)
+    if (!activeWorkspaceSession.value) return
   }
-  const activeSession = activeEditorSession.value
+  const activeSession = activeWorkspaceSession.value
   activeSession.tabs.push(tab)
   activeSession.activeTabPath = path
   // 已分割：新文件登记到「激活 pane」的标签列表
-  if (isEditorSplit.value) addPaneTab(activePaneId.value, path)
+  if (isWorkspaceSplit.value) addPaneTab(activePaneId.value, path)
 
   try {
     const [content, fileStat] = await Promise.all([
@@ -5032,7 +5083,7 @@ async function openEditorFile(path, agentId = null) {
     tab.content = content
     tab.originalContent = content
     tab.externalModified = false
-    updateEditorTabFileStat(tab, fileStat)
+    updateWorkspaceTabFileStat(tab, fileStat)
     tab.loading = false
 
     let modelData = editorModels.get(path)
@@ -5056,22 +5107,22 @@ async function openEditorFile(path, agentId = null) {
       cmEditorView = null
     }
     ensureMonacoEditor()
-    activateEditorTab(path)
+    activateWorkspaceTab(path)
   } catch (error) {
     tab.loading = false
     tab.error = error.message || '读取文件失败'
   }
 }
 
-async function saveEditorTab(path) {
-  const tab = getEditorTabByPath(path)
+async function saveWorkspaceTab(path) {
+  const tab = getWorkspaceTabByPath(path)
   if (!tab) return
 
   const modelData = editorModels.get(path)
   const content = modelData ? modelData.content : tab.content
 
   const { host, port } = getGatewayAddress()
-  const targetNodeId = getEditorTargetNodeId()
+  const targetNodeId = getWorkspaceTargetNodeId()
   const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, 'file-write'), {
     method: 'POST',
     body: JSON.stringify({ path, content, node_id: targetNodeId })
@@ -5093,7 +5144,7 @@ async function saveEditorTab(path) {
 
   try {
     const fileStat = await fetchFileStat(path)
-    updateEditorTabFileStat(tab, fileStat)
+    updateWorkspaceTabFileStat(tab, fileStat)
   } catch (error) {
     console.error('[EDITOR] Failed to refresh file stat after save:', error)
   }
@@ -5101,33 +5152,33 @@ async function saveEditorTab(path) {
   showToast('文件已保存', 'success')
 }
 
-async function saveActiveEditorTab() {
-  if (!activeEditorTab.value) return
-  await saveEditorTab(activeEditorTab.value.path)
+async function saveActiveWorkspaceTab() {
+  if (!activeWorkspaceTab.value) return
+  await saveWorkspaceTab(activeWorkspaceTab.value.path)
 }
 
 // 保存指定 pane 当前绑定的文件（每个 pane 内的保存按钮调用）
-async function savePaneEditorFile(paneId) {
-  const path = editorViewPanes.get(paneId)
+async function savePaneWorkspaceFile(paneId) {
+  const path = workspaceViewPanes.get(paneId)
   if (!path) return
-  await saveEditorTab(path)
+  await saveWorkspaceTab(path)
 }
 
-function toggleEditorEditable() {
-  isEditorEditable.value = !isEditorEditable.value
+function toggleWorkspaceEditable() {
+  isWorkspaceEditable.value = !isWorkspaceEditable.value
   if (cmEditorView) {
-    cmEditorView.updateOptions({ readOnly: !isEditorEditable.value })
+    cmEditorView.updateOptions({ readOnly: !isWorkspaceEditable.value })
   }
   for (const [, view] of editorViews) {
-    view.updateOptions({ readOnly: !isEditorEditable.value })
+    view.updateOptions({ readOnly: !isWorkspaceEditable.value })
   }
 }
 
-function hasDirtyEditorTabs() {
-  return editorTabs.value.some(tab => tab.isDirty)
+function hasDirtyWorkspaceTabs() {
+  return workspaceTabs.value.some(tab => tab.isDirty)
 }
 
-function confirmCloseEditorPanel() {
+function confirmCloseWorkspacePanel() {
   return new Promise((resolve) => {
     showConfirm(
       '存在未保存标签，确定关闭编辑器吗？',
@@ -5141,38 +5192,38 @@ function confirmCloseEditorPanel() {
 // 编辑器主区域正承载终端/聊天时，对应独立面板的显示状态是被内嵌取代的遗留值；
 // 关闭编辑器前需复位，否则独立面板会「凭空」浮现（如编辑器内新建终端后关闭编辑器）。
 // 同时复位主区域视图，避免下次打开编辑器直接进入终端/聊天视图。
-function resetEditorHostedPanelState() {
-  if (editorHostsTerminal.value) showTerminalPanel.value = false
-  if (editorHostsChat.value) showChatPanel.value = false
-  editorMainView.value = 'file'
+function resetWorkspaceHostedPanelState() {
+  if (workspaceHostsTerminal.value) showTerminalPanel.value = false
+  if (workspaceHostsChat.value) showChatPanel.value = false
+  workspaceMainView.value = 'file'
   // 关闭编辑器时一并收起自由分割，避免下次打开残留多 pane 布局
-  if (isEditorSplit.value) collapseEditorPanes()
+  if (isWorkspaceSplit.value) collapseWorkspacePanes()
   // 内嵌会话 Panel 只在编辑器内部渲染：编辑器关闭后它们失去宿主，
   // 若继续留在 panels 中会既不可见、又让 hasNoPanel 恒为 false（宠物大厅不显示）。
   // 因此关闭编辑器时一并关闭所有非 detach 的会话 Panel（detach 的浮动面板保留）。
   for (const panel of [...panels.value]) {
     if (!sessionDetachedPanels.value.has(panel.id)) closePanel(panel.id)
   }
-  editorSessionPanelId.value = null
+  workspaceSessionPanelId.value = null
 }
 
-async function closeEditorPanel() {
-  if (hasDirtyEditorTabs()) {
-    const confirmed = await confirmCloseEditorPanel()
+async function closeWorkspacePanel() {
+  if (hasDirtyWorkspaceTabs()) {
+    const confirmed = await confirmCloseWorkspacePanel()
     if (!confirmed) return
   }
 
-  resetEditorHostedPanelState()
-  showEditorPanel.value = false
+  resetWorkspaceHostedPanelState()
+  showWorkspacePanel.value = false
   // 面板收起后 Git diff 容器随之销毁，释放 Monaco diff 实例并清空 diff 视图
-  editorDiff.value = null
+  workspaceDiff.value = null
   disposeGitDiffEditor()
 }
 
 // 为 Agent 创建/打开编辑器会话
-function createEditorForAgent(agent) {
+function createWorkspaceForAgent(agent) {
   if (!socket.value) {
-    console.warn('[editor-session] No socket connection')
+    console.warn('[workspace-session] No socket connection')
     return
   }
 
@@ -5180,7 +5231,7 @@ function createEditorForAgent(agent) {
   const agentName = agent.name || agent.agent_type
 
   // 检查是否已存在该 Agent 的编辑器会话
-  let session = editorSessions.value.find(s => s.agent_id === agentId)
+  let session = workspaceSessions.value.find(s => s.agent_id === agentId)
   if (!session) {
     // 创建新的编辑器会话
     session = {
@@ -5195,29 +5246,29 @@ function createEditorForAgent(agent) {
       showSidebar: true,
       sidebarView: 'files'
     }
-    editorSessions.value.push(session)
+    workspaceSessions.value.push(session)
   }
 
   // 切换到该会话
-  activeEditorSessionId.value = agentId
-  showEditorPanel.value = true
+  activeWorkspaceSessionId.value = agentId
+  showWorkspacePanel.value = true
 
 }
 
 // 编辑器面板下拉框选择 Agent
-function selectEditorAgent(agentId) {
+function selectWorkspaceAgent(agentId) {
   if (!agentId) return
   const agent = agentList.value.find(a => a.agent_id === agentId)
   if (!agent) return
-  createEditorForAgent(agent)
+  createWorkspaceForAgent(agent)
 }
 
 // 关闭编辑器会话
-async function closeEditorSession(agentId) {
-  const sessionIndex = editorSessions.value.findIndex(s => s.agent_id === agentId)
+async function closeWorkspaceSession(agentId) {
+  const sessionIndex = workspaceSessions.value.findIndex(s => s.agent_id === agentId)
   if (sessionIndex === -1) return
 
-  const session = editorSessions.value[sessionIndex]
+  const session = workspaceSessions.value[sessionIndex]
 
   // 检查是否有未保存的标签
   const hasDirty = session.tabs.some(tab => tab.isDirty)
@@ -5243,30 +5294,30 @@ async function closeEditorSession(agentId) {
   }
 
   // 从数组中移除
-  editorSessions.value.splice(sessionIndex, 1)
+  workspaceSessions.value.splice(sessionIndex, 1)
 
   // 如果关闭的是当前激活的会话，切换到另一个
-  if (activeEditorSessionId.value === agentId) {
-    activeEditorSessionId.value = editorSessions.value.length > 0 ? editorSessions.value[0].agent_id : null
-    if (!activeEditorSessionId.value) {
-      // 与 closeEditorPanel 一致：编辑器承载终端/聊天时，关闭编辑器需一并收起其独立面板状态
-      resetEditorHostedPanelState()
-      showEditorPanel.value = false
+  if (activeWorkspaceSessionId.value === agentId) {
+    activeWorkspaceSessionId.value = workspaceSessions.value.length > 0 ? workspaceSessions.value[0].agent_id : null
+    if (!activeWorkspaceSessionId.value) {
+      // 与 closeWorkspacePanel 一致：编辑器承载终端/聊天时，关闭编辑器需一并收起其独立面板状态
+      resetWorkspaceHostedPanelState()
+      showWorkspacePanel.value = false
     }
   }
 
 }
 
 // 切换编辑器会话
-function switchEditorSession(agentId) {
-  const session = editorSessions.value.find(s => s.agent_id === agentId)
+function switchWorkspaceSession(agentId) {
+  const session = workspaceSessions.value.find(s => s.agent_id === agentId)
   if (!session) return
 
-  activeEditorSessionId.value = agentId
-  showEditorPanel.value = true
+  activeWorkspaceSessionId.value = agentId
+  showWorkspacePanel.value = true
 }
 
-function confirmCloseDirtyEditorTab(path) {
+function confirmCloseDirtyWorkspaceTab(path) {
   return new Promise((resolve) => {
     showConfirm(
       '该标签存在未保存修改，确定关闭吗？',
@@ -5277,12 +5328,12 @@ function confirmCloseDirtyEditorTab(path) {
   })
 }
 
-async function closeEditorTab(path, paneId = null) {
-  const tab = getEditorTabByPath(path)
+async function closeWorkspaceTab(path, paneId = null) {
+  const tab = getWorkspaceTabByPath(path)
   if (!tab) return
 
   if (tab.isDirty) {
-    const confirmed = await confirmCloseDirtyEditorTab(path)
+    const confirmed = await confirmCloseDirtyWorkspaceTab(path)
     if (!confirmed) return
   }
 
@@ -5290,16 +5341,16 @@ async function closeEditorTab(path, paneId = null) {
   // 若该文件仍被其他 pane 引用，则不销毁模型、也不从全局 tabs 移除，
   // 其他 pane 的编辑器保持原样（这正是「关闭一个 pane 的标签不影响另一个」的关键）。
   let closedFromPane = false
-  if (paneId && isEditorSplit.value) {
+  if (paneId && isWorkspaceSplit.value) {
     closedFromPane = true
     removePaneTab(paneId, path)
-    const panePaths = editorPaneTabs.get(paneId) || []
-    if (editorViewPanes.get(paneId) === path) {
+    const panePaths = workspacePaneTabs.get(paneId) || []
+    if (workspaceViewPanes.get(paneId) === path) {
       const nextPath = panePaths[panePaths.length - 1] || null
       if (nextPath) {
-        activateEditorTab(nextPath)
+        activateWorkspaceTab(nextPath)
       } else {
-        editorViewPanes.delete(paneId)
+        workspaceViewPanes.delete(paneId)
         const view = editorViews.get(paneId)
         if (view) view.setModel(null)
       }
@@ -5308,7 +5359,7 @@ async function closeEditorTab(path, paneId = null) {
     // 没有其他 pane 引用该文件：继续走下方全局清理（释放模型 / LSP / 全局 tab）
   }
 
-  const session = activeEditorSession.value
+  const session = activeWorkspaceSession.value
   if (!session) return
   const index = session.tabs.findIndex(item => item.path === path)
   if (index === -1) return
@@ -5336,7 +5387,7 @@ async function closeEditorTab(path, paneId = null) {
       // 避免它继续指向已删除的 path。
       session.activeTabPath = nextTab ? nextTab.path : null
     } else if (nextTab) {
-      activateEditorTab(nextTab.path)
+      activateWorkspaceTab(nextTab.path)
     } else {
       session.activeTabPath = null
       // 不销毁编辑器实例，保留编辑器和容器 DOM，
@@ -5348,7 +5399,7 @@ async function closeEditorTab(path, paneId = null) {
       }
       for (const [pid, view] of editorViews) {
         view.setModel(null)
-        editorViewPanes.delete(pid)
+        workspaceViewPanes.delete(pid)
       }
     }
   }
@@ -5360,7 +5411,7 @@ async function handleFileTreeNodeClick(agentId, node) {
     return
   }
 
-  await openEditorFile(node.path, agentId)
+  await openWorkspaceFile(node.path, agentId)
 }
 
 // ===== 编辑器目录树键盘操作 =====
@@ -5373,7 +5424,7 @@ function selectFileTreeNode(agentId, node) {
 // 将光标选中节点滚动到可视区域内
 function scrollFileTreeNodeIntoView(path) {
   nextTick(() => {
-    const el = document.querySelector(`.editor-tree-node[data-node-path="${CSS.escape(path)}"]`)
+    const el = document.querySelector(`.workspace-tree-node[data-node-path="${CSS.escape(path)}"]`)
     if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' })
   })
 }
@@ -5383,20 +5434,20 @@ function focusFileTreeContainer() {
   nextTick(() => {
     const agentId = selectedAgentId.value
     let el = agentId
-      ? document.querySelector(`.editor-file-tree-list[data-agent-id="${CSS.escape(agentId)}"]`)
+      ? document.querySelector(`.workspace-file-tree-list[data-agent-id="${CSS.escape(agentId)}"]`)
       : null
-    if (!el) el = document.querySelector('.editor-file-tree-list')
+    if (!el) el = document.querySelector('.workspace-file-tree-list')
     if (el) el.focus()
   })
 }
 
 // 切到编辑器侧边栏的全局搜索并聚焦输入框（mode 为 'content' 内容搜索 / 'filename' 文件名搜索）
-function openEditorGlobalSearch(mode = 'content') {
-  if (!showEditorPanel.value) return
-  setEditorSidebarView('search')
+function openWorkspaceGlobalSearch(mode = 'content') {
+  if (!showWorkspacePanel.value) return
+  setWorkspaceSidebarView('search')
   setGlobalSearchMode(mode)
   nextTick(() => {
-    const input = document.querySelector('.editor-global-search-input')
+    const input = document.querySelector('.workspace-global-search-input')
     if (input) input.focus()
   })
 }
@@ -5419,7 +5470,7 @@ const gitDiffLoading = ref(false)
 const gitDiffError = ref('')
 const gitDiffTruncated = ref(false)
 // 主区域 diff 视图状态（非空时编辑器主区域显示 diff，而非文件内容）
-const editorDiff = ref(null)
+const workspaceDiff = ref(null)
 // Monaco DiffEditor：并排/内联切换（桌面默认并排；移动端屏幕窄，默认内联）
 const gitDiffSideBySide = ref(window.innerWidth > 768)
 // diff 显示范围：false=只显示变更上下文区域（默认），true=显示文件全文
@@ -5431,13 +5482,13 @@ function isNarrowGitDiffViewport() {
 }
 const GIT_LOG_PAGE_SIZE = 100
 
-// Git 视图作用的目标 Agent：优先编辑器面板下拉框选中的 Agent（activeEditorSession），
+// Git 视图作用的目标 Agent：优先编辑器面板下拉框选中的 Agent（activeWorkspaceSession），
 // 回退到全局当前 Agent。这样在面板顶部切换 Agent 后，Git 视图会跟随该 Agent 的工作目录。
 function getGitTargetAgent() {
-  const editorAgent = activeEditorSession.value?.agent
-  if (editorAgent) {
+  const workspaceAgent = activeWorkspaceSession.value?.agent
+  if (workspaceAgent) {
     // 会话内缓存的 agent 对象可能过期，优先按 agent_id 取最新的列表项
-    return agentList.value.find(a => a.agent_id === editorAgent.agent_id) || editorAgent
+    return agentList.value.find(a => a.agent_id === workspaceAgent.agent_id) || workspaceAgent
   }
   return agentList.value.find(a => a.agent_id === currentAgentId.value) || null
 }
@@ -5520,8 +5571,8 @@ async function fetchGitBranches() {
 }
 
 // 编辑器面板切换 Agent 时，若当前停留在 Git 视图，则按新 Agent 的工作目录重新拉取
-watch(activeEditorSessionId, () => {
-  if (!showEditorPanel.value || editorSidebarView.value !== 'git') return
+watch(activeWorkspaceSessionId, () => {
+  if (!showWorkspacePanel.value || workspaceSidebarView.value !== 'git') return
   nextTick(() => {
     refreshGitView()
   })
@@ -5534,7 +5585,7 @@ async function refreshGitView() {
   gitSelectedFile.value = null
   gitDiffText.value = ''
   gitDiffError.value = ''
-  editorDiff.value = null
+  workspaceDiff.value = null
   disposeGitDiffEditor()
   await Promise.all([fetchGitLog(false), fetchGitBranches()])
 }
@@ -5546,7 +5597,7 @@ async function toggleGitCommitDetail(commit) {
     gitCommitFiles.value = []
     gitSelectedFile.value = null
     gitDiffText.value = ''
-    editorDiff.value = null
+    workspaceDiff.value = null
     disposeGitDiffEditor()
     return
   }
@@ -5555,7 +5606,7 @@ async function toggleGitCommitDetail(commit) {
   gitSelectedFile.value = null
   gitDiffText.value = ''
   gitDiffError.value = ''
-  editorDiff.value = null
+  workspaceDiff.value = null
   disposeGitDiffEditor()
   const workingDir = getGitWorkingDir()
   if (!workingDir) return
@@ -5585,14 +5636,14 @@ async function viewGitFileDiff(commitHash, filePath) {
   gitDiffNewText = ''
   // 已分割：diff 作为「激活 pane」的一种内容类型打开（与 file/session/chat/terminal 同等处理），
   // 每个 pane 一个独立 DiffEditor 实例，互不干扰。
-  if (isEditorSplit.value) {
+  if (isWorkspaceSplit.value) {
     const pane = activePane.value
     if (pane) {
       // 从 diff 切到 diff（换文件）时先释放旧实例，避免复用旧 model
       disposeDiffEditorForPane(pane.id)
       pane.view = 'diff'
       pane.sessionPanelId = null
-      persistEditorPaneLayout()
+      persistWorkspacePaneLayout()
       gitDiffLoading.value = false
       await loadDiffForPane(pane.id, commitHash, filePath)
       return
@@ -5600,10 +5651,10 @@ async function viewGitFileDiff(commitHash, filePath) {
   }
   // 未分割：沿用原有单例路径（零回归）
   // diff 属于「文件视图」：若主区域当前停在 chat/terminal/session，需先切回文件视图，
-  // 否则 diff 会被这些内容挡住（editorMainView 与 editorDiff 两个状态需协调）。
-  showEditorFileView()
+  // 否则 diff 会被这些内容挡住（workspaceMainView 与 workspaceDiff 两个状态需协调）。
+  showWorkspaceFileView()
   // 切到主区域显示 diff（侧栏只保留文件列表）
-  editorDiff.value = {
+  workspaceDiff.value = {
     commitHash,
     filePath,
     loading: true,
@@ -5622,17 +5673,17 @@ async function viewGitFileDiff(commitHash, filePath) {
       const entry = await ensureGitDiffFullText(commitHash, filePath)
       if (entry) gitDiffTruncated.value = Boolean(gitDiffTruncated.value || entry.truncated)
     }
-    if (editorDiff.value) {
-      editorDiff.value.truncated = gitDiffTruncated.value
-      editorDiff.value.loading = false
+    if (workspaceDiff.value) {
+      workspaceDiff.value.truncated = gitDiffTruncated.value
+      workspaceDiff.value.loading = false
     }
     await nextTick()
     await renderGitDiffMonaco(filePath)
   } catch (error) {
     gitDiffError.value = error.message || '获取 diff 失败'
-    if (editorDiff.value) {
-      editorDiff.value.loading = false
-      editorDiff.value.error = gitDiffError.value
+    if (workspaceDiff.value) {
+      workspaceDiff.value.loading = false
+      workspaceDiff.value.error = gitDiffError.value
     }
   } finally {
     gitDiffLoading.value = false
@@ -5669,8 +5720,8 @@ async function ensureGitDiffFullText(commitHash, filePath) {
 }
 
 // 关闭主区域 diff 视图，回到文件内容
-function closeEditorDiff() {
-  editorDiff.value = null
+function closeWorkspaceDiff() {
+  workspaceDiff.value = null
   gitSelectedFile.value = null
   disposeGitDiffEditor()
   nextTick(() => layoutMonacoEditor())
@@ -5680,7 +5731,7 @@ function closeEditorDiff() {
 // 说明：优先使用「父版本全文 / 当前版本全文」两份完整文件渲染，
 // 这样行号即文件绝对行号；若全文不可得则降级为解析 unified diff。
 // 实例独立于主编辑器 cmEditorView。
-const gitDiffContainerRef = computed(() => editorPanelRef.value?.diffContainerRef || null)
+const gitDiffContainerRef = computed(() => workspacePanelRef.value?.diffContainerRef || null)
 let gitDiffEditor = null
 let gitDiffOriginalModel = null
 let gitDiffModifiedModel = null
@@ -5757,7 +5808,7 @@ async function renderGitDiffMonaco(filePath) {
   if (!container) {
     const message = 'diff 容器未就绪，请重试'
     gitDiffError.value = message
-    if (editorDiff.value) editorDiff.value.error = message
+    if (workspaceDiff.value) workspaceDiff.value.error = message
     return
   }
   try {
@@ -5790,14 +5841,14 @@ async function renderGitDiffMonaco(filePath) {
     console.warn('[GIT] render diff with monaco failed:', error)
     const message = `diff 渲染失败：${error?.message || error}`
     gitDiffError.value = message
-    if (editorDiff.value) editorDiff.value.error = message
+    if (workspaceDiff.value) workspaceDiff.value.error = message
   }
 }
 
 // 并排 / 内联切换
 function toggleGitDiffSideBySide() {
   gitDiffSideBySide.value = !gitDiffSideBySide.value
-  if (editorDiff.value) editorDiff.value.sideBySide = gitDiffSideBySide.value
+  if (workspaceDiff.value) workspaceDiff.value.sideBySide = gitDiffSideBySide.value
   if (gitDiffEditor) {
     gitDiffEditor.updateOptions({ renderSideBySide: gitDiffSideBySide.value && !isNarrowGitDiffViewport() })
   }
@@ -5806,34 +5857,34 @@ function toggleGitDiffSideBySide() {
 // 全文 / 仅变更上下文区域切换（默认仅上下文）
 async function toggleGitDiffShowFull() {
   gitDiffShowFull.value = !gitDiffShowFull.value
-  if (editorDiff.value) editorDiff.value.showFull = gitDiffShowFull.value
-  if (!editorDiff.value?.filePath) return
+  if (workspaceDiff.value) workspaceDiff.value.showFull = gitDiffShowFull.value
+  if (!workspaceDiff.value?.filePath) return
   // 切到「全文」时按需拉取两侧全文（首次较慢，之后走缓存）
   if (gitDiffShowFull.value) {
-    const { commitHash, filePath } = editorDiff.value
+    const { commitHash, filePath } = workspaceDiff.value
     const key = `${commitHash}|${filePath}`
     if (!gitDiffFullTextCache.has(key)) {
-      editorDiff.value.loading = true
+      workspaceDiff.value.loading = true
       try {
         const entry = await ensureGitDiffFullText(commitHash, filePath)
         if (entry) {
           gitDiffTruncated.value = Boolean(gitDiffTruncated.value || entry.truncated)
-          editorDiff.value.truncated = gitDiffTruncated.value
+          workspaceDiff.value.truncated = gitDiffTruncated.value
         }
       } catch (error) {
         gitDiffError.value = error.message || '获取文件全文失败'
-        editorDiff.value.error = gitDiffError.value
-        editorDiff.value.loading = false
+        workspaceDiff.value.error = gitDiffError.value
+        workspaceDiff.value.loading = false
         return
       } finally {
-        if (editorDiff.value) editorDiff.value.loading = false
+        if (workspaceDiff.value) workspaceDiff.value.loading = false
       }
     } else {
       await ensureGitDiffFullText(commitHash, filePath)
     }
     await nextTick()
   }
-  await renderGitDiffMonaco(editorDiff.value.filePath)
+  await renderGitDiffMonaco(workspaceDiff.value.filePath)
 }
 
 // 跳转到上一个 / 下一个差异（Monaco DiffEditor 内置导航）
@@ -5884,7 +5935,7 @@ function layoutGitDiffEditor() {
 
 // ===== 自由分割：diff pane 的多实例管理 =====
 // 每个 diff pane 一个独立 Monaco DiffEditor；diff 数据挂在 leaf.diff 上（commitHash/filePath/loading/error/truncated/sideBySide/showFull）。
-// 与未分割时的单例路径完全隔离：这里只操作 diffEditorViews，不碰 gitDiffEditor / editorDiff。
+// 与未分割时的单例路径完全隔离：这里只操作 diffEditorViews，不碰 gitDiffEditor / workspaceDiff。
 
 // 释放某个 diff pane 的实例与 model
 function disposeDiffEditorForPane(paneId) {
@@ -5939,7 +5990,7 @@ function ensureDiffEditorForPane(paneId) {
 
 // 用该 pane 的 diff 数据渲染 Monaco（容器未就绪时轮询等待）
 async function renderDiffForPane(paneId) {
-  const pane = findEditorPaneById(editorPaneTree.value, paneId)
+  const pane = findWorkspacePaneById(workspacePaneTree.value, paneId)
   if (!pane || pane.view !== 'diff' || !pane.diff) return
   let container = resolveDiffContainer(paneId)
   for (let i = 0; !container && i < 10; i++) {
@@ -5948,7 +5999,7 @@ async function renderDiffForPane(paneId) {
   }
   if (!container) return
   // 等待期间 pane 可能已切走/关闭
-  const current = findEditorPaneById(editorPaneTree.value, paneId)
+  const current = findWorkspacePaneById(workspacePaneTree.value, paneId)
   if (!current || current.view !== 'diff' || !current.diff) return
   const diff = current.diff
   try {
@@ -5985,7 +6036,7 @@ async function renderDiffForPane(paneId) {
 
 // 为某个 pane 加载并渲染 diff（写 leaf.diff 后调用）
 async function loadDiffForPane(paneId, commitHash, filePath) {
-  const pane = findEditorPaneById(editorPaneTree.value, paneId)
+  const pane = findWorkspacePaneById(workspacePaneTree.value, paneId)
   if (!pane || pane.view !== 'diff') return
   const workingDir = getGitWorkingDir()
   if (!workingDir) return
@@ -6002,7 +6053,7 @@ async function loadDiffForPane(paneId, commitHash, filePath) {
   try {
     const diffData = await callGitApi('git/diff', { path: workingDir, hash: commitHash, file: filePath })
     // 等待期间 pane 可能已切走/关闭
-    const current = findEditorPaneById(editorPaneTree.value, paneId)
+    const current = findWorkspacePaneById(workspacePaneTree.value, paneId)
     if (!current || current.view !== 'diff' || !current.diff) return
     current.diff.diffText = diffData.diff || ''
     current.diff.truncated = Boolean(diffData.truncated)
@@ -6016,7 +6067,7 @@ async function loadDiffForPane(paneId, commitHash, filePath) {
     await nextTick()
     await renderDiffForPane(paneId)
   } catch (error) {
-    const current = findEditorPaneById(editorPaneTree.value, paneId)
+    const current = findWorkspacePaneById(workspacePaneTree.value, paneId)
     if (current && current.diff) {
       current.diff.loading = false
       current.diff.error = error.message || '获取 diff 失败'
@@ -6026,7 +6077,7 @@ async function loadDiffForPane(paneId, commitHash, filePath) {
 
 // diff pane 内切换「并排 / 内联」
 function togglePaneDiffSideBySide(paneId) {
-  const pane = findEditorPaneById(editorPaneTree.value, paneId)
+  const pane = findWorkspacePaneById(workspacePaneTree.value, paneId)
   if (!pane || !pane.diff) return
   pane.diff.sideBySide = !pane.diff.sideBySide
   const entry = diffEditorViews.get(paneId)
@@ -6035,7 +6086,7 @@ function togglePaneDiffSideBySide(paneId) {
 
 // diff pane 内切换「全文 / 仅上下文」
 async function togglePaneDiffShowFull(paneId) {
-  const pane = findEditorPaneById(editorPaneTree.value, paneId)
+  const pane = findWorkspacePaneById(workspacePaneTree.value, paneId)
   if (!pane || !pane.diff) return
   pane.diff.showFull = !pane.diff.showFull
   const entry = diffEditorViews.get(paneId)
@@ -6075,15 +6126,15 @@ function navigatePaneDiff(paneId, direction) {
   if (typeof entry.editor.goToDiff === 'function') entry.editor.goToDiff(target)
 }
 
-// 关闭某个 diff pane 的 diff（回到空 file pane）
+// 关闭某个 diff pane 的 diff（回到空 pane）
 function closePaneDiff(paneId) {
-  const pane = findEditorPaneById(editorPaneTree.value, paneId)
+  const pane = findWorkspacePaneById(workspacePaneTree.value, paneId)
   if (!pane) return
   disposeDiffEditorForPane(paneId)
   pane.diff = null
-  pane.view = 'file'
-  persistEditorPaneLayout()
-  nextTick(() => scheduleEditorLayout())
+  pane.view = 'empty'
+  persistWorkspacePaneLayout()
+  nextTick(() => scheduleWorkspaceLayout())
 }
 
 // 显式 layout 合并到下一帧，避免同一帧内对多个 diff 实例反复 layout 造成尺寸震荡
@@ -6341,7 +6392,7 @@ async function runFileTreeContextAction(action) {
         const absPath = `${String(dirPath).replace(/\/$/, '')}/${trimmedName}`
         createFileOrDirectory(agent.agent_id, absPath, kind)
           .then(() => refreshFileTreeDir(agent.agent_id, menu.node))
-          .then(() => (kind === 'file' ? openEditorFile(absPath, agent.agent_id) : null))
+          .then(() => (kind === 'file' ? openWorkspaceFile(absPath, agent.agent_id) : null))
           .then(() => showToast(`${label}已创建`, 'success'))
           .catch((error) => showToast(error.message || `创建${label}失败`, 'error'))
         return null
@@ -6353,9 +6404,9 @@ async function runFileTreeContextAction(action) {
   if (action.id === 'find-in-folder') {
     const dirPath = getFileTreeContextDirPath()
     globalSearchFileGlob.value = buildDirSearchGlob(agent.agent_id, dirPath)
-    setEditorSidebarView('search')
+    setWorkspaceSidebarView('search')
     nextTick(() => {
-      const input = document.querySelector('.editor-global-search-input')
+      const input = document.querySelector('.workspace-global-search-input')
       if (input) input.focus()
     })
     return
@@ -6976,7 +7027,7 @@ function closePanel(panelId) {
 function closeVisiblePanelsOnMobile() {
   if (showTerminalPanel.value && !terminalDetached.value) showTerminalPanel.value = false
   if (showChatPanel.value && !chatDetached.value) showChatPanel.value = false
-  if (showEditorPanel.value && !editorDetached.value) closeEditorPanel()
+  if (showWorkspacePanel.value && !workspaceDetached.value) closeWorkspacePanel()
   for (const panel of [...panels.value]) {
     if (!sessionDetachedPanels.value.has(panel.id)) {
       closePanel(panel.id)
@@ -7048,7 +7099,7 @@ function openAgentInActivePane(agent) {
   }
   targetPanel.agentId = agent.agent_id
   activePanelId.value = targetPanel.id
-  editorSessionPanelId.value = targetPanel.id
+  workspaceSessionPanelId.value = targetPanel.id
   setActivePaneView('session', targetPanel.id)
   switchAgent(agent)
   nextTick(() => maybeStartTour('panel'))
@@ -7059,7 +7110,7 @@ function openAgentInActivePane(agent) {
 function openAgentInPanel(agent, panelId = null) {
   // 所有内嵌 Panel 都只在编辑器内部渲染：从宠物大厅等入口打开 Agent 时，
   // 必须确保编辑器处于打开状态，否则 Panel 会失去宿主而不可见。
-  showEditorPanel.value = true
+  showWorkspacePanel.value = true
   // 移动端不支持多 Panel，直接切换
   if (windowWidth.value <= 768) {
     // 从大厅进入 Panel 时推送一条历史状态，使移动端返回键能关闭 Panel 回到大厅
@@ -7081,18 +7132,18 @@ function openAgentInPanel(agent, panelId = null) {
   }
   // 编辑器已内部分割：把 Agent 路由到「激活 pane」中打开（与工作区分割分支对称）。
   // 否则 Panel 会作为 panel-grid 的整格子项渲染到编辑器外面，用户感知为「Agent 的 panel 跑出编辑器」。
-  if (isEditorSplit.value) {
+  if (isWorkspaceSplit.value) {
     const existingPanel = panels.value.find(p => p.agentId === agent.agent_id)
     if (existingPanel) {
-      const hostingPane = findEditorPaneBySessionPanelId(existingPanel.id)
+      const hostingPane = findWorkspacePaneBySessionPanelId(existingPanel.id)
       if (hostingPane) {
-        activateEditorPane(hostingPane.id)
+        activateWorkspacePane(hostingPane.id)
       } else {
         setActivePaneView('session', existingPanel.id)
       }
       activePanelId.value = existingPanel.id
       switchAgent(agent)
-      editorSessionPanelId.value = existingPanel.id
+      workspaceSessionPanelId.value = existingPanel.id
       return
     }
     // 显式指定 panelId（如命令面板）：直接把它放到激活 pane。
@@ -7101,7 +7152,7 @@ function openAgentInPanel(agent, panelId = null) {
       if (targetPanel) {
         targetPanel.agentId = agent.agent_id
         activePanelId.value = targetPanel.id
-        editorSessionPanelId.value = targetPanel.id
+        workspaceSessionPanelId.value = targetPanel.id
         setActivePaneView('session', targetPanel.id)
         switchAgent(agent)
         return
@@ -7116,8 +7167,8 @@ function openAgentInPanel(agent, panelId = null) {
   if (existingPanel) {
     activePanelId.value = existingPanel.id
     // 该 Panel 可能尚未被编辑器主区域承载（例如从宠物大厅进入），补上会话视图归属
-    editorSessionPanelId.value = existingPanel.id
-    setEditorMainView('session')
+    workspaceSessionPanelId.value = existingPanel.id
+    setWorkspaceMainView('session')
     switchAgent(agent)
     return
   }
@@ -7144,8 +7195,8 @@ function openAgentInPanel(agent, panelId = null) {
   activePanelId.value = targetPanel.id
   // 内嵌 Panel 只在编辑器内部渲染：把该 Panel 交给编辑器主区域的会话视图承载，
   // 否则 Panel 会失去宿主而不可见（编辑器停在文件视图）。
-  editorSessionPanelId.value = targetPanel.id
-  setEditorMainView('session')
+  workspaceSessionPanelId.value = targetPanel.id
+  setWorkspaceMainView('session')
   // 切换当前 Agent
   switchAgent(agent)
   // 首次打开对话面板时展示 Panel 场景引导（等 Panel 挂载后再触发，确保高亮目标存在）
@@ -7162,10 +7213,33 @@ function openAgentInCurrentPanel(agent) {
     openAgentInPanel(agent)
     return
   }
+  // 内嵌 Panel 只在编辑器内部渲染：必须确保编辑器打开、且 Panel 被编辑器承载，
+  // 否则 Panel 失去宿主而不可见（编辑器停在文件视图或已分割时尤其明显）。
+  showWorkspacePanel.value = true
   const existingPanel = panels.value.find(p => p.agentId === agent.agent_id)
   if (existingPanel) {
+    // 已分割：把承载该 Panel 的 pane 设为激活；未承载则放进激活 pane。
+    if (isWorkspaceSplit.value) {
+      const hostingPane = findWorkspacePaneBySessionPanelId(existingPanel.id)
+      if (hostingPane) {
+        activateWorkspacePane(hostingPane.id)
+      } else {
+        setActivePaneView('session', existingPanel.id)
+      }
+      activePanelId.value = existingPanel.id
+      workspaceSessionPanelId.value = existingPanel.id
+      switchAgent(agent)
+      return
+    }
     activePanelId.value = existingPanel.id
+    workspaceSessionPanelId.value = existingPanel.id
+    setWorkspaceMainView('session')
     switchAgent(agent)
+    return
+  }
+  // 已分割：把 Agent 放进「激活 pane」（该 pane 已有 Panel 则就地覆盖）
+  if (isWorkspaceSplit.value) {
+    openAgentInActivePane(agent)
     return
   }
   let targetPanel = panels.value.find(p => p.id === activePanelId.value)
@@ -7182,6 +7256,8 @@ function openAgentInCurrentPanel(agent) {
   }
   targetPanel.agentId = agent.agent_id
   activePanelId.value = targetPanel.id
+  workspaceSessionPanelId.value = targetPanel.id
+  setWorkspaceMainView('session')
   switchAgent(agent)
 }
 
@@ -7363,44 +7439,44 @@ function getPanelHistoryState(panel) {
 }
 
 // 编辑器主区域是否正在承载聊天室 / 终端（此时独立面板让位，避免同一状态被两个实例争抢）
-// 两种承载方式：① 未分割时 editorMainView === 'chat'/'terminal'；
+// 两种承载方式：① 未分割时 workspaceMainView === 'chat'/'terminal'；
 //              ② 已分割时某个 pane 的 view === 'chat'/'terminal'（host 单例，至多一个）。
-const editorHostsChat = computed(() =>
-  showEditorPanel.value && (
-    isEditorSplit.value
-      ? !!findEditorPaneByView('chat')
-      : editorMainView.value === 'chat'
+const workspaceHostsChat = computed(() =>
+  showWorkspacePanel.value && (
+    isWorkspaceSplit.value
+      ? !!findWorkspacePaneByView('chat')
+      : workspaceMainView.value === 'chat'
   )
 )
-const editorHostsTerminal = computed(() =>
-  showEditorPanel.value && (
-    isEditorSplit.value
-      ? !!findEditorPaneByView('terminal')
-      : editorMainView.value === 'terminal'
+const workspaceHostsTerminal = computed(() =>
+  showWorkspacePanel.value && (
+    isWorkspaceSplit.value
+      ? !!findWorkspacePaneByView('terminal')
+      : workspaceMainView.value === 'terminal'
   )
 )
 // 编辑器主区域是否正在承载会话面板（此时网格中对应 panel 让位，避免同一 xterm host 被两实例争抢）
-const editorHostsSession = computed(() => showEditorPanel.value && editorMainView.value === 'session')
+const workspaceHostsSession = computed(() => showWorkspacePanel.value && workspaceMainView.value === 'session')
 // 编辑器主区域会话视图当前显示的 panel（由编辑器侧边栏 Agent 列表点击决定）
-const editorSessionPanelId = ref(null)
+const workspaceSessionPanelId = ref(null)
 // 编辑器当前占用的 panel：只要编辑器面板打开且已选定 panel，就让它从网格让位。
 // 不随主区域视图（file/chat/terminal/session）变化而回到网格，否则点 chat/终端时
 // 该 panel 会「凭空」出现在网格里，把布局挤乱（用户期望的是替换，而非并存）。
-const editorHostedPanel = computed(() => {
-  if (!showEditorPanel.value || !editorSessionPanelId.value) return null
+const workspaceHostedPanel = computed(() => {
+  if (!showWorkspacePanel.value || !workspaceSessionPanelId.value) return null
   // 自由分割模式：panel 由某个 pane 承载时才让它从网格让位；
   // 若没有任何 pane 承载它（例如承载它的 pane 被切成了 file/chat/terminal），
   // 则回到网格渲染，避免 panel「凭空消失」。
-  if (isEditorSplit.value) {
-    const hostingPane = findEditorPaneBySessionPanelId(editorSessionPanelId.value)
+  if (isWorkspaceSplit.value) {
+    const hostingPane = findWorkspacePaneBySessionPanelId(workspaceSessionPanelId.value)
     if (!hostingPane) return null
   }
-  return panels.value.find(p => p.id === editorSessionPanelId.value) || null
+  return panels.value.find(p => p.id === workspaceSessionPanelId.value) || null
 })
 // 编辑器会话视图对应的 panel：优先取记录的面板，回退到当前激活/首个已绑定 Agent 的面板
-const editorSessionPanel = computed(() => {
-  if (!editorHostsSession.value) return null
-  const byId = editorHostedPanel.value
+const workspaceSessionPanel = computed(() => {
+  if (!workspaceHostsSession.value) return null
+  const byId = workspaceHostedPanel.value
   if (byId) return byId
   const active = panels.value.find(p => p.id === activePanelId.value && p.agentId)
   if (active) return active
@@ -7413,7 +7489,7 @@ const editorSessionPanel = computed(() => {
 // 「网格被切成两列、但只有一个子项」→ 编辑器只占半宽、右侧空白的现象。
 const embeddedPanelCount = computed(() => {
   // 网格唯一子项是编辑器面板（未打开时为空状态）
-  return showEditorPanel.value && !editorDetached.value ? 1 : 0
+  return showWorkspacePanel.value && !workspaceDetached.value ? 1 : 0
 })
 
 // 当前是否没有任何可见的内嵌 Panel（用于展示空状态欢迎背景）
@@ -7447,18 +7523,18 @@ function detachPanel(type, panelId = null) {
     terminalDetached.value = !terminalDetached.value
   } else if (type === 'chat') {
     chatDetached.value = !chatDetached.value
-  } else if (type === 'editor') {
-    editorDetached.value = !editorDetached.value
-    // 嵌入/浮动切换会重建 EditorPanel，释放旧容器上的 diff 实例；
+  } else if (type === 'workspace') {
+    workspaceDetached.value = !workspaceDetached.value
+    // 嵌入/浮动切换会重建 WorkspacePanel，释放旧容器上的 diff 实例；
     // 若主区域仍显示 diff，等新容器挂载后重新渲染，避免出现空白 diff。
-    const diffFilePath = editorDiff.value?.filePath
+    const diffFilePath = workspaceDiff.value?.filePath
     disposeGitDiffEditor()
     if (diffFilePath && !gitDiffLoading.value && !gitDiffError.value) {
       nextTick(() => renderGitDiffMonaco(diffFilePath))
     }
-    // 已分割时 diff 由各 pane 的独立实例承载：容器随 EditorPanel 重建而失效，
+    // 已分割时 diff 由各 pane 的独立实例承载：容器随 WorkspacePanel 重建而失效，
     // 需释放旧实例并在新容器挂载后按各 pane 的 diff 数据重新渲染。
-    if (isEditorSplit.value) {
+    if (isWorkspaceSplit.value) {
       const paneIds = [...diffEditorViews.keys()]
       for (const paneId of paneIds) disposeDiffEditorForPane(paneId)
       nextTick(() => {
@@ -8348,13 +8424,13 @@ const currentAgent = computed(() => {
 
 // 注意：已停止Agent的折叠状态现在由AgentSidebar组件内部管理
 
-watch([showEditorPanel, currentAgentId, editorSidebarView], ([isEditorPanelVisible, agentId, sidebarView]) => {
-  if (!isEditorPanelVisible || !agentId || sidebarView !== 'files') {
+watch([showWorkspacePanel, currentAgentId, workspaceSidebarView], ([isWorkspacePanelVisible, agentId, sidebarView]) => {
+  if (!isWorkspacePanelVisible || !agentId || sidebarView !== 'files') {
     return
   }
 
   nextTick(() => {
-    ensureEditorSidebarFileTree()
+    ensureWorkspaceSidebarFileTree()
   })
 })
 
@@ -8429,7 +8505,7 @@ function toggleBatchMode() {
 // 编辑器侧边栏 Agent 列表点击：把该 Agent 的会话显示到编辑器主区域（一次一个）
 // 编辑器会话视图是单会话的：切换 Agent 时复用同一个 Panel 覆盖 agentId，
 // 而不是每次新建 Panel（否则旧 Panel 会留在网格里，把编辑器挤成半屏）。
-function onEditorSidebarAgentClick(agent) {
+function onWorkspaceSidebarAgentClick(agent) {
   if (isBatchMode.value) {
     toggleSelectAgent(agent.agent_id)
     return
@@ -8439,8 +8515,8 @@ function onEditorSidebarAgentClick(agent) {
     openAgentInPanel(agent)
     const mobilePanel = panels.value.find(p => p.agentId === agent.agent_id)
     if (mobilePanel) {
-      editorSessionPanelId.value = mobilePanel.id
-      setEditorMainView('session')
+      workspaceSessionPanelId.value = mobilePanel.id
+      setWorkspaceMainView('session')
     }
     return
   }
@@ -8449,28 +8525,28 @@ function onEditorSidebarAgentClick(agent) {
   if (existingPanel) {
     // 自由分割模式：优先把「激活 pane」切到该 Panel；若该 Panel 已被别的 pane 承载，
     // 则聚焦到那个 pane（避免同一 panel 出现在两个 pane 中）。
-    if (isEditorSplit.value) {
-      const hostingPane = findEditorPaneBySessionPanelId(existingPanel.id)
+    if (isWorkspaceSplit.value) {
+      const hostingPane = findWorkspacePaneBySessionPanelId(existingPanel.id)
       if (hostingPane) {
-        activateEditorPane(hostingPane.id)
+        activateWorkspacePane(hostingPane.id)
       } else {
         setActivePaneView('session', existingPanel.id)
       }
     }
     activePanelId.value = existingPanel.id
     switchAgent(agent)
-    editorSessionPanelId.value = existingPanel.id
-    setEditorMainView('session')
+    workspaceSessionPanelId.value = existingPanel.id
+    setWorkspaceMainView('session')
     return
   }
   // 自由分割模式：把 Agent 打开到「激活 pane」中（若该区域已有 Panel 则覆盖），
   // 绝不复用其他 pane 承载的 Panel，否则会把那个区域的会话清掉。
-  if (isEditorSplit.value) {
+  if (isWorkspaceSplit.value) {
     openAgentInActivePane(agent)
     return
   }
   // 否则复用编辑器当前承载的 Panel（没有则回退到激活 Panel / 新建）
-  let targetPanel = editorSessionPanel.value
+  let targetPanel = workspaceSessionPanel.value
     || panels.value.find(p => p.id === activePanelId.value)
   if (!targetPanel) {
     if (panels.value.length >= MAX_PANELS) {
@@ -8488,8 +8564,8 @@ function onEditorSidebarAgentClick(agent) {
   setActivePaneView('session', targetPanel.id)
   activePanelId.value = targetPanel.id
   switchAgent(agent)
-  editorSessionPanelId.value = targetPanel.id
-  setEditorMainView('session')
+  workspaceSessionPanelId.value = targetPanel.id
+  setWorkspaceMainView('session')
 }
 
 // ========== 宠物网关操作 ==========
@@ -8630,7 +8706,7 @@ function interruptCurrentAgent() {
 function isFocusKeyAvailable(key) {
   if (!key) return false
   if (key === 'terminal') return !!(showTerminalPanel.value && !terminalDetached.value && document.querySelector('.terminal-panel'))
-  if (key === 'editor') return !!(showEditorPanel.value && !editorDetached.value && document.querySelector('.editor-panel'))
+  if (key === 'workspace') return !!(showWorkspacePanel.value && !workspaceDetached.value && document.querySelector('.workspace-panel'))
   if (key === 'chat') return !!(showChatPanel.value && !chatDetached.value && document.querySelector('.chat-panel'))
   if (key.startsWith('session:')) {
     const panelId = key.slice('session:'.length)
@@ -8639,13 +8715,13 @@ function isFocusKeyAvailable(key) {
   return false
 }
 
-// 命名面板（terminal/editor/chat）的焦点 key：
+// 命名面板（terminal/workspace/chat）的焦点 key：
 // 优先依据真实 DOM 焦点；焦点不在任何可聚焦元素上时（如仅鼠标点击过面板空白处，
 // activeElement 为 body），回退到最近一次交互的命名面板（activeWindow，由面板的
 // mousedown 更新），并用 isFocusKeyAvailable 过滤掉已关闭/已分离的残留值。
 function getNamedPanelFocusKey() {
   const focusedKey = getFocusedZoneKey()
-  if (focusedKey === 'terminal' || focusedKey === 'editor' || focusedKey === 'chat') {
+  if (focusedKey === 'terminal' || focusedKey === 'workspace' || focusedKey === 'chat') {
     return focusedKey
   }
   if (activeWindow.value && isFocusKeyAvailable(activeWindow.value)) {
@@ -8654,7 +8730,7 @@ function getNamedPanelFocusKey() {
   return null
 }
 
-// 当前焦点所处面板的 key（session:<id> / terminal / editor / chat）
+// 当前焦点所处面板的 key（session:<id> / terminal / workspace / chat）
 // 命令面板打开时会抢走焦点，此时优先用"打开前"记录的快照（且该面板须仍有效）；
 // 否则依据真实 DOM 焦点，最后回退到当前激活 Panel
 function getFocusedPanelKey() {
@@ -8676,9 +8752,9 @@ function closeFocusedPanel() {
   if (!key) return
   if (key === 'terminal') {
     showTerminalPanel.value = false
-  } else if (key === 'editor') {
-    resetEditorHostedPanelState()
-    showEditorPanel.value = false
+  } else if (key === 'workspace') {
+    resetWorkspaceHostedPanelState()
+    showWorkspacePanel.value = false
   } else if (key === 'chat') {
     showChatPanel.value = false
   } else if (key.startsWith('session:')) {
@@ -8691,8 +8767,8 @@ function detachFocusedPanel() {
   if (!key) return
   if (key === 'terminal') {
     detachPanel('terminal')
-  } else if (key === 'editor') {
-    detachPanel('editor')
+  } else if (key === 'workspace') {
+    detachPanel('workspace')
   } else if (key === 'chat') {
     detachPanel('chat')
   } else if (key.startsWith('session:')) {
@@ -8991,7 +9067,7 @@ function SIDEBAR_TOUR_STEPS() {
       title: 'Agent 列表',
       desc: '编辑器侧边栏按节点与自定义分组列出全部 Agent，每项显示类型、名称、状态与工作目录；点击即可在编辑器中打开它。',
       hint: '等待输入的 Agent 会高亮闪烁，提醒你及时处理。',
-      target: '.editor-sidebar-agents',
+      target: '.workspace-sidebar-agents',
       placement: 'right',
     },
     {
@@ -9000,7 +9076,7 @@ function SIDEBAR_TOUR_STEPS() {
       title: 'Agent 右键菜单',
       desc: '在任一 Agent 项上右键，可就地执行查看变更、创建终端、打开编辑器、重命名、复制、权限管理、无损重生、删除等操作，无需先打开面板。',
       hint: '菜单内容与命令面板（Ctrl+P）的「当前 Agent」组一致，作用于被右键的那个 Agent。',
-      target: '.editor-sidebar-agents .agent-item',
+      target: '.workspace-sidebar-agents .agent-item',
       placement: 'right',
     },
     {
@@ -9009,7 +9085,7 @@ function SIDEBAR_TOUR_STEPS() {
       title: '批量操作',
       desc: '点击侧边栏顶部的「☑」进入批量选择模式，可勾选多个 Agent 后批量复制、加入分组或删除。',
       hint: '批量删除不可恢复，操作前请确认选中的 Agent。',
-      target: '.editor-sidebar-agents',
+      target: '.workspace-sidebar-agents',
       placement: 'right',
     },
     {
@@ -9018,7 +9094,7 @@ function SIDEBAR_TOUR_STEPS() {
       title: '管理分组',
       desc: '点击侧边栏顶部的「📁」可重命名或删除自定义分组；分组可折叠，便于按项目或用途归类 Agent。',
       hint: 'Agent 停止后会自动从分组中移除，避免分组里堆积无效条目。',
-      target: '.editor-sidebar-agents',
+      target: '.workspace-sidebar-agents',
       placement: 'right',
     },
   ]
@@ -9066,7 +9142,7 @@ function startOnboarding(tourId = 'welcome') {
   clearOnboardingTimer()
   activeTourId.value = tourId
   // 侧边栏场景需先打开编辑器并切到 Agent 列表视图，否则引导目标不可见
-  if (tourId === 'sidebar') openEditorAgentList()
+  if (tourId === 'sidebar') openWorkspaceAgentList()
 }
 // 命令面板上下文：统一暴露宠物菜单与命令面板共用的动作回调
 const commandPaletteCtx = computed(() => ({
@@ -9089,11 +9165,11 @@ const commandPaletteCtx = computed(() => ({
   openAdminRestartService: () => openAdminSystemAction('restart'),
   openAdminSyncConfig: () => openAdminSystemAction('sync-config'),
   openAdminNodeSecret: () => openAdminSystemAction('node-secret'),
-  openEditorAgentList,
+  openWorkspaceAgentList,
   toggleTerminalPanel,
   toggleChatPanel,
   // 打开编辑器侧边栏的「管理分组」弹窗（重命名 / 删除）
-  manageGroups: () => { editorPanelRef.value?.openManageGroups?.() },
+  manageGroups: () => { workspacePanelRef.value?.openManageGroups?.() },
   openTopology: openTopologyOverlay,
   openSettings: () => { showSettingsModal.value = true },
   openDocs: openDocs,
@@ -9116,17 +9192,17 @@ const commandPaletteCtx = computed(() => ({
   viewCurrentRules: () => { const a = getCurrentAgentOrNull(); if (a) viewRules(a) },
   viewCurrentTools: () => { const a = getCurrentAgentOrNull(); if (a) viewTools(a) },
   createTerminalForCurrent: () => { const a = getCurrentAgentOrNull(); if (a) createTerminalForAgent(a) },
-  openEditorForCurrent: () => { const a = getCurrentAgentOrNull(); if (a) createEditorForAgent(a) },
+  openWorkspaceForCurrent: () => { const a = getCurrentAgentOrNull(); if (a) createWorkspaceForAgent(a) },
   // 全局：打开/隐藏编辑器面板（与 Ctrl+E 分支行为一致，不依赖当前 Agent）
-  toggleEditorPanel,
+  toggleWorkspacePanel,
   // 全局：快速抵达编辑器侧边栏的「内容搜索」（与 Ctrl+Shift+F 分支行为一致，编辑器未打开时不响应）
-  openEditorGlobalSearch: () => openEditorGlobalSearch('content'),
+  openWorkspaceGlobalSearch: () => openWorkspaceGlobalSearch('content'),
   // 全局：快速抵达编辑器侧边栏的「文件名搜索」（与 Ctrl+Shift+P 分支行为一致，编辑器未打开时不响应）
-  openEditorFileSearch: () => openEditorGlobalSearch('filename'),
+  openWorkspaceFileSearch: () => openWorkspaceGlobalSearch('filename'),
   // 全局：快速抵达编辑器侧边栏的目录树（与 Ctrl+Shift+E 分支行为一致，编辑器未打开时不响应）
-  openEditorFileTree: () => {
-    if (!showEditorPanel.value) return
-    setEditorSidebarView('files')
+  openWorkspaceFileTree: () => {
+    if (!showWorkspacePanel.value) return
+    setWorkspaceSidebarView('files')
     focusFileTreeContainer()
   },
   toggleCurrentAutoScroll,
@@ -11219,9 +11295,9 @@ function getCurrentAgentNodeId() {
 }
 
 // 获取编辑器目标节点ID（优先使用编辑器对应agent的节点ID）
-function getEditorTargetNodeId() {
-  const editorAgentNodeId = activeEditorSession.value?.agent?.node_id
-  return String(editorAgentNodeId || getCurrentAgentNodeId() || 'master').trim() || 'master'
+function getWorkspaceTargetNodeId() {
+  const workspaceAgentNodeId = activeWorkspaceSession.value?.agent?.node_id
+  return String(workspaceAgentNodeId || getCurrentAgentNodeId() || 'master').trim() || 'master'
 }
 
 // 校验：同一节点同一工作目录不允许同时有两个未启用 worktree 的 code_agent。
@@ -11720,9 +11796,9 @@ async function fetchAgentList() {
 
       // 首次拉取到 Agent 后自动打开编辑器（唯一容器），让用户直接进入工作区；
       // 无 Agent 时保持关闭，露出宠物大厅作为欢迎页。
-      if (!editorAutoOpened && agentList.value.length > 0) {
-        editorAutoOpened = true
-        showEditorPanel.value = true
+      if (!workspaceAutoOpened && agentList.value.length > 0) {
+        workspaceAutoOpened = true
+        showWorkspacePanel.value = true
       }
     }
     
@@ -16305,8 +16381,8 @@ function stopChatPanelInteraction() {
 // 聊天室功能方法
 function toggleChatPanel() {
   // 编辑器主区域正在显示聊天室时，顶栏按钮语义为「收起」：切回文件视图
-  if (editorHostsChat.value) {
-    setEditorMainView('file')
+  if (workspaceHostsChat.value) {
+    setWorkspaceMainView('file')
     return
   }
   showChatPanel.value = !showChatPanel.value
@@ -16482,17 +16558,17 @@ function selectPrivateClient(clientId) {
 }
 
 // 监听面板显示状态
-watch(showEditorPanel, (visible) => {
+watch(showWorkspacePanel, (visible) => {
   if (visible) {
-    startEditorFileHeartbeat()
+    startWorkspaceFileHeartbeat()
     return
   }
 
-  stopEditorFileHeartbeat()
+  stopWorkspaceFileHeartbeat()
 })
 
-watch(activeEditorTabPath, () => {
-  startEditorFileHeartbeat()
+watch(activeWorkspaceTabPath, () => {
+  startWorkspaceFileHeartbeat()
 })
 
 watch(showTerminalPanel, (newValue, oldValue) => {
@@ -16704,40 +16780,40 @@ function handleGlobalKeydown(event) {
 
   // Ctrl/Cmd + S 保存当前编辑器标签
   if (isModifierPressed && !event.altKey && event.key === 's') {
-    if (showEditorPanel.value && activeEditorTab.value && !activeEditorTab.value.loading) {
+    if (showWorkspacePanel.value && activeWorkspaceTab.value && !activeWorkspaceTab.value.loading) {
       event.preventDefault()
-      saveActiveEditorTab()
+      saveActiveWorkspaceTab()
     }
     return
   }
 
   // Ctrl/Cmd + Shift + F 快速抵达编辑器侧边栏的「内容搜索」（编辑器未打开时不响应）
   if (isModifierPressed && !event.altKey && event.shiftKey && event.code === 'KeyF') {
-    if (!showEditorPanel.value) return
+    if (!showWorkspacePanel.value) return
     // 输入框内保留默认行为（避免打断输入）
     if (isEditableElement(event.target)) return
     event.preventDefault()
-    openEditorGlobalSearch('content')
+    openWorkspaceGlobalSearch('content')
     return
   }
 
   // Ctrl/Cmd + Shift + P 快速抵达编辑器侧边栏的「文件名搜索」（编辑器未打开时不响应）
   if (isModifierPressed && !event.altKey && event.shiftKey && event.code === 'KeyP') {
-    if (!showEditorPanel.value) return
+    if (!showWorkspacePanel.value) return
     // 输入框内保留默认行为（避免打断输入）
     if (isEditableElement(event.target)) return
     event.preventDefault()
-    openEditorGlobalSearch('filename')
+    openWorkspaceGlobalSearch('filename')
     return
   }
 
   // Ctrl/Cmd + Shift + E 快速抵达编辑器侧边栏的目录树（编辑器未打开时不响应）
   if (isModifierPressed && !event.altKey && event.shiftKey && event.code === 'KeyE') {
-    if (!showEditorPanel.value) return
+    if (!showWorkspacePanel.value) return
     // 输入框内保留默认行为（避免打断输入）
     if (isEditableElement(event.target)) return
     event.preventDefault()
-    setEditorSidebarView('files')
+    setWorkspaceSidebarView('files')
     focusFileTreeContainer()
     return
   }
@@ -16745,10 +16821,10 @@ function handleGlobalKeydown(event) {
   // Ctrl/Cmd + E 打开/隐藏编辑器面板
   if (isModifierPressed && !event.altKey && !event.shiftKey && event.code === 'KeyE') {
     event.preventDefault()
-    if (showEditorPanel.value) {
-      closeEditorPanel()
+    if (showWorkspacePanel.value) {
+      closeWorkspacePanel()
     } else {
-      showEditorPanel.value = true
+      showWorkspacePanel.value = true
     }
     return
   }
@@ -16774,7 +16850,7 @@ function handleGlobalKeydown(event) {
 
     event.preventDefault()
 
-    openEditorAgentList()
+    openWorkspaceAgentList()
   }
   
   // Ctrl + ` 打开/隐藏终端面板
@@ -16832,9 +16908,9 @@ function handleGlobalKeydown(event) {
   // Ctrl/Cmd + \ 左右分割当前激活 pane；Ctrl/Cmd + Shift + \ 上下分割
   // 仅在编辑器已打开（file 视图）且非移动端时生效；未分割时先分割激活 pane。
   if (isModifierPressed && !event.altKey && event.code === 'Backslash') {
-    if (editorMainView.value === 'file' && windowWidth.value > 768) {
+    if (workspaceMainView.value === 'file' && windowWidth.value > 768) {
       event.preventDefault()
-      splitEditorPane(activePaneId.value, event.shiftKey ? 'column' : 'row')
+      splitWorkspacePane(activePaneId.value, event.shiftKey ? 'column' : 'row')
       return
     }
   }
@@ -16845,15 +16921,15 @@ function handleGlobalKeydown(event) {
   if (isModifierPressed && !event.altKey && event.code === 'KeyW') {
     event.preventDefault()
     // 编辑器处于分割态且焦点在编辑器工作区内：Ctrl+W 优先关闭「激活 pane」（VS Code 语义）
-    if (isEditorSplit.value && editorMainView.value === 'file' && windowWidth.value > 768) {
+    if (isWorkspaceSplit.value && workspaceMainView.value === 'file' && windowWidth.value > 768) {
       const editorZone = getFocusedZoneKey()
       const namedKey = getNamedPanelFocusKey()
-      if (editorZone === 'editor' || namedKey === 'editor') {
-        closeEditorPane(activePaneId.value)
+      if (editorZone === 'workspace' || namedKey === 'workspace') {
+        closeWorkspacePane(activePaneId.value)
         return
       }
     }
-    // 命名面板（terminal/editor/chat）内：即使焦点未落在可聚焦元素上（仅鼠标点击过面板），
+    // 命名面板（terminal/workspace/chat）内：即使焦点未落在可聚焦元素上（仅鼠标点击过面板），
     // 也应关闭该面板，而不是被大厅逻辑拦截
     if (!getFocusedZoneKey() && !getNamedPanelFocusKey()) {
       const lobby = petLobbyRef.value
@@ -17044,21 +17120,21 @@ function getFocusZones() {
       },
     })
   }
-  if (showEditorPanel.value && !editorDetached.value) {
+  if (showWorkspacePanel.value && !workspaceDetached.value) {
     zones.push({
-      key: 'editor',
-      kind: 'editor',
+      key: 'workspace',
+      kind: 'workspace',
       focus: () => {
-        focusWindow('editor')
+        focusWindow('workspace')
         nextTick(() => {
-          const view = getActiveEditorView()
+          const view = getActiveWorkspaceView()
           if (view) {
             view.focus()
             return
           }
           // 无编辑器内容时，回退聚焦编辑器内首个可聚焦控件（如活动栏按钮），
           // 避免聚焦到不可交互的容器后被框架重置焦点
-          focusFirstIn(document.querySelector('.editor-panel'))
+          focusFirstIn(document.querySelector('.workspace-panel'))
         })
       },
     })
@@ -17085,8 +17161,8 @@ function getFocusedZoneKey() {
   if (!el) return null
   const termEl = document.querySelector('.terminal-panel')
   if (termEl && termEl.contains(el)) return 'terminal'
-  const editorEl = document.querySelector('.editor-panel')
-  if (editorEl && editorEl.contains(el)) return 'editor'
+  const workspaceEl = document.querySelector('.workspace-panel')
+  if (workspaceEl && workspaceEl.contains(el)) return 'workspace'
   const chatEl = document.querySelector('.chat-panel')
   if (chatEl && chatEl.contains(el)) return 'chat'
   for (const panel of panels.value) {
@@ -17106,8 +17182,8 @@ function getActiveFocusZoneKey() {
   if (activeWindow.value === 'terminal' && showTerminalPanel.value && !terminalDetached.value) {
     return 'terminal'
   }
-  if (activeWindow.value === 'editor' && showEditorPanel.value && !editorDetached.value) {
-    return 'editor'
+  if (activeWindow.value === 'workspace' && showWorkspacePanel.value && !workspaceDetached.value) {
+    return 'workspace'
   }
   if (activeWindow.value === 'chat' && showChatPanel.value && !chatDetached.value) {
     return 'chat'
@@ -17126,8 +17202,8 @@ function getFocusZoneRect(zone) {
     el = sessionPanelRefs.get(panelId)?.$el || null
   } else if (zone.kind === 'terminal') {
     el = document.querySelector('.terminal-panel')
-  } else if (zone.kind === 'editor') {
-    el = document.querySelector('.editor-panel')
+  } else if (zone.kind === 'workspace') {
+    el = document.querySelector('.workspace-panel')
   } else if (zone.kind === 'chat') {
     el = document.querySelector('.chat-panel')
   }
@@ -17218,21 +17294,21 @@ const pushOverlayState = () => {
 }
 
 // 打开编辑器面板并切到「Agent 列表」视图（原全局 Agent 侧边栏的唯一入口）
-const openEditorAgentList = () => {
-  if (!showEditorPanel.value) {
-    showEditorPanel.value = true
+const openWorkspaceAgentList = () => {
+  if (!showWorkspacePanel.value) {
+    showWorkspacePanel.value = true
     if (windowWidth.value <= 768) {
       pushOverlayState()
     }
   }
-  setEditorSidebarView('agents')
+  setWorkspaceSidebarView('agents')
 }
 
 // 打开/关闭终端面板（移动端处理history）
 const toggleTerminalPanel = () => {
   // 编辑器主区域正在显示终端时，顶栏按钮语义为「收起」：切回文件视图
-  if (editorHostsTerminal.value) {
-    setEditorMainView('file')
+  if (workspaceHostsTerminal.value) {
+    setWorkspaceMainView('file')
     return
   }
   const newState = !showTerminalPanel.value
@@ -17242,36 +17318,36 @@ const toggleTerminalPanel = () => {
   }
 }
 // 打开/关闭编辑器面板（移动端处理history；不依赖当前 Agent，与 Ctrl+E 行为一致）
-const toggleEditorPanel = () => {
-  if (showEditorPanel.value) {
-    closeEditorPanel()
+const toggleWorkspacePanel = () => {
+  if (showWorkspacePanel.value) {
+    closeWorkspacePanel()
     return
   }
-  showEditorPanel.value = true
+  showWorkspacePanel.value = true
   if (windowWidth.value <= 768) {
     pushOverlayState()
   }
 }
 
-watch(showEditorPanel, async (visible) => {
+watch(showWorkspacePanel, async (visible) => {
   if (visible) {
-    ensureEditorPanelInViewport()
+    ensureWorkspacePanelInViewport()
     await nextTick()
     ensureMonacoEditor()
-    if (activeEditorTabPath.value) {
-      activateEditorTab(activeEditorTabPath.value)
+    if (activeWorkspaceTabPath.value) {
+      activateWorkspaceTab(activeWorkspaceTabPath.value)
     }
     nextTick(() => layoutMonacoEditor())
   } else {
-    stopEditorPanelInteraction()
+    stopWorkspacePanelInteraction()
   }
 })
 
-watch(activeEditorTabPath, async (path) => {
+watch(activeWorkspaceTabPath, async (path) => {
   if (!path) return
   await nextTick()
   ensureMonacoEditor()
-  activateEditorTab(path)
+  activateWorkspaceTab(path)
 })
 
 // Agent 心跳定时器
@@ -17350,7 +17426,7 @@ watch(
 
 onMounted(() => {
   // 阶段4：恢复上次的编辑器分割布局（非法数据自动回退默认单 leaf）
-  restoreEditorPaneLayout()
+  restoreWorkspacePaneLayout()
   // 不再在页面加载时创建终端，改为动态创建
 
   // 启动心跳机制
@@ -17394,17 +17470,17 @@ onMounted(() => {
   handleResize = () => {
     windowWidth.value = window.innerWidth
     updateViewportHeight()
-    ensureEditorPanelInViewport()
+    ensureWorkspacePanelInViewport()
     ensureTerminalPanelInViewport()
     sessionDetachedPanels.value.forEach(panelId => {
       ensureSessionPanelInViewport(panelId)
       saveSessionPanelRect(panelId)
     })
-    saveEditorPanelRect()
+    saveWorkspacePanelRect()
     saveTerminalPanelRect()
     // 已分割时每个 Monaco 实例自带 automaticLayout(ResizeObserver)，会自行跟随容器尺寸，
     // 此处不再逐个 layout()（否则 resize → layout → 尺寸变化 → 再 layout 会形成震荡）。
-    if (!isEditorSplit.value) {
+    if (!isWorkspaceSplit.value) {
       layoutMonacoEditor()
     }
     // 视口跨过移动端断点时，diff 的并排/内联需重新应用（Monaco 不会自动跟随）
@@ -17504,8 +17580,8 @@ onUnmounted(() => {
     heartbeatTimer = null
   }
   
-  stopEditorPanelInteraction()
-  stopEditorFileHeartbeat()
+  stopWorkspacePanelInteraction()
+  stopWorkspaceFileHeartbeat()
   window.visualViewport?.removeEventListener('resize', visualViewportResizeHandler)
 
   if (cmEditorView) {
@@ -17516,7 +17592,7 @@ onUnmounted(() => {
     view.dispose()
   }
   editorViews.clear()
-  editorViewPanes.clear()
+  workspaceViewPanes.clear()
   for (const modelData of editorModels.values()) {
     if (modelData.model && !modelData.model.isDisposed()) {
       modelData.model.dispose()
@@ -17717,7 +17793,7 @@ function sendSystemNotification(message) {
 }
 
 /* Agent 等待输入状态的背景高亮 */
-.editor-agent-node.waiting-input {
+.workspace-agent-node.waiting-input {
   background: rgba(210, 153, 34, 0.15);
 }
 
@@ -17963,7 +18039,7 @@ body::-webkit-scrollbar {
   }
 }
 
-.editor-panel {
+.workspace-panel {
   position: fixed;
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border-subtle);
@@ -17976,16 +18052,16 @@ body::-webkit-scrollbar {
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.editor-panel-active {
+.workspace-panel-active {
   border-color: var(--color-accent) !important;
   box-shadow: 0 0 0 1px var(--color-accent), 0 0 20px rgba(32, 200, 255, 0.15) !important;
 }
 
-.editor-panel-dragging {
+.workspace-panel-dragging {
   transition: none;
 }
 
-.editor-panel-header {
+.workspace-panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -17997,33 +18073,33 @@ body::-webkit-scrollbar {
   min-height: 28px;
 }
 
-.editor-panel-title-group {
+.workspace-panel-title-group {
   min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.editor-panel-header h3 {
+.workspace-panel-header h3 {
   margin: 0;
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
 }
 
-.editor-agent-label {
+.workspace-agent-label {
   font-size: 11px;
   color: var(--color-text-secondary);
   white-space: nowrap;
 }
 
-.editor-panel-actions {
+.workspace-panel-actions {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.editor-tabs {
+.workspace-tabs {
   display: flex;
   align-items: stretch;
   gap: 2px;
@@ -18032,7 +18108,7 @@ body::-webkit-scrollbar {
   overflow-x: auto;
 }
 
-.editor-tab {
+.workspace-tab {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -18049,23 +18125,23 @@ body::-webkit-scrollbar {
   line-height: 1.2;
 }
 
-.editor-tab.active {
+.workspace-tab.active {
   background: transparent;
   color: var(--color-text-primary);
 }
 
-.editor-tab-name {
+.workspace-tab-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.editor-tab-dirty {
+.workspace-tab-dirty {
   color: #ff8520;
   font-size: 10px;
 }
 
-.editor-tab-close {
+.workspace-tab-close {
   border: none;
   background: transparent;
   color: inherit;
@@ -18075,7 +18151,7 @@ body::-webkit-scrollbar {
   padding: 0;
 }
 
-.editor-panel-toolbar {
+.workspace-panel-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -18087,20 +18163,20 @@ body::-webkit-scrollbar {
   background: var(--color-bg-secondary);
 }
 
-.editor-toolbar-status {
+.workspace-toolbar-status {
   font-size: 12px;
   color: var(--color-text-secondary);
 }
 
-.editor-toolbar-status.error {
+.workspace-toolbar-status.error {
   color: var(--color-error);
 }
 
-.editor-toolbar-spacer {
+.workspace-toolbar-spacer {
   flex: 1;
 }
 
-.editor-edit-toggle {
+.workspace-edit-toggle {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -18116,40 +18192,40 @@ body::-webkit-scrollbar {
 
 }
 
-.editor-edit-toggle:hover {
+.workspace-edit-toggle:hover {
   background: var(--color-bg-hover);
 }
 
-.editor-edit-toggle:active {
+.workspace-edit-toggle:active {
   transform: scale(0.96);
 }
 
-.editor-edit-toggle.editable {
+.workspace-edit-toggle.editable {
   background: rgba(54, 255, 124, 0.15);
   color: var(--color-success);
 }
 
-.editor-edit-toggle.editable:hover {
+.workspace-edit-toggle.editable:hover {
   background: rgba(54, 255, 124, 0.25);
 }
 
-.editor-edit-toggle-icon {
+.workspace-edit-toggle-icon {
   font-size: 12px;
 }
 
-.editor-edit-toggle-text {
+.workspace-edit-toggle-text {
   font-size: 11px;
   letter-spacing: 0.02em;
 }
 
-.editor-workspace {
+.workspace-main {
   flex: 1;
   min-height: 0;
   display: flex;
   background: transparent;
 }
 
-.editor-activity-bar {
+.workspace-activity-bar {
   width: 44px;
   display: flex;
   flex-direction: column;
@@ -18160,7 +18236,7 @@ body::-webkit-scrollbar {
   background: transparent;
 }
 
-.editor-activity-button {
+.workspace-activity-button {
   width: 32px;
   height: 32px;
   display: flex;
@@ -18176,14 +18252,14 @@ body::-webkit-scrollbar {
   transition: all 0.15s ease-out;
 }
 
-.editor-activity-button:hover,
-.editor-activity-button.active {
+.workspace-activity-button:hover,
+.workspace-activity-button.active {
   color: var(--color-text-primary);
   background: var(--color-accent-subtle);
   border-color: var(--color-border-active);
 }
 
-.editor-sidebar {
+.workspace-sidebar {
   position: relative;
   min-width: 200px;
   max-width: 560px;
@@ -18196,7 +18272,7 @@ body::-webkit-scrollbar {
 }
 
 /* 编辑器主区域嵌入的聊天室 / 终端视图：撑满主区域 */
-.editor-main-embed-view {
+.workspace-main-embed-view {
   flex: 1;
   min-height: 0;
   min-width: 0;
@@ -18204,13 +18280,13 @@ body::-webkit-scrollbar {
   flex-direction: column;
 }
 
-.editor-main-embed-view > * {
+.workspace-main-embed-view > * {
   flex: 1;
   min-height: 0;
 }
 
 /* 自由分割：每个 pane 的内容容器（撑满 leaf body） */
-.editor-pane-content-slot {
+.workspace-pane-content-slot {
   flex: 1;
   min-height: 0;
   min-width: 0;
@@ -18218,19 +18294,19 @@ body::-webkit-scrollbar {
   flex-direction: column;
 }
 
-.editor-pane-content-slot > * {
+.workspace-pane-content-slot > * {
   flex: 1;
   min-height: 0;
 }
 
 /* 自由分割：file pane 内部的标签栏固定高度，不参与 flex 撑满 */
-.editor-pane-content-slot > .editor-pane-tabs {
+.workspace-pane-content-slot > .workspace-pane-tabs {
   flex: 0 0 auto;
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
 /* 自由分割：每个 pane 自己的保存 / 只读按钮，固定在标签栏右侧不随标签滚动 */
-.editor-pane-actions {
+.workspace-pane-actions {
   position: sticky;
   right: 0;
   margin-left: auto;
@@ -18241,7 +18317,7 @@ body::-webkit-scrollbar {
   background: var(--color-bg-secondary, #1e1e1e);
 }
 
-.editor-pane-action {
+.workspace-pane-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -18257,21 +18333,21 @@ body::-webkit-scrollbar {
   cursor: pointer;
 }
 
-.editor-pane-action:hover:not(:disabled) {
+.workspace-pane-action:hover:not(:disabled) {
   background: var(--color-bg-hover, rgba(255, 255, 255, 0.08));
 }
 
-.editor-pane-action.editable {
+.workspace-pane-action.editable {
   color: var(--color-accent, #4a9eff);
 }
 
-.editor-pane-action:disabled {
+.workspace-pane-action:disabled {
   opacity: 0.4;
   cursor: default;
 }
 
 /* 自由分割：非激活 pane 的占位 */
-.editor-pane-placeholder {
+.workspace-pane-placeholder {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -18284,7 +18360,7 @@ body::-webkit-scrollbar {
   cursor: pointer;
 }
 /* 自由分割：非激活 file pane 的只读预览（内容可见但不可编辑，避免误以为编辑器消失） */
-.editor-pane-preview {
+.workspace-pane-preview {
   flex: 1;
   min-height: 0;
   min-width: 0;
@@ -18294,7 +18370,7 @@ body::-webkit-scrollbar {
   cursor: pointer;
   background: var(--color-bg-secondary);
 }
-.editor-pane-preview-head {
+.workspace-pane-preview-head {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -18306,16 +18382,16 @@ body::-webkit-scrollbar {
   background: var(--color-bg-primary);
   border-bottom: 1px solid var(--color-border-subtle);
 }
-.editor-pane-preview-name {
+.workspace-pane-preview-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.editor-pane-preview-hint {
+.workspace-pane-preview-hint {
   flex: 0 0 auto;
   opacity: 0.7;
 }
-.editor-pane-preview-body {
+.workspace-pane-preview-body {
   flex: 1;
   min-height: 0;
   margin: 0;
@@ -18331,7 +18407,7 @@ body::-webkit-scrollbar {
 }
 
 /* 自由分割：session leaf 内的会话面板容器 */
-.editor-pane-session-wrap {
+.workspace-pane-session-wrap {
   flex: 1;
   min-height: 0;
   min-width: 0;
@@ -18340,13 +18416,13 @@ body::-webkit-scrollbar {
   overflow: hidden;
 }
 
-.editor-pane-session-wrap > * {
+.workspace-pane-session-wrap > * {
   flex: 1;
   min-height: 0;
 }
 
 /* 自由分割：chat / terminal leaf 内的面板容器（与 session leaf 同型） */
-.editor-pane-embed-wrap {
+.workspace-pane-embed-wrap {
   flex: 1;
   min-height: 0;
   min-width: 0;
@@ -18355,13 +18431,13 @@ body::-webkit-scrollbar {
   overflow: hidden;
 }
 
-.editor-pane-embed-wrap > * {
+.workspace-pane-embed-wrap > * {
   flex: 1;
   min-height: 0;
 }
 
 /* 自由分割：diff leaf 内的容器（与 session/chat/terminal leaf 同型） */
-.editor-pane-diff-wrap {
+.workspace-pane-diff-wrap {
   flex: 1;
   min-height: 0;
   min-width: 0;
@@ -18370,8 +18446,8 @@ body::-webkit-scrollbar {
   overflow: hidden;
 }
 
-/* diff pane 内的 diff 视图（与 EditorPanel.vue 的 .editor-diff-* 同款，此处为 App.vue 作用域副本） */
-.editor-pane-diff-wrap .editor-diff-view {
+/* diff pane 内的 diff 视图（与 WorkspacePanel.vue 的 .workspace-diff-* 同款，此处为 App.vue 作用域副本） */
+.workspace-pane-diff-wrap .workspace-diff-view {
   flex: 1;
   min-height: 0;
   min-width: 0;
@@ -18380,7 +18456,7 @@ body::-webkit-scrollbar {
   overflow: hidden;
 }
 
-.editor-pane-diff-wrap .editor-diff-header {
+.workspace-pane-diff-wrap .workspace-diff-header {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -18391,7 +18467,7 @@ body::-webkit-scrollbar {
   flex-shrink: 0;
 }
 
-.editor-pane-diff-wrap .editor-diff-title {
+.workspace-pane-diff-wrap .workspace-diff-title {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -18400,17 +18476,17 @@ body::-webkit-scrollbar {
   color: var(--color-text-primary);
 }
 
-.editor-pane-diff-wrap .editor-diff-hash {
+.workspace-pane-diff-wrap .workspace-diff-hash {
   color: var(--color-text-secondary);
   font-family: monospace;
 }
 
-.editor-pane-diff-wrap .editor-diff-truncated {
+.workspace-pane-diff-wrap .workspace-diff-truncated {
   color: var(--color-warning, #e6a23c);
 }
 
-.editor-pane-diff-wrap .editor-diff-toggle,
-.editor-pane-diff-wrap .editor-diff-close {
+.workspace-pane-diff-wrap .workspace-diff-toggle,
+.workspace-pane-diff-wrap .workspace-diff-close {
   flex-shrink: 0;
   padding: 2px 8px;
   border: 1px solid var(--color-border);
@@ -18421,13 +18497,13 @@ body::-webkit-scrollbar {
   cursor: pointer;
 }
 
-.editor-pane-diff-wrap .editor-diff-toggle:hover,
-.editor-pane-diff-wrap .editor-diff-close:hover {
+.workspace-pane-diff-wrap .workspace-diff-toggle:hover,
+.workspace-pane-diff-wrap .workspace-diff-close:hover {
   color: var(--color-text-primary);
   border-color: var(--color-text-secondary);
 }
 
-.editor-pane-diff-wrap .editor-diff-nav {
+.workspace-pane-diff-wrap .workspace-diff-nav {
   flex-shrink: 0;
   padding: 2px 6px;
   border: 1px solid var(--color-border);
@@ -18439,12 +18515,12 @@ body::-webkit-scrollbar {
   cursor: pointer;
 }
 
-.editor-pane-diff-wrap .editor-diff-nav:hover {
+.workspace-pane-diff-wrap .workspace-diff-nav:hover {
   color: var(--color-text-primary);
   border-color: var(--color-text-secondary);
 }
 
-.editor-pane-diff-wrap .editor-diff-status {
+.workspace-pane-diff-wrap .workspace-diff-status {
   flex: 1;
   display: flex;
   align-items: center;
@@ -18454,11 +18530,11 @@ body::-webkit-scrollbar {
   font-size: 13px;
 }
 
-.editor-pane-diff-wrap .editor-diff-status.error {
+.workspace-pane-diff-wrap .workspace-diff-status.error {
   color: var(--color-danger, #f56c6c);
 }
 
-.editor-pane-diff-wrap .editor-diff-monaco {
+.workspace-pane-diff-wrap .workspace-diff-monaco {
   flex: 1;
   min-height: 0;
   min-width: 0;
@@ -18466,7 +18542,7 @@ body::-webkit-scrollbar {
 }
 
 /* 编辑器会话视图：未选择会话时的占位 */
-.editor-session-placeholder {
+.workspace-session-placeholder {
   margin: auto;
   text-align: center;
   color: #8ba3b8;
@@ -18475,17 +18551,17 @@ body::-webkit-scrollbar {
 }
 
 /* 编辑器侧边栏内嵌 Agent 列表：占满侧边栏 */
-.editor-sidebar-agents {
+.workspace-sidebar-agents {
   overflow: hidden;
 }
 
-.editor-sidebar-agents :deep(.agent-sidebar) {
+.workspace-sidebar-agents :deep(.agent-sidebar) {
   width: 100%;
   border-right: none;
   background: transparent;
 }
 
-.editor-sidebar-resize-handle {
+.workspace-sidebar-resize-handle {
   position: absolute;
   top: 0;
   right: -4px;
@@ -18495,7 +18571,7 @@ body::-webkit-scrollbar {
   z-index: 5;
 }
 
-.editor-sidebar-resize-handle::after {
+.workspace-sidebar-resize-handle::after {
   content: '';
   position: absolute;
   top: 0;
@@ -18507,11 +18583,11 @@ body::-webkit-scrollbar {
   transition: background 0.15s ease;
 }
 
-.editor-sidebar-resize-handle:hover::after {
+.workspace-sidebar-resize-handle:hover::after {
   background: #20c8ff;
 }
 
-.editor-sidebar-header {
+.workspace-sidebar-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -18521,18 +18597,18 @@ body::-webkit-scrollbar {
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
-.editor-sidebar-title {
+.workspace-sidebar-title {
   font-size: 12px;
   font-weight: 600;
   color: var(--color-text-primary);
 }
 
 /* 移动端专用关闭按钮：桌面端隐藏（桌面端用原有按钮，两者行为一致） */
-.editor-sidebar-close-mobile {
+.workspace-sidebar-close-mobile {
   display: none;
 }
 
-.editor-sidebar-content {
+.workspace-sidebar-content {
   flex: 1;
   min-height: 0;
   display: flex;
@@ -18540,7 +18616,7 @@ body::-webkit-scrollbar {
   overflow: hidden;
 }
 
-.editor-file-tree-panel {
+.workspace-file-tree-panel {
   flex: 1;
   min-height: 0;
   display: flex;
@@ -18548,13 +18624,13 @@ body::-webkit-scrollbar {
   overflow-y: auto;
 }
 
-.editor-file-tree-list {
+.workspace-file-tree-list {
   flex: 1;
   min-height: 0;
   overflow: auto;
 }
 
-.editor-file-tree-empty {
+.workspace-file-tree-empty {
   padding: 12px;
   color: var(--color-text-secondary);
   font-size: 12px;
@@ -18562,15 +18638,15 @@ body::-webkit-scrollbar {
 }
 
 /* Agent 节点样式 */
-.editor-agent-node {
+.workspace-agent-node {
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
-.editor-agent-node.selected {
+.workspace-agent-node.selected {
   background: var(--color-bg-tertiary);
 }
 
-.editor-agent-node.selected .agent-node-content {
+.workspace-agent-node.selected .agent-node-content {
   background: var(--color-bg-tertiary);
 }
 
@@ -18611,7 +18687,7 @@ body::-webkit-scrollbar {
   border-top: 1px solid var(--color-border-subtle);
 }
 
-.editor-agent-node.stopped {
+.workspace-agent-node.stopped {
   opacity: 0.7;
 }
 
@@ -18653,7 +18729,7 @@ body::-webkit-scrollbar {
   margin-left: 12px;
 }
 
-.editor-sidebar-placeholder {
+.workspace-sidebar-placeholder {
   align-items: center;
   justify-content: center;
   text-align: center;
@@ -18662,16 +18738,16 @@ body::-webkit-scrollbar {
   color: var(--color-text-secondary);
 }
 
-.editor-sidebar-placeholder-icon {
+.workspace-sidebar-placeholder-icon {
   font-size: 22px;
 }
 
-.editor-sidebar-placeholder-text {
+.workspace-sidebar-placeholder-text {
   font-size: 12px;
   line-height: 1.6;
 }
 
-.editor-global-search-panel {
+.workspace-global-search-panel {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -18679,12 +18755,12 @@ body::-webkit-scrollbar {
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
-.editor-global-search-mode-tabs {
+.workspace-global-search-mode-tabs {
   display: flex;
   gap: 6px;
 }
 
-.editor-global-search-mode-tab {
+.workspace-global-search-mode-tab {
   flex: 1;
   padding: 6px 10px;
   border: none;
@@ -18696,17 +18772,17 @@ body::-webkit-scrollbar {
   touch-action: manipulation;
 }
 
-.editor-global-search-mode-tab.active {
+.workspace-global-search-mode-tab.active {
   background: var(--color-accent);
   color: #fff;
 }
 
-.editor-global-search-mode-tab:disabled {
+.workspace-global-search-mode-tab:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.editor-global-search-input {
+.workspace-global-search-input {
   width: 100%;
   padding: 8px 10px;
   border: none;
@@ -18715,25 +18791,25 @@ body::-webkit-scrollbar {
   color: var(--color-text-primary);
   font-size: 12px;
   box-sizing: border-box;
-  /* 覆盖 .editor-panel 的 user-select: none，否则移动端点击输入框无法唤起软键盘 */
+  /* 覆盖 .workspace-panel 的 user-select: none，否则移动端点击输入框无法唤起软键盘 */
   user-select: text;
   -webkit-user-select: text;
   touch-action: manipulation;
 }
 
-.editor-global-search-input:focus {
+.workspace-global-search-input:focus {
   outline: none;
   border-color: var(--color-accent);
 }
 
-.editor-global-search-toolbar {
+.workspace-global-search-toolbar {
   display: flex;
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
 }
 
-.editor-global-search-toggle {
+.workspace-global-search-toggle {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -18741,44 +18817,44 @@ body::-webkit-scrollbar {
   color: var(--color-text-primary);
 }
 
-.editor-global-search-actions {
+.workspace-global-search-actions {
   display: flex;
   gap: 8px;
 }
 
-.editor-global-search-btn {
+.workspace-global-search-btn {
   min-width: 30px;
   width: 30px;
   height: 30px;
   font-size: 15px;
 }
 
-.editor-global-search-results {
+.workspace-global-search-results {
   flex: 1;
   min-height: 0;
   overflow: auto;
   padding: 12px;
 }
 
-.editor-global-search-summary {
+.workspace-global-search-summary {
   margin-bottom: 10px;
   font-size: 12px;
   color: var(--color-text-secondary);
 }
 
-.editor-global-search-empty {
+.workspace-global-search-empty {
   font-size: 12px;
   color: var(--color-text-secondary);
 }
 
-.editor-global-search-file-group {
+.workspace-global-search-file-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
   margin-bottom: 12px;
 }
 
-.editor-global-search-file-path {
+.workspace-global-search-file-path {
   font-size: 12px;
   font-weight: 600;
   color: var(--color-accent);
@@ -18786,12 +18862,12 @@ body::-webkit-scrollbar {
   word-break: break-all;
 }
 
-.editor-global-search-file-count {
+.workspace-global-search-file-count {
   margin-left: 4px;
   color: var(--color-text-secondary);
 }
 
-.editor-global-search-file-result {
+.workspace-global-search-file-result {
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -18806,22 +18882,22 @@ body::-webkit-scrollbar {
   cursor: pointer;
 }
 
-.editor-global-search-file-result:hover {
+.workspace-global-search-file-result:hover {
   background: var(--color-bg-hover);
 }
 
-.editor-global-search-file-result-name {
+.workspace-global-search-file-result-name {
   font-size: 12px;
   font-weight: 600;
 }
 
-.editor-global-search-file-result-path {
+.workspace-global-search-file-result-path {
   font-size: 11px;
   color: var(--color-text-secondary);
   word-break: break-all;
 }
 
-.editor-global-search-match {
+.workspace-global-search-match {
   width: 100%;
   display: flex;
   gap: 10px;
@@ -18834,19 +18910,19 @@ body::-webkit-scrollbar {
   cursor: pointer;
 }
 
-.editor-global-search-match:hover {
+.workspace-global-search-match:hover {
   border-color: var(--color-border-active);
   background: var(--color-bg-hover);
 }
 
-.editor-global-search-line {
+.workspace-global-search-line {
   flex: 0 0 auto;
   min-width: 32px;
   font-size: 11px;
   color: var(--color-text-secondary);
 }
 
-.editor-global-search-text {
+.workspace-global-search-text {
   flex: 1;
   min-width: 0;
   font-size: 12px;
@@ -18854,13 +18930,13 @@ body::-webkit-scrollbar {
   word-break: break-word;
 }
 
-.editor-global-search-text mark {
+.workspace-global-search-text mark {
   background: rgba(255, 133, 32, 0.32);
   color: #ff8520;
 }
 
 /* ===== 编辑器侧边栏 Git 视图 ===== */
-.editor-git-panel {
+.workspace-git-panel {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -18868,7 +18944,7 @@ body::-webkit-scrollbar {
   font-size: 12px;
 }
 
-.editor-git-toolbar {
+.workspace-git-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -18877,7 +18953,7 @@ body::-webkit-scrollbar {
   border-bottom: 1px solid var(--border-color, #2a2a2a);
 }
 
-.editor-git-branch {
+.workspace-git-branch {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -18885,31 +18961,31 @@ body::-webkit-scrollbar {
   color: var(--text-secondary, #b0b0b0);
 }
 
-.editor-git-branch-name {
+.workspace-git-branch-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 500;
 }
 
-.editor-git-summary {
+.workspace-git-summary {
   padding: 4px 8px;
   color: var(--text-secondary, #888);
   font-size: 11px;
 }
 
-.editor-git-summary .error {
+.workspace-git-summary .error {
   color: #ff5f56;
 }
 
-.editor-git-commit-list {
+.workspace-git-commit-list {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
 }
 
-.editor-git-commit {
+.workspace-git-commit {
   display: flex;
   align-items: stretch;
   gap: 4px;
@@ -18918,16 +18994,16 @@ body::-webkit-scrollbar {
   border-left: 2px solid transparent;
 }
 
-.editor-git-commit:hover {
+.workspace-git-commit:hover {
   background: rgba(255, 255, 255, 0.04);
 }
 
-.editor-git-commit.selected {
+.workspace-git-commit.selected {
   background: rgba(255, 133, 32, 0.10);
   border-left-color: #ff8520;
 }
 
-.editor-git-graph {
+.workspace-git-graph {
   flex: 0 0 20px;
   display: flex;
   justify-content: center;
@@ -18948,20 +19024,20 @@ body::-webkit-scrollbar {
   fill: #d8a06a;
 }
 
-.editor-git-commit-body {
+.workspace-git-commit-body {
   flex: 1;
   min-width: 0;
   padding: 4px 0;
 }
 
-.editor-git-commit-subject {
+.workspace-git-commit-subject {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text-primary, #e0e0e0);
 }
 
-.editor-git-commit-meta {
+.workspace-git-commit-meta {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -18971,7 +19047,7 @@ body::-webkit-scrollbar {
   color: var(--text-secondary, #888);
 }
 
-.editor-git-refs {
+.workspace-git-refs {
   display: inline-flex;
   flex-wrap: wrap;
   gap: 3px;
@@ -19000,37 +19076,37 @@ body::-webkit-scrollbar {
   color: #7ec87e;
 }
 
-.editor-git-author {
+.workspace-git-author {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 120px;
 }
 
-.editor-git-hash {
+.workspace-git-hash {
   font-family: var(--mono-font, monospace);
   color: #c0a060;
 }
 
-.editor-git-commit-detail {
+.workspace-git-commit-detail {
   margin-top: 6px;
   padding: 4px 0 2px;
   border-top: 1px dashed var(--border-color, #2a2a2a);
   cursor: default;
 }
 
-.editor-git-detail-summary,
-.editor-git-detail-empty {
+.workspace-git-detail-summary,
+.workspace-git-detail-empty {
   padding: 2px 0;
   font-size: 11px;
   color: var(--text-secondary, #888);
 }
 
-.editor-git-detail-empty.error {
+.workspace-git-detail-empty.error {
   color: #ff5f56;
 }
 
-.editor-git-file {
+.workspace-git-file {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -19045,15 +19121,15 @@ body::-webkit-scrollbar {
   cursor: pointer;
 }
 
-.editor-git-file:hover {
+.workspace-git-file:hover {
   background: rgba(255, 255, 255, 0.06);
 }
 
-.editor-git-file.active {
+.workspace-git-file.active {
   background: rgba(255, 133, 32, 0.14);
 }
 
-.editor-git-file-status {
+.workspace-git-file-status {
   flex: 0 0 14px;
   text-align: center;
   font-weight: 700;
@@ -19065,7 +19141,7 @@ body::-webkit-scrollbar {
 .git-status-D { color: #ff5f56; }
 .git-status-R { color: #6a9fd8; }
 
-.editor-git-file-path {
+.workspace-git-file-path {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -19075,7 +19151,7 @@ body::-webkit-scrollbar {
   text-align: left;
 }
 
-.editor-git-file-stat {
+.workspace-git-file-stat {
   flex: 0 0 auto;
   font-family: var(--mono-font, monospace);
   font-size: 10px;
@@ -19097,14 +19173,14 @@ body::-webkit-scrollbar {
 .git-diff-hunk { color: #6a9fd8; }
 .git-diff-meta { color: #888; }
 
-.editor-git-empty {
+.workspace-git-empty {
   padding: 12px 8px;
   text-align: center;
   color: var(--text-secondary, #888);
   font-size: 11px;
 }
 
-.editor-git-load-more {
+.workspace-git-load-more {
   display: block;
   width: calc(100% - 16px);
   margin: 6px 8px;
@@ -19117,11 +19193,11 @@ body::-webkit-scrollbar {
   cursor: pointer;
 }
 
-.editor-git-load-more:hover {
+.workspace-git-load-more:hover {
   background: rgba(255, 255, 255, 0.10);
 }
 
-.editor-panel-content {
+.workspace-panel-content {
   flex: 1;
   display: flex;
   min-width: 0;
@@ -19130,7 +19206,7 @@ body::-webkit-scrollbar {
   user-select: text;
 }
 
-.editor-panel-content-main {
+.workspace-panel-content-main {
   flex: 1;
   padding: 0;
   min-width: 0;
@@ -19138,13 +19214,13 @@ body::-webkit-scrollbar {
   background: var(--color-bg-secondary);
 }
 
-.editor-monaco-container {
+.workspace-monaco-container {
   width: 100%;
   height: 100%;
   font-family: 'Consolas', 'Microsoft YaHei', monospace;
 }
 
-.editor-placeholder {
+.workspace-placeholder {
   margin: auto;
   text-align: center;
   color: #8ba3b8;
@@ -19152,89 +19228,89 @@ body::-webkit-scrollbar {
   padding: 24px;
 }
 
-.editor-placeholder-icon {
+.workspace-placeholder-icon {
   font-size: 36px;
   margin-bottom: 12px;
 }
 
-.editor-placeholder-title {
+.workspace-placeholder-title {
   font-size: 15px;
   font-weight: 600;
   color: #e6edf3;
   margin-bottom: 8px;
 }
 
-.editor-placeholder-text {
+.workspace-placeholder-text {
   font-size: 13px;
   line-height: 1.6;
 }
 
-.editor-resize-handle {
+.workspace-resize-handle {
   position: absolute;
   z-index: 2;
 }
 
-.editor-resize-n,
-.editor-resize-s {
+.workspace-resize-n,
+.workspace-resize-s {
   left: 10px;
   right: 10px;
   height: 10px;
 }
 
-.editor-resize-e,
-.editor-resize-w {
+.workspace-resize-e,
+.workspace-resize-w {
   top: 10px;
   bottom: 10px;
   width: 10px;
 }
 
-.editor-resize-n {
+.workspace-resize-n {
   top: -5px;
   cursor: n-resize;
 }
 
-.editor-resize-s {
+.workspace-resize-s {
   bottom: -5px;
   cursor: s-resize;
 }
 
-.editor-resize-e {
+.workspace-resize-e {
   right: -5px;
   cursor: e-resize;
 }
 
-.editor-resize-w {
+.workspace-resize-w {
   left: -5px;
   cursor: w-resize;
 }
 
-.editor-resize-ne,
-.editor-resize-nw,
-.editor-resize-se,
-.editor-resize-sw {
+.workspace-resize-ne,
+.workspace-resize-nw,
+.workspace-resize-se,
+.workspace-resize-sw {
   width: 14px;
   height: 14px;
 }
 
-.editor-resize-ne {
+.workspace-resize-ne {
   top: -6px;
   right: -6px;
   cursor: ne-resize;
 }
 
-.editor-resize-nw {
+.workspace-resize-nw {
   top: -6px;
   left: -6px;
   cursor: nw-resize;
 }
 
-.editor-resize-se {
+.workspace-resize-se {
   right: -6px;
   bottom: -6px;
   cursor: se-resize;
 }
 
-.editor-resize-sw {
+.workspace-resize-sw {
   left: -6px;
   bottom: -6px;
   cursor: sw-resize;
@@ -19727,7 +19803,7 @@ body::-webkit-scrollbar {
 }
 
 /* 目录树列表容器可聚焦以接收键盘事件，但不显示默认描边 */
-.editor-file-tree-list:focus {
+.workspace-file-tree-list:focus {
   outline: none;
 }
 
@@ -21909,7 +21985,7 @@ body::-webkit-scrollbar {
     -webkit-overflow-scrolling: touch;
   }
 
-  .editor-panel {
+  .workspace-panel {
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
@@ -21922,21 +21998,21 @@ body::-webkit-scrollbar {
     z-index: 2000 !important;
   }
 
-  .editor-panel-header {
+  .workspace-panel-header {
     cursor: default;
     padding: 6px 10px;
   }
 
-  .editor-panel-toolbar {
+  .workspace-panel-toolbar {
     padding: 0 10px;
   }
 
-  .editor-panel-content,
-  .editor-panel-content-main {
+  .workspace-panel-content,
+  .workspace-panel-content-main {
     min-height: 0;
   }
 
-  .editor-resize-handle {
+  .workspace-resize-handle {
     display: none !important;
   }
 
@@ -22146,7 +22222,7 @@ body::-webkit-scrollbar {
   /* 移动端编辑器面板已全屏，侧栏改为底部抽屉（占 55% 高度），
      这样打开侧栏时仍能看到上方主区域的 diff / 编辑器内容，
      且点「✕」可随时收起侧栏查看完整主区域 */
-  .editor-sidebar {
+  .workspace-sidebar {
     position: absolute;
     left: 0;
     right: 0;
@@ -22163,14 +22239,14 @@ body::-webkit-scrollbar {
     box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.35);
   }
   /* 移动端无鼠标，隐藏拖拽调宽手柄（JS 侧也已按 768px 拦截） */
-  .editor-sidebar-resize-handle {
+  .workspace-sidebar-resize-handle {
     display: none;
   }
-  .editor-sidebar-header {
+  .workspace-sidebar-header {
     padding: 8px 10px;
   }
   /* 移动端显示专用关闭按钮，并放大点击区 */
-  .editor-sidebar-close-mobile {
+  .workspace-sidebar-close-mobile {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -22179,30 +22255,30 @@ body::-webkit-scrollbar {
     font-size: 16px;
   }
   /* Git 提交列表：移动端可读性优先，适当放大字号与点击区域 */
-  .editor-git-panel {
+  .workspace-git-panel {
     font-size: 13px;
   }
-  .editor-git-commit {
+  .workspace-git-commit {
     padding: 6px 8px 6px 2px;
   }
-  .editor-git-commit-subject {
+  .workspace-git-commit-subject {
     font-size: 13px;
   }
-  .editor-git-commit-meta {
+  .workspace-git-commit-meta {
     flex-wrap: wrap;
     row-gap: 2px;
   }
-  .editor-git-file {
+  .workspace-git-file {
     padding: 6px 4px;
     font-size: 12px;
   }
   /* 移动端 diff 视图：主区域全屏，头部按钮放大点击区 */
-  .editor-diff-toggle,
-  .editor-diff-close {
+  .workspace-diff-toggle,
+  .workspace-diff-close {
     padding: 4px 10px;
     font-size: 12px;
   }
-  .editor-diff-nav {
+  .workspace-diff-nav {
     padding: 4px 10px;
     font-size: 12px;
   }

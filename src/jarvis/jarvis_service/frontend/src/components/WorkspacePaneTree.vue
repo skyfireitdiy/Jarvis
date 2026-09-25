@@ -2,11 +2,11 @@
   <!-- 分割容器：flex 布局 + 可拖拽分隔条 -->
   <div
     v-if="node.type === 'split'"
-    class="editor-pane-split"
-    :class="node.direction === 'row' ? 'editor-pane-split-row' : 'editor-pane-split-column'"
+    class="workspace-pane-split"
+    :class="node.direction === 'row' ? 'workspace-pane-split-row' : 'workspace-pane-split-column'"
   >
-    <div class="editor-pane-split-child" :style="childStyle(0)">
-      <EditorPaneTree
+    <div class="workspace-pane-split-child" :style="childStyle(0)">
+      <WorkspacePaneTree
         :node="node.children[0]"
         :activePaneId="activePaneId"
         :canClose="true"
@@ -19,15 +19,15 @@
         <template #pane-content="slotProps">
           <slot name="pane-content" v-bind="slotProps" />
         </template>
-      </EditorPaneTree>
+      </WorkspacePaneTree>
     </div>
     <div
-      class="editor-pane-divider"
-      :class="node.direction === 'row' ? 'editor-pane-divider-vertical' : 'editor-pane-divider-horizontal'"
+      class="workspace-pane-divider"
+      :class="node.direction === 'row' ? 'workspace-pane-divider-vertical' : 'workspace-pane-divider-horizontal'"
       @mousedown="$emit('startResize', $event, node)"
     ></div>
-    <div class="editor-pane-split-child" :style="childStyle(1)">
-      <EditorPaneTree
+    <div class="workspace-pane-split-child" :style="childStyle(1)">
+      <WorkspacePaneTree
         :node="node.children[1]"
         :activePaneId="activePaneId"
         :canClose="true"
@@ -40,31 +40,31 @@
         <template #pane-content="slotProps">
           <slot name="pane-content" v-bind="slotProps" />
         </template>
-      </EditorPaneTree>
+      </WorkspacePaneTree>
     </div>
   </div>
 
   <!-- leaf：标题栏 + 内容插槽 -->
   <div
     v-else
-    class="editor-pane-leaf"
-    :class="{ 'editor-pane-leaf-active': node.id === activePaneId }"
+    class="workspace-pane-leaf"
+    :class="{ 'workspace-pane-leaf-active': node.id === activePaneId }"
     @mousedown="$emit('activate', node.id)"
   >
-    <div class="editor-pane-leaf-header">
-      <span class="editor-pane-leaf-title">{{ getTitle ? getTitle(node) : (node.view === 'session' ? '会话' : '文件') }}</span>
-      <div class="editor-pane-leaf-actions">
-        <button class="editor-pane-leaf-btn" title="左右分" @click.stop="$emit('split', node.id, 'row')">◫</button>
-        <button class="editor-pane-leaf-btn" title="上下分" @click.stop="$emit('split', node.id, 'column')">⬓</button>
+    <div class="workspace-pane-leaf-header">
+      <span class="workspace-pane-leaf-title">{{ getTitle ? getTitle(node) : (node.view === 'session' ? '会话' : '文件') }}</span>
+      <div class="workspace-pane-leaf-actions">
+        <button class="workspace-pane-leaf-btn" title="左右分" @click.stop="$emit('split', node.id, 'row')">◫</button>
+        <button class="workspace-pane-leaf-btn" title="上下分" @click.stop="$emit('split', node.id, 'column')">⬓</button>
         <button
           v-if="canClose"
-          class="editor-pane-leaf-btn"
+          class="workspace-pane-leaf-btn"
           title="关闭此区域"
           @click.stop="$emit('close', node.id)"
         >✕</button>
       </div>
     </div>
-    <div class="editor-pane-leaf-body">
+    <div class="workspace-pane-leaf-body">
       <slot name="pane-content" :pane="node" :active="node.id === activePaneId" />
     </div>
   </div>
@@ -90,7 +90,7 @@ function childStyle(index) {
 </script>
 
 <style scoped>
-.editor-pane-split {
+.workspace-pane-split {
   display: flex;
   flex: 1;
   min-width: 0;
@@ -99,42 +99,42 @@ function childStyle(index) {
   height: 100%;
 }
 
-.editor-pane-split-row {
+.workspace-pane-split-row {
   flex-direction: row;
 }
 
-.editor-pane-split-column {
+.workspace-pane-split-column {
   flex-direction: column;
 }
 
-.editor-pane-split-child {
+.workspace-pane-split-child {
   display: flex;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
 
-.editor-pane-divider {
+.workspace-pane-divider {
   flex: 0 0 auto;
   background: var(--color-border-subtle);
   transition: background 0.15s ease;
 }
 
-.editor-pane-divider:hover {
+.workspace-pane-divider:hover {
   background: var(--color-accent);
 }
 
-.editor-pane-divider-vertical {
+.workspace-pane-divider-vertical {
   width: 4px;
   cursor: ew-resize;
 }
 
-.editor-pane-divider-horizontal {
+.workspace-pane-divider-horizontal {
   height: 4px;
   cursor: ns-resize;
 }
 
-.editor-pane-leaf {
+.workspace-pane-leaf {
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -145,11 +145,11 @@ function childStyle(index) {
   border: 1px solid transparent;
 }
 
-.editor-pane-leaf-active {
+.workspace-pane-leaf-active {
   border-color: var(--color-accent);
 }
 
-.editor-pane-leaf-header {
+.workspace-pane-leaf-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -161,18 +161,18 @@ function childStyle(index) {
   flex-shrink: 0;
 }
 
-.editor-pane-leaf-title {
+.workspace-pane-leaf-title {
   font-size: 12px;
   color: var(--color-text-secondary);
 }
 
-.editor-pane-leaf-actions {
+.workspace-pane-leaf-actions {
   display: flex;
   align-items: center;
   gap: 2px;
 }
 
-.editor-pane-leaf-btn {
+.workspace-pane-leaf-btn {
   border: none;
   background: transparent;
   color: var(--color-text-secondary);
@@ -183,12 +183,12 @@ function childStyle(index) {
   border-radius: 3px;
 }
 
-.editor-pane-leaf-btn:hover {
+.workspace-pane-leaf-btn:hover {
   background: var(--color-bg-hover);
   color: var(--color-text-primary);
 }
 
-.editor-pane-leaf-body {
+.workspace-pane-leaf-body {
   flex: 1;
   min-height: 0;
   min-width: 0;

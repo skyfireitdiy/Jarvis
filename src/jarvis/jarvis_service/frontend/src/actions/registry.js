@@ -77,7 +77,7 @@ export const ACTIONS = [
     group: "界面",
     icon: "📝",
     keywords: ["编辑器", "editor", "打开", "open"],
-    run: (ctx) => ctx.toggleEditorPanel && ctx.toggleEditorPanel(),
+    run: (ctx) => ctx.toggleWorkspacePanel && ctx.toggleWorkspacePanel(),
   },
   {
     // 全局动作：快速抵达编辑器侧边栏的「内容搜索」（编辑器未打开时不响应）
@@ -99,7 +99,8 @@ export const ACTIONS = [
       "global",
       "find",
     ],
-    run: (ctx) => ctx.openEditorGlobalSearch && ctx.openEditorGlobalSearch(),
+    run: (ctx) =>
+      ctx.openWorkspaceGlobalSearch && ctx.openWorkspaceGlobalSearch(),
   },
   {
     // 全局动作：快速抵达编辑器侧边栏的「文件名搜索」（编辑器未打开时不响应）
@@ -121,7 +122,7 @@ export const ACTIONS = [
       "file",
       "find",
     ],
-    run: (ctx) => ctx.openEditorFileSearch && ctx.openEditorFileSearch(),
+    run: (ctx) => ctx.openWorkspaceFileSearch && ctx.openWorkspaceFileSearch(),
   },
   {
     // 全局动作：快速抵达编辑器侧边栏的目录树（编辑器未打开时不响应）
@@ -134,7 +135,7 @@ export const ACTIONS = [
     group: "界面",
     icon: "📁",
     keywords: ["目录树", "文件树", "资源管理器", "file", "tree", "explorer"],
-    run: (ctx) => ctx.openEditorFileTree && ctx.openEditorFileTree(),
+    run: (ctx) => ctx.openWorkspaceFileTree && ctx.openWorkspaceFileTree(),
   },
   {
     id: "current-toggle-auto-scroll",
