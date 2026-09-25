@@ -94,6 +94,9 @@
       <button class="icon-btn" @click="toggleTerminalPanel()" :disabled="!socket" title="终端面板 (Ctrl+`)">
         💻
       </button>
+      <button class="icon-btn" @click="toggleEditorPanel()" :disabled="!socket" title="编辑器 (Ctrl+E)">
+        📝
+      </button>
       <button class="icon-btn" @click="openCommandPalette()" title="命令面板 (Ctrl+P)">
         ⌘
       </button>
@@ -255,6 +258,7 @@
         :sidebarView="editorSidebarView"
         :resizeDirections="editorResizeDirections"
         :embedded="true"
+        :diff="editorDiff"
         @focus="focusWindow('editor')"
         @startMove="startEditorPanelMove"
         @toggleMaximize="toggleEditorMaximize"
@@ -265,6 +269,8 @@
         @toggleEditable="toggleEditorEditable"
         @setSidebarView="setEditorSidebarView"
         @startResize="startEditorPanelResize"
+        @toggleDiffSideBySide="toggleGitDiffSideBySide"
+        @closeDiff="closeEditorDiff"
         @detach="detachPanel('editor')"
       >
         <template #sidebar>
@@ -577,16 +583,7 @@
                                 <span v-if="file.deletions" class="git-del-stat">-{{ file.deletions }}</span>
                               </span>
                             </button>
-                            <div v-if="gitSelectedFile" class="editor-git-diff">
-                              <div class="editor-git-diff-header">
-                                <span class="editor-git-diff-title" :title="gitSelectedFile">{{ gitSelectedFile }}</span>
-                                <span v-if="gitDiffTruncated" class="editor-git-diff-truncated">（已截断）</span>
-                                <button class="editor-git-diff-toggle" @click="toggleGitDiffSideBySide">{{ gitDiffSideBySide ? '内联' : '并排' }}</button>
-                              </div>
-                              <div v-if="gitDiffLoading" class="editor-git-detail-empty">加载 diff...</div>
-                              <div v-else-if="gitDiffError" class="editor-git-detail-empty error">{{ gitDiffError }}</div>
-                              <div v-else ref="gitDiffContainerRef" class="editor-git-diff-monaco"></div>
-                            </div>
+
                           </template>
                         </div>
                       </div>
@@ -787,6 +784,7 @@
       :showSidebar="showEditorSidebar"
       :sidebarView="editorSidebarView"
       :resizeDirections="editorResizeDirections"
+      :diff="editorDiff"
       @focus="focusWindow('editor')"
       @startMove="startEditorPanelMove"
       @toggleMaximize="toggleEditorMaximize"
@@ -797,6 +795,8 @@
       @toggleEditable="toggleEditorEditable"
       @setSidebarView="setEditorSidebarView"
       @startResize="startEditorPanelResize"
+      @toggleDiffSideBySide="toggleGitDiffSideBySide"
+      @closeDiff="closeEditorDiff"
       @detach="detachPanel('editor')"
     >
       <template #sidebar>
@@ -1106,16 +1106,7 @@
                               <span v-if="file.deletions" class="git-del-stat">-{{ file.deletions }}</span>
                             </span>
                           </button>
-                          <div v-if="gitSelectedFile" class="editor-git-diff">
-                            <div class="editor-git-diff-header">
-                              <span class="editor-git-diff-title" :title="gitSelectedFile">{{ gitSelectedFile }}</span>
-                              <span v-if="gitDiffTruncated" class="editor-git-diff-truncated">（已截断）</span>
-                              <button class="editor-git-diff-toggle" @click="toggleGitDiffSideBySide">{{ gitDiffSideBySide ? '内联' : '并排' }}</button>
-                            </div>
-                            <div v-if="gitDiffLoading" class="editor-git-detail-empty">加载 diff...</div>
-                            <div v-else-if="gitDiffError" class="editor-git-detail-empty error">{{ gitDiffError }}</div>
-                            <div v-else ref="gitDiffContainerRef" class="editor-git-diff-monaco"></div>
-                          </div>
+
                         </template>
                       </div>
                     </div>
@@ -3617,8 +3608,7 @@ function toggleEditorSearchSidebar() {
 
 function closeEditorSidebar() {
   showEditorSidebar.value = false
-  // 侧栏收起后 diff 容器会被销毁，释放 Monaco diff 实例避免泄漏
-  disposeGitDiffEditor()
+  // 侧栏收起不影响主区域 diff，仅重排主编辑器
   nextTick(() => {
     layoutMonacoEditor()
   })
@@ -4026,7 +4016,8 @@ async function closeEditorPanel() {
   }
 
   showEditorPanel.value = false
-  // 面板收起后 Git diff 容器随之销毁，释放 Monaco diff 实例
+  // 面板收起后 Git diff 容器随之销毁，释放 Monaco diff 实例并清空 diff 视图
+  editorDiff.value = null
   disposeGitDiffEditor()
 }
 
@@ -4236,8 +4227,15 @@ const gitDiffText = ref('')
 const gitDiffLoading = ref(false)
 const gitDiffError = ref('')
 const gitDiffTruncated = ref(false)
+// 主区域 diff 视图状态（非空时编辑器主区域显示 diff，而非文件内容）
+const editorDiff = ref(null)
 // Monaco DiffEditor：并排/内联切换（桌面默认并排；移动端屏幕窄，默认内联）
 const gitDiffSideBySide = ref(window.innerWidth > 768)
+
+// 当前是否处于窄屏（移动端）：diff 强制内联，避免并排两栏在窄屏上被裁掉
+function isNarrowGitDiffViewport() {
+  return windowWidth.value <= 768
+}
 const GIT_LOG_PAGE_SIZE = 100
 
 // 取 Git 目标 Agent 的 node_id（与搜索视图一致，用当前 Agent）
@@ -4319,6 +4317,7 @@ async function refreshGitView() {
   gitSelectedFile.value = null
   gitDiffText.value = ''
   gitDiffError.value = ''
+  editorDiff.value = null
   disposeGitDiffEditor()
   await Promise.all([fetchGitLog(false), fetchGitBranches()])
 }
@@ -4330,6 +4329,7 @@ async function toggleGitCommitDetail(commit) {
     gitCommitFiles.value = []
     gitSelectedFile.value = null
     gitDiffText.value = ''
+    editorDiff.value = null
     disposeGitDiffEditor()
     return
   }
@@ -4338,6 +4338,7 @@ async function toggleGitCommitDetail(commit) {
   gitSelectedFile.value = null
   gitDiffText.value = ''
   gitDiffError.value = ''
+  editorDiff.value = null
   disposeGitDiffEditor()
   const workingDir = getGitWorkingDir()
   if (!workingDir) return
@@ -4363,6 +4364,15 @@ async function viewGitFileDiff(commitHash, filePath) {
   gitDiffError.value = ''
   gitDiffTruncated.value = false
   gitDiffLoading.value = true
+  // 切到主区域显示 diff（侧栏只保留文件列表）
+  editorDiff.value = {
+    commitHash,
+    filePath,
+    loading: true,
+    error: '',
+    truncated: false,
+    sideBySide: gitDiffSideBySide.value,
+  }
   try {
     // diff 文本仅用于「已截断」提示与降级；正文由两份全文提供
     const [diffData, newData, oldData] = await Promise.all([
@@ -4376,20 +4386,36 @@ async function viewGitFileDiff(commitHash, filePath) {
     gitDiffTruncated.value = Boolean(diffData.truncated || newData.truncated || oldData.truncated)
     gitDiffOldText = oldData.content || ''
     gitDiffNewText = newData.content || ''
+    if (editorDiff.value) {
+      editorDiff.value.truncated = gitDiffTruncated.value
+      editorDiff.value.loading = false
+    }
     await nextTick()
-    renderGitDiffMonaco(filePath)
+    await renderGitDiffMonaco(filePath)
   } catch (error) {
     gitDiffError.value = error.message || '获取 diff 失败'
+    if (editorDiff.value) {
+      editorDiff.value.loading = false
+      editorDiff.value.error = gitDiffError.value
+    }
   } finally {
     gitDiffLoading.value = false
   }
+}
+
+// 关闭主区域 diff 视图，回到文件内容
+function closeEditorDiff() {
+  editorDiff.value = null
+  gitSelectedFile.value = null
+  disposeGitDiffEditor()
+  nextTick(() => layoutMonacoEditor())
 }
 
 // ===== Git diff 的 Monaco DiffEditor（只读）=====
 // 说明：优先使用「父版本全文 / 当前版本全文」两份完整文件渲染，
 // 这样行号即文件绝对行号；若全文不可得则降级为解析 unified diff。
 // 实例独立于主编辑器 cmEditorView。
-const gitDiffContainerRef = ref(null)
+const gitDiffContainerRef = computed(() => editorPanelRef.value?.diffContainerRef || null)
 let gitDiffEditor = null
 let gitDiffOriginalModel = null
 let gitDiffModifiedModel = null
@@ -4427,11 +4453,11 @@ function ensureGitDiffEditor() {
     readOnly: true,
     originalEditable: false,
     automaticLayout: true,
-    renderSideBySide: gitDiffSideBySide.value,
+    renderSideBySide: gitDiffSideBySide.value && !isNarrowGitDiffViewport(),
     // 侧栏很窄，Monaco 默认会在空间不足时强制切到内联视图，
     // 导致「并排」按钮点了没效果，因此桌面端显式关闭该自动降级；
     // 移动端屏幕窄，反而需要它兜底（用户仍可手动切回并排）。
-    useInlineViewWhenSpaceIsLimited: window.innerWidth <= 768,
+    useInlineViewWhenSpaceIsLimited: isNarrowGitDiffViewport(),
     // 侧栏较窄，关掉 minimap 与多余装饰，避免挤压内容
     minimap: { enabled: false },
     scrollBeyondLastLine: false,
@@ -4440,13 +4466,25 @@ function ensureGitDiffEditor() {
     smoothScrolling: true,
     folding: false,
     lineNumbersMinChars: 3,
-    wordWrap: 'off',
+    // 窄屏内联 diff 若关闭换行，长行会横向溢出导致内容看不全，故移动端开启自动换行
+    wordWrap: isNarrowGitDiffViewport() ? 'on' : 'off',
   })
 }
 
-// 用当前两侧全文渲染 diff（失败静默降级，不影响提交列表）
-function renderGitDiffMonaco(filePath) {
-  if (!gitDiffContainerRef.value) return
+// 用当前两侧全文渲染 diff（容器未就绪时轮询等待；失败给出可见错误）
+async function renderGitDiffMonaco(filePath) {
+  // 主区域容器由 v-if 控制，切换后需等一帧；仍不可得则轮询等待（最多 500ms）
+  let container = gitDiffContainerRef.value
+  for (let i = 0; !container && i < 10; i++) {
+    await new Promise(resolve => setTimeout(resolve, 50))
+    container = gitDiffContainerRef.value
+  }
+  if (!container) {
+    const message = 'diff 容器未就绪，请重试'
+    gitDiffError.value = message
+    if (editorDiff.value) editorDiff.value.error = message
+    return
+  }
   try {
     ensureGitDiffEditor()
     if (!gitDiffEditor) return
@@ -4463,18 +4501,22 @@ function renderGitDiffMonaco(filePath) {
     gitDiffOriginalModel = monaco.editor.createModel(oldText, language)
     gitDiffModifiedModel = monaco.editor.createModel(newText, language)
     gitDiffEditor.setModel({ original: gitDiffOriginalModel, modified: gitDiffModifiedModel })
-    gitDiffEditor.updateOptions({ renderSideBySide: gitDiffSideBySide.value })
+    gitDiffEditor.updateOptions({ renderSideBySide: gitDiffSideBySide.value && !isNarrowGitDiffViewport() })
     gitDiffEditor.layout()
   } catch (error) {
     console.warn('[GIT] render diff with monaco failed:', error)
+    const message = `diff 渲染失败：${error?.message || error}`
+    gitDiffError.value = message
+    if (editorDiff.value) editorDiff.value.error = message
   }
 }
 
 // 并排 / 内联切换
 function toggleGitDiffSideBySide() {
   gitDiffSideBySide.value = !gitDiffSideBySide.value
+  if (editorDiff.value) editorDiff.value.sideBySide = gitDiffSideBySide.value
   if (gitDiffEditor) {
-    gitDiffEditor.updateOptions({ renderSideBySide: gitDiffSideBySide.value })
+    gitDiffEditor.updateOptions({ renderSideBySide: gitDiffSideBySide.value && !isNarrowGitDiffViewport() })
   }
 }
 
@@ -5720,10 +5762,11 @@ function detachPanel(type, panelId = null) {
   } else if (type === 'editor') {
     editorDetached.value = !editorDetached.value
     // 嵌入/浮动切换会重建 EditorPanel，释放旧容器上的 diff 实例；
-    // 若仍有选中的文件，等新容器挂载后重新渲染，避免出现空白 diff。
+    // 若主区域仍显示 diff，等新容器挂载后重新渲染，避免出现空白 diff。
+    const diffFilePath = editorDiff.value?.filePath
     disposeGitDiffEditor()
-    if (gitSelectedFile.value && !gitDiffLoading.value && !gitDiffError.value) {
-      nextTick(() => renderGitDiffMonaco(gitSelectedFile.value))
+    if (diffFilePath && !gitDiffLoading.value && !gitDiffError.value) {
+      nextTick(() => renderGitDiffMonaco(diffFilePath))
     }
   } else if (type === 'session' && panelId) {
     if (sessionDetachedPanels.value.has(panelId)) {
@@ -7320,13 +7363,7 @@ const commandPaletteCtx = computed(() => ({
   createTerminalForCurrent: () => { const a = getCurrentAgentOrNull(); if (a) createTerminalForAgent(a) },
   openEditorForCurrent: () => { const a = getCurrentAgentOrNull(); if (a) createEditorForAgent(a) },
   // 全局：打开/隐藏编辑器面板（与 Ctrl+E 分支行为一致，不依赖当前 Agent）
-  toggleEditorPanel: () => {
-    if (showEditorPanel.value) {
-      closeEditorPanel()
-    } else {
-      showEditorPanel.value = true
-    }
-  },
+  toggleEditorPanel,
   // 全局：快速抵达编辑器侧边栏的「内容搜索」（与 Ctrl+Shift+F 分支行为一致，编辑器未打开时不响应）
   openEditorGlobalSearch: () => openEditorGlobalSearch('content'),
   // 全局：快速抵达编辑器侧边栏的「文件名搜索」（与 Ctrl+Shift+P 分支行为一致，编辑器未打开时不响应）
@@ -15411,6 +15448,17 @@ const toggleTerminalPanel = () => {
     pushOverlayState()
   }
 }
+// 打开/关闭编辑器面板（移动端处理history；不依赖当前 Agent，与 Ctrl+E 行为一致）
+const toggleEditorPanel = () => {
+  if (showEditorPanel.value) {
+    closeEditorPanel()
+    return
+  }
+  showEditorPanel.value = true
+  if (windowWidth.value <= 768) {
+    pushOverlayState()
+  }
+}
 
 watch(showEditorPanel, async (visible) => {
   if (visible) {
@@ -15562,6 +15610,14 @@ onMounted(() => {
     saveEditorPanelRect()
     saveTerminalPanelRect()
     layoutMonacoEditor()
+    // 视口跨过移动端断点时，diff 的并排/内联需重新应用（Monaco 不会自动跟随）
+    if (gitDiffEditor) {
+      gitDiffEditor.updateOptions({
+        renderSideBySide: gitDiffSideBySide.value && !isNarrowGitDiffViewport(),
+        wordWrap: isNarrowGitDiffViewport() ? 'on' : 'off',
+      })
+      gitDiffEditor.layout()
+    }
     handleToolbarResize()
 
     const activeSession = terminalSessions.value.find(session => session.terminal_id === activeTerminalId.value)
@@ -16935,74 +16991,6 @@ body::-webkit-scrollbar {
 .git-add-stat { color: #7ec87e; }
 .git-del-stat { color: #ff5f56; }
 
-.editor-git-diff {
-  margin-top: 6px;
-  border: 1px solid var(--border-color, #2a2a2a);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.editor-git-diff-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 6px;
-  background: rgba(255, 255, 255, 0.05);
-  font-size: 11px;
-  font-family: var(--mono-font, monospace);
-  color: var(--text-secondary, #b0b0b0);
-  overflow: hidden;
-}
-
-.editor-git-diff-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.editor-git-diff-toggle {
-  flex: 0 0 auto;
-  padding: 1px 6px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid var(--border-color, #2a2a2a);
-  border-radius: 3px;
-  color: var(--text-secondary, #b0b0b0);
-  font-size: 10px;
-  cursor: pointer;
-}
-
-.editor-git-diff-toggle:hover {
-  background: rgba(255, 255, 255, 0.16);
-  color: var(--text-primary, #d0d0d0);
-}
-
-.editor-git-diff-truncated {
-  flex: 0 0 auto;
-  color: #ff8520;
-  font-size: 10px;
-}
-
-.editor-git-diff-monaco {
-  height: 320px;
-  background: #0d1b2a;
-}
-
-.editor-git-diff-body {
-  margin: 0;
-  padding: 4px 0;
-  max-height: 340px;
-  overflow: auto;
-  background: #1a1a1a;
-  font-family: var(--mono-font, monospace);
-  font-size: 11px;
-  line-height: 1.45;
-}
-
-.editor-git-diff-body code {
-  display: block;
-}
 
 .git-diff-line {
   display: block;
@@ -20096,15 +20084,11 @@ body::-webkit-scrollbar {
     padding: 6px 4px;
     font-size: 12px;
   }
-  /* 移动端 diff 容器撑满可用高度，避免固定 320px 在长屏上过矮、
-     又让内联 diff 有足够纵向空间阅读 */
-  .editor-git-diff-monaco {
-    height: 60vh;
-    min-height: 240px;
-  }
-  .editor-git-diff-toggle {
+  /* 移动端 diff 视图：主区域全屏，头部按钮放大点击区 */
+  .editor-diff-toggle,
+  .editor-diff-close {
     padding: 4px 10px;
-    font-size: 11px;
+    font-size: 12px;
   }
 }
 

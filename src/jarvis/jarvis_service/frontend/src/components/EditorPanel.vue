@@ -81,7 +81,21 @@
       </div>
       <slot name="sidebar"></slot>
       <div class="editor-panel-content editor-panel-content-main">
-        <div v-if="tabs.length === 0" class="editor-placeholder">
+        <div v-if="diff" class="editor-diff-view">
+          <div class="editor-diff-header">
+            <span class="editor-diff-title" :title="diff.filePath">{{ diff.filePath }}</span>
+            <span v-if="diff.commitHash" class="editor-diff-hash">{{ diff.commitHash.slice(0, 7) }}</span>
+            <span v-if="diff.truncated" class="editor-diff-truncated">（已截断）</span>
+            <button class="editor-diff-toggle" @click="$emit('toggleDiffSideBySide')">
+              {{ diff.sideBySide ? '内联' : '并排' }}
+            </button>
+            <button class="editor-diff-close" @click="$emit('closeDiff')" title="关闭 diff">✕</button>
+          </div>
+          <div v-if="diff.loading" class="editor-diff-status">加载 diff...</div>
+          <div v-else-if="diff.error" class="editor-diff-status error">{{ diff.error }}</div>
+          <div v-else ref="diffContainerRef" class="editor-diff-monaco"></div>
+        </div>
+        <div v-else-if="tabs.length === 0" class="editor-placeholder">
           <div class="editor-placeholder-icon">📝</div>
           <div class="editor-placeholder-title">点击文件树中的文件打开代码编辑器</div>
           <div class="editor-placeholder-text">支持 Monaco 语法高亮、智能提示、代码折叠、多标签切换与保存。</div>
@@ -115,7 +129,8 @@ const props = defineProps({
   isEditable: Boolean,
   showSidebar: Boolean,
   sidebarView: String,
-  resizeDirections: Array
+  resizeDirections: Array,
+  diff: Object
 })
 
 const emit = defineEmits([
@@ -129,13 +144,17 @@ const emit = defineEmits([
   'closeTab',
   'toggleEditable',
   'setSidebarView',
-  'startResize'
+  'startResize',
+  'toggleDiffSideBySide',
+  'closeDiff'
 ])
 
 const editorContainerRef = ref(null)
+const diffContainerRef = ref(null)
 
 defineExpose({
-  editorContainerRef
+  editorContainerRef,
+  diffContainerRef
 })
 </script>
 
@@ -414,6 +433,83 @@ defineExpose({
 .editor-monaco-container {
   flex: 1;
   min-height: 0;
+  overflow: hidden;
+}
+
+.editor-diff-view {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.editor-diff-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.editor-diff-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-primary);
+}
+
+.editor-diff-hash {
+  color: var(--color-text-secondary);
+  font-family: monospace;
+}
+
+.editor-diff-truncated {
+  color: var(--color-warning, #e6a23c);
+}
+
+.editor-diff-toggle,
+.editor-diff-close {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.editor-diff-toggle:hover,
+.editor-diff-close:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-text-secondary);
+}
+
+.editor-diff-status {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.editor-diff-status.error {
+  color: var(--color-danger, #f56c6c);
+}
+
+.editor-diff-monaco {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
   overflow: hidden;
 }
 
