@@ -7221,19 +7221,51 @@ function handleAgentItemClick(agent, event) {
 }
 
 // 编辑器侧边栏 Agent 列表点击：把该 Agent 的会话显示到编辑器主区域（一次一个）
+// 编辑器会话视图是单会话的：切换 Agent 时复用同一个 Panel 覆盖 agentId，
+// 而不是每次新建 Panel（否则旧 Panel 会留在网格里，把编辑器挤成半屏）。
 function onEditorSidebarAgentClick(agent) {
   if (isBatchMode.value) {
     toggleSelectAgent(agent.agent_id)
     return
   }
-  // 复用既有 Panel 机制绑定 Agent（已在某 Panel 则激活，否则新建/复用激活 Panel）
-  openAgentInPanel(agent)
-  // 记录并切换到编辑器会话视图
-  const panel = panels.value.find(p => p.agentId === agent.agent_id)
-  if (panel) {
-    editorSessionPanelId.value = panel.id
-    setEditorMainView('session')
+  // 移动端不支持多 Panel，沿用既有逻辑（复用当前激活 Panel）
+  if (windowWidth.value <= 768) {
+    openAgentInPanel(agent)
+    const mobilePanel = panels.value.find(p => p.agentId === agent.agent_id)
+    if (mobilePanel) {
+      editorSessionPanelId.value = mobilePanel.id
+      setEditorMainView('session')
+    }
+    return
   }
+  // 该 Agent 已在某个 Panel 中：直接显示那个 Panel（不新建）
+  const existingPanel = panels.value.find(p => p.agentId === agent.agent_id)
+  if (existingPanel) {
+    activePanelId.value = existingPanel.id
+    switchAgent(agent)
+    editorSessionPanelId.value = existingPanel.id
+    setEditorMainView('session')
+    return
+  }
+  // 否则复用编辑器当前承载的 Panel（没有则回退到激活 Panel / 新建）
+  let targetPanel = editorSessionPanel.value
+    || panels.value.find(p => p.id === activePanelId.value)
+  if (!targetPanel) {
+    if (panels.value.length >= MAX_PANELS) {
+      showToast(`最多支持 ${MAX_PANELS} 个 Panel`, 'warning')
+      return
+    }
+    targetPanel = { id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, agentId: null }
+    panels.value.push(targetPanel)
+  } else if (targetPanel.agentId && targetPanel.agentId !== agent.agent_id) {
+    // 复用同一个 Panel：先清掉其中已有 Agent 的 Panel 级状态，避免残留
+    closeAgentInPanel(targetPanel.id)
+  }
+  targetPanel.agentId = agent.agent_id
+  activePanelId.value = targetPanel.id
+  switchAgent(agent)
+  editorSessionPanelId.value = targetPanel.id
+  setEditorMainView('session')
 }
 
 // ========== 宠物网关操作 ==========

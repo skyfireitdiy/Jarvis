@@ -109,12 +109,6 @@
           @click="$emit('setMainView', 'terminal')"
           title="终端"
         >⌨️</button>
-        <button
-          class="editor-activity-button"
-          :class="{ active: mainView === 'session' }"
-          @click="$emit('setMainView', 'session')"
-          title="会话"
-        >🗂</button>
       </div>
       <slot name="sidebar"></slot>
       <div class="editor-panel-content editor-panel-content-main">
