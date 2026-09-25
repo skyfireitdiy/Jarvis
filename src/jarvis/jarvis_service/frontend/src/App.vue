@@ -6877,6 +6877,10 @@ function openAgentInPanel(agent, panelId = null) {
     const targetPanel = panels.value.find(p => p.id === activePanelId.value) || panels.value[0]
     if (targetPanel) {
       targetPanel.agentId = agent.agent_id
+      // 内嵌 Panel 只在编辑器内部渲染：必须把该 Panel 交给编辑器主区域的会话视图承载，
+      // 否则 Panel 失去宿主而不可见（移动端从大厅双击宠物即此路径）。
+      workspaceSessionPanelId.value = targetPanel.id
+      setWorkspaceMainView('session')
     }
     switchAgent(agent)
     return

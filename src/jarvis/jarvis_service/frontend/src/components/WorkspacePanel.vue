@@ -28,7 +28,6 @@
         </select>
       </div>
       <div class="workspace-panel-actions">
-        <button v-if="!$slots['pane-tree']" class="icon-btn" @click.stop="$emit('save')" :disabled="!activeTab || activeTab.loading" title="保存文件">💾</button>
         <button class="icon-btn close-btn" @click.stop="$emit('close')" title="关闭">✕</button>
       </div>
     </div>
