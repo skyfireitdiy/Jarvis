@@ -21848,6 +21848,10 @@ body::-webkit-scrollbar {
     min-height: 36px;
     font-size: 16px;
   }
+  /* 移动端隐藏桌面端关闭按钮，避免出现两个关闭按钮 */
+  .workspace-sidebar-close-desktop {
+    display: none;
+  }
   /* Git 提交列表：移动端可读性优先，适当放大字号与点击区域 */
   .workspace-git-panel {
     font-size: 13px;
