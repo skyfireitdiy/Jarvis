@@ -34,6 +34,7 @@
           </option>
         </select>
         <button class="terminal-create-btn" @click="$emit('createTerminal')" :disabled="!socket" title="新建终端">➕</button>
+        <button class="terminal-create-btn" @click="$emit('close')" title="关闭面板">✕</button>
       </div>
     </div>
 

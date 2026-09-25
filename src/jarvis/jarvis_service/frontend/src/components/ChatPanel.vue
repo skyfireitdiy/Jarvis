@@ -6,7 +6,16 @@
     :style="panelStyle"
     @mousedown="$emit('focus', 'chat')"
   >
-    <!-- 聊天室标题栏已移除：面板标题由外层 pane 头部承载，界面更紧凑 -->
+    <div class="chat-panel-header" @mousedown="!embedded && $emit('startMove', $event)">
+      <div class="chat-panel-title-group">
+        <h3>聊天室</h3>
+        <span v-if="unreadCount > 0" class="chat-unread-badge">{{ unreadCount }}</span>
+      </div>
+      <span class="chat-username">{{ myName }}</span>
+      <div class="chat-panel-actions">
+        <button class="icon-btn small" @click="$emit('close')" title="关闭面板">✕</button>
+      </div>
+    </div>
 
     <!-- 主体区域：侧边栏 + 消息区 横向排列 -->
     <div class="chat-body">
@@ -573,7 +582,7 @@ watch(
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: 2px 10px;
   background:
     linear-gradient(160deg, rgba(32, 200, 255, 0.10) 0%, transparent 46%),
     var(--color-bg-tertiary);

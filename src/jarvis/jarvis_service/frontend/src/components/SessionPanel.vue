@@ -15,7 +15,6 @@
         <span class="session-agent-status" :class="getStatusClass(agent)">{{ getStatusLabel(agent) }}</span>
         <!-- 操作图标已迁移至 Ctrl+P 命令面板「当前 Agent」组 -->
         <div class="session-header-actions">
-          <button class="session-close-panel-btn" @click.stop="$emit('detach')" :title="embedded ? '分离为浮动窗口' : '嵌入回主界面'">⧉</button>
           <button class="session-close-panel-btn" @click.stop="$emit('close-panel')" title="关闭面板">✕</button>
         </div>
       </div>
@@ -887,7 +886,7 @@ function getTerminalStyle(terminalContent) {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
+  padding: 4px 8px;
   background:
     linear-gradient(160deg, rgba(32, 200, 255, 0.10) 0%, transparent 46%),
     var(--color-bg-tertiary);
@@ -1430,15 +1429,14 @@ function getTerminalStyle(terminalContent) {
     font-size: 15px;
   }
 
-  /* 移动端：头部图标过多时自动换行显示 */
+  /* 移动端：标题栏保持单行，Agent 名收缩省略，关闭按钮始终与内容同行 */
   .session-panel-header {
-    flex-wrap: wrap;
-    row-gap: 4px;
+    flex-wrap: nowrap;
   }
 
   .session-agent-name {
     flex: 1 1 auto;
-    min-width: 60px;
+    min-width: 0;
   }
 
   .session-agent-status {
