@@ -10361,12 +10361,23 @@ function scrollToDirSelected() {
   })
 }
 
+// 查找会话输入框 textarea：同一 Agent 可能同时存在多个实例（网格版与编辑器内嵌版），
+// 其中被 v-show 隐藏的副本仍在 DOM 中且排在前面，直接 querySelector 会命中它，
+// 对其 focus() 无效（display:none 元素无法获得焦点），导致补全后焦点回不到输入框。
+// 因此优先取可见实例，全部不可见时再退回首个匹配。
+function findVisiblePanelTextarea(agentId) {
+  const selector = agentId
+    ? `.input-wrapper textarea[data-agent-id="${agentId}"]`
+    : '.input-wrapper textarea'
+  const candidates = Array.from(document.querySelectorAll(selector))
+  const visible = candidates.find(el => el.getClientRects().length > 0)
+  return visible || candidates[0] || null
+}
+
 // 在指定位置插入文本
 function insertAtPosition(text, position, agentId = null) {
   const targetAgentId = agentId || currentAgentId.value
-  const textarea = targetAgentId
-    ? document.querySelector(`.input-wrapper textarea[data-agent-id="${targetAgentId}"]`) || document.querySelector('.input-wrapper textarea')
-    : document.querySelector('.input-wrapper textarea')
+  const textarea = findVisiblePanelTextarea(targetAgentId)
   if (!textarea || position === -1) return
 
   const currentText = targetAgentId
@@ -10407,9 +10418,7 @@ function insertCompletion(item, agentId = null) {
     return
   }
 
-  const textarea = targetAgentId
-    ? document.querySelector(`.input-wrapper textarea[data-agent-id="${targetAgentId}"]`) || document.querySelector('.input-wrapper textarea')
-    : document.querySelector('.input-wrapper textarea')
+  const textarea = findVisiblePanelTextarea(targetAgentId)
 
   // 数据源以 panelInputTexts / inputText 为准，textarea 仅用于同步光标；
   // 移动端点击补全项时 textarea 可能已失焦甚至查询不到，不能因此直接放弃插入

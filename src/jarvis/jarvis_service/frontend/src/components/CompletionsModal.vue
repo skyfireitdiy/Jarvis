@@ -36,7 +36,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onBeforeUnmount } from 'vue'
 
 const props = defineProps({
   visible: Boolean,
@@ -56,12 +56,27 @@ const emit = defineEmits(['update:visible', 'update:searchText', 'close', 'selec
 const searchInput = ref(null)
 const listRef = ref(null)
 const itemRefs = ref([])
+let focusTimer = null
 
 watch(() => props.visible, (newVal) => {
+  // 关闭时清掉待执行的聚焦定时器：否则用户在弹窗打开后很快选中补全项时，
+  // 该定时器会把焦点从会话输入框抢回搜索框（弹窗已关闭，焦点无处可去）
+  if (focusTimer) {
+    clearTimeout(focusTimer)
+    focusTimer = null
+  }
   if (newVal) {
-    setTimeout(() => {
+    focusTimer = setTimeout(() => {
+      focusTimer = null
       searchInput.value?.focus()
     }, 100)
+  }
+})
+
+onBeforeUnmount(() => {
+  if (focusTimer) {
+    clearTimeout(focusTimer)
+    focusTimer = null
   }
 })
 
