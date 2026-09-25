@@ -5969,11 +5969,16 @@ function getPanelHistoryState(panel) {
   }
 }
 
+// 编辑器主区域是否正在承载聊天室 / 终端（此时独立面板让位，避免同一状态被两个实例争抢）
+const editorHostsChat = computed(() => showEditorPanel.value && editorMainView.value === 'chat')
+const editorHostsTerminal = computed(() => showEditorPanel.value && editorMainView.value === 'terminal')
+
 // 内嵌面板数量（非 detach 且可见的面板）
 const embeddedPanelCount = computed(() => {
   let count = 0
-  if (showTerminalPanel.value && !terminalDetached.value) count++
-  if (showChatPanel.value && !chatDetached.value) count++
+  // 被编辑器主区域承载的终端/聊天面板不参与网格布局（模板中不会渲染独立实例）
+  if (showTerminalPanel.value && !terminalDetached.value && !editorHostsTerminal.value) count++
+  if (showChatPanel.value && !chatDetached.value && !editorHostsChat.value) count++
   if (showEditorPanel.value && !editorDetached.value) count++
   // 内嵌 SessionPanel 数量 = 总面板数 - 已 detach 的面板数
   count += panels.value.filter(p => !sessionDetachedPanels.value.has(p.id)).length
@@ -5982,10 +5987,6 @@ const embeddedPanelCount = computed(() => {
 
 // 当前是否没有任何可见的内嵌 Panel（用于展示空状态欢迎背景）
 const hasNoPanel = computed(() => embeddedPanelCount.value === 0)
-// 编辑器主区域是否正在承载聊天室 / 终端（此时独立面板让位，避免同一状态被两个实例争抢）
-const editorHostsChat = computed(() => showEditorPanel.value && editorMainView.value === 'chat')
-const editorHostsTerminal = computed(() => showEditorPanel.value && editorMainView.value === 'terminal')
-
 // 是否已完成首次 Agent 列表拉取（无论成功失败）。
 // 声明位置需早于下方 immediate watch（否则 watch 立即求值会命中 TDZ）。
 const agentListLoaded = ref(false)
