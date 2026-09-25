@@ -86,6 +86,11 @@
             <span class="editor-diff-title" :title="diff.filePath">{{ diff.filePath }}</span>
             <span v-if="diff.commitHash" class="editor-diff-hash">{{ diff.commitHash.slice(0, 7) }}</span>
             <span v-if="diff.truncated" class="editor-diff-truncated">（已截断）</span>
+            <button class="editor-diff-nav" @click="$emit('diffNavPrev')" title="上一个差异">▲</button>
+            <button class="editor-diff-nav" @click="$emit('diffNavNext')" title="下一个差异">▼</button>
+            <button class="editor-diff-toggle" @click="$emit('toggleDiffShowFull')" :title="diff.showFull ? '只显示变更上下文区域' : '显示文件全文'">
+              {{ diff.showFull ? '仅上下文' : '全文' }}
+            </button>
             <button class="editor-diff-toggle" @click="$emit('toggleDiffSideBySide')">
               {{ diff.sideBySide ? '内联' : '并排' }}
             </button>
@@ -147,7 +152,10 @@ const emit = defineEmits([
   'startResize',
   'toggleDiffSideBySide',
   'closeDiff',
-  'closeSidebar'
+  'closeSidebar',
+  'toggleDiffShowFull',
+  'diffNavPrev',
+  'diffNavNext'
 ])
 
 const editorContainerRef = ref(null)
@@ -489,6 +497,23 @@ defineExpose({
 
 .editor-diff-toggle:hover,
 .editor-diff-close:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-text-secondary);
+}
+
+.editor-diff-nav {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.editor-diff-nav:hover {
   color: var(--color-text-primary);
   border-color: var(--color-text-secondary);
 }
