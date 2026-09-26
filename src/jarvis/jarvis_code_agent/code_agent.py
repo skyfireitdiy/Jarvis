@@ -261,6 +261,7 @@ class CodeAgent(Agent):
             "symbol_dependency",  # 符号依赖查询工具
             "lsp",  # LSP 语义查询工具（定义/引用/实现/诊断/修复建议）
             "add_images",  # 添加图片到对话上下文工具
+            "ocr",  # OCR 文字识别工具（把图片转成文字，供不支持多模态的模型看图）
             "gateway_manager",  # Gateway 管理工具（Agent 通信、节点管理、模型组查询等）
             "browser_ext",  # 浏览器扩展工具（操作用户本地真实浏览器标签页）
             "daemon",  # 本机守护进程工具（调用用户机器上 jarvis-daemon 注册的能力）
