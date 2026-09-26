@@ -138,6 +138,102 @@ export const ACTIONS = [
     run: (ctx) => ctx.openWorkspaceFileTree && ctx.openWorkspaceFileTree(),
   },
   {
+    // 全局动作：打开命令面板
+    id: "open-command-palette",
+    label: "打开命令面板",
+    // 实际由 App.vue 的 Ctrl+P 分支执行；此处仅作展示，不参与 ctrl+alt 统一分发
+    shortcut: "Ctrl+P",
+    condition: "已登录",
+    en: "Open Command Palette",
+    group: "界面",
+    icon: "⌘",
+    keywords: ["命令面板", "命令", "面板", "command", "palette", "search"],
+    run: (ctx) => ctx.openCommandPalette && ctx.openCommandPalette(),
+  },
+  {
+    // 全局动作：保存编辑器当前标签
+    id: "save-active-editor-tab",
+    label: "保存当前文件",
+    // 实际由 App.vue 的 Ctrl+S 分支执行；此处仅作展示，不参与 ctrl+alt 统一分发
+    shortcut: "Ctrl+S",
+    condition: "需编辑器面板已打开且有活动标签",
+    en: "Save Active File",
+    group: "界面",
+    icon: "💾",
+    keywords: ["保存", "文件", "save", "file", "editor"],
+    run: (ctx) => ctx.saveActiveWorkspaceTab && ctx.saveActiveWorkspaceTab(),
+  },
+  {
+    // 全局动作：左右分割编辑器工作区
+    id: "split-workspace-pane-row",
+    label: "左右分割编辑器",
+    // 实际由 App.vue 的 Ctrl+\ 分支执行；此处仅作展示，不参与 ctrl+alt 统一分发
+    shortcut: "Ctrl+\\",
+    condition: "需编辑器面板处于文件视图且非移动端",
+    en: "Split Editor Right",
+    group: "界面",
+    icon: "▥",
+    keywords: ["分割", "左右", "编辑器", "split", "editor", "pane"],
+    run: (ctx) =>
+      ctx.splitWorkspacePane && ctx.splitWorkspacePane(ctx.activePaneId, "row"),
+  },
+  {
+    // 全局动作：上下分割编辑器工作区
+    id: "split-workspace-pane-column",
+    label: "上下分割编辑器",
+    // 实际由 App.vue 的 Ctrl+Shift+\ 分支执行；此处仅作展示，不参与 ctrl+alt 统一分发
+    shortcut: "Ctrl+Shift+\\",
+    condition: "需编辑器面板处于文件视图且非移动端",
+    en: "Split Editor Down",
+    group: "界面",
+    icon: "▤",
+    keywords: ["分割", "上下", "编辑器", "split", "editor", "pane"],
+    run: (ctx) =>
+      ctx.splitWorkspacePane &&
+      ctx.splitWorkspacePane(ctx.activePaneId, "column"),
+  },
+  {
+    // 全局动作：关闭当前焦点所在的面板 / 编辑器激活区域
+    id: "close-focused-panel",
+    label: "关闭当前焦点面板",
+    // 实际由 App.vue 的 Ctrl+W 分支执行；此处仅作展示，不参与 ctrl+alt 统一分发
+    shortcut: "Ctrl+W",
+    condition: "需存在当前焦点面板",
+    en: "Close Focused Panel",
+    group: "界面",
+    icon: "✕",
+    keywords: ["关闭", "面板", "close", "panel", "焦点"],
+    run: (ctx) => ctx.closeFocusedPanel && ctx.closeFocusedPanel(),
+  },
+  {
+    // 全局动作：发送缓冲输入（等待多行输入时）
+    id: "send-buffered-input",
+    label: "发送缓冲输入",
+    // 实际由 App.vue 的 Ctrl+Alt+Enter 分支执行；此处仅作展示，不参与 ctrl+alt 统一分发
+    shortcut: "Ctrl+Alt+Enter",
+    condition: "需存在缓冲输入",
+    en: "Send Buffered Input",
+    group: "执行",
+    icon: "⏎",
+    keywords: ["发送", "缓冲", "输入", "send", "buffer", "input"],
+    run: (ctx) => ctx.sendBufferedInput && ctx.sendBufferedInput(),
+  },
+  {
+    // 全局动作：删除宠物大厅中选中的 Agent
+    id: "delete-lobby-agent",
+    label: "删除选中的 Agent",
+    // 实际由 App.vue 的 Delete 分支执行；此处仅作展示，不参与 ctrl+alt 统一分发
+    shortcut: "Delete",
+    condition: "大厅中已选中 Agent 且焦点不在输入框内",
+    en: "Delete Selected Agent",
+    group: "大厅",
+    icon: "🗑",
+    keywords: ["删除", "大厅", "agent", "delete", "lobby"],
+    enabled: (ctx) => !!ctx?.lobbyActiveAgentId,
+    run: (ctx) =>
+      ctx.deleteLobbyAgent && ctx.deleteLobbyAgent(ctx.lobbyActiveAgentId),
+  },
+  {
     id: "current-toggle-auto-scroll",
     label: "切换自动滚动",
     shortcut: "Ctrl+Alt+S",
@@ -270,28 +366,6 @@ export const ACTIONS = [
       ctx.toggleCurrentAgentOutput && ctx.toggleCurrentAgentOutput(),
   },
   {
-    id: "current-detach-panel",
-    label: "分离当前焦点面板",
-    shortcut: "Ctrl+Alt+F",
-    condition: "需存在当前焦点面板",
-    en: "Detach Focused Panel",
-    group: "界面",
-    icon: "⧉",
-    keywords: ["分离", "浮动", "detach", "float", "panel", "焦点"],
-    run: (ctx) => ctx.detachFocusedPanel && ctx.detachFocusedPanel(),
-  },
-  {
-    id: "current-close-panel",
-    label: "关闭当前焦点面板",
-    shortcut: "Ctrl+Alt+W",
-    condition: "需存在当前焦点面板",
-    en: "Close Focused Panel",
-    group: "界面",
-    icon: "✕",
-    keywords: ["关闭", "面板", "close", "panel", "焦点"],
-    run: (ctx) => ctx.closeFocusedPanel && ctx.closeFocusedPanel(),
-  },
-  {
     id: "interrupt-current",
     label: "中断当前 Agent",
     shortcut: "Ctrl+Alt+K",
@@ -394,17 +468,6 @@ export const ACTIONS = [
     keywords: ["重启", "节点", "全部", "restart", "nodes", "all"],
     enabled: (ctx) => !!ctx?.hasPermission && ctx.hasPermission("admin:config"),
     run: (ctx) => ctx.restartAllNodes && ctx.restartAllNodes(),
-  },
-  {
-    id: "toggle-sidebar",
-    label: "切换 Agent 侧边栏",
-    shortcut: "Ctrl+A",
-    condition: "不在输入框内",
-    en: "Toggle Agent Sidebar",
-    group: "界面",
-    icon: "📋",
-    keywords: ["侧边栏", "侧栏", "sidebar", "toggle"],
-    run: (ctx) => ctx.toggleAgentSidebar && ctx.toggleAgentSidebar(),
   },
   {
     id: "manage-groups",

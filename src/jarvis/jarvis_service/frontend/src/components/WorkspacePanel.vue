@@ -12,20 +12,6 @@
     >
       <div class="workspace-panel-title-group">
         <h3>工作区</h3>
-        <span v-if="agents && agents.length" class="workspace-agent-label">当前 Agent</span>
-        <select
-          v-if="agents && agents.length"
-          class="workspace-agent-select"
-          :value="activeAgentId || ''"
-          title="选择 Agent"
-          @mousedown.stop
-          @change="$emit('selectAgent', $event.target.value)"
-        >
-          <option value="" disabled>选择 Agent</option>
-          <option v-for="agent in agents" :key="agent.agent_id" :value="agent.agent_id">
-            {{ agent.name || agent.agent_id }}
-          </option>
-        </select>
       </div>
       <div class="workspace-panel-actions">
         <button class="icon-btn close-btn" @click.stop="$emit('close')" title="关闭">✕</button>
@@ -196,8 +182,6 @@ const props = defineProps({
   interaction: Object,
   panelStyle: Object,
   agentName: String,
-  agents: Array,
-  activeAgentId: String,
   activeTab: Object,
   activeTabPath: String,
   tabs: Array,
@@ -216,7 +200,6 @@ const emit = defineEmits([
   'focus',
   'startMove',
   'toggleMaximize',
-  'detach',
   'save',
   'close',
   'activateTab',
@@ -231,7 +214,6 @@ const emit = defineEmits([
   'toggleDiffShowFull',
   'diffNavPrev',
   'diffNavNext',
-  'selectAgent',
   'splitPane',
   'openSettings',
   'openDocs',
@@ -303,23 +285,6 @@ defineExpose({
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
-}
-
-.workspace-agent-label {
-  font-size: 11px;
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-}
-
-.workspace-agent-select {
-  max-width: 220px;
-  font-size: 12px;
-  padding: 2px 4px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 4px;
-  background: var(--color-bg-secondary, var(--color-bg-primary));
-  color: var(--color-text-primary);
-  cursor: pointer;
 }
 
 .workspace-panel-actions {

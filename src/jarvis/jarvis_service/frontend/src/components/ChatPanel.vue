@@ -227,7 +227,6 @@ const emit = defineEmits([
   'focus',
   'startMove',
   'close',
-  'detach',
   'createRoom',
   'joinRoom',
   'sendMessage',

@@ -86,7 +86,6 @@ const emit = defineEmits([
   'update:selectedNodeId',
   'createTerminal',
   'close',
-  'detach',
   'switch',
   'closeTerminal',
   'setHostRef',

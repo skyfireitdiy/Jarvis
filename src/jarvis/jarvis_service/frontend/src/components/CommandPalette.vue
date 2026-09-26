@@ -9,7 +9,7 @@
             class="cmd-input"
             v-model="query"
             type="text"
-            :placeholder="isAgentMode ? '搜索 Agent…' : title"
+            :placeholder="placeholder"
             autocomplete="off"
             spellcheck="false"
             @keydown="onInputKeydown"
@@ -42,14 +42,15 @@
               </button>
             </div>
           </template>
-          <div v-else class="cmd-empty">{{ isAgentMode ? '无匹配 Agent' : '无匹配命令' }}</div>
+          <div v-else class="cmd-empty">{{ emptyText }}</div>
         </div>
 
         <div class="cmd-footer">
           <span><b>↑↓</b> 选择</span>
-          <span><b>Enter</b> {{ isAgentMode ? '当前面板打开' : '执行' }}</span>
+          <span><b>Enter</b> {{ isAgentMode ? '当前面板打开' : isFileMode ? '打开文件' : '执行' }}</span>
           <span v-if="isAgentMode"><b>Tab</b> 新面板打开</span>
-          <span v-if="!isAgentMode"><b>a&gt;</b> 切换 Agent</span>
+          <span v-if="isFileMode"><b>⌫</b> 返回命令</span>
+          <span v-else-if="!isAgentMode"><b>a&gt;</b> 切换 Agent　<b>f&gt;</b> 搜索文件</span>
           <span v-else><b>⌫</b> 返回命令</span>
           <span><b>Esc</b> 关闭</span>
         </div>
@@ -116,6 +117,29 @@ const AGENT_PREFIX = /^\s*a>\s*/i
 const isAgentMode = computed(() => AGENT_PREFIX.test(query.value))
 const agentQuery = computed(() => query.value.replace(AGENT_PREFIX, ''))
 
+// ===== 文件搜索模式：输入 f> 或 F> 时，列表改为展示「当前 Agent 工作区」的文件 =====
+// 搜索由 App.vue 调后端接口完成（结果经 ctx.fileSearchResults 回传），这里只负责前缀识别与渲染。
+const FILE_PREFIX = /^\s*f>\s*/i
+const isFileMode = computed(() => FILE_PREFIX.test(query.value))
+const fileQuery = computed(() => query.value.replace(FILE_PREFIX, ''))
+
+const placeholder = computed(() => {
+  if (isAgentMode.value) return '搜索 Agent…'
+  if (isFileMode.value) return '搜索文件…'
+  return props.title
+})
+
+const emptyText = computed(() => {
+  if (isAgentMode.value) return '无匹配 Agent'
+  if (isFileMode.value) {
+    if (props.ctx?.fileSearchLoading) return '搜索中…'
+    if (props.ctx?.fileSearchError) return props.ctx.fileSearchError
+    if (!fileQuery.value.trim()) return '输入文件名以搜索当前 Agent 工作区'
+    return '无匹配文件'
+  }
+  return '无匹配命令'
+})
+
 function agentStatusIcon(agent) {
   const ctx = props.ctx || {}
   if (typeof ctx.isWaitingInput === 'function' && ctx.isWaitingInput(agent)) return '🚨'
@@ -173,9 +197,30 @@ const agentEntries = computed(() => {
     })
 })
 
+// 文件条目：由 App.vue 调后端模糊搜索的结果（ctx.fileSearchResults）映射而来，
+// 复用命令面板的渲染与键盘导航。结果只含文件，不含规则/自定义命令。
+const fileEntries = computed(() => {
+  const ctx = props.ctx || {}
+  const list = Array.isArray(ctx.fileSearchResults) ? ctx.fileSearchResults : []
+  return list.map(item => {
+    const filePath = item?.file_path || ''
+    const name = item?.name || filePath.split('/').pop() || filePath
+    return {
+      id: `file-open:${filePath}`,
+      label: name,
+      group: '文件',
+      icon: '📄',
+      keywords: [filePath],
+      meta: filePath,
+      isFileEntry: true,
+      run: c => c.openFileResult && c.openFileResult(item),
+    }
+  })
+})
+
 // 「最近使用」条目：把记录的命令 id 映射为动作对象；仅在无搜索词、非 Agent 模式下展示
 const recentActions = computed(() => {
-  if (isAgentMode.value || query.value.trim()) return []
+  if (isAgentMode.value || isFileMode.value || query.value.trim()) return []
   const byId = new Map((props.actions || []).map(a => [a.id, a]))
   return recentIds.value.map(id => byId.get(id)).filter(Boolean)
 })
@@ -185,7 +230,9 @@ const flatEntries = computed(() => {
   let flatIndex = 0
   const matched = isAgentMode.value
     ? agentEntries.value
-    : filterActions(props.actions, query.value)
+    : isFileMode.value
+      ? fileEntries.value
+      : filterActions(props.actions, query.value)
   // 最近使用条目置顶（group 标记为「最近使用」，由 groupActions 聚合成最顶部分组），并从常规列表中剔除避免重复
   const recentIdSet = new Set(recentActions.value.map(a => a.id))
   const recentEntries = recentActions.value.map(action => ({
@@ -200,7 +247,7 @@ const flatEntries = computed(() => {
       disabled: isDisabled(action),
       flatIndex: flatIndex++,
     }))
-  return isAgentMode.value ? restEntries : [...recentEntries, ...restEntries]
+  return isAgentMode.value || isFileMode.value ? restEntries : [...recentEntries, ...restEntries]
 })
 
 const entryById = computed(() => new Map(flatEntries.value.map(e => [e.action.id, e])))
@@ -245,7 +292,8 @@ function onItemHover(index) {
 
 function run(action, openMode = 'current') {
   if (!action || isDisabled(action)) return
-  if (!action.isAgentEntry) recordRecent(action.id)
+  // Agent / 文件条目不是命令，不记入「最近使用」
+  if (!action.isAgentEntry && !action.isFileEntry) recordRecent(action.id)
   emit('run', action, openMode)
 }
 
@@ -322,6 +370,14 @@ watch(
 
 watch(query, () => {
   activeIndex.value = 0
+  // 文件模式：输入即搜（由 App.vue 调后端模糊搜索）；离开文件模式时清理结果
+  if (isFileMode.value) {
+    if (typeof props.ctx?.searchWorkspaceFiles === 'function') {
+      props.ctx.searchWorkspaceFiles(fileQuery.value)
+    }
+  } else if (typeof props.ctx?.clearWorkspaceFileSearch === 'function') {
+    props.ctx.clearWorkspaceFileSearch()
+  }
 })
 
 defineExpose({ focus: () => inputEl.value?.focus() })
