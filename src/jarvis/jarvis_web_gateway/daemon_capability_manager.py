@@ -138,7 +138,17 @@ class DaemonCapabilityManager:
             browser_info = first.get("browser_info") or {}
             if not isinstance(browser_info, dict):
                 browser_info = {}
+            hostname = str(
+                system_info.get("hostname") or browser_info.get("hostname") or ""
+            ).strip()
             now = time.time()
+            # 同一台机器上的 daemon 重启后 client_id 会变（含 PID），旧连接在心跳
+            # 超时（最长约 70s）前仍留在会话表里，导致 list_sessions 出现幽灵条目、
+            # 能力调用可能被路由到已失效的旧连接。这里以 (user_id, hostname) 作为
+            # 稳定身份，在注册新会话前主动清理同机器的旧会话。
+            # hostname 为空时无法可靠识别身份，不做清理以免误杀。
+            if hostname:
+                await self._replace_stale_sessions(session_id, user_id, hostname)
             self._sessions[session_id] = {
                 "websocket": websocket,
                 "user_id": user_id,
@@ -243,6 +253,36 @@ class DaemonCapabilityManager:
         future = self._pending_calls.get(request_id)
         if future is not None and not future.done():
             future.set_result(message)
+
+    async def _replace_stale_sessions(
+        self,
+        new_session_id: str,
+        user_id: Optional[str],
+        hostname: str,
+    ) -> None:
+        """清理同一台机器（同 user_id + 同 hostname）遗留的旧会话。
+
+        daemon 重启后 ``client_id`` 会变（含 PID），旧连接在心跳超时前仍留在
+        会话表中。以 ``(user_id, hostname)`` 作为稳定身份，在注册新会话前把
+        旧会话一并断开，避免幽灵条目与调用错路由。
+        """
+        stale: List[str] = []
+        for session_id, session in list(self._sessions.items()):
+            if session_id == new_session_id:
+                continue
+            if session.get("user_id") != user_id:
+                continue
+            if str(session.get("hostname") or "").strip() != hostname:
+                continue
+            stale.append(session_id)
+        for session_id in stale:
+            logger.info(
+                "[DAEMON] replace stale session: old=%s new=%s hostname=%s",
+                session_id,
+                new_session_id,
+                hostname,
+            )
+            await self.disconnect(session_id)
 
     async def disconnect(self, session_id: str) -> None:
         """关闭并移除会话，失败所有等待中的调用。"""
