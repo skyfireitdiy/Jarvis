@@ -32,7 +32,13 @@ import (
 )
 
 // version 是守护进程版本，作为 extension_version 上报给网关。
-const version = "0.1.0"
+//
+// 声明为 var 而非 const，以便发布时通过构建参数注入真实版本号：
+//
+//	go build -ldflags "-X main.version=v5.0.5" ./cmd/jarvis-daemon
+//
+// 未注入时使用下面的默认值。
+var version = "0.1.0"
 
 func main() {
 	if len(os.Args) > 1 && !isFlag(os.Args[1]) {

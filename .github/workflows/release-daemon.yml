@@ -1,0 +1,137 @@
+---
+name: Release jarvis-daemon
+
+"on":
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            ext: ""
+          - goos: linux
+            goarch: arm64
+            ext: ""
+          - goos: windows
+            goarch: amd64
+            ext: ".exe"
+          - goos: windows
+            goarch: arm64
+            ext: ".exe"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: daemon/go.mod
+          cache-dependency-path: daemon/go.sum
+
+      - name: Build static binary
+        working-directory: daemon
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          EXT: ${{ matrix.ext }}
+        run: |
+          # CGO_ENABLED=0 保证静态链接，不依赖目标机 glibc 版本。
+          # -trimpath 去除本地路径，-s -w 去掉符号表与调试信息。
+          # tag 触发时把版本号注入二进制；手动触发时用默认值。
+          version="${{ github.ref_name }}"
+          if [ -z "$version" ] || [ "${version#v}" = "$version" ]; then
+            ldflags="-s -w"
+          else
+            ldflags="-s -w -X main.version=${version}"
+          fi
+          echo "注入版本: ${version:-<默认>}"
+          go build -trimpath -ldflags="$ldflags" \
+            -o "jarvis-daemon${EXT}" ./cmd/jarvis-daemon
+
+      - name: Verify injected version
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: daemon
+        env:
+          EXT: ${{ matrix.ext }}
+        run: |
+          if strings "jarvis-daemon${EXT}" \
+            | grep -qx "${{ github.ref_name }}"; then
+            echo "版本注入确认: ${{ github.ref_name }}"
+          else
+            echo "版本未注入到二进制"
+            exit 1
+          fi
+
+      - name: Verify static linking
+        if: matrix.goos == 'linux'
+        working-directory: daemon
+        env:
+          EXT: ${{ matrix.ext }}
+        run: |
+          file "jarvis-daemon${EXT}"
+          if ldd "jarvis-daemon${EXT}" 2>&1 \
+            | grep -q "not a dynamic executable"; then
+            echo "静态链接确认"
+          else
+            echo "二进制不是静态链接"
+            ldd "jarvis-daemon${EXT}" || true
+            exit 1
+          fi
+
+      - name: Package artifact
+        working-directory: daemon
+        env:
+          EXT: ${{ matrix.ext }}
+        run: |
+          name="jarvis-daemon_${{ matrix.goos }}_${{ matrix.goarch }}"
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            zip -r "${name}.zip" "jarvis-daemon${EXT}"
+            echo "ASSET=${name}.zip" >> "$GITHUB_ENV"
+          else
+            tar -czf "${name}.tar.gz" "jarvis-daemon${EXT}"
+            echo "ASSET=${name}.tar.gz" >> "$GITHUB_ENV"
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-daemon-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: daemon/${{ env.ASSET }}
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -lh dist
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
