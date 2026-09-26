@@ -2446,7 +2446,7 @@ class ChildNodeClient:
                 continue
 
             try:
-                async with httpx.AsyncClient(timeout=5.0) as client:
+                async with httpx.AsyncClient(timeout=5.0, trust_env=False) as client:
                     resp = await client.post(
                         f"http://127.0.0.1:{port}/update_token",
                         json={"token": new_token},

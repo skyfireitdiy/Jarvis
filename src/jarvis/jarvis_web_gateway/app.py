@@ -1943,7 +1943,7 @@ def create_app(
         # 同步新Token到所有running状态的Agent
         gateway_token = os.environ.get("JARVIS_AUTH_TOKEN", "")
         if gateway_token:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(trust_env=False) as client:
                 for agent in agent_manager.get_agent_list():
                     if agent.get("status") == "running":
                         port = agent.get("port")
@@ -6315,7 +6315,7 @@ def create_app(
             # 代理到 Agent 进程的 /sessions 接口
             import httpx
 
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(trust_env=False) as client:
                 http_response = await client.get(
                     f"http://127.0.0.1:{agent_info.port}/sessions"
                 )
@@ -6409,7 +6409,7 @@ def create_app(
             # 代理到 Agent 进程的 /sessions 接口
             import httpx
 
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(trust_env=False) as client:
                 http_response = await client.post(
                     f"http://127.0.0.1:{agent_info.port}/sessions", json=request
                 )
@@ -9424,7 +9424,7 @@ def create_app(
                         continue
 
                     port = agent_info.port
-                    async with httpx.AsyncClient() as client:
+                    async with httpx.AsyncClient(trust_env=False) as client:
                         resp = await client.post(
                             f"http://127.0.0.1:{port}/message",
                             json={
