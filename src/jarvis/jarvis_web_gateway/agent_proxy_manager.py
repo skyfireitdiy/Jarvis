@@ -70,9 +70,13 @@ class AgentProxyManager:
         self._ws_timeout = ws_timeout
 
         # 创建 httpx 异步客户端（带连接池）
+        # trust_env=False：目标恒为本机 agent 端口（127.0.0.1:<port>），
+        # 必须忽略 HTTP_PROXY/HTTPS_PROXY 等环境变量，否则请求会被
+        # 系统代理拦截（no_proxy 中的 "127.*" 通配 httpx 不识别）导致 502。
         self._http_client = httpx.AsyncClient(
             timeout=http_timeout,
             follow_redirects=True,
+            trust_env=False,
         )
 
         logger.info("[PROXY MANAGER] AgentProxyManager initialized")
