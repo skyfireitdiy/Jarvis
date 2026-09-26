@@ -179,6 +179,11 @@ func handleWindowsScriptExec(params map[string]any) (any, error) {
 	stdoutStr, stdoutTruncated := truncateOutput(stdout.Bytes(), windowsScriptMaxOutputBytes)
 	stderrStr, stderrTruncated := truncateOutput(stderr.Bytes(), windowsScriptMaxOutputBytes)
 
+	// PowerShell 在 stderr 非终端时会把错误流序列化成 CLIXML，这里还原为可读文本
+	// （见 windows_clixml.go）。非 PowerShell 解释器（cmd）的 stderr 是纯文本，
+	// decodePowerShellStderr 会原样返回，不受影响。
+	stderrStr = decodePowerShellStderr(stderrStr)
+
 	timedOut := errors.Is(ctx.Err(), context.DeadlineExceeded)
 
 	exitCode := 0
