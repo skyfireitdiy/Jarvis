@@ -1,0 +1,15 @@
+{
+  "id": "20260926_091314_717877",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis-daemon",
+    "multi-gateway",
+    "wsclient",
+    "go",
+    "verified",
+    "task-123"
+  ],
+  "content": "jarvis-daemon 多网关改造（task-120~123）已完成，全仓编译与测试全绿。\n\n关键 API：\n- auth.Store（多网关 map，key=auth.GatewayKey）：Set(gateway,token)/Get(gateway)(Credentials,error)/Clear(gateway)/ClearAll()/List()/MarkTokenInvalid(gateway)/TokenValid(gateway)/Has(gateway)。导出 NormalizeGateway(g)、GatewayKey(g)（hostname:port，忽略协议差异，http://h:443 与 https://h:443 同键）。\n- wsclient.Manager：NewManager(opts Options)（向后兼容）/NewManagerWithOptions(ManagerOptions)。ManagerOptions{Options, OnGatewayStateChange(gateway,state), OnGatewayAuthError(gateway,code,reason), OnGatewaySession(gateway,sessionID)}。方法 Connect(g,token)/Disconnect(g)/DisconnectAll()/Get(g)/Count()/Status() []GatewayStatus。\n- 关键设计：Options 里的 OnStateChange/OnAuthError/OnSession 会被 NewManagerWithOptions 清空，改由 Manager 在每个网关 Client 上注入闭包（捕获 normalized gateway）后转发，这样上层能区分是哪个网关触发的。这是 OnAuthError 原本签名 func(code int, reason string) 无 gateway 上下文的解法。\n- localapi.New(store, manager, version) 3 参数（去掉了 onAuth/onLogout 回调）。路由：POST /api/auth{gateway,token}（空 gateway/token→400）、POST /api/logout{gateway?}（不带=全清）、GET /api/status→{success,gateways:[{gateway,session_id,connected,state,token_valid,auth_failed}],daemon_version}。\n- main.go：store + manager 接线；OnGatewayAuthError 里 store.MarkTokenInvalid(gateway)（只标记该网关）；退出时 manager.DisconnectAll()。cfg.Gateway 仍保留在配置里但不再用于主动连接（无 token 不主动连，等网页推送）。\n\n验证：gofmt -l . 空、go vet ./... 空、go build ./... OK、go test ./... 全 ok、go test -race ./... 全 ok、CGO_ENABLED=0 / GOOS=windows / GOOS=darwin 交叉编译全 OK。真机 e2e（隔离端口 17899 + 临时 config，不碰已部署服务）：两网关并存 status 返回 2 条、只登出 A 后剩 B、全登出后空、空 gateway 返回 400、退出日志正常。\n\n坑：Go 工具链需 export PATH=$PATH:/usr/local/go/bin，否则静态扫描器误报 'go: not found'。",
+  "created_at": "2026-09-26T09:13:14.717922",
+  "updated_at": "2026-09-26T09:13:14.717928"
+}

@@ -1,0 +1,15 @@
+{
+  "id": "20260926_085640_469079",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis-daemon",
+    "wsclient",
+    "multi-gateway",
+    "task-121",
+    "go",
+    "verified"
+  ],
+  "content": "jarvis-daemon 多网关改造 task-121 完成（wsclient 多网关连接管理器）。\n\n新增 daemon/internal/wsclient/manager.go + manager_test.go，未改动任何既有文件。\n\nAPI：\n- type GatewayStatus{Gateway,SessionID string; Connected bool; State string; TokenValid,AuthFailed bool}\n- NewManager(opts Options) *Manager  // opts 为公共模板，Gateway/Token 由 Connect 覆盖\n- Connect(gateway, token string)  // 同网关先 Stop 旧 Client 再重建；空 gateway/token → no-op\n- Disconnect(gateway string) / DisconnectAll() / Get(gateway)(*Client,bool) / Count() int\n- Status() []GatewayStatus  // 按 Gateway 字典序排序，稳定\n\n关键设计：\n1) 键 = auth.GatewayKey(gateway)，忽略协议差异。\n2) 锁粒度：sync.Mutex + clients/gateways/tokens 三 map；Connect/Disconnect/DisconnectAll 先在锁内改 map 并取出旧 Client 指针，解锁后再 Stop()，避免持锁阻塞与死锁。\n3) Status 先在锁内快照 map+key 列表，解锁后再逐个读 Client.State()/SessionID()/AuthFailed()。\n4) TokenValid 由 Manager 从 !Client.AuthFailed() 推导，无需上层注入。\n5) 未修改 Client 任何公开签名；Manager 不依赖 localapi（只 import auth + sort/sync）。\n\n验证（真跑）：gofmt -l internal/wsclient 空；go vet ./internal/wsclient/... 空；go build / CGO_ENABLED=0 build / GOOS=windows / GOOS=darwin 均 exit=0；go test -race -v ./internal/wsclient/... 18/18 PASS（含既有 11 个无回归）。\n\n坑（写测试时踩到）：\n- 并发测试若读协程与写协程共用一个 WaitGroup，且 close(stop) 在 wg.Wait() 之后 → 死锁挂起。必须拆成 wg(写)+readers(读)：wg.Wait() → close(stop) → readers.Wait()。\n- GatewayStatus.Gateway 是规范化后的完整地址（含 http:// 前缀），不是 host:port。\n- 造「同网关」测试要用同一 gateway 字符串直接 Connect 两次，不要拼 ?query（会变成不同 URL 路径导致 bad handshake）。\n- 测试真实 WS 连接参照 client_capability_test.go：httptest.NewServer + websocket.Upgrader{Subprotocols:[]string{\"jarvis-daemon\"}}，路径 /api/daemon/ws，服务端收 hello 回 hello_ack。\n\n遗留：go build ./... 全仓仍失败，仅剩 internal/localapi/server.go:96/104/117 三处 auth.Store 新签名未适配（task-122 范围）。\n\n下一步 task-122：改 internal/localapi/server.go —— /api/auth 多网关并存、/api/logout 支持带/不带 gateway、/api/status 返回 {gateways:[...]}（可直接复用 Manager.Status() 的 JSON 结构）。",
+  "created_at": "2026-09-26T08:56:40.469109",
+  "updated_at": "2026-09-26T08:56:40.469115"
+}
