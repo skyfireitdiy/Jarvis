@@ -51,14 +51,21 @@ func TestListSorted(t *testing.T) {
 		}
 	}
 
+	// NewRegistry 会装配平台能力，这里只校验本次注册的三项相对顺序。
 	list := r.List()
-	if len(list) != 3 {
-		t.Fatalf("期望 3 项，实际 %d", len(list))
+	got := make([]string, 0, 3)
+	for _, c := range list {
+		if c.Name == "a" || c.Name == "b" || c.Name == "c" {
+			got = append(got, c.Name)
+		}
+	}
+	if len(got) != 3 {
+		t.Fatalf("期望 3 项，实际 %d", len(got))
 	}
 	want := []string{"a", "b", "c"}
-	for i, c := range list {
-		if c.Name != want[i] {
-			t.Fatalf("第 %d 项应为 %s，实际 %s", i, want[i], c.Name)
+	for i, name := range got {
+		if name != want[i] {
+			t.Fatalf("第 %d 项应为 %s，实际 %s", i, want[i], name)
 		}
 	}
 
@@ -77,22 +84,54 @@ func TestListForPlatform(t *testing.T) {
 	_ = r.Register(Capability{Name: "windows.cap", Platform: PlatformWindows})
 
 	linux := r.ListForPlatform(PlatformLinux)
-	if len(linux) != 2 {
-		t.Fatalf("Linux 平台期望 2 项，实际 %d", len(linux))
+	// NewRegistry 会装配平台能力，这里只校验本次注册的三项。
+	gotLinux := namesOf(linux)
+	if !containsAll(gotLinux, "any.cap", "linux.cap") {
+		t.Fatalf("Linux 平台应包含 any.cap 与 linux.cap，实际 %v", gotLinux)
 	}
-	if linux[0].Name != "any.cap" || linux[1].Name != "linux.cap" {
-		t.Fatalf("Linux 平台结果不符: %+v", linux)
+	if contains(gotLinux, "windows.cap") {
+		t.Fatalf("Linux 平台不应当出现 windows.cap，实际 %v", gotLinux)
 	}
 
 	windows := r.ListForPlatform(PlatformWindows)
-	if len(windows) != 2 {
-		t.Fatalf("Windows 平台期望 2 项，实际 %d", len(windows))
+	gotWindows := namesOf(windows)
+	if !containsAll(gotWindows, "any.cap", "windows.cap") {
+		t.Fatalf("Windows 平台应包含 any.cap 与 windows.cap，实际 %v", gotWindows)
 	}
 	for _, c := range windows {
 		if c.Name == "linux.cap" {
 			t.Fatal("Windows 平台不应当出现 linux.cap")
 		}
 	}
+}
+
+// namesOf 提取能力名称列表，便于断言。
+func namesOf(caps []Capability) []string {
+	out := make([]string, 0, len(caps))
+	for _, c := range caps {
+		out = append(out, c.Name)
+	}
+	return out
+}
+
+// contains 判断名称列表是否包含指定名称。
+func contains(names []string, target string) bool {
+	for _, n := range names {
+		if n == target {
+			return true
+		}
+	}
+	return false
+}
+
+// containsAll 判断名称列表是否包含全部指定名称。
+func containsAll(names []string, targets ...string) bool {
+	for _, t := range targets {
+		if !contains(names, t) {
+			return false
+		}
+	}
+	return true
 }
 
 // TestExecute 覆盖成功、未注册、Handler 返回错误、Handler panic 四种情况。
@@ -177,7 +216,10 @@ func TestMultiRegistryIsolation(t *testing.T) {
 	if _, ok := r2.Get("only.in.r1"); ok {
 		t.Fatal("r2 不应看到 r1 的能力，注册表之间必须隔离")
 	}
-	if len(r2.List()) != 0 {
-		t.Fatalf("r2 应为空，实际 %d 项", len(r2.List()))
+	// 两个实例各自装配了平台能力，但 r1 新增的能力不应出现在 r2 中。
+	for _, c := range r2.List() {
+		if c.Name == "only.in.r1" {
+			t.Fatal("r2 不应包含 r1 注册的能力")
+		}
 	}
 }

@@ -24,6 +24,7 @@ import (
 	"syscall"
 
 	"jarvis-daemon/internal/auth"
+	"jarvis-daemon/internal/capability"
 	"jarvis-daemon/internal/config"
 	"jarvis-daemon/internal/localapi"
 	"jarvis-daemon/internal/service"
@@ -174,11 +175,16 @@ func runDaemon(args []string) {
 
 	store := auth.NewStore()
 
+	// 注册当前平台的能力，供网关下发指令时执行。
+	registry := capability.NewRegistry()
+	log.Printf("[daemon] 已注册 %d 个平台能力", len(registry.ListForPlatform(capability.PlatformLinux)))
+
 	client := wsclient.New(wsclient.Options{
 		Gateway:           cfg.Gateway,
 		Token:             "",
 		ClientID:          buildClientID(),
 		Version:           version,
+		Registry:          registry,
 		HeartbeatInterval: cfg.HeartbeatInterval,
 		ReconnectMin:      cfg.ReconnectMin,
 		ReconnectMax:      cfg.ReconnectMax,
