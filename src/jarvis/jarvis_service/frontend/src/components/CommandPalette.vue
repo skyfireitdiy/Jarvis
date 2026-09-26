@@ -172,7 +172,6 @@ const agentEntries = computed(() => {
     })
     .map(agent => {
       const nodeLabel = typeof ctx.getAgentNodeLabel === 'function' ? ctx.getAgentNodeLabel(agent) : ''
-      const active = agent?.agent_id === ctx.currentAgentId
       const metaParts = []
       if (nodeLabel) metaParts.push(`🖥 ${nodeLabel}`)
       if (agent?.proxy_node) metaParts.push(`🔀 代理 ${agent.proxy_node}`)
@@ -188,9 +187,9 @@ const agentEntries = computed(() => {
         icon: agentStatusIcon(agent),
         keywords: [nodeLabel],
         meta: metaParts.join('   '),
-        // 仅当「当前 Agent 且其面板已打开」时禁用（选中它只是切回自身，无意义）；
-        // 当前 Agent 的面板未打开时仍可选中，用于重新打开它
-        disabled: active && isOpened(agent),
+        // 所有 Agent 都可选：可见的切过去（激活），不可见的在当前区域创建 Panel 并打开。
+        // 因此不置灰——即使选中「当前 Agent 自身」也有意义（把焦点切回它的会话）。
+        disabled: false,
         isAgentEntry: true,
         run: (c, openMode) => c.switchToAgent && c.switchToAgent(agent, openMode),
       }
