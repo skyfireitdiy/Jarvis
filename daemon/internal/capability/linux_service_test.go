@@ -3,9 +3,11 @@
 package capability
 
 import (
+	"context"
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 )
 
 // 注意：本文件的测试**不会**对任何真实 systemd 单元执行 start/stop/restart，
@@ -116,12 +118,31 @@ func TestLinuxServiceListParameterValidation(t *testing.T) {
 	}
 }
 
+// hasUserSystemdInstance 探测本机是否存在可用的 systemd 用户实例。
+//
+// `systemctl --user list-units` 在无用户实例时会以非 0 退出（或输出为空），
+// 据此判断是否具备真跑 list 的环境前提。
+func hasUserSystemdInstance() bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "systemctl", "--user", "list-units", "--no-pager").Output()
+	if err != nil {
+		return false
+	}
+	return len(strings.TrimSpace(string(out))) > 0
+}
+
 // TestLinuxServiceListReal 真机验证 list 能返回结果。
 //
-// 本机 systemctl --user 可用（is-system-running=running），因此真跑。
+// 前提：本机存在可用的 systemd 用户实例（`systemctl --user` 能正常应答）。
+// CI runner 上 systemctl 二进制存在但没有用户实例，list-units 会返回空，
+// 此时跳过而非失败——该断言验证的是「解析真实输出」的能力，不是环境本身。
 func TestLinuxServiceListReal(t *testing.T) {
 	if _, err := exec.LookPath("systemctl"); err != nil {
 		t.Skip("本机无 systemctl，跳过")
+	}
+	if !hasUserSystemdInstance() {
+		t.Skip("本机无 systemd 用户实例（systemctl --user 不可用），跳过")
 	}
 
 	res, err := handleLinuxServiceList(map[string]any{})
