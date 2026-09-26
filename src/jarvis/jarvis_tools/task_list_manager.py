@@ -2329,6 +2329,9 @@ class task_list_manager:
             actual_output = task_update_info.get("actual_output")
             verification_method = task_update_info.get("verification_method")
 
+            # 是否因所有任务结束而自动清除了任务列表
+            auto_cleared = False
+
             if status is not None:
                 # 当状态更新为 completed 时，验证 verification_method 必须存在
                 if status == "completed" and task.status.value != "completed":
@@ -2523,6 +2526,12 @@ class task_list_manager:
                         "stderr": "更新任务属性失败",
                     }
 
+            # 任务完成后，若所有任务均已进入终态，则自动清除任务列表
+            if status == "completed" and self._try_auto_clear_task_list(
+                task_list_manager, task_list_id, agent, is_main_agent
+            ):
+                auto_cleared = True
+
             # 获取更新后的任务信息
             updated_task = task_list.get_task(task_id)
             result = {
@@ -2530,6 +2539,21 @@ class task_list_manager:
                 "task": updated_task.to_dict() if updated_task else None,
                 "message": "任务更新成功",
             }
+
+            # 若因所有任务结束而自动清除了任务列表，在返回内容中明确说明
+            if auto_cleared:
+                result["message"] = (
+                    f"任务 [{task.task_name}] 已更新为 completed；"
+                    "当前任务列表中的所有任务均已结束（无 pending/running 任务），"
+                    "任务列表已被自动清除，无需再调用 clear_tasks。"
+                    "后续如需继续执行任务，请重新调用 add_tasks 创建新的任务列表。"
+                )
+                result["task_list_auto_cleared"] = True
+                result["auto_clear_reason"] = (
+                    "所有任务均已进入终态（completed/failed/abandoned），"
+                    "为避免任务列表堆积，系统自动清除了该任务列表"
+                )
+
             return {
                 "success": True,
                 "stdout": json.dumps(result, ensure_ascii=False, indent=2),
@@ -2541,6 +2565,64 @@ class task_list_manager:
                 "stdout": "",
                 "stderr": f"更新任务失败: {str(e)}",
             }
+
+    def _try_auto_clear_task_list(
+        self,
+        task_list_manager: Any,
+        task_list_id: str,
+        agent: Any,
+        is_main_agent: bool,
+    ) -> bool:
+        """任务全部进入终态后自动清除任务列表，防止任务列表越堆越多。
+
+        仅当任务列表非空且不存在任何活跃任务（pending/running）时才清除。
+        清除失败时静默忽略，不影响主流程。
+
+        参数:
+            task_list_manager: TaskListManager 实例
+            task_list_id: 任务列表 ID
+            agent: Agent 实例
+            is_main_agent: 是否为主 Agent
+
+        返回:
+            bool: 是否执行了自动清除
+        """
+        # 只有主 Agent 才有权限删除任务列表
+        if not is_main_agent:
+            return False
+
+        try:
+            task_list = task_list_manager.get_task_list(task_list_id)
+            if not task_list or not task_list.tasks:
+                return False
+
+            # 存在活跃任务（pending/running）时不清除
+            if task_list.active_task_ids:
+                return False
+
+            success, error_msg = task_list_manager.delete_task_list(
+                task_list_id, is_main_agent
+            )
+            if not success:
+                return False
+
+            # 清除 Agent 上残留的任务列表相关状态
+            self._set_task_list_id(agent, "")
+            self._set_running_task_id(agent, None)
+            self._unsubscribe_model_call_event(agent)
+
+            PrettyOutput.auto_print(
+                "🧹 所有任务均已结束，已自动清除任务列表，避免任务堆积"
+            )
+            return True
+        except Exception as e:
+            # 自动清除属于优化行为，失败不影响主流程
+            save_exception(
+                e,
+                module="jarvis_tools.task_list_manager",
+                function="_try_auto_clear_task_list",
+            )
+            return False
 
     def _handle_clear_tasks(
         self,
