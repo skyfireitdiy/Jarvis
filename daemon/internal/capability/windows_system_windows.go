@@ -93,13 +93,14 @@ func CollectSystemInfo() (map[string]any, error) {
 // 数据来源是注册表 CurrentVersion 键（PowerShell Get-ItemProperty），
 // 失败时回退到 wmic os。两者都不可用时返回空串，由调用方省略字段。
 func readWindowsOSVersion() (name, version, build string) {
-	if out, err := runWindowsCommand(
-		"powershell",
-		"-NoProfile",
-		"-NonInteractive",
-		"-Command",
+	// 走 runWindowsPowerShellCommand：它用 -EncodedCommand 传脚本并强制 UTF-8 输出，
+	// 因此 ProductName 即使被本地化为中文（如「Windows 10 专业版」）也不会乱码。
+	// 早期版本这里用 runWindowsCommand 直接拼 -Command，中文系统上会输出 GBK 字节
+	// 而被 Go 按 UTF-8 误解，故改为统一走 PowerShell 执行器。
+	if out, err := runWindowsPowerShellCommand(
 		"(Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion') | "+
 			"Select-Object ProductName,DisplayVersion,CurrentBuildNumber | ConvertTo-Csv -NoTypeInformation",
+		windowsSystemInfoTimeout,
 	); err == nil {
 		name, version, build = parseWindowsOSVersionCSV(out)
 		if name != "" || version != "" {
@@ -107,6 +108,8 @@ func readWindowsOSVersion() (name, version, build string) {
 		}
 	}
 
+	// 回退：wmic 无 UTF-8 输出模式，但该分支只取 Caption/Version/BuildNumber，
+	// 若 Caption 为中文仍可能乱码，故仅作为 PowerShell 不可用时的兜底。
 	if out, err := runWindowsCommand("wmic", "os", "get", "Caption,Version,BuildNumber", "/format:csv"); err == nil {
 		name, version, build = parseWindowsOSVersionCSV(out)
 	}
@@ -117,13 +120,12 @@ func readWindowsOSVersion() (name, version, build string) {
 //
 // 通过 PowerShell 的 Get-CimInstance Win32_OperatingSystem 获取；失败时返回 0。
 func readWindowsMemoryKB() (totalKB, availableKB int64) {
-	out, err := runWindowsCommand(
-		"powershell",
-		"-NoProfile",
-		"-NonInteractive",
-		"-Command",
+	// 统一走 runWindowsPowerShellCommand（-EncodedCommand + UTF-8 输出），
+	// 避免任何编码相关的意外；本函数只读数值，但保持与其他 PowerShell 调用一致。
+	out, err := runWindowsPowerShellCommand(
 		"$os = Get-CimInstance Win32_OperatingSystem; "+
 			"'{0},{1}' -f $os.TotalVisibleMemorySize, $os.FreePhysicalMemory",
+		windowsSystemInfoTimeout,
 	)
 	if err != nil {
 		return 0, 0
@@ -145,12 +147,10 @@ func readWindowsMemoryKB() (totalKB, availableKB int64) {
 //
 // 通过 PowerShell 的 Win32_OperatingSystem.LastBootUpTime 获取；失败时 ok 为 false。
 func readWindowsBootTime() (time.Time, bool) {
-	out, err := runWindowsCommand(
-		"powershell",
-		"-NoProfile",
-		"-NonInteractive",
-		"-Command",
+	// 统一走 runWindowsPowerShellCommand（-EncodedCommand + UTF-8 输出）。
+	out, err := runWindowsPowerShellCommand(
 		"(Get-CimInstance Win32_OperatingSystem).LastBootUpTime.ToString('o')",
+		windowsSystemInfoTimeout,
 	)
 	if err != nil {
 		return time.Time{}, false
@@ -170,9 +170,19 @@ func readWindowsBootTime() (time.Time, bool) {
 	return time.Time{}, false
 }
 
-// runWindowsCommand 执行外部命令并返回标准输出。
+// runWindowsCommand 执行外部命令并返回标准输出（UTF-8）。
 //
 // 统一带超时，避免命令挂起导致能力调用阻塞；命令不存在时返回明确错误。
+//
+// 编码说明：本函数被 readWindowsOSVersion / readWindowsMemoryKB /
+// readWindowsBootTime 调用，这三个函数只读取**纯 ASCII 数值与英文产品名**
+// （如 "Microsoft Windows 10 Pro"、"26200"、"33382940"），不涉及中文。
+// 因此这里不强制 UTF-8 输出（wmic 也不支持），直接按 UTF-8 解释即可——
+// 即使系统代码页是 GBK，ASCII 字节在两种编码下完全一致，不会乱码。
+//
+// 若将来这些函数需要读取中文内容，必须改为走 PowerShell 并复用
+// runWindowsPowerShellCommand（它已保证 UTF-8 输出），或在此处加
+// looksLikeUTF8 校验与明确报错，避免静默产生 U+FFFD。
 func runWindowsCommand(name string, args ...string) (string, error) {
 	if _, err := requireTool(name, ""); err != nil {
 		return "", err

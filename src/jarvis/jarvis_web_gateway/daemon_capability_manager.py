@@ -149,6 +149,18 @@ class DaemonCapabilityManager:
             # hostname 为空时无法可靠识别身份，不做清理以免误杀。
             if hostname:
                 await self._replace_stale_sessions(session_id, user_id, hostname)
+            # 守护进程可在 hello 中直接携带能力列表（新版 daemon 会这么做）。
+            # 这样会话一注册就带有能力，无需再依赖运行时 capability.list 往返；
+            # 旧版 daemon 不带该字段时回退为空列表，仍可通过主动查询获取。
+            hello_capabilities = first.get("capabilities")
+            if not isinstance(hello_capabilities, list):
+                hello_capabilities = []
+            # 守护进程可在 hello 中携带构建信息（版本/编译时间/Go 版本/目标平台）。
+            # 编译时间取自 daemon exe 的 mtime（见 daemon/internal/buildinfo）。
+            # 旧版 daemon 不带该字段时回退为空字典。
+            hello_build_info = first.get("build_info")
+            if not isinstance(hello_build_info, dict):
+                hello_build_info = {}
             self._sessions[session_id] = {
                 "websocket": websocket,
                 "user_id": user_id,
@@ -165,7 +177,8 @@ class DaemonCapabilityManager:
                 ).strip(),
                 "system_info": system_info,
                 "daemon_version": first.get("extension_version"),
-                "capabilities": [],
+                "build_info": hello_build_info,
+                "capabilities": hello_capabilities,
                 "connected_at": now,
                 "last_seen": now,
             }
@@ -468,6 +481,7 @@ class DaemonCapabilityManager:
                     "platform": session.get("platform"),
                     "system_info": session.get("system_info") or {},
                     "daemon_version": session.get("daemon_version"),
+                    "build_info": session.get("build_info") or {},
                     "capabilities": session.get("capabilities") or [],
                     "connected_at": session.get("connected_at"),
                 }
@@ -488,6 +502,7 @@ class DaemonCapabilityManager:
             "platform": session.get("platform"),
             "system_info": session.get("system_info") or {},
             "daemon_version": session.get("daemon_version"),
+            "build_info": session.get("build_info") or {},
             "capabilities": session.get("capabilities") or [],
             "connected_at": session.get("connected_at"),
         }

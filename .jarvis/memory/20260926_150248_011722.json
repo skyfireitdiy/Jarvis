@@ -1,0 +1,15 @@
+{
+  "id": "20260926_150248_011722",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "daemon",
+    "windows",
+    "capability",
+    "task-154",
+    "root-cause"
+  ],
+  "content": "【task-154 完成】capability.list 返回空的真正根因与修复。\n\n根因（非「hello 缺 capabilities」那么简单）：daemon 读循环是单 goroutine 顺序处理消息；client.go 的 handleCapabilityCall 原本在读循环内**同步**执行 Registry.Execute。耗时能力（windows.app.list 拉起 PowerShell、windows.screenshot 加载 System.Drawing）占住读循环数秒，期间网关发来的 capability.list 无法被读取 → 网关 asyncio.wait_for 超时 → /api/daemon/capability/list 返回 timed out，表现为「能力列表返回空」。\n\n修复：\n1. client.go 新增 writeMu sync.Mutex + writeJSON(conn,v)；所有写（hello/ping/结果）改走 writeJSON（gorilla/websocket 同一时刻仅允许一个 writer）。\n2. handleCapabilityCall 与 handleCommand 执行体包进独立 goroutine。\n3. hello 消息新增 capabilities 字段（Registry.List()）。\n4. daemon_capability_manager.py：hello 处理读 first.get(\"capabilities\") 存会话（非 list 回退空）。\n\n回归测试：client_capability_test.go 新增 TestHelloCarriesCapabilities、TestSlowCapabilityCallDoesNotBlockList。已验证：改回同步则后者 FAIL，异步则 PASS。\n\n验证：gofmt/vet(linux+windows)/build/6平台交叉编译/go test 全绿；无 cgo；go.mod 仅 gorilla/websocket；Python 测试 9 passed。\n\n【关键教训】网关 /api/daemon/sessions 只读会话缓存的 capabilities；该缓存靠 hello 或运行时查询填充。daemon 读循环阻塞是隐藏陷阱，任何耗时能力都会拖垮其他请求。",
+  "created_at": "2026-09-26T15:02:48.011763",
+  "updated_at": "2026-09-26T15:02:48.011769"
+}

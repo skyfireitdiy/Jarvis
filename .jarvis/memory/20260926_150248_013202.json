@@ -1,0 +1,8 @@
+{
+  "id": "20260926_150248_013202",
+  "type": "project_long_term",
+  "tags": ["jarvis", "daemon", "windows", "deploy", "SF-PC"],
+  "content": "【部署信息】用户机器 SF-PC（Windows 10 Pro 25H2 build 26200），daemon session 374c99f8-10b8-42dc-aa87-72523df2cc27，node daemon-SF-PC-780，exe 在 D:\\，PID 780。当前运行的是旧版 v5.0.5（windows.app.list 描述仍是「通过 reg.exe 查询」）。\n\n部署需两边都更新：网关（jwg，本机 127.0.0.1:8000，pid 3463523，systemd jarvis-service）需重启以加载 daemon_capability_manager.py 改动；daemon exe 需重新编译（CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build）+ 替换 D:\\ 下旧版 + 重启 daemon 进程。\n\n【用户声明】用户明确「等下我自己更新，你不要更新」——禁止代为部署/重启。\n\n【环境】本机 Linux 无 PowerShell/wine，Windows 运行期行为无法端到端验证。go 在 /usr/local/go/bin，需 export PATH=$PATH:/usr/local/go/bin。",
+  "created_at": "2026-09-26T15:02:48.013221",
+  "updated_at": "2026-09-26T15:02:48.013226"
+}

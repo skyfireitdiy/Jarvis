@@ -1,0 +1,8 @@
+{
+  "id": "20260926_145801_339294",
+  "type": "project_long_term",
+  "tags": ["jarvis", "daemon", "windows", "encoding", "task-153"],
+  "content": "【task-153 完成】Windows daemon 中文乱码修复。\n\n根因（纠正任务原描述）：windows.app.list 不用 PowerShell，用 reg query（windows_app_windows.go），reg.exe 输出 GBK 且无 UTF-8 模式。三条 GBK 路径：runRegQuery→reg.exe（app.list）、runWindowsCommand→powershell/wmic（system.info）、runWindowsPowerShellCommand→powershell（clipboard/screenshot）。\n\n修复策略：不引 GBK 解码表（标准库无、x/text 被禁），改为让子进程直接输出 UTF-8。\n\n改动文件：\n- 新建 internal/capability/windows_encoding.go（无构建标签，Linux 可单测）：windowsPowerShellPreamble（[Console]::OutputEncoding/$OutputEncoding/[Console]::InputEncoding 三项）、encodePowerShellCommand（base64 UTF-16LE 无 BOM）、utf16LEBytes/decodeUTF16LEBytes、looksLikeUTF8（RFC3629 严格）、trimPowerShellOutput。\n- 新建 windows_encoding_test.go（190 行，全 PASS）。\n- windows_clipboard_windows.go：runWindowsPowerShellCommand 改用 -EncodedCommand encodePowerShellCommand(fullScript)，返回前加 looksLikeUTF8 校验。\n- windows_app_windows.go：runRegQuery 重写走 PowerShell；新增 buildRegQueryScript（构造与 reg.exe 完全一致的文本格式，使 parseWindowsRegSubKeys/parseWindowsUninstallEntry/parseWindowsRegValues 三个纯解析函数零改动，其单测继续有效）、toPowerShellRegistryPath（HKLM\\→HKLM:\\ 等 5 种前缀）；collectWindowsApps 改 requirePowerShell()。\n- 新建 windows_app_windows_test.go：覆盖 toPowerShellRegistryPath、buildRegQueryScript 片段断言（显式断言含 `n 且拒绝连续反引号）、输出格式与解析层兼容。\n\n关键坑：Go 原始字符串用反引号定界，PowerShell 的 `n 必须靠字符串拼接 \"`\" + \"n\" 构造。已用独立 Go 程序复现验证生成脚本含真实反引号+n。\n\n验证：gofmt/vet(linux+windows)/build(linux+windows)/交叉编译/单测全绿。真机端到端未验证（本机无 Windows）。",
+  "created_at": "2026-09-26T14:58:01.339329",
+  "updated_at": "2026-09-26T14:58:01.339336"
+}

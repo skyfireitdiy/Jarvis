@@ -161,3 +161,113 @@ def test_list_sessions_without_system_info_returns_empty_dict():
     detail = manager.get_session("s1")
     assert detail is not None
     assert detail["system_info"] == {}
+
+
+def test_hello_build_info_persisted(client, auth_token):
+    """hello 携带 build_info 时，会话应落库并可从 list_sessions/get_session 读出。
+
+    build_info 由新版 daemon 上报（含编译时间），供网关判断「当前运行的是哪一版、
+    何时编译的」。旧版 daemon 不带该字段，见下一个用例。
+    """
+    build_info = {
+        "version": "v5.0.6",
+        "build_time": "2026-09-26T15:00:00Z",
+        "build_time_unix": 1789000000,
+        "build_time_source": "exe_mtime",
+        "go_version": "go1.27.1",
+        "os": "windows",
+        "arch": "amd64",
+        "exe_path": r"D:\jarvis-daemon.exe",
+    }
+    with client.websocket_connect(
+        "/api/daemon/ws", subprotocols=_token_subprotocol(auth_token)
+    ) as ws:
+        ws.send_json(
+            {
+                "type": "hello",
+                "client_id": "daemon-buildinfo-1",
+                "extension_version": "v5.0.6",
+                "build_info": build_info,
+                "tabs": [],
+            }
+        )
+        ack = ws.receive_json()
+        assert ack.get("type") == "hello_ack"
+        manager = client.app.state.daemon_capability_manager
+        sessions = manager.list_sessions()
+        assert len(sessions) == 1
+        session = sessions[0]
+        # build_info 原样落库
+        assert session["build_info"] == build_info
+        # 编译时间可读出
+        assert session["build_info"]["build_time"] == "2026-09-26T15:00:00Z"
+        assert session["build_info"]["build_time_source"] == "exe_mtime"
+        # get_session 同样带 build_info
+        detail = manager.get_session(session["session_id"])
+        assert detail is not None
+        assert detail["build_info"] == build_info
+
+
+def test_hello_without_build_info_returns_empty_dict(client, auth_token):
+    """兼容旧版：无 build_info 时应回退为空 dict，不得抛异常。"""
+    with client.websocket_connect(
+        "/api/daemon/ws", subprotocols=_token_subprotocol(auth_token)
+    ) as ws:
+        ws.send_json(
+            {
+                "type": "hello",
+                "client_id": "daemon-nobuildinfo-1",
+                "extension_version": "0.0.0-legacy",
+                "tabs": [],
+            }
+        )
+        ack = ws.receive_json()
+        assert ack.get("type") == "hello_ack"
+        manager = client.app.state.daemon_capability_manager
+        sessions = manager.list_sessions()
+        assert len(sessions) == 1
+        assert sessions[0]["build_info"] == {}
+
+
+def test_hello_with_invalid_build_info_type(client, auth_token):
+    """build_info 类型非法（非 dict）时应被规整为空 dict，不得抛异常。"""
+    with client.websocket_connect(
+        "/api/daemon/ws", subprotocols=_token_subprotocol(auth_token)
+    ) as ws:
+        ws.send_json(
+            {
+                "type": "hello",
+                "client_id": "daemon-badbuildinfo-1",
+                "extension_version": "0.0.0",
+                "build_info": "not-a-dict",
+                "tabs": [],
+            }
+        )
+        ack = ws.receive_json()
+        assert ack.get("type") == "hello_ack"
+        manager = client.app.state.daemon_capability_manager
+        sessions = manager.list_sessions()
+        assert len(sessions) == 1
+        assert sessions[0]["build_info"] == {}
+
+
+def test_list_sessions_without_build_info_returns_empty_dict():
+    """未上报 build_info 的会话，list_sessions/get_session 应返回空 dict 而非 None。"""
+    manager = DaemonCapabilityManager()
+    manager._sessions["s1"] = {
+        "websocket": None,
+        "user_id": "u1",
+        "client_id": "c1",
+        "node_id": "c1",
+        "hostname": "",
+        "platform": "",
+        "daemon_version": "0.0.0",
+        "capabilities": [],
+        "connected_at": 0.0,
+        "last_seen": 0.0,
+    }
+    sessions = manager.list_sessions()
+    assert sessions[0]["build_info"] == {}
+    detail = manager.get_session("s1")
+    assert detail is not None
+    assert detail["build_info"] == {}
