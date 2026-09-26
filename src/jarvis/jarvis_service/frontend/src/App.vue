@@ -16663,9 +16663,12 @@ window.__jarvisAuthBridge = {
   getGateway: () => {
     const parsed = parseGatewayAddress(gatewayUrl.value)
     if (!parsed) return null
-    const scheme = parsed.protocol === 'ws' || parsed.protocol === 'wss'
-      ? 'http'
-      : parsed.protocol || 'http'
+    // 网关地址可能以 ws(s):// 配置（前端连 WebSocket 用），但这里要交给
+    // daemon 作为「HTTP 基地址」使用，必须保留传输安全性：
+    // wss→https、ws→http。若一律降级成 http，daemon 会以明文 ws 去连
+    // HTTPS 端口，被 nginx 以 400 拒绝，表现为 websocket: bad handshake。
+    const schemeMap = { ws: 'http', wss: 'https', http: 'http', https: 'https' }
+    const scheme = schemeMap[parsed.protocol] || parsed.protocol || 'http'
     const host = parsed.host || window.location.hostname || '127.0.0.1'
     const port = parsed.port || '8000'
     return `${scheme}://${host}:${port}`
