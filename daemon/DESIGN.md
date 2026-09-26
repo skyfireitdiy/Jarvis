@@ -166,7 +166,74 @@ reconnect_max: 30 # 秒
 
 命令行参数可覆盖配置文件（如 `--listen`、`--gateway`）。
 
-## 7. 网页侧改动
+## 7. 服务安装与管理
+
+守护进程支持注册为系统服务，实现开机自启与统一的生命周期管理。参考实现为 `src/jarvis/jarvis_service/cli.py`（`SystemdBackend` / `WindowsTaskBackend`）。
+
+### 7.1 子命令
+
+```text
+jarvis-daemon [run] [选项]     前台运行守护进程（默认行为，向后兼容）
+jarvis-daemon install [选项]   安装为系统服务并设为开机自启（不启动）
+jarvis-daemon uninstall        停止并卸载系统服务
+jarvis-daemon start            启动服务
+jarvis-daemon stop             停止服务
+jarvis-daemon restart          重启服务
+jarvis-daemon status           查看服务状态
+```
+
+`install` 与 `run` 共用 `-listen` / `-gateway` / `-config` 选项；`install` 会把这些值固化进服务定义。
+
+### 7.2 平台实现
+
+| 项       | Linux                                                  | Windows                                       |
+| -------- | ------------------------------------------------------ | --------------------------------------------- |
+| 服务定义 | `~/.config/systemd/user/jarvis-daemon.service`         | 计划任务 `Jarvis-Daemon`                      |
+| 安装     | 写 unit + `systemctl --user daemon-reload` + `enable`  | `schtasks /Create /SC ONLOGON /RL HIGHEST /F` |
+| 启动     | `systemctl --user start`                               | 分离进程启动 + PID 文件                       |
+| 停止     | `systemctl --user stop`                                | `taskkill /PID <pid> /F`                      |
+| 自启     | `systemctl --user enable`                              | 计划任务本身（登录时触发）                    |
+| 状态     | `is-active` / `is-enabled` / `show --property=MainPID` | PID 存活（`tasklist`）+ `schtasks /Query`     |
+
+Linux unit 关键内容：
+
+```ini
+[Unit]
+Description=Jarvis Daemon
+After=network.target
+
+[Service]
+Type=simple
+Environment=PATH=<可执行文件目录>:<当前 PATH>
+Environment=<透传的代理环境变量，有值才写>
+ExecStart=<可执行文件绝对路径> run --listen 127.0.0.1:17800
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+```
+
+Windows PID 文件位于 `~/.jarvis/pids/jarvis-daemon.pid`。
+
+### 7.3 代码结构
+
+```text
+internal/service/
+├── service.go            # Service 接口、Options、Status、New、ResolveExecPath、BuildRunArgs
+├── systemd_linux.go      # //go:build linux：BuildUnit + systemd 用户服务实现
+├── task_windows.go       # //go:build windows：计划任务实现
+├── new_linux.go          # //go:build linux：平台分发
+├── new_windows.go        # //go:build windows：平台分发
+├── new_other.go          # //go:build !linux && !windows：兜底
+├── procattr_windows.go   # //go:build windows：分离进程启动属性
+├── procattr_other.go     # //go:build !windows：空实现
+└── service_test.go       # 纯函数与平台分发单元测试
+```
+
+平台分发通过 `newPlatformService()` 由各平台文件提供，`New()` 在返回 nil 时兜底为 `unsupportedService`（避免在无构建标签的文件里引用平台专有类型）。
+
+## 8. 网页侧改动
 
 仅一处：新增「认证本地进程」按钮，点击后：
 
@@ -183,7 +250,7 @@ await fetch("http://127.0.0.1:17800/api/auth", {
 
 不改动任何现有逻辑。
 
-## 8. 验证方式
+## 9. 验证方式
 
 1. `go build ./...` 通过；
 2. 启动守护进程，`curl -X POST http://127.0.0.1:17800/api/auth -d '{"gateway":"...","token":"<真实JWT>"}'`；
@@ -192,14 +259,14 @@ await fetch("http://127.0.0.1:17800/api/auth", {
 5. 网关下发测试 command → 守护进程返回占位 `result`；
 6. 断线后按退避重连；Token 失效（4401）时不空转重连。
 
-## 9. 后续（不在本轮）
+## 10. 后续（不在本轮）
 
 - 指令的真实执行（业务功能）；
 - 守护进程自更新；
 - 浏览器扩展更新（下载 zip → 覆盖扩展目录 → 通知 `chrome.runtime.reload()`）；
 - 服务端更新。
 
-## 10. 已确认的决策
+## 11. 已确认的决策
 
 | 项           | 决定                                                          |
 | ------------ | ------------------------------------------------------------- |
