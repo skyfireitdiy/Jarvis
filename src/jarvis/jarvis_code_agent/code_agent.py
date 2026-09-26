@@ -263,6 +263,7 @@ class CodeAgent(Agent):
             "add_images",  # 添加图片到对话上下文工具
             "gateway_manager",  # Gateway 管理工具（Agent 通信、节点管理、模型组查询等）
             "browser_ext",  # 浏览器扩展工具（操作用户本地真实浏览器标签页）
+            "daemon",  # 本机守护进程工具（调用用户机器上 jarvis-daemon 注册的能力）
             "sub_code_agent",  # 子代码Agent工具，用于创建子Agent执行独立任务
             "eval_js",  # 前端 JS 执行工具（Web 网关模式下向前端浏览器下发 JS）
         ]

@@ -106,10 +106,15 @@ class BrowserExtensionManager:
         except Exception as exc:  # pragma: no cover - 防御性
             logger.exception("[BROWSER-EXT] cleanup loop error: %s", exc)
 
-    async def handle_extension_websocket(self, websocket: WebSocket) -> None:
+    async def handle_extension_websocket(
+        self,
+        websocket: WebSocket,
+        user_id: Optional[str] = None,
+    ) -> None:
         """处理插件 WebSocket 连接：注册会话、收发消息、断开清理。
 
         注意：鉴权在 app.py 的端点层完成，本方法不做权限校验。
+        ``user_id`` 由端点层从 token 解析后传入，优先于 hello 帧里的 user_id。
         """
         # 插件使用自定义子协议，必须回显其中一个否则浏览器会断开
         await websocket.accept(subprotocol="jarvis-ext")
@@ -133,12 +138,13 @@ class BrowserExtensionManager:
                 return
 
             client_id = str(first.get("client_id") or "").strip() or session_id
-            user_id = first.get("user_id")
+            # 端点层从 token 解析出的 user_id 优先；hello 帧里的 user_id 仅作兼容回退
+            session_user_id = user_id if user_id is not None else first.get("user_id")
             tabs_meta = first.get("tabs") or []
             now = time.time()
             self._sessions[session_id] = {
                 "websocket": websocket,
-                "user_id": user_id,
+                "user_id": session_user_id,
                 "client_id": client_id,
                 "tabs_meta": tabs_meta,
                 "connected_at": now,
@@ -257,6 +263,34 @@ class BrowserExtensionManager:
         logger.info("[BROWSER-EXT] session removed: %s", session_id)
 
     # ------------------------------------------------------------------
+    # 会话归属校验
+    # ------------------------------------------------------------------
+    def check_session_access(
+        self,
+        session_id: str,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
+    ) -> tuple[bool, str]:
+        """校验调用方是否有权访问指定浏览器扩展会话。
+
+        规则：
+        - 会话不存在 → 拒绝；
+        - ``user_id`` 为空、为 ``system`` 或 ``is_admin`` 为真 → 放行（网关内部/管理员）；
+        - 否则要求会话的 ``user_id`` 与调用方一致。
+
+        Returns:
+            (是否允许, 拒绝原因)；允许时原因为空字符串。
+        """
+        session = self._sessions.get(session_id)
+        if session is None:
+            return False, f"browser session not found: {session_id}"
+        if not user_id or user_id == "system" or is_admin:
+            return True, ""
+        if session.get("user_id") != user_id:
+            return False, "forbidden: browser session belongs to another user"
+        return True, ""
+
+    # ------------------------------------------------------------------
     # 指令下发
     # ------------------------------------------------------------------
     async def send_command(
@@ -265,12 +299,17 @@ class BrowserExtensionManager:
         action: str,
         params: Optional[Dict[str, Any]] = None,
         timeout: float = DEFAULT_COMMAND_TIMEOUT,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
     ) -> Dict[str, Any]:
         """向指定会话下发指令并等待结果。
 
         Raises:
-            RuntimeError: 会话不存在、连接已失效或指令超时。
+            RuntimeError: 会话不存在、无访问权限、连接已失效或指令超时。
         """
+        allowed, reason = self.check_session_access(session_id, user_id, is_admin)
+        if not allowed:
+            raise RuntimeError(reason)
         session = self._sessions.get(session_id)
         if session is None:
             raise RuntimeError(f"browser session not found: {session_id}")

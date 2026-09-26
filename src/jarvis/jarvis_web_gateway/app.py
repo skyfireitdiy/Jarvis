@@ -56,6 +56,11 @@ from jarvis.jarvis_web_gateway.browser_extension_manager import (
     browser_extension_manager,
 )
 from jarvis.jarvis_web_gateway.chat_manager import ChatManager
+from jarvis.jarvis_web_gateway.daemon_capability_manager import (
+    DAEMON_SUBPROTOCOL,
+    DaemonCapabilityManager,
+    daemon_capability_manager,
+)
 from jarvis.jarvis_web_gateway.agent_proxy_manager import (
     AgentProxyManager,
     AgentNotFoundError,
@@ -98,6 +103,8 @@ from jarvis.jarvis_web_gateway.node_protocol import (
     CONFIG_GET_REQUEST,
     CONFIG_SET_REQUEST,
     CODE_UPDATE_TO_MAIN_REQUEST,
+    DAEMON_CAPABILITY_LIST_REQUEST,
+    DAEMON_CAPABILITY_CALL_REQUEST,
 )
 from jarvis import __version__ as JARVIS_VERSION
 from jarvis.jarvis_web_gateway.node_runtime import AgentRouteInfo, NodeRuntime
@@ -294,6 +301,11 @@ _node_runtime: Optional["NodeRuntime"] = None
 def get_browser_extension_manager() -> "BrowserExtensionManager":
     """获取全局浏览器扩展连接管理器（供工具层使用）。"""
     return browser_extension_manager
+
+
+def get_daemon_capability_manager() -> "DaemonCapabilityManager":
+    """获取全局守护进程能力管理器（供工具层使用）。"""
+    return daemon_capability_manager
 
 
 # 浏览器扩展源码目录名（位于仓库根目录，随网关一起分发）
@@ -1993,6 +2005,7 @@ def create_app(
     app.state.agent_proxy_manager = agent_proxy_manager
     app.state.node_connection_manager = node_connection_manager
     app.state.browser_extension_manager = browser_extension_manager
+    app.state.daemon_capability_manager = daemon_capability_manager
 
     # 注入扩展最新版本提供器：握手时随 hello_ack 下发给扩展，
     # 使扩展无需打开 Jarvis 网页也能自行发现新版本并提示用户升级。
@@ -2092,10 +2105,8 @@ def create_app(
     def verify_agent_proxy_access(request: Request) -> None:
         """验证 Agent HTTP 代理访问权限。
 
-        已登录会话或 Bearer Token 任一通过即可。
+        必须携带有效 Bearer Token（或已登录会话），与 WS 代理端点保持一致。
         """
-        if any(auth is not None for auth in manager._auth_store.values()):
-            return
         verify_token(request)
 
     # HTTP API：登录接口
@@ -2256,9 +2267,19 @@ def create_app(
     async def api_browser_ext_list_sessions(request: Request) -> Dict[str, Any]:
         """列出当前在线的浏览器扩展会话。
 
-        可选 query 参数：user_id（仅返回该用户的会话）
+        可选 query 参数：user_id（仅返回该用户的会话）。
+        非管理员未显式传 user_id 时，默认只返回自己（token 对应 user_id）的会话。
         """
-        user_id = request.query_params.get("user_id") or None
+        user_info = request.state.user_info or {}
+        current_user_id = user_info.get("user_id")
+        is_admin = bool(user_info.get("is_admin"))
+        requested_user_id = request.query_params.get("user_id") or None
+        if is_admin or current_user_id in (None, "system"):
+            user_id = requested_user_id
+        else:
+            user_id = requested_user_id or current_user_id
+            if user_id != current_user_id:
+                return {"success": False, "error": "forbidden: cannot list other users"}
         sessions = browser_extension_manager.list_sessions(user_id=user_id)
         return {"success": True, "sessions": sessions}
 
@@ -2267,6 +2288,7 @@ def create_app(
         """向指定浏览器扩展会话下发指令并等待结果。
 
         请求体：{"session_id": str, "action": str, "params": dict, "timeout": float}
+        非管理员只能操作属于自己（token 对应 user_id）的会话。
         """
         try:
             body = await request.json()
@@ -2285,13 +2307,207 @@ def create_app(
             timeout = float(body.get("timeout", 15.0))
         except (TypeError, ValueError):
             timeout = 15.0
+        user_info = request.state.user_info or {}
         try:
             result = await browser_extension_manager.send_command(
-                session_id, action, params, timeout=timeout
+                session_id,
+                action,
+                params,
+                timeout=timeout,
+                user_id=user_info.get("user_id"),
+                is_admin=bool(user_info.get("is_admin")),
             )
         except Exception as exc:
             return {"success": False, "error": str(exc)}
         return {"success": True, "result": result}
+
+    # ------------------------------------------------------------------
+    # 守护进程（jarvis-daemon）API：供 Agent 工具层（子进程）通过 HTTP 调用
+    # ------------------------------------------------------------------
+    def _resolve_daemon_session_node(session_id: str) -> Optional[str]:
+        """判断守护进程会话是否属于远端节点。
+
+        会话在本机（含 master 自身）时返回 None；属于远端节点时返回该 node_id。
+        """
+        session = daemon_capability_manager.get_session(session_id)
+        if session is None:
+            return None
+        node_id = str(session.get("node_id") or "").strip()
+        local_node_id = _node_runtime.local_node_id if _node_runtime else "master"
+        if not node_id or node_id in (local_node_id, "master"):
+            return None
+        return node_id
+
+    @app.get("/api/daemon/sessions", dependencies=[Depends(verify_token)])
+    async def api_daemon_list_sessions(request: Request) -> Dict[str, Any]:
+        """列出当前在线的守护进程会话（含各自已注册的能力列表）。
+
+        非管理员只能看到属于自己（token 对应 user_id）的会话。
+        """
+        user_info = request.state.user_info or {}
+        user_id = user_info.get("user_id")
+        is_admin = bool(user_info.get("is_admin"))
+        if user_id and user_id != "system" and not is_admin:
+            sessions = daemon_capability_manager.list_sessions(user_id=user_id)
+        else:
+            sessions = daemon_capability_manager.list_sessions()
+        return {"success": True, "sessions": sessions}
+
+    @app.post("/api/daemon/capability/list", dependencies=[Depends(verify_token)])
+    async def api_daemon_capability_list(request: Request) -> Dict[str, Any]:
+        """查询指定守护进程会话的能力列表。
+
+        请求体：{"session_id": str, "timeout": float}
+        非管理员只能查询属于自己（token 对应 user_id）的会话。
+        会话属于远端节点时，经 node 隧道转发到该节点执行。
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return {"success": False, "error": "invalid json body"}
+        session_id = str(body.get("session_id") or "").strip()
+        if not session_id:
+            return {"success": False, "error": "session_id is required"}
+        try:
+            timeout = float(body.get("timeout", 15.0))
+        except (TypeError, ValueError):
+            timeout = 15.0
+        user_info = request.state.user_info or {}
+        user_id = user_info.get("user_id")
+        is_admin = bool(user_info.get("is_admin"))
+        # 会话归属校验（远端节点侧会再校验一次，这里先给出明确错误）
+        allowed, reason = daemon_capability_manager.check_session_access(
+            session_id, user_id, is_admin
+        )
+        if not allowed:
+            return {"success": False, "error": reason}
+        remote_node_id = _resolve_daemon_session_node(session_id)
+        if remote_node_id is not None:
+            if _node_connection_manager is None:
+                return {
+                    "success": False,
+                    "error": "node connection manager unavailable",
+                }
+            try:
+                response = await _node_connection_manager.send_request_to_node(
+                    remote_node_id,
+                    DAEMON_CAPABILITY_LIST_REQUEST,
+                    {
+                        "session_id": session_id,
+                        "timeout": timeout,
+                        "user_id": user_id,
+                        "is_admin": is_admin,
+                    },
+                    timeout=timeout + 10.0,
+                )
+            except Exception as exc:
+                return {"success": False, "error": str(exc)}
+            payload = response.get("payload") or {}
+            if not payload.get("success"):
+                error = payload.get("error")
+                if isinstance(error, dict):
+                    error = error.get("message") or str(error)
+                return {
+                    "success": False,
+                    "error": error or "remote node request failed",
+                }
+            return {"success": True, "capabilities": payload.get("capabilities") or []}
+        try:
+            capabilities = await daemon_capability_manager.list_capabilities(
+                session_id,
+                timeout=timeout,
+                user_id=user_id,
+                is_admin=is_admin,
+            )
+        except Exception as exc:
+            return {"success": False, "error": str(exc)}
+        return {"success": True, "capabilities": capabilities}
+
+    @app.post("/api/daemon/capability/call", dependencies=[Depends(verify_token)])
+    async def api_daemon_capability_call(request: Request) -> Dict[str, Any]:
+        """调用指定守护进程会话的一项能力并等待结果。
+
+        请求体：{"session_id": str, "name": str, "params": dict, "timeout": float}
+        非管理员只能调用属于自己（token 对应 user_id）的会话。
+        会话属于远端节点时，经 node 隧道转发到该节点执行。
+        """
+        try:
+            body = await request.json()
+        except Exception:
+            return {"success": False, "error": "invalid json body"}
+        session_id = str(body.get("session_id") or "").strip()
+        name = str(body.get("name") or "").strip()
+        if not session_id:
+            return {"success": False, "error": "session_id is required"}
+        if not name:
+            return {"success": False, "error": "name is required"}
+        params = body.get("params") or {}
+        if not isinstance(params, dict):
+            return {"success": False, "error": "params must be an object"}
+        try:
+            timeout = float(body.get("timeout", 30.0))
+        except (TypeError, ValueError):
+            timeout = 30.0
+        user_info = request.state.user_info or {}
+        user_id = user_info.get("user_id")
+        is_admin = bool(user_info.get("is_admin"))
+        # 会话归属校验（远端节点侧会再校验一次，这里先给出明确错误）
+        allowed, reason = daemon_capability_manager.check_session_access(
+            session_id, user_id, is_admin
+        )
+        if not allowed:
+            return {"success": False, "error": reason}
+        remote_node_id = _resolve_daemon_session_node(session_id)
+        if remote_node_id is not None:
+            if _node_connection_manager is None:
+                return {
+                    "success": False,
+                    "error": "node connection manager unavailable",
+                }
+            try:
+                response = await _node_connection_manager.send_request_to_node(
+                    remote_node_id,
+                    DAEMON_CAPABILITY_CALL_REQUEST,
+                    {
+                        "session_id": session_id,
+                        "name": name,
+                        "params": params,
+                        "timeout": timeout,
+                        "user_id": user_id,
+                        "is_admin": is_admin,
+                    },
+                    timeout=timeout + 10.0,
+                )
+            except Exception as exc:
+                return {"success": False, "error": str(exc)}
+            payload = response.get("payload") or {}
+            if not payload.get("success"):
+                error = payload.get("error")
+                if isinstance(error, dict):
+                    error = error.get("message") or str(error)
+                return {
+                    "success": False,
+                    "error": error or "remote node request failed",
+                }
+            return {
+                "success": True,
+                "result": {
+                    "success": True,
+                    "data": payload.get("data"),
+                    "error": payload.get("error") or "",
+                },
+            }
+        try:
+            result = await daemon_capability_manager.call_capability(
+                session_id,
+                name,
+                params=params,
+                timeout=timeout,
+                user_id=user_id,
+                is_admin=is_admin,
+            )
+        except Exception as exc:
+            return {"success": False, "error": str(exc)}
         return {"success": True, "result": result}
 
     @app.post("/api/browser-ext/scripts/save", dependencies=[Depends(verify_token)])
@@ -3183,7 +3399,7 @@ def create_app(
         if auth_payload is not None:
             authorized, reason = gateway._check_auth(auth_payload)
         else:
-            authorized = any(auth is not None for auth in manager._auth_store.values())
+            authorized = False
             reason = "Authentication required"
         if not authorized:
             await websocket.accept(subprotocol="jarvis-ws")
@@ -3250,20 +3466,49 @@ def create_app(
         """浏览器扩展连接端点。
 
         鉴权复用 _extract_auth_from_headers + gateway._check_auth，
-        连接建立后交由 browser_extension_manager 处理（不做权限校验）。
+        连接建立后交由 browser_extension_manager 处理；
+        从 token 解析出的 user_id 会绑定到会话上，用于后续归属校验。
         """
         auth_payload = _extract_auth_from_headers(websocket)
         if auth_payload is not None:
             authorized, reason = gateway._check_auth(auth_payload)
         else:
-            authorized = any(auth is not None for auth in manager._auth_store.values())
+            authorized = False
             reason = "Authentication required"
         if not authorized:
             await websocket.accept(subprotocol="jarvis-ext")
             await _send_error(websocket, "AUTH_FAILED", reason or "Invalid token")
             await websocket.close(code=4401, reason="Unauthorized")
             return
-        await browser_extension_manager.handle_extension_websocket(websocket)
+        user_info = (auth_payload or {}).get("user_info") or {}
+        await browser_extension_manager.handle_extension_websocket(
+            websocket, user_id=user_info.get("user_id")
+        )
+
+    # 守护进程 WebSocket：用户机器上的 jarvis-daemon 主动连出到网关
+    @app.websocket("/api/daemon/ws")
+    async def daemon_websocket_endpoint(websocket: WebSocket) -> None:
+        """守护进程连接端点（与浏览器扩展端点完全独立）。
+
+        鉴权复用 _extract_auth_from_headers + gateway._check_auth，
+        连接建立后交由 daemon_capability_manager 处理；
+        从 token 解析出的 user_id 会绑定到会话上，用于后续归属校验。
+        """
+        auth_payload = _extract_auth_from_headers(websocket)
+        if auth_payload is not None:
+            authorized, reason = gateway._check_auth(auth_payload)
+        else:
+            authorized = False
+            reason = "Authentication required"
+        if not authorized:
+            await websocket.accept(subprotocol=DAEMON_SUBPROTOCOL)
+            await _send_error(websocket, "AUTH_FAILED", reason or "Invalid token")
+            await websocket.close(code=4401, reason="Unauthorized")
+            return
+        user_info = (auth_payload or {}).get("user_info") or {}
+        await daemon_capability_manager.handle_daemon_websocket(
+            websocket, user_id=user_info.get("user_id")
+        )
 
     # WebSocket 代理：代理到 Agent WebSocket
     @app.websocket("/api/agent/{agent_id}/ws")
@@ -3281,7 +3526,7 @@ def create_app(
         if auth_payload is not None:
             authorized, reason = gateway._check_auth(auth_payload)
         else:
-            authorized = any(auth is not None for auth in manager._auth_store.values())
+            authorized = False
             reason = "Authentication required"
         if not authorized:
             await websocket.accept(subprotocol="jarvis-ws")
@@ -3578,7 +3823,7 @@ def create_app(
         if auth_payload is not None:
             authorized, reason = gateway._check_auth(auth_payload)
         else:
-            authorized = any(auth is not None for auth in manager._auth_store.values())
+            authorized = False
             reason = "Authentication required"
         if not authorized:
             await websocket.accept(subprotocol="jarvis-ws")

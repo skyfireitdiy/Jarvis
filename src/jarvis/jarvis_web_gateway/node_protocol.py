@@ -48,6 +48,10 @@ CONFIG_SET_REQUEST = "config_set_request"
 CONFIG_SET_RESPONSE = "config_set_response"
 CODE_UPDATE_TO_MAIN_REQUEST = "code_update_to_main_request"
 CODE_UPDATE_TO_MAIN_RESPONSE = "code_update_to_main_response"
+DAEMON_CAPABILITY_LIST_REQUEST = "daemon_capability_list_request"
+DAEMON_CAPABILITY_LIST_RESPONSE = "daemon_capability_list_response"
+DAEMON_CAPABILITY_CALL_REQUEST = "daemon_capability_call_request"
+DAEMON_CAPABILITY_CALL_RESPONSE = "daemon_capability_call_response"
 ERROR = "error"
 
 

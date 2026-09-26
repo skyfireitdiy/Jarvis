@@ -65,6 +65,10 @@ from .node_protocol import (
     CONFIG_SET_RESPONSE,
     CODE_UPDATE_TO_MAIN_REQUEST,
     CODE_UPDATE_TO_MAIN_RESPONSE,
+    DAEMON_CAPABILITY_LIST_REQUEST,
+    DAEMON_CAPABILITY_LIST_RESPONSE,
+    DAEMON_CAPABILITY_CALL_REQUEST,
+    DAEMON_CAPABILITY_CALL_RESPONSE,
     NODE_AUTH,
     NODE_AUTH_RESULT,
     NODE_HEARTBEAT,
@@ -299,6 +303,18 @@ class NodeConnectionManager:
                         node_id,
                         request_id,
                     )
+                    continue
+                if message_type == DAEMON_CAPABILITY_LIST_REQUEST:
+                    response = await self._handle_daemon_capability_list_request(
+                        next_message
+                    )
+                    await websocket.send_json(response)
+                    continue
+                if message_type == DAEMON_CAPABILITY_CALL_REQUEST:
+                    response = await self._handle_daemon_capability_call_request(
+                        next_message
+                    )
+                    await websocket.send_json(response)
                     continue
                 logger.warning(
                     "[NODE] unhandled message node_id=%s type=%s request_id=%s",
@@ -1278,6 +1294,118 @@ class NodeConnectionManager:
                 request_id=request_id,
             )
 
+    async def _handle_daemon_capability_list_request(
+        self, message: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """处理守护进程能力列表请求（child 端）。
+
+        master 把「查询某节点上守护进程能力」的请求转发到 child，
+        child 再向本机守护进程连接发起 capability.list。
+        """
+        payload = message.get("payload") or {}
+        request_id = message.get("request_id")
+        session_id = str(payload.get("session_id") or "").strip()
+        timeout = float(payload.get("timeout") or 15.0)
+        user_id = payload.get("user_id")
+        is_admin = bool(payload.get("is_admin"))
+        logger.info(
+            "[NODE DAEMON] child handling capability list session_id=%s request_id=%s",
+            session_id,
+            request_id,
+        )
+        try:
+            from .daemon_capability_manager import daemon_capability_manager
+
+            capabilities = await daemon_capability_manager.list_capabilities(
+                session_id,
+                timeout=timeout,
+                user_id=user_id,
+                is_admin=is_admin,
+            )
+            return build_node_message(
+                DAEMON_CAPABILITY_LIST_RESPONSE,
+                {"success": True, "capabilities": capabilities},
+                request_id=request_id,
+            )
+        except Exception as exc:
+            logger.error(
+                "[NODE DAEMON] child capability list failed session_id=%s error=%s",
+                session_id,
+                exc,
+            )
+            return build_node_message(
+                DAEMON_CAPABILITY_LIST_RESPONSE,
+                {
+                    "success": False,
+                    "error": {
+                        "code": "DAEMON_CAPABILITY_LIST_FAILED",
+                        "message": str(exc),
+                    },
+                },
+                request_id=request_id,
+            )
+
+    async def _handle_daemon_capability_call_request(
+        self, message: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """处理守护进程能力调用请求（child 端）。
+
+        master 把「调用某节点上守护进程能力」的请求转发到 child，
+        child 再向本机守护进程连接发起 capability.call。
+        """
+        payload = message.get("payload") or {}
+        request_id = message.get("request_id")
+        session_id = str(payload.get("session_id") or "").strip()
+        name = str(payload.get("name") or "").strip()
+        params = payload.get("params") or {}
+        timeout = float(payload.get("timeout") or 30.0)
+        user_id = payload.get("user_id")
+        is_admin = bool(payload.get("is_admin"))
+        logger.info(
+            "[NODE DAEMON] child handling capability call session_id=%s name=%s request_id=%s",
+            session_id,
+            name,
+            request_id,
+        )
+        try:
+            from .daemon_capability_manager import daemon_capability_manager
+
+            result = await daemon_capability_manager.call_capability(
+                session_id,
+                name,
+                params=params,
+                timeout=timeout,
+                user_id=user_id,
+                is_admin=is_admin,
+            )
+            return build_node_message(
+                DAEMON_CAPABILITY_CALL_RESPONSE,
+                {
+                    "success": bool(result.get("success")),
+                    "data": result.get("data"),
+                    "error": result.get("error") or "",
+                },
+                request_id=request_id,
+            )
+        except Exception as exc:
+            logger.error(
+                "[NODE DAEMON] child capability call failed session_id=%s name=%s error=%s",
+                session_id,
+                name,
+                exc,
+            )
+            return build_node_message(
+                DAEMON_CAPABILITY_CALL_RESPONSE,
+                {
+                    "success": False,
+                    "error": {
+                        "code": "DAEMON_CAPABILITY_CALL_FAILED",
+                        "message": str(exc),
+                    },
+                },
+                request_id=request_id,
+            )
+
     async def _handle_config_get_request(
         self, message: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -1823,6 +1951,18 @@ class ChildNodeClient:
                     continue
                 if message_type == CODE_UPDATE_TO_MAIN_REQUEST:
                     response = await self._handle_code_update_to_main_request(
+                        next_message
+                    )
+                    await self._ws.send(json.dumps(response))
+                    continue
+                if message_type == DAEMON_CAPABILITY_LIST_REQUEST:
+                    response = await self._node_connection_manager._handle_daemon_capability_list_request(
+                        next_message
+                    )
+                    await self._ws.send(json.dumps(response))
+                    continue
+                if message_type == DAEMON_CAPABILITY_CALL_REQUEST:
+                    response = await self._node_connection_manager._handle_daemon_capability_call_request(
                         next_message
                     )
                     await self._ws.send(json.dumps(response))

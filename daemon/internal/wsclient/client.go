@@ -1,8 +1,8 @@
 // Package wsclient 实现与网关的 WebSocket 连接。
 //
-// 协议与浏览器扩展完全一致（见 browser_extension/background/ws_client.js）：
-//   - 连接 {ws_gateway}/api/browser-ext/ws
-//   - 子协议 ["jarvis-ext", "jarvis-token.<urlencoded-token>"]
+// 协议与浏览器扩展一致，但走独立的守护进程端点：
+//   - 连接 {ws_gateway}/api/daemon/ws
+//   - 子协议 ["jarvis-daemon", "jarvis-token.<urlencoded-token>"]
 //   - 首帧 hello，应答 hello_ack
 //   - 周期性 ping / pong
 //   - 关闭码 4401/4403 表示鉴权失败，不再重连
@@ -22,6 +22,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"jarvis-daemon/internal/capability"
 	"jarvis-daemon/internal/handler"
 )
 
@@ -52,6 +53,8 @@ type Options struct {
 	OnAuthError func(code int, reason string)
 	// OnSession 在收到 hello_ack 时回调，参数为 session_id。
 	OnSession func(sessionID string)
+	// Registry 是能力注册表；为 nil 时回退到旧的占位 Dispatch 行为。
+	Registry *capability.Registry
 }
 
 // Client 是网关 WebSocket 客户端。
@@ -313,8 +316,55 @@ func (c *Client) handleMessage(conn *websocket.Conn, msg map[string]any) {
 		}
 	case "command":
 		c.handleCommand(conn, msg)
+	case "capability.list":
+		c.handleCapabilityList(conn)
+	case "capability.call":
+		c.handleCapabilityCall(conn, msg)
 	default:
 		log.Printf("[wsclient] 收到未处理的消息类型: %s", msgType)
+	}
+}
+
+// handleCapabilityList 回应网关的能力列表查询。
+func (c *Client) handleCapabilityList(conn *websocket.Conn) {
+	caps := []capability.Capability{}
+	if c.opts.Registry != nil {
+		caps = c.opts.Registry.List()
+	}
+	reply := map[string]any{
+		"type":         "capability.list.result",
+		"capabilities": caps,
+	}
+	if err := conn.WriteJSON(reply); err != nil {
+		log.Printf("[wsclient] 回能力列表失败: %v", err)
+	}
+}
+
+// handleCapabilityCall 执行一次能力调用并回结果。
+func (c *Client) handleCapabilityCall(conn *websocket.Conn, msg map[string]any) {
+	callID, _ := msg["id"].(string)
+	name, _ := msg["name"].(string)
+
+	var res capability.Result
+	switch {
+	case c.opts.Registry == nil:
+		res = capability.Result{Success: false, Error: "capability registry is nil"}
+	case name == "":
+		res = capability.Result{Success: false, Error: "capability name is empty"}
+	default:
+		params, _ := msg["params"].(map[string]any)
+		res = c.opts.Registry.Execute(name, params)
+	}
+
+	reply := map[string]any{
+		"type":    "capability.call.result",
+		"id":      callID,
+		"success": res.Success,
+		"data":    res.Data,
+		"error":   res.Error,
+	}
+	if err := conn.WriteJSON(reply); err != nil {
+		log.Printf("[wsclient] 回能力调用结果失败: %v", err)
 	}
 }
 
@@ -330,7 +380,13 @@ func (c *Client) handleCommand(conn *websocket.Conn, msg map[string]any) {
 		log.Printf("[wsclient] 指令解析失败: %v", err)
 		return
 	}
-	result := handler.Dispatch(cmd)
+	// 已接入能力注册表时走注册表，否则保持旧的占位行为。
+	var result handler.Result
+	if c.opts.Registry != nil {
+		result = handler.DispatchWith(c.opts.Registry, cmd)
+	} else {
+		result = handler.Dispatch(cmd)
+	}
 	if err := conn.WriteJSON(result); err != nil {
 		log.Printf("[wsclient] 回结果失败: %v", err)
 	}
@@ -377,7 +433,7 @@ func ReconnectDelay(attempt, minSec, maxSec int) time.Duration {
 
 // BuildSubprotocols 构造 WS 子协议列表。
 func BuildSubprotocols(token string) []string {
-	protocols := []string{"jarvis-ext"}
+	protocols := []string{"jarvis-daemon"}
 	if token != "" {
 		protocols = append(protocols, "jarvis-token."+url.QueryEscape(token))
 	}
@@ -391,7 +447,7 @@ func BuildWSURL(gateway string) (string, error) {
 		return "", errors.New("网关地址为空")
 	}
 	ws := ToWSURL(g)
-	return ws + "/api/browser-ext/ws", nil
+	return ws + "/api/daemon/ws", nil
 }
 
 // NormalizeGateway 规范化网关地址：补协议、去尾部斜杠。

@@ -12,7 +12,7 @@
 具体而言：
 
 1. 网页（已登录）把登录信息（JWT + 网关地址）推送给本地守护进程；
-2. 守护进程使用与浏览器扩展**相同的 WebSocket 子协议**连接网关；
+2. 守护进程使用**独立端点** `/api/daemon/ws`（子协议 `jarvis-daemon`）连接网关，握手/心跳形态与浏览器扩展一致；
 3. 保持在线：`hello` / `hello_ack` / 心跳 / 断线重连；
 4. 能接收网关下发的指令，并返回**占位结果**（`not_implemented`）。
 
@@ -32,23 +32,24 @@
 └──────────────┘                                    │  (Go, 常驻)         │
                                                     └─────────┬──────────┘
                                                               │ ②WS 子协议
-                                                              │ ["jarvis-ext",
+                                                              │ ["jarvis-daemon",
                                                               │  "jarvis-token.<jwt>"]
                                                               ▼
                                                     ┌────────────────────┐
-                                                    │ 网关 /api/browser-  │
-                                                    │ ext/ws              │
+                                                    │ 网关 /api/daemon/ws │
                                                     │  hello/hello_ack    │
                                                     │  ping/pong          │
-                                                    │  command/result     │
+                                                    │  capability.list    │
+                                                    │  capability.call    │
                                                     └────────────────────┘
 ```
 
-**关键设计**：守护进程复用浏览器扩展的协议，在网关眼里它就是一个"扩展会话"。
+**关键设计**：守护进程使用与浏览器扩展一致的握手/心跳形态，但走**独立端点**，
+网关侧由独立的 `daemon_capability_manager` 管理会话，与扩展会话互不干扰。
 
 因此：
 
-- **网关侧零改动**：直接复用现有端点 `app.py:3248`（`/api/browser-ext/ws`）与会话管理 `browser_extension_manager.handle_extension_websocket`；
+- **网关侧**：新增端点 `/api/daemon/ws`（`app.py`）与会话管理 `daemon_capability_manager.handle_daemon_websocket`，并提供 `/api/daemon/sessions`、`/api/daemon/capability/list`、`/api/daemon/capability/call` 三个 HTTP API 供 Agent 工具层调用；
 - **网页侧极小改动**：只新增一个「认证本地进程」入口 + 一次 `fetch`，不动现有逻辑。
 
 ## 3. 认证链路
@@ -78,25 +79,26 @@ Content-Type: application/json
 
 ### 3.2 守护进程 → 网关
 
-完全照搬浏览器扩展的做法（`browser_extension/background/ws_client.js:65-69`）：
+守护进程与浏览器扩展使用同一套握手/心跳形态（参考 `browser_extension/background/ws_client.js:65-69`），但走独立端点：
 
-| 项       | 取值                                                                                            |
-| -------- | ----------------------------------------------------------------------------------------------- |
-| URL      | `{ws_gateway}/api/browser-ext/ws`                                                               |
-| 子协议   | `["jarvis-ext", "jarvis-token." + urlencode(token)]`                                            |
-| 首帧     | `{"type":"hello","client_id":...,"extension_version":...,"browser_info":...,"tabs":[]}`         |
-| 应答     | `{"type":"hello_ack","session_id":...,"heartbeat_interval":...,"latest_extension_version":...}` |
-| 心跳     | 按 `heartbeat_interval`（默认 20s）发 `{"type":"ping"}`，收 `pong`                              |
-| 指令     | 收 `{"id","type":"command","action","params","timeout_ms"}` → 回 `{"id","type":"result",...}`   |
-| 鉴权失败 | 关闭码 `4401` / `4403` → 标记 Token 失效，**不重连**，等网页重新推送                            |
-| 其他断开 | 指数退避重连：1s → 30s                                                                          |
+| 项       | 取值                                                                                                                                              |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| URL      | `{ws_gateway}/api/daemon/ws`                                                                                                                      |
+| 子协议   | `["jarvis-daemon", "jarvis-token." + urlencode(token)]`                                                                                           |
+| 首帧     | `{"type":"hello","client_id":...,"extension_version":...,"browser_info":...,"tabs":[]}`                                                           |
+| 应答     | `{"type":"hello_ack","session_id":...,"heartbeat_interval":...}`                                                                                  |
+| 心跳     | 按 `heartbeat_interval`（默认 20s）发 `{"type":"ping"}`，收 `pong`                                                                                |
+| 能力     | 收 `{"type":"capability.list"}` → 回 `capability.list.result`；收 `{"type":"capability.call","id","name","params"}` → 回 `capability.call.result` |
+| 鉴权失败 | 关闭码 `4401` / `4403` → 标记 Token 失效，**不重连**，等网页重新推送                                                                              |
+| 其他断开 | 指数退避重连：1s → 30s                                                                                                                            |
 
-守护进程作为"扩展会话"的字段约定：
+守护进程会话的字段约定：
 
 - `client_id`：`daemon-<hostname>-<uuid>`
 - `extension_version`：守护进程自身版本
 - `browser_info`：标识为守护进程（如 `{"name":"jarvis-daemon","os":...}`）
 - `tabs`：空数组
+- `user_id`：**不由守护进程上报**，而是网关从 WS 子协议中的 `jarvis-token.<token>` 解析得到并绑定到会话上，用于多用户隔离（见 8.7）
 
 ### 3.3 状态查询
 
@@ -147,9 +149,17 @@ daemon/                          # 与 browser_extension/ 同级
     ├── auth/
     │   └── store.go             # 内存 token / gateway 存储
     ├── wsclient/
-    │   └── client.go            # WS 子协议 + hello + 心跳 + 重连
+    │   ├── client.go            # WS 子协议 + hello + 心跳 + 重连 + 能力消息处理
+    │   └── client_capability_test.go # 能力列表 / 能力调用 的 WS 单元测试
+    ├── capability/
+    │   ├── capability.go        # Platform / Capability / Result / Registry
+    │   ├── platform.go          # Current / Matches（平台判定）
+    │   ├── registry_linux.go    # //go:build linux：Linux 能力装配（本轮空）
+    │   ├── registry_windows.go  # //go:build windows：Windows 能力装配（本轮空）
+    │   ├── registry_other.go    # //go:build !linux && !windows：兜底（本轮空）
+    │   └── capability_test.go   # 注册 / 查询 / 平台过滤 / 执行 单元测试
     └── handler/
-        └── dispatch.go          # command 分发（本轮占位返回 not_implemented）
+        └── dispatch.go          # command 分发（action 即能力名；未接入注册表时占位返回 not_implemented）
 ```
 
 ## 6. 配置
@@ -233,7 +243,129 @@ internal/service/
 
 平台分发通过 `newPlatformService()` 由各平台文件提供，`New()` 在返回 nil 时兜底为 `unsupportedService`（避免在无构建标签的文件里引用平台专有类型）。
 
-## 8. 网页侧改动
+## 8. 能力注册表（Capability Registry）
+
+### 8.1 设计目标与参考对象
+
+守护进程需要一套统一的方式描述「本机可以做什么」，让网关（进而让模型）能够**先查询能力、再按名调用**，而不必在网关侧硬编码平台差异。
+
+参考对象是 Python 侧 `src/jarvis/jarvis_tools/registry.py` 的 `Tool` / `ToolRegistry` 模型：每个工具由 `name` / `description` / `parameters` / `func` 四要素构成，注册表负责注册、查询、列出与执行。Go 侧做等价映射，但改用 Go 惯用法：`Handler` 返回 `(any, error)`，结果用 `Result{Success, Data, Error}` 表达。
+
+### 8.2 Capability 结构
+
+| 字段          | 类型                                       | 说明                                              |
+| ------------- | ------------------------------------------ | ------------------------------------------------- |
+| `name`        | `string`                                   | 能力唯一名称，建议「域.动作」形式（如 `fs.read`） |
+| `description` | `string`                                   | 能力说明，供模型理解用途                          |
+| `parameters`  | `map[string]any`                           | 参数 JSON schema 描述，可为空                     |
+| `platform`    | `Platform`                                 | 适用平台；为空时视为 `any`                        |
+| `handler`     | `func(params map[string]any) (any, error)` | 能力实现；不参与 JSON 序列化（`json:"-"`）        |
+
+`Result` 为一次调用的结果：`success`（bool）、`data`（any）、`error`（string）。
+
+### 8.3 Registry 接口
+
+| 方法                             | 说明                                                                                                                                                   |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `NewRegistry()`                  | 创建注册表，并调用 `registerPlatformCapabilities` 装配当前平台能力                                                                                     |
+| `Register(cap Capability) error` | 注册能力；名称为空或重复注册均返回错误（不静默覆盖）                                                                                                   |
+| `Get(name string)`               | 按名查询，返回 `(*Capability, bool)`                                                                                                                   |
+| `List()`                         | 返回全部能力副本，按名称升序                                                                                                                           |
+| `ListForPlatform(p Platform)`    | 返回适用于指定平台的能力（含 `any`），按名称升序                                                                                                       |
+| `Execute(name, params) Result`   | 按名执行；未注册返回 `unknown capability: <name>`；`handler` 为 nil 返回 `capability not implemented: <name>`；`handler` panic 会被 recover 并转为错误 |
+
+注册表并发安全（`sync.RWMutex`），且**不含任何全局状态**——`NewRegistry()` 每次返回独立实例，因此多个守护进程连接同一网关时互不干扰。
+
+### 8.4 平台划分与分发方式
+
+平台取值：`windows` / `linux` / `darwin` / `any`，其中 `any` 表示跨平台通用能力（`Matches` 对任意平台返回 true）。
+
+平台专有能力通过**构建标签**装配：
+
+```text
+internal/capability/
+├── capability.go          # 无标签：类型与注册表
+├── platform.go            # 无标签：Current / Matches
+├── registry_linux.go      # //go:build linux
+├── registry_windows.go    # //go:build windows
+└── registry_other.go      # //go:build !linux && !windows
+```
+
+各平台文件提供 `registerPlatformCapabilities(reg *Registry)`，由 `NewRegistry()` 调用。之所以不把 `runtime.GOOS` 的 `switch` 写在无标签文件里，是因为那样会引用平台专有类型，交叉编译（如 `GOOS=windows go build`）时对应类型被排除而直接编译失败。该做法与 `internal/service` 的 `newPlatformService()` 一致。
+
+### 8.5 WS 协议扩展
+
+在既有 WS 连接上新增两类消息（网关 → 守护进程）：
+
+#### 查询能力列表
+
+```json
+{ "type": "capability.list" }
+```
+
+```json
+{
+  "type": "capability.list.result",
+  "capabilities": [
+    {
+      "name": "fs.read",
+      "description": "读取文件内容",
+      "parameters": {
+        "type": "object",
+        "properties": { "path": { "type": "string" } }
+      },
+      "platform": "any"
+    }
+  ]
+}
+```
+
+#### 调用能力
+
+```json
+{
+  "type": "capability.call",
+  "id": "call-1",
+  "name": "fs.read",
+  "params": { "path": "/tmp/a.txt" }
+}
+```
+
+```json
+{
+  "type": "capability.call.result",
+  "id": "call-1",
+  "success": true,
+  "data": { "content": "..." },
+  "error": ""
+}
+```
+
+失败时 `success` 为 `false`、`error` 给出原因（如 `unknown capability: fs.read`、`capability registry is nil`、`capability name is empty`）。
+
+### 8.6 与扩展 command/result 信封的关系
+
+指令的信封结构保持不变（`{id, type:"command", action, params, timeout_ms}` → `{id, type:"result", success, data, error}`），只是 **`action` 现在就是能力名**：接入注册表后由 `handler.DispatchWith(reg, cmd)` 执行，未接入（`Registry` 为 nil）时回退到旧的占位实现（返回 `not_implemented`），保证向后兼容。
+
+### 8.7 本轮范围
+
+本轮**只实现框架**：
+
+- 未注册任何实际能力（Linux / Windows 操作能力均未注册，`registerPlatformCapabilities` 为空实现）；
+- 网关侧（Python）已实现：新增独立端点 `/api/daemon/ws` 与会话管理 `daemon_capability_manager`，并提供 `/api/daemon/sessions`、`/api/daemon/capability/list`、`/api/daemon/capability/call` 三个 HTTP API；跨节点调用经 `node_protocol` 的 `daemon_capability_*` 消息由 `NodeConnectionManager` 转发；
+- 多守护进程连接同一网关时，网关侧以 `hello` 中的 `client_id` 区分会话（`session_id` 由网关分配），能力调用结果按 `id` 回投到对应会话。
+
+#### 多用户隔离
+
+守护进程能力可在用户本机执行任意操作，因此网关侧必须做用户级隔离，避免任意有效 Token 跨用户调用他人机器：
+
+- **会话绑定 `user_id`**：`/api/daemon/ws` 端点鉴权成功后，从 `auth_payload["user_info"]` 取 `user_id` 传入 `DaemonCapabilityManager.handle_daemon_websocket`，写入会话；浏览器扩展端点（`/api/browser-ext/ws`）同样处理。
+- **去掉「无 Token 也放行」兜底**：daemon 与 browser-ext 的 WS 端点原先在未携带 token 时以「网关存在任一已登录会话」为由放行，现已改为直接鉴权失败（4401）。
+- **HTTP API 归属校验**：`/api/daemon/capability/list`、`/api/daemon/capability/call`、`/api/browser-ext/command` 在调用前用 `check_session_access(session_id, user_id, is_admin)` 校验会话归属；`/api/daemon/sessions`、`/api/browser-ext/sessions` 按 `user_id` 过滤（`user_id` 为 `system` 或 `is_admin` 时可见全部）。
+- **跨节点转发携带 `user_id`**：master 把 `daemon_capability_list_request` / `daemon_capability_call_request` 转发到 child 时，payload 中带上 `user_id` 与 `is_admin`，child 侧再次校验归属，避免绕过。
+- **拒绝语义**：会话不存在返回 `daemon session not found: <id>`；跨用户返回 `forbidden: daemon session belongs to another user`。
+
+## 9. 网页侧改动
 
 仅一处：新增「认证本地进程」按钮，点击后：
 
@@ -250,28 +382,33 @@ await fetch("http://127.0.0.1:17800/api/auth", {
 
 不改动任何现有逻辑。
 
-## 9. 验证方式
+## 10. 验证方式
 
 1. `go build ./...` 通过；
 2. 启动守护进程，`curl -X POST http://127.0.0.1:17800/api/auth -d '{"gateway":"...","token":"<真实JWT>"}'`；
 3. `GET /api/status` 返回 `connected: true` 且带 `session_id`；
-4. 网关侧 `GET /api/browser-ext/sessions` 能看到该会话；
-5. 网关下发测试 command → 守护进程返回占位 `result`；
-6. 断线后按退避重连；Token 失效（4401）时不空转重连。
+4. 网关侧 `GET /api/daemon/sessions` 能看到该会话；
+5. 网关侧 `POST /api/daemon/capability/list`（带 `session_id`）→ 返回能力列表（当前为空数组）；
+6. 网关侧 `POST /api/daemon/capability/call`（带 `session_id`/`name`/`params`）→ 返回 `unknown capability: <name>`；
+7. 断线后按退避重连；Token 失效（4401）时不空转重连；
+8. 多用户隔离：用用户 A 的 Token 携带用户 B 的 `session_id` 调用 `capability/list` 或 `capability/call` → 返回 `forbidden: daemon session belongs to another user`；`GET /api/daemon/sessions` 只返回 A 自己的会话；未携带 Token 连接 `/api/daemon/ws` → 关闭码 4401。
 
-## 10. 后续（不在本轮）
+## 11. 后续（不在本轮）
 
 - 指令的真实执行（业务功能）；
 - 守护进程自更新；
 - 浏览器扩展更新（下载 zip → 覆盖扩展目录 → 通知 `chrome.runtime.reload()`）；
 - 服务端更新。
 
-## 11. 已确认的决策
+## 12. 已确认的决策
 
-| 项           | 决定                                                          |
-| ------------ | ------------------------------------------------------------- |
-| 本地端口鉴权 | 不做鉴权（仅绑 127.0.0.1）                                    |
-| 端口 / 配置  | 默认 `127.0.0.1:17800`，配置走 `~/.jarvis/daemon/config.yaml` |
-| 代码位置     | `daemon/`，与浏览器扩展同目录                                 |
-| 本轮范围     | 只打通链路与通信                                              |
-| 扩展目录路径 | 后续再定（本轮不涉及扩展更新）                                |
+| 项             | 决定                                                          |
+| -------------- | ------------------------------------------------------------- |
+| 本地端口鉴权   | 不做鉴权（仅绑 127.0.0.1）                                    |
+| 端口 / 配置    | 默认 `127.0.0.1:17800`，配置走 `~/.jarvis/daemon/config.yaml` |
+| 代码位置       | `daemon/`，与浏览器扩展同目录                                 |
+| 本轮范围       | 只打通链路与通信                                              |
+| 扩展目录路径   | 后续再定（本轮不涉及扩展更新）                                |
+| 能力命名       | 「域.动作」形式（如 `fs.read`），`action` 即能力名            |
+| 能力平台分发   | 用构建标签（`registry_*.go`），不在无标签文件里写平台 switch  |
+| 能力注册表范围 | 本轮只实现框架，不注册任何实际能力；网关侧未实现              |
