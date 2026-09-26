@@ -166,19 +166,27 @@ func handleWindowsServiceStatus(params map[string]any) (any, error) {
 	// 用 Get-CimInstance Win32_Service 可拿到更多字段（启动类型、进程 ID、路径等），
 	// 比 Get-Service 更接近 systemctl show 的信息量。
 	//
-	// 关键：-Filter 需要的是 **WQL 谓词**（如 Name='Spooler'），不是裸字符串。
-	// 早期实现直接传 encodePowerShellText(unit)（即 'Spooler'），WQL 解析后
-	// 匹配不到任何实例，导致**所有服务名都报「未找到服务」**（真机实测暴露）。
+	// 关键：-Filter 需要的是 **WQL 谓词**，且字符串值必须用**单引号包裹**，
+	// 形如 Name='Spooler'。真机实测两种错误写法都会导致「无效查询 HRESULT 0x80041017」
+	// 或匹配不到任何实例，从而**所有服务名都报「未找到服务」**：
+	//   - 传裸字符串 'Spooler'（早期实现）→ 不是谓词；
+	//   - 传 'Name=' + 'Spooler' → 拼出 Name=Spooler，值缺引号。
+	//
+	// 因此这里在 PowerShell 侧显式构造带引号的谓词：先对 unit 做单引号转义
+	// （encodePowerShellText 会把内部的 ' 写成 ''），再拼进 WQL 的单引号里。
+	// 由于 WQL 与 PowerShell 的单引号转义规则不同，这里分两步：
+	//   1. Go 侧把 unit 转成 PowerShell 单引号字面量（用于构造查询串）；
+	//   2. 查询串内再包一层 WQL 单引号。
 	//
 	// 另外按描述承诺支持显示名：先按 Name 精确匹配，未命中再按 DisplayName 匹配。
-	// 两处都用 encodePowerShellText 做单引号转义，防注入。
 	quoted := encodePowerShellText(unit)
 	script := fmt.Sprintf(
-		"$s = Get-CimInstance Win32_Service -Filter ('Name=' + %s); "+
-			"if ($null -eq $s) { $s = Get-CimInstance Win32_Service -Filter ('DisplayName=' + %s) }; "+
+		"$name = %s; "+
+			"$s = Get-CimInstance Win32_Service -Filter (\"Name='\" + $name + \"'\"); "+
+			"if ($null -eq $s) { $s = Get-CimInstance Win32_Service -Filter (\"DisplayName='\" + $name + \"'\") }; "+
 			"if ($null -eq $s) { Write-Output 'NOT_FOUND'; exit 0 }; "+
 			"$s | Select-Object Name,DisplayName,State,StartMode,ProcessId,PathName,Status | ConvertTo-Csv -NoTypeInformation",
-		quoted, quoted,
+		quoted,
 	)
 
 	out, err := runWindowsPowerShellCommand(script, windowsServiceTimeout)
