@@ -103,8 +103,6 @@ from jarvis.jarvis_web_gateway.node_protocol import (
     CONFIG_GET_REQUEST,
     CONFIG_SET_REQUEST,
     CODE_UPDATE_TO_MAIN_REQUEST,
-    DAEMON_CAPABILITY_LIST_REQUEST,
-    DAEMON_CAPABILITY_CALL_REQUEST,
 )
 from jarvis import __version__ as JARVIS_VERSION
 from jarvis.jarvis_web_gateway.node_runtime import AgentRouteInfo, NodeRuntime
@@ -2325,9 +2323,22 @@ def create_app(
     # 守护进程（jarvis-daemon）API：供 Agent 工具层（子进程）通过 HTTP 调用
     # ------------------------------------------------------------------
     def _resolve_daemon_session_node(session_id: str) -> Optional[str]:
-        """判断守护进程会话是否属于远端节点。
+        """返回承载指定守护进程会话的远端节点 ID；本机会话返回 None。
 
-        会话在本机（含 master 自身）时返回 None；属于远端节点时返回该 node_id。
+        背景：守护进程（jarvis-daemon）只与「它直连的那个网关进程」通信，
+        会话登记在哪个进程，能力就必须由哪个进程执行。当前架构下守护进程
+        会话不做跨节点同步（node_protocol 中没有会话同步类消息），因此
+        本进程能查到的会话必然是本机会话，本函数恒返回 None。
+
+        保留本函数是为了给跨节点能力留出唯一入口：将来实现「会话跨节点
+        同步」后，只需在此处改为依据会话真实归属返回 node_id，调用方
+        （能力查询/调用接口）即可自动获得转发能力，无需再改接口层。
+
+        注意：不能用会话的 ``node_id`` 直接当节点归属——该字段来自守护进程
+        hello 自报，缺省时回退为 client_id（形如 daemon-<host>-<pid>），
+        只是客户端标识。历史实现正是把它当节点 ID 去转发，导致命中不存在
+        的节点并报 "node connection not found"。因此这里要求它必须能在
+        node_registry 中查到真实节点，否则视为本机会话。
         """
         session = daemon_capability_manager.get_session(session_id)
         if session is None:
@@ -2335,6 +2346,9 @@ def create_app(
         node_id = str(session.get("node_id") or "").strip()
         local_node_id = _node_runtime.local_node_id if _node_runtime else "master"
         if not node_id or node_id in (local_node_id, "master"):
+            return None
+        registry = _node_runtime.node_registry if _node_runtime else None
+        if registry is None or registry.get(node_id) is None:
             return None
         return node_id
 
@@ -2359,7 +2373,7 @@ def create_app(
 
         请求体：{"session_id": str, "timeout": float}
         非管理员只能查询属于自己（token 对应 user_id）的会话。
-        会话属于远端节点时，经 node 隧道转发到该节点执行。
+        守护进程会话不做跨节点同步，故一律在本进程处理。
         """
         try:
             body = await request.json()
@@ -2375,43 +2389,12 @@ def create_app(
         user_info = request.state.user_info or {}
         user_id = user_info.get("user_id")
         is_admin = bool(user_info.get("is_admin"))
-        # 会话归属校验（远端节点侧会再校验一次，这里先给出明确错误）
+        # 会话归属校验
         allowed, reason = daemon_capability_manager.check_session_access(
             session_id, user_id, is_admin
         )
         if not allowed:
             return {"success": False, "error": reason}
-        remote_node_id = _resolve_daemon_session_node(session_id)
-        if remote_node_id is not None:
-            if _node_connection_manager is None:
-                return {
-                    "success": False,
-                    "error": "node connection manager unavailable",
-                }
-            try:
-                response = await _node_connection_manager.send_request_to_node(
-                    remote_node_id,
-                    DAEMON_CAPABILITY_LIST_REQUEST,
-                    {
-                        "session_id": session_id,
-                        "timeout": timeout,
-                        "user_id": user_id,
-                        "is_admin": is_admin,
-                    },
-                    timeout=timeout + 10.0,
-                )
-            except Exception as exc:
-                return {"success": False, "error": str(exc)}
-            payload = response.get("payload") or {}
-            if not payload.get("success"):
-                error = payload.get("error")
-                if isinstance(error, dict):
-                    error = error.get("message") or str(error)
-                return {
-                    "success": False,
-                    "error": error or "remote node request failed",
-                }
-            return {"success": True, "capabilities": payload.get("capabilities") or []}
         try:
             capabilities = await daemon_capability_manager.list_capabilities(
                 session_id,
@@ -2427,9 +2410,8 @@ def create_app(
     async def api_daemon_capability_call(request: Request) -> Dict[str, Any]:
         """调用指定守护进程会话的一项能力并等待结果。
 
-        请求体：{"session_id": str, "name": str, "params": dict, "timeout": float}
         非管理员只能调用属于自己（token 对应 user_id）的会话。
-        会话属于远端节点时，经 node 隧道转发到该节点执行。
+        守护进程会话不做跨节点同步，故一律在本进程执行。
         """
         try:
             body = await request.json()
@@ -2457,46 +2439,6 @@ def create_app(
         )
         if not allowed:
             return {"success": False, "error": reason}
-        remote_node_id = _resolve_daemon_session_node(session_id)
-        if remote_node_id is not None:
-            if _node_connection_manager is None:
-                return {
-                    "success": False,
-                    "error": "node connection manager unavailable",
-                }
-            try:
-                response = await _node_connection_manager.send_request_to_node(
-                    remote_node_id,
-                    DAEMON_CAPABILITY_CALL_REQUEST,
-                    {
-                        "session_id": session_id,
-                        "name": name,
-                        "params": params,
-                        "timeout": timeout,
-                        "user_id": user_id,
-                        "is_admin": is_admin,
-                    },
-                    timeout=timeout + 10.0,
-                )
-            except Exception as exc:
-                return {"success": False, "error": str(exc)}
-            payload = response.get("payload") or {}
-            if not payload.get("success"):
-                error = payload.get("error")
-                if isinstance(error, dict):
-                    error = error.get("message") or str(error)
-                return {
-                    "success": False,
-                    "error": error or "remote node request failed",
-                }
-            return {
-                "success": True,
-                "result": {
-                    "success": True,
-                    "data": payload.get("data"),
-                    "error": payload.get("error") or "",
-                },
-            }
         try:
             result = await daemon_capability_manager.call_capability(
                 session_id,
@@ -2508,7 +2450,14 @@ def create_app(
             )
         except Exception as exc:
             return {"success": False, "error": str(exc)}
-        return {"success": True, "result": result}
+        return {
+            "success": True,
+            "result": {
+                "success": bool(result.get("success")),
+                "data": result.get("data"),
+                "error": result.get("error") or "",
+            },
+        }
 
     @app.post("/api/browser-ext/scripts/save", dependencies=[Depends(verify_token)])
     async def api_browser_ext_script_save(request: Request) -> Dict[str, Any]:

@@ -183,7 +183,7 @@ func runDaemon(args []string) {
 
 	// 注册当前平台的能力，供网关下发指令时执行。
 	registry := capability.NewRegistry()
-	log.Printf("[daemon] 已注册 %d 个平台能力", len(registry.ListForPlatform(capability.PlatformLinux)))
+	log.Printf("[daemon] 已注册 %d 个平台能力", len(registry.ListForPlatform(capability.Current())))
 
 	manager := wsclient.NewManagerWithOptions(wsclient.ManagerOptions{
 		Options: wsclient.Options{
