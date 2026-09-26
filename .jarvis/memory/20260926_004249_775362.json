@@ -1,0 +1,8 @@
+{
+  "id": "20260926_004249_775362",
+  "type": "project_long_term",
+  "tags": ["jarvis", "frontend", "workspace-split", "bug", "App.vue"],
+  "content": "Jarvis 前端「未分割时打开文件 → 点左右分/上下分 → 两个 pane 全变 empty」根因与修复（App.vue，bundle index-Btpjpn_c.js）：\n\n根因：未分割态与已分割态的 leaf.view 语义不一致。未分割时内容一律由 workspaceMainView 承载，唯一 leaf 的 view 应恒为 'file'。但 closeWorkspacePane 的反向迁移（App.vue ~2458-2485）在「回到未分割」时只处理 session/chat/terminal/diff 分支，最后的 else 分支只设 workspaceMainView='file'，**没有把 only.view 归位**。若关闭的正是新分割出来的空 pane（view='empty'），存活 leaf 会残留 view='empty'。之后用户打开文件（未分割走单实例 cmEditorView，workspaceViewPanes 无记录），再点分割时 splitWorkspacePane 的补种条件 `if (target.view === 'file' && !workspaceViewPanes.has(target.id))` 因 target.view==='empty' 不成立 → 两个 pane 都 applyEditorViewModel → setModel(null) → 全空。\n\n修复（最小改动）：closeWorkspacePane 回到未分割后，若 only.view !== 'file' 则强制归位 only.view='file'; only.sessionPanelId=null; only.diff=null。\n\n验证（真实浏览器，硬刷新后）：打开 setup.py → 左右分（pane-1 view=file 带 setup.py 标签 + Monaco 可见，新 pane empty）→ 关闭空 pane 回未分割 → 再左右分/上下分，pane-1 仍为 file 且显示 setup.py；session 反向迁移路径（打开 Agent → 分割 → 关闭空 pane）仍正常回迁到 workspaceMainView='session'；无 console 错误、无 longtask、terminal-host=0。\n\n关键不变量：未分割态唯一 leaf 的 view 恒为 'file'，任何回到未分割的路径都必须把 leaf.view 归位。",
+  "created_at": "2026-09-26T00:42:49.775395",
+  "updated_at": "2026-09-26T00:42:49.775400"
+}

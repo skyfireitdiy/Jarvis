@@ -11,6 +11,7 @@
         :activePaneId="activePaneId"
         :canClose="true"
         :getTitle="getTitle"
+        :getStatus="getStatus"
         @activate="(id) => $emit('activate', id)"
         @split="(id, dir) => $emit('split', id, dir)"
         @close="(id) => $emit('close', id)"
@@ -32,6 +33,7 @@
         :activePaneId="activePaneId"
         :canClose="true"
         :getTitle="getTitle"
+        :getStatus="getStatus"
         @activate="(id) => $emit('activate', id)"
         @split="(id, dir) => $emit('split', id, dir)"
         @close="(id) => $emit('close', id)"
@@ -51,19 +53,15 @@
     :class="{ 'workspace-pane-leaf-active': node.id === activePaneId }"
     @mousedown="$emit('activate', node.id)"
   >
-    <div class="workspace-pane-leaf-header">
-      <span class="workspace-pane-leaf-title">{{ getTitle ? getTitle(node) : (node.view === 'session' ? '会话' : '文件') }}</span>
-      <div class="workspace-pane-leaf-actions">
-        <button v-if="canSplit" class="workspace-pane-leaf-btn" title="左右分" @click.stop="$emit('split', node.id, 'row')">◫</button>
-        <button v-if="canSplit" class="workspace-pane-leaf-btn" title="上下分" @click.stop="$emit('split', node.id, 'column')">⬓</button>
-        <button
-          v-if="canClose"
-          class="workspace-pane-leaf-btn"
-          title="关闭此区域"
-          @click.stop="$emit('close', node.id)"
-        >✕</button>
-      </div>
-    </div>
+    <WorkspacePaneHeader
+      :node="node"
+      :canSplit="canSplit"
+      :canClose="canClose"
+      :getTitle="getTitle"
+      :getStatus="getStatus"
+      @split="(id, dir) => $emit('split', id, dir)"
+      @close="(id) => $emit('close', id)"
+    />
     <div class="workspace-pane-leaf-body">
       <slot name="pane-content" :pane="node" :active="node.id === activePaneId" />
     </div>
@@ -72,6 +70,7 @@
 
 <script setup>
 import { defineProps, defineEmits } from 'vue'
+import WorkspacePaneHeader from './WorkspacePaneHeader.vue'
 
 const props = defineProps({
   node: { type: Object, required: true },
@@ -79,6 +78,7 @@ const props = defineProps({
   canClose: { type: Boolean, default: true },
   canSplit: { type: Boolean, default: true },
   getTitle: { type: Function, default: null },
+  getStatus: { type: Function, default: null },
 })
 
 defineEmits(['activate', 'split', 'close', 'startResize'])
@@ -148,45 +148,6 @@ function childStyle(index) {
 
 .workspace-pane-leaf-active {
   border-color: var(--color-accent);
-}
-
-.workspace-pane-leaf-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 2px 8px;
-  min-height: 24px;
-  background: var(--color-bg-primary);
-  border-bottom: 1px solid var(--color-border-subtle);
-  flex-shrink: 0;
-}
-
-.workspace-pane-leaf-title {
-  font-size: 12px;
-  color: var(--color-text-secondary);
-}
-
-.workspace-pane-leaf-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.workspace-pane-leaf-btn {
-  border: none;
-  background: transparent;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  font-size: 12px;
-  line-height: 1;
-  padding: 2px 4px;
-  border-radius: 3px;
-}
-
-.workspace-pane-leaf-btn:hover {
-  background: var(--color-bg-hover);
-  color: var(--color-text-primary);
 }
 
 .workspace-pane-leaf-body {

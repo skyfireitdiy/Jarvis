@@ -42,14 +42,12 @@
         :activeTabPath="activeWorkspaceTabPath"
         :tabs="workspaceTabs"
         :isMaximized="isWorkspaceMaximized"
-        :isEditable="isWorkspaceEditable"
         :showSidebar="showWorkspaceSidebar"
         :sidebarView="workspaceSidebarView"
         :mainView="workspaceMainView"
         :resizeDirections="workspaceResizeDirections"
         :embedded="true"
         :diff="workspaceDiff"
-        :canSplit="canSplitWorkspacePane"
         :isAdmin="!!auth.userInfo?.is_admin"
         @focus="focusWindow('workspace')"
         @startMove="startWorkspacePanelMove"
@@ -58,7 +56,6 @@
         @close="closeWorkspacePanel"
         @activateTab="activateWorkspaceTab"
         @closeTab="closeWorkspaceTab"
-        @toggleEditable="toggleWorkspaceEditable"
         @setSidebarView="toggleWorkspaceSidebarView"
         @setMainView="toggleWorkspaceMainView"
         @startResize="startWorkspacePanelResize"
@@ -67,7 +64,6 @@
         @diffNavPrev="navigateGitDiff('prev')"
         @diffNavNext="navigateGitDiff('next')"
         @closeDiff="closeWorkspaceDiff"
-        @splitPane="onWorkspaceSplitRequest($event)"
         @openSettings="showSettingsModal = true; pushOverlayState()"
         @openDocs="openDocs()"
         @openAdmin="showAdminPanel = true; pushOverlayState()"
@@ -479,6 +475,7 @@
             :activePaneId="activePaneId"
             :canSplit="windowWidth > 768"
             :getTitle="getWorkspacePaneTitle"
+            :getStatus="getWorkspacePaneStatus"
             @activate="activateWorkspacePane"
             @split="splitWorkspacePane"
             @close="closeWorkspacePane"
@@ -687,6 +684,19 @@
               </div>
             </template>
           </WorkspacePaneTree>
+        </template>
+        <!-- 未分割态的区域标题栏：与已分割时各 pane 的标题栏同源（WorkspacePaneHeader）。
+             未分割时内容由 workspaceMainView 承载，故用一个虚拟 node 反映真实视图，
+             使标题/状态文案与已分割时一致。canClose=false（唯一区域不可关闭）。 -->
+        <template #main-view-header>
+          <WorkspacePaneHeader
+            :node="workspaceMainViewHeaderNode"
+            :canSplit="canSplitWorkspacePane"
+            :canClose="false"
+            :getTitle="getWorkspacePaneTitle"
+            :getStatus="getWorkspacePaneStatus"
+            @split="splitWorkspacePane"
+          />
         </template>
         <!-- 编辑器主区域视图：聊天室 / 终端（嵌入模式，复用独立面板组件与状态） -->
         <template #main-view>
@@ -1285,7 +1295,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref, triggerRef, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, triggerRef, watch } from 'vue'
 // 必须用 ESM 版入口：包根路径在打包时会被解析到 min/（AMD 格式），
 // 拿不到 monaco.lsp（Monaco 内置的 LSP 客户端），也无法按 ESM 方式使用。
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.main.js'
@@ -1330,6 +1340,7 @@ import TerminalPanel from './components/TerminalPanel.vue'
 import ChatPanel from './components/ChatPanel.vue'
 import WorkspacePanel from './components/WorkspacePanel.vue'
 import WorkspacePaneTree from './components/WorkspacePaneTree.vue'
+import WorkspacePaneHeader from './components/WorkspacePaneHeader.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import CreateAgentModal from './components/CreateAgentModal.vue'
@@ -2336,11 +2347,6 @@ function activateWorkspacePane(paneId) {
     remountMonacoEditor()
   })
 }
-// 编辑器工具栏「分屏」按钮的入口：对「激活 pane」执行分割。
-// 单独包一层是为了避免模板里直接传 activePaneId 带来的作用域歧义。
-function onWorkspaceSplitRequest(direction) {
-  splitWorkspacePane(activePaneId.value, direction)
-}
 // 以 direction 方向切分指定 leaf：把该 leaf 替换为 split，原 leaf 保留在首位，
 // 新 leaf 成为激活 pane。
 // 注意：session / chat / terminal leaf 不能把承载内容复制给新 leaf（否则同一 Panel 或同一
@@ -2481,6 +2487,14 @@ function closeWorkspacePane(paneId) {
       } else {
         workspaceMainView.value = 'file'
       }
+      // 未分割态的唯一 leaf 必须归位为 'file'：未分割时内容一律由 workspaceMainView 承载，
+      // leaf.view 只是「已分割」语义下的占位。若残留 'empty'（例如关闭的正是新分割出来的空 pane），
+      // 之后再次分割会因 target.view !== 'file' 而不把当前文件绑到原 pane，导致两个 pane 全空。
+      if (only.view !== 'file') {
+        only.view = 'file'
+        only.sessionPanelId = null
+        only.diff = null
+      }
     }
   }
   persistWorkspacePaneLayout()
@@ -2554,7 +2568,14 @@ function findWorkspacePaneByView(view, exceptPaneId = null) {
 // 返回是否成功改写（未分割或没有激活 pane 时返回 false，调用方回退到旧路径）。
 function setActivePaneView(view, sessionPanelId = null) {
   if (!isWorkspaceSplit.value) return false
-  let pane = activePane.value
+  const pane = activePane.value
+  if (!pane) return false
+  return setActivePaneViewForPane(pane, view, sessionPanelId)
+}
+
+// 把「指定 pane」的视图切换为 view（file / session / chat / terminal / diff / empty）。
+// 与 setActivePaneView 的区别：作用于传入的 pane，而非当前激活 pane（用于「收起」时定位承载 host 的 pane）。
+function setActivePaneViewForPane(pane, view, sessionPanelId = null) {
   if (!pane) return false
   if (view === 'session') {
     if (!sessionPanelId) return false
@@ -2615,6 +2636,29 @@ function getWorkspacePaneTitle(pane) {
   const panePath = workspaceViewPanes.get(pane.id) || (pane.id === activePaneId.value ? activeWorkspaceTabPath.value : null)
   if (panePath) return panePath.split('/').pop() || panePath
   return '文件'
+}
+
+// 未分割态标题栏用的虚拟 node：未分割时内容由 workspaceMainView 承载，
+// 而 pane 树唯一 leaf 的 view 恒为 'file'（见 closeWorkspacePane 的不变量），
+// 直接传 leaf 会导致「打开会话时标题显示为文件」。故按 workspaceMainView 构造视图信息。
+const workspaceMainViewHeaderNode = computed(() => ({
+  type: 'leaf',
+  id: workspacePaneTree.value?.id || 'pane-root',
+  view: workspaceMainView.value,
+  sessionPanelId: workspaceSessionPanelId.value,
+}))
+
+// pane 状态文案（原顶部工具栏的状态提示，现随 pane 标题栏展示）：
+// 只对 file pane 有意义——取该 pane 自己绑定的文件对应的标签状态。
+function getWorkspacePaneStatus(pane) {
+  if (!pane || pane.view !== 'file') return ''
+  const path = workspaceViewPanes.get(pane.id) || (pane.id === activePaneId.value ? activeWorkspaceTabPath.value : null)
+  if (!path) return ''
+  const tab = getWorkspaceTabByPath(path)
+  if (!tab) return ''
+  if (tab.loading) return '加载中...'
+  if (tab.error) return tab.error
+  return tab.isDirty ? '未保存修改' : '已保存'
 }
 
 // 非激活 file pane 的只读预览文本：取当前激活文件的内容，截断到合理长度，
@@ -3822,8 +3866,10 @@ function toggleWorkspaceSidebarView(view) {
 }
 
 // 活动栏按钮点击（聊天室/终端）：已打开该主视图时再次点击则回到文件视图。
+// 分割态下 workspaceMainView 恒为 'file'，host 由某个 pane 承载，故需同时判断 pane 承载情况。
 function toggleWorkspaceMainView(view) {
-  if (workspaceMainView.value === view) {
+  const hostedByPane = isWorkspaceSplit.value && !!findWorkspacePaneByView(view)
+  if (workspaceMainView.value === view || hostedByPane) {
     setWorkspaceMainView('file')
     return
   }
@@ -3832,11 +3878,17 @@ function toggleWorkspaceMainView(view) {
 
 // 切换编辑器主区域视图（file / chat / terminal）
 function setWorkspaceMainView(view) {
-  if (workspaceMainView.value === view) return
   // 自由分割模式：pane 树本身承载 file/session 内容，主区域视图恒为 file，
   // 因此这里不改 workspaceMainView、也不收起分割（会话显示在各自的 pane 中）。
+  // 注意：分割态下 workspaceMainView 恒为 'file'，故「收起」语义（切回 file）必须在此提前处理，
+  // 否则会被下面的 workspaceMainView === view 早退吞掉，导致 chat/terminal 收不起来。
   if (isWorkspaceSplit.value) {
-    if (view === 'file') return
+    if (view === 'file') {
+      // 收起：把承载 chat / terminal 的 pane 清成中性空白（host 单例，至多一个）
+      const hostPane = findWorkspacePaneByView('chat') || findWorkspacePaneByView('terminal')
+      if (hostPane) setActivePaneViewForPane(hostPane, 'empty')
+      return
+    }
     if (view === 'session') return
     // chat / terminal：交给「激活 pane」承载（host 单例，setActivePaneView 会先卸载其他 pane 上的同类型承载）
     if (setActivePaneView(view)) return
@@ -3844,6 +3896,7 @@ function setWorkspaceMainView(view) {
     workspaceMainView.value = view
     return
   }
+  if (workspaceMainView.value === view) return
   // 自由分割只在「文件视图」下有意义：切到 chat/terminal 时先收起分割，
   // 否则 pane 树仍会渲染，chat/terminal 内容无处显示。
   if (view !== 'file' && isWorkspaceSplit.value) {
@@ -3857,6 +3910,17 @@ function setWorkspaceMainView(view) {
       layoutGitDiffEditor()
     })
   }
+}
+
+// 在工作区中显示 chat / terminal（host 单例）：确保工作区面板已打开，再交给主区域或激活 pane 承载。
+// 面板分离能力移除后，chat/terminal 只能在工作区内部渲染，因此任何「打开终端/聊天室」的入口
+// 都必须走这里，而不是去改已废弃的 showTerminalPanel / showChatPanel 标志。
+function showWorkspaceHostView(view) {
+  if (!showWorkspacePanel.value) {
+    showWorkspacePanel.value = true
+    if (windowWidth.value <= 768) pushOverlayState()
+  }
+  setWorkspaceMainView(view)
 }
 
 // 让主区域回到「文件视图」（打开文件 / 打开 diff 时调用）。
@@ -4166,7 +4230,7 @@ async function openWorkspaceFile(path, agentId = null) {
     return
   }
 
-  const tab = {
+  const tab = reactive({
     path,
     name: path.split('/').pop() || path,
     content: '',
@@ -4178,7 +4242,7 @@ async function openWorkspaceFile(path, agentId = null) {
     externalModified: false,
     mtimeNs: null,
     fileSize: null,
-  }
+  })
   const session = activeWorkspaceSession.value
   if (!session) {
     // 编辑器面板可能通过 Ctrl+E / 命令面板打开（只设 showWorkspacePanel，未创建会话）。
@@ -14568,8 +14632,8 @@ function createTerminal() {
   }
   socket.value.send(JSON.stringify(message))
   
-  // 自动打开终端面板
-  showTerminalPanel.value = true
+  // 自动在工作区中显示终端
+  showWorkspaceHostView('terminal')
 }
 
 function createTerminalForSelectedNode() {
@@ -14592,8 +14656,8 @@ function createTerminalForSelectedNode() {
   }
   socket.value.send(JSON.stringify(message))
 
-  // 自动打开终端面板
-  showTerminalPanel.value = true
+  // 自动在工作区中显示终端
+  showWorkspaceHostView('terminal')
 }
 
 // 在指定节点上创建独立终端（大厅节点右键菜单）
@@ -14612,8 +14676,8 @@ function createTerminalForNode(nodeId) {
     payload: { node_id: normalizedNodeId },
   }
   socket.value.send(JSON.stringify(message))
-  // 自动打开终端面板
-  showTerminalPanel.value = true
+  // 自动在工作区中显示终端
+  showWorkspaceHostView('terminal')
 }
 
 function createTerminalForAgent(agent) {
@@ -14639,8 +14703,8 @@ function createTerminalForAgent(agent) {
   }
   socket.value.send(JSON.stringify(message))
   
-  // 自动打开终端面板
-  showTerminalPanel.value = true
+  // 自动在工作区中显示终端
+  showWorkspaceHostView('terminal')
 }
 
 function closeTerminal(terminalId) {
@@ -15543,23 +15607,21 @@ function stopChatPanelInteraction() {
 
 // 聊天室功能方法
 function toggleChatPanel() {
-  // 编辑器主区域正在显示聊天室时，顶栏按钮语义为「收起」：切回文件视图
+  // 工作区正在显示聊天室时，语义为「收起」：切回文件视图
   if (workspaceHostsChat.value) {
     setWorkspaceMainView('file')
     return
   }
-  showChatPanel.value = !showChatPanel.value
-  if (showChatPanel.value) {
-    focusWindow('chat')
-    chatUnreadCount.value = 0
-    // 首次打开时注册客户端并获取聊天室列表
-    if (!myClientId.value) {
-      myClientId.value = getOrCreateClientId()
-      sendChatMessageToServer('chat_register', { client_id: myClientId.value, name: username.value })
-    }
-    sendChatMessageToServer('chat_get_rooms', {})
-    sendChatMessageToServer('chat_get_clients', {})
+  showWorkspaceHostView('chat')
+  focusWindow('chat')
+  chatUnreadCount.value = 0
+  // 首次打开时注册客户端并获取聊天室列表
+  if (!myClientId.value) {
+    myClientId.value = getOrCreateClientId()
+    sendChatMessageToServer('chat_register', { client_id: myClientId.value, name: username.value })
   }
+  sendChatMessageToServer('chat_get_rooms', {})
+  sendChatMessageToServer('chat_get_clients', {})
 }
 
 // username变更时同步更新聊天室注册名
@@ -16020,10 +16082,8 @@ function handleGlobalKeydown(event) {
   // Ctrl + ` 打开/隐藏终端面板
   if (event.ctrlKey && !event.altKey && event.key === '`') {
     event.preventDefault()
-    
-    // 切换终端面板显示状态
     if (socket.value) {
-      showTerminalPanel.value = !showTerminalPanel.value
+      toggleTerminalPanel()
     }
   }
 
@@ -16474,16 +16534,12 @@ const openWorkspaceAgentList = () => {
 
 // 打开/关闭终端面板（移动端处理history）
 const toggleTerminalPanel = () => {
-  // 编辑器主区域正在显示终端时，顶栏按钮语义为「收起」：切回文件视图
+  // 工作区正在显示终端时，语义为「收起」：切回文件视图
   if (workspaceHostsTerminal.value) {
     setWorkspaceMainView('file')
     return
   }
-  const newState = !showTerminalPanel.value
-  showTerminalPanel.value = newState
-  if (newState && windowWidth.value <= 768) {
-    pushOverlayState()
-  }
+  showWorkspaceHostView('terminal')
 }
 // 打开/关闭编辑器面板（移动端处理history；不依赖当前 Agent，与 Ctrl+E 行为一致）
 const toggleWorkspacePanel = () => {
