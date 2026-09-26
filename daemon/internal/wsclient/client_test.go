@@ -7,7 +7,7 @@ import (
 
 func TestBuildSubprotocols(t *testing.T) {
 	got := BuildSubprotocols("abc.def-ghi")
-	want := []string{"jarvis-ext", "jarvis-token.abc.def-ghi"}
+	want := []string{"jarvis-daemon", "jarvis-token.abc.def-ghi"}
 	if len(got) != len(want) {
 		t.Fatalf("长度不符: got=%v want=%v", got, want)
 	}
@@ -31,8 +31,8 @@ func TestBuildSubprotocolsEscapesToken(t *testing.T) {
 
 func TestBuildSubprotocolsNoToken(t *testing.T) {
 	got := BuildSubprotocols("")
-	if len(got) != 1 || got[0] != "jarvis-ext" {
-		t.Errorf("无 Token 时应只有 jarvis-ext，实际 %v", got)
+	if len(got) != 1 || got[0] != "jarvis-daemon" {
+		t.Errorf("无 Token 时应只有 jarvis-daemon，实际 %v", got)
 	}
 }
 
@@ -53,9 +53,9 @@ func TestNormalizeGateway(t *testing.T) {
 
 func TestBuildWSURL(t *testing.T) {
 	cases := map[string]string{
-		"https://jvs-ai.cn":      "wss://jvs-ai.cn/api/browser-ext/ws",
-		"http://127.0.0.1:8000":  "ws://127.0.0.1:8000/api/browser-ext/ws",
-		"http://127.0.0.1:8000/": "ws://127.0.0.1:8000/api/browser-ext/ws",
+		"https://jvs-ai.cn":      "wss://jvs-ai.cn/api/daemon/ws",
+		"http://127.0.0.1:8000":  "ws://127.0.0.1:8000/api/daemon/ws",
+		"http://127.0.0.1:8000/": "ws://127.0.0.1:8000/api/daemon/ws",
 	}
 	for in, want := range cases {
 		got, err := BuildWSURL(in)
