@@ -2,11 +2,14 @@
 
 package capability
 
-// 本文件单测 windows_app_windows.go 中「注册表查询脚本构造」的正确性。
+// 本文件单测 windows_app_windows.go 中「应用列表脚本构造」的正确性。
 //
-// 带 //go:build windows 标签：buildRegQueryScript 依赖 encodePowerShellText
+// 带 //go:build windows 标签：buildWindowsAppListScript 依赖 encodePowerShellText
 // 等无标签函数，但被测对象本身只在 Windows 构建下存在，故测试也需同样标签。
 // 在 Linux 上可用 `GOOS=windows go vet ./...` 做编译期检查。
+//
+// 解析层 parseWindowsAppCSV 的测试在无标签的 windows_app_parse_test.go 中，
+// 因为它是纯函数、可在 Linux 上直接运行。
 
 import (
 	"strings"
@@ -67,43 +70,34 @@ func TestToPowerShellRegistryPath(t *testing.T) {
 	}
 }
 
-// TestBuildRegQueryScriptContainsRequiredPieces 验证生成的脚本包含所有必需片段。
+// TestBuildWindowsAppListScriptContainsRequiredPieces 验证生成的脚本包含所有必需片段。
 //
-// 重点验证反引号拼接是否真的产生了 PowerShell 换行转义（`n）而不是字面量
-// 反引号+n。这是本函数最容易出错的地方：Go 的原始字符串用反引号定界，
-// 因此 PowerShell 的 `n 必须靠字符串拼接构造。
-func TestBuildRegQueryScriptContainsRequiredPieces(t *testing.T) {
-	script := buildRegQueryScript(`HKLM:\SOFTWARE\Test`)
+// 重点验证：
+//   - 三个根键都被转成 PowerShell 路径并作为字面量列出（防止漏掉 32 位视图或 HKCU）；
+//   - 使用 Get-ChildItem + Get-ItemProperty 遍历（不是逐键启动进程）；
+//   - 用 Select-Object 哈希表把字段统一为 [string]（保证 CSV 列稳定）；
+//   - 以 ConvertTo-Csv -NoTypeInformation 结尾。
+func TestBuildWindowsAppListScriptContainsRequiredPieces(t *testing.T) {
+	script := buildWindowsAppListScript()
 
-	// 必须含键路径的转义字面量。
-	if !strings.Contains(script, `'HKLM:\SOFTWARE\Test'`) {
-		t.Errorf("脚本未包含转义后的键路径字面量：\n%s", script)
-	}
-
-	// 必须含 PowerShell 换行转义 `n（反引号 + n），而不是字面量 "`n" 两个字符。
-	// 检查方式：脚本中应出现反引号字符后跟 n。
-	if !strings.Contains(script, "`n") {
-		t.Errorf("脚本未包含 PowerShell 换行转义（反引号+n）：\n%s", script)
-	}
-
-	// 不应出现 Go 原始字符串定界反引号残留导致的语法错误迹象：
-	// 若拼接写错，会出现连续两个反引号。
-	if strings.Contains(script, "``") {
-		t.Errorf("脚本含连续反引号，说明拼接有误：\n%s", script)
-	}
-
-	// 必须含关键 cmdlet 与判据。
 	required := []string{
-		"Test-Path",
+		// 三个根键的 PowerShell 字面量。
+		`'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'`,
+		`'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall'`,
+		`'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'`,
+		// 遍历与读取。
 		"Get-ChildItem",
-		"Get-Item",
-		"GetValueNames",
-		"GetValueKind",
-		"GetValue",
-		"[Console]::Out.Write",
-		"REG_SZ",
-		"REG_DWORD",
-		"REG_EXPAND_SZ",
+		"Get-ItemProperty",
+		// 字段统一为字符串。
+		"Select-Object",
+		"[string]$_.DisplayName",
+		"[string]$_.DisplayVersion",
+		"[string]$_.Publisher",
+		"[string]$_.InstallLocation",
+		"[string]$_.InstallDate",
+		"[string]$_.SystemComponent",
+		// 输出格式。
+		"ConvertTo-Csv -NoTypeInformation",
 	}
 	for _, r := range required {
 		if !strings.Contains(script, r) {
@@ -111,54 +105,9 @@ func TestBuildRegQueryScriptContainsRequiredPieces(t *testing.T) {
 		}
 	}
 
-	// 键不存在时必须 exit 1（对应 reg.exe 失败语义，调用方据此跳过该键）。
-	if !strings.Contains(script, "exit 1") {
-		t.Errorf("脚本缺少「键不存在时退出」逻辑：\n%s", script)
-	}
-}
-
-// TestBuildRegQueryScriptOutputFormatMatchesRegExe 验证输出格式与 reg.exe 兼容。
-//
-// 解析层 parseWindowsRegValues 依赖「值名 类型 数据」三段式且类型以 REG_ 开头。
-// 这里用一段模拟输出验证解析层能吃下本脚本产生的格式，从而确认「换数据源
-// 不破坏解析」这一设计目标成立。
-func TestBuildRegQueryScriptOutputFormatMatchesRegExe(t *testing.T) {
-	// 模拟 buildRegQueryScript 在真实 Windows 上产生的输出（含中文应用名）。
-	simulated := "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{GUID}\r\n" +
-		"    DisplayName    REG_SZ    东方财富信息股份有限公司\r\n" +
-		"    DisplayVersion    REG_SZ    12.0.2\r\n" +
-		"    Publisher    REG_SZ    东方财富信息股份有限公司\r\n" +
-		"    SystemComponent    REG_DWORD    0x0\r\n"
-
-	app := parseWindowsUninstallEntry(simulated)
-	if app == nil {
-		t.Fatal("解析结果为 nil，说明输出格式与解析层不兼容")
-	}
-	if got := app["name"]; got != "东方财富信息股份有限公司" {
-		t.Errorf("应用名解析错误：期望 %q，得到 %q", "东方财富信息股份有限公司", got)
-	}
-	if got := app["publisher"]; got != "东方财富信息股份有限公司" {
-		t.Errorf("发布者解析错误：期望 %q，得到 %q", "东方财富信息股份有限公司", got)
-	}
-	if got := app["version"]; got != "12.0.2" {
-		t.Errorf("版本解析错误：期望 %q，得到 %q", "12.0.2", got)
-	}
-}
-
-// TestBuildRegQueryScriptSubKeyFormatMatchesRegExe 验证子键列举格式与解析层兼容。
-func TestBuildRegQueryScriptSubKeyFormatMatchesRegExe(t *testing.T) {
-	simulated := "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\r\n" +
-		"    HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{GUID-A}\r\n" +
-		"    HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\AppName\r\n"
-
-	subKeys := parseWindowsRegSubKeys(simulated)
-	if len(subKeys) != 2 {
-		t.Fatalf("期望解析出 2 个子键，得到 %d 个：%v", len(subKeys), subKeys)
-	}
-	if subKeys[0] != "{GUID-A}" {
-		t.Errorf("首个子键错误：期望 %q，得到 %q", "{GUID-A}", subKeys[0])
-	}
-	if subKeys[1] != "AppName" {
-		t.Errorf("第二个子键错误：期望 %q，得到 %q", "AppName", subKeys[1])
+	// 不应出现 Go 原始字符串定界反引号残留导致的语法错误迹象：
+	// 若拼接写错，会出现连续两个反引号。
+	if strings.Contains(script, "``") {
+		t.Errorf("脚本含连续反引号，说明拼接有误：\n%s", script)
 	}
 }

@@ -23,11 +23,9 @@ func processStartTime() (time.Time, bool) {
 		return time.Time{}, false
 	}
 
-	// Filetime 是 100 纳秒为单位、自 1601-01-01 UTC 起算的计数。
-	// 转成 Unix 纳秒：减去 1601→1970 的偏移（11644473600 秒）。
-	const windowsToUnixEpoch = 11644473600
-	nanos := creation.Nanoseconds()
-	sec := nanos/1e9 - windowsToUnixEpoch
-	nsec := nanos % 1e9
-	return time.Unix(sec, nsec), true
+	// FILETIME 是 100 纳秒为单位、自 1601-01-01 UTC 起算的无符号 64 位计数。
+	// 换算逻辑抽到 filetime.go 的 filetimeToTime（无构建标签，Linux 可单测），
+	// 那里详细说明了为何不能用 creation.Nanoseconds()（会 int64 溢出）。
+	ticks := int64(creation.HighDateTime)<<32 | int64(creation.LowDateTime)
+	return filetimeToTime(ticks), true
 }
