@@ -163,10 +163,14 @@ for target in "${TARGETS[@]}"; do
   echo "--> 构建 ${goos}/${goarch}"
   # CGO_ENABLED=0 保证静态链接，不依赖目标机 glibc 版本；
   # -trimpath 去除本地路径；-s -w 去掉符号表与调试信息。
-  CGO_ENABLED=0 GOOS="${goos}" GOARCH="${goarch}" \
-    go build -trimpath \
-      -ldflags "-s -w -X main.version=${VERSION}" \
-      -o "${out}" ./cmd/jarvis-daemon
+  # 必须切到模块根目录，否则 ./cmd/jarvis-daemon 会相对调用者的 cwd 解析。
+  (
+    cd "${MODULE_DIR}"
+    CGO_ENABLED=0 GOOS="${goos}" GOARCH="${goarch}" \
+      go build -trimpath \
+        -ldflags "-s -w -X main.version=${VERSION}" \
+        -o "${out}" ./cmd/jarvis-daemon
+  )
 
   built+=("${out}")
 done
