@@ -16670,6 +16670,56 @@ window.__jarvisAuthBridge = {
     const port = parsed.port || '8000'
     return `${scheme}://${host}:${port}`
   },
+  // 供真实浏览器验证/排查时手动触发一次 daemon 同步
+  syncToDaemon: () => syncTokenToDaemon(auth.value.token, window.__jarvisAuthBridge.getGateway()),
+}
+
+// ========== 本机 daemon 登录态同步 ==========
+// 前端 token 变化时，自动把「远程网关地址 + token」推送给本机 jarvis-daemon，
+// 让 daemon 无需用户手动配置即可感知登录态（daemon 侧多网关并存，互不顶掉）。
+// 注意：gateway 是远程网关地址，daemon 地址是本机回环，两者必须分开。
+const DAEMON_DEFAULT_URL = 'http://127.0.0.1:17800'
+
+// 解析本机 daemon 地址：默认回环 17800，允许 localStorage 覆盖（便于测试/自定义端口）
+function getDaemonUrl() {
+  let url = ''
+  try {
+    url = localStorage.getItem('jarvis_daemon_url') || ''
+  } catch (e) {
+    url = ''
+  }
+  url = String(url).trim()
+  if (!url) return DAEMON_DEFAULT_URL
+  if (!/^https?:\/\//i.test(url)) url = 'http://' + url
+  return url.replace(/\/+$/, '')
+}
+
+// 把当前登录态同步到本机 daemon。
+// token 非空 → POST /api/auth {gateway, token}；token 为空 → POST /api/logout {gateway}。
+// 完全 fire-and-forget：不 await、不抛错、不弹 toast、不阻塞主流程；daemon 不存在时静默。
+function syncTokenToDaemon(token, gateway) {
+  try {
+    if (!gateway) return
+    const daemonUrl = getDaemonUrl()
+    const isLogout = !token
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 1500)
+    fetch(`${daemonUrl}${isLogout ? '/api/logout' : '/api/auth'}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(isLogout ? { gateway } : { gateway, token }),
+      signal: controller.signal,
+      credentials: 'omit',
+    })
+      .then(() => {})
+      .catch((e) => {
+        // daemon 不存在（连接被拒）或超时属预期情况，只留 debug 级日志，不产生噪音
+        console.debug('[AUTH] sync token to daemon skipped:', e?.message || e)
+      })
+      .finally(() => clearTimeout(timer))
+  } catch (e) {
+    console.debug('[AUTH] sync token to daemon failed:', e?.message || e)
+  }
 }
 
 watch(
@@ -16680,6 +16730,8 @@ watch(
     } catch (e) {
       console.warn('[AUTH] broadcast token change failed:', e)
     }
+    // token 变化（含登出置空）时同步给本机 daemon
+    syncTokenToDaemon(newToken, window.__jarvisAuthBridge.getGateway())
   }
 )
 
@@ -16701,6 +16753,9 @@ onMounted(() => {
     showConnectModal.value = false
     isAutoConnecting.value = true
     connect()
+    // 页面加载时已有 token（loadSavedToken 回填路径不会触发 watch），补推一次给本机 daemon，
+    // 保证 daemon 与页面登录态一致；失败静默，不影响连接主流程。
+    syncTokenToDaemon(auth.value.token, window.__jarvisAuthBridge.getGateway())
   }
 
   updateViewportHeight()

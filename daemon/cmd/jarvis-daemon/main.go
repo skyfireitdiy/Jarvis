@@ -185,34 +185,27 @@ func runDaemon(args []string) {
 	registry := capability.NewRegistry()
 	log.Printf("[daemon] 已注册 %d 个平台能力", len(registry.ListForPlatform(capability.PlatformLinux)))
 
-	client := wsclient.New(wsclient.Options{
-		Gateway:           cfg.Gateway,
-		Token:             "",
-		ClientID:          buildClientID(),
-		Version:           version,
-		Registry:          registry,
-		HeartbeatInterval: cfg.HeartbeatInterval,
-		ReconnectMin:      cfg.ReconnectMin,
-		ReconnectMax:      cfg.ReconnectMax,
-		OnStateChange: func(state string) {
-			log.Printf("[daemon] 连接状态: %s", state)
+	manager := wsclient.NewManagerWithOptions(wsclient.ManagerOptions{
+		Options: wsclient.Options{
+			// Gateway/Token 由 Connect 按具体网关覆盖，这里不预设。
+			ClientID:          buildClientID(),
+			Version:           version,
+			Registry:          registry,
+			HeartbeatInterval: cfg.HeartbeatInterval,
+			ReconnectMin:      cfg.ReconnectMin,
+			ReconnectMax:      cfg.ReconnectMax,
 		},
-		OnAuthError: func(code int, reason string) {
-			log.Printf("[daemon] 鉴权失败（关闭码 %d），标记 Token 失效，等待网页重新推送", code)
-			store.MarkTokenInvalid()
+		OnGatewayStateChange: func(gateway, state string) {
+			log.Printf("[daemon] 连接状态: %s (%s)", state, gateway)
+		},
+		OnGatewayAuthError: func(gateway string, code int, reason string) {
+			// 鉴权失败只影响该网关：标记其 Token 失效，等待网页重新推送。
+			log.Printf("[daemon] 网关 %s 鉴权失败（关闭码 %d），标记 Token 失效，等待网页重新推送", gateway, code)
+			store.MarkTokenInvalid(gateway)
 		},
 	})
 
-	api := localapi.New(store, client, version,
-		func(gateway, token string) {
-			// 收到新凭据：以新参数重建连接。
-			client.UpdateCredentials(gateway, token)
-			client.Start()
-		},
-		func() {
-			client.Stop()
-		},
-	)
+	api := localapi.New(store, manager, version)
 
 	srv := localapi.NewHTTPServer(cfg.Listen, api.Handler())
 
@@ -239,7 +232,7 @@ func runDaemon(args []string) {
 		log.Printf("[daemon] 收到退出信号，正在关闭…")
 	}
 
-	client.Stop()
+	manager.DisconnectAll()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*1e9)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
