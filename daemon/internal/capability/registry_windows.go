@@ -13,6 +13,7 @@ package capability
 //   - windows_clipboard_windows.go：剪贴板读写与截图
 //   - windows_script_windows.go：脚本执行
 //   - windows_fs_windows.go：文件系统读写与目录列举
+//   - windows_transfer_windows.go：分块文件传输（stat/read/write/verify）
 //   - windows_service_windows.go：系统服务查询与启停
 //   - windows_common_windows.go：参数解析与外部命令辅助函数
 func registerPlatformCapabilities(reg *Registry) {
@@ -24,5 +25,6 @@ func registerPlatformCapabilities(reg *Registry) {
 	registerWindowsClipboard(reg)
 	registerWindowsScript(reg)
 	registerWindowsFS(reg)
+	registerWindowsTransfer(reg)
 	registerWindowsService(reg)
 }

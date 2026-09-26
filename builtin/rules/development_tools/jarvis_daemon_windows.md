@@ -44,7 +44,7 @@ daemon(action="call", session_id="<sid>", name="windows.window.list", params={})
 **禁止**：
 
 - 未经确认就结束用户进程或关闭用户窗口。
-- 在用户机器上留下临时文件——**任务结束必须清理**（见「你必须执行的操作」第 5 节）。
+- 在用户机器上留下临时文件——**任务结束必须清理**（见「你必须执行的操作」第 6 节）。
 
 ### 3. 用事实验证，不臆测 UI 状态
 
@@ -95,11 +95,77 @@ daemon(action="list_capabilities", session_id="<sid>")
 | 结束进程                          | `windows.process.kill`                 | `pid`、`force`                                    |
 | 列已安装应用                      | `windows.app.list`                     | `filter`（名称或发布者）                          |
 | 文件读写列                        | `windows.fs.read` / `.write` / `.list` | `path` 等                                         |
+| 大文件分块传输                    | `windows.fs.transfer.*`                | `path`、`offset`、`length`、`data`、`sha256`      |
 | 服务管理                          | `windows.service.*`                    | `unit`（需管理员权限才能启停）                    |
 | 截图                              | `windows.screenshot`                   | `path`（**只截主屏，返回体不含图像**）            |
 | 系统信息                          | `windows.system.info`                  | 无                                                |
 
-### 3. 定位 UI 元素（核心方法论）
+### 3. 文件传输（大文件 / 双向）
+
+`windows.fs.read` / `.write` 面向「看内容」，单次上限 8 MiB，不适合搬文件。
+搬文件（尤其是二进制、大文件、需要校验完整性）请用 `windows.fs.transfer.*` 四个能力。
+Linux 侧完全对称，把前缀换成 `linux.` 即可（参数与返回字段逐字一致）。
+
+| 能力                         | 用途                  | 关键参数                                       | 主要返回字段                                                  |
+| ---------------------------- | --------------------- | ---------------------------------------------- | ------------------------------------------------------------- |
+| `windows.fs.transfer.stat`   | 传输前查元信息 / 比对 | `path`                                         | `exists`、`size`、`mtime`、`sha256`、`is_dir`                 |
+| `windows.fs.transfer.read`   | 分块读（下载）        | `path`、`offset`、`length`                     | `data`（base64）、`bytes_read`、`eof`、`chunk_sha256`、`size` |
+| `windows.fs.transfer.write`  | 分块写（上传 / 续传） | `path`、`offset`、`data`（base64）、`truncate` | `written_bytes`、`size`、`truncated`                          |
+| `windows.fs.transfer.verify` | 落盘后校验完整性      | `path`、`sha256`                               | `match`、`size`、`actual_sha256`                              |
+
+**约束（必须记住）：**
+
+- 单文件上限 **512 MiB**；`stat` / `read` / `write` / `verify` 都会校验，超限直接报错。
+- 单块上限 **8 MiB**，默认块 **1 MiB**（`length` 不传即 1 MiB）。
+- `offset` 不能为负。`offset` 超出文件尾**不报错**，返回 `bytes_read=0` + `eof=true`。
+- `length<=0` 表示「读到文件尾」；`length` 超过剩余部分时自动取剩余并置 `eof=true`。
+- `write` 的 `data` 是 **base64**；首块传 `truncate=true` 清空已有内容，后续块传 `truncate=false`。
+- 断点续传：从 `stat` 拿到已传大小，把 `offset` 设到那里继续写即可（`truncate=false`）。
+
+**推荐流程（下载：真机 → 本地）：**
+
+```text
+# 1) 先看文件是否存在、多大、校验和是多少
+daemon(action="call", session_id="<sid>", name="windows.fs.transfer.stat",
+       params={"path": "C:\\data\\big.bin"})
+
+# 2) 按 1 MiB 循环分块读，直到 eof=true
+daemon(action="call", session_id="<sid>", name="windows.fs.transfer.read",
+       params={"path": "C:\\data\\big.bin", "offset": 0, "length": 1048576})
+#    → 拿到 data(base64) 后本地拼接，offset += bytes_read，重复直到 eof
+
+# 3) 本地拼完后，用第 1 步的 sha256 比对；或反过来对真机文件调 verify
+daemon(action="call", session_id="<sid>", name="windows.fs.transfer.verify",
+       params={"path": "C:\\data\\big.bin", "sha256": "<第1步拿到的 sha256>"})
+```
+
+**推荐流程（上传：本地 → 真机）：**
+
+```text
+# 1) 先 stat 目标路径，确认是否已存在部分内容（决定 offset 起点）
+daemon(action="call", session_id="<sid>", name="windows.fs.transfer.stat",
+       params={"path": "C:\\data\\upload.bin"})
+
+# 2) 首块 truncate=true，后续块 truncate=false 并按 offset 定位
+daemon(action="call", session_id="<sid>", name="windows.fs.transfer.write",
+       params={"path": "C:\\data\\upload.bin", "offset": 0,
+               "data": "<base64 首块>", "truncate": true})
+daemon(action="call", session_id="<sid>", name="windows.fs.transfer.write",
+       params={"path": "C:\\data\\upload.bin", "offset": 1048576,
+               "data": "<base64 第二块>", "truncate": false})
+
+# 3) 传完 verify 校验
+daemon(action="call", session_id="<sid>", name="windows.fs.transfer.verify",
+       params={"path": "C:\\data\\upload.bin", "sha256": "<本地算出的 sha256>"})
+```
+
+**注意：**
+
+- 传输完的临时文件必须清理（见「你必须执行的操作」第 6 节）。
+- 上层不做 `pull`/`push` 封装，分块循环由调用方控制——这样断点续传与进度上报都更灵活。
+- 超过 512 MiB 的文件应改用独立通道（如 `windows.script.exec` 调 `curl`/`scp`），不要用本能力硬传。
+
+### 4. 定位 UI 元素（核心方法论）
 
 按以下顺序降级尝试，不要一上来就盲点坐标。
 
@@ -135,7 +201,7 @@ foreach($e in $all){ $c=$e.Current; $r=$c.BoundingRectangle
 
 前两者都不可行时，用「点击 → 输入 → Ctrl+A/Ctrl+C → 读剪贴板」验证是否点中了输入框；用窗口标题/进程状态变化判断操作是否生效。**每次只变一个变量**，避免多点连击。
 
-### 4. 验证操作结果
+### 5. 验证操作结果
 
 常用判据：
 
@@ -145,7 +211,7 @@ foreach($e in $all){ $c=$e.Current; $r=$c.BoundingRectangle
 - **进程**：`windows.process.list` 确认启动/退出。
 - **OCR**：重新截图 OCR，看界面文字是否如预期。
 
-### 5. 清理临时产物
+### 6. 清理临时产物
 
 **必须**：任务结束删除本次在用户机器上产生的所有临时文件（截图、脚本、临时数据）。
 
