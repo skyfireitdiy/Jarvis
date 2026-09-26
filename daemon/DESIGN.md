@@ -349,11 +349,45 @@ internal/capability/
 
 ### 8.7 本轮范围
 
-本轮**只实现框架**：
+本轮实现框架 **并注册 Linux 平台能力**：
 
-- 未注册任何实际能力（Linux / Windows 操作能力均未注册，`registerPlatformCapabilities` 为空实现）；
+- Linux 平台已注册 21 个能力（`registerPlatformCapabilities` 在 `registry_linux.go` 中按 `//go:build linux` 装配），见下表；Windows / Darwin 暂未注册（为空实现）；
 - 网关侧（Python）已实现：新增独立端点 `/api/daemon/ws` 与会话管理 `daemon_capability_manager`，并提供 `/api/daemon/sessions`、`/api/daemon/capability/list`、`/api/daemon/capability/call` 三个 HTTP API；跨节点调用经 `node_protocol` 的 `daemon_capability_*` 消息由 `NodeConnectionManager` 转发；
 - 多守护进程连接同一网关时，网关侧以 `hello` 中的 `client_id` 区分会话（`session_id` 由网关分配），能力调用结果按 `id` 回投到对应会话。
+
+#### 已注册的 Linux 能力
+
+| 能力名                  | 说明                                           | 实现方式                                       |
+| ----------------------- | ---------------------------------------------- | ---------------------------------------------- |
+| `linux.script.exec`     | 执行 shell 脚本                                | `sh -c`（带超时）                              |
+| `linux.process.list`    | 列出进程                                       | 直接读 `/proc`（不依赖 `ps`）                  |
+| `linux.process.kill`    | 结束进程                                       | 发送信号                                       |
+| `linux.system.info`     | 系统信息（发行版/内核/CPU/内存等）             | 读 `/proc`、`/etc/os-release`                  |
+| `linux.fs.read`         | 读文件（支持 offset/limit，二进制自动 base64） | 标准库                                         |
+| `linux.fs.write`        | 写文件                                         | 标准库                                         |
+| `linux.fs.list`         | 列目录                                         | 标准库                                         |
+| `linux.service.list`    | 列出用户级 systemd 服务                        | `systemctl --user`                             |
+| `linux.service.status`  | 查询服务状态                                   | `systemctl --user`                             |
+| `linux.service.start`   | 启动服务                                       | `systemctl --user`                             |
+| `linux.service.stop`    | 停止服务                                       | `systemctl --user`                             |
+| `linux.service.restart` | 重启服务                                       | `systemctl --user`                             |
+| `linux.window.list`     | 列出窗口                                       | `wmctrl -lp`，回退 `xdotool search`            |
+| `linux.window.focus`    | 激活窗口                                       | `wmctrl -i -a` / `xdotool windowactivate`      |
+| `linux.window.close`    | 关闭窗口                                       | `wmctrl -i -c` / `xdotool windowclose`         |
+| `linux.input.click`     | 鼠标移动并点击                                 | `xdotool mousemove` + `click`                  |
+| `linux.input.type`      | 输入文本                                       | `xdotool type --delay -- <text>`               |
+| `linux.input.keys`      | 发送按键/组合键                                | `xdotool key -- <keys>`                        |
+| `linux.clipboard.get`   | 读剪贴板                                       | `xclip -selection clipboard -o` / `xsel -b -o` |
+| `linux.clipboard.set`   | 写剪贴板                                       | `xclip` stdin / `xsel -b -i`                   |
+| `linux.screenshot`      | 截屏                                           | `import` > `scrot` > `grim`                    |
+
+设计约束与已知限制：
+
+- **GUI 能力不直接链接 X11**：早期尝试用纯 Go `dlopen`（`cgo_import_dynamic` + `linkname`）调用 X11 失败（ABI0/ABIInternal 不匹配），cgo 方案又需要 `X11/extensions/XTest.h` 且破坏 `CGO_ENABLED=0` 交叉编译，故最终改为**调用外部命令**（`xdotool`/`wmctrl`/`xclip`/`xsel`/`import`/`scrot`/`grim`）。缺失工具时返回带安装提示的明确错误。
+- GUI 能力执行前检查 `DISPLAY` / `WAYLAND_DISPLAY`，为空时返回「未检测到图形环境」；Wayland 下 `xdotool`/`wmctrl` 通常不可用（仅 `grim` 截图可用）。
+- `linux.service.*` 仅支持 `--user` 级服务；unit 名做了白名单校验并**拒绝以 `-` 开头**，避免 `--now` 之类被 `systemctl` 当作命令行选项（参数注入）。
+- `linux.fs.*` 未做路径白名单/沙箱，可读写守护进程有权限的任意路径；二进制判定为「含 NUL 或非法 UTF-8」，纯 ASCII 的二进制格式可能漏判。
+- GUI 能力的成功路径**未在本机端到端验证**（本机无 `DISPLAY` 且 GUI 工具均缺失），仅验证了错误路径与解析逻辑。
 
 #### 多用户隔离
 
@@ -388,8 +422,8 @@ await fetch("http://127.0.0.1:17800/api/auth", {
 2. 启动守护进程，`curl -X POST http://127.0.0.1:17800/api/auth -d '{"gateway":"...","token":"<真实JWT>"}'`；
 3. `GET /api/status` 返回 `connected: true` 且带 `session_id`；
 4. 网关侧 `GET /api/daemon/sessions` 能看到该会话；
-5. 网关侧 `POST /api/daemon/capability/list`（带 `session_id`）→ 返回能力列表（当前为空数组）；
-6. 网关侧 `POST /api/daemon/capability/call`（带 `session_id`/`name`/`params`）→ 返回 `unknown capability: <name>`；
+5. 网关侧 `POST /api/daemon/capability/list`（带 `session_id`）→ 返回能力列表（Linux 下为 21 个 `linux.*` 能力）；
+6. 网关侧 `POST /api/daemon/capability/call`（带 `session_id`/`name`/`params`）→ 执行对应能力；能力名不存在时返回 `unknown capability: <name>`；
 7. 断线后按退避重连；Token 失效（4401）时不空转重连；
 8. 多用户隔离：用用户 A 的 Token 携带用户 B 的 `session_id` 调用 `capability/list` 或 `capability/call` → 返回 `forbidden: daemon session belongs to another user`；`GET /api/daemon/sessions` 只返回 A 自己的会话；未携带 Token 连接 `/api/daemon/ws` → 关闭码 4401。
 
@@ -402,13 +436,13 @@ await fetch("http://127.0.0.1:17800/api/auth", {
 
 ## 12. 已确认的决策
 
-| 项             | 决定                                                          |
-| -------------- | ------------------------------------------------------------- |
-| 本地端口鉴权   | 不做鉴权（仅绑 127.0.0.1）                                    |
-| 端口 / 配置    | 默认 `127.0.0.1:17800`，配置走 `~/.jarvis/daemon/config.yaml` |
-| 代码位置       | `daemon/`，与浏览器扩展同目录                                 |
-| 本轮范围       | 只打通链路与通信                                              |
-| 扩展目录路径   | 后续再定（本轮不涉及扩展更新）                                |
-| 能力命名       | 「域.动作」形式（如 `fs.read`），`action` 即能力名            |
-| 能力平台分发   | 用构建标签（`registry_*.go`），不在无标签文件里写平台 switch  |
-| 能力注册表范围 | 本轮只实现框架，不注册任何实际能力；网关侧未实现              |
+| 项             | 决定                                                                     |
+| -------------- | ------------------------------------------------------------------------ |
+| 本地端口鉴权   | 不做鉴权（仅绑 127.0.0.1）                                               |
+| 端口 / 配置    | 默认 `127.0.0.1:17800`，配置走 `~/.jarvis/daemon/config.yaml`            |
+| 代码位置       | `daemon/`，与浏览器扩展同目录                                            |
+| 本轮范围       | 只打通链路与通信                                                         |
+| 扩展目录路径   | 后续再定（本轮不涉及扩展更新）                                           |
+| 能力命名       | 「域.动作」形式（如 `fs.read`），`action` 即能力名                       |
+| 能力平台分发   | 用构建标签（`registry_*.go`），不在无标签文件里写平台 switch             |
+| 能力注册表范围 | 框架 + Linux 平台 21 个能力已实现；Windows / Darwin 未注册；网关侧已实现 |

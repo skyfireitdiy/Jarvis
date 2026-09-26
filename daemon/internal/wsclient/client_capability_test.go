@@ -143,12 +143,19 @@ func TestCapabilityList(t *testing.T) {
 	if !ok {
 		t.Fatalf("期望 capabilities 为数组，实际 %T", reply["capabilities"])
 	}
-	if len(caps) != 1 {
-		t.Fatalf("期望 1 个能力，实际 %d", len(caps))
+	// NewRegistry 会装配平台能力，因此这里断言 test.echo 在列表中，而不是断言列表长度为 1。
+	var found bool
+	for _, raw := range caps {
+		item, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		if item["name"] == "test.echo" {
+			found = true
+		}
 	}
-	first, _ := caps[0].(map[string]any)
-	if first["name"] != "test.echo" {
-		t.Fatalf("期望能力名 test.echo，实际 %v", first["name"])
+	if !found {
+		t.Fatalf("能力列表中应当包含 test.echo，实际 %v", caps)
 	}
 }
 
