@@ -22,7 +22,7 @@ const realCLIXMLErrorSample = "#< CLIXML\r\n" +
 
 // TestDecodePowerShellStderrRealSample 用真机样本验证解码。
 func TestDecodePowerShellStderrRealSample(t *testing.T) {
-	got := decodePowerShellStderr(realCLIXMLErrorSample)
+	got := decodePowerShellStderr(realCLIXMLErrorSample, "")
 
 	if strings.Contains(got, "CLIXML") || strings.Contains(got, "<Objs") || strings.Contains(got, "_x000D_") {
 		t.Fatalf("解码后仍含 CLIXML 残留：\n%q", got)
@@ -42,7 +42,7 @@ func TestDecodePowerShellStderrRealSample(t *testing.T) {
 // TestDecodePowerShellStderrNonCLIXML 验证普通文本 stderr 原样返回。
 func TestDecodePowerShellStderrNonCLIXML(t *testing.T) {
 	plain := "error: file not found\nsecond line\n"
-	if got := decodePowerShellStderr(plain); got != plain {
+	if got := decodePowerShellStderr(plain, ""); got != plain {
 		t.Errorf("非 CLIXML 输入应原样返回：\n期望 %q\n得到 %q", plain, got)
 	}
 }
@@ -58,7 +58,7 @@ func TestDecodePowerShellStderrProgressOnly(t *testing.T) {
 		"<MS><I64 N=\"SourceId\">1</I64><PR N=\"Record\"><AV>Preparing modules for first use.</AV><AI>0</AI><Nil /><PI>-1</PI><PC>-1</PC><T>Completed</T><SR>-1</SR><SD> </SD></PR></MS></Obj>" +
 		"</Objs>"
 
-	if got := decodePowerShellStderr(progressOnly); got != "" {
+	if got := decodePowerShellStderr(progressOnly, ""); got != "" {
 		t.Errorf("仅含 progress 的 CLIXML 应返回空串，得到 %q", got)
 	}
 }
@@ -71,7 +71,7 @@ func TestDecodePowerShellStderrMixedProgressAndError(t *testing.T) {
 		"<S S=\"Error\">real error message_x000D__x000A_</S>" +
 		"</Objs>"
 
-	got := decodePowerShellStderr(mixed)
+	got := decodePowerShellStderr(mixed, "")
 	if strings.Contains(got, "Preparing modules") {
 		t.Errorf("progress 噪音不应出现在结果中：\n%q", got)
 	}
@@ -87,7 +87,7 @@ func TestDecodePowerShellStderrHTMLEntities(t *testing.T) {
 		"<S S=\"Error\">a &lt; b &amp;&amp; c &gt; d &quot;quoted&quot; &apos;single&apos;</S>" +
 		"</Objs>"
 
-	got := decodePowerShellStderr(sample)
+	got := decodePowerShellStderr(sample, "")
 	want := `a < b && c > d "quoted" 'single'`
 	if got != want {
 		t.Errorf("XML 实体反转义错误：\n期望 %q\n得到 %q", want, got)
@@ -103,7 +103,7 @@ func TestDecodePowerShellStderrAmpersandBeforeEntity(t *testing.T) {
 		"<S S=\"Error\">&amp;lt;</S>" +
 		"</Objs>"
 
-	got := decodePowerShellStderr(sample)
+	got := decodePowerShellStderr(sample, "")
 	if got != "&lt;" {
 		t.Errorf("&amp;lt; 应还原为字面量 %q，得到 %q", "&lt;", got)
 	}
@@ -128,7 +128,54 @@ func TestDecodeCLIXMLHexEscapesPlain(t *testing.T) {
 
 // TestDecodePowerShellStderrEmpty 验证空输入。
 func TestDecodePowerShellStderrEmpty(t *testing.T) {
-	if got := decodePowerShellStderr(""); got != "" {
+	if got := decodePowerShellStderr("", ""); got != "" {
 		t.Errorf("空输入应返回空串，得到 %q", got)
+	}
+}
+
+// realPreambleEchoStderr 是真机实测的 stderr 样本：Write-Error 触发非终止错误时，
+// PowerShell 会回显出错语句的完整源码，而 windowsPowerShellPreamble 被拼在脚本最前，
+// 于是它本身也被回显（换行被 PowerShell 改写过，const 内并无换行）。
+const realPreambleEchoStderr = "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $OutputEncoding = [System.Text.Encoding]::UTF8;\r\n" +
+	" [Console]::InputEncoding = [System.Text.Encoding]::UTF8; $ProgressPreference = 'SilentlyContinue'\r\n" +
+	"Write-Error 'this is an error'; Write-Output 'after' : this is an error\r\n" +
+	"    + CategoryInfo          : NotSpecified: (:) [Write-Error], WriteErrorException\r\n" +
+	"    + FullyQualifiedErrorId : Microsoft.PowerShell.Commands.WriteErrorException\r\n "
+
+// TestStripPowerShellPreambleEchoRealSample 用真机样本验证前置语句回显被剥离，
+// 且用户脚本自身的错误信息完整保留。
+func TestStripPowerShellPreambleEchoRealSample(t *testing.T) {
+	got := decodePowerShellStderr(realPreambleEchoStderr, windowsPowerShellPreamble)
+
+	if strings.Contains(got, "OutputEncoding") || strings.Contains(got, "ProgressPreference") {
+		t.Errorf("前置语句回显未被剥离：\n%q", got)
+	}
+	// 用户脚本自身的错误信息必须保留。
+	for _, want := range []string{"this is an error", "CategoryInfo", "FullyQualifiedErrorId"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("用户错误信息 %q 被误删：\n%q", want, got)
+		}
+	}
+}
+
+// TestStripPowerShellPreambleEchoEmptyPreamble 验证 preamble 为空时不做剥离。
+func TestStripPowerShellPreambleEchoEmptyPreamble(t *testing.T) {
+	in := "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8;\r\nreal error\r\n"
+	if got := decodePowerShellStderr(in, ""); got != in {
+		t.Errorf("preamble 为空时不应剥离：\n期望 %q\n得到 %q", in, got)
+	}
+}
+
+// TestStripPowerShellPreambleEchoKeepsUserCode 验证用户脚本里出现的同名标识符
+// 若与编码设置特征同处一行会被过滤（已知取舍），但不同行的用户代码不受影响。
+func TestStripPowerShellPreambleEchoKeepsUserCode(t *testing.T) {
+	in := "my OutputEncoding check failed\r\n" + // 含 OutputEncoding 但无 UTF8 → 保留
+		"real error line\r\n"
+	got := decodePowerShellStderr(in, windowsPowerShellPreamble)
+	if !strings.Contains(got, "my OutputEncoding check failed") {
+		t.Errorf("仅含 OutputEncoding 而无 UTF8 的行不应被删除：\n%q", got)
+	}
+	if !strings.Contains(got, "real error line") {
+		t.Errorf("普通错误行被误删：\n%q", got)
 	}
 }

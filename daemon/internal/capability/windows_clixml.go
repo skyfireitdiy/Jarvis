@@ -64,9 +64,14 @@ const clixmlHeader = "#< CLIXML"
 // 之所以不引入 encoding/xml：CLIXML 里的 <S> 节点可能包含未转义的裸文本，
 // 且我们只关心文本内容，手写扫描更简单、更容错（XML 解析器遇到畸形输入会整体失败，
 // 而这里希望「尽力还原」）。
-func decodePowerShellStderr(raw string) string {
+//
+// preamble 参数为脚本前置语句（windowsPowerShellPreamble），用于剥离回显噪音：
+// PowerShell 对**非终止错误**（如 Write-Error）会回显整条出错语句的源码，而前置
+// 语句被拼在脚本最前面，于是它本身也被一起回显（真机实测暴露）。这属于纯噪音，
+// 应剥离。传空串表示不做剥离。
+func decodePowerShellStderr(raw, preamble string) string {
 	if !strings.Contains(raw, clixmlHeader) {
-		return raw
+		return stripPowerShellPreambleEcho(raw, preamble)
 	}
 
 	// 剥掉 "#< CLIXML" 行，只保留 XML 主体。
@@ -108,7 +113,55 @@ func decodePowerShellStderr(raw string) string {
 	}
 
 	// 各 <S> 段本身已含换行（还原后），直接拼接。
-	return strings.TrimRight(strings.Join(segments, ""), "\r\n")
+	// 拼接后再剥离 preamble 回显噪音（CLIXML 的 <S S="Error"> 同样会回显前置语句）。
+	return stripPowerShellPreambleEcho(strings.TrimRight(strings.Join(segments, ""), "\r\n"), preamble)
+}
+
+// stripPowerShellPreambleEcho 剥离 stderr 中回显的 PowerShell 前置语句。
+//
+// 背景：PowerShell 对**非终止错误**（如 Write-Error）会回显出错语句的完整源码。
+// 由于 windowsPowerShellPreamble 被拼在用户脚本最前面，它会被一起回显，形如：
+//
+//	[Console]::OutputEncoding = ...::UTF8; $OutputEncoding = ...::UTF8;
+//	 [Console]::InputEncoding = ...::UTF8; $ProgressPreference = 'SilentlyContinue'
+//	Write-Error 'x' : x
+//
+// 回显文本里 preamble 的换行被 PowerShell 改写过（const 内没有换行，回显却多出
+// 换行与缩进），因此不能做逐字匹配。这里改为**按特征行过滤**：整行同时包含
+// "OutputEncoding" 与 "UTF8"、或整行同时包含 "ProgressPreference" 与
+// "SilentlyContinue" 的行视为 preamble 回显行，予以丢弃。
+//
+// 这样只删噪音行，不影响用户脚本自身的错误信息（用户代码里同时出现这几个
+// 标识符的概率极低，且即便出现也仅丢失该行）。
+func stripPowerShellPreambleEcho(s, preamble string) string {
+	if preamble == "" || s == "" {
+		return s
+	}
+	// 快速判断：没有编码设置特征就不必逐行处理。
+	if !strings.Contains(s, "OutputEncoding") && !strings.Contains(s, "ProgressPreference") {
+		return s
+	}
+
+	lines := strings.Split(s, "\n")
+	kept := lines[:0]
+	for _, line := range lines {
+		if isPowerShellPreambleEchoLine(line) {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	return strings.Join(kept, "\n")
+}
+
+// isPowerShellPreambleEchoLine 判断一行是否为 windowsPowerShellPreamble 的回显。
+func isPowerShellPreambleEchoLine(line string) bool {
+	if strings.Contains(line, "OutputEncoding") && strings.Contains(line, "UTF8") {
+		return true
+	}
+	if strings.Contains(line, "ProgressPreference") && strings.Contains(line, "SilentlyContinue") {
+		return true
+	}
+	return false
 }
 
 // decodeCLIXMLText 还原 CLIXML 文本节点中的转义。
