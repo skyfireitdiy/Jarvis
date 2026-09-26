@@ -640,6 +640,7 @@
                   <!-- session leaf：渲染真实会话面板（复用与 #main-view 相同的接线） -->
                   <div v-if="getPanePanel(pane)" class="workspace-pane-session-wrap" @mousedown="activateWorkspacePane(pane.id)">
                     <SessionPanel
+                      :ref="el => setSessionPanelRef(getPanePanel(pane)?.id, el)"
                       :embedded="true"
                       :agent="getPanelAgent(getPanePanel(pane))"
                       :messages="getPanelMessages(getPanePanel(pane))"
@@ -765,6 +766,7 @@
           <div v-else-if="workspaceMainView === 'session'" class="workspace-main-embed-view">
             <SessionPanel
               v-if="workspaceSessionPanel"
+              :ref="el => setSessionPanelRef(workspaceSessionPanel?.id, el)"
               :embedded="true"
               :agent="getPanelAgent(workspaceSessionPanel)"
               :messages="getPanelMessages(workspaceSessionPanel)"
@@ -2074,10 +2076,16 @@ const showWorkspacePanel = ref(false)
 let workspaceAutoOpened = false
 const sessionPanelRefs = new Map()  // panelId -> SessionPanel 组件实例
 
+// 注册/注销 SessionPanel 组件实例（供 App 侧调用其暴露的 focusInput 等能力）。
+// 说明：模板中同一 panel 可能由不同宿主（pane 叶子 / 编辑器主区域）渲染，
+// 且 :ref 内联函数每次重渲染都会先以 null 注销、再以实例注册，故这里做幂等处理：
+// - el 为空时仅当当前登记项确为该 panel 时才删除，避免误删其它宿主的有效引用；
+// - panelId 为空（宿主已卸载、panel 已不存在）时直接忽略。
 function setSessionPanelRef(panelId, el) {
+  if (!panelId) return
   if (el) {
     sessionPanelRefs.set(panelId, el)
-  } else {
+  } else if (sessionPanelRefs.has(panelId)) {
     sessionPanelRefs.delete(panelId)
   }
 }
