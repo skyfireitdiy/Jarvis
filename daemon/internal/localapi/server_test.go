@@ -313,3 +313,70 @@ func TestStatusContentType(t *testing.T) {
 		t.Fatalf("daemon_version = %v", body["daemon_version"])
 	}
 }
+
+// TestCORSPreflight 预检请求（OPTIONS）必须返回 CORS 头且不进入业务逻辑。
+//
+// 场景：网页部署在 https://jvs-ai.cn，跨源 POST 到 http://127.0.0.1:17800，
+// 浏览器先发 OPTIONS 预检；缺少 CORS 头会被直接拦截。
+func TestCORSPreflight(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+
+	req, err := http.NewRequest(http.MethodOptions, srv.URL+"/api/auth", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Origin", "https://jvs-ai.cn")
+	req.Header.Set("Access-Control-Request-Method", "POST")
+	req.Header.Set("Access-Control-Request-Headers", "content-type")
+	req.Header.Set("Access-Control-Request-Private-Network", "true")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("preflight: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("预检状态码 = %d, 期望 204", resp.StatusCode)
+	}
+	checks := map[string]string{
+		"Access-Control-Allow-Origin":          "*",
+		"Access-Control-Allow-Methods":         "GET, POST, OPTIONS",
+		"Access-Control-Allow-Headers":         "Content-Type",
+		"Access-Control-Allow-Private-Network": "true",
+	}
+	for k, want := range checks {
+		if got := resp.Header.Get(k); got != want {
+			t.Fatalf("%s = %q, 期望 %q", k, got, want)
+		}
+	}
+}
+
+// TestCORSActualResponse 实际请求（含错误响应）也要带 CORS 头，
+// 否则浏览器读不到状态码与响应体。
+func TestCORSActualResponse(t *testing.T) {
+	srv, _, _ := newTestServer(t)
+
+	// 成功路径：GET /api/status
+	resp, err := http.Get(srv.URL + "/api/status")
+	if err != nil {
+		t.Fatalf("get status: %v", err)
+	}
+	resp.Body.Close()
+	if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "*" {
+		t.Fatalf("status 响应 Allow-Origin = %q, 期望 *", got)
+	}
+
+	// 错误路径：GET /api/auth → 405，也必须带 CORS 头。
+	resp, err = http.Get(srv.URL + "/api/auth")
+	if err != nil {
+		t.Fatalf("get auth: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("GET /api/auth 状态码 = %d, 期望 405", resp.StatusCode)
+	}
+	if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "*" {
+		t.Fatalf("405 响应 Allow-Origin = %q, 期望 *", got)
+	}
+}

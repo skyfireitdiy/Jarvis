@@ -36,12 +36,41 @@ func New(store *auth.Store, manager *wsclient.Manager, version string) *Server {
 }
 
 // Handler 返回路由。
+//
+// 外层包一层 CORS 处理：网页可能部署在任意源（如 https://jvs-ai.cn），
+// 而本服务固定监听 http://127.0.0.1:17800，跨源访问必然触发预检，
+// 没有 CORS 响应头浏览器会直接拦截请求。
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/auth", s.handleAuth)
 	mux.HandleFunc("/api/status", s.handleStatus)
 	mux.HandleFunc("/api/logout", s.handleLogout)
-	return mux
+	return withCORS(mux)
+}
+
+// withCORS 为所有响应加上 CORS 头，并直接响应预检请求。
+//
+// 允许任意源（*）：本服务只监听回环地址、且不做鉴权，能被访问到的前提是
+// 请求已经打到用户本机；凭据由请求体携带，不使用 Cookie，故无需
+// Access-Control-Allow-Credentials。
+// 同时允许 Chrome 私有网络访问（PNA）所需的头，避免公网页面访问
+// 本机回环地址时被额外的私有网络预检拦截。
+func withCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("Access-Control-Allow-Origin", "*")
+		h.Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		h.Set("Access-Control-Allow-Headers", "Content-Type")
+		h.Set("Access-Control-Max-Age", "600")
+		h.Set("Access-Control-Allow-Private-Network", "true")
+
+		// 预检请求：CORS 头已写入，直接返回 204，不再进入业务路由。
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 type authRequest struct {
