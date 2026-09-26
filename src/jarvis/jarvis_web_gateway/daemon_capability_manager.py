@@ -129,6 +129,12 @@ class DaemonCapabilityManager:
                 return
 
             client_id = str(first.get("client_id") or "").strip() or session_id
+            # 守护进程上报的是自身（用户侧服务）的系统信息；浏览器信息由浏览器
+            # 扩展另行上报，不在此处理。兼容旧版：旧版把 hostname/platform 放在
+            # browser_info 里，故仍保留该回退路径。
+            system_info = first.get("system_info") or {}
+            if not isinstance(system_info, dict):
+                system_info = {}
             browser_info = first.get("browser_info") or {}
             if not isinstance(browser_info, dict):
                 browser_info = {}
@@ -138,8 +144,16 @@ class DaemonCapabilityManager:
                 "user_id": user_id,
                 "client_id": client_id,
                 "node_id": str(first.get("node_id") or "").strip() or client_id,
-                "hostname": str(browser_info.get("hostname") or "").strip(),
-                "platform": str(browser_info.get("platform") or "").strip(),
+                "hostname": str(
+                    system_info.get("hostname") or browser_info.get("hostname") or ""
+                ).strip(),
+                "platform": str(
+                    system_info.get("os_name")
+                    or system_info.get("platform")
+                    or browser_info.get("platform")
+                    or ""
+                ).strip(),
+                "system_info": system_info,
                 "daemon_version": first.get("extension_version"),
                 "capabilities": [],
                 "connected_at": now,
@@ -151,6 +165,16 @@ class DaemonCapabilityManager:
                 client_id,
                 self._sessions[session_id]["node_id"],
                 user_id,
+            )
+            # 诊断日志：便于端到端排查「系统信息是否收到」。
+            # 若此处 system_info 为空，说明 daemon 未上报或上报字段名不符；
+            # 若此处有值但 /api/daemon/sessions 看不到，问题在返回层。
+            logger.info(
+                "[DAEMON] hello system_info: received=%s hostname=%r platform=%r fields=%d",
+                bool(system_info),
+                self._sessions[session_id]["hostname"],
+                self._sessions[session_id]["platform"],
+                len(system_info),
             )
 
             await websocket.send_json(
@@ -402,6 +426,7 @@ class DaemonCapabilityManager:
                     "node_id": session.get("node_id"),
                     "hostname": session.get("hostname"),
                     "platform": session.get("platform"),
+                    "system_info": session.get("system_info") or {},
                     "daemon_version": session.get("daemon_version"),
                     "capabilities": session.get("capabilities") or [],
                     "connected_at": session.get("connected_at"),
@@ -421,6 +446,7 @@ class DaemonCapabilityManager:
             "node_id": session.get("node_id"),
             "hostname": session.get("hostname"),
             "platform": session.get("platform"),
+            "system_info": session.get("system_info") or {},
             "daemon_version": session.get("daemon_version"),
             "capabilities": session.get("capabilities") or [],
             "connected_at": session.get("connected_at"),
