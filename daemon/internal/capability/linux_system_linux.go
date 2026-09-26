@@ -30,6 +30,14 @@ func registerLinuxSystem(reg *Registry) {
 
 // handleLinuxSystemInfo 是 linux.system.info 的实现。
 func handleLinuxSystemInfo(_ map[string]any) (any, error) {
+	return CollectSystemInfo()
+}
+
+// CollectSystemInfo 采集本机系统信息。
+//
+// 该函数同时服务于 linux.system.info 能力与守护进程注册时的 hello 上报，
+// 保证两处字段与取值完全一致。各平台在带构建标签的文件中提供实现。
+func CollectSystemInfo() (map[string]any, error) {
 	hostname, _ := os.Hostname()
 
 	kernel := ""

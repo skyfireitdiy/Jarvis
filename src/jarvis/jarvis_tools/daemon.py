@@ -51,6 +51,9 @@ class DaemonTool:
 不依赖当前 Agent 所在环境，可操作用户自己的机器。
 每次调用只能执行一个 action：
 - list_sessions: 列出当前在线的守护进程会话（返回 session_id 列表）。**应先调用此操作获取 session_id**
+  每个会话还包含该后台服务所在机器的系统信息（system_info：hostname/os_name/os_version/arch/
+  cpu_count/cpu_model/mem_total_kb/mem_available_kb/uptime_sec/user/home 等），
+  可据此判断该机器的环境与可调用的能力。
 - list_capabilities: 列出指定会话上可用的能力清单（含 name/description/parameters/platform）。需 session_id
 - call: 按能力名调用指定会话上的能力。需 session_id、name；可选 params（能力参数对象）、timeout
 

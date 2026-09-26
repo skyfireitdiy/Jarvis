@@ -243,14 +243,21 @@ func (c *Client) connectAndServe(ctx context.Context) error {
 	log.Printf("[wsclient] 已连接 %s（子协议 %v）", wsURL, conn.Subprotocol())
 
 	// 发送 hello
+	//
+	// 守护进程只上报自身（用户侧服务）的系统信息；浏览器信息由浏览器扩展
+	// 自行上报，守护进程不代报，故此处不再发送 browser_info。
 	hello := map[string]any{
 		"type":              "hello",
 		"client_id":         c.opts.ClientID,
 		"extension_version": c.opts.Version,
-		"browser_info": map[string]any{
-			"name": "jarvis-daemon",
-		},
-		"tabs": []any{},
+		"tabs":              []any{},
+	}
+	if sysInfo, err := capability.CollectSystemInfo(); err != nil {
+		log.Printf("[wsclient] 采集系统信息失败，hello 将不含 system_info: %v", err)
+	} else {
+		hello["system_info"] = sysInfo
+		log.Printf("[wsclient] hello 将上报 system_info: hostname=%v fields=%d",
+			sysInfo["hostname"], len(sysInfo))
 	}
 	if err := conn.WriteJSON(hello); err != nil {
 		return fmt.Errorf("发送 hello 失败: %w", err)
