@@ -2635,7 +2635,9 @@ function getWorkspacePaneTitle(pane) {
   // 每个 file pane 都有独立编辑器实例，标题显示该 pane 自己绑定的文件
   const panePath = workspaceViewPanes.get(pane.id) || (pane.id === activePaneId.value ? activeWorkspaceTabPath.value : null)
   if (panePath) return panePath.split('/').pop() || panePath
-  return '文件'
+  // 文件视图但未绑定任何文件（如刚打开编辑器、或分割出的空 pane）：
+  // 内容区是空占位符，标题也应显示「空区域」，与 view='empty' 的语义保持一致。
+  return '空区域'
 }
 
 // 未分割态标题栏用的虚拟 node：未分割时内容由 workspaceMainView 承载，
@@ -6678,6 +6680,34 @@ const workspaceSessionPanel = computed(() => {
   return panels.value.find(p => p.agentId) || null
 })
 
+// 「当前可见」的会话 Agent 集合：即此刻真正显示在界面上的 Agent 会话。
+// 注意：不能用「panel 对象是否持有 agentId」来判断——面板被收起（视图切回 file）后
+// panel.agentId 仍在，但会话已不可见。命令面板据此判断「选中它是否只是切回自身」：
+// 会话不可见时选中它是有意义的（重新打开），故不能置灰。
+const visibleSessionAgentIds = computed(() => {
+  const ids = new Set()
+  if (isWorkspaceSplit.value) {
+    const walk = (node) => {
+      if (!node) return
+      if (node.type === 'leaf') {
+        if (node.view === 'session' && node.sessionPanelId) {
+          const panel = panels.value.find(p => p.id === node.sessionPanelId)
+          if (panel && panel.agentId) ids.add(panel.agentId)
+        }
+        return
+      }
+      ;(node.children || []).forEach(walk)
+    }
+    walk(workspacePaneTree.value)
+    return ids
+  }
+  if (workspaceMainView.value === 'session') {
+    const panel = panels.value.find(p => p.id === workspaceSessionPanelId.value)
+    if (panel && panel.agentId) ids.add(panel.agentId)
+  }
+  return ids
+})
+
 // 网格内实际渲染的顶层子项数量（用于 panel-grid 的列/行布局）。
 // 注意：会话/终端/聊天面板一律只在编辑器面板内部渲染（或作为浮动面板），
 // 它们不是 panel-grid 的直接子项，因此绝不能计入网格布局，否则会出现
@@ -8420,8 +8450,8 @@ const commandPaletteCtx = computed(() => ({
   getAgentNodeLabel,
   getStatusClass,
   isWaitingInput,
-  // 已在某个 Panel 中打开的 Agent（用于把“激活”的 Agent 排在列表上方）
-  openedAgentIds: new Set(panels.value.filter(p => p.agentId).map(p => p.agentId)),
+  // 当前「可见」的 Agent 会话（用于把激活的 Agent 排在列表上方，并判断是否置灰）
+  openedAgentIds: visibleSessionAgentIds.value,
   // 节点组：作用于大厅中选中的节点（lobbyActiveNodeId）
   currentNodeId: lobbyActiveNodeId.value,
   createAgentOnNode: (nodeId) => onLobbyCreateAgentOnNode(nodeId),
