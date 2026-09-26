@@ -49,6 +49,12 @@ const (
 	// 与 Linux 侧 wmctrl -c 语义一致，不强制终止进程。
 	wmClose = 0x0010
 
+	// vkMenu 对应虚拟键 VK_MENU（即 Alt 键）。
+	// 用于 keybd_event 模拟一次 Alt 按键，绕过 Windows 前台锁定策略（见 focusWindow）。
+	// 注意：procKeybdEvent 与 keyeventfKeyUp 已在 windows_input_windows.go 中声明，
+	// 这里直接复用，不重复定义。
+	vkMenu = 0x12
+
 	// windowsGUITool 是本文件各能力返回结果中 tool 字段的值，便于与 Linux 侧对齐。
 	windowsGUITool = "user32.dll"
 )
@@ -331,10 +337,9 @@ func handleWindowsWindowFocus(params map[string]any) (any, error) {
 	// SW_RESTORE：若窗口已最小化则还原；对正常窗口无副作用。
 	procShowWindow.Call(hwnd, swRestore)
 
-	// SetForegroundWindow 受 Windows 前台锁定策略限制，可能失败。
-	// 这里不把失败当错误，而是如实返回 focused 状态。
-	r, _, _ := procSetForegroundWindow.Call(hwnd)
-	focused := r != 0
+	// 切前台受 Windows 前台锁定策略限制，focusWindow 内部会先直接尝试、
+	// 失败后模拟一次 Alt 按键取得前台资格再重试（详见该函数注释）。
+	focused := focusWindow(hwnd)
 
 	return map[string]any{
 		"window_id": formatWindowID(hwnd),
@@ -342,6 +347,39 @@ func handleWindowsWindowFocus(params map[string]any) (any, error) {
 		"focused":   focused,
 		"tool":      windowsGUITool,
 	}, nil
+}
+
+// focusWindow 把窗口切到前台，返回是否真正成功。
+//
+// 为什么需要「模拟一次 Alt 按键」
+// ==============================
+// Windows 有前台锁定策略（foreground lock）：只有**当前拥有前台的进程**、或
+// 「最近接收过用户输入」的进程，才能调用 SetForegroundWindow 成功。守护进程在
+// 后台运行，直接调用会被系统静默拒绝——真机实测 SetForegroundWindow 返回 False
+// 且前台窗口不变（GetForegroundWindow 仍是原窗口）。
+//
+// 标准绕过手法是先用 keybd_event 模拟一次按键（这里用 Alt 的按下+抬起），
+// 使本进程获得「最近有用户输入」的资格，随后 SetForegroundWindow 即可成功。
+// 真机实测：加这一步后 setfg=True 且 GetForegroundWindow 确认前台已切换。
+// （对照实验：不模拟按键时 setfg=False；先 AttachThreadInput 再调用也仍为 False。）
+//
+// 选择 Alt 的原因：Alt 单独按下+抬起不产生任何字符输入，也不会触发菜单（菜单需要
+// Alt+字母），副作用最小；且不会污染剪贴板或输入法状态。
+//
+// 注意：模拟按键有轻微全局副作用（会短暂改变键盘修饰键状态），因此只在首次
+// 尝试失败后才使用，避免无谓干扰。
+func focusWindow(hwnd uintptr) bool {
+	// 首次直接尝试：若本进程已具备前台资格（如用户刚与守护进程交互过），无需模拟按键。
+	if r, _, _ := procSetForegroundWindow.Call(hwnd); r != 0 {
+		return true
+	}
+
+	// 模拟一次 Alt 按下+抬起，取得前台资格后重试。
+	procKeybdEvent.Call(vkMenu, 0, 0, 0)
+	procKeybdEvent.Call(vkMenu, 0, keyeventfKeyUp, 0)
+
+	r, _, _ := procSetForegroundWindow.Call(hwnd)
+	return r != 0
 }
 
 // handleWindowsWindowClose 是 windows.window.close 的实现。

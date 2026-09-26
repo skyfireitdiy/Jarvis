@@ -36,7 +36,11 @@ import (
 //
 // 与 Linux 侧 linuxGUITimeout（10s）保持一致：剪贴板读写都是毫秒级操作，
 // 10s 足够覆盖进程冷启动；超时说明 PowerShell 卡死，应尽快失败而不是挂住调用方。
-const windowsClipboardTimeout = 10 * time.Second
+//
+// 注意：windows.clipboard.set 内部带重试（见 windowsClipboardSetScript），
+// 真机实测剪贴板被其他进程占用时可能需要重试近 10 次（约 10s）才成功，
+// 因此这里放宽到 30s，避免重试尚未完成就被超时打断。
+const windowsClipboardTimeout = 30 * time.Second
 
 // windowsScreenshotTimeout 是执行 PowerShell 截图命令的超时时间。
 //
@@ -222,7 +226,9 @@ func handleWindowsClipboardSet(params map[string]any) (any, error) {
 
 	// 关键安全点：text 经 encodePowerShellText 变成单引号字面量后才拼进脚本。
 	// 该函数把文本内的单引号双写，其余字符在单引号字面量中不被解释，杜绝注入。
-	script := "Set-Clipboard -Value " + encodePowerShellText(text)
+	// 脚本内自带重试：Windows 剪贴板常被其他进程短暂占用，一次调用极易失败
+	// （真机实测最坏第 9 次才成功），详见 buildWindowsClipboardSetScript。
+	script := buildWindowsClipboardSetScript(encodePowerShellText(text))
 
 	out, err := runWindowsPowerShellCommand(script, windowsClipboardTimeout)
 	if err != nil {
