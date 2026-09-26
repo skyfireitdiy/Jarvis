@@ -10068,8 +10068,13 @@ async function fetchAgentStatus(agent) {
           console.warn('[AGENT STATUS] waiting_confirm but no pending_confirm payload found')
         }
       } else {
+        // 运行中（running）：输入框依然可用（可先行输入，Ctrl+Enter 发送/缓冲），
+        // 故与 waiting_multi 一样把焦点交给多行输入框，避免用户必须手动点击才能输入。
         inputMode.value = 'multi'
         panelInputModes.value.set(agent.agent_id, 'multi')
+        const targetPanel = panels.value.find(p => p.agentId === agent.agent_id)
+        const sp = targetPanel ? sessionPanelRefs.get(targetPanel.id) : null
+        if (sp?.focusInput && !isAutoFocusSuppressed()) sp.focusInput()
       }
     } else {
     }
