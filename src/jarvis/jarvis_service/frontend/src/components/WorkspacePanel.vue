@@ -17,40 +17,6 @@
         <button class="icon-btn close-btn" @click.stop="$emit('close')" title="关闭">✕</button>
       </div>
     </div>
-    <div class="workspace-panel-toolbar">
-      <span class="workspace-toolbar-status" v-if="activeTab?.loading">加载中...</span>
-      <span class="workspace-toolbar-status error" v-else-if="activeTab?.error">{{ activeTab.error }}</span>
-      <span class="workspace-toolbar-status" v-else-if="activeTab">{{ activeTab.isDirty ? '未保存修改' : '已保存' }}</span>
-      <div class="workspace-toolbar-spacer"></div>
-      <button
-        v-if="canSplit"
-        class="workspace-edit-toggle"
-        @click="$emit('splitPane', 'row')"
-        title="左右分屏"
-      >
-        <span class="workspace-edit-toggle-icon">◫</span>
-        <span class="workspace-edit-toggle-text">左右分</span>
-      </button>
-      <button
-        v-if="canSplit"
-        class="workspace-edit-toggle"
-        @click="$emit('splitPane', 'column')"
-        title="上下分屏"
-      >
-        <span class="workspace-edit-toggle-icon">⬓</span>
-        <span class="workspace-edit-toggle-text">上下分</span>
-      </button>
-      <button
-        v-if="tabs.length > 0 && !$slots['pane-tree']"
-        class="workspace-edit-toggle"
-        :class="{ 'editable': isEditable }"
-        @click="$emit('toggleEditable')"
-        :title="isEditable ? '切换到只读模式' : '切换到编辑模式'"
-      >
-        <span class="workspace-edit-toggle-icon">{{ isEditable ? '🔓' : '🔒' }}</span>
-        <span class="workspace-edit-toggle-text">{{ isEditable ? '可编辑' : '只读' }}</span>
-      </button>
-    </div>
     <div class="workspace-main">
       <div class="workspace-activity-bar">
         <button
@@ -132,6 +98,9 @@
              此时不再渲染原有的单视图内容，避免两套渲染路径并存。 -->
         <slot name="pane-tree"></slot>
         <template v-if="!$slots['pane-tree']">
+        <!-- 未分割态的区域标题栏：与已分割时各 pane 的标题栏同源（WorkspacePaneHeader），
+             保证「未分割也有分屏入口」。由 App.vue 传入（含根 leaf 与分屏回调）。 -->
+        <slot name="main-view-header"></slot>
         <slot name="main-view"></slot>
         <div v-show="mainView === 'file'" class="workspace-main-file-view">
           <div v-if="diff" class="workspace-diff-view">
@@ -186,13 +155,11 @@ const props = defineProps({
   activeTabPath: String,
   tabs: Array,
   isMaximized: Boolean,
-  isEditable: Boolean,
   showSidebar: Boolean,
   sidebarView: String,
   mainView: { type: String, default: 'file' },
   resizeDirections: Array,
   diff: Object,
-  canSplit: { type: Boolean, default: false },
   isAdmin: { type: Boolean, default: false }
 })
 
@@ -204,7 +171,6 @@ const emit = defineEmits([
   'close',
   'activateTab',
   'closeTab',
-  'toggleEditable',
   'setSidebarView',
   'setMainView',
   'startResize',
@@ -214,7 +180,6 @@ const emit = defineEmits([
   'toggleDiffShowFull',
   'diffNavPrev',
   'diffNavNext',
-  'splitPane',
   'openSettings',
   'openDocs',
   'openAdmin'
@@ -366,73 +331,6 @@ defineExpose({
   font-size: 12px;
   line-height: 1;
   padding: 0;
-}
-
-.workspace-panel-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-height: 30px;
-  padding: 0 10px;
-  border-top: 1px solid var(--color-border-subtle);
-  border-bottom: 1px solid var(--color-border-subtle);
-  background: var(--color-bg-secondary);
-}
-
-.workspace-toolbar-status {
-  font-size: 12px;
-  color: var(--color-text-secondary);
-}
-
-.workspace-toolbar-status.error {
-  color: var(--color-error);
-}
-
-.workspace-toolbar-spacer {
-  flex: 1;
-}
-
-.workspace-edit-toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  border: none;
-  border-radius: var(--tile-radius-xs);
-  font-size: 11px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease-out;
-  background: var(--color-bg-tertiary);
-  color: var(--color-text-secondary);
-
-}
-
-.workspace-edit-toggle:hover {
-  background: var(--color-bg-hover);
-}
-
-.workspace-edit-toggle:active {
-  transform: scale(0.96);
-}
-
-.workspace-edit-toggle.editable {
-  background: rgba(54, 255, 124, 0.15);
-  color: var(--color-success);
-}
-
-.workspace-edit-toggle.editable:hover {
-  background: rgba(54, 255, 124, 0.25);
-}
-
-.workspace-edit-toggle-icon {
-  font-size: 12px;
-}
-
-.workspace-edit-toggle-text {
-  font-size: 11px;
-  letter-spacing: 0.02em;
 }
 
 .workspace-main {
