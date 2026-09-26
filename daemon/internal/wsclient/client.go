@@ -22,6 +22,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"jarvis-daemon/internal/buildinfo"
 	"jarvis-daemon/internal/capability"
 	"jarvis-daemon/internal/handler"
 )
@@ -66,11 +67,27 @@ type Client struct {
 	sessionID string
 	ws        *websocket.Conn
 
+	// writeMu 串行化对同一连接的写操作。
+	//
+	// gorilla/websocket 明确要求「同一时刻只能有一个 writer」，否则并发写会
+	// 破坏帧边界。引入异步执行后（见 handleCapabilityCall / handleCommand），
+	// 读循环、心跳循环与执行 goroutine 都可能同时写，故必须加锁。
+	writeMu sync.Mutex
+
 	// 控制重连与心跳
 	cancel  context.CancelFunc
 	stopped bool
 	// authFailed 表示当前 Token 已失效，不再重连。
 	authFailed bool
+}
+
+// writeJSON 串行地向连接写入一帧 JSON。
+//
+// 所有写操作都必须经由此函数，以保证同一连接上不会出现并发写。
+func (c *Client) writeJSON(conn *websocket.Conn, v any) error {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	return conn.WriteJSON(v)
 }
 
 // 连接状态。
@@ -259,7 +276,26 @@ func (c *Client) connectAndServe(ctx context.Context) error {
 		log.Printf("[wsclient] hello 将上报 system_info: hostname=%v fields=%d",
 			sysInfo["hostname"], len(sysInfo))
 	}
-	if err := conn.WriteJSON(hello); err != nil {
+	// 在 hello 中直接携带能力列表。
+	//
+	// 为什么必须放在 hello 里：网关的 /api/daemon/sessions 只读取会话缓存中的
+	// capabilities，而该缓存仅在网关主动发起 capability.list 往返后才被填充。
+	// 若不在握手里带上，会话刚注册时能力列表恒为空；更关键的是，当守护进程
+	// 正在执行一个耗时能力（如 windows.app.list 要拉起 PowerShell）时，读循环
+	// 被占用，网关发来的 capability.list 无法及时被读取，查询会因超时返回空。
+	// 因此在握手阶段一次性上报，网关即可立即缓存，无需再依赖运行时查询。
+	if c.opts.Registry != nil {
+		hello["capabilities"] = c.opts.Registry.List()
+	}
+	// 在 hello 中携带构建信息（编译时间等）。
+	//
+	// 编译时间取自 exe 自身的 mtime（见 internal/buildinfo），而非 ldflags 注入，
+	// 以免破坏可复现构建。网关侧可用它判断「当前运行的是哪一版、何时编译的」。
+	buildInfo := buildinfo.Collect(c.opts.Version)
+	hello["build_info"] = buildInfo.AsMap()
+	log.Printf("[wsclient] hello 将上报 build_info: version=%s build_time=%s source=%s",
+		buildInfo.Version, buildInfo.BuildTime, buildInfo.BuildTimeSource)
+	if err := c.writeJSON(conn, hello); err != nil {
 		return fmt.Errorf("发送 hello 失败: %w", err)
 	}
 
@@ -342,40 +378,53 @@ func (c *Client) handleCapabilityList(conn *websocket.Conn) {
 		"type":         "capability.list.result",
 		"capabilities": caps,
 	}
-	if err := conn.WriteJSON(reply); err != nil {
+	if err := c.writeJSON(conn, reply); err != nil {
 		log.Printf("[wsclient] 回能力列表失败: %v", err)
 	}
 }
 
 // handleCapabilityCall 执行一次能力调用并回结果。
+//
+// 执行放在独立 goroutine 中，避免阻塞读循环。
+//
+// 为什么必须异步：读循环是单 goroutine 顺序处理消息的。若在此同步执行能力，
+// 一个耗时能力（如 windows.app.list 要拉起 PowerShell、windows.screenshot 要
+// 加载 System.Drawing）会把读循环占住数秒；期间网关发来的 capability.list
+// 无法被读取，网关侧的等待会超时，表现为「能力列表查询返回空」。异步执行后，
+// 读循环始终能及时响应列表查询与心跳。
 func (c *Client) handleCapabilityCall(conn *websocket.Conn, msg map[string]any) {
 	callID, _ := msg["id"].(string)
 	name, _ := msg["name"].(string)
+	params, _ := msg["params"].(map[string]any)
 
-	var res capability.Result
-	switch {
-	case c.opts.Registry == nil:
-		res = capability.Result{Success: false, Error: "capability registry is nil"}
-	case name == "":
-		res = capability.Result{Success: false, Error: "capability name is empty"}
-	default:
-		params, _ := msg["params"].(map[string]any)
-		res = c.opts.Registry.Execute(name, params)
-	}
+	go func() {
+		var res capability.Result
+		switch {
+		case c.opts.Registry == nil:
+			res = capability.Result{Success: false, Error: "capability registry is nil"}
+		case name == "":
+			res = capability.Result{Success: false, Error: "capability name is empty"}
+		default:
+			res = c.opts.Registry.Execute(name, params)
+		}
 
-	reply := map[string]any{
-		"type":    "capability.call.result",
-		"id":      callID,
-		"success": res.Success,
-		"data":    res.Data,
-		"error":   res.Error,
-	}
-	if err := conn.WriteJSON(reply); err != nil {
-		log.Printf("[wsclient] 回能力调用结果失败: %v", err)
-	}
+		reply := map[string]any{
+			"type":    "capability.call.result",
+			"id":      callID,
+			"success": res.Success,
+			"data":    res.Data,
+			"error":   res.Error,
+		}
+		if err := c.writeJSON(conn, reply); err != nil {
+			log.Printf("[wsclient] 回能力调用结果失败: %v", err)
+		}
+	}()
 }
 
 // handleCommand 处理指令并回结果。
+//
+// 与 handleCapabilityCall 同理，指令分发也放到独立 goroutine 中执行，
+// 避免耗时指令阻塞读循环（进而拖垮心跳与能力列表查询）。
 func (c *Client) handleCommand(conn *websocket.Conn, msg map[string]any) {
 	raw, err := json.Marshal(msg)
 	if err != nil {
@@ -387,16 +436,18 @@ func (c *Client) handleCommand(conn *websocket.Conn, msg map[string]any) {
 		log.Printf("[wsclient] 指令解析失败: %v", err)
 		return
 	}
-	// 已接入能力注册表时走注册表，否则保持旧的占位行为。
-	var result handler.Result
-	if c.opts.Registry != nil {
-		result = handler.DispatchWith(c.opts.Registry, cmd)
-	} else {
-		result = handler.Dispatch(cmd)
-	}
-	if err := conn.WriteJSON(result); err != nil {
-		log.Printf("[wsclient] 回结果失败: %v", err)
-	}
+	go func() {
+		// 已接入能力注册表时走注册表，否则保持旧的占位行为。
+		var result handler.Result
+		if c.opts.Registry != nil {
+			result = handler.DispatchWith(c.opts.Registry, cmd)
+		} else {
+			result = handler.Dispatch(cmd)
+		}
+		if err := c.writeJSON(conn, result); err != nil {
+			log.Printf("[wsclient] 回结果失败: %v", err)
+		}
+	}()
 }
 
 // heartbeatLoop 周期性发送 ping。
@@ -409,7 +460,7 @@ func (c *Client) heartbeatLoop(ctx context.Context, conn *websocket.Conn) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if err := conn.WriteJSON(map[string]string{"type": "ping"}); err != nil {
+			if err := c.writeJSON(conn, map[string]string{"type": "ping"}); err != nil {
 				log.Printf("[wsclient] 心跳发送失败: %v", err)
 				return
 			}

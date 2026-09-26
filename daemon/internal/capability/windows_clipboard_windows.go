@@ -110,19 +110,6 @@ func registerWindowsClipboard(reg *Registry) {
 	})
 }
 
-// windowsPowerShellPreamble 是所有 PowerShell 脚本的前置语句。
-//
-// 作用：把 PowerShell 的输出编码强制为 UTF-8。
-//
-// 为什么必需：Go 的 cmd.Output() 按原始字节返回，不做任何编码转换。而
-// Windows PowerShell 默认使用控制台代码页（中文 Windows 上是 GBK/CP936）
-// 输出，Go 侧按 UTF-8 解码会得到乱码——剪贴板里的中文、截图路径里的中文
-// 都会受影响。显式设置 [Console]::OutputEncoding 后，PowerShell 统一以
-// UTF-8 写出，与 Go 的预期一致。
-//
-// 注意：这里设置的是「输出编码」，不影响脚本内部字符串处理。
-const windowsPowerShellPreamble = "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8"
-
 // requirePowerShell 探测 powershell.exe 是否可用，返回其绝对路径。
 //
 // Windows 自带 Windows PowerShell 5.1（powershell.exe），因此正常情况下必然存在；
@@ -131,17 +118,29 @@ func requirePowerShell() (string, error) {
 	return requireTool("powershell.exe", "Windows 自带 Windows PowerShell 5.1，请确认系统 PATH 未被破坏")
 }
 
-// runWindowsPowerShellCommand 执行一段 PowerShell 脚本并返回标准输出。
+// runWindowsPowerShellCommand 执行一段 PowerShell 脚本并返回标准输出（UTF-8）。
 //
 // 参数说明：
 //   - script：完整的 PowerShell 脚本文本。**调用方必须自行保证其中的用户输入
 //     已做转义**（见 encodePowerShellText）；本函数不做任何转义。
 //   - timeout：超时时间。
 //
-// 用 -NoProfile 跳过用户配置文件（避免用户自定义 profile 拖慢启动或改变行为），
-// 用 -NonInteractive 禁止交互式提示（否则脚本若意外弹出确认框会一直挂到超时），
-// 用 -ExecutionPolicy Bypass 绕过脚本执行策略限制（-Command 传入的文本受策略约束，
-// 绕过可保证在受限策略机器上也能执行）。
+// 编码方案（这是本函数的核心，修复了真实机器上的中文乱码）：
+//
+//  1. 用 -EncodedCommand 而非 -Command 传递脚本。原因：-Command 的脚本文本经
+//     命令行参数传递，Windows PowerShell 5.1 按 ANSI 代码页（中文系统 = GBK）
+//     解析该参数，而 Go 的 exec 按 UTF-8 字节传递，导致脚本内的中文损坏。
+//     -EncodedCommand 接受 base64(UTF-16LE)，是纯 ASCII，彻底绕开该问题。
+//     编码实现见 windows_encoding.go 的 encodePowerShellCommand。
+//
+//  2. 脚本最前面拼接 windowsPowerShellPreamble，把 PowerShell 的输出编码设为
+//     UTF-8。这样 Go 侧读到的 stdout 字节就是 UTF-8，直接 string(out) 即可，
+//     无需引入 GBK 解码表（标准库无此能力，第三方包被项目约束禁止）。
+//
+// 其余开关：
+//   - -NoProfile：跳过用户配置文件（避免自定义 profile 拖慢启动或改变行为）。
+//   - -NonInteractive：禁止交互式提示（否则意外弹出的确认框会一直挂到超时）。
+//   - -ExecutionPolicy Bypass：绕过脚本执行策略限制。
 //
 // 失败时把 stderr 内容带进错误信息，便于排查（如 System.Drawing 加载失败）。
 func runWindowsPowerShellCommand(script string, timeout time.Duration) (string, error) {
@@ -153,14 +152,14 @@ func runWindowsPowerShellCommand(script string, timeout time.Duration) (string, 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	// 统一在前面拼接输出编码设置，保证所有脚本的输出都是 UTF-8。
+	// 前置语句必须在任何输出产生之前执行，因此拼在脚本最前面。
 	fullScript := windowsPowerShellPreamble + "\n" + script
 
 	cmd := exec.CommandContext(ctx, ps,
 		"-NoProfile",
 		"-NonInteractive",
 		"-ExecutionPolicy", "Bypass",
-		"-Command", fullScript,
+		"-EncodedCommand", encodePowerShellCommand(fullScript),
 	)
 
 	out, err := cmd.Output()
@@ -175,6 +174,14 @@ func runWindowsPowerShellCommand(script string, timeout time.Duration) (string, 
 			}
 		}
 		return "", fmt.Errorf("执行 PowerShell 失败: %w", err)
+	}
+
+	// 正常情况下 PowerShell 已按 UTF-8 输出，直接转换即可。
+	// 若环境异常导致仍按 GBK 输出，字节流不是合法 UTF-8；此时给出明确错误，
+	// 而不是静默返回一串 U+FFFD 让调用方困惑于「为什么全是问号」。
+	if !looksLikeUTF8(out) {
+		return "", fmt.Errorf("PowerShell 输出不是合法 UTF-8（疑似仍按控制台代码页输出），"+
+			"请确认系统未强制覆盖控制台输出编码；原始字节长度 %d", len(out))
 	}
 	return string(out), nil
 }

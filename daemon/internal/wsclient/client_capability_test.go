@@ -259,3 +259,179 @@ func TestCapabilityCallUnknown(t *testing.T) {
 		t.Fatalf("期望 error 含 unknown capability，实际 %q", errMsg)
 	}
 }
+
+// TestHelloCarriesCapabilities 验证握手帧 hello 中直接携带能力列表。
+//
+// 背景：网关的 /api/daemon/sessions 只读取会话缓存中的 capabilities，该缓存
+// 依赖 hello 或运行时查询填充。若 hello 不带能力，会话刚建立时能力列表为空。
+func TestHelloCarriesCapabilities(t *testing.T) {
+	gateway, connCh := startCapabilityTestServer(t)
+	reg := newEchoRegistry(t)
+
+	client := New(Options{
+		Gateway:  gateway,
+		Token:    "test-token",
+		ClientID: "test-daemon",
+		Version:  "0.0.0-test",
+		Registry: reg,
+	})
+	client.Start()
+	defer client.Stop()
+
+	serverConn := waitForConn(t, connCh)
+	hello := readJSONWithTimeout(t, serverConn)
+	if hello["type"] != "hello" {
+		t.Fatalf("期望首帧为 hello，实际 %v", hello["type"])
+	}
+	caps, ok := hello["capabilities"].([]any)
+	if !ok {
+		t.Fatalf("期望 hello 携带 capabilities 数组，实际 %T", hello["capabilities"])
+	}
+	var found bool
+	for _, raw := range caps {
+		if item, ok := raw.(map[string]any); ok && item["name"] == "test.echo" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("hello.capabilities 应包含 test.echo，实际 %v", caps)
+	}
+}
+
+// TestHelloCarriesBuildInfo 验证握手帧 hello 中携带构建信息（编译时间等）。
+//
+// 需求：daemon 上报信息需带编译时间，便于网关判断「当前运行的是哪一版、何时编译的」。
+// 编译时间取自 exe 的 mtime（见 internal/buildinfo），此处只校验字段存在且格式自洽。
+func TestHelloCarriesBuildInfo(t *testing.T) {
+	gateway, connCh := startCapabilityTestServer(t)
+	reg := newEchoRegistry(t)
+
+	client := New(Options{
+		Gateway:  gateway,
+		Token:    "test-token",
+		ClientID: "test-daemon",
+		Version:  "v9.9.9-test",
+		Registry: reg,
+	})
+	client.Start()
+	defer client.Stop()
+
+	serverConn := waitForConn(t, connCh)
+	hello := readJSONWithTimeout(t, serverConn)
+	if hello["type"] != "hello" {
+		t.Fatalf("期望首帧为 hello，实际 %v", hello["type"])
+	}
+
+	bi, ok := hello["build_info"].(map[string]any)
+	if !ok {
+		t.Fatalf("期望 hello 携带 build_info 对象，实际 %T", hello["build_info"])
+	}
+
+	// 版本应与 Options.Version 一致。
+	if bi["version"] != "v9.9.9-test" {
+		t.Errorf("build_info.version = %v, 期望 v9.9.9-test", bi["version"])
+	}
+	// 平台字段应非空（本机运行，必定可采集）。
+	if bi["os"] == "" || bi["os"] == nil {
+		t.Errorf("build_info.os 不应为空，实际 %v", bi["os"])
+	}
+	if bi["arch"] == "" || bi["arch"] == nil {
+		t.Errorf("build_info.arch 不应为空，实际 %v", bi["arch"])
+	}
+	if bi["go_version"] == "" || bi["go_version"] == nil {
+		t.Errorf("build_info.go_version 不应为空，实际 %v", bi["go_version"])
+	}
+	// 来源标注必须为已知取值之一。
+	src, _ := bi["build_time_source"].(string)
+	switch src {
+	case "exe_mtime", "process_start", "unknown":
+	default:
+		t.Errorf("build_info.build_time_source = %q, 非预期取值", src)
+	}
+}
+
+// TestSlowCapabilityCallDoesNotBlockList 验证耗时能力不会阻塞后续 capability.list。
+//
+// 这是本次修复的核心回归测试：修复前 handleCapabilityCall 在读循环内同步执行，
+// 一个 sleep 能力会把读循环占住，导致随后到达的 capability.list 迟迟得不到响应
+// （网关侧表现为查询超时、能力列表返回空）。修复后执行在独立 goroutine 中，
+// 列表查询应立即得到响应。
+func TestSlowCapabilityCallDoesNotBlockList(t *testing.T) {
+	gateway, connCh := startCapabilityTestServer(t)
+	reg := capability.NewRegistry()
+	if err := reg.Register(capability.Capability{
+		Name:        "test.slow",
+		Description: "故意耗时的测试能力",
+		Handler: func(params map[string]any) (any, error) {
+			time.Sleep(2 * time.Second)
+			return map[string]any{"done": true}, nil
+		},
+	}); err != nil {
+		t.Fatalf("注册 test.slow 失败: %v", err)
+	}
+
+	client := New(Options{
+		Gateway:  gateway,
+		Token:    "test-token",
+		ClientID: "test-daemon",
+		Version:  "0.0.0-test",
+		Registry: reg,
+	})
+	client.Start()
+	defer client.Stop()
+
+	serverConn := waitForConn(t, connCh)
+	readJSONWithTimeout(t, serverConn) // hello
+	if err := serverConn.WriteJSON(map[string]any{
+		"type":       "hello_ack",
+		"session_id": "test-session",
+	}); err != nil {
+		t.Fatalf("回 hello_ack 失败: %v", err)
+	}
+
+	// 触发一个耗时 2 秒的能力调用，但**不等待**其结果。
+	if err := serverConn.WriteJSON(map[string]any{
+		"type": "capability.call",
+		"id":   "slow1",
+		"name": "test.slow",
+	}); err != nil {
+		t.Fatalf("发送 capability.call 失败: %v", err)
+	}
+
+	// 紧接着查询能力列表：必须在 1 秒内拿到结果（远小于 slow 的 2 秒）。
+	// 若修复失效，读循环被 slow 占住，这里会超时失败。
+	if err := serverConn.WriteJSON(map[string]any{"type": "capability.list"}); err != nil {
+		t.Fatalf("发送 capability.list 失败: %v", err)
+	}
+
+	type readResult struct {
+		msg map[string]any
+		err error
+	}
+	ch := make(chan readResult, 1)
+	go func() {
+		_, data, err := serverConn.ReadMessage()
+		if err != nil {
+			ch <- readResult{err: err}
+			return
+		}
+		var m map[string]any
+		if err := json.Unmarshal(data, &m); err != nil {
+			ch <- readResult{err: err}
+			return
+		}
+		ch <- readResult{msg: m}
+	}()
+
+	select {
+	case r := <-ch:
+		if r.err != nil {
+			t.Fatalf("读取消息失败: %v", r.err)
+		}
+		if r.msg["type"] != "capability.list.result" {
+			t.Fatalf("期望先收到 capability.list.result，实际 %v", r.msg["type"])
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatal("capability.list 在 1 秒内未得到响应：耗时能力阻塞了读循环")
+	}
+}
