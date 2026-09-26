@@ -222,7 +222,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits([
-  'activate', 'detach', 'close-agent', 'close-panel',
+  'activate', 'close-agent', 'close-panel',
   'send', 'complete', 'open-completions',
   'input-change', 'keydown', 'paste',
   'show-buffer', 'clear-buffer',
