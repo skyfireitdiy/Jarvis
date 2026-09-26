@@ -165,11 +165,20 @@ func handleWindowsServiceStatus(params map[string]any) (any, error) {
 
 	// 用 Get-CimInstance Win32_Service 可拿到更多字段（启动类型、进程 ID、路径等），
 	// 比 Get-Service 更接近 systemctl show 的信息量。
+	//
+	// 关键：-Filter 需要的是 **WQL 谓词**（如 Name='Spooler'），不是裸字符串。
+	// 早期实现直接传 encodePowerShellText(unit)（即 'Spooler'），WQL 解析后
+	// 匹配不到任何实例，导致**所有服务名都报「未找到服务」**（真机实测暴露）。
+	//
+	// 另外按描述承诺支持显示名：先按 Name 精确匹配，未命中再按 DisplayName 匹配。
+	// 两处都用 encodePowerShellText 做单引号转义，防注入。
+	quoted := encodePowerShellText(unit)
 	script := fmt.Sprintf(
-		"$s = Get-CimInstance Win32_Service -Filter %s; "+
+		"$s = Get-CimInstance Win32_Service -Filter ('Name=' + %s); "+
+			"if ($null -eq $s) { $s = Get-CimInstance Win32_Service -Filter ('DisplayName=' + %s) }; "+
 			"if ($null -eq $s) { Write-Output 'NOT_FOUND'; exit 0 }; "+
 			"$s | Select-Object Name,DisplayName,State,StartMode,ProcessId,PathName,Status | ConvertTo-Csv -NoTypeInformation",
-		encodePowerShellText(unit),
+		quoted, quoted,
 	)
 
 	out, err := runWindowsPowerShellCommand(script, windowsServiceTimeout)

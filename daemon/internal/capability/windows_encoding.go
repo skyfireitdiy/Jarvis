@@ -51,9 +51,15 @@ import (
 //     PowerShell 写 stdin，但统一设置可避免某些 cmdlet 因输入编码不一致而报错。
 //
 // 注意：必须在**任何输出产生之前**设置，因此该前置语句会被拼在脚本最前面。
+//
+// $ProgressPreference = 'SilentlyContinue' 的作用：PowerShell 在 stderr 不是终端时，
+// 会把 progress 流（如首次加载模块时的 "Preparing modules for first use."）序列化成
+// CLIXML（形如 "#< CLIXML\r\n<Objs Version=...>"）写到 stderr。这会让 windows.script.exec
+// 的 stderr 字段被大量噪音污染（真机实测暴露）。关掉 progress 输出即可消除。
 const windowsPowerShellPreamble = "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; " +
 	"$OutputEncoding = [System.Text.Encoding]::UTF8; " +
-	"[Console]::InputEncoding = [System.Text.Encoding]::UTF8"
+	"[Console]::InputEncoding = [System.Text.Encoding]::UTF8; " +
+	"$ProgressPreference = 'SilentlyContinue'"
 
 // encodePowerShellCommand 把 PowerShell 脚本编码为 -EncodedCommand 所需的参数。
 //
