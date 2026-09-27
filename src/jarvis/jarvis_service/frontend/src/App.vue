@@ -1043,6 +1043,7 @@
       :hideWorkingDir="hideWorkingDir"
       :autoInstallBrowserExt="autoInstallBrowserExt"
       :terminalName="terminalName"
+      :daemonPort="daemonPort"
       @update:visible="showSettingsModal = $event"
       @update:autoLoginEnabled="autoLoginEnabled = $event"
       @saveAutoLoginSetting="saveAutoLoginSetting"
@@ -1056,6 +1057,8 @@
       @saveAutoInstallBrowserExtSetting="saveAutoInstallBrowserExtSetting"
       @update:terminalName="terminalName = $event"
       @saveTerminalNameSetting="saveTerminalNameSetting"
+      @update:daemonPort="daemonPort = $event"
+      @saveDaemonPortSetting="saveDaemonPortSetting"
       @confirmClearHistory="confirmClearHistory"
       @disconnectAll="disconnectAll"
     />
@@ -16774,19 +16777,73 @@ window.__jarvisAuthBridge = {
 // 让 daemon 无需用户手动配置即可感知登录态（daemon 侧多网关并存，互不顶掉）。
 // 注意：gateway 是远程网关地址，daemon 地址是本机回环，两者必须分开。
 const DAEMON_DEFAULT_URL = 'http://127.0.0.1:17800'
+const DAEMON_URL_STORAGE_KEY = 'jarvis_daemon_url'
+const DAEMON_DEFAULT_PORT = '17800'
 
-// 解析本机 daemon 地址：默认回环 17800，允许 localStorage 覆盖（便于测试/自定义端口）
+// 规范化 daemon 地址：去空白、补 http:// 前缀、去尾部斜杠。
+// 空串返回空串（调用方决定是否回退默认值），便于设置页区分「未配置」。
+function normalizeDaemonUrl(value) {
+  let url = String(value || '').trim()
+  if (!url) return ''
+  if (!/^https?:\/\//i.test(url)) url = 'http://' + url
+  return url.replace(/\/+$/, '')
+}
+
+// 从已保存的 daemon 地址中提取端口号（设置页只暴露端口，IP 恒为回环 127.0.0.1）。
+function extractDaemonPort(url) {
+  const normalized = normalizeDaemonUrl(url)
+  if (!normalized) return ''
+  try {
+    return new URL(normalized).port || ''
+  } catch (e) {
+    return ''
+  }
+}
+
+// 解析本机 daemon 地址：默认回环 17800，允许 localStorage 覆盖（设置页可改端口，便于端口被占用时自定义）
 function getDaemonUrl() {
   let url = ''
   try {
-    url = localStorage.getItem('jarvis_daemon_url') || ''
+    url = localStorage.getItem(DAEMON_URL_STORAGE_KEY) || ''
   } catch (e) {
     url = ''
   }
-  url = String(url).trim()
-  if (!url) return DAEMON_DEFAULT_URL
-  if (!/^https?:\/\//i.test(url)) url = 'http://' + url
-  return url.replace(/\/+$/, '')
+  return normalizeDaemonUrl(url) || DAEMON_DEFAULT_URL
+}
+
+// 设置页展示用的端口（未配置时展示默认端口，便于用户在此基础上改）
+function loadDaemonPort() {
+  let url = ''
+  try {
+    url = localStorage.getItem(DAEMON_URL_STORAGE_KEY) || ''
+  } catch (e) {
+    url = ''
+  }
+  return extractDaemonPort(url) || DAEMON_DEFAULT_PORT
+}
+const daemonPort = ref(loadDaemonPort())
+// 保存 daemon 端口：只接受端口号（IP 恒为本机回环 127.0.0.1）。
+// 写 localStorage 后立即用新地址重新推送一次登录态，使用户改完端口无需刷新页面即可让后续请求走新端口。
+function saveDaemonPortSetting(nextValue = daemonPort.value) {
+  const port = String(nextValue || '').trim()
+  // 留空或等于默认端口则清除覆盖项，回到默认地址
+  if (!port || port === DAEMON_DEFAULT_PORT) {
+    daemonPort.value = DAEMON_DEFAULT_PORT
+    try {
+      localStorage.removeItem(DAEMON_URL_STORAGE_KEY)
+    } catch (error) {
+      console.warn('[DAEMON] Failed to clear daemon port:', error)
+    }
+  } else {
+    daemonPort.value = port
+    try {
+      localStorage.setItem(DAEMON_URL_STORAGE_KEY, `http://127.0.0.1:${port}`)
+    } catch (error) {
+      console.warn('[DAEMON] Failed to save daemon port:', error)
+    }
+  }
+  // 端口变化后立即重新推送一次给本机 daemon（与终端名称/扩展开关一致的做法）
+  syncTokenToDaemon(auth.value.token, window.__jarvisAuthBridge.getGateway())
 }
 
 // 把当前登录态同步到本机 daemon。

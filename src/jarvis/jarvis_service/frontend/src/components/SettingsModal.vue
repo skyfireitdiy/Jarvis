@@ -118,6 +118,22 @@
         />
       </div>
 
+      <!-- 本机后台服务端口 -->
+      <div class="form-group">
+        <label>本机后台服务端口</label>
+        <div class="form-help" style="margin-bottom:10px">本机 jarvis-daemon 的监听端口（默认 17800）。若默认端口被占用、daemon 改用了其它端口，请在此填写新端口号，浏览器将据此连接本机后台服务（地址恒为本机 127.0.0.1）。留空或填默认端口即恢复默认。</div>
+        <input
+          class="node-name-input"
+          :value="localDaemonPort"
+          placeholder="17800"
+          inputmode="numeric"
+          @input="onDaemonPortInput($event.target.value)"
+          @change="onDaemonPortCommit"
+          @keydown.enter="$event.target.blur()"
+          @blur="onDaemonPortCommit"
+        />
+      </div>
+
       <!-- 节点显示名映射 -->
       <div class="form-group">
         <label>节点显示名</label>
@@ -230,7 +246,8 @@ const props = defineProps({
   nodeDisplayNames: { type: Object, default: () => ({}) },
   hideWorkingDir: { type: Boolean, default: false },
   autoInstallBrowserExt: { type: Boolean, default: false },
-  terminalName: { type: String, default: '' }
+  terminalName: { type: String, default: '' },
+  daemonPort: { type: String, default: '' }
 })
 
 const emit = defineEmits([
@@ -248,7 +265,9 @@ const emit = defineEmits([
   'update:autoInstallBrowserExt',
   'saveAutoInstallBrowserExtSetting',
   'update:terminalName',
-  'saveTerminalNameSetting'
+  'saveTerminalNameSetting',
+  'update:daemonPort',
+  'saveDaemonPortSetting'
 ])
 
 // 本地状态
@@ -258,6 +277,7 @@ const localNotifyOnInput = ref(props.notifyOnInput)
 const localHideWorkingDir = ref(props.hideWorkingDir)
 const localAutoInstallBrowserExt = ref(props.autoInstallBrowserExt)
 const localTerminalName = ref(props.terminalName)
+const localDaemonPort = ref(props.daemonPort)
 const changePasswordForm = ref({ old_password: '', new_password: '', confirm_password: '' })
 const loading = ref(false)
 // 节点显示名本地副本（编辑中，input 时即时更新并向上同步）
@@ -335,6 +355,20 @@ watch(() => props.autoInstallBrowserExt, (newVal) => {
 watch(() => props.terminalName, (newVal) => {
   localTerminalName.value = newVal
 })
+
+watch(() => props.daemonPort, (newVal) => {
+  localDaemonPort.value = newVal
+})
+
+// 本机后台服务端口输入：更新本地副本并向上同步（父组件负责持久化到 localStorage）。
+// 输入过程中不即时持久化，避免用户逐字符输入时反复写入半成品端口；失焦/回车时提交。
+function onDaemonPortInput(value) {
+  localDaemonPort.value = String(value || '').trim()
+  emit('update:daemonPort', localDaemonPort.value)
+}
+function onDaemonPortCommit() {
+  emit('saveDaemonPortSetting', localDaemonPort.value)
+}
 
 // 终端名称输入：更新本地副本并向上同步（父组件负责持久化与同步到扩展/daemon）
 function onTerminalNameInput(value) {
