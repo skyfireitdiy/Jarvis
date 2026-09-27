@@ -166,7 +166,7 @@
               />
             </g>
 
-            <!-- 本机执行面节点（浏览器扩展在左、本地后台服务在右；机箱造型） -->
+            <!-- 本机执行面节点（浏览器扩展在左、本地后台服务在右；圆形造型，与服务器机箱明显区分） -->
             <g
               v-for="n in localNodes"
               :key="n.id"
@@ -175,27 +175,16 @@
               @mouseenter="hovered = n.id"
             >
               <title>{{ n.title }}</title>
-              <rect v-if="n.state !== 'offline'" :x="n.x - NODE_R - 4" :y="n.y - NODE_R * 0.86 - 4" :width="NODE_R * 2 + 8" :height="NODE_R * 1.72 + 8" rx="9"
-                    :stroke="n.color" stroke-width="1.4" fill="none" class="topo-ring" />
-              <!-- 机箱主体 -->
-              <rect :x="n.x - NODE_R" :y="n.y - NODE_R * 0.86" :width="NODE_R * 2" :height="NODE_R * 1.72" rx="6"
-                    :fill="n.fill" :stroke="n.color" stroke-width="1.8" class="topo-server" />
-              <!-- 顶部插槽 -->
-              <line :x1="n.x - NODE_R + 6" :y1="n.y - NODE_R * 0.86 + 7" :x2="n.x + NODE_R - 6" :y2="n.y - NODE_R * 0.86 + 7"
-                    :stroke="n.color" stroke-width="1.4" opacity="0.6" />
-              <!-- 散热格栅 -->
-              <line v-for="k in 3" :key="'lg' + k"
-                    :x1="n.x - NODE_R + 8" :y1="n.y - NODE_R * 0.86 + 6 + k * 4.6"
-                    :x2="n.x + NODE_R - 16" :y2="n.y - NODE_R * 0.86 + 6 + k * 4.6"
-                    :stroke="n.color" stroke-width="1" opacity="0.35" />
-              <!-- 指示灯 -->
-              <circle :cx="n.x + NODE_R - 10" :cy="n.y - 2" r="2.4" :fill="n.color" class="topo-led" />
-              <circle :cx="n.x + NODE_R - 10" :cy="n.y + 5" r="2.4" :fill="n.color" opacity="0.4" />
-              <!-- 底部状态条 -->
-              <rect :x="n.x - NODE_R + 6" :y="n.y + NODE_R * 0.86 - 8" :width="NODE_R * 2 - 12" :height="3" rx="1.5"
-                    :fill="n.color" opacity="0.5" />
-              <text :x="n.x" :y="n.y + NODE_R * 0.86 + 16" text-anchor="middle" class="topo-node-label">{{ n.short }}</text>
-              <text :x="n.x" :y="n.y + NODE_R * 0.86 + 29" text-anchor="middle" class="topo-node-count">{{ n.sub }}</text>
+              <circle v-if="n.state !== 'offline'" :cx="n.x" :cy="n.y" :r="ACCESS_R + 5"
+                      :stroke="n.color" stroke-width="1.4" fill="none" class="topo-ring" />
+              <!-- 圆形主体 -->
+              <circle :cx="n.x" :cy="n.y" :r="ACCESS_R"
+                      :fill="n.fill" :stroke="n.color" stroke-width="1.8" class="topo-server" />
+              <!-- 类型图标 -->
+              <text :x="n.x" :y="n.y" text-anchor="middle" dominant-baseline="central"
+                    class="topo-access-ico">{{ n.icon }}</text>
+              <text :x="n.x" :y="n.y + ACCESS_R + 16" text-anchor="middle" class="topo-node-label">{{ n.short }}</text>
+              <text :x="n.x" :y="n.y + ACCESS_R + 29" text-anchor="middle" class="topo-node-count">{{ n.sub }}</text>
             </g>
 
             <!-- 中心 master（与子节点同款服务器机箱，仅靠颜色/尺寸区分主次） -->
@@ -275,6 +264,21 @@
               </svg>代码
             </span>
           </div>
+          <div class="topo-legend-group">
+            <span class="topo-legend-h">接入端</span>
+            <span class="topo-legend-item topo-legend-shape">
+              <svg width="20" height="18" viewBox="0 0 20 18">
+                <circle cx="10" cy="9" r="7" fill="rgba(8,18,30,0.95)" stroke="#34d99b" stroke-width="1.4" />
+                <text x="10" y="12.4" text-anchor="middle" font-size="8">🧩</text>
+              </svg>浏览器扩展
+            </span>
+            <span class="topo-legend-item topo-legend-shape">
+              <svg width="20" height="18" viewBox="0 0 20 18">
+                <circle cx="10" cy="9" r="7" fill="rgba(8,18,30,0.95)" stroke="#34d99b" stroke-width="1.4" />
+                <text x="10" y="12.4" text-anchor="middle" font-size="8">🖥</text>
+              </svg>后台服务
+            </span>
+          </div>
           <span class="topo-legend-hint">Esc 关闭</span>
         </div>
       </div>
@@ -284,7 +288,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { buildTopology, layoutTopology, layoutAgents } from './topology.js'
+import { buildTopology, layoutTopology, layoutAgents, formatBrowserLabel } from './topology.js'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -400,6 +404,8 @@ const lines = computed(() =>
 // 名称取会话的 name，故这里展示的是「整个网络接入的」客户端，而非仅本机。
 const LOCAL_NODE_R = NODE_R
 const LOCAL_NODE_MARGIN = 24
+// 接入端节点用圆形（普通节点是服务器机箱），半径略小于机箱半高以留出标签空间
+const ACCESS_R = NODE_R * 0.86
 // 同列多个节点之间的垂直间距（含机箱高度）
 const ACCESS_NODE_GAP = NODE_R * 1.72 + 30
 
@@ -439,7 +445,8 @@ const localNodes = computed(() => {
   const nodes = []
   props.extensionSessions.forEach((s, i) => {
     const name = accessSessionName(s, '浏览器扩展')
-    const version = String((s && s.extension_version) || '').trim()
+    // 副标题展示「浏览器名 主版本 · 扩展版本」，让用户区分不同浏览器/设备
+    const browserLabel = formatBrowserLabel(s && s.browser_info, s && s.extension_version)
     nodes.push({
       id: `ext-${s.session_id || i}`,
       x: leftX,
@@ -450,8 +457,9 @@ const localNodes = computed(() => {
       color: nodeColor('online'),
       fill: 'rgba(8,18,30,0.95)',
       short: accessShortName(name),
-      sub: version ? `v${version}` : '浏览器扩展',
-      title: `浏览器扩展 · ${name}${version ? ` · v${version}` : ''}`,
+      sub: browserLabel || '浏览器扩展',
+      icon: '🧩',
+      title: `浏览器扩展 · ${name}${browserLabel ? ` · ${browserLabel}` : ''}`,
     })
   })
   props.daemonSessions.forEach((s, i) => {
@@ -470,6 +478,7 @@ const localNodes = computed(() => {
       fill: 'rgba(8,18,30,0.95)',
       short: accessShortName(name),
       sub: detail || '后台服务',
+      icon: '🖥',
       title: `后台服务 · ${name}${detail ? ` · ${detail}` : ''}`,
     })
   })
@@ -754,6 +763,11 @@ defineExpose({ close })
 .topo-node.is-local > .topo-node-label {
   font-size: 11px;
   font-weight: 600;
+}
+/* 接入端胶囊节点内的类型图标（🧩 浏览器扩展 / 🖥 后台服务） */
+.topo-access-ico {
+  font-size: 13px;
+  pointer-events: none;
 }
 .topo-links-local .topo-link {
   stroke-linecap: round;

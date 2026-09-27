@@ -161,7 +161,7 @@
           />
         </g>
 
-        <!-- 接入端节点：左列=浏览器扩展，右列=本地后台服务（机箱造型与网关节点一致） -->
+        <!-- 接入端节点：左列=浏览器扩展，右列=本地后台服务（圆形造型，与网关机箱节点明显区分） -->
         <!-- 名称/版本/平台均来自网关会话（扩展 hello 上报 name、daemon hello 上报 name/hostname） -->
         <g
           v-for="n in accessNodes"
@@ -170,35 +170,12 @@
           :class="'st-' + n.state"
         >
           <title>{{ n.title }}</title>
-          <rect
-            :x="n.x - LOCAL_NODE_RW"
-            :y="n.y - LOCAL_NODE_RH"
-            :width="LOCAL_NODE_RW * 2"
-            :height="LOCAL_NODE_RH * 2"
-            rx="6"
-            :fill="n.fill"
-            :stroke="n.color"
-            stroke-width="1.3"
-            class="lobby-node-body"
-          />
-          <line
-            :x1="n.x - LOCAL_NODE_RW + 6" :y1="n.y - LOCAL_NODE_RH + 7"
-            :x2="n.x + LOCAL_NODE_RW - 6" :y2="n.y - LOCAL_NODE_RH + 7"
-            :stroke="n.color" stroke-width="1.4" opacity="0.6"
-          />
-          <line
-            v-for="k in 3" :key="'lg' + k"
-            :x1="n.x - LOCAL_NODE_RW + 8" :y1="n.y - LOCAL_NODE_RH + 6 + k * 4.6"
-            :x2="n.x + LOCAL_NODE_RW - 16" :y2="n.y - LOCAL_NODE_RH + 6 + k * 4.6"
-            :stroke="n.color" stroke-width="1" opacity="0.35"
-          />
-          <circle :cx="n.x + LOCAL_NODE_RW - 10" :cy="n.y - 2" r="2.4" :fill="n.color" class="lobby-node-led" />
-          <circle :cx="n.x + LOCAL_NODE_RW - 10" :cy="n.y + 5" r="2.4" :fill="n.color" opacity="0.4" />
-          <rect
-            :x="n.x - LOCAL_NODE_RW + 6" :y="n.y + LOCAL_NODE_RH - 8"
-            :width="LOCAL_NODE_RW * 2 - 12" :height="3" rx="1.5"
-            :fill="n.color" opacity="0.5"
-          />
+          <!-- 圆形主体 -->
+          <circle :cx="n.x" :cy="n.y" :r="LOCAL_NODE_RH"
+                  :fill="n.fill" :stroke="n.color" stroke-width="1.3" class="lobby-node-body" />
+          <!-- 类型图标 -->
+          <text :x="n.x" :y="n.y" text-anchor="middle" dominant-baseline="central"
+                class="lobby-access-ico">{{ n.icon }}</text>
           <text :x="n.x" :y="n.y + LOCAL_NODE_RH + 16" text-anchor="middle" class="lobby-node-label">{{ n.short }}</text>
           <text :x="n.x" :y="n.y + LOCAL_NODE_RH + 29" text-anchor="middle" class="lobby-node-count">{{ n.sub }}</text>
         </g>
@@ -709,7 +686,7 @@
 </template>
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { normalizeNodeStatus, normalizeAgentStatus } from './topology.js'
+import { normalizeNodeStatus, normalizeAgentStatus, formatBrowserLabel } from './topology.js'
 import { exportElementAsImage } from '../utils/exportImage.js'
 
 const props = defineProps({
@@ -1130,7 +1107,8 @@ const accessNodes = computed(() => {
   const nodes = []
   extensionSessions.value.forEach((s, i) => {
     const name = accessSessionName(s, '浏览器扩展')
-    const version = String((s && s.extension_version) || '').trim()
+    // 副标题展示「浏览器名 主版本 · 扩展版本」，让用户区分不同浏览器/设备
+    const browserLabel = formatBrowserLabel(s && s.browser_info, s && s.extension_version)
     nodes.push({
       id: `ext-${s.session_id || i}`,
       x: leftX,
@@ -1139,8 +1117,9 @@ const accessNodes = computed(() => {
       color: nodeColor('online'),
       fill: 'rgba(8,18,30,0.7)',
       short: accessShortName(name),
-      sub: version ? `v${version}` : '浏览器扩展',
-      title: `浏览器扩展 · ${name}${version ? ` · v${version}` : ''}`,
+      sub: browserLabel || '浏览器扩展',
+      icon: '🧩',
+      title: `浏览器扩展 · ${name}${browserLabel ? ` · ${browserLabel}` : ''}`,
       masterX: masterPos.x,
       masterY: masterPos.y,
     })
@@ -1159,6 +1138,7 @@ const accessNodes = computed(() => {
       fill: 'rgba(8,18,30,0.7)',
       short: accessShortName(name),
       sub: detail || '后台服务',
+      icon: '🖥',
       title: `后台服务 · ${name}${detail ? ` · ${detail}` : ''}`,
       masterX: masterPos.x,
       masterY: masterPos.y,
@@ -2784,6 +2764,10 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden, openInst
 }
 .lobby-node.is-local .lobby-node-count {
   fill: rgba(150, 190, 210, 0.5);
+}
+/* 接入端胶囊节点内的类型图标（🧩 浏览器扩展 / 🖥 后台服务） */
+.lobby-access-ico {
+  font-size: 11px;
 }
 /* 本机执行面曲线连线 */
 .lobby-links-local .lobby-link {

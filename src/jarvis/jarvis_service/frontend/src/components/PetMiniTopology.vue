@@ -39,7 +39,7 @@
         />
       </g>
 
-      <!-- 接入端：浏览器扩展（左列）/ 后台服务（右列），每个在线会话一个点 -->
+      <!-- 接入端：浏览器扩展（左列）/ 后台服务（右列），每个在线会话一个圆点 -->
       <!-- 96×96 空间极小，仅画点不画名字，名称通过 title 悬停查看 -->
       <g v-for="n in accessPoints" :key="n.id" class="pt-mini-node">
         <title>{{ n.title }}</title>
@@ -76,7 +76,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { buildTopology, layoutTopology } from './topology.js'
+import { buildTopology, layoutTopology, formatBrowserLabel } from './topology.js'
 
 const props = defineProps({
   nodes: { type: Array, default: () => [] },
@@ -176,13 +176,14 @@ const accessPoints = computed(() => {
   const points = []
   props.extensionSessions.forEach((s, i) => {
     const name = String((s && s.name) || '').trim() || '浏览器扩展'
+    const browserLabel = formatBrowserLabel(s && s.browser_info, s && s.extension_version)
     points.push({
       id: `ext-${s.session_id || i}`,
       x: leftX,
       y: extYs[i],
       color: nodeColor('online'),
       fill: 'rgba(8,18,30,0.95)',
-      title: `浏览器扩展 · ${name}`,
+      title: `浏览器扩展 · ${name}${browserLabel ? ` · ${browserLabel}` : ''}`,
     })
   })
   props.daemonSessions.forEach((s, i) => {

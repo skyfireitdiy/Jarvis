@@ -292,3 +292,39 @@ export function layoutAgents(model, nodeLayout, options = {}) {
 
   return { agents: placed };
 }
+
+// 浏览器 UA 解析：从 browser_info.user_agent 提取「浏览器名 + 主版本」，用于接入端节点展示。
+// 零依赖、纯正则；无法识别时返回空串（由调用方决定回退文案）。
+// 注意顺序：Edge/Opera 的 UA 里也含 Chrome/Safari 标记，必须先匹配更具体的。
+const BROWSER_UA_PATTERNS = [
+  { name: "Edge", re: /Edg(?:e|A|iOS)?\/([\d.]+)/ },
+  { name: "Opera", re: /(?:OPR|Opera)\/([\d.]+)/ },
+  { name: "Vivaldi", re: /Vivaldi\/([\d.]+)/ },
+  { name: "Yandex", re: /YaBrowser\/([\d.]+)/ },
+  { name: "Firefox", re: /(?:Firefox|FxiOS)\/([\d.]+)/ },
+  { name: "Chrome", re: /(?:Chrome|CriOS)\/([\d.]+)/ },
+  { name: "Safari", re: /Version\/([\d.]+).*Safari/ },
+];
+
+export function parseBrowserFromUserAgent(userAgent) {
+  const ua = String(userAgent || "");
+  if (!ua) return { name: "", version: "" };
+  for (const { name, re } of BROWSER_UA_PATTERNS) {
+    const m = ua.match(re);
+    if (m) return { name, version: m[1] || "" };
+  }
+  return { name: "", version: "" };
+}
+
+// 组装浏览器扩展节点的展示标签，如「Edge 153 · v5.0.5」。
+// browserInfo 为网关会话的 browser_info（含 user_agent）；extensionVersion 为扩展版本。
+export function formatBrowserLabel(browserInfo, extensionVersion) {
+  const info =
+    browserInfo && typeof browserInfo === "object" ? browserInfo : {};
+  const { name, version } = parseBrowserFromUserAgent(info.user_agent);
+  const major = version ? String(version).split(".")[0] : "";
+  const browser = name ? (major ? `${name} ${major}` : name) : "";
+  const ext = String(extensionVersion || "").trim();
+  const extLabel = ext ? `v${ext}` : "";
+  return [browser, extLabel].filter(Boolean).join(" · ");
+}
