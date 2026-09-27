@@ -107,6 +107,40 @@ def test_build_update_same_version_not_available(monkeypatch):
     assert info["note"]  # note 非空
 
 
+def test_normalize_version_strips_v_prefix():
+    """归一化：去空白、去前导 v/V。"""
+    assert dcm._normalize_version("v6.0.0") == "6.0.0"
+    assert dcm._normalize_version("V6.0.0") == "6.0.0"
+    assert dcm._normalize_version(" 6.0.0 ") == "6.0.0"
+    assert dcm._normalize_version("") == ""
+    assert dcm._normalize_version(None) == ""
+
+
+def test_build_update_version_compare_ignores_v_prefix(monkeypatch):
+    """daemon 上报带 v（git tag），网关自身版本不带 v → 必须判定为同一版本。
+
+    否则会永远判定「版本不同」→ daemon 反复下载并重启（无限循环）。
+    """
+    monkeypatch.setattr(dcm, "DAEMON_LATEST_VERSION", "6.0.0")
+    # daemon 上报 v6.0.0（release 构建注入的 tag）
+    info = dcm._build_daemon_update("v6.0.0", "linux", "amd64")
+    assert info is not None
+    assert info["available"] is False
+    assert info["note"] == "already up to date"
+    # 反向：网关带 v、daemon 不带，同样应判定一致
+    monkeypatch.setattr(dcm, "DAEMON_LATEST_VERSION", "v6.0.0")
+    info2 = dcm._build_daemon_update("6.0.0", "linux", "amd64")
+    assert info2 is not None
+    assert info2["available"] is False
+
+
+def test_daemon_latest_version_comes_from_gateway_version():
+    """网关「最新版本」= 网关自身版本，不再读环境变量。"""
+    from jarvis import __version__
+
+    assert dcm.DAEMON_LATEST_VERSION == str(__version__).strip()
+
+
 def test_build_update_linux_url(monkeypatch):
     """linux → .tar.gz，URL 形如 base/tag/asset。"""
     monkeypatch.setattr(dcm, "DAEMON_LATEST_VERSION", "v1.2.0")

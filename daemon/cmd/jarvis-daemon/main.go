@@ -390,21 +390,15 @@ func browserExtTokenFor(gateway string) string {
 // daemonUpdateMu 串行化自动更新，避免多个网关同时握手时并发下载/替换互相干扰。
 var daemonUpdateMu sync.Mutex
 
-// maybeAutoUpdateDaemon 在网关下发 daemon 更新指令且「自动更新」开关开启时，异步执行更新。
+// maybeAutoUpdateDaemon 在网关下发 daemon 更新指令时异步执行更新。
 //
-// 设计要点（与 maybeAutoSyncBrowserExt 一致的安全默认）：
-//   - 受「自动更新 daemon」开关约束：开关关闭（默认）时直接跳过，不下载、不起协程。
-//     开关由用户在 Web 设置界面显式打开后随登录态推送给本机守护进程（只存内存态，
-//     不落盘），故守护进程重启后回到关闭，等待前端再次推送——未收到推送一律不自动更新；
+// 设计要点：
+//   - 无条件自动更新：daemon 必须与网关保持同版本，网关在 hello_ack 中把自身
+//     版本作为「最新版本」下发，daemon 比对后自动更新，无开关、无环境变量；
 //   - 立即返回，把下载/替换放到独立 goroutine（可能耗时数秒），不阻塞 WS 读循环；
 //   - 更新前把当前凭据临时落盘，供重启后恢复登录态（见 selfupdate.SaveTokenState）；
 //   - 任何失败只记日志，绝不影响连接与既有能力。
 func maybeAutoUpdateDaemon(gateway, sessionID string, info map[string]any) {
-	// 开关判断必须放在函数入口、goroutine 之外：关闭时提前返回，避免无谓起协程。
-	if !capability.AutoUpdateDaemon() {
-		log.Printf("[daemon] 自动更新已关闭，跳过 daemon 更新（网关 %s）", gateway)
-		return
-	}
 	parsed, err := selfupdate.ParseUpdateInfo(info)
 	if err != nil {
 		// 无可用更新时静默跳过；其他解析错误只记日志。
@@ -419,6 +413,14 @@ func maybeAutoUpdateDaemon(gateway, sessionID string, info map[string]any) {
 		daemonUpdateMu.Lock()
 		defer daemonUpdateMu.Unlock()
 
+		// 防重复：熔断（重启循环）+ 同版本失败不重试 + 失败退避。
+		// 触发点是每次 WS 握手，若不加约束，失败的更新会随重连无限重试。
+		state, _ := selfupdate.LoadAttemptState()
+		if skip, reason := selfupdate.ShouldSkipUpdate(state, version, parsed.LatestVersion, selfupdate.NowUnix()); skip {
+			log.Printf("[daemon] 跳过自动更新（网关 %s）: %s", gateway, reason)
+			return
+		}
+
 		target, err := service.InstalledBinaryPath()
 		if err != nil {
 			log.Printf("[daemon] 无法确定可执行文件路径，跳过自动更新: %v", err)
@@ -428,6 +430,20 @@ func maybeAutoUpdateDaemon(gateway, sessionID string, info map[string]any) {
 		// 更新会重启服务，先把当前凭据临时落盘，供重启后恢复登录态。
 		// 落盘失败不阻断更新（最坏情况只是重启后需重新推送凭据）。
 		saveCurrentCredentialsForUpdate(gateway)
+
+		// 记录「已开始尝试更新到该版本」并置 InProgress：若替换后新版本起不来，
+		// 新进程启动时会读到该标记且版本未变，从而熔断，避免无限重启。
+		// 目标版本变化时重置计数（视为新机会）。
+		attempts := state.Attempts
+		if !selfupdate.SameVersion(state.TargetVersion, parsed.LatestVersion) {
+			attempts = 0
+		}
+		_ = selfupdate.SaveAttemptState(selfupdate.AttemptState{
+			TargetVersion:   parsed.LatestVersion,
+			Attempts:        attempts,
+			LastAttemptUnix: selfupdate.NowUnix(),
+			InProgress:      true,
+		})
 
 		log.Printf("[daemon] 检测到 daemon 新版本 %s（当前 %s），开始自动更新（网关 %s，目标 %s）",
 			parsed.LatestVersion, parsed.CurrentVersion, gateway, target)
@@ -444,9 +460,20 @@ func maybeAutoUpdateDaemon(gateway, sessionID string, info map[string]any) {
 			},
 		})
 		if err != nil {
-			log.Printf("[daemon] 自动更新 daemon 失败（网关 %s）: %v", gateway, err)
+			// 失败：累加尝试次数并记录原因，供下次握手时退避判断。
+			_ = selfupdate.SaveAttemptState(selfupdate.AttemptState{
+				TargetVersion:   parsed.LatestVersion,
+				Attempts:        attempts + 1,
+				LastAttemptUnix: selfupdate.NowUnix(),
+				LastError:       err.Error(),
+				InProgress:      false,
+			})
+			log.Printf("[daemon] 自动更新 daemon 失败（网关 %s，第 %d 次）: %v", gateway, attempts+1, err)
 			return
 		}
+		// 成功：清除尝试状态（Linux 上替换已完成；Windows 上已交给 helper）。
+		// 若随后重启失败，新进程读到的是已清除状态，不会误熔断。
+		_ = selfupdate.ClearAttemptState()
 		log.Printf("[daemon] daemon 自动更新已完成（版本 %s）", parsed.LatestVersion)
 	}()
 }

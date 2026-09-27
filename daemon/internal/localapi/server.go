@@ -86,10 +86,6 @@ type authRequest struct {
 	// 由前端推送。用 *bool 以区分「未提供」（nil，保持原值，兼容旧前端）与
 	// 「显式关闭」（false）。
 	AutoInstallBrowserExt *bool `json:"auto_install_browser_ext"`
-	// AutoUpdateDaemon 是「是否自动更新守护进程自身」开关，随登录态一并由前端
-	// 推送。用 *bool 以区分「未提供」（nil，保持原值，兼容旧前端）与「显式关闭」
-	// （false）。默认关闭，仅显式打开后才允许静默下载并替换自身。
-	AutoUpdateDaemon *bool `json:"auto_update_daemon"`
 }
 
 // logoutRequest 的 gateway 可选：带则只登出该网关，不带则登出全部。
@@ -99,11 +95,10 @@ type logoutRequest struct {
 
 // settingsRequest 是 /api/settings 的请求体。
 //
-// AutoInstallBrowserExt / AutoUpdateDaemon 用 *bool：nil 表示请求未提供该字段
-// （返回 400），以区分「未提供」与「显式关闭」。目前仅此两项，后续可扩展。
+// AutoInstallBrowserExt 用 *bool：nil 表示请求未提供该字段（返回 400），
+// 以区分「未提供」与「显式关闭」。目前仅此一项，后续可扩展。
 type settingsRequest struct {
 	AutoInstallBrowserExt *bool `json:"auto_install_browser_ext"`
-	AutoUpdateDaemon      *bool `json:"auto_update_daemon"`
 }
 
 // handleAuth 接收网页推送的凭据并触发对应网关连接。
@@ -138,10 +133,6 @@ func (s *Server) handleAuth(w http.ResponseWriter, r *http.Request) {
 	// 兼容旧前端。开关只存内存态，不落盘（用户要求只存浏览器存储）。
 	if req.AutoInstallBrowserExt != nil {
 		capability.SetAutoInstallBrowserExt(*req.AutoInstallBrowserExt)
-	}
-	// 同理，「自动更新守护进程」开关也随登录态推送；未提供（nil）时保持原值。
-	if req.AutoUpdateDaemon != nil {
-		capability.SetAutoUpdateDaemon(*req.AutoUpdateDaemon)
 	}
 	log.Printf("[localapi] 收到认证推送: gateway=%s token=%s... name=%q",
 		req.Gateway, maskToken(req.Token), req.Name)
@@ -215,15 +206,12 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"success": true})
 }
 
-// handleSettings 读写守护进程的设置项（目前含「自动安装浏览器扩展」与
-// 「自动更新守护进程」两个开关）。
+// handleSettings 读写守护进程的设置项（目前含「自动安装浏览器扩展」开关）。
 //
 // GET  → 返回当前值，供前端在打开设置界面时回显；
-// POST → 更新开关，请求体可含 {"auto_install_browser_ext": bool}
+// POST → 更新开关，请求体需含 {"auto_install_browser_ext": bool}。
 //
-//	与/或 {"auto_update_daemon": bool}，至少需提供其中一项。
-//
-// 注意：两个开关都只存内存态，不落盘（用户要求只存浏览器存储）；守护进程重启后
+// 注意：开关只存内存态，不落盘（用户要求只存浏览器存储）；守护进程重启后
 // 回到默认值 false（关闭），等待前端再次推送。
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
@@ -231,7 +219,6 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"success":                  true,
 			"auto_install_browser_ext": capability.AutoInstallBrowserExt(),
-			"auto_update_daemon":       capability.AutoUpdateDaemon(),
 		})
 	case http.MethodPost:
 		var req settingsRequest
@@ -242,28 +229,20 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
-		// 两个字段都缺失（nil）视为非法请求：语义明确，避免「静默不改」让调用方困惑。
-		// 只提供其中一个字段是允许的（便于前端只改一项，且兼容旧前端）。
-		if req.AutoInstallBrowserExt == nil && req.AutoUpdateDaemon == nil {
+		// 字段缺失（nil）视为非法请求：语义明确，避免「静默不改」让调用方困惑。
+		if req.AutoInstallBrowserExt == nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{
 				"success": false,
-				"error":   "at least one of auto_install_browser_ext / auto_update_daemon is required",
+				"error":   "auto_install_browser_ext is required",
 			})
 			return
 		}
-		if req.AutoInstallBrowserExt != nil {
-			capability.SetAutoInstallBrowserExt(*req.AutoInstallBrowserExt)
-			log.Printf("[localapi] 更新设置: auto_install_browser_ext=%v", *req.AutoInstallBrowserExt)
-		}
-		if req.AutoUpdateDaemon != nil {
-			capability.SetAutoUpdateDaemon(*req.AutoUpdateDaemon)
-			log.Printf("[localapi] 更新设置: auto_update_daemon=%v", *req.AutoUpdateDaemon)
-		}
-		// 回显更新后的实际值，便于调用方确认（未提供的字段返回其当前值）。
+		capability.SetAutoInstallBrowserExt(*req.AutoInstallBrowserExt)
+		log.Printf("[localapi] 更新设置: auto_install_browser_ext=%v", *req.AutoInstallBrowserExt)
+		// 回显更新后的实际值，便于调用方确认。
 		writeJSON(w, http.StatusOK, map[string]any{
 			"success":                  true,
 			"auto_install_browser_ext": capability.AutoInstallBrowserExt(),
-			"auto_update_daemon":       capability.AutoUpdateDaemon(),
 		})
 	default:
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{

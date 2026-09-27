@@ -30,6 +30,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import WebSocket
 
+from jarvis import __version__ as JARVIS_VERSION
+
 logger = logging.getLogger(__name__)
 
 # 会话心跳超时（秒）：超过该时长未收到任何消息则清理会话
@@ -47,18 +49,14 @@ DAEMON_SUBPROTOCOL = "jarvis-daemon"
 # ---------------------------------------------------------------------------
 # daemon 自更新（T5）：网关侧「最新版本」数据来源
 #
-# v1 采用**配置驱动**（零外网依赖、可离线）：网关不访问 GitHub API，只按配置
-# 拼装下载链接下发给 daemon。配置读取沿用网关既有范式（模块级常量 + 环境变量
-# 覆盖，参考 app.py 的 JARVIS_NODE_SECRET / JARVIS_AUTH_TOKEN）。
+# 「最新版本」= **网关自身版本**（``jarvis.__version__``）。daemon 必须与网关
+# 保持同版本，故网关在握手时把自身版本下发给 daemon，由 daemon 自行比对并
+# 无条件自动更新（无开关、无环境变量）。
 #
-#   JARVIS_DAEMON_LATEST_VERSION   最新版本号（tag，如 v1.2.3）。
-#                                  **为空表示不下发更新**（默认，安全）。
 #   JARVIS_DAEMON_RELEASE_BASE_URL Release 下载根地址，默认指向本仓库。
 #   JARVIS_DAEMON_ASSETS           可选，JSON 字符串，显式映射
 #                                  "os/arch" → {"asset": "...", "sha256": "...", "size": N}；
 #                                  缺省时按产物命名规则自动拼装（无 sha256）。
-#
-# 注意：发版后需人工更新 JARVIS_DAEMON_LATEST_VERSION（见设计文档第 6 节）。
 # ---------------------------------------------------------------------------
 
 # 本仓库 owner/repo（来源：pyproject.toml:144 Homepage / README.md:268）。
@@ -70,8 +68,8 @@ DAEMON_RELEASE_BASE_URL = os.environ.get(
     f"https://github.com/{DAEMON_RELEASE_OWNER_REPO}/releases/download",
 ).rstrip("/")
 
-# 最新版本号；空字符串 = 不下发更新（默认关闭，避免误触发升级）。
-DAEMON_LATEST_VERSION = os.environ.get("JARVIS_DAEMON_LATEST_VERSION", "").strip()
+# 最新版本号 = 网关自身版本；daemon 与网关始终保持同版本。
+DAEMON_LATEST_VERSION = str(JARVIS_VERSION or "").strip()
 
 # 支持的平台/架构（与 .github/workflows/release-daemon.yml 的构建矩阵一致，无 macOS）。
 DAEMON_SUPPORTED_OS = ("linux", "windows")
@@ -174,18 +172,31 @@ def _resolve_daemon_platform(source: Any) -> Tuple[str, str]:
     return os_name, arch
 
 
+def _normalize_version(value: Any) -> str:
+    """归一化版本号用于比对：去空白、去前导 ``v``/``V``。
+
+    daemon 的版本来自 git tag（形如 ``v5.0.5``），网关自身版本为 ``6.0.0``
+    （不带 v）。两侧格式不一致，直接字符串比较会永远判定为「版本不同」，
+    导致 daemon 反复下载并重启。故比对前统一归一化。
+    """
+    text = str(value or "").strip()
+    if text[:1] in ("v", "V"):
+        text = text[1:].strip()
+    return text
+
+
 def _build_daemon_update(
     daemon_version: str, os_name: str, arch: str
 ) -> Optional[Dict[str, Any]]:
     """构造 hello_ack 的 ``daemon_update`` 字段。
 
-    返回 None 表示「不下发」（未配置最新版本，或平台/架构无法判定）——
+    返回 None 表示「不下发」（网关自身版本缺失，或平台/架构无法判定）——
     此时 hello_ack 不携带该键，与旧行为完全一致。
     否则返回固定字段的 dict（字段名与设计文档 3.2 逐字一致）。
     """
     latest = DAEMON_LATEST_VERSION
     if not latest:
-        # 未配置最新版本 → 不下发任何更新信息。
+        # 网关自身版本缺失 → 不下发任何更新信息。
         return None
     if not os_name or not arch:
         # 平台/架构无法判定（旧版 daemon）→ 跳过更新判断，不打扰连接。
@@ -203,8 +214,8 @@ def _build_daemon_update(
         "note": "",
     }
 
-    # 版本一致 → 已是最新，available=false 并说明原因。
-    if current == latest:
+    # 版本一致（归一化后）→ 已是最新，available=false 并说明原因。
+    if _normalize_version(current) == _normalize_version(latest):
         info["note"] = "already up to date"
         return info
 

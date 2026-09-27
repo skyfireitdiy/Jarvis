@@ -130,12 +130,21 @@ Token 现状**只存内存、不落盘**（`auth/store.go:1-15`）。重启后 T
 > 缺点：前端不在线时 daemon 会一直未认证，直到用户下次打开网页。
 > **决策：默认采用临时落盘方案**，保证「静默更新 + 重启」后仍在线；并在文档与日志中明确告知。
 
-### 3.7 开关与安全
+### 3.7 无条件更新与防重复
 
-- 新增 daemon 设置项 `auto_update_daemon`（默认 **false**），与
-  `auto_install_browser_ext` 同范式（内存态 + `syncTokenToDaemon` 推送，见
-  `daemon/internal/capability/browser_ext_settings.go` 与 `localapi/server.go:216-240`）。
-- 仅当开关为 true 且 `daemon_update.available=true` 时才执行更新。
+- **无开关**：daemon 必须与网关保持同版本，`daemon_update.available=true` 即执行更新，
+  不提供 `auto_update_daemon` 设置项（用户口径：无条件、与网关自身版本同步）。
+- **防重复**（触发点是每次 WS 握手，若不加约束，失败的更新会随重连无限重试）：
+  1. **同版本失败不重试 + 指数退避**：连续失败按 1min → 5min → 30min 退避，
+     退避窗口内跳过；目标版本变化则重置计数。
+  2. **跨重启熔断**：更新前把「正在更新到版本 X」写入
+     `~/.jarvis/daemon/update-attempt.json`（0600，`in_progress=true`）；若替换后新版本
+     起不来，新进程启动时读到该标记且自身版本仍为旧版 → 判定为重启循环，熔断自动更新并告警；
+     网关发布更新版本（目标版本变化）后自动恢复。更新成功后清除该文件。
+  3. 实现见 `internal/selfupdate/attempt_state.go`（`ShouldSkipUpdate` / `BackoffFor` /
+     `NormalizeVersion`），接线见 `cmd/jarvis-daemon/main.go` 的 `maybeAutoUpdateDaemon`。
+- 版本比对必须**归一化**（去前导 `v`/`V` + trim）：网关版本来自 `jarvis.__version__`（如 `6.0.0`），
+  daemon 版本由构建注入（如 `v5.0.5`），不归一化会误判为不同版本 → 无限重启循环。
 - 只允许从 **HTTPS** 的 GitHub 域名下载（白名单 `github.com` / `objects.githubusercontent.com`），
   防 SSRF / 中间人。
 - 更新失败只记日志，绝不影响当前连接与能力。
@@ -157,7 +166,7 @@ v1 采用**配置驱动**（零新依赖、可离线）：
 
 | 任务 | 内容                                                                        | 状态                                                        |
 | ---- | --------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| T1   | daemon 侧：开关 `auto_update_daemon`（capability 包 + localapi + 前端推送） | ✅ 已实现（daemon 侧）                                      |
+| T1   | daemon 侧：无条件自动更新（无开关）+ 防重复（退避 + 跨重启熔断）            | ✅ 已实现                                                   |
 | T2   | daemon 侧：解析 `hello_ack.daemon_update`，实现下载/校验/解包/原子替换/重启 | ✅ 已实现                                                   |
 | T3   | daemon 侧：Windows helper 子命令 `self-update-apply`                        | ✅ 已实现（未真机验证）                                     |
 | T4   | daemon 侧：Token 临时落盘与启动恢复（一次性）                               | ✅ 已实现                                                   |
@@ -166,13 +175,13 @@ v1 采用**配置驱动**（零新依赖、可离线）：
 
 ### 5.1 daemon 侧实现要点（对应 T1–T4）
 
-- 开关：`internal/capability/daemon_update_settings.go`（内存态，默认 false），
-  经 `localapi` 的 `/api/auth`、`/api/settings` 的 `auto_update_daemon` 字段推送。
 - 更新核心：`internal/selfupdate/`（`ParseUpdateInfo` / `ValidateDownloadURL` 白名单 /
   `Download` 流式 sha256 / `ExtractBinary` / `Apply` / 平台 `restart_*.go`）。
+- 防重复：`internal/selfupdate/attempt_state.go`（`ShouldSkipUpdate` 集中判定退避与熔断，
+  状态落盘 `~/.jarvis/daemon/update-attempt.json`）。
 - 上层接线：`internal/wsclient/client.go` 解析 `hello_ack.daemon_update` 并回调
   `Options.OnDaemonUpdate`；`manager.go` 提供带网关维度的 `OnGatewayDaemonUpdate`；
-  `cmd/jarvis-daemon/main.go` 的 `maybeAutoUpdateDaemon` 按开关决定是否执行。
+  `cmd/jarvis-daemon/main.go` 的 `maybeAutoUpdateDaemon` 无条件执行（仅受防重复约束）。
 - helper：`cmd/jarvis-daemon` 的 `self-update-apply` 子命令（Windows 轮询等父进程退出后替换）。
 - Token 中转：`internal/selfupdate/token.go`，更新前写 `~/.jarvis/daemon/update-token.json`（0600），
   启动时读取并**立即删除**，随后 `manager.ConnectWithName` 主动重连。
