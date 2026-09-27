@@ -973,6 +973,9 @@ function getTerminalStyle(terminalContent) {
   gap: 6px;
   background: var(--color-bg-tile);
   min-height: 0;
+  /* 覆盖 .workspace-panel 继承下来的 user-select: none，使消息内容可选中、可 Ctrl+C 复制 */
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .message {
