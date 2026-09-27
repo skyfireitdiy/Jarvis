@@ -12,6 +12,7 @@ package capability
 //   - linux_transfer_linux.go：分块文件传输（stat/read/write/verify）
 //   - linux_service_linux.go：systemd 用户服务管理
 //   - linux_gui_linux.go：窗口/输入/剪贴板/截图（依赖外部命令）
+//   - linux_browser_ext_linux.go：浏览器扩展下载与更新
 func registerPlatformCapabilities(reg *Registry) {
 	registerLinuxScript(reg)
 	registerLinuxProcess(reg)
@@ -20,4 +21,5 @@ func registerPlatformCapabilities(reg *Registry) {
 	registerLinuxTransfer(reg)
 	registerLinuxService(reg)
 	registerLinuxGUI(reg)
+	registerLinuxBrowserExt(reg)
 }

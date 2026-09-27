@@ -21,6 +21,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
+	"sync"
 	"syscall"
 
 	"jarvis-daemon/internal/auth"
@@ -185,6 +187,16 @@ func runDaemon(args []string) {
 	registry := capability.NewRegistry()
 	log.Printf("[daemon] 已注册 %d 个平台能力", len(registry.ListForPlatform(capability.Current())))
 
+	// 把「按网关取 Token」注入能力层，使 browser.ext.sync 能自行从网关下载扩展包。
+	// 能力 Handler 签名无法携带凭据存储，故用注入方式解耦（capability 包不反向依赖 auth）。
+	capability.SetBrowserExtCredentialProvider(func(gateway string) (string, bool) {
+		creds, err := store.Get(gateway)
+		if err != nil || creds.Token == "" {
+			return "", false
+		}
+		return creds.Token, true
+	})
+
 	manager := wsclient.NewManagerWithOptions(wsclient.ManagerOptions{
 		Options: wsclient.Options{
 			// Gateway/Token 由 Connect 按具体网关覆盖，这里不预设。
@@ -202,6 +214,11 @@ func runDaemon(args []string) {
 			// 鉴权失败只影响该网关：标记其 Token 失效，等待网页重新推送。
 			log.Printf("[daemon] 网关 %s 鉴权失败（关闭码 %d），标记 Token 失效，等待网页重新推送", gateway, code)
 			store.MarkTokenInvalid(gateway)
+		},
+		OnGatewayHelloAck: func(gateway, sessionID, latestExtVersion string) {
+			// 网关随握手告知其打包的扩展最新版本；与本地副本不一致时异步同步。
+			// 放在独立 goroutine 中：下载可能耗时数秒，不能阻塞 WS 读循环。
+			maybeAutoSyncBrowserExt(gateway, latestExtVersion)
 		},
 	})
 
@@ -247,4 +264,57 @@ func buildClientID() string {
 		host = "unknown"
 	}
 	return fmt.Sprintf("daemon-%s-%d", host, os.Getpid())
+}
+
+// browserExtSyncMu 串行化扩展同步，避免多个网关同时握手时并发写同一目录。
+var browserExtSyncMu sync.Mutex
+
+// maybeAutoSyncBrowserExt 在网关下发扩展最新版本且与本地不一致时，异步同步扩展包。
+//
+// 设计要点：
+//   - 立即返回，把下载/解压放到独立 goroutine（下载可能耗时数秒），不阻塞 WS 读循环；
+//   - 版本一致时直接跳过，避免每次重连都重复下载；
+//   - 任何失败只记日志，绝不影响连接与既有能力；
+//   - 不重启浏览器：仅把新版本落盘，由用户在 chrome://extensions 手动刷新。
+func maybeAutoSyncBrowserExt(gateway, latestVersion string) {
+	latestVersion = strings.TrimSpace(latestVersion)
+	if latestVersion == "" {
+		// 网关未提供版本（旧版网关或读取失败），无法判断是否需要更新。
+		return
+	}
+	localVersion := capability.LocalBrowserExtVersion()
+	if localVersion == latestVersion {
+		return
+	}
+
+	go func() {
+		// 同一时刻只允许一个同步任务，避免并发替换目录互相干扰。
+		browserExtSyncMu.Lock()
+		defer browserExtSyncMu.Unlock()
+
+		// 加锁后再判断一次：等待期间可能已被其他网关同步到目标版本。
+		if capability.LocalBrowserExtVersion() == latestVersion {
+			return
+		}
+		log.Printf("[daemon] 检测到扩展版本不一致（本地 %q → 网关 %q），开始自动同步（网关 %s）",
+			localVersion, latestVersion, gateway)
+
+		count, version, err := capability.SyncBrowserExt(gateway, browserExtTokenFor(gateway))
+		if err != nil {
+			log.Printf("[daemon] 自动同步浏览器扩展失败（网关 %s）: %v", gateway, err)
+			return
+		}
+		log.Printf("[daemon] 浏览器扩展已同步到 %q（%d 个文件，目录 %s）；"+
+			"请在浏览器 chrome://extensions 点击「刷新」使新版本生效",
+			version, count, capability.BrowserExtDirOrEmpty())
+	}()
+}
+
+// browserExtTokenFor 取指定网关的 Token；无凭据时返回空串（同步会因此报错并记日志）。
+func browserExtTokenFor(gateway string) string {
+	token, ok := capability.BrowserExtToken(gateway)
+	if !ok {
+		return ""
+	}
+	return token
 }

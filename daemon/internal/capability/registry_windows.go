@@ -15,6 +15,7 @@ package capability
 //   - windows_fs_windows.go：文件系统读写与目录列举
 //   - windows_transfer_windows.go：分块文件传输（stat/read/write/verify）
 //   - windows_service_windows.go：系统服务查询与启停
+//   - windows_browser_ext_windows.go：浏览器扩展下载与更新
 //   - windows_common_windows.go：参数解析与外部命令辅助函数
 func registerPlatformCapabilities(reg *Registry) {
 	registerWindowsSystem(reg)
@@ -27,4 +28,5 @@ func registerPlatformCapabilities(reg *Registry) {
 	registerWindowsFS(reg)
 	registerWindowsTransfer(reg)
 	registerWindowsService(reg)
+	registerWindowsBrowserExt(reg)
 }

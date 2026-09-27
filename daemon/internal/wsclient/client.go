@@ -57,6 +57,12 @@ type Options struct {
 	OnAuthError func(code int, reason string)
 	// OnSession 在收到 hello_ack 时回调，参数为 session_id。
 	OnSession func(sessionID string)
+	// OnHelloAck 在收到 hello_ack 时回调，额外带上网关下发的扩展最新版本号
+	// （latest_extension_version，网关未提供时为空串）。
+	//
+	// 与 OnSession 的区别：OnSession 只关心会话建立，本回调用于「版本比对 → 自动更新」。
+	// 两者可同时设置；为保持向后兼容，未设置 OnHelloAck 时行为不变。
+	OnHelloAck func(sessionID, latestExtensionVersion string)
 	// Registry 是能力注册表；为 nil 时回退到旧的占位 Dispatch 行为。
 	Registry *capability.Registry
 }
@@ -363,6 +369,11 @@ func (c *Client) handleMessage(conn *websocket.Conn, msg map[string]any) {
 			log.Printf("[wsclient] hello_ack: session_id=%s", sid)
 			if c.opts.OnSession != nil {
 				c.opts.OnSession(sid)
+			}
+			// 网关随 hello_ack 下发扩展最新版本（可能缺失，缺失时为空串）。
+			if c.opts.OnHelloAck != nil {
+				latest, _ := msg["latest_extension_version"].(string)
+				c.opts.OnHelloAck(sid, latest)
 			}
 		}
 	case "command":

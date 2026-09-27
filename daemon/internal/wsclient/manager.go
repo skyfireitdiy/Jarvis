@@ -43,6 +43,11 @@ type ManagerOptions struct {
 	OnGatewayAuthError func(gateway string, code int, reason string)
 	// OnGatewaySession 在某个网关收到 hello_ack 时回调。
 	OnGatewaySession func(gateway, sessionID string)
+	// OnGatewayHelloAck 在某个网关收到 hello_ack 时回调，额外带上网关下发的
+	// 扩展最新版本号（latest_extension_version，网关未提供时为空串）。
+	//
+	// 用于「版本比对 → 自动更新扩展」；与 OnGatewaySession 可同时设置。
+	OnGatewayHelloAck func(gateway, sessionID, latestExtensionVersion string)
 }
 
 // Manager 管理多个网关的 WebSocket 连接。
@@ -64,6 +69,8 @@ type Manager struct {
 	onStateChange func(gateway, state string)
 	onAuthError   func(gateway string, code int, reason string)
 	onSession     func(gateway, sessionID string)
+	// onHelloAck 是带 gateway 维度、并携带扩展最新版本的 hello_ack 回调。
+	onHelloAck func(gateway, sessionID, latestExtensionVersion string)
 	// clients 以 auth.GatewayKey 为键。
 	clients map[string]*Client
 	// gateways 记录每个键对应的原始网关地址，供 Status 展示与 Disconnect 反查。
@@ -93,11 +100,13 @@ func NewManagerWithOptions(mopts ManagerOptions) *Manager {
 	opts.OnStateChange = nil
 	opts.OnAuthError = nil
 	opts.OnSession = nil
+	opts.OnHelloAck = nil
 	return &Manager{
 		opts:          opts,
 		onStateChange: mopts.OnGatewayStateChange,
 		onAuthError:   mopts.OnGatewayAuthError,
 		onSession:     mopts.OnGatewaySession,
+		onHelloAck:    mopts.OnGatewayHelloAck,
 		clients:       make(map[string]*Client),
 		gateways:      make(map[string]string),
 		tokens:        make(map[string]string),
@@ -145,6 +154,11 @@ func (m *Manager) ConnectWithName(gateway, token, name string) {
 	}
 	if m.onSession != nil {
 		opts.OnSession = func(sessionID string) { m.onSession(normalized, sessionID) }
+	}
+	if m.onHelloAck != nil {
+		opts.OnHelloAck = func(sessionID, latest string) {
+			m.onHelloAck(normalized, sessionID, latest)
+		}
 	}
 	client := New(opts)
 	m.clients[key] = client
