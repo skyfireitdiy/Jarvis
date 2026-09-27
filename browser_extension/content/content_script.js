@@ -20,6 +20,24 @@
     // DOM 尚不可用时忽略
   }
 
+  // 本机已安装扩展标记：页面据此隐藏「安装浏览器插件」引导按钮。
+  // 标记写在 DOM（而非 localStorage）上，理由：
+  // - 隔离世界与页面共享 DOM，页面可直接读取；
+  // - 随页面刷新自动重建，用户卸载扩展后标记即消失，无需清理逻辑。
+  // 注意：该标记表示「本机装了扩展」，与「扩展是否在线/已连接网关」无关，
+  // 因此不会让桌面端在线状态影响未装扩展的移动端。
+  try {
+    document.documentElement.dataset.jarvisExtInstalled = "1";
+    const manifest = chrome.runtime.getManifest();
+    if (manifest && manifest.version) {
+      document.documentElement.dataset.jarvisExtVersion = String(
+        manifest.version,
+      );
+    }
+  } catch (e) {
+    // 扩展上下文失效时忽略
+  }
+
   // 上报 content script 已注入，便于 background 侧诊断
   try {
     chrome.runtime.sendMessage({

@@ -180,7 +180,9 @@
       </button>
 
       <!-- 安装浏览器插件：打开安装指引弹层（内含下载按钮）；有新版本时显示红点 -->
+      <!-- 已检测到本机安装扩展（content script 写入的 DOM 标记）时隐藏该按钮：既然装了就不必再引导安装 -->
       <button
+        v-if="!extensionInstalled"
         class="pet-lobby-display-toggle pet-lobby-install-toggle"
         :class="{ 'has-update': extensionVersion.outdated }"
         title="安装浏览器插件"
@@ -476,11 +478,11 @@
 
         <div v-if="extensionVersion.outdated" class="lobby-install-update">
           <span class="lobby-install-update-icon">⬆</span>
-          <span>检测到插件有新版本（当前 {{ extensionVersion.current.join('、') }} → 最新 {{ extensionVersion.latest }}），请重新下载并重新加载扩展。</span>
+          <span>检测到插件有新版本（当前 {{ localExtensionVersion }} → 最新 {{ extensionVersion.latest }}），请重新下载并重新加载扩展。</span>
         </div>
         <div v-else-if="extensionVersion.latest" class="lobby-install-version">
-          <span v-if="extensionVersion.current.length">当前插件版本 {{ extensionVersion.current.join('、') }} · 最新版本 {{ extensionVersion.latest }}</span>
-          <span v-else>最新插件版本 {{ extensionVersion.latest }}（暂未检测到已连接的插件）</span>
+          <span v-if="localExtensionVersion">当前插件版本 {{ localExtensionVersion }} · 最新版本 {{ extensionVersion.latest }}</span>
+          <span v-else>最新插件版本 {{ extensionVersion.latest }}（暂未检测到本机已安装的插件）</span>
         </div>
 
         <!-- 风险提示与免责声明：插件申请了高敏感权限，下载前必须让用户明确知悉 -->
@@ -1503,8 +1505,9 @@ async function downloadExtension() {
 }
 
 // ===== 扩展版本检测 =====
-// 网关打包版本与在线扩展版本比对：任一缺失时不判定为需升级
-const extensionVersion = ref({ latest: '', current: [], outdated: false, checked: false })
+// latest 来自网关打包版本；「当前版本」取本机扩展上报的 localExtensionVersion。
+// 任一缺失时不判定为需升级。
+const extensionVersion = ref({ latest: '', outdated: false, checked: false })
 
 function isVersionOutdated(current, latest) {
   if (!current || !latest) return false
@@ -1521,18 +1524,77 @@ async function refreshExtensionVersion() {
     return
   }
   if (!info) {
-    extensionVersion.value = { latest: '', current: [], outdated: false, checked: true }
+    extensionVersion.value = { latest: '', outdated: false, checked: true }
     return
   }
   const latest = info.latestVersion || ''
-  const current = (info.sessions || [])
-    .map(s => (s && s.extension_version) ? String(s.extension_version) : '')
-    .filter(Boolean)
+  // 仅保留网关打包的最新版本；「当前版本」一律取本机扩展上报的版本
+  // （localExtensionVersion），不再使用网关的全局在线会话版本，
+  // 避免多设备/多用户在线时把别人的版本显示成本机版本。
   extensionVersion.value = {
     latest,
-    current,
-    outdated: current.some(v => isVersionOutdated(v, latest)),
+    outdated: isVersionOutdated(localExtensionVersion.value, latest),
     checked: true
+  }
+}
+
+// 是否已安装浏览器扩展：由扩展的 content script 在页面上写入 DOM 标记
+// （document.documentElement.dataset.jarvisExtInstalled）判定。
+// 该标记表示「本机装了扩展」，与「扩展是否在线/已连接网关」无关：
+// - 桌面端装了扩展 → content script 注入 → 标记存在 → 隐藏安装按钮；
+// - 移动端未装扩展 → 无 content script → 标记缺失 → 照常显示按钮；
+// 因此不会因桌面端扩展在线而误隐藏移动端的引导按钮。
+const extensionInstalled = ref(false)
+// 本机已安装扩展的版本号：同样由 content script 写入 DOM（dataset.jarvisExtVersion），
+// 取自扩展自身的 chrome.runtime.getManifest().version。
+// 用它而非网关的在线会话版本：网关 sessions 是全局的（不区分设备/用户），
+// 多设备在线时会显示成别人的版本，与本机实际安装的版本不符。
+const localExtensionVersion = ref('')
+
+function readExtensionInstalled() {
+  try {
+    return document.documentElement.dataset.jarvisExtInstalled === '1'
+  } catch (e) {
+    /* DOM 不可用时视为未安装 */
+  }
+  return false
+}
+
+function readLocalExtensionVersion() {
+  try {
+    return String(document.documentElement.dataset.jarvisExtVersion || '')
+  } catch (e) {
+    /* DOM 不可用时视为未知 */
+  }
+  return ''
+}
+
+// content script 在 document_idle 注入，可能晚于本组件挂载；
+// 故挂载后短时轮询直至读到标记，读到即停止。
+let extensionInstalledTimer = null
+function startExtensionInstalledWatch() {
+  extensionInstalled.value = readExtensionInstalled()
+  localExtensionVersion.value = readLocalExtensionVersion()
+  if (extensionInstalled.value) return
+  let attempts = 0
+  extensionInstalledTimer = setInterval(() => {
+    if (readExtensionInstalled()) {
+      extensionInstalled.value = true
+      localExtensionVersion.value = readLocalExtensionVersion()
+      stopExtensionInstalledWatch()
+      // 本机版本此时才可用：重算一次「是否有新版本」，使升级提示立即生效
+      refreshExtensionVersion()
+      return
+    }
+    // 最多轮询约 10 秒（20 × 500ms），避免无扩展时长期空转
+    if (++attempts >= 20) stopExtensionInstalledWatch()
+  }, 500)
+}
+
+function stopExtensionInstalledWatch() {
+  if (extensionInstalledTimer) {
+    clearInterval(extensionInstalledTimer)
+    extensionInstalledTimer = null
   }
 }
 
@@ -2004,6 +2066,7 @@ onMounted(() => {
   rafId = requestAnimationFrame(step)
   refreshTimer = setInterval(refreshLoop, 800)
   dashTimer = setInterval(() => { dashNow.value = new Date() }, 1000)
+  startExtensionInstalledWatch()
   startExtensionVersionPolling()
   window.addEventListener('keydown', onGlobalKeydown)
   window.addEventListener('resize', closeContextMenu)
@@ -2090,6 +2153,7 @@ onUnmounted(() => {
     dashTimer = null
   }
   stopExtensionVersionPolling()
+  stopExtensionInstalledWatch()
   if (resizeObserver) {
     resizeObserver.disconnect()
     resizeObserver = null
