@@ -143,6 +143,65 @@
             :class="{ mismatch: n.versionMismatch }"
           >{{ n.version }}</text>
         </g>
+
+        <!-- 曲线连线：master → 各个在线接入端（浏览器扩展 / 本地后台服务） -->
+        <!-- 端点数量不定（可能有多台设备/多个浏览器），故用曲线分列两侧，避免与节点间直线混淆 -->
+        <g class="lobby-links-local">
+          <path
+            v-for="link in accessLinks"
+            :key="link.key"
+            :d="link.d"
+            fill="none"
+            :stroke="link.offline ? 'rgba(255,93,108,0.35)' : '#20c8ff'"
+            :stroke-opacity="link.offline ? 1 : 0.55"
+            :stroke-width="1.6"
+            :stroke-dasharray="link.offline ? '6 5' : ''"
+            class="lobby-link"
+            :class="{ 'is-flow': !link.offline }"
+          />
+        </g>
+
+        <!-- 接入端节点：左列=浏览器扩展，右列=本地后台服务（机箱造型与网关节点一致） -->
+        <!-- 名称/版本/平台均来自网关会话（扩展 hello 上报 name、daemon hello 上报 name/hostname） -->
+        <g
+          v-for="n in accessNodes"
+          :key="n.id"
+          class="lobby-node is-local"
+          :class="'st-' + n.state"
+        >
+          <title>{{ n.title }}</title>
+          <rect
+            :x="n.x - LOCAL_NODE_RW"
+            :y="n.y - LOCAL_NODE_RH"
+            :width="LOCAL_NODE_RW * 2"
+            :height="LOCAL_NODE_RH * 2"
+            rx="6"
+            :fill="n.fill"
+            :stroke="n.color"
+            stroke-width="1.3"
+            class="lobby-node-body"
+          />
+          <line
+            :x1="n.x - LOCAL_NODE_RW + 6" :y1="n.y - LOCAL_NODE_RH + 7"
+            :x2="n.x + LOCAL_NODE_RW - 6" :y2="n.y - LOCAL_NODE_RH + 7"
+            :stroke="n.color" stroke-width="1.4" opacity="0.6"
+          />
+          <line
+            v-for="k in 3" :key="'lg' + k"
+            :x1="n.x - LOCAL_NODE_RW + 8" :y1="n.y - LOCAL_NODE_RH + 6 + k * 4.6"
+            :x2="n.x + LOCAL_NODE_RW - 16" :y2="n.y - LOCAL_NODE_RH + 6 + k * 4.6"
+            :stroke="n.color" stroke-width="1" opacity="0.35"
+          />
+          <circle :cx="n.x + LOCAL_NODE_RW - 10" :cy="n.y - 2" r="2.4" :fill="n.color" class="lobby-node-led" />
+          <circle :cx="n.x + LOCAL_NODE_RW - 10" :cy="n.y + 5" r="2.4" :fill="n.color" opacity="0.4" />
+          <rect
+            :x="n.x - LOCAL_NODE_RW + 6" :y="n.y + LOCAL_NODE_RH - 8"
+            :width="LOCAL_NODE_RW * 2 - 12" :height="3" rx="1.5"
+            :fill="n.color" opacity="0.5"
+          />
+          <text :x="n.x" :y="n.y + LOCAL_NODE_RH + 16" text-anchor="middle" class="lobby-node-label">{{ n.short }}</text>
+          <text :x="n.x" :y="n.y + LOCAL_NODE_RH + 29" text-anchor="middle" class="lobby-node-count">{{ n.sub }}</text>
+        </g>
       </svg>
     </div>
 
@@ -681,6 +740,10 @@ const props = defineProps({
   downloadExtension: { type: Function, default: null },
   // 查询扩展版本（异步函数，返回 { latestVersion, sessions }），用于检测插件更新
   checkExtensionVersion: { type: Function, default: null },
+  // 查询后台服务（daemon）会话（异步函数，返回会话数组），用于拓扑图展示接入的 daemon 节点
+  checkDaemonSessions: { type: Function, default: null },
+  // 查询浏览器扩展会话（异步函数，返回会话数组），用于拓扑图展示接入的扩展节点
+  checkExtensionSessions: { type: Function, default: null },
 })
 
 const emit = defineEmits(['selectAgent', 'sendInput', 'complete', 'openCompletions', 'activePetChange', 'activeNodeChange', 'createAgentOnNode', 'contextAgent', 'contextRun', 'nodeContextRun', 'renameNode', 'addAgentToGroup', 'removeAgentFromGroup', 'openOnboarding'])
@@ -1012,6 +1075,119 @@ const nodeLinks = computed(() => {
   }
   return links
 })
+
+// ===== 接入端节点：浏览器扩展（左列） / 本地后台服务（右列） =====
+// 二者不属于网关节点（availableNodeOptions），而是「接入本网关的客户端」：
+// - 浏览器扩展：网关 /api/browser-ext/sessions 返回的在线扩展会话（可能多台设备/多个浏览器）；
+// - 本地后台服务（daemon）：网关 /api/daemon/sessions 返回的在线 daemon 会话（可能多台机器）。
+// 名称取会话里的 name（用户配置的终端名，daemon 缺省回退 hostname），全部来自网关，
+// 因此这里展示的是「整个网络接入的」客户端，而不是仅本机。
+// 位置：分列舞台左右边缘，各自在垂直方向均匀分布，用曲线连到 master 机箱。
+const LOCAL_NODE_RW = 30
+const LOCAL_NODE_RH = NODE_RH
+// 距舞台左右边缘的水平留白
+const LOCAL_NODE_MARGIN = 24
+// 同列多个节点之间的垂直间距（含机箱高度）
+const ACCESS_NODE_GAP = LOCAL_NODE_RH * 2 + 26
+
+// 单列节点的纵向坐标：以 master 的 y 为中心均匀分布，并限制在舞台内
+function accessColumnYs(count, centerY, stageH) {
+  if (count <= 0) return []
+  const total = (count - 1) * ACCESS_NODE_GAP
+  const start = centerY - total / 2
+  const minY = LOCAL_NODE_RH + 18
+  const maxY = Math.max(minY, stageH - LOCAL_NODE_RH - 34)
+  const ys = []
+  for (let i = 0; i < count; i++) {
+    ys.push(Math.min(Math.max(start + i * ACCESS_NODE_GAP, minY), maxY))
+  }
+  return ys
+}
+
+// 会话展示名：优先网关会话里的 name，缺失时按类型回退
+function accessSessionName(session, fallback) {
+  const name = String((session && session.name) || '').trim()
+  return name || fallback
+}
+
+// 名称过长时截断（机箱下方标签宽度有限）
+function accessShortName(name) {
+  const s = String(name || '')
+  if (s.length > 10) return s.slice(0, 9) + '…'
+  return s
+}
+
+const accessNodes = computed(() => {
+  const w = stageSize.value.w
+  const h = stageSize.value.h
+  if (!w || !h) return []
+  const masterPos = nodeLayout.value.get('master')
+  if (!masterPos) return []
+  const leftX = LOCAL_NODE_MARGIN + LOCAL_NODE_RW
+  const rightX = w - LOCAL_NODE_MARGIN - LOCAL_NODE_RW
+  const extYs = accessColumnYs(extensionSessions.value.length, masterPos.y, h)
+  const daemonYs = accessColumnYs(daemonSessions.value.length, masterPos.y, h)
+  const nodes = []
+  extensionSessions.value.forEach((s, i) => {
+    const name = accessSessionName(s, '浏览器扩展')
+    const version = String((s && s.extension_version) || '').trim()
+    nodes.push({
+      id: `ext-${s.session_id || i}`,
+      x: leftX,
+      y: extYs[i],
+      state: 'online',
+      color: nodeColor('online'),
+      fill: 'rgba(8,18,30,0.7)',
+      short: accessShortName(name),
+      sub: version ? `v${version}` : '浏览器扩展',
+      title: `浏览器扩展 · ${name}${version ? ` · v${version}` : ''}`,
+      masterX: masterPos.x,
+      masterY: masterPos.y,
+    })
+  })
+  daemonSessions.value.forEach((s, i) => {
+    const name = accessSessionName(s, '后台服务')
+    const platform = String((s && s.platform) || '').trim()
+    const version = String((s && s.daemon_version) || '').trim()
+    const detail = [platform, version ? `v${version}` : ''].filter(Boolean).join(' · ')
+    nodes.push({
+      id: `daemon-${s.session_id || i}`,
+      x: rightX,
+      y: daemonYs[i],
+      state: 'online',
+      color: nodeColor('online'),
+      fill: 'rgba(8,18,30,0.7)',
+      short: accessShortName(name),
+      sub: detail || '后台服务',
+      title: `后台服务 · ${name}${detail ? ` · ${detail}` : ''}`,
+      masterX: masterPos.x,
+      masterY: masterPos.y,
+    })
+  })
+  return nodes
+})
+
+// 曲线连线：master 机箱 → 各接入端节点。
+// 用三次贝塞尔：控制点在水平中段分别上下错开，使连线呈明显弧线，
+// 与节点间直线（nodeLinks）区分开；左右两侧弧向相反，视觉上更对称。
+const accessLinks = computed(() =>
+  accessNodes.value.map(n => {
+    const midX = (n.masterX + n.x) / 2
+    const span = Math.abs(n.x - n.masterX)
+    // 弧高：随水平跨度自适应，并限制上限，避免小屏时弧线过大
+    const bow = Math.min(Math.max(span * 0.16, 24), 80)
+    // 左侧节点向上拱、右侧节点向下拱（以 master 为基准）
+    const dir = n.x < n.masterX ? -1 : 1
+    const c1y = n.masterY + dir * bow
+    const c2y = n.y + dir * bow
+    return {
+      key: `access-${n.id}`,
+      d: `M ${n.masterX} ${n.masterY} C ${midX} ${c1y}, ${midX} ${c2y}, ${n.x} ${n.y}`,
+      color: n.color,
+      offline: n.state === 'offline',
+    }
+  }),
+)
 
 // Agent 与所属节点的连线：宠物中心 → 节点坐标（颜色取 agent 状态色）
 const agentLinks = computed(() => {
@@ -1740,6 +1916,49 @@ function stopExtensionVersionPolling() {
   }
 }
 
+// ===== 接入端会话轮询（浏览器扩展 / 本地后台服务） =====
+// 数据源均为网关会话列表（由父组件注入）：
+// - checkExtensionSessions → GET /api/browser-ext/sessions（含 name / extension_version）
+// - checkDaemonSessions    → GET /api/daemon/sessions（含 name / platform / daemon_version）
+// 拓扑图据此为每个在线会话渲染一个节点并显示其名称。
+// 注意：网关对非管理员只返回其自己 user_id 的会话，故普通用户看到的是自己的接入端。
+const extensionSessions = ref([])
+const daemonSessions = ref([])
+const ACCESS_POLL_MS = 10000
+let accessTimer = null
+
+async function refreshAccessSessions() {
+  if (typeof props.checkExtensionSessions === 'function') {
+    try {
+      const sessions = await props.checkExtensionSessions()
+      extensionSessions.value = Array.isArray(sessions) ? sessions : []
+    } catch (e) {
+      // 轮询场景下异常不得中断定时器
+      extensionSessions.value = []
+    }
+  }
+  if (typeof props.checkDaemonSessions === 'function') {
+    try {
+      const sessions = await props.checkDaemonSessions()
+      daemonSessions.value = Array.isArray(sessions) ? sessions : []
+    } catch (e) {
+      daemonSessions.value = []
+    }
+  }
+}
+
+function startAccessPolling() {
+  refreshAccessSessions()
+  accessTimer = setInterval(refreshAccessSessions, ACCESS_POLL_MS)
+}
+
+function stopAccessPolling() {
+  if (accessTimer) {
+    clearInterval(accessTimer)
+    accessTimer = null
+  }
+}
+
 // 点击菜单项：按菜单来源分派给父组件执行，然后关闭菜单
 function onContextAction(act) {
   if (!act || act.enabled === false) return
@@ -2190,6 +2409,7 @@ onMounted(() => {
   dashTimer = setInterval(() => { dashNow.value = new Date() }, 1000)
   startExtensionInstalledWatch()
   startExtensionVersionPolling()
+  startAccessPolling()
   window.addEventListener('keydown', onGlobalKeydown)
   window.addEventListener('resize', closeContextMenu)
   window.addEventListener('resize', updateIsMobile)
@@ -2277,6 +2497,7 @@ onUnmounted(() => {
   }
   stopExtensionVersionPolling()
   stopExtensionInstalledWatch()
+  stopAccessPolling()
   if (resizeObserver) {
     resizeObserver.disconnect()
     resizeObserver = null
@@ -2554,7 +2775,20 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden, openInst
 .lobby-node-body {
   transition: filter 0.15s ease;
 }
-
+/* 本机执行面节点（浏览器扩展 / 本地后台服务）：仅作展示，不参与节点点击交互 */
+.lobby-node.is-local {
+  pointer-events: none;
+}
+.lobby-node.is-local .lobby-node-label {
+  fill: rgba(180, 220, 240, 0.6);
+}
+.lobby-node.is-local .lobby-node-count {
+  fill: rgba(150, 190, 210, 0.5);
+}
+/* 本机执行面曲线连线 */
+.lobby-links-local .lobby-link {
+  stroke-linecap: round;
+}
 /* 选中的节点：机箱描边加粗发光 + 轻微放大，明确当前节点操作的作用对象 */
 .lobby-node.active .lobby-node-body {
   stroke-width: 2.6;

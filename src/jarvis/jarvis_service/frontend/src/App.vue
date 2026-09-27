@@ -11,6 +11,8 @@
       :currentAgentId="currentAgentId"
       :nodes="availableNodeOptions"
       :getStatusClass="getStatusClass"
+      :extensionSessions="topologyExtensionSessions"
+      :daemonSessions="topologyDaemonSessions"
       @petSyncStatus="petSyncAllStatus"
       @petInterruptCurrent="petInterruptCurrent"
       @petGotoWaiting="petGotoWaitingAgent"
@@ -829,6 +831,8 @@
           :currentUserName="auth.userInfo?.display_name || auth.userInfo?.username || ''"
           :downloadExtension="downloadBrowserExtension"
           :checkExtensionVersion="fetchBrowserExtensionVersion"
+          :checkDaemonSessions="fetchDaemonSessions"
+          :checkExtensionSessions="fetchBrowserExtensionSessions"
           :contextActions="lobbyContextActions"
           :agentGroups="agentGroups"
           @selectAgent="onLobbySelectAgent"
@@ -1228,8 +1232,10 @@
       :agents="agentList"
       :getStatusClass="getStatusClass"
       :nodeDisplayNames="nodeDisplayNames"
+      :extensionSessions="topologyExtensionSessions"
+      :daemonSessions="topologyDaemonSessions"
       @update:visible="showTopologyOverlay = $event"
-      @close="showTopologyOverlay = false"
+      @close="closeTopologyOverlay"
     />
 
     <!-- 命令面板（Ctrl+P） -->
@@ -2067,6 +2073,70 @@ async function fetchBrowserExtensionVersion() {
   } catch (e) {
     // 版本查询失败不应影响弹层展示
     return null
+  }
+}
+
+// 查询本机后台服务（daemon）在线会话：返回会话数组，供大厅拓扑图展示接入的 daemon 节点。
+// 非管理员仅返回自己（token 对应用户）的会话，由网关侧限制。
+async function fetchDaemonSessions() {
+  try {
+    const { host, port } = getGatewayAddress()
+    const url = `${getHttpProtocol()}://${host}:${port}/api/daemon/sessions`
+    const response = await fetchWithAuth(url)
+    if (!response.ok) return []
+    const result = await response.json()
+    if (!result || !result.success) return []
+    return Array.isArray(result.sessions) ? result.sessions : []
+  } catch (e) {
+    // 查询失败不应影响拓扑图渲染，视为无在线 daemon
+    return []
+  }
+}
+
+// 查询浏览器扩展在线会话：返回会话数组（含 name / extension_version），
+// 供拓扑图为每个接入的扩展渲染一个节点并显示名称。
+// 注意：/api/browser-ext/version 的 sessions 只含 session_id/extension_version，
+// 不含 name，故这里单独调 /api/browser-ext/sessions。
+// 非管理员仅返回自己（token 对应用户）的会话，由网关侧限制。
+async function fetchBrowserExtensionSessions() {
+  try {
+    const { host, port } = getGatewayAddress()
+    const url = `${getHttpProtocol()}://${host}:${port}/api/browser-ext/sessions`
+    const response = await fetchWithAuth(url)
+    if (!response.ok) return []
+    const result = await response.json()
+    if (!result || !result.success) return []
+    return Array.isArray(result.sessions) ? result.sessions : []
+  } catch (e) {
+    // 查询失败不应影响拓扑图渲染，视为无在线扩展
+    return []
+  }
+}
+
+// —— 网络拓扑大图中的「接入端」会话列表 ——
+// 浏览器扩展 / 后台服务（daemon）均取网关会话列表：可能有多台设备/多个浏览器接入，
+// 每个会话在拓扑图中渲染为一个节点并显示其 name（用户配置的终端名）。
+// 非管理员只能看到自己的会话（网关侧限制），管理员可见全部。
+const topologyExtensionSessions = ref([])
+const topologyDaemonSessions = ref([])
+let topologyAccessTimer = null
+async function refreshTopologyAccessSessions() {
+  const [extSessions, daemonSessions] = await Promise.all([
+    fetchBrowserExtensionSessions(),
+    fetchDaemonSessions(),
+  ])
+  topologyExtensionSessions.value = Array.isArray(extSessions) ? extSessions : []
+  topologyDaemonSessions.value = Array.isArray(daemonSessions) ? daemonSessions : []
+}
+function startTopologyAccessPolling() {
+  if (topologyAccessTimer) return
+  refreshTopologyAccessSessions()
+  topologyAccessTimer = setInterval(refreshTopologyAccessSessions, 5000)
+}
+function stopTopologyAccessPolling() {
+  if (topologyAccessTimer) {
+    clearInterval(topologyAccessTimer)
+    topologyAccessTimer = null
   }
 }
 
@@ -7827,6 +7897,12 @@ function petGotoWaitingAgent() {
 // 打开网络拓扑大图（点击宠物旁迷你图或右键菜单触发）
 function openTopologyOverlay() {
   showTopologyOverlay.value = true
+  startTopologyAccessPolling()
+}
+// 关闭网络拓扑大图：停止接入端会话轮询，避免后台空转
+function closeTopologyOverlay() {
+  showTopologyOverlay.value = false
+  stopTopologyAccessPolling()
 }
 
 // 公网使用文档站点（MkDocs 发布到 GitHub Pages）
@@ -16938,6 +17014,12 @@ onMounted(() => {
   if (hasAuthToken()) {
     startAgentListRefresh()
   }
+
+  // 接入端会话轮询（浏览器扩展 / 后台服务）：迷你拓扑常驻显示，需在挂载后即开始拉取，
+  // 否则要等用户打开一次拓扑大图才会出现接入端节点。
+  if (hasAuthToken()) {
+    startTopologyAccessPolling()
+  }
   
   // 添加滚动事件监听，实现滚动到顶部时加载更多历史
   setupHistoryScrollListener(outputList.value)
@@ -17052,6 +17134,8 @@ onUnmounted(() => {
   
   stopWorkspacePanelInteraction()
   stopWorkspaceFileHeartbeat()
+  // 停止接入端会话轮询
+  stopTopologyAccessPolling()
   window.visualViewport?.removeEventListener('resize', visualViewportResizeHandler)
 
   if (cmEditorView) {

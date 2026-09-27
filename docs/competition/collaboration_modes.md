@@ -1386,6 +1386,15 @@ digraph G4 {
     u1 [label="用户 A"];
     u2 [label="用户 B"];
   }
+  subgraph cluster_local {
+    label = "用户本机执行面";
+    style = "filled";
+    color = "#7B61FF";
+    fillcolor = "#F3F0FF";
+    node [fillcolor="#E4DBFF", color="#7B61FF"];
+    ext [label="浏览器扩展\n（Browser Bridge）"];
+    daemon [label="本地后台服务\n（jarvis-daemon）"];
+  }
   subgraph cluster_master {
     label = "主节点";
     style = "filled";
@@ -1415,6 +1424,8 @@ digraph G4 {
   }
   u1 -> gw_m [label="使用"];
   u2 -> gw_m [label="使用"];
+  ext -> gw_m [label="WebSocket 主动连出" color="#7B61FF"];
+  daemon -> gw_m [label="本地回环 127.0.0.1:17800" color="#7B61FF"];
   gw_m -> ag_m [dir=both];
   gw_w1 -> ag_w1 [dir=both];
   gw_w2 -> ag_w2 [dir=both];
@@ -1642,7 +1653,7 @@ Jarvis 提供节点级的运维能力：
 
 ```dot
 digraph G8 {
-  graph [rankdir="LR", splines=line, fontname="Sans-serif", label="节点服务组成：前端 × 网关 × Agent", labelloc="t", nodesep=0.5, ranksep=1.2];
+  graph [rankdir="LR", splines=line, fontname="Sans-serif", label="节点服务组成：前端 × 网关 × Agent × 本机执行面", labelloc="t", nodesep=0.5, ranksep=1.2];
   node [shape=box, style="rounded,filled", fontname="Sans-serif", fontsize=11];
   edge [fontname="Sans-serif", fontsize=10];
   subgraph cluster_user {
@@ -1652,6 +1663,15 @@ digraph G8 {
     fillcolor = "#FFF8E7";
     node [fillcolor="#FFE6CC", color="#D79B00"];
     browser [label="浏览器"];
+  }
+  subgraph cluster_local {
+    label = "用户本机执行面";
+    style = "filled";
+    color = "#7B61FF";
+    fillcolor = "#F3F0FF";
+    node [fillcolor="#E4DBFF", color="#7B61FF"];
+    ext [label="浏览器扩展\n（Browser Bridge）"];
+    daemon [label="本地后台服务\n（jarvis-daemon）"];
   }
   subgraph cluster_node {
     label = "节点";
@@ -1668,6 +1688,8 @@ digraph G8 {
   fe -> gw [label="API 请求"];
   gw -> ag1 [label="代理"];
   gw -> ag2 [label="代理"];
+  ext -> gw [label="WebSocket 主动连出" color="#7B61FF"];
+  daemon -> gw [label="本地回环 127.0.0.1:17800" color="#7B61FF"];
 }
 ```
 
@@ -1686,6 +1708,7 @@ digraph G8 {
 - **迷你拓扑图**：常驻于宠物旁（宠物大厅见 3.5.9 节），以纯 SVG 自绘的星形结构展示 master 与各子节点的连接关系——节点颜色区分在线/离线/未知，连线虚实区分节点状态，中心节点上的小圆点表示该节点上运行的 Agent 及其状态。一眼即可判断「哪个节点掉线、哪个节点上还有 Agent 在跑」
 - **拓扑大图浮层**：点击迷你图展开，提供完整的网络视图——节点按环形布局排布，Agent 以状态配色（运行中/等待输入/空闲/已停止）环绕其所属节点绘制，左上角统计卡片汇总各状态 Agent 数量，鼠标悬停节点或 Agent 可查看详情卡（节点 ID、在线状态、其上的 Agent 列表），按 `Esc` 关闭
 - **状态实时同步**：拓扑数据直接来源于节点与 Agent 的实时状态，与 `list_nodes`、`list_agents` 查询结果一致，无需额外刷新即可反映节点上下线、Agent 启停的变化
+- **本机执行面**：除节点与 Agent 外，拓扑中同样呈现**用户本机执行面**——**浏览器扩展**与**本地后台服务 `jarvis-daemon`** 均以主动连出方式挂接到主网关（扩展走 WebSocket，daemon 走本地回环 `127.0.0.1:17800`），因此「哪些用户的本机已接入、是否在线」也能在拓扑中一眼可见
 
 拓扑可视化与 `update_nodes_code`、`restart_nodes` 配合，构成完整的节点级运维闭环：**先看拓扑定位问题节点，再对该节点执行更新或重启**，避免了在无节点概念的工具中「盲操作」的困境。
 

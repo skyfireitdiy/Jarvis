@@ -150,6 +150,54 @@
               <text :x="n.x" :y="n.y + NODE_R * 0.86 + 29" text-anchor="middle" class="topo-node-count">{{ n.drawAgents.length }}/{{ n.agents.length }} agent</text>
             </g>
 
+            <!-- 连线：master -> 本机执行面节点（浏览器扩展/本地后台服务），曲线 -->
+            <g class="topo-links-local">
+              <path
+                v-for="l in localLinks"
+                :key="'LL' + l.id"
+                :d="l.d"
+                :stroke="l.state === 'offline' ? 'rgba(255,93,108,0.35)' : '#20c8ff'"
+                :stroke-opacity="l.state === 'offline' ? 1 : 0.55"
+                :stroke-width="l.hot ? 2.4 : 1.6"
+                :stroke-dasharray="l.state === 'offline' ? '6 5' : ''"
+                class="topo-link"
+                :class="{ 'is-hot': l.hot, 'is-flow': l.state !== 'offline' }"
+                fill="none"
+              />
+            </g>
+
+            <!-- 本机执行面节点（浏览器扩展在左、本地后台服务在右；机箱造型） -->
+            <g
+              v-for="n in localNodes"
+              :key="n.id"
+              class="topo-node is-local"
+              :class="['st-' + n.state, { 'is-hot': hovered === n.id }]"
+              @mouseenter="hovered = n.id"
+            >
+              <title>{{ n.title }}</title>
+              <rect v-if="n.state !== 'offline'" :x="n.x - NODE_R - 4" :y="n.y - NODE_R * 0.86 - 4" :width="NODE_R * 2 + 8" :height="NODE_R * 1.72 + 8" rx="9"
+                    :stroke="n.color" stroke-width="1.4" fill="none" class="topo-ring" />
+              <!-- 机箱主体 -->
+              <rect :x="n.x - NODE_R" :y="n.y - NODE_R * 0.86" :width="NODE_R * 2" :height="NODE_R * 1.72" rx="6"
+                    :fill="n.fill" :stroke="n.color" stroke-width="1.8" class="topo-server" />
+              <!-- 顶部插槽 -->
+              <line :x1="n.x - NODE_R + 6" :y1="n.y - NODE_R * 0.86 + 7" :x2="n.x + NODE_R - 6" :y2="n.y - NODE_R * 0.86 + 7"
+                    :stroke="n.color" stroke-width="1.4" opacity="0.6" />
+              <!-- 散热格栅 -->
+              <line v-for="k in 3" :key="'lg' + k"
+                    :x1="n.x - NODE_R + 8" :y1="n.y - NODE_R * 0.86 + 6 + k * 4.6"
+                    :x2="n.x + NODE_R - 16" :y2="n.y - NODE_R * 0.86 + 6 + k * 4.6"
+                    :stroke="n.color" stroke-width="1" opacity="0.35" />
+              <!-- 指示灯 -->
+              <circle :cx="n.x + NODE_R - 10" :cy="n.y - 2" r="2.4" :fill="n.color" class="topo-led" />
+              <circle :cx="n.x + NODE_R - 10" :cy="n.y + 5" r="2.4" :fill="n.color" opacity="0.4" />
+              <!-- 底部状态条 -->
+              <rect :x="n.x - NODE_R + 6" :y="n.y + NODE_R * 0.86 - 8" :width="NODE_R * 2 - 12" :height="3" rx="1.5"
+                    :fill="n.color" opacity="0.5" />
+              <text :x="n.x" :y="n.y + NODE_R * 0.86 + 16" text-anchor="middle" class="topo-node-label">{{ n.short }}</text>
+              <text :x="n.x" :y="n.y + NODE_R * 0.86 + 29" text-anchor="middle" class="topo-node-count">{{ n.sub }}</text>
+            </g>
+
             <!-- 中心 master（与子节点同款服务器机箱，仅靠颜色/尺寸区分主次） -->
             <g class="topo-node is-center" :class="'st-' + model.center.state" @mouseenter="hovered = 'master'">
               <rect v-if="model.center.state !== 'offline'" :x="layout.center.x - CENTER_W / 2 - 5" :y="layout.center.y - CENTER_H / 2 - 5" :width="CENTER_W + 10" :height="CENTER_H + 10" rx="11"
@@ -244,6 +292,10 @@ const props = defineProps({
   agents: { type: Array, default: () => [] },
   getStatusClass: { type: Function, default: () => 'running' },
   nodeDisplayNames: { type: Object, default: () => ({}) },
+  // 接入的浏览器扩展会话（网关 /api/browser-ext/sessions，含 name / extension_version）
+  extensionSessions: { type: Array, default: () => [] },
+  // 接入的后台服务会话（网关 /api/daemon/sessions，含 name / platform / daemon_version）
+  daemonSessions: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits(['update:visible', 'close'])
@@ -341,6 +393,106 @@ const lines = computed(() =>
     state: n.state,
     hot: hovered.value === n.id,
   }))
+)
+
+// 接入端节点：浏览器扩展（左列）、后台服务（右列），各自垂直方向均匀分布。
+// 数据源均为网关会话列表（props.extensionSessions / props.daemonSessions），
+// 名称取会话的 name，故这里展示的是「整个网络接入的」客户端，而非仅本机。
+const LOCAL_NODE_R = NODE_R
+const LOCAL_NODE_MARGIN = 24
+// 同列多个节点之间的垂直间距（含机箱高度）
+const ACCESS_NODE_GAP = NODE_R * 1.72 + 30
+
+// 单列节点的纵向坐标：以 master 的 y 为中心均匀分布，并限制在画布内
+function accessColumnYs(count, centerY) {
+  if (count <= 0) return []
+  const total = (count - 1) * ACCESS_NODE_GAP
+  const start = centerY - total / 2
+  const minY = NODE_R * 0.86 + 22
+  const maxY = Math.max(minY, H - NODE_R * 0.86 - 40)
+  const ys = []
+  for (let i = 0; i < count; i++) {
+    ys.push(Math.min(Math.max(start + i * ACCESS_NODE_GAP, minY), maxY))
+  }
+  return ys
+}
+
+// 会话展示名：优先网关会话里的 name，缺失时按类型回退
+function accessSessionName(session, fallback) {
+  const name = String((session && session.name) || '').trim()
+  return name || fallback
+}
+
+// 名称过长时截断（机箱下方标签宽度有限）
+function accessShortName(name) {
+  const s = String(name || '')
+  if (s.length > 10) return s.slice(0, 9) + '…'
+  return s
+}
+
+const localNodes = computed(() => {
+  const cy = layout.value.center.y
+  const leftX = LOCAL_NODE_MARGIN + LOCAL_NODE_R
+  const rightX = W - LOCAL_NODE_MARGIN - LOCAL_NODE_R
+  const extYs = accessColumnYs(props.extensionSessions.length, cy)
+  const daemonYs = accessColumnYs(props.daemonSessions.length, cy)
+  const nodes = []
+  props.extensionSessions.forEach((s, i) => {
+    const name = accessSessionName(s, '浏览器扩展')
+    const version = String((s && s.extension_version) || '').trim()
+    nodes.push({
+      id: `ext-${s.session_id || i}`,
+      x: leftX,
+      y: extYs[i],
+      masterX: layout.value.center.x,
+      masterY: cy,
+      state: 'online',
+      color: nodeColor('online'),
+      fill: 'rgba(8,18,30,0.95)',
+      short: accessShortName(name),
+      sub: version ? `v${version}` : '浏览器扩展',
+      title: `浏览器扩展 · ${name}${version ? ` · v${version}` : ''}`,
+    })
+  })
+  props.daemonSessions.forEach((s, i) => {
+    const name = accessSessionName(s, '后台服务')
+    const platform = String((s && s.platform) || '').trim()
+    const version = String((s && s.daemon_version) || '').trim()
+    const detail = [platform, version ? `v${version}` : ''].filter(Boolean).join(' · ')
+    nodes.push({
+      id: `daemon-${s.session_id || i}`,
+      x: rightX,
+      y: daemonYs[i],
+      masterX: layout.value.center.x,
+      masterY: cy,
+      state: 'online',
+      color: nodeColor('online'),
+      fill: 'rgba(8,18,30,0.95)',
+      short: accessShortName(name),
+      sub: detail || '后台服务',
+      title: `后台服务 · ${name}${detail ? ` · ${detail}` : ''}`,
+    })
+  })
+  return nodes
+})
+
+// 曲线连线：master → 各接入端节点。控制点在水平中段上下错开，使连线呈明显弧线，
+// 与节点间直线（lines）区分；左右两侧弧向相反，视觉对称。
+const localLinks = computed(() =>
+  localNodes.value.map(n => {
+    const midX = (n.masterX + n.x) / 2
+    const span = Math.abs(n.x - n.masterX)
+    const bow = Math.min(Math.max(span * 0.16, 24), 80)
+    const dir = n.x < n.masterX ? -1 : 1
+    const c1y = n.masterY + dir * bow
+    const c2y = n.y + dir * bow
+    return {
+      id: n.id,
+      d: `M ${n.masterX} ${n.masterY} C ${midX} ${c1y}, ${midX} ${c2y}, ${n.x} ${n.y}`,
+      state: n.state,
+      hot: hovered.value === n.id,
+    }
+  })
 )
 
 // 节点 -> agent 连线：每个 agent 连回其所属节点（master 连到中心）
@@ -594,6 +746,17 @@ defineExpose({ close })
 }
 .topo-node.is-hot > .topo-server {
   filter: url(#topo-glow);
+}
+/* 本机执行面节点：不参与 hover 详情卡（无 agent），仅作状态展示 */
+.topo-node.is-local {
+  cursor: default;
+}
+.topo-node.is-local > .topo-node-label {
+  font-size: 11px;
+  font-weight: 600;
+}
+.topo-links-local .topo-link {
+  stroke-linecap: round;
 }
 .topo-server {
   transition: filter 0.15s ease;

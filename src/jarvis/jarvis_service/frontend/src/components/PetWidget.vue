@@ -115,6 +115,8 @@
       :nodes="nodes"
       :agents="agentList || []"
       :getStatusClass="getStatusClass"
+      :extensionSessions="extensionSessions || []"
+      :daemonSessions="daemonSessions || []"
       :x="petMiniPos.x"
       :y="petMiniPos.y"
       @open="petOpenTopology"
@@ -147,6 +149,10 @@ const props = defineProps({
   currentAgentId: String,
   nodes: { type: Array, default: () => [] },
   getStatusClass: Function,
+  // 接入的浏览器扩展会话（网关 /api/browser-ext/sessions），透传给迷你拓扑
+  extensionSessions: { type: Array, default: () => [] },
+  // 接入的后台服务会话（网关 /api/daemon/sessions），透传给迷你拓扑
+  daemonSessions: { type: Array, default: () => [] },
 })
 const emit = defineEmits([
   'petSyncStatus',

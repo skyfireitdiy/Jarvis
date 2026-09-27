@@ -39,6 +39,13 @@
         />
       </g>
 
+      <!-- 接入端：浏览器扩展（左列）/ 后台服务（右列），每个在线会话一个点 -->
+      <!-- 96×96 空间极小，仅画点不画名字，名称通过 title 悬停查看 -->
+      <g v-for="n in accessPoints" :key="n.id" class="pt-mini-node">
+        <title>{{ n.title }}</title>
+        <circle :cx="n.x" :cy="n.y" r="2.6" :stroke="n.color" :fill="n.fill" stroke-width="0.8" />
+      </g>
+
       <!-- 其余节点 -->
       <g
         v-for="n in nodePoints"
@@ -77,6 +84,10 @@ const props = defineProps({
   getStatusClass: { type: Function, default: () => 'running' },
   x: { type: Number, default: 0 },
   y: { type: Number, default: 0 },
+  // 接入的浏览器扩展会话（网关 /api/browser-ext/sessions，含 name / extension_version）
+  extensionSessions: { type: Array, default: () => [] },
+  // 接入的后台服务会话（网关 /api/daemon/sessions，含 name / platform / daemon_version）
+  daemonSessions: { type: Array, default: () => [] },
 })
 
 const W = 96
@@ -142,6 +153,51 @@ const lines = computed(() =>
     active: n.agents.length > 0,
   }))
 )
+
+// 接入端小点：浏览器扩展（左列）/ 后台服务（右列），每个在线会话一个点。
+// 数据来自网关会话列表（props），名称仅用于 title 悬停提示（96×96 放不下文字）。
+const accessPoints = computed(() => {
+  const cy = layout.value.center.y
+  const leftX = 6
+  const rightX = W - 6
+  const gap = 8
+  const place = (count) => {
+    if (count <= 0) return []
+    const total = (count - 1) * gap
+    const start = cy - total / 2
+    const ys = []
+    for (let i = 0; i < count; i++) {
+      ys.push(Math.min(Math.max(start + i * gap, 5), H - 5))
+    }
+    return ys
+  }
+  const extYs = place(props.extensionSessions.length)
+  const daemonYs = place(props.daemonSessions.length)
+  const points = []
+  props.extensionSessions.forEach((s, i) => {
+    const name = String((s && s.name) || '').trim() || '浏览器扩展'
+    points.push({
+      id: `ext-${s.session_id || i}`,
+      x: leftX,
+      y: extYs[i],
+      color: nodeColor('online'),
+      fill: 'rgba(8,18,30,0.95)',
+      title: `浏览器扩展 · ${name}`,
+    })
+  })
+  props.daemonSessions.forEach((s, i) => {
+    const name = String((s && s.name) || '').trim() || '后台服务'
+    points.push({
+      id: `daemon-${s.session_id || i}`,
+      x: rightX,
+      y: daemonYs[i],
+      color: nodeColor('online'),
+      fill: 'rgba(8,18,30,0.95)',
+      title: `后台服务 · ${name}`,
+    })
+  })
+  return points
+})
 
 const centerColor = computed(() => nodeColor(model.value.center.state))
 const centerFill = computed(() =>
