@@ -24,6 +24,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"jarvis-daemon/internal/auth"
 	"jarvis-daemon/internal/capability"
@@ -390,6 +391,47 @@ func browserExtTokenFor(gateway string) string {
 // daemonUpdateMu 串行化自动更新，避免多个网关同时握手时并发下载/替换互相干扰。
 var daemonUpdateMu sync.Mutex
 
+// daemonRetryScheduled 标记「已有一个待定的退避重试定时器」。
+//
+// 为什么需要：退避到期后必须主动重试（见下方 maybeAutoUpdateDaemon 注释），而触发
+// 点（WS 握手）可能短时间多次到达（如前端反复推送凭据导致重连）。若无去重，每次
+// 触发都会再起一个定时器，窗口一到多个 goroutine 同时抢 daemonUpdateMu，形成重试
+// 风暴。定时器到期时先清除本标记再执行，保证后续仍能重新安排。
+var daemonRetryScheduled bool
+
+// daemonRetryMu 保护 daemonRetryScheduled。
+var daemonRetryMu sync.Mutex
+
+// scheduleDaemonUpdateRetry 在 after 之后自动重试一次自动更新。
+//
+// 为什么必须主动重试：maybeAutoUpdateDaemon 的触发点是 WS 握手收到 hello_ack，但
+// 连接稳定时只有 ping/pong 心跳、不产生 hello_ack；且前端重复推送相同凭据时
+// ConnectWithName 会因幂等判断跳过重建连接（见 wsclient/manager.go），同样不产生
+// hello_ack。若不主动安排定时器，退避窗口到期后没有任何事件来唤醒检查，更新会
+// 永久停滞在「退避中」。
+//
+// 去重：同一时刻只允许一个待定定时器；已安排则忽略本次请求。
+func scheduleDaemonUpdateRetry(gateway, sessionID string, info map[string]any, after time.Duration) {
+	daemonRetryMu.Lock()
+	if daemonRetryScheduled {
+		daemonRetryMu.Unlock()
+		return
+	}
+	daemonRetryScheduled = true
+	daemonRetryMu.Unlock()
+
+	log.Printf("[daemon] 将在 %s 后重试自动更新（网关 %s）", after.Round(time.Second), gateway)
+	time.AfterFunc(after, func() {
+		// 先清除标记再调用：即使重试后再次失败，也能重新安排下一轮定时器。
+		daemonRetryMu.Lock()
+		daemonRetryScheduled = false
+		daemonRetryMu.Unlock()
+
+		log.Printf("[daemon] 退避到期，自动重试 daemon 更新（网关 %s）", gateway)
+		maybeAutoUpdateDaemon(gateway, sessionID, info)
+	})
+}
+
 // maybeAutoUpdateDaemon 在网关下发 daemon 更新指令时异步执行更新。
 //
 // 设计要点：
@@ -397,7 +439,8 @@ var daemonUpdateMu sync.Mutex
 //     版本作为「最新版本」下发，daemon 比对后自动更新，无开关、无环境变量；
 //   - 立即返回，把下载/替换放到独立 goroutine（可能耗时数秒），不阻塞 WS 读循环；
 //   - 更新前把当前凭据临时落盘，供重启后恢复登录态（见 selfupdate.SaveTokenState）；
-//   - 任何失败只记日志，绝不影响连接与既有能力。
+//   - 任何失败只记日志，绝不影响连接与既有能力；
+//   - 退避到期后主动安排定时重试（见 scheduleDaemonUpdateRetry），不依赖外部握手事件。
 func maybeAutoUpdateDaemon(gateway, sessionID string, info map[string]any) {
 	parsed, err := selfupdate.ParseUpdateInfo(info)
 	if err != nil {
@@ -418,6 +461,11 @@ func maybeAutoUpdateDaemon(gateway, sessionID string, info map[string]any) {
 		state, _ := selfupdate.LoadAttemptState()
 		if skip, reason := selfupdate.ShouldSkipUpdate(state, version, parsed.LatestVersion, selfupdate.NowUnix()); skip {
 			log.Printf("[daemon] 跳过自动更新（网关 %s）: %s", gateway, reason)
+			// 退避中则安排到期主动重试；RetryAfter 返回 0 表示熔断态（等网关发新版），
+			// 此时不得安排重试，否则会陷入重启循环。
+			if wait := selfupdate.RetryAfter(state, version, parsed.LatestVersion, selfupdate.NowUnix()); wait > 0 {
+				scheduleDaemonUpdateRetry(gateway, sessionID, info, wait+time.Second)
+			}
 			return
 		}
 

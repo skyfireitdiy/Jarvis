@@ -181,3 +181,36 @@ func ShouldSkipUpdate(state AttemptState, currentVersion, targetVersion string, 
 	}
 	return false, ""
 }
+
+// RetryAfter 返回距下次可重试还需等待的时长；无需等待（或不应重试）时返回 0。
+//
+// 为什么需要：ShouldSkipUpdate 只在「触发点」（WS 握手收到 hello_ack）被调用。
+// 但连接稳定时只有 ping/pong 心跳，不产生 hello_ack；且前端重复推送相同凭据时
+// ConnectWithName 会因幂等判断跳过重建连接（见 wsclient/manager.go），同样不产生
+// hello_ack。结果是退避窗口到期后没有任何事件来唤醒检查，更新就此永久停滞。
+// 调用方据此返回值安排定时器，实现「退避到期自动重试」，不再依赖外部握手事件。
+//
+// 返回 0 的三种情形需调用方区分对待：
+//   - 目标版本变化 / 无失败记录：应当立即尝试；
+//   - 熔断态（InProgress 且目标版本未变）：不应重试，否则会陷入重启循环。
+//
+// 因此调用方应先经 ShouldSkipUpdate 判定「是否跳过」，仅在跳过时用本函数取等待
+// 时长；若返回 0 则说明是熔断态，不得安排重试。
+func RetryAfter(state AttemptState, currentVersion, targetVersion string, now int64) time.Duration {
+	if !SameVersion(state.TargetVersion, targetVersion) {
+		// 目标版本变化：视为新机会，无需等待。
+		return 0
+	}
+	if state.InProgress {
+		// 熔断态：等网关发布新版本才恢复，此处不安排重试。
+		return 0
+	}
+	if state.Attempts > 0 {
+		wait := BackoffFor(state.Attempts)
+		elapsed := now - state.LastAttemptUnix
+		if remaining := wait - time.Duration(elapsed)*time.Second; remaining > 0 {
+			return remaining
+		}
+	}
+	return 0
+}

@@ -246,3 +246,94 @@ func TestShouldSkipUpdate(t *testing.T) {
 		}
 	})
 }
+
+func TestRetryAfter(t *testing.T) {
+	const now = int64(1700000000)
+
+	t.Run("无状态无需等待", func(t *testing.T) {
+		if got := RetryAfter(AttemptState{}, "v5.0.5", "6.0.0", now); got != 0 {
+			t.Errorf("RetryAfter = %v, want 0", got)
+		}
+	})
+
+	t.Run("目标版本变化无需等待", func(t *testing.T) {
+		state := AttemptState{
+			TargetVersion:   "6.0.0",
+			Attempts:        3,
+			LastAttemptUnix: now - 1,
+		}
+		if got := RetryAfter(state, "v5.0.5", "6.0.1", now); got != 0 {
+			t.Errorf("目标变化时 RetryAfter = %v, want 0", got)
+		}
+	})
+
+	t.Run("熔断态返回 0 表示不应重试", func(t *testing.T) {
+		state := AttemptState{
+			TargetVersion:   "6.0.0",
+			Attempts:        1,
+			LastAttemptUnix: now - 1,
+			InProgress:      true,
+		}
+		if got := RetryAfter(state, "v5.0.5", "6.0.0", now); got != 0 {
+			t.Errorf("熔断态 RetryAfter = %v, want 0", got)
+		}
+	})
+
+	t.Run("退避窗口内返回剩余时长", func(t *testing.T) {
+		state := AttemptState{
+			TargetVersion:   "6.0.0",
+			Attempts:        1,
+			LastAttemptUnix: now - 10, // 退避 1min，已过 10s
+		}
+		want := 50 * time.Second
+		if got := RetryAfter(state, "v5.0.5", "6.0.0", now); got != want {
+			t.Errorf("RetryAfter = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("退避窗口已过返回 0", func(t *testing.T) {
+		state := AttemptState{
+			TargetVersion:   "6.0.0",
+			Attempts:        1,
+			LastAttemptUnix: now - 61,
+		}
+		if got := RetryAfter(state, "v5.0.5", "6.0.0", now); got != 0 {
+			t.Errorf("退避已过 RetryAfter = %v, want 0", got)
+		}
+	})
+
+	t.Run("第 2 次失败按 5min 档计算", func(t *testing.T) {
+		state := AttemptState{
+			TargetVersion:   "6.0.0",
+			Attempts:        2,
+			LastAttemptUnix: now - 61,
+		}
+		want := 5*time.Minute - 61*time.Second
+		if got := RetryAfter(state, "v5.0.5", "6.0.0", now); got != want {
+			t.Errorf("RetryAfter = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("超出阶梯按 30min 封顶", func(t *testing.T) {
+		state := AttemptState{
+			TargetVersion:   "6.0.0",
+			Attempts:        100,
+			LastAttemptUnix: now - 10,
+		}
+		want := 30*time.Minute - 10*time.Second
+		if got := RetryAfter(state, "v5.0.5", "6.0.0", now); got != want {
+			t.Errorf("RetryAfter = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("版本 v 前缀不影响判定", func(t *testing.T) {
+		state := AttemptState{
+			TargetVersion:   "v6.0.0",
+			Attempts:        1,
+			LastAttemptUnix: now - 10,
+		}
+		if got := RetryAfter(state, "v5.0.5", "6.0.0", now); got != 50*time.Second {
+			t.Errorf("RetryAfter = %v, want 50s", got)
+		}
+	})
+}

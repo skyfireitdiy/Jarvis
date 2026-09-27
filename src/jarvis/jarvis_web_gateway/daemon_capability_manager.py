@@ -185,6 +185,17 @@ def _normalize_version(value: Any) -> str:
     return text
 
 
+def _release_tag(version: Any) -> str:
+    """把版本号转成 GitHub Release 的 tag。
+
+    为什么需要：网关自身版本为 ``6.0.1``（不带 v），而 Release tag 由
+    ``release-daemon.yml`` 的 ``github.ref_name`` 注入，实际形如 ``v6.0.1``。
+    直接用版本号拼下载地址会得到 ``/download/6.0.1/...``，GitHub 返回 404。
+    故先归一化（去掉可能已有的 v 前缀，避免拼出 ``vv6.0.1``）再补 ``v``。
+    """
+    return f"v{_normalize_version(version)}"
+
+
 def _build_daemon_update(
     daemon_version: str, os_name: str, arch: str
 ) -> Optional[Dict[str, Any]]:
@@ -235,7 +246,7 @@ def _build_daemon_update(
 
     info["available"] = True
     info["asset"] = asset
-    info["url"] = f"{DAEMON_RELEASE_BASE_URL}/{latest}/{asset}"
+    info["url"] = f"{DAEMON_RELEASE_BASE_URL}/{_release_tag(latest)}/{asset}"
     info["sha256"] = str(explicit.get("sha256") or "").strip()
     try:
         info["size"] = int(explicit.get("size") or 0)
