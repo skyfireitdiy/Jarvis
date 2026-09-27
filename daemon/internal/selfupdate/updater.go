@@ -113,16 +113,16 @@ func Run(opts Options) error {
 		if pid, herr := SpawnApplyHelper("", newBinary, opts.TargetPath, opts.Restart); herr == nil && pid > 0 {
 			log.Printf("[selfupdate] 已启动更新 helper（pid=%d），将在进程退出后完成替换", pid)
 			// 关键：helper 要等目标文件不再被占用才能替换，而当前进程正占着它。
-			// 因此必须主动重启服务（Stop 会终止本进程），否则 helper 会一直等到
-			// 60 秒超时、替换失败退出，更新永远无法生效。
+			// 因此必须让本进程尽快退出（见 exitForHelperReplacement 的说明：不能走
+			// restartService，那依赖 PID 文件，schtasks 启动的进程没有该文件，会误判
+			// 「服务未运行」而不杀本进程、还多拉起一个抢端口的进程），否则 helper 会
+			// 一直等到 60 秒超时、替换失败退出，更新永远无法生效。
+			// 替换与重启都由 helper 负责（helper 带 --restart，替换成功后自行重启服务）。
+			report(StateDone, "")
 			if opts.Restart {
 				report(StateRestarting, "")
-				if rerr := restartService(); rerr != nil {
-					// 重启失败不算更新失败（文件待 helper 替换），只记日志。
-					log.Printf("[selfupdate] 重启服务失败（helper 将在进程退出后替换，可手动重启）: %v", rerr)
-				}
 			}
-			report(StateDone, "")
+			exitForHelperReplacement()
 			return nil
 		}
 		report(StateFailed, err.Error())
