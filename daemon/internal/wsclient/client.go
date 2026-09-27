@@ -204,6 +204,13 @@ func (c *Client) Stop() {
 
 func (c *Client) setState(state string) {
 	c.mu.Lock()
+	// 已停止的 Client 只允许回到 disconnected：Stop 之后连接 goroutine 仍可能
+	// 在 connectAndServe 里把状态置为 connecting/connected，若不拦截会把 Stop
+	// 已置好的 disconnected 覆盖掉（表现为「Stop 后状态仍是 connecting」）。
+	if c.stopped && state != StateDisconnected {
+		c.mu.Unlock()
+		return
+	}
 	if c.state == state {
 		c.mu.Unlock()
 		return
