@@ -226,6 +226,13 @@ func runDaemon(args []string) {
 		log.Printf("[daemon] 已从自动更新中转文件恢复凭据（网关 %s），该文件已删除", restoredCreds.Gateway)
 	}
 
+	// 清理上一次自动更新遗留的中间产物（尝试状态、.new/.helper.exe 残留）。
+	// 放在这里是因为：Windows 上更新走 helper 路径，父进程启动 helper 后立即退出、
+	// helper 又删不掉正在运行的自身，只有「替换完成后的新进程启动时」才能安全清理。
+	// 无条件调用（不依赖 restored）：函数内部幂等，且仅在「目标版本 == 当前版本」
+	// 时才清除尝试状态，失败退避/熔断信息不受影响。
+	selfupdate.CleanupAfterUpdate(version)
+
 	// 注册当前平台的能力，供网关下发指令时执行。
 	registry := capability.NewRegistry()
 	log.Printf("[daemon] 已注册 %d 个平台能力", len(registry.ListForPlatform(capability.Current())))
