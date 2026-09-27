@@ -232,7 +232,9 @@
       </button>
 
       <!-- 安装本地后台服务（daemon）：打开安装指引弹层（内含下载链接与安装命令） -->
+      <!-- 已检测到本机安装并运行 daemon（本机回环 /api/status 探测成功）时隐藏该按钮：既然装了就不必再引导安装 -->
       <button
+        v-if="!daemonInstalled"
         class="pet-lobby-display-toggle"
         title="安装本地后台服务"
         @click.stop="openDaemonDialog()"
@@ -723,6 +725,9 @@ const props = defineProps({
   checkDaemonSessions: { type: Function, default: null },
   // 查询浏览器扩展会话（异步函数，返回会话数组），用于拓扑图展示接入的扩展节点
   checkExtensionSessions: { type: Function, default: null },
+  // 本机是否已安装并运行后台服务（daemon）：由父组件探测本机回环 /api/status 后传入，
+  // 为 true 时隐藏「安装本地后台服务」按钮（弹层仍可经命令面板打开）
+  localDaemonOnline: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['selectAgent', 'sendInput', 'complete', 'openCompletions', 'activePetChange', 'activeNodeChange', 'createAgentOnNode', 'contextAgent', 'contextRun', 'nodeContextRun', 'renameNode', 'addAgentToGroup', 'removeAgentFromGroup', 'openOnboarding'])
@@ -1781,6 +1786,11 @@ async function downloadExtension() {
 // ===== 安装本地后台服务（daemon）弹层 =====
 // 展示安装步骤、下载链接与风险提示；纯静态内容，无网络请求
 const daemonDialog = ref({ visible: false })
+
+// 是否已安装本地后台服务（daemon）：由父组件探测本机回环 /api/status 后经 props 传入。
+// daemon 是本机进程，无法像浏览器扩展那样向页面注入 DOM 标记，故只能靠本机探测判定；
+// 探测成功（本机 daemon 正在运行）即隐藏大厅的安装引导按钮，与扩展的隐藏逻辑保持一致。
+const daemonInstalled = computed(() => props.localDaemonOnline === true)
 
 function openDaemonDialog() {
   daemonDialog.value = { visible: true }

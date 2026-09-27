@@ -13,6 +13,7 @@
       :getStatusClass="getStatusClass"
       :extensionSessions="topologyExtensionSessions"
       :daemonSessions="topologyDaemonSessions"
+      :localDaemonOnline="localDaemonOnline"
       @petSyncStatus="petSyncAllStatus"
       @petInterruptCurrent="petInterruptCurrent"
       @petGotoWaiting="petGotoWaitingAgent"
@@ -833,6 +834,7 @@
           :checkExtensionVersion="fetchBrowserExtensionVersion"
           :checkDaemonSessions="fetchDaemonSessions"
           :checkExtensionSessions="fetchBrowserExtensionSessions"
+          :localDaemonOnline="localDaemonOnline"
           :contextActions="lobbyContextActions"
           :agentGroups="agentGroups"
           @selectAgent="onLobbySelectAgent"
@@ -16924,6 +16926,44 @@ function saveDaemonPortSetting(nextValue = daemonPort.value) {
   syncTokenToDaemon(auth.value.token, window.__jarvisAuthBridge.getGateway())
 }
 
+// 本机是否已安装并运行 daemon：探测本机回环 /api/status（daemon 监听 127.0.0.1，CORS 全开、无需鉴权）。
+// 用本机探测而非网关 /api/daemon/sessions：后者是全局会话，多机在线时会串到别人的设备。
+// 探测成功即认为「本机已装 daemon」，前端据此隐藏大厅的安装引导入口（与浏览器扩展的隐藏逻辑一致）。
+const localDaemonOnline = ref(false)
+let localDaemonProbeTimer = null
+async function probeLocalDaemon() {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 1500)
+  try {
+    const resp = await fetch(`${getDaemonUrl()}/api/status`, {
+      signal: controller.signal,
+      credentials: 'omit',
+    })
+    if (!resp.ok) {
+      localDaemonOnline.value = false
+      return
+    }
+    const data = await resp.json()
+    localDaemonOnline.value = !!data?.success
+  } catch (e) {
+    // daemon 未安装/未启动属预期情况，静默视为离线
+    localDaemonOnline.value = false
+  } finally {
+    clearTimeout(timer)
+  }
+}
+function startLocalDaemonProbe() {
+  if (localDaemonProbeTimer) return
+  probeLocalDaemon()
+  localDaemonProbeTimer = setInterval(probeLocalDaemon, 10000)
+}
+function stopLocalDaemonProbe() {
+  if (localDaemonProbeTimer) {
+    clearInterval(localDaemonProbeTimer)
+    localDaemonProbeTimer = null
+  }
+}
+
 // 把当前登录态同步到本机 daemon。
 // token 非空 → POST /api/auth {gateway, token, name}；token 为空 → POST /api/logout {gateway}。
 // name 即「终端名称」，daemon 会在向网关登录（hello 帧）时带上，供网关区分终端。
@@ -17020,6 +17060,10 @@ onMounted(() => {
   if (hasAuthToken()) {
     startTopologyAccessPolling()
   }
+
+  // 本机 daemon 是否在线探测：与登录态无关（daemon 无需鉴权即可应答 /api/status），
+  // 用于隐藏大厅的「安装本地后台服务」引导入口。
+  startLocalDaemonProbe()
   
   // 添加滚动事件监听，实现滚动到顶部时加载更多历史
   setupHistoryScrollListener(outputList.value)
@@ -17136,6 +17180,8 @@ onUnmounted(() => {
   stopWorkspaceFileHeartbeat()
   // 停止接入端会话轮询
   stopTopologyAccessPolling()
+  // 停止本机 daemon 在线探测
+  stopLocalDaemonProbe()
   window.visualViewport?.removeEventListener('resize', visualViewportResizeHandler)
 
   if (cmEditorView) {

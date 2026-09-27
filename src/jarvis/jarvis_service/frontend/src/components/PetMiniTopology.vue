@@ -88,6 +88,8 @@ const props = defineProps({
   extensionSessions: { type: Array, default: () => [] },
   // 接入的后台服务会话（网关 /api/daemon/sessions，含 name / platform / daemon_version）
   daemonSessions: { type: Array, default: () => [] },
+  // 本机是否已安装并运行后台服务（本机回环 /api/status 探测）：为 true 时不再提示安装
+  localDaemonOnline: { type: Boolean, default: false },
 })
 
 const W = 96

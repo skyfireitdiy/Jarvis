@@ -117,6 +117,7 @@
       :getStatusClass="getStatusClass"
       :extensionSessions="extensionSessions || []"
       :daemonSessions="daemonSessions || []"
+      :localDaemonOnline="localDaemonOnline"
       :x="petMiniPos.x"
       :y="petMiniPos.y"
       @open="petOpenTopology"
@@ -153,6 +154,8 @@ const props = defineProps({
   extensionSessions: { type: Array, default: () => [] },
   // 接入的后台服务会话（网关 /api/daemon/sessions），透传给迷你拓扑
   daemonSessions: { type: Array, default: () => [] },
+  // 本机是否已安装并运行后台服务（本机回环 /api/status 探测），透传给迷你拓扑用于隐藏安装引导
+  localDaemonOnline: { type: Boolean, default: false },
 })
 const emit = defineEmits([
   'petSyncStatus',
