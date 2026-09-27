@@ -110,6 +110,9 @@ func cmdInstall(args []string) error {
 		Gateway:    *gatewayFlag,
 		ConfigPath: *configFlag,
 	}
+	if notice := service.InstallNotice(); notice != "" {
+		fmt.Printf("[daemon] %s\n", notice)
+	}
 	msg, err := service.New().Install(opts)
 	if err != nil {
 		return err

@@ -73,7 +73,7 @@ func (s *taskService) Install(opts Options) (string, error) {
 		return "", err
 	}
 	if _, err := runCmd("schtasks", args...); err != nil {
-		return "", fmt.Errorf("创建计划任务失败: %w", err)
+		return "", fmt.Errorf("创建计划任务失败: %w（该任务以最高权限运行，需在**管理员**终端中执行 install）", err)
 	}
 	return fmt.Sprintf("计划任务已创建：%s（可执行文件：%s）", TaskName, installedPath), nil
 }
@@ -181,12 +181,39 @@ func readAlivePID(pidPath string) int {
 	return pid
 }
 
-// runCmd 执行外部命令并返回标准输出。
+// runCmd 执行外部命令并返回标准输出（UTF-8 文本）。
+//
+// 编码问题：schtasks / taskkill / tasklist 是原生控制台程序，按**控制台输出代码页**
+// 写出文本——中文 Windows 上是 GBK/CP936，不是 UTF-8。Go 的 os/exec 只返回原始字节，
+// 直接 string(out) 会把 GBK 按 UTF-8 解释，得到 "����: �ܾ����ʡ�" 这类乱码，
+// 用户无法看懂失败原因（真机实测 install 失败时即如此）。
+//
+// 修复策略（与 internal/capability 的 windows_encoding.go 同思路，不引入 GBK 解码表）：
+// 用 PowerShell 包裹执行，借助 PowerShell 完成「GBK 解码 → UTF-8 输出」的转码：
+//
+//  1. 先按**系统默认**的 [Console]::OutputEncoding（中文系统 = GBK）读取外部命令输出。
+//     这一步必须在改编码之前，否则 PowerShell 会用 UTF-8 去解码 GBK 字节而得到乱码。
+//  2. 再把 [Console]::OutputEncoding 设为 UTF-8，用 [Console]::Out.Write 写出。
+//     此时 Go 侧读到的就是 UTF-8 字节，直接 string(out) 即为正确文本。
+//
+// 之所以不用 `cmd /c chcp 65001`：chcp 只改 cmd 会话的输出代码页，而原生工具在
+// stdout 被重定向到管道时是否遵循该代码页并无保证；PowerShell 的显式转码不依赖
+// 子进程行为，更可靠（也与项目既有的 runWindowsPowerShellCommand 路径一致）。
+//
+// 脚本经 -EncodedCommand（base64 UTF-16LE）传递，避免命令行参数按 ANSI 代码页解析
+// 导致脚本内非 ASCII 字符损坏（见 windows_encoding.go 的说明）。
 func runCmd(name string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), cmdTimeout)
 	defer cancel()
 
-	out, err := exec.CommandContext(ctx, name, args...).Output()
+	script := buildPowerShellScript(name, args)
+	cmd := exec.CommandContext(ctx, "powershell.exe",
+		"-NoProfile",
+		"-NonInteractive",
+		"-ExecutionPolicy", "Bypass",
+		"-EncodedCommand", encodePowerShellCommand(script),
+	)
+	out, err := cmd.Output()
 	if err != nil {
 		if ctx.Err() != nil {
 			return "", fmt.Errorf("%s 超时", name)
