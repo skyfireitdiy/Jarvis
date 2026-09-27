@@ -13,11 +13,13 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -31,8 +33,10 @@ import (
 	"jarvis-daemon/internal/config"
 	"jarvis-daemon/internal/daemonlog"
 	"jarvis-daemon/internal/localapi"
+	"jarvis-daemon/internal/login"
 	"jarvis-daemon/internal/selfupdate"
 	"jarvis-daemon/internal/service"
+	"jarvis-daemon/internal/webui"
 	"jarvis-daemon/internal/wsclient"
 )
 
@@ -88,6 +92,8 @@ func runSubcommand(name string, args []string) error {
 		return cmdStatus()
 	case "self-update-apply":
 		return cmdSelfUpdateApply(args)
+	case "login":
+		return cmdLogin(args)
 	case "help", "-h", "--help":
 		printUsage()
 		return nil
@@ -155,6 +161,92 @@ func cmdStatus() error {
 	return nil
 }
 
+// cmdLogin 用用户名密码登录网关，并把拿到的凭据推送给本地守护进程。
+//
+// 用途：无 GUI 的主机上没有浏览器可推送凭据，本命令提供命令行替代路径。
+// 密码只通过交互式隐藏输入获取，不接受命令行参数，避免落入 shell 历史与进程列表。
+func cmdLogin(args []string) error {
+	fs := flag.NewFlagSet("login", flag.ContinueOnError)
+	gatewayFlag := fs.String("gateway", "", "网关地址（覆盖配置文件）")
+	userFlag := fs.String("u", "", "登录用户名（缺省时交互式输入）")
+	configFlag := fs.String("config", "", "配置文件路径（默认 ~/.jarvis/daemon/config.yaml）")
+	listenFlag := fs.String("listen", "", "本地 API 监听地址（覆盖配置文件）")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	// 读取配置：用于补齐未在命令行给出的网关地址与本地监听地址。
+	cfgPath := *configFlag
+	if cfgPath == "" {
+		cfgPath = config.DefaultPath()
+	}
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		return fmt.Errorf("加载配置失败: %w", err)
+	}
+
+	// 网关地址：命令行优先，其次配置文件。
+	gateway := login.NormalizeGateway(*gatewayFlag)
+	if gateway == "" {
+		gateway = login.NormalizeGateway(cfg.Gateway)
+	}
+	if gateway == "" {
+		return fmt.Errorf("未指定网关地址，请用 -gateway 指定，或先在配置文件 %s 中配置 gateway", cfgPath)
+	}
+
+	// 本地监听地址：命令行优先，其次配置文件，最后回退默认值。
+	listen := strings.TrimSpace(*listenFlag)
+	if listen == "" {
+		listen = strings.TrimSpace(cfg.Listen)
+	}
+	if listen == "" {
+		listen = config.DefaultListen
+	}
+
+	// 用户名：命令行优先，否则交互式输入。
+	username := strings.TrimSpace(*userFlag)
+	if username == "" {
+		fmt.Fprint(os.Stderr, "用户名: ")
+		reader := bufio.NewReader(os.Stdin)
+		line, err := reader.ReadString('\n')
+		if err != nil && strings.TrimSpace(line) == "" {
+			return fmt.Errorf("读取用户名失败: %w", err)
+		}
+		username = strings.TrimSpace(line)
+	}
+	if username == "" {
+		return fmt.Errorf("用户名不能为空")
+	}
+
+	// 密码：仅交互式隐藏输入。
+	password, err := login.ReadPassword("密码: ")
+	if err != nil {
+		return fmt.Errorf("读取密码失败: %w", err)
+	}
+	if password == "" {
+		return fmt.Errorf("密码不能为空")
+	}
+
+	fmt.Printf("[daemon] 正在登录网关 %s ...\n", gateway)
+	result, err := login.Login(gateway, username, password)
+	if err != nil {
+		return err
+	}
+	// 只打印脱敏后的 token，避免完整凭据进入日志。
+	displayName := result.DisplayName
+	if displayName == "" {
+		displayName = result.Username
+	}
+	fmt.Printf("[daemon] 登录成功: %s（token %s）\n", displayName, login.MaskToken(result.Token))
+
+	// 推送给本地守护进程：name 传空，保留该网关已有名称。
+	if err := login.PushAuth(listen, gateway, result.Token, ""); err != nil {
+		return err
+	}
+	fmt.Printf("[daemon] 已向本地后台服务（%s）推送凭据，守护进程将连接网关\n", listen)
+	return nil
+}
+
 // printUsage 打印用法说明。
 func printUsage() {
 	fmt.Print(`jarvis-daemon - Jarvis 本地守护进程
@@ -167,16 +259,54 @@ func printUsage() {
   jarvis-daemon stop             停止服务
   jarvis-daemon restart          重启服务
   jarvis-daemon status           查看服务状态
+  jarvis-daemon login [选项]     用用户名密码登录网关并向本地服务推送凭据
   jarvis-daemon self-update-apply [选项]  自动更新 helper（内部使用，勿手动调用）
 
 选项（run / install 共用）:
   -listen string    本地 API 监听地址（覆盖配置文件）
   -gateway string   默认网关地址（覆盖配置文件）
   -config string    配置文件路径（默认 ~/.jarvis/daemon/config.yaml）
+  -web-listen string  Web 登录服务监听地址（覆盖配置文件，默认 0.0.0.0:17801；传空串关闭）
+
+选项（login 专用）:
+  -gateway string   网关地址（覆盖配置文件）
+  -u string         登录用户名（缺省时交互式输入；密码始终交互式输入）
+  -listen string    本地 API 监听地址（覆盖配置文件）
+  -config string    配置文件路径（默认 ~/.jarvis/daemon/config.yaml）
 `)
 }
 
-// runDaemon 以前台方式运行守护进程。
+// isNonLoopbackListen 判断监听地址是否会对外（非回环）暴露。
+// 仅用于决定是否打印安全风险提示：绑定 127.0.0.1 / ::1 时不应误报。
+// 规则：
+//   - 空串视为关闭服务，返回 false；
+//   - 主机部分为空（如 ":17801"）或为 0.0.0.0 / :: 表示监听所有网卡，返回 true；
+//   - 主机为回环地址（127.0.0.0/8、::1、localhost）返回 false；
+//   - 其余（含具体内网 IP、主机名）一律按对外暴露处理，返回 true。
+func isNonLoopbackListen(addr string) bool {
+	addr = strings.TrimSpace(addr)
+	if addr == "" {
+		return false
+	}
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		// 解析失败时保守处理：无法确认是回环，就按对外暴露提示。
+		return true
+	}
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return true
+	}
+	if strings.EqualFold(host, "localhost") {
+		return false
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return !ip.IsLoopback()
+	}
+	// 主机名等无法判定，按对外暴露处理。
+	return true
+}
+
 func runDaemon(args []string) {
 	// 隐藏自身控制台窗口：Windows 上由计划任务以交互方式启动控制台程序时，
 	// 系统会分配一个可见的控制台窗口，用户桌面上会常驻一个黑框。
@@ -193,6 +323,7 @@ func runDaemon(args []string) {
 	listenFlag := fs.String("listen", "", "本地 API 监听地址（覆盖配置文件）")
 	gatewayFlag := fs.String("gateway", "", "默认网关地址（覆盖配置文件）")
 	configFlag := fs.String("config", "", "配置文件路径（默认 ~/.jarvis/daemon/config.yaml）")
+	webListenFlag := fs.String("web-listen", "", "Web 登录服务监听地址（覆盖配置文件；传空串可关闭）")
 	_ = fs.Parse(args)
 
 	cfgPath := *configFlag
@@ -208,6 +339,17 @@ func runDaemon(args []string) {
 	}
 	if *gatewayFlag != "" {
 		cfg.Gateway = *gatewayFlag
+	}
+	// -web-listen 需要区分「未提供」（沿用配置文件）与「显式传空串」（关闭服务）：
+	// flag 默认值也是空串，无法用值判断，故用 fs.Visit 检测该选项是否真的出现过。
+	webListenSet := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "web-listen" {
+			webListenSet = true
+		}
+	})
+	if webListenSet {
+		cfg.WebListen = *webListenFlag
 	}
 	if err := cfg.Validate(); err != nil {
 		log.Fatalf("配置非法: %v", err)
@@ -300,8 +442,24 @@ func runDaemon(args []string) {
 
 	srv := localapi.NewHTTPServer(cfg.Listen, api.Handler())
 
+	// Web 登录服务：供**其他机器**的浏览器访问（无 GUI 主机上没有浏览器）。
+	// 与本地 API 相互独立；WebListen 为空表示关闭该服务。
+	var webSrv *http.Server
+	if strings.TrimSpace(cfg.WebListen) != "" {
+		ui := webui.New(store, manager, version)
+		webSrv = localapi.NewHTTPServer(cfg.WebListen, ui.Handler())
+	}
+
 	// 若配置里已有网关但无 Token，则不主动连接（等网页推送）。
 	log.Printf("[daemon] jarvis-daemon %s 启动，本地 API: http://%s", version, cfg.Listen)
+	if webSrv != nil {
+		// 仅当确实绑定了非回环地址时才提示风险，避免绑 127.0.0.1 时误报。
+		if isNonLoopbackListen(cfg.WebListen) {
+			log.Printf("[daemon] Web 登录页: http://%s/（绑定非回环地址，仅限可信内网使用）", cfg.WebListen)
+		} else {
+			log.Printf("[daemon] Web 登录页: http://%s/", cfg.WebListen)
+		}
+	}
 	if cfgPath != "" {
 		log.Printf("[daemon] 配置文件: %s", cfgPath)
 	}
@@ -312,6 +470,15 @@ func runDaemon(args []string) {
 			errCh <- err
 		}
 	}()
+	if webSrv != nil {
+		go func() {
+			if err := webSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				// Web 登录服务启动失败不应拖垮整个守护进程（本地 API 仍可用），
+				// 仅记录日志，便于用户在无 GUI 主机上排查端口占用等问题。
+				log.Printf("[daemon] Web 登录服务启动失败（%s）: %v", cfg.WebListen, err)
+			}
+		}()
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -328,6 +495,11 @@ func runDaemon(args []string) {
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Printf("[daemon] 关闭本地 API 失败: %v", err)
+	}
+	if webSrv != nil {
+		if err := webSrv.Shutdown(shutdownCtx); err != nil {
+			log.Printf("[daemon] 关闭 Web 登录服务失败: %v", err)
+		}
 	}
 }
 

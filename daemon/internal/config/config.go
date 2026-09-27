@@ -16,6 +16,11 @@ const (
 	DefaultHeartbeatInterval = 20 // 秒
 	DefaultReconnectMin      = 1  // 秒
 	DefaultReconnectMax      = 30 // 秒
+	// DefaultWebListen 是 Web 登录服务的默认监听地址。
+	//
+	// 刻意监听 0.0.0.0：该服务就是给**其他机器**的浏览器访问的（无 GUI 主机
+	// 上没有浏览器）。仅应在可信内网使用，详见 internal/webui 的安全说明。
+	DefaultWebListen = "0.0.0.0:17801"
 )
 
 // Config 是守护进程的运行配置。
@@ -24,6 +29,10 @@ type Config struct {
 	Listen string
 	// Gateway 是默认网关地址；可被 /api/auth 推送的值覆盖。
 	Gateway string
+	// WebListen 是 Web 登录服务的监听地址（供其他机器的浏览器访问）。
+	//
+	// 空字符串表示关闭该服务；默认 0.0.0.0:17801（见 DefaultWebListen）。
+	WebListen string
 	// HeartbeatInterval 是心跳间隔（秒），可被 hello_ack 覆盖。
 	HeartbeatInterval int
 	// ReconnectMin / ReconnectMax 是重连退避的上下限（秒）。
@@ -36,6 +45,7 @@ func Default() Config {
 	return Config{
 		Listen:            DefaultListen,
 		Gateway:           "",
+		WebListen:         DefaultWebListen,
 		HeartbeatInterval: DefaultHeartbeatInterval,
 		ReconnectMin:      DefaultReconnectMin,
 		ReconnectMax:      DefaultReconnectMax,
@@ -97,6 +107,9 @@ func (c *Config) set(key, value string) error {
 		c.Listen = value
 	case "gateway":
 		c.Gateway = value
+	case "web_listen":
+		// 空值表示关闭 Web 登录服务，故不做非空校验。
+		c.WebListen = value
 	case "heartbeat_interval":
 		n, err := strconv.Atoi(value)
 		if err != nil {
