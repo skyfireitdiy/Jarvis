@@ -2284,7 +2284,8 @@ const globalSearchExecuted = ref(false)
 const globalSearchMode = ref('content')
 const fileSearchResults = ref([])
 const showWorkspaceSidebar = ref(true)
-const workspaceSidebarView = ref('files')
+// 默认展示 Agent 列表（而非文件目录树）
+const workspaceSidebarView = ref('agents')
 // 编辑器主区域视图：'file' 显示代码编辑器/diff，'chat' 显示聊天室，'terminal' 显示终端
 const workspaceMainView = ref('file')
 

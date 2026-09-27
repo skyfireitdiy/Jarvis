@@ -21,6 +21,14 @@
       <div class="workspace-activity-bar">
         <button
           class="workspace-activity-button"
+          :class="{ active: showSidebar && sidebarView === 'agents' }"
+          @click="$emit('setSidebarView', 'agents')"
+          title="Agent 列表"
+        >
+          <img class="workspace-activity-icon" src="/icons/jarvis-pet.svg" alt="Agent" />
+        </button>
+        <button
+          class="workspace-activity-button"
           :class="{ active: showSidebar && sidebarView === 'files' }"
           @click="$emit('setSidebarView', 'files')"
           title="目录树"
@@ -41,12 +49,6 @@
             <path d="M15.698 7.287 8.712.302a1.03 1.03 0 0 0-1.457 0l-1.45 1.45 1.84 1.84a1.223 1.223 0 0 1 1.55 1.56l1.773 1.774a1.224 1.224 0 0 1 1.267 2.025 1.226 1.226 0 0 1-2.002-1.334L8.58 5.963v4.353a1.228 1.228 0 1 1-1.008-.036V5.887a1.228 1.228 0 0 1-.666-1.608L5.093 2.466l-4.45 4.45a1.03 1.03 0 0 0 0 1.457l6.986 6.986a1.03 1.03 0 0 0 1.457 0l6.612-6.612a1.03 1.03 0 0 0 0-1.46z"/>
           </svg>
         </button>
-        <button
-          class="workspace-activity-button"
-          :class="{ active: showSidebar && sidebarView === 'agents' }"
-          @click="$emit('setSidebarView', 'agents')"
-          title="Agent 列表"
-        >📋</button>
         <button
           class="workspace-activity-button"
           :class="{ active: mainView === 'chat' }"
@@ -372,6 +374,14 @@ defineExpose({
   color: var(--color-text-primary);
   background: var(--color-accent-subtle);
   border-color: var(--color-border-active);
+}
+
+/* Agent 图标：使用主图标（Jarvis 吉祥物），需缩放到与 emoji 图标视觉一致 */
+.workspace-activity-icon {
+  width: 20px;
+  height: 20px;
+  display: block;
+  object-fit: contain;
 }
 
 .workspace-panel-content {
