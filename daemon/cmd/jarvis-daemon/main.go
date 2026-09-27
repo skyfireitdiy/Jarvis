@@ -176,6 +176,11 @@ func printUsage() {
 
 // runDaemon 以前台方式运行守护进程。
 func runDaemon(args []string) {
+	// 隐藏自身控制台窗口：Windows 上由计划任务以交互方式启动控制台程序时，
+	// 系统会分配一个可见的控制台窗口，用户桌面上会常驻一个黑框。
+	// 非 Windows 平台为空操作。
+	service.HideSelfConsole()
+
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 	listenFlag := fs.String("listen", "", "本地 API 监听地址（覆盖配置文件）")
 	gatewayFlag := fs.String("gateway", "", "默认网关地址（覆盖配置文件）")
