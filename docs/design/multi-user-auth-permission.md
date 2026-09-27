@@ -769,7 +769,7 @@ class PermissionManager:
 ### 9.2 Token安全
 
 - JWT签名密钥从 `JARVIS_JWT_SECRET` 环境变量读取，未设置则随机生成（重启后失效）
-- Token有效期24小时（可配置）
+- Token默认永不过期（不写入 `exp`，便于后台服务长期连接）；如需有效期可设 `JARVIS_JWT_EXPIRE_HOURS` > 0
 - 支持Token黑名单（登出时加入）
 - 黑名单定期清理过期条目
 
@@ -834,13 +834,13 @@ class PermissionManager:
 
 ## 十一、环境变量
 
-| 变量名                         | 说明                       | 默认值               |
-| ------------------------------ | -------------------------- | -------------------- |
-| `JARVIS_ADMIN_PASSWORD`        | 初始管理员密码（首次启动） | 随机生成             |
-| `JARVIS_JWT_SECRET`            | JWT签名密钥                | 随机生成（重启失效） |
-| `JARVIS_JWT_EXPIRE_HOURS`      | JWT有效期（小时）          | 24                   |
-| `JARVIS_LOCK_FAIL_COUNT`       | 登录失败锁定阈值           | 5                    |
-| `JARVIS_LOCK_DURATION_MINUTES` | 锁定时长（分钟）           | 30                   |
+| 变量名                         | 说明                          | 默认值               |
+| ------------------------------ | ----------------------------- | -------------------- |
+| `JARVIS_ADMIN_PASSWORD`        | 初始管理员密码（首次启动）    | 随机生成             |
+| `JARVIS_JWT_SECRET`            | JWT签名密钥                   | 随机生成（重启失效） |
+| `JARVIS_JWT_EXPIRE_HOURS`      | JWT有效期（小时），0=永不过期 | 0                    |
+| `JARVIS_LOCK_FAIL_COUNT`       | 登录失败锁定阈值              | 5                    |
+| `JARVIS_LOCK_DURATION_MINUTES` | 锁定时长（分钟）              | 30                   |
 
 ---
 

@@ -20,8 +20,9 @@ _jwt_secret: str = os.environ.get("JARVIS_JWT_SECRET", "")
 if not _jwt_secret:
     _jwt_secret = uuid.uuid4().hex + uuid.uuid4().hex
 
-# Token 有效期（小时）
-_jwt_expire_hours: int = int(os.environ.get("JARVIS_JWT_EXPIRE_HOURS", "24"))
+# Token 有效期（小时）：0 表示永不过期（后台服务需长期连接）
+# 兼容旧环境变量 JARVIS_JWT_EXPIRE_HOURS，默认 0（永不过期）
+_jwt_expire_hours: int = int(os.environ.get("JARVIS_JWT_EXPIRE_HOURS", "0"))
 
 # Token 黑名单：{jti: exp_timestamp}
 _revoked_tokens: dict[str, float] = {}
@@ -29,6 +30,9 @@ _revoked_tokens: dict[str, float] = {}
 
 def generate_jwt_token(user_id: str, username: str, is_admin: bool) -> str:
     """生成 JWT Token。
+
+    默认不写入 exp 字段，即 Token 永不过期（后台服务需长期连接）。
+    仅当 JARVIS_JWT_EXPIRE_HOURS > 0 时才签发带有效期的 Token。
 
     Args:
         user_id: 用户唯一标识
@@ -44,16 +48,18 @@ def generate_jwt_token(user_id: str, username: str, is_admin: bool) -> str:
         "username": username,
         "is_admin": is_admin,
         "iat": int(now),
-        "exp": int(now) + _jwt_expire_hours * 3600,
         "jti": uuid.uuid4().hex,
     }
+    # 仅当配置了有限有效期（>0）时才写入 exp，否则签发的 Token 永不过期
+    if _jwt_expire_hours > 0:
+        payload["exp"] = int(now) + _jwt_expire_hours * 3600
     return jwt.encode(payload, _jwt_secret, algorithm="HS256")
 
 
 def validate_jwt_token(token: str) -> Optional[dict]:
     """验证 JWT Token。
 
-    验证签名和有效期，并检查 Token 是否在黑名单中。
+    验证签名和有效期（无 exp 字段视为永不过期），并检查 Token 是否在黑名单中。
 
     Args:
         token: JWT Token 字符串

@@ -70,8 +70,8 @@ P7: 修改前端 App.vue + ConnectModal.vue (依赖P5)
 1. `generate_jwt_token(user_id: str, username: str, is_admin: bool) -> str`
    - 使用 `JARVIS_JWT_SECRET` 环境变量作为签名密钥
    - 未设置则随机生成（存内存，重启失效）
-   - payload含：`user_id`, `username`, `is_admin`, `iat`, `exp`, `jti`
-   - 有效期从 `JARVIS_JWT_EXPIRE_HOURS` 读取，默认24小时
+   - payload含：`user_id`, `username`, `is_admin`, `iat`, `jti`（默认不写 `exp`，即永不过期）
+   - 有效期从 `JARVIS_JWT_EXPIRE_HOURS` 读取，默认0（永不过期）；设为 >0 才写入 `exp`
 
 2. `validate_jwt_token(token: str) -> Optional[dict]`
    - 验证签名和有效期
@@ -90,7 +90,7 @@ P7: 修改前端 App.vue + ConnectModal.vue (依赖P5)
 **环境变量**：
 
 - `JARVIS_JWT_SECRET`：签名密钥
-- `JARVIS_JWT_EXPIRE_HOURS`：有效期（默认24）
+- `JARVIS_JWT_EXPIRE_HOURS`：有效期（默认0，即永不过期）
 
 ---
 
@@ -556,7 +556,7 @@ bcrypt>=4.0.0
 | 变量名                    | 必需 | 默认值   | 说明                              |
 | ------------------------- | ---- | -------- | --------------------------------- |
 | `JARVIS_JWT_SECRET`       | 否   | 随机生成 | JWT签名密钥，生产环境必须设置     |
-| `JARVIS_JWT_EXPIRE_HOURS` | 否   | 24       | JWT有效期（小时）                 |
+| `JARVIS_JWT_EXPIRE_HOURS` | 否   | 0        | JWT有效期（小时），0=永不过期     |
 | `JARVIS_ADMIN_PASSWORD`   | 否   | 随机生成 | 初始admin密码，首次启动输出到日志 |
 
 ### 6.3 数据目录
