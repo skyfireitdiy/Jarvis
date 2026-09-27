@@ -155,7 +155,99 @@ func TestManagerConnectReplacesSameGateway(t *testing.T) {
 	waitForGatewayConnected(t, m, gateway)
 }
 
-// TestManagerDisconnectOneGateway 验证只断开指定网关，不影响其他网关。
+// TestManagerConnectWithNameIdempotent 验证：凭据与名称都不变、且连接正常时，
+// 重复 ConnectWithName 不会重建连接（Client 指针不变、不产生新连接）。
+//
+// 这是「会话 id 反复变化」的回归测试：网页会多次推送同一份凭据，
+// 修复前每次推送都会断旧连建新连，网关侧因此不断分配新 session_id。
+func TestManagerConnectWithNameIdempotent(t *testing.T) {
+	gateway, connCh := startMultiGatewayTestServer(t)
+
+	m := NewManager(Options{ClientID: "test-daemon", Version: "0.0.0-test"})
+	defer m.DisconnectAll()
+
+	m.ConnectWithName(gateway, "token-x", "SF-PC")
+	first, ok := m.Get(gateway)
+	if !ok {
+		t.Fatal("首次 ConnectWithName 后应能取到 Client")
+	}
+	select {
+	case <-connCh:
+	case <-time.After(5 * time.Second):
+		t.Fatal("首次连接未建立")
+	}
+	waitForGatewayConnected(t, m, gateway)
+
+	// 重复推送完全相同的凭据与名称：应命中幂等，不重建。
+	for i := 0; i < 3; i++ {
+		m.ConnectWithName(gateway, "token-x", "SF-PC")
+	}
+	again, ok := m.Get(gateway)
+	if !ok {
+		t.Fatal("重复 ConnectWithName 后应仍能取到 Client")
+	}
+	if first != again {
+		t.Fatal("凭据与名称未变时应复用同一 Client（指针相同）")
+	}
+	// 不应有第二条连接被建立。
+	select {
+	case <-connCh:
+		t.Fatal("幂等路径不应新建连接")
+	case <-time.After(300 * time.Millisecond):
+	}
+}
+
+// TestManagerConnectWithNameRebuildsOnChange 验证凭据或名称变化时仍会重建连接。
+func TestManagerConnectWithNameRebuildsOnChange(t *testing.T) {
+	gateway, _ := startMultiGatewayTestServer(t)
+
+	m := NewManager(Options{ClientID: "test-daemon", Version: "0.0.0-test"})
+	defer m.DisconnectAll()
+
+	m.ConnectWithName(gateway, "token-x", "SF-PC")
+	first, _ := m.Get(gateway)
+	waitForGatewayConnected(t, m, gateway)
+
+	// token 变化 → 必须重建。
+	m.ConnectWithName(gateway, "token-y", "SF-PC")
+	second, _ := m.Get(gateway)
+	if first == second {
+		t.Fatal("token 变化时应重建 Client")
+	}
+
+	// name 变化 → 必须重建。
+	m.ConnectWithName(gateway, "token-y", "OTHER-PC")
+	third, _ := m.Get(gateway)
+	if second == third {
+		t.Fatal("name 变化时应重建 Client")
+	}
+}
+
+// TestManagerConnectWithNameRebuildsWhenDisconnected 验证连接已断开时即使
+// 凭据与名称不变也会重建（幂等只覆盖「连接仍可用」的情形）。
+func TestManagerConnectWithNameRebuildsWhenDisconnected(t *testing.T) {
+	gateway, _ := startMultiGatewayTestServer(t)
+
+	m := NewManager(Options{ClientID: "test-daemon", Version: "0.0.0-test"})
+	defer m.DisconnectAll()
+
+	m.ConnectWithName(gateway, "token-x", "SF-PC")
+	first, _ := m.Get(gateway)
+	waitForGatewayConnected(t, m, gateway)
+
+	// 手动停掉连接，模拟断开态。
+	first.Stop()
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) && first.State() != StateDisconnected {
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	m.ConnectWithName(gateway, "token-x", "SF-PC")
+	second, _ := m.Get(gateway)
+	if first == second {
+		t.Fatal("连接已断开时应重建 Client")
+	}
+}
 func TestManagerDisconnectOneGateway(t *testing.T) {
 	gateway, _ := startMultiGatewayTestServer(t)
 

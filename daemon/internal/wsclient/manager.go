@@ -135,6 +135,14 @@ func (m *Manager) Connect(gateway, token string) {
 //
 // name 会随 hello 帧上报给网关，使网关能区分不同终端（为空则网关侧回退 hostname）。
 // name 为空时保留该网关此前已记录的名称，便于「只更新 token」的推送不丢失名称。
+//
+// 幂等：若该网关已有 Client，且 token 与 name 与本次推送完全一致、连接又处于
+// 正常状态（未断开、未鉴权失败），则直接返回，不重建连接。
+//
+// 为什么必须幂等：网页在页面加载、token 变化、设置变更等时机都会推送 /api/auth，
+// 且可能同时有多个页面推送。若无条件重建，每次推送都会断旧连、建新连，网关侧
+// 会为每条新连接分配新的 session_id，表现为「会话 id 反复变化」，还会让正在执行
+// 的能力调用因连接被替换而失败。
 func (m *Manager) ConnectWithName(gateway, token, name string) {
 	key := auth.GatewayKey(gateway)
 	if key == "" || token == "" {
@@ -148,6 +156,16 @@ func (m *Manager) ConnectWithName(gateway, token, name string) {
 	old := m.clients[key]
 	if name == "" {
 		name = m.names[key]
+	}
+	// 幂等判断：凭据与名称都没变，且现有连接仍然可用时，不做任何重建。
+	// 只认「已连接 / 连接中」两种状态：断开态说明需要重连，鉴权失败态说明
+	// 需要新 token（此处 token 相同，重建也无益，交由上层重新推送）。
+	if old != nil && m.tokens[key] == token && m.names[key] == name {
+		state := old.State()
+		if state == StateConnected || state == StateConnecting {
+			m.mu.Unlock()
+			return
+		}
 	}
 	opts := m.opts
 	opts.Gateway = normalized
