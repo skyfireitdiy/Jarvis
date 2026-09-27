@@ -48,6 +48,11 @@ type ManagerOptions struct {
 	//
 	// 用于「版本比对 → 自动更新扩展」；与 OnGatewaySession 可同时设置。
 	OnGatewayHelloAck func(gateway, sessionID, latestExtensionVersion string)
+	// OnGatewayDaemonUpdate 在某个网关收到 hello_ack 且下发了 daemon_update 时回调，
+	// 参数为网关地址、session_id 与原始的更新指令 map。
+	//
+	// 与 OnGatewayHelloAck 独立：前者用于扩展自动更新，本回调用于 daemon 自动更新。
+	OnGatewayDaemonUpdate func(gateway, sessionID string, info map[string]any)
 }
 
 // Manager 管理多个网关的 WebSocket 连接。
@@ -71,6 +76,8 @@ type Manager struct {
 	onSession     func(gateway, sessionID string)
 	// onHelloAck 是带 gateway 维度、并携带扩展最新版本的 hello_ack 回调。
 	onHelloAck func(gateway, sessionID, latestExtensionVersion string)
+	// onDaemonUpdate 是带 gateway 维度的 daemon 更新指令回调（daemon_update）。
+	onDaemonUpdate func(gateway, sessionID string, info map[string]any)
 	// clients 以 auth.GatewayKey 为键。
 	clients map[string]*Client
 	// gateways 记录每个键对应的原始网关地址，供 Status 展示与 Disconnect 反查。
@@ -101,16 +108,18 @@ func NewManagerWithOptions(mopts ManagerOptions) *Manager {
 	opts.OnAuthError = nil
 	opts.OnSession = nil
 	opts.OnHelloAck = nil
+	opts.OnDaemonUpdate = nil
 	return &Manager{
-		opts:          opts,
-		onStateChange: mopts.OnGatewayStateChange,
-		onAuthError:   mopts.OnGatewayAuthError,
-		onSession:     mopts.OnGatewaySession,
-		onHelloAck:    mopts.OnGatewayHelloAck,
-		clients:       make(map[string]*Client),
-		gateways:      make(map[string]string),
-		tokens:        make(map[string]string),
-		names:         make(map[string]string),
+		opts:           opts,
+		onStateChange:  mopts.OnGatewayStateChange,
+		onAuthError:    mopts.OnGatewayAuthError,
+		onSession:      mopts.OnGatewaySession,
+		onHelloAck:     mopts.OnGatewayHelloAck,
+		onDaemonUpdate: mopts.OnGatewayDaemonUpdate,
+		clients:        make(map[string]*Client),
+		gateways:       make(map[string]string),
+		tokens:         make(map[string]string),
+		names:          make(map[string]string),
 	}
 }
 
@@ -158,6 +167,11 @@ func (m *Manager) ConnectWithName(gateway, token, name string) {
 	if m.onHelloAck != nil {
 		opts.OnHelloAck = func(sessionID, latest string) {
 			m.onHelloAck(normalized, sessionID, latest)
+		}
+	}
+	if m.onDaemonUpdate != nil {
+		opts.OnDaemonUpdate = func(sessionID string, info map[string]any) {
+			m.onDaemonUpdate(normalized, sessionID, info)
 		}
 	}
 	client := New(opts)

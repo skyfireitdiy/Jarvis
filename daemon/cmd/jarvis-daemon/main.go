@@ -29,6 +29,7 @@ import (
 	"jarvis-daemon/internal/capability"
 	"jarvis-daemon/internal/config"
 	"jarvis-daemon/internal/localapi"
+	"jarvis-daemon/internal/selfupdate"
 	"jarvis-daemon/internal/service"
 	"jarvis-daemon/internal/wsclient"
 )
@@ -41,6 +42,14 @@ import (
 //
 // 未注入时使用下面的默认值。
 var version = "0.1.0"
+
+// currentStore 是 runDaemon 创建的凭据存储，供自动更新流程在更新前临时落盘凭据。
+// 仅在 runDaemon 内被赋值；子命令路径不会用到。
+var currentStore *auth.Store
+
+// currentManager 是 runDaemon 创建的多网关连接管理器，供自动更新流程回执进度
+// （daemon.update.status）。仅在 runDaemon 内被赋值；子命令路径不会用到。
+var currentManager *wsclient.Manager
 
 func main() {
 	if len(os.Args) > 1 && !isFlag(os.Args[1]) {
@@ -75,6 +84,8 @@ func runSubcommand(name string, args []string) error {
 		return cmdSimple("重启", func(s service.Service) (string, error) { return s.Restart() })
 	case "status":
 		return cmdStatus()
+	case "self-update-apply":
+		return cmdSelfUpdateApply(args)
 	case "help", "-h", "--help":
 		printUsage()
 		return nil
@@ -147,6 +158,7 @@ func printUsage() {
   jarvis-daemon stop             停止服务
   jarvis-daemon restart          重启服务
   jarvis-daemon status           查看服务状态
+  jarvis-daemon self-update-apply [选项]  自动更新 helper（内部使用，勿手动调用）
 
 选项（run / install 共用）:
   -listen string    本地 API 监听地址（覆盖配置文件）
@@ -182,6 +194,17 @@ func runDaemon(args []string) {
 	}
 
 	store := auth.NewStore()
+
+	// 暴露给自动更新流程，用于更新前临时落盘凭据（见 saveCurrentCredentialsForUpdate）。
+	currentStore = store
+
+	// 若上一次是「自动更新 → 重启」，启动时恢复临时保存的凭据并立即删除该文件。
+	// 必须在 Manager 构造前完成：恢复后下面会主动发起连接。
+	restoredCreds, restored := selfupdate.LoadAndClearTokenState()
+	if restored {
+		store.SetWithName(restoredCreds.Gateway, restoredCreds.Token, restoredCreds.Name)
+		log.Printf("[daemon] 已从自动更新中转文件恢复凭据（网关 %s），该文件已删除", restoredCreds.Gateway)
+	}
 
 	// 注册当前平台的能力，供网关下发指令时执行。
 	registry := capability.NewRegistry()
@@ -220,7 +243,20 @@ func runDaemon(args []string) {
 			// 放在独立 goroutine 中：下载可能耗时数秒，不能阻塞 WS 读循环。
 			maybeAutoSyncBrowserExt(gateway, latestExtVersion)
 		},
+		OnGatewayDaemonUpdate: func(gateway, sessionID string, info map[string]any) {
+			// 网关随握手告知 daemon 有新版本；受「自动更新」开关约束，异步执行。
+			// 放在独立 goroutine 中：下载 + 替换可能耗时，不能阻塞 WS 读循环。
+			maybeAutoUpdateDaemon(gateway, sessionID, info)
+		},
 	})
+
+	// 暴露给自动更新流程，用于回执更新进度（见 reportDaemonUpdateStatus）。
+	currentManager = manager
+
+	// 若上一次是「自动更新 → 重启」恢复了凭据，则主动发起连接（否则等网页推送）。
+	if restored {
+		manager.ConnectWithName(restoredCreds.Gateway, restoredCreds.Token, restoredCreds.Name)
+	}
 
 	api := localapi.New(store, manager, version)
 
@@ -330,4 +366,116 @@ func browserExtTokenFor(gateway string) string {
 		return ""
 	}
 	return token
+}
+
+// daemonUpdateMu 串行化自动更新，避免多个网关同时握手时并发下载/替换互相干扰。
+var daemonUpdateMu sync.Mutex
+
+// maybeAutoUpdateDaemon 在网关下发 daemon 更新指令且「自动更新」开关开启时，异步执行更新。
+//
+// 设计要点（与 maybeAutoSyncBrowserExt 一致的安全默认）：
+//   - 受「自动更新 daemon」开关约束：开关关闭（默认）时直接跳过，不下载、不起协程。
+//     开关由用户在 Web 设置界面显式打开后随登录态推送给本机守护进程（只存内存态，
+//     不落盘），故守护进程重启后回到关闭，等待前端再次推送——未收到推送一律不自动更新；
+//   - 立即返回，把下载/替换放到独立 goroutine（可能耗时数秒），不阻塞 WS 读循环；
+//   - 更新前把当前凭据临时落盘，供重启后恢复登录态（见 selfupdate.SaveTokenState）；
+//   - 任何失败只记日志，绝不影响连接与既有能力。
+func maybeAutoUpdateDaemon(gateway, sessionID string, info map[string]any) {
+	// 开关判断必须放在函数入口、goroutine 之外：关闭时提前返回，避免无谓起协程。
+	if !capability.AutoUpdateDaemon() {
+		log.Printf("[daemon] 自动更新已关闭，跳过 daemon 更新（网关 %s）", gateway)
+		return
+	}
+	parsed, err := selfupdate.ParseUpdateInfo(info)
+	if err != nil {
+		// 无可用更新时静默跳过；其他解析错误只记日志。
+		if !errors.Is(err, selfupdate.ErrNotAvailable) {
+			log.Printf("[daemon] 解析 daemon 更新指令失败（网关 %s）: %v", gateway, err)
+		}
+		return
+	}
+
+	go func() {
+		// 同一时刻只允许一个更新任务，避免并发替换同一可执行文件。
+		daemonUpdateMu.Lock()
+		defer daemonUpdateMu.Unlock()
+
+		target, err := service.InstalledBinaryPath()
+		if err != nil {
+			log.Printf("[daemon] 无法确定可执行文件路径，跳过自动更新: %v", err)
+			return
+		}
+
+		// 更新会重启服务，先把当前凭据临时落盘，供重启后恢复登录态。
+		// 落盘失败不阻断更新（最坏情况只是重启后需重新推送凭据）。
+		saveCurrentCredentialsForUpdate(gateway)
+
+		log.Printf("[daemon] 检测到 daemon 新版本 %s（当前 %s），开始自动更新（网关 %s，目标 %s）",
+			parsed.LatestVersion, parsed.CurrentVersion, gateway, target)
+
+		err = selfupdate.Run(selfupdate.Options{
+			Info:       parsed,
+			Version:    version,
+			TargetPath: target,
+			Restart:    true,
+			// 把更新进度回执给网关（单向 daemon.update.status，网关只记日志）。
+			// 连接可能已中断（重启前），Send 失败只记日志、不影响更新流程。
+			Report: func(state selfupdate.UpdateState, errMsg string) {
+				reportDaemonUpdateStatus(gateway, parsed.LatestVersion, state, errMsg)
+			},
+		})
+		if err != nil {
+			log.Printf("[daemon] 自动更新 daemon 失败（网关 %s）: %v", gateway, err)
+			return
+		}
+		log.Printf("[daemon] daemon 自动更新已完成（版本 %s）", parsed.LatestVersion)
+	}()
+}
+
+// saveCurrentCredentialsForUpdate 把指定网关的当前凭据临时落盘，供更新重启后恢复。
+//
+// 无凭据或落盘失败时只记日志，不返回错误（调用方不应因此中断更新流程）。
+func saveCurrentCredentialsForUpdate(gateway string) {
+	creds, err := currentStore.Get(gateway)
+	if err != nil || creds.Token == "" {
+		log.Printf("[daemon] 更新前未找到网关 %s 的凭据，重启后需重新推送", gateway)
+		return
+	}
+	state := selfupdate.TokenState{
+		Gateway:     creds.Gateway,
+		Token:       creds.Token,
+		Name:        creds.Name,
+		SavedAtUnix: selfupdate.NowUnix(),
+	}
+	if err := selfupdate.SaveTokenState(state); err != nil {
+		log.Printf("[daemon] 更新前保存凭据失败（重启后需重新推送）: %v", err)
+		return
+	}
+	log.Printf("[daemon] 更新前已临时保存网关 %s 的凭据，重启后自动恢复", gateway)
+}
+
+// reportDaemonUpdateStatus 把更新进度以单向 daemon.update.status 回执给网关。
+//
+// 网关只记录日志、不回复（协议见 daemon/docs/daemon-self-update-protocol.md）。
+// 连接可能已断开（尤其 restarting 阶段）或该网关已不在管理器中，此时只记日志，
+// 绝不因回执失败中断更新流程。
+func reportDaemonUpdateStatus(gateway, version string, state selfupdate.UpdateState, errMsg string) {
+	client, ok := currentManager.Get(gateway)
+	if !ok {
+		log.Printf("[daemon] 更新状态 %s 无法回执（网关 %s 未连接）", state, gateway)
+		return
+	}
+	payload := map[string]any{
+		"type":    "daemon.update.status",
+		"state":   string(state),
+		"version": version,
+	}
+	if errMsg != "" {
+		payload["error"] = errMsg
+	}
+	if err := client.Send(payload); err != nil {
+		log.Printf("[daemon] 更新状态 %s 回执失败（网关 %s）: %v", state, gateway, err)
+		return
+	}
+	log.Printf("[daemon] 更新状态已回执：state=%s version=%s（网关 %s）", state, version, gateway)
 }

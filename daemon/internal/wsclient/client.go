@@ -63,6 +63,12 @@ type Options struct {
 	// 与 OnSession 的区别：OnSession 只关心会话建立，本回调用于「版本比对 → 自动更新」。
 	// 两者可同时设置；为保持向后兼容，未设置 OnHelloAck 时行为不变。
 	OnHelloAck func(sessionID, latestExtensionVersion string)
+	// OnDaemonUpdate 在收到 hello_ack 且网关下发了 daemon_update 时回调，
+	// 参数为 session_id 与原始的更新指令 map（对应 daemon_update 对象）。
+	//
+	// 是否真正执行更新由上层决定（需同时满足「自动更新开关开启」与「指令可用」）。
+	// 为保持向后兼容，未设置本回调时行为不变；网关未下发 daemon_update 时不回调。
+	OnDaemonUpdate func(sessionID string, info map[string]any)
 	// Registry 是能力注册表；为 nil 时回退到旧的占位 Dispatch 行为。
 	Registry *capability.Registry
 }
@@ -97,6 +103,20 @@ func (c *Client) writeJSON(conn *websocket.Conn, v any) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
 	return conn.WriteJSON(v)
+}
+
+// Send 向当前连接发送一帧 JSON（未连接时返回错误，不阻塞）。
+//
+// 供上层在收到网关指令后回执进度（如 daemon.update.status）；
+// 复用 writeJSON 的写锁，保证不会与心跳/能力结果并发写同一连接。
+func (c *Client) Send(v any) error {
+	c.mu.RLock()
+	conn := c.ws
+	c.mu.RUnlock()
+	if conn == nil {
+		return errors.New("连接未建立")
+	}
+	return c.writeJSON(conn, v)
 }
 
 // 连接状态。
@@ -374,6 +394,13 @@ func (c *Client) handleMessage(conn *websocket.Conn, msg map[string]any) {
 			if c.opts.OnHelloAck != nil {
 				latest, _ := msg["latest_extension_version"].(string)
 				c.opts.OnHelloAck(sid, latest)
+			}
+			// 网关随 hello_ack 下发 daemon 更新指令（daemon_update，可能缺失）。
+			// 缺失或不是对象时跳过，不打扰既有流程。
+			if c.opts.OnDaemonUpdate != nil {
+				if info, ok := msg["daemon_update"].(map[string]any); ok && info != nil {
+					c.opts.OnDaemonUpdate(sid, info)
+				}
 			}
 		}
 	case "command":

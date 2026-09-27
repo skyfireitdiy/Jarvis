@@ -10,20 +10,23 @@
 
 协议（与 daemon/internal/wsclient/client.go 对齐）：
     - 首帧 ``hello``（含 client_id / node_id / hostname / platform / daemon_version）
-    - 网关回 ``hello_ack``（含 session_id / heartbeat_interval）
+    - 网关回 ``hello_ack``（含 session_id / heartbeat_interval；可选 ``daemon_update``）
     - 心跳 ``ping`` / ``pong``
     - 能力查询 ``capability.list`` → ``capability.list.result``
     - 能力调用 ``capability.call`` → ``capability.call.result``
+    - 自更新回执 ``daemon.update.status``（daemon → 网关，单向，网关只记录不回复）
     - 兼容旧信封 ``command`` → ``result``
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import os
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import WebSocket
 
@@ -40,6 +43,197 @@ DEFAULT_LIST_TIMEOUT = 15.0
 
 # 守护进程连接使用的 WS 子协议
 DAEMON_SUBPROTOCOL = "jarvis-daemon"
+
+# ---------------------------------------------------------------------------
+# daemon 自更新（T5）：网关侧「最新版本」数据来源
+#
+# v1 采用**配置驱动**（零外网依赖、可离线）：网关不访问 GitHub API，只按配置
+# 拼装下载链接下发给 daemon。配置读取沿用网关既有范式（模块级常量 + 环境变量
+# 覆盖，参考 app.py 的 JARVIS_NODE_SECRET / JARVIS_AUTH_TOKEN）。
+#
+#   JARVIS_DAEMON_LATEST_VERSION   最新版本号（tag，如 v1.2.3）。
+#                                  **为空表示不下发更新**（默认，安全）。
+#   JARVIS_DAEMON_RELEASE_BASE_URL Release 下载根地址，默认指向本仓库。
+#   JARVIS_DAEMON_ASSETS           可选，JSON 字符串，显式映射
+#                                  "os/arch" → {"asset": "...", "sha256": "...", "size": N}；
+#                                  缺省时按产物命名规则自动拼装（无 sha256）。
+#
+# 注意：发版后需人工更新 JARVIS_DAEMON_LATEST_VERSION（见设计文档第 6 节）。
+# ---------------------------------------------------------------------------
+
+# 本仓库 owner/repo（来源：pyproject.toml:144 Homepage / README.md:268）。
+DAEMON_RELEASE_OWNER_REPO = "skyfireitdiy/Jarvis"
+
+# 默认下载根地址：https://github.com/<owner>/<repo>/releases/download
+DAEMON_RELEASE_BASE_URL = os.environ.get(
+    "JARVIS_DAEMON_RELEASE_BASE_URL",
+    f"https://github.com/{DAEMON_RELEASE_OWNER_REPO}/releases/download",
+).rstrip("/")
+
+# 最新版本号；空字符串 = 不下发更新（默认关闭，避免误触发升级）。
+DAEMON_LATEST_VERSION = os.environ.get("JARVIS_DAEMON_LATEST_VERSION", "").strip()
+
+# 支持的平台/架构（与 .github/workflows/release-daemon.yml 的构建矩阵一致，无 macOS）。
+DAEMON_SUPPORTED_OS = ("linux", "windows")
+DAEMON_SUPPORTED_ARCH = ("amd64", "arm64")
+
+
+def _load_daemon_assets() -> Dict[str, Dict[str, Any]]:
+    """解析 ``JARVIS_DAEMON_ASSETS`` 环境变量为显式产物映射。
+
+    期望格式（JSON 字符串）::
+
+        {"linux/amd64": {"asset": "jarvis-daemon_linux_amd64.tar.gz",
+                         "sha256": "…", "size": 12345678}}
+
+    解析失败仅告警并返回空字典（不抛异常，避免影响守护进程连接）。
+    """
+    raw = os.environ.get("JARVIS_DAEMON_ASSETS", "").strip()
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except (ValueError, TypeError) as exc:
+        logger.warning("[DAEMON] JARVIS_DAEMON_ASSETS 解析失败，忽略：%s", exc)
+        return {}
+    if not isinstance(parsed, dict):
+        logger.warning("[DAEMON] JARVIS_DAEMON_ASSETS 不是对象，忽略")
+        return {}
+    result: Dict[str, Dict[str, Any]] = {}
+    for key, value in parsed.items():
+        if isinstance(value, dict):
+            result[str(key)] = value
+    return result
+
+
+# 显式产物映射（os/arch → {asset, sha256, size}）；缺省为空，按命名规则拼装。
+DAEMON_ASSETS: Dict[str, Dict[str, Any]] = _load_daemon_assets()
+
+
+def _daemon_asset_name(os_name: str, arch: str) -> str:
+    """按 Release 产物命名规则拼装产物名（见 release-daemon.yml:100-107）。
+
+    Linux → ``jarvis-daemon_linux_<arch>.tar.gz``；
+    Windows → ``jarvis-daemon_windows_<arch>.zip``；
+    其他平台（含 macOS）→ 空串（无产物）。
+    """
+    if os_name == "linux":
+        return f"jarvis-daemon_linux_{arch}.tar.gz"
+    if os_name == "windows":
+        return f"jarvis-daemon_windows_{arch}.zip"
+    return ""
+
+
+def _resolve_daemon_platform(source: Any) -> Tuple[str, str]:
+    """从会话（或 hello 帧）中解析 (os, arch)，统一小写。
+
+    取值优先级：
+      os:   build_info.os → system_info.os_name → system_info.platform → platform
+      arch: build_info.arch → system_info.arch → system_info.machine
+
+    无法判定时对应项返回空串（调用方据此跳过更新判断）。
+    """
+    if not isinstance(source, dict):
+        return "", ""
+    build_info = source.get("build_info") or {}
+    if not isinstance(build_info, dict):
+        build_info = {}
+    system_info = source.get("system_info") or {}
+    if not isinstance(system_info, dict):
+        system_info = {}
+
+    os_name = (
+        str(
+            build_info.get("os")
+            or system_info.get("os_name")
+            or system_info.get("platform")
+            or source.get("platform")
+            or ""
+        )
+        .strip()
+        .lower()
+    )
+    arch = (
+        str(
+            build_info.get("arch")
+            or system_info.get("arch")
+            or system_info.get("machine")
+            or ""
+        )
+        .strip()
+        .lower()
+    )
+
+    # 归一化常见别名，避免 daemon 用 "x86_64"/"aarch64" 上报时匹配不到产物。
+    arch_alias = {
+        "x86_64": "amd64",
+        "x64": "amd64",
+        "aarch64": "arm64",
+    }
+    arch = arch_alias.get(arch, arch)
+    return os_name, arch
+
+
+def _build_daemon_update(
+    daemon_version: str, os_name: str, arch: str
+) -> Optional[Dict[str, Any]]:
+    """构造 hello_ack 的 ``daemon_update`` 字段。
+
+    返回 None 表示「不下发」（未配置最新版本，或平台/架构无法判定）——
+    此时 hello_ack 不携带该键，与旧行为完全一致。
+    否则返回固定字段的 dict（字段名与设计文档 3.2 逐字一致）。
+    """
+    latest = DAEMON_LATEST_VERSION
+    if not latest:
+        # 未配置最新版本 → 不下发任何更新信息。
+        return None
+    if not os_name or not arch:
+        # 平台/架构无法判定（旧版 daemon）→ 跳过更新判断，不打扰连接。
+        return None
+
+    current = str(daemon_version or "").strip()
+    info: Dict[str, Any] = {
+        "available": False,
+        "latest_version": latest,
+        "current_version": current,
+        "url": "",
+        "sha256": "",
+        "size": 0,
+        "asset": "",
+        "note": "",
+    }
+
+    # 版本一致 → 已是最新，available=false 并说明原因。
+    if current == latest:
+        info["note"] = "already up to date"
+        return info
+
+    # 平台/架构不受支持（如 macOS）→ available=false 并说明。
+    if os_name not in DAEMON_SUPPORTED_OS or arch not in DAEMON_SUPPORTED_ARCH:
+        info["note"] = f"no release asset for {os_name}/{arch}"
+        return info
+
+    # 显式映射优先，否则按命名规则拼装。
+    explicit = DAEMON_ASSETS.get(f"{os_name}/{arch}") or {}
+    asset = str(explicit.get("asset") or "").strip() or _daemon_asset_name(
+        os_name, arch
+    )
+    if not asset:
+        info["note"] = f"no release asset for {os_name}/{arch}"
+        return info
+
+    info["available"] = True
+    info["asset"] = asset
+    info["url"] = f"{DAEMON_RELEASE_BASE_URL}/{latest}/{asset}"
+    info["sha256"] = str(explicit.get("sha256") or "").strip()
+    try:
+        info["size"] = int(explicit.get("size") or 0)
+    except (TypeError, ValueError):
+        info["size"] = 0
+    if not info["sha256"]:
+        # 未配置 sha256：daemon 侧会跳过校验并记警告（见设计文档 3.4）。
+        info["note"] = "sha256 not configured; daemon will skip verification"
+    return info
 
 
 class DaemonCapabilityManager:
@@ -186,6 +380,8 @@ class DaemonCapabilityManager:
                 "capabilities": hello_capabilities,
                 "connected_at": now,
                 "last_seen": now,
+                # 自更新进度（daemon.update.status 回执写入；未回执时为 None）。
+                "update_state": None,
             }
             logger.info(
                 "[DAEMON] session connected: session_id=%s client_id=%s node_id=%s user_id=%s",
@@ -205,13 +401,37 @@ class DaemonCapabilityManager:
                 len(system_info),
             )
 
-            await websocket.send_json(
-                {
-                    "type": "hello_ack",
-                    "session_id": session_id,
-                    "heartbeat_interval": 20,
-                }
+            # 自更新判断：把「最新版本」与 daemon 上报的版本/架构比对，
+            # 结果随 hello_ack 下发（只增不改，旧 daemon 忽略即可）。
+            # 未配置最新版本或平台无法判定时返回 None → 不携带该键，
+            # 保证旧字段与旧行为完全不变。
+            daemon_os, daemon_arch = _resolve_daemon_platform(
+                self._sessions[session_id]
             )
+            daemon_update = _build_daemon_update(
+                self._sessions[session_id].get("daemon_version") or "",
+                daemon_os,
+                daemon_arch,
+            )
+            hello_ack: Dict[str, Any] = {
+                "type": "hello_ack",
+                "session_id": session_id,
+                "heartbeat_interval": 20,
+            }
+            if daemon_update is not None:
+                hello_ack["daemon_update"] = daemon_update
+                logger.info(
+                    "[DAEMON] update check: session_id=%s current=%s latest=%s "
+                    "os=%s arch=%s available=%s note=%s",
+                    session_id,
+                    daemon_update.get("current_version"),
+                    daemon_update.get("latest_version"),
+                    daemon_os,
+                    daemon_arch,
+                    daemon_update.get("available"),
+                    daemon_update.get("note"),
+                )
+            await websocket.send_json(hello_ack)
 
             # 消息循环
             while True:
@@ -226,6 +446,26 @@ class DaemonCapabilityManager:
                     self._handle_capability_list_result(session_id, message)
                 elif msg_type == "capability.call.result":
                     self._handle_capability_call_result(message)
+                elif msg_type == "daemon.update.status":
+                    # 自更新进度回执（单向）：仅记录日志并更新会话字段，
+                    # **绝不回复**（daemon 不等待，旧网关 debug 忽略亦兼容）。
+                    state = str(message.get("state") or "").strip()
+                    version = str(message.get("version") or "").strip()
+                    error = str(message.get("error") or "").strip()
+                    if session is not None:
+                        session["update_state"] = {
+                            "state": state,
+                            "version": version,
+                            "error": error,
+                            "updated_at": time.time(),
+                        }
+                    logger.info(
+                        "[DAEMON] update status: session_id=%s state=%s version=%s error=%s",
+                        session_id,
+                        state or "?",
+                        version or "?",
+                        error or "",
+                    )
                 elif msg_type == "ping":
                     await websocket.send_json({"type": "pong"})
                 elif msg_type == "hello":
@@ -490,6 +730,7 @@ class DaemonCapabilityManager:
                     "build_info": session.get("build_info") or {},
                     "capabilities": session.get("capabilities") or [],
                     "connected_at": session.get("connected_at"),
+                    "update_state": session.get("update_state"),
                 }
             )
         return result
@@ -512,6 +753,7 @@ class DaemonCapabilityManager:
             "build_info": session.get("build_info") or {},
             "capabilities": session.get("capabilities") or [],
             "connected_at": session.get("connected_at"),
+            "update_state": session.get("update_state"),
         }
 
     # ------------------------------------------------------------------
