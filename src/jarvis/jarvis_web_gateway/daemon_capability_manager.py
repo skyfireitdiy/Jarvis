@@ -26,13 +26,17 @@ import logging
 import os
 import time
 import uuid
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from fastapi import WebSocket
 
 from jarvis import __version__ as JARVIS_VERSION
 
 logger = logging.getLogger(__name__)
+
+# 「网关打包的浏览器扩展最新版本」提供器：返回版本号字符串，无版本时返回 None。
+# 与 browser_extension_manager.LatestVersionProvider 语义一致。
+LatestVersionProvider = Callable[[], Optional[str]]
 
 # 会话心跳超时（秒）：超过该时长未收到任何消息则清理会话
 HEARTBEAT_TIMEOUT = 60.0
@@ -279,6 +283,32 @@ class DaemonCapabilityManager:
         self._pending_lists: Dict[str, asyncio.Future] = {}
         # 心跳巡检任务
         self._cleanup_task: Optional[asyncio.Task] = None
+        # 网关打包的扩展最新版本提供器（未注入时返回 None，不影响握手）
+        self._latest_version_provider: Optional[LatestVersionProvider] = None
+
+    def set_latest_version_provider(
+        self, provider: Optional[LatestVersionProvider]
+    ) -> None:
+        """注入「网关打包的浏览器扩展最新版本」提供器。
+
+        握手时把结果随 hello_ack 的 ``latest_extension_version`` 下发给守护进程，
+        供其在「自动安装/更新浏览器扩展」开关打开时判断是否需要同步扩展。
+        未注入或读取失败时该字段不下发，daemon 侧应忽略（与旧行为一致）。
+        """
+        self._latest_version_provider = provider
+
+    def _get_latest_extension_version(self) -> Optional[str]:
+        """读取网关打包的扩展最新版本；未注入或异常时返回 None。"""
+        provider = self._latest_version_provider
+        if provider is None:
+            return None
+        try:
+            version = provider()
+        except Exception as exc:  # pragma: no cover - 防御性
+            logger.warning("[DAEMON] latest version provider failed: %s", exc)
+            return None
+        version = str(version or "").strip()
+        return version or None
 
     # ------------------------------------------------------------------
     # 会话生命周期

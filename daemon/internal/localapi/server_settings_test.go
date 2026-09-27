@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"jarvis-daemon/internal/auth"
 	"jarvis-daemon/internal/capability"
+	"jarvis-daemon/internal/wsclient"
 )
 
 // resetAutoInstallBrowserExt 复位包级开关态。
@@ -212,4 +215,76 @@ func TestAutoInstallBrowserExtConcurrent(t *testing.T) {
 		_ = capability.AutoInstallBrowserExt()
 	}
 	<-done
+}
+
+// TestBrowserExtEnabledCallbackOnTransition 开关由关闭变为打开时触发回调；
+// 重复置 true（无跃迁）或置 false 均不触发。
+//
+// 回归背景：daemon 只在 hello_ack 时检查一次开关，而前端推送开关通常晚于
+// hello_ack，导致用户已打开开关却仍被判定为「已关闭」并跳过同步。修复方式是在
+// 开关发生 false→true 跃迁时回调上层补做一次同步检查；本用例锁定该触发语义。
+func TestBrowserExtEnabledCallbackOnTransition(t *testing.T) {
+	resetAutoInstallBrowserExt(t)
+
+	store := auth.NewStore()
+	manager := wsclient.NewManager(wsclient.Options{
+		ClientID:          "test-client",
+		Version:           "test",
+		ReconnectMin:      0,
+		ReconnectMax:      0,
+		HeartbeatInterval: 0,
+	})
+	api := New(store, manager, "1.2.3")
+	var calls int
+	api.SetOnBrowserExtEnabled(func() { calls++ })
+	srv := httptest.NewServer(api.Handler())
+	t.Cleanup(func() {
+		srv.Close()
+		manager.DisconnectAll()
+	})
+
+	enabled := true
+	// 第一次打开：发生 false→true 跃迁，回调 1 次。
+	postJSON(t, srv.URL+"/api/auth", authRequest{
+		Gateway:               "http://gw-a.example.com:8080",
+		Token:                 "token-aaaaaaaa",
+		AutoInstallBrowserExt: &enabled,
+	})
+	if calls != 1 {
+		t.Fatalf("首次打开开关应触发 1 次回调，实际 %d", calls)
+	}
+
+	// 再次置 true：无跃迁，不触发。
+	postJSON(t, srv.URL+"/api/settings", settingsRequest{AutoInstallBrowserExt: &enabled})
+	if calls != 1 {
+		t.Fatalf("重复置 true 不应触发回调，实际 %d", calls)
+	}
+
+	// 置 false：不触发。
+	disabled := false
+	postJSON(t, srv.URL+"/api/settings", settingsRequest{AutoInstallBrowserExt: &disabled})
+	if calls != 1 {
+		t.Fatalf("置 false 不应触发回调，实际 %d", calls)
+	}
+
+	// 再次打开：又一次跃迁，回调递增到 2。
+	postJSON(t, srv.URL+"/api/settings", settingsRequest{AutoInstallBrowserExt: &enabled})
+	if calls != 2 {
+		t.Fatalf("再次打开开关应触发第 2 次回调，实际 %d", calls)
+	}
+}
+
+// TestBrowserExtEnabledCallbackNilSafe 未注入回调时开关跃迁不应 panic。
+func TestBrowserExtEnabledCallbackNilSafe(t *testing.T) {
+	resetAutoInstallBrowserExt(t)
+	srv, _, _ := newTestServer(t)
+
+	enabled := true
+	code, body := postJSON(t, srv.URL+"/api/settings", settingsRequest{AutoInstallBrowserExt: &enabled})
+	if code != http.StatusOK {
+		t.Fatalf("settings 状态码 = %d, 期望 200; body=%v", code, body)
+	}
+	if !capability.AutoInstallBrowserExt() {
+		t.Fatalf("开关应为 true")
+	}
 }

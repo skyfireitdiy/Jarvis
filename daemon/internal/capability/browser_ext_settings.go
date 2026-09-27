@@ -30,10 +30,18 @@ var (
 // SetAutoInstallBrowserExt 设置「自动安装/更新浏览器扩展」开关。
 //
 // 由 localapi 在收到 /api/settings 或 /api/auth 的推送时调用。
-func SetAutoInstallBrowserExt(enabled bool) {
+//
+// 返回「本次调用是否发生了 false → true 的跃迁」（即开关从关闭变为打开）。
+// 调用方据此决定是否立刻补做一次扩展同步检查：daemon 仅在收到 hello_ack 时
+// 检查一次开关，而前端推送开关通常晚于 hello_ack（daemon 启动后先连网关、
+// 前端随后才推设置），若不补查，用户明明已打开开关却会看到「已关闭，跳过
+// 自动同步」，且该状态会一直持续到下次重连。
+func SetAutoInstallBrowserExt(enabled bool) bool {
 	autoInstallBrowserExtMu.Lock()
 	defer autoInstallBrowserExtMu.Unlock()
+	transitioned := enabled && !autoInstallBrowserExt
 	autoInstallBrowserExt = enabled
+	return transitioned
 }
 
 // AutoInstallBrowserExt 返回开关当前值；默认 false（关闭）。

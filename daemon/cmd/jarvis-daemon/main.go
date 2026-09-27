@@ -266,14 +266,22 @@ func runDaemon(args []string) {
 			store.MarkTokenInvalid(gateway)
 		},
 		OnGatewayHelloAck: func(gateway, sessionID, latestExtVersion string) {
-			// 网关随握手告知其打包的扩展最新版本；与本地副本不一致时异步同步。
-			// 放在独立 goroutine 中：下载可能耗时数秒，不能阻塞 WS 读循环。
-			maybeAutoSyncBrowserExt(gateway, latestExtVersion)
+			// 网关随握手下发的扩展最新版本（旧字段，兼容保留）。
+			// 版本号全局统一，实际同步以 daemon_update.latest_version 为准
+			// （见 OnGatewayDaemonUpdate）；此处仅记录，供开关补查时兜底使用。
+			rememberGatewayExtVersion(gateway, latestExtVersion)
 		},
 		OnGatewayDaemonUpdate: func(gateway, sessionID string, info map[string]any) {
 			// 网关随握手告知 daemon 有新版本；受「自动更新」开关约束，异步执行。
 			// 放在独立 goroutine 中：下载 + 替换可能耗时，不能阻塞 WS 读循环。
 			maybeAutoUpdateDaemon(gateway, sessionID, info)
+			// 版本号全局统一（扩展与 daemon 同版本），故 daemon_update.latest_version
+			// 同时也是「网关打包的扩展最新版本」：据此驱动扩展自动同步。
+			// 记下来供「扩展开关随后被打开」时补查使用（开关常晚于握手推送）。
+			if latest, _ := info["latest_version"].(string); latest != "" {
+				rememberGatewayExtVersion(gateway, latest)
+				maybeAutoSyncBrowserExt(gateway, latest)
+			}
 		},
 	})
 
@@ -286,6 +294,9 @@ func runDaemon(args []string) {
 	}
 
 	api := localapi.New(store, manager, version)
+	// 开关由关闭变为打开时，补做一次扩展同步检查：daemon 只在 hello_ack 时检查
+	// 一次开关，而前端推送开关通常晚于 hello_ack，若不补查会一直判定为「已关闭」。
+	api.SetOnBrowserExtEnabled(func() { onBrowserExtSwitchEnabled(manager) })
 
 	srv := localapi.NewHTTPServer(cfg.Listen, api.Handler())
 
@@ -331,6 +342,61 @@ func buildClientID() string {
 
 // browserExtSyncMu 串行化扩展同步，避免多个网关同时握手时并发写同一目录。
 var browserExtSyncMu sync.Mutex
+
+// gatewayExtVersionMu 保护 gatewayExtVersions。
+var gatewayExtVersionMu sync.Mutex
+
+// gatewayExtVersions 记录各网关最近一次下发的扩展最新版本（键为 GatewayKey）。
+//
+// 为什么需要：maybeAutoSyncBrowserExt 的版本号来自握手（daemon_update），而
+// 「开关被打开」这一事件发生在握手之后，此时没有新的握手可依赖，只能回查这里
+// 缓存的值，否则补查时拿不到版本号、无法判断是否需要同步。
+var gatewayExtVersions = map[string]string{}
+
+// rememberGatewayExtVersion 记录某网关最近一次下发的扩展最新版本。
+//
+// 空串表示网关未提供版本：忽略而不覆盖，避免旧的 hello_ack 空值把随后
+// daemon_update 带来的真实版本号冲掉（两者在同一轮握手中先后到达）。
+func rememberGatewayExtVersion(gateway, latestVersion string) {
+	if latestVersion == "" {
+		return
+	}
+	key := auth.GatewayKey(gateway)
+	gatewayExtVersionMu.Lock()
+	defer gatewayExtVersionMu.Unlock()
+	gatewayExtVersions[key] = latestVersion
+}
+
+// gatewayExtVersionOf 取某网关最近一次下发的扩展最新版本；无记录时返回 ("", false)。
+func gatewayExtVersionOf(gateway string) (string, bool) {
+	key := auth.GatewayKey(gateway)
+	gatewayExtVersionMu.Lock()
+	defer gatewayExtVersionMu.Unlock()
+	v, ok := gatewayExtVersions[key]
+	return v, ok
+}
+
+// onBrowserExtSwitchEnabled 在「自动安装/更新浏览器扩展」开关由关闭变为打开时调用，
+// 对所有已连接、且已知网关扩展版本的网关补做一次同步检查。
+//
+// 为什么需要：daemon 启动后先连网关、收 hello_ack 时开关仍是默认 false（前端尚未
+// 推送），于是打印「已关闭，跳过自动同步」；前端随后才把开关推来，但 daemon 不会
+// 重新检查，导致用户明明已打开开关却始终不同步，直到下次重连。此处在开关打开时
+// 主动补查一次，消除该时序依赖。
+func onBrowserExtSwitchEnabled(manager *wsclient.Manager) {
+	for _, st := range manager.Status() {
+		if !st.Connected {
+			continue
+		}
+		latest, ok := gatewayExtVersionOf(st.Gateway)
+		if !ok {
+			// 该网关尚未下发过版本（未收到 hello_ack），等其自身握手时再处理。
+			continue
+		}
+		log.Printf("[daemon] 扩展开关已打开，补做一次同步检查（网关 %s，网关版本 %q）", st.Gateway, latest)
+		maybeAutoSyncBrowserExt(st.Gateway, latest)
+	}
+}
 
 // maybeAutoSyncBrowserExt 在网关下发扩展最新版本且与本地不一致时，异步同步扩展包。
 //
@@ -383,6 +449,19 @@ func maybeAutoSyncBrowserExt(gateway, latestVersion string) {
 		log.Printf("[daemon] 浏览器扩展已同步到 %q（%d 个文件，目录 %s）；"+
 			"请在浏览器 chrome://extensions 点击「刷新」使新版本生效",
 			version, count, capability.BrowserExtDirOrEmpty())
+
+		// 同步完成后自动打开本机浏览器的扩展页：用户需在扩展页点一次「刷新」
+		// （已安装）或「加载已解压的扩展程序」（未安装）新版本才生效，自动打开
+		// 省去手动聚焦窗口 → Ctrl+L → 输入 URL → 回车。
+		// 失败只记日志：扩展文件已成功落盘，打开页面失败不影响同步结果。
+		opened, openErr := capability.OpenBrowserExtensionsPage()
+		if openErr != nil {
+			log.Printf("[daemon] 自动打开浏览器扩展页失败（网关 %s）: %v", gateway, openErr)
+		} else if len(opened) > 0 {
+			log.Printf("[daemon] 已自动打开浏览器扩展页：%s", strings.Join(opened, "、"))
+		} else {
+			log.Printf("[daemon] 未找到可打开的浏览器（Edge/Chrome 均未安装），请手动打开扩展页")
+		}
 	}()
 }
 

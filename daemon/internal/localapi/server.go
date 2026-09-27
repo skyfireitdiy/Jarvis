@@ -23,6 +23,27 @@ type Server struct {
 	store   *auth.Store
 	manager *wsclient.Manager
 	version string
+	// onBrowserExtEnabled 在「自动安装/更新浏览器扩展」开关由关闭变为打开时调用。
+	//
+	// 为什么需要：daemon 只在收到 hello_ack 时检查一次该开关，而前端推送开关
+	// 通常晚于 hello_ack（daemon 启动后先连网关、前端随后才推设置），导致用户
+	// 已打开开关却仍被判定为「已关闭」并跳过同步，且会一直持续到下次重连。
+	// 由上层注入本回调，在开关打开时补做一次同步检查。
+	//
+	// 可为 nil（未注入时不做任何事），便于测试与最小改动。
+	onBrowserExtEnabled func()
+}
+
+// SetOnBrowserExtEnabled 注入「扩展开关被打开」时的回调；由 main 在装配时调用。
+func (s *Server) SetOnBrowserExtEnabled(fn func()) {
+	s.onBrowserExtEnabled = fn
+}
+
+// notifyBrowserExtEnabled 在开关发生 false → true 跃迁时触发回调（回调可为 nil）。
+func (s *Server) notifyBrowserExtEnabled(transitioned bool) {
+	if transitioned && s.onBrowserExtEnabled != nil {
+		s.onBrowserExtEnabled()
+	}
 }
 
 // New 创建本地 API 服务。
@@ -132,7 +153,7 @@ func (s *Server) handleAuth(w http.ResponseWriter, r *http.Request) {
 	// 前端可随登录态一并推送「自动安装浏览器扩展」开关；未提供（nil）时保持原值，
 	// 兼容旧前端。开关只存内存态，不落盘（用户要求只存浏览器存储）。
 	if req.AutoInstallBrowserExt != nil {
-		capability.SetAutoInstallBrowserExt(*req.AutoInstallBrowserExt)
+		s.notifyBrowserExtEnabled(capability.SetAutoInstallBrowserExt(*req.AutoInstallBrowserExt))
 	}
 	log.Printf("[localapi] 收到认证推送: gateway=%s token=%s... name=%q",
 		req.Gateway, maskToken(req.Token), req.Name)
@@ -237,7 +258,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
-		capability.SetAutoInstallBrowserExt(*req.AutoInstallBrowserExt)
+		s.notifyBrowserExtEnabled(capability.SetAutoInstallBrowserExt(*req.AutoInstallBrowserExt))
 		log.Printf("[localapi] 更新设置: auto_install_browser_ext=%v", *req.AutoInstallBrowserExt)
 		// 回显更新后的实际值，便于调用方确认。
 		writeJSON(w, http.StatusOK, map[string]any{
