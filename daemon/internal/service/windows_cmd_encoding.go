@@ -31,6 +31,7 @@ import (
 //
 // 脚本结构（顺序不可调换）：
 //
+//	$ProgressPreference='SilentlyContinue';
 //	$ErrorActionPreference='Continue';
 //	$out = & <name> <args...> 2>&1 | Out-String;   # 此时 OutputEncoding 仍是系统默认，正确解码子进程输出
 //	$code = $LASTEXITCODE;                          # 捕获外部命令退出码（管道不改变它）
@@ -53,8 +54,13 @@ import (
 //     创建失败却打印「计划任务已创建」）。用 $LASTEXITCODE 捕获并透传退出码后，
 //     Go 侧才能正确识别失败。注意 $LASTEXITCODE 要在执行外部命令后立即捕获，
 //     管道（| Out-String）不会改变它。
+//   - $ProgressPreference='SilentlyContinue'：PowerShell 默认会把进度记录（progress
+//     stream）也输出，且被 `2>&1` 并入 stdout 后序列化成 CLIXML（形如 `#< CLIXML`
+//     加一段 XML），把真正的失败原因淹没（真机实测 install 失败时即如此）。关闭进度
+//     流后 stdout 只剩外部命令的真实输出。兜底清理见 stripPowerShellClixml。
 func buildPowerShellScript(name string, args []string) string {
 	var b strings.Builder
+	b.WriteString("$ProgressPreference='SilentlyContinue'; ")
 	b.WriteString("$ErrorActionPreference='Continue'; ")
 	b.WriteString("$out = & ")
 	b.WriteString(quotePowerShellArg(name))
@@ -68,6 +74,59 @@ func buildPowerShellScript(name string, args []string) string {
 	b.WriteString("[Console]::Out.Write($out); ")
 	b.WriteString("exit $code")
 	return b.String()
+}
+
+// stripPowerShellClixml 从 PowerShell 输出中剔除 CLIXML 噪音，只保留可读文本。
+//
+// 背景：PowerShell 在输出被重定向到管道时，会把某些流（progress / verbose / warning
+// 等）序列化成 CLIXML——以 `#< CLIXML` 开头、后跟一段 `<Objs ...>...</Objs>` XML。
+// 真机实测 install 失败时，stdout 里混入的正是 progress 记录的 CLIXML，把「拒绝访问」
+// 这类真正的错误文本淹没（且 XML 内的中文按 GBK 写出，转码后仍是乱码）。
+//
+// 处理策略（纯文本、不解析 XML，避免引入依赖）：
+//  1. 删除从 `#< CLIXML` 到该行末尾的内容（CLIXML 头）；
+//  2. 删除所有 `<Objs ...>...</Objs>` 段落（跨行匹配）；
+//  3. 去掉残留的孤立 XML 标签行与多余空行。
+//
+// 之所以还保留这个兜底：$ProgressPreference='SilentlyContinue' 只能关掉 progress 流，
+// 若其他流（如 warning）仍产生 CLIXML，这里能保证错误信息可读。
+func stripPowerShellClixml(s string) string {
+	if !strings.Contains(s, "#< CLIXML") && !strings.Contains(s, "<Objs") {
+		return s
+	}
+	// 1. 删除 `#< CLIXML` 到行尾。
+	if i := strings.Index(s, "#< CLIXML"); i >= 0 {
+		lineEnd := strings.IndexByte(s[i:], '\n')
+		if lineEnd < 0 {
+			s = s[:i]
+		} else {
+			s = s[:i] + s[i+lineEnd+1:]
+		}
+	}
+	// 2. 删除 <Objs ...>...</Objs> 段落（非贪婪，跨行）。
+	for {
+		start := strings.Index(s, "<Objs")
+		if start < 0 {
+			break
+		}
+		end := strings.Index(s[start:], "</Objs>")
+		if end < 0 {
+			// 没有闭合标签，直接截断到结尾。
+			s = s[:start]
+			break
+		}
+		s = s[:start] + s[start+end+len("</Objs>"):]
+	}
+	// 3. 清理残留的孤立标签行与多余空行。
+	var lines []string
+	for _, ln := range strings.Split(s, "\n") {
+		t := strings.TrimSpace(ln)
+		if strings.HasPrefix(t, "<") && strings.HasSuffix(t, ">") {
+			continue
+		}
+		lines = append(lines, ln)
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
 }
 
 // quotePowerShellArg 按 PowerShell 规则为单个参数加上必要的引号与转义。

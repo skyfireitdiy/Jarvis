@@ -221,7 +221,12 @@ func runCmd(name string, args ...string) (string, error) {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			msg := strings.TrimSpace(string(exitErr.Stderr))
 			if msg == "" {
-				msg = strings.TrimSpace(string(out))
+				// PowerShell 把外部命令的 stdout/stderr 都写到了自己的 stdout，
+				// 且可能混入 CLIXML 噪音（见 stripPowerShellClixml），需先清理再取用。
+				msg = stripPowerShellClixml(string(out))
+			}
+			if msg == "" {
+				msg = "命令返回非零退出码，但无输出"
 			}
 			return string(out), fmt.Errorf("%s 失败: %s", name, msg)
 		}

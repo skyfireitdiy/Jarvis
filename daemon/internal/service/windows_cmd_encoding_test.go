@@ -34,17 +34,52 @@ func TestQuotePowerShellArg(t *testing.T) {
 	}
 }
 
+// TestStripPowerShellClixml 验证 CLIXML 噪音被剔除、真实错误文本保留。
+// 用例取自真机 Windows 上 install 失败时的实际输出。
+func TestStripPowerShellClixml(t *testing.T) {
+	// 真机输出：CLIXML 头 + Objs 段（progress 记录）混杂在错误文本之前。
+	realWorld := "#< CLIXML\n<Objs Version=\"1.1.0.1\" xmlns=\"http://schemas.microsoft.com/powershell/2004/04\"><Obj S=\"progress\" RefId=\"0\"><TN RefId=\"0\"><T>System.Management.Automation.PSCustomObject</T><T>System.Object</T></TN><MS><I64 N=\"SourceId\">1</I64><PR N=\"Record\"><AV>正在准备首次使用模块。</AV><AI>0</AI><Nil /><PI>-1</PI><PC>-1</PC><T>Completed</T><SR>-1</SR><SD> </SD></PR></MS></Obj></Objs>\n错误: 拒绝访问。"
+	got := stripPowerShellClixml(realWorld)
+	want := "错误: 拒绝访问。"
+	if got != want {
+		t.Errorf("stripPowerShellClixml 未正确清理:\n got = %q\nwant = %q", got, want)
+	}
+
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"无 CLIXML 原样返回", "错误: 拒绝访问。", "错误: 拒绝访问。"},
+		{"仅 CLIXML 头", "#< CLIXML\n错误: 拒绝访问。", "错误: 拒绝访问。"},
+		{"仅 Objs 段", "<Objs Version=\"1.1\"><Obj/></Objs>错误: 拒绝访问。", "错误: 拒绝访问。"},
+		{"CLIXML 在错误之后", "错误: 拒绝访问。\n#< CLIXML\n<Objs><Obj/></Objs>", "错误: 拒绝访问。"},
+		{"空串", "", ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := stripPowerShellClixml(c.in); got != c.want {
+				t.Errorf("stripPowerShellClixml(%q) = %q, 期望 %q", c.in, got, c.want)
+			}
+		})
+	}
+}
+
 // TestBuildPowerShellScriptStructure 验证脚本结构：先执行命令再改编码再写出，
 // 顺序不可调换（先改编码会导致 GBK 输出被按 UTF-8 误解码）。
 func TestBuildPowerShellScriptStructure(t *testing.T) {
 	script := buildPowerShellScript("schtasks", []string{"/Create", "/TN", "Jarvis-Daemon"})
 
+	idxProgress := strings.Index(script, "$ProgressPreference='SilentlyContinue'")
 	idxExec := strings.Index(script, "$out = & schtasks")
 	idxCode := strings.Index(script, "$code = $LASTEXITCODE")
 	idxSetEnc := strings.Index(script, "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8")
 	idxWrite := strings.Index(script, "[Console]::Out.Write($out)")
 	idxExit := strings.Index(script, "exit $code")
 
+	if idxProgress < 0 {
+		t.Fatalf("脚本未包含关闭进度流片段: %q", script)
+	}
 	if idxExec < 0 {
 		t.Fatalf("脚本未包含执行命令片段: %q", script)
 	}
@@ -60,12 +95,12 @@ func TestBuildPowerShellScriptStructure(t *testing.T) {
 	if idxExit < 0 {
 		t.Fatalf("脚本未包含透传退出码片段: %q", script)
 	}
-	// 关键顺序：执行 → 捕获退出码 → 改编码 → 写出 → 透传退出码。
+	// 关键顺序：关闭进度流 → 执行 → 捕获退出码 → 改编码 → 写出 → 透传退出码。
 	// 捕获 $LASTEXITCODE 必须在执行之后（否则拿到的是上一条命令的退出码）；
 	// exit 必须在最后（否则后续语句不会执行）。
-	if !(idxExec < idxCode && idxCode < idxSetEnc && idxSetEnc < idxWrite && idxWrite < idxExit) {
-		t.Errorf("脚本片段顺序错误（应为 执行 < 捕获退出码 < 改编码 < 写出 < 透传退出码）：exec=%d code=%d setEnc=%d write=%d exit=%d\n%s",
-			idxExec, idxCode, idxSetEnc, idxWrite, idxExit, script)
+	if !(idxProgress < idxExec && idxExec < idxCode && idxCode < idxSetEnc && idxSetEnc < idxWrite && idxWrite < idxExit) {
+		t.Errorf("脚本片段顺序错误（应为 关闭进度流 < 执行 < 捕获退出码 < 改编码 < 写出 < 透传退出码）：progress=%d exec=%d code=%d setEnc=%d write=%d exit=%d\n%s",
+			idxProgress, idxExec, idxCode, idxSetEnc, idxWrite, idxExit, script)
 	}
 	// stderr 合并，保证失败原因也能被捕获。
 	if !strings.Contains(script, "2>&1") {
