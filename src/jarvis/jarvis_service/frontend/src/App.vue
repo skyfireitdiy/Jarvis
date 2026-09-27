@@ -7722,6 +7722,9 @@ function onWorkspaceSidebarAgentClick(agent) {
       workspaceSessionPanelId.value = mobilePanel.id
       setWorkspaceMainView('session')
     }
+    // 移动端侧栏是覆盖主区域的底部抽屉（占 55% 高度），点选后自动收起，
+    // 让用户立刻看到会话内容，体验更好。
+    closeWorkspaceSidebar()
     return
   }
   // 该 Agent 已在某个 Panel 中：直接显示那个 Panel（不新建）
