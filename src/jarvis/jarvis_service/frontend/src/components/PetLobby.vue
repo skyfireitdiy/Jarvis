@@ -89,6 +89,24 @@
           />
         </g>
 
+        <!-- 曲线连线：master → 各个在线接入端（浏览器扩展 / 本地后台服务） -->
+        <!-- 端点数量不定（可能有多台设备/多个浏览器），故用曲线分列两侧，避免与节点间直线混淆 -->
+        <!-- 必须排在节点之前渲染：SVG 无 z-index，后渲染者在上层，否则连线会盖住网关节点 -->
+        <g class="lobby-links-local">
+          <path
+            v-for="link in accessLinks"
+            :key="link.key"
+            :d="link.d"
+            fill="none"
+            :stroke="link.offline ? 'rgba(255,93,108,0.35)' : '#20c8ff'"
+            :stroke-opacity="link.offline ? 1 : 0.55"
+            :stroke-width="1.6"
+            :stroke-dasharray="link.offline ? '6 5' : ''"
+            class="lobby-link"
+            :class="{ 'is-flow': !link.offline }"
+          />
+        </g>
+
         <!-- 节点：服务器机箱造型（master 金色居中，其余按状态着色） -->
         <g
           v-for="n in nodeItems"
@@ -144,23 +162,6 @@
           >{{ n.version }}</text>
         </g>
 
-        <!-- 曲线连线：master → 各个在线接入端（浏览器扩展 / 本地后台服务） -->
-        <!-- 端点数量不定（可能有多台设备/多个浏览器），故用曲线分列两侧，避免与节点间直线混淆 -->
-        <g class="lobby-links-local">
-          <path
-            v-for="link in accessLinks"
-            :key="link.key"
-            :d="link.d"
-            fill="none"
-            :stroke="link.offline ? 'rgba(255,93,108,0.35)' : '#20c8ff'"
-            :stroke-opacity="link.offline ? 1 : 0.55"
-            :stroke-width="1.6"
-            :stroke-dasharray="link.offline ? '6 5' : ''"
-            class="lobby-link"
-            :class="{ 'is-flow': !link.offline }"
-          />
-        </g>
-
         <!-- 接入端节点：左列=浏览器扩展，右列=本地后台服务（圆形造型，与网关机箱节点明显区分） -->
         <!-- 名称/版本/平台均来自网关会话（扩展 hello 上报 name、daemon hello 上报 name/hostname） -->
         <g
@@ -176,8 +177,9 @@
           <!-- 类型图标 -->
           <text :x="n.x" :y="n.y" text-anchor="middle" dominant-baseline="central"
                 class="lobby-access-ico">{{ n.icon }}</text>
-          <text :x="n.x" :y="n.y + LOCAL_NODE_RH + 16" text-anchor="middle" class="lobby-node-label">{{ n.short }}</text>
-          <text :x="n.x" :y="n.y + LOCAL_NODE_RH + 29" text-anchor="middle" class="lobby-node-count">{{ n.sub }}</text>
+          <!-- 标签文字：左列靠左、右列靠右，向舞台内部延伸，避免被舞台边缘裁切 -->
+          <text :x="n.x" :y="n.y + LOCAL_NODE_RH + 16" :text-anchor="n.anchor" class="lobby-node-label">{{ n.short }}</text>
+          <text :x="n.x" :y="n.y + LOCAL_NODE_RH + 29" :text-anchor="n.anchor" class="lobby-node-count">{{ n.sub }}</text>
         </g>
       </svg>
     </div>
@@ -1062,8 +1064,8 @@ const nodeLinks = computed(() => {
 // 位置：分列舞台左右边缘，各自在垂直方向均匀分布，用曲线连到 master 机箱。
 const LOCAL_NODE_RW = 30
 const LOCAL_NODE_RH = NODE_RH
-// 距舞台左右边缘的水平留白
-const LOCAL_NODE_MARGIN = 24
+// 距舞台左右边缘的水平留白（留足空间，避免节点下方标签的文字被舞台边缘裁切）
+const LOCAL_NODE_MARGIN = 56
 // 同列多个节点之间的垂直间距（含机箱高度）
 const ACCESS_NODE_GAP = LOCAL_NODE_RH * 2 + 26
 
@@ -1119,6 +1121,8 @@ const accessNodes = computed(() => {
       short: accessShortName(name),
       sub: browserLabel || '浏览器扩展',
       icon: '🧩',
+      // 左列节点靠左对齐，标签文字向舞台内部延伸，避免被左边缘裁切
+      anchor: 'start',
       title: `浏览器扩展 · ${name}${browserLabel ? ` · ${browserLabel}` : ''}`,
       masterX: masterPos.x,
       masterY: masterPos.y,
@@ -1128,7 +1132,9 @@ const accessNodes = computed(() => {
     const name = accessSessionName(s, '后台服务')
     const platform = String((s && s.platform) || '').trim()
     const version = String((s && s.daemon_version) || '').trim()
-    const detail = [platform, version ? `v${version}` : ''].filter(Boolean).join(' · ')
+    // daemon 上报的版本可能自带 v 前缀（如 v5.0.5），避免拼成 vv5.0.5
+    const versionLabel = version ? (/^v/i.test(version) ? version : `v${version}`) : ''
+    const detail = [platform, versionLabel].filter(Boolean).join(' · ')
     nodes.push({
       id: `daemon-${s.session_id || i}`,
       x: rightX,
@@ -1139,6 +1145,8 @@ const accessNodes = computed(() => {
       short: accessShortName(name),
       sub: detail || '后台服务',
       icon: '🖥',
+      // 右列节点靠右对齐，标签文字向舞台内部延伸，避免被右边缘裁切
+      anchor: 'end',
       title: `后台服务 · ${name}${detail ? ` · ${detail}` : ''}`,
       masterX: masterPos.x,
       masterY: masterPos.y,

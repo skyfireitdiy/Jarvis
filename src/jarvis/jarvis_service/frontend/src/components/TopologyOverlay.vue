@@ -88,6 +88,23 @@
               />
             </g>
 
+            <!-- 连线：master -> 本机执行面节点（浏览器扩展/本地后台服务），曲线 -->
+            <!-- 必须排在节点之前渲染：SVG 无 z-index，后渲染者在上层，否则连线会盖住网关节点 -->
+            <g class="topo-links-local">
+              <path
+                v-for="l in localLinks"
+                :key="'LL' + l.id"
+                :d="l.d"
+                :stroke="l.state === 'offline' ? 'rgba(255,93,108,0.35)' : '#20c8ff'"
+                :stroke-opacity="l.state === 'offline' ? 1 : 0.55"
+                :stroke-width="l.hot ? 2.4 : 1.6"
+                :stroke-dasharray="l.state === 'offline' ? '6 5' : ''"
+                class="topo-link"
+                :class="{ 'is-hot': l.hot, 'is-flow': l.state !== 'offline' }"
+                fill="none"
+              />
+            </g>
+
             <!-- Agent 节点（机器人造型；code_agent 带护目镜，已停止的 agent 不绘制） -->
             <g
               v-for="a in agentLayout.agents"
@@ -150,22 +167,6 @@
               <text :x="n.x" :y="n.y + NODE_R * 0.86 + 29" text-anchor="middle" class="topo-node-count">{{ n.drawAgents.length }}/{{ n.agents.length }} agent</text>
             </g>
 
-            <!-- 连线：master -> 本机执行面节点（浏览器扩展/本地后台服务），曲线 -->
-            <g class="topo-links-local">
-              <path
-                v-for="l in localLinks"
-                :key="'LL' + l.id"
-                :d="l.d"
-                :stroke="l.state === 'offline' ? 'rgba(255,93,108,0.35)' : '#20c8ff'"
-                :stroke-opacity="l.state === 'offline' ? 1 : 0.55"
-                :stroke-width="l.hot ? 2.4 : 1.6"
-                :stroke-dasharray="l.state === 'offline' ? '6 5' : ''"
-                class="topo-link"
-                :class="{ 'is-hot': l.hot, 'is-flow': l.state !== 'offline' }"
-                fill="none"
-              />
-            </g>
-
             <!-- 本机执行面节点（浏览器扩展在左、本地后台服务在右；圆形造型，与服务器机箱明显区分） -->
             <g
               v-for="n in localNodes"
@@ -183,8 +184,9 @@
               <!-- 类型图标 -->
               <text :x="n.x" :y="n.y" text-anchor="middle" dominant-baseline="central"
                     class="topo-access-ico">{{ n.icon }}</text>
-              <text :x="n.x" :y="n.y + ACCESS_R + 16" text-anchor="middle" class="topo-node-label">{{ n.short }}</text>
-              <text :x="n.x" :y="n.y + ACCESS_R + 29" text-anchor="middle" class="topo-node-count">{{ n.sub }}</text>
+              <!-- 标签文字：左列靠左、右列靠右，向画布内部延伸，避免被画布边缘裁切 -->
+              <text :x="n.x" :y="n.y + ACCESS_R + 16" :text-anchor="n.anchor" class="topo-node-label">{{ n.short }}</text>
+              <text :x="n.x" :y="n.y + ACCESS_R + 29" :text-anchor="n.anchor" class="topo-node-count">{{ n.sub }}</text>
             </g>
 
             <!-- 中心 master（与子节点同款服务器机箱，仅靠颜色/尺寸区分主次） -->
@@ -403,7 +405,8 @@ const lines = computed(() =>
 // 数据源均为网关会话列表（props.extensionSessions / props.daemonSessions），
 // 名称取会话的 name，故这里展示的是「整个网络接入的」客户端，而非仅本机。
 const LOCAL_NODE_R = NODE_R
-const LOCAL_NODE_MARGIN = 24
+// 距画布左右边缘的水平留白（留足空间，避免节点下方标签的文字被画布边缘裁切）
+const LOCAL_NODE_MARGIN = 56
 // 接入端节点用圆形（普通节点是服务器机箱），半径略小于机箱半高以留出标签空间
 const ACCESS_R = NODE_R * 0.86
 // 同列多个节点之间的垂直间距（含机箱高度）
@@ -459,6 +462,8 @@ const localNodes = computed(() => {
       short: accessShortName(name),
       sub: browserLabel || '浏览器扩展',
       icon: '🧩',
+      // 左列节点靠左对齐，标签文字向画布内部延伸，避免被左边缘裁切
+      anchor: 'start',
       title: `浏览器扩展 · ${name}${browserLabel ? ` · ${browserLabel}` : ''}`,
     })
   })
@@ -466,7 +471,9 @@ const localNodes = computed(() => {
     const name = accessSessionName(s, '后台服务')
     const platform = String((s && s.platform) || '').trim()
     const version = String((s && s.daemon_version) || '').trim()
-    const detail = [platform, version ? `v${version}` : ''].filter(Boolean).join(' · ')
+    // daemon 上报的版本可能自带 v 前缀（如 v5.0.5），避免拼成 vv5.0.5
+    const versionLabel = version ? (/^v/i.test(version) ? version : `v${version}`) : ''
+    const detail = [platform, versionLabel].filter(Boolean).join(' · ')
     nodes.push({
       id: `daemon-${s.session_id || i}`,
       x: rightX,
@@ -479,6 +486,8 @@ const localNodes = computed(() => {
       short: accessShortName(name),
       sub: detail || '后台服务',
       icon: '🖥',
+      // 右列节点靠右对齐，标签文字向画布内部延伸，避免被右边缘裁切
+      anchor: 'end',
       title: `后台服务 · ${name}${detail ? ` · ${detail}` : ''}`,
     })
   })
