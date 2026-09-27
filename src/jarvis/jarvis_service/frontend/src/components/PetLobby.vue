@@ -192,6 +192,16 @@
         <span class="pet-lobby-display-label">安装浏览器插件</span>
         <span v-if="extensionVersion.outdated" class="pet-lobby-update-dot" title="插件有新版本"></span>
       </button>
+
+      <!-- 安装本地后台服务（daemon）：打开安装指引弹层（内含下载链接与安装命令） -->
+      <button
+        class="pet-lobby-display-toggle"
+        title="安装本地后台服务"
+        @click.stop="openDaemonDialog()"
+      >
+        <span class="pet-lobby-display-icon">🖥</span>
+        <span class="pet-lobby-display-label">本地后台服务</span>
+      </button>
     </div>
 
     <!-- 无 Agent 时的空状态引导：新用户第一次进入大厅时给出明确的下一步 -->
@@ -533,6 +543,106 @@
             :disabled="installDialog.downloading"
             @click="downloadExtension()"
           >{{ installDialog.downloading ? '下载中…' : '下载插件包' }}</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 安装本地后台服务（daemon）弹层：安装说明 + 下载链接 + 风险提示 -->
+    <div
+      v-if="daemonDialog.visible"
+      class="lobby-rename-mask"
+      @pointerdown.stop
+      @click.stop="closeDaemonDialog"
+    >
+      <div class="lobby-install-dialog" @click.stop>
+        <div class="lobby-rename-title">安装本地后台服务</div>
+        <div class="lobby-rename-sub">Jarvis Daemon · 让 Agent 直接操作你这台电脑（脚本 / 文件 / 系统服务 / 桌面 GUI）</div>
+        <div class="lobby-install-steps">
+          <div class="lobby-install-step">
+            <span class="lobby-install-step-no">1</span>
+            <span class="lobby-install-step-text">
+              打开下载页
+              <code>https://github.com/skyfireitdiy/Jarvis/releases</code>
+              （或点击下方按钮），在最新 Release 的 Assets 中按你的系统选择对应文件：
+            </span>
+          </div>
+          <div class="lobby-install-step">
+            <span class="lobby-install-step-no">2</span>
+            <span class="lobby-install-step-text">
+              下载并解压对应平台的压缩包：Windows 64 位 <code>jarvis-daemon_windows_amd64.zip</code>、
+              Windows ARM64 <code>jarvis-daemon_windows_arm64.zip</code>；
+              Linux x86_64 <code>jarvis-daemon_linux_amd64.tar.gz</code>、
+              Linux ARM64 <code>jarvis-daemon_linux_arm64.tar.gz</code>。
+            </span>
+          </div>
+          <div class="lobby-install-step">
+            <span class="lobby-install-step-no">3</span>
+            <span class="lobby-install-step-text">
+              <strong>Windows</strong>：在解压目录打开 PowerShell，执行 <code>.\jarvis-daemon.exe install</code>，
+              再执行 <code>.\jarvis-daemon.exe start</code>（会注册为登录自启的计划任务）。
+            </span>
+          </div>
+          <div class="lobby-install-step">
+            <span class="lobby-install-step-no">4</span>
+            <span class="lobby-install-step-text">
+              <strong>Linux</strong>：解压后执行 <code>chmod +x jarvis-daemon</code>，然后执行
+              <code>./jarvis-daemon install</code>，再执行 <code>./jarvis-daemon start</code>
+              （会注册为 <code>systemctl --user</code> 用户服务并开机自启）。
+            </span>
+          </div>
+          <div class="lobby-install-step">
+            <span class="lobby-install-step-no">5</span>
+            <span class="lobby-install-step-text">
+              安装后 daemon 会在本机 <code>127.0.0.1:17800</code> 监听，并自动连回本网关；
+              可在「设置 → 本机后台服务端口」中修改前端连接端口。
+              其它命令：<code>status</code> 查看状态、<code>stop</code> 停止、<code>uninstall</code> 卸载。
+            </span>
+          </div>
+        </div>
+
+        <!-- 风险提示与免责声明：daemon 是本机常驻进程，权限远高于浏览器扩展 -->
+        <div class="lobby-install-risk">
+          <div class="lobby-install-risk-head">
+            <span class="lobby-install-risk-icon">⚠</span>
+            <span>高风险提示 · 请务必阅读后再安装</span>
+          </div>
+          <div class="lobby-install-risk-body">
+            <p>
+              本地后台服务（daemon）是一个<strong>常驻在你电脑上的后台进程</strong>，它会把本机能力暴露给连接到本网关的 Agent。
+              安装并启动后，Agent 将<strong>直接以你的用户身份操作这台电脑</strong>。
+            </p>
+            <p>具体而言，连接到本网关的 Agent 将<strong>具备以下能力</strong>：</p>
+            <ul>
+              <li>执行<strong>任意本地脚本与命令</strong>（含系统命令、包管理器、构建脚本等）；</li>
+              <li><strong>读取、写入、删除你本机的任意文件</strong>（当前版本无路径沙箱限制）；</li>
+              <li>查看、启动、停止、重启你的<strong>系统服务</strong>（Linux 为用户级 systemd 服务）；</li>
+              <li>枚举并结束本机<strong>任意进程</strong>；</li>
+              <li>控制你的<strong>桌面 GUI</strong>：列出/聚焦/关闭窗口，模拟鼠标点击与键盘输入，读写系统剪贴板，截取屏幕画面；</li>
+              <li>读取本机<strong>系统信息</strong>（主机名、用户、硬件与运行环境等）。</li>
+            </ul>
+            <p class="lobby-install-risk-warn">
+              上述能力叠加后，等同于<strong>「把你这台电脑的控制权完全交给 Agent」</strong>。
+              其中<strong>删除文件、结束进程、停止服务</strong>等操作<strong>不可逆</strong>，一旦执行无法恢复；
+              剪贴板与屏幕内容也可能包含<strong>密码、验证码、私密信息</strong>。
+            </p>
+            <p>
+              <strong>免责声明：</strong>本程序按「现状」提供，仅用于你本人授权范围内的本机自动化。
+              请仅在你<strong>完全信任</strong>所连接的网关与 Agent 的前提下安装使用。
+              因授权、误操作或第三方滥用导致的账号泄露、资金损失、数据丢失、系统损坏等后果，
+              由使用者自行承担，本项目及作者不承担任何责任。
+              若不接受上述风险，请<strong>立即关闭本弹窗，不要下载或安装</strong>。
+            </p>
+          </div>
+        </div>
+
+        <div class="lobby-rename-actions">
+          <button class="lobby-rename-btn cancel" @click="closeDaemonDialog">关闭</button>
+          <a
+            class="lobby-rename-btn ok"
+            href="https://github.com/skyfireitdiy/Jarvis/releases"
+            target="_blank"
+            rel="noopener noreferrer"
+          >前往下载页</a>
         </div>
       </div>
     </div>
@@ -1504,6 +1614,18 @@ async function downloadExtension() {
   }
 }
 
+// ===== 安装本地后台服务（daemon）弹层 =====
+// 展示安装步骤、下载链接与风险提示；纯静态内容，无网络请求
+const daemonDialog = ref({ visible: false })
+
+function openDaemonDialog() {
+  daemonDialog.value = { visible: true }
+}
+
+function closeDaemonDialog() {
+  if (daemonDialog.value.visible) daemonDialog.value.visible = false
+}
+
 // ===== 扩展版本检测 =====
 // latest 来自网关打包版本；「当前版本」取本机扩展上报的 localExtensionVersion。
 // 任一缺失时不判定为需升级。
@@ -2105,6 +2227,7 @@ function onGlobalKeydown(e) {
     closeRenameDialog()
     closeGroupDialog()
     closeRemoveGroupDialog()
+    closeDaemonDialog()
     return
   }
   // 弹层内输入时不拦截，避免误触发确认
@@ -2359,7 +2482,7 @@ function renameActiveNode(nodeId) {
   return true
 }
 
-defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden, openInstallExtensionDialog, closeActivePanel, hideActiveOutputAndClose, closeActiveNode, renameActiveNode, selectAgentInDirection, selectNodeInDirection, toggleAllOutputs })
+defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden, openInstallExtensionDialog, openDaemonDialog, closeActivePanel, hideActiveOutputAndClose, closeActiveNode, renameActiveNode, selectAgentInDirection, selectNodeInDirection, toggleAllOutputs })
 </script>
 
 <style scoped>
@@ -3542,6 +3665,13 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden, openInst
 .lobby-rename-btn.ok:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+/* 用 <a> 实现的按钮（如「前往下载页」）：去掉下划线并保持与按钮一致的排版 */
+a.lobby-rename-btn {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  box-sizing: border-box;
 }
 
 /* 安装浏览器插件弹层：比通用弹层更大，保证高风险提示无需翻页即可读完 */

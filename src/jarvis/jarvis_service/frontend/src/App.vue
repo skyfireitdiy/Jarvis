@@ -8386,6 +8386,8 @@ const commandPaletteCtx = computed(() => ({
   },
   // 打开宠物大厅的「安装浏览器插件」弹层
   openInstallExtension: () => { petLobbyRef.value?.openInstallExtensionDialog?.() },
+  // 打开宠物大厅的「安装本地后台服务（daemon）」弹层
+  openDaemonInstall: () => { petLobbyRef.value?.openDaemonDialog?.() },
   // 退出登录：断开所有连接并清除认证信息（复用设置面板的断开逻辑）
   logout: disconnectAll,
   // 当前 Agent 组

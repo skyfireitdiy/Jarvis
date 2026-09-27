@@ -654,6 +654,28 @@ export const ACTIONS = [
     ],
     run: (ctx) => ctx.openInstallExtension && ctx.openInstallExtension(),
   },
+  {
+    id: "install-daemon",
+    label: "安装本地后台服务",
+    shortcut: "Ctrl+Alt+Shift+B",
+    condition: "已登录",
+    en: "Install Local Daemon",
+    group: "界面",
+    icon: "🖥",
+    keywords: [
+      "后台",
+      "服务",
+      "本地",
+      "守护",
+      "进程",
+      "安装",
+      "daemon",
+      "service",
+      "local",
+      "install",
+    ],
+    run: (ctx) => ctx.openDaemonInstall && ctx.openDaemonInstall(),
+  },
   // ===== 账号 =====
   {
     id: "logout",
