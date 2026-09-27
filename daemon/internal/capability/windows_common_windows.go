@@ -6,7 +6,21 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"syscall"
 )
+
+// createNoWindow 让控制台程序不新建控制台窗口。
+//
+// 守护进程在 Windows 上以分离进程（DETACHED_PROCESS）运行，本身没有控制台；
+// 此时若启动 powershell / cmd / tasklist 等控制台程序且不带该标志，Windows 会
+// 为子进程**新建一个控制台窗口**，表现为每次调用能力时「闪一下黑框」。
+// 加上 CREATE_NO_WINDOW 后子进程在无窗口的隐藏控制台中运行。
+const createNoWindow = 0x08000000
+
+// hideWindow 返回让子进程不弹控制台窗口的启动属性。
+func hideWindow() *syscall.SysProcAttr {
+	return &syscall.SysProcAttr{CreationFlags: createNoWindow}
+}
 
 // 本文件提供 Windows 侧能力共用的参数解析与外部命令辅助函数。
 //

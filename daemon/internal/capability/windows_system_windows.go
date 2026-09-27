@@ -191,6 +191,8 @@ func runWindowsCommand(name string, args ...string) (string, error) {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, name, args...)
+	// 守护进程本身无控制台，不加该属性会为 wmic 等新建控制台窗口（闪黑框）。
+	cmd.SysProcAttr = hideWindow()
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("执行 %s 失败: %w", name, err)

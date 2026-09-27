@@ -160,6 +160,8 @@ func runWindowsProcessCommand(name string, args ...string) (string, error) {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, name, args...)
+	// 守护进程本身无控制台，不加该属性会为 tasklist / taskkill 新建控制台窗口（闪黑框）。
+	cmd.SysProcAttr = hideWindow()
 	out, err := cmd.Output()
 	if err != nil {
 		if exitErr, ok := err.(interface{ Stderr() []byte }); ok {

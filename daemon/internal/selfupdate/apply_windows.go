@@ -70,7 +70,9 @@ func SpawnApplyHelper(_ string, newBinary, target string, restart bool) (int, er
 	}
 	cmd := exec.Command(helperExe, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP | 0x00000008, // DETACHED_PROCESS
+		// CREATE_NO_WINDOW：helper 也是控制台程序，父进程无控制台时若不带该标志
+		// 会新建控制台窗口（闪黑框）。
+		CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP | 0x00000008 | 0x08000000, // DETACHED_PROCESS | CREATE_NO_WINDOW
 	}
 	cmd.Stdout = nil
 	cmd.Stderr = nil

@@ -144,6 +144,8 @@ func handleWindowsScriptExec(params map[string]any) (any, error) {
 	defer cleanup()
 
 	cmd := exec.CommandContext(ctx, interpreter, args...)
+	// 守护进程本身无控制台，不加该属性会为解释器新建控制台窗口（闪黑框）。
+	cmd.SysProcAttr = hideWindow()
 	if stdin != "" {
 		cmd.Stdin = strings.NewReader(stdin)
 	}
@@ -160,8 +162,10 @@ func handleWindowsScriptExec(params map[string]any) (any, error) {
 		if cmd.Process == nil {
 			return nil
 		}
-		if err := exec.Command("taskkill", "/T", "/F", "/PID",
-			fmt.Sprintf("%d", cmd.Process.Pid)).Run(); err != nil {
+		kill := exec.Command("taskkill", "/T", "/F", "/PID",
+			fmt.Sprintf("%d", cmd.Process.Pid))
+		kill.SysProcAttr = hideWindow()
+		if err := kill.Run(); err != nil {
 			return cmd.Process.Kill()
 		}
 		return nil

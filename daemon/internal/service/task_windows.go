@@ -220,6 +220,8 @@ func runCmd(name string, args ...string) (string, error) {
 		"-ExecutionPolicy", "Bypass",
 		"-EncodedCommand", encodePowerShellCommand(script),
 	)
+	// 守护进程本身无控制台，不加该属性会为 PowerShell 新建控制台窗口（闪黑框）。
+	cmd.SysProcAttr = hideWindowProcAttr()
 	out, err := cmd.Output()
 	if err != nil {
 		if ctx.Err() != nil {
