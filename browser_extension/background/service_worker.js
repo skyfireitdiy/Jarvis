@@ -40,6 +40,11 @@ const UPDATE_NOTIFICATION_ID = "jarvis-extension-update";
 // 同一版本只提示一次，避免每次重连/唤醒都弹通知。
 const NOTIFIED_VERSION_KEY = "notified_extension_version";
 
+// chrome.storage.local 中缓存「终端名称」的键。
+// 该值由 Jarvis 网页设置页配置，扩展在探测登录态时顺带读取并缓存，
+// 供 hello 上报给网关（网关据此区分不同终端）。页面未打开时用缓存值。
+const TERMINAL_NAME_KEY = "terminal_name";
+
 /** 读取已配置的网关列表。 */
 async function loadGateways() {
   const cfg = await chrome.storage.local.get(["gateways"]);
@@ -66,7 +71,7 @@ function normalizeGateway(gateway) {
 /** 收集 hello 帧所需的浏览器信息。 */
 async function buildHello() {
   const tabs = await chrome.tabs.query({});
-  return {
+  const hello = {
     type: "hello",
     client_id: await getClientId(),
     extension_version: EXTENSION_VERSION,
@@ -82,6 +87,33 @@ async function buildHello() {
       window_id: t.windowId,
     })),
   };
+  // 终端名称：由 Jarvis 网页设置页配置，扩展缓存后随 hello 上报，
+  // 使网关能区分不同终端。为空则不带该字段（网关侧回退 hostname）。
+  const name = await getTerminalName();
+  if (name) hello.name = name;
+  return hello;
+}
+
+/** 读取缓存的终端名称（可能为空）。 */
+async function getTerminalName() {
+  try {
+    const cfg = await chrome.storage.local.get([TERMINAL_NAME_KEY]);
+    return String(cfg[TERMINAL_NAME_KEY] || "").trim();
+  } catch (e) {
+    console.warn("[Jarvis] read terminal name failed", e);
+    return "";
+  }
+}
+
+/** 缓存终端名称（空值不写入，避免覆盖已有名称）。 */
+async function cacheTerminalName(name) {
+  const value = String(name || "").trim();
+  if (!value) return;
+  try {
+    await chrome.storage.local.set({ [TERMINAL_NAME_KEY]: value });
+  } catch (e) {
+    console.warn("[Jarvis] cache terminal name failed", e);
+  }
 }
 
 /** 稳定的客户端 ID（首次生成后持久化）。 */
@@ -460,7 +492,7 @@ function gatewayKey(gateway) {
  * 必须通过 chrome.scripting.executeScript({ world: "MAIN" }) 注入：
  * MV3 中隔离世界（content script）动态插入的 inline script 不会在主世界执行。
  * 该函数会被序列化后注入，禁止引用外部变量。
- * @returns {{token: string|null, gateway: string|null}|null}
+ * @returns {{token: string|null, gateway: string|null, name: string|null}|null}
  */
 function readAuthBridgeInMainWorld() {
   try {
@@ -472,7 +504,12 @@ function readAuthBridgeInMainWorld() {
     if (typeof bridge.getGateway === "function") {
       gateway = bridge.getGateway() || null;
     }
-    return { token, gateway: gateway || location.origin };
+    // 终端名称：页面设置页配置，随 hello 上报给网关
+    let name = null;
+    if (typeof bridge.getName === "function") {
+      name = bridge.getName() || null;
+    }
+    return { token, gateway: gateway || location.origin, name };
   } catch (e) {
     return null;
   }
@@ -512,6 +549,8 @@ async function requestTokenFromPages(gateway) {
           Boolean(resp.token),
         );
         if (!resp.token) continue;
+        // 顺带缓存页面配置的终端名称，供 hello 上报（页面未打开时用缓存值）
+        if (resp.name) await cacheTerminalName(resp.name);
         // 只接受声明网关与目标网关一致的响应（忽略协议差异）
         if (gatewayKey(resp.gateway) === gKey) {
           return resp.token;

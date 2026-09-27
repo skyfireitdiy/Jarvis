@@ -141,6 +141,10 @@ class DaemonCapabilityManager:
             hostname = str(
                 system_info.get("hostname") or browser_info.get("hostname") or ""
             ).strip()
+            # 终端名称：由用户在 Jarvis 网页设置页配置，前端推送给 daemon，
+            # daemon 在 hello 中携带。用于让网关/Agent 以用户可读的名称识别终端。
+            # 为空时回退 hostname（旧版 daemon 不带该字段）。
+            terminal_name = str(first.get("name") or "").strip() or hostname
             now = time.time()
             # 同一台机器上的 daemon 重启后 client_id 会变（含 PID），旧连接在心跳
             # 超时（最长约 70s）前仍留在会话表里，导致 list_sessions 出现幽灵条目、
@@ -169,6 +173,7 @@ class DaemonCapabilityManager:
                 "hostname": str(
                     system_info.get("hostname") or browser_info.get("hostname") or ""
                 ).strip(),
+                "name": terminal_name,
                 "platform": str(
                     system_info.get("os_name")
                     or system_info.get("platform")
@@ -478,6 +483,7 @@ class DaemonCapabilityManager:
                     "user_id": session.get("user_id"),
                     "node_id": session.get("node_id"),
                     "hostname": session.get("hostname"),
+                    "name": session.get("name") or session.get("hostname"),
                     "platform": session.get("platform"),
                     "system_info": session.get("system_info") or {},
                     "daemon_version": session.get("daemon_version"),
@@ -499,6 +505,7 @@ class DaemonCapabilityManager:
             "user_id": session.get("user_id"),
             "node_id": session.get("node_id"),
             "hostname": session.get("hostname"),
+            "name": session.get("name") or session.get("hostname"),
             "platform": session.get("platform"),
             "system_info": session.get("system_info") or {},
             "daemon_version": session.get("daemon_version"),

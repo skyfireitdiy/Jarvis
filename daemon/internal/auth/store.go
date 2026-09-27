@@ -21,6 +21,10 @@ var ErrNoCredentials = errors.New("没有可用的凭据")
 type Credentials struct {
 	Gateway string
 	Token   string
+	// Name 是用户在前端设置的「终端名称」（默认计算机名）。
+	// 用于向网关登录（hello 帧）时上报，使网关能区分不同终端。
+	// 为空表示用户未设置，此时网关侧回退到 hostname。
+	Name string
 }
 
 // NormalizeGateway 规范化网关地址：去除首尾空白；无 http(s):// 前缀时补 http://；
@@ -90,6 +94,23 @@ func (s *Store) Set(gateway, token string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.creds[key] = Credentials{Gateway: gateway, Token: token}
+	s.valid[key] = true
+}
+
+// SetWithName 写入指定网关的凭据（含终端名称），并重置该网关的 tokenValid 为 true。
+// name 为空时保留该网关已有的名称（避免「只更新 token」的推送把名称清空）。
+func (s *Store) SetWithName(gateway, token, name string) {
+	key := GatewayKey(gateway)
+	if key == "" {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	prev := s.creds[key]
+	if name == "" {
+		name = prev.Name
+	}
+	s.creds[key] = Credentials{Gateway: gateway, Token: token, Name: name}
 	s.valid[key] = true
 }
 

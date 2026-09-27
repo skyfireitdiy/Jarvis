@@ -43,6 +43,9 @@ type Options struct {
 	ClientID string
 	// Version 是守护进程版本，作为 extension_version 上报。
 	Version string
+	// Name 是用户设置的「终端名称」（默认计算机名），随 hello 上报给网关，
+	// 使网关能区分不同终端；为空时 hello 不带 name 字段（网关侧回退 hostname）。
+	Name string
 	// HeartbeatInterval 是默认心跳间隔（秒）；hello_ack 可覆盖。
 	HeartbeatInterval int
 	// ReconnectMin / ReconnectMax 是重连退避上下限（秒）。
@@ -268,6 +271,11 @@ func (c *Client) connectAndServe(ctx context.Context) error {
 		"client_id":         c.opts.ClientID,
 		"extension_version": c.opts.Version,
 		"tabs":              []any{},
+	}
+	// 终端名称：用户在前端设置、随 /api/auth 推送过来，用于让网关区分不同终端。
+	// 为空时不下发该字段，保持与旧版网关的兼容（网关侧回退到 hostname）。
+	if c.opts.Name != "" {
+		hello["name"] = c.opts.Name
 	}
 	if sysInfo, err := capability.CollectSystemInfo(); err != nil {
 		log.Printf("[wsclient] 采集系统信息失败，hello 将不含 system_info: %v", err)

@@ -92,6 +92,19 @@
         </div>
       </div>
 
+      <!-- 终端名称 -->
+      <div class="form-group">
+        <label>终端名称</label>
+        <div class="form-help" style="margin-bottom:10px">用于在网关侧区分不同终端（如「家里的台式机」「办公笔记本」）。留空则使用默认名称；修改后会自动同步给浏览器扩展与本机 daemon，Agent 即可按名称定位到这台机器。</div>
+        <input
+          class="node-name-input"
+          :value="localTerminalName"
+          placeholder="例如：办公笔记本"
+          @input="onTerminalNameInput($event.target.value)"
+          @keydown.enter="$event.target.blur()"
+        />
+      </div>
+
       <!-- 节点显示名映射 -->
       <div class="form-group">
         <label>节点显示名</label>
@@ -202,7 +215,8 @@ const props = defineProps({
   showToast: { type: Function, default: () => {} },
   nodeOptions: { type: Array, default: () => [] },
   nodeDisplayNames: { type: Object, default: () => ({}) },
-  hideWorkingDir: { type: Boolean, default: false }
+  hideWorkingDir: { type: Boolean, default: false },
+  terminalName: { type: String, default: '' }
 })
 
 const emit = defineEmits([
@@ -216,7 +230,9 @@ const emit = defineEmits([
   'saveNotifySettings',
   'saveNodeDisplayNames',
   'update:hideWorkingDir',
-  'saveHideWorkingDirSetting'
+  'saveHideWorkingDirSetting',
+  'update:terminalName',
+  'saveTerminalNameSetting'
 ])
 
 // 本地状态
@@ -224,6 +240,7 @@ const localAutoLoginEnabled = ref(props.autoLoginEnabled)
 const localNotifyOnExit = ref(props.notifyOnExit)
 const localNotifyOnInput = ref(props.notifyOnInput)
 const localHideWorkingDir = ref(props.hideWorkingDir)
+const localTerminalName = ref(props.terminalName)
 const changePasswordForm = ref({ old_password: '', new_password: '', confirm_password: '' })
 const loading = ref(false)
 // 节点显示名本地副本（编辑中，input 时即时更新并向上同步）
@@ -294,6 +311,18 @@ watch(() => props.nodeDisplayNames, (newVal) => {
 watch(() => props.hideWorkingDir, (newVal) => {
   localHideWorkingDir.value = newVal
 })
+
+watch(() => props.terminalName, (newVal) => {
+  localTerminalName.value = newVal
+})
+
+// 终端名称输入：更新本地副本并向上同步（父组件负责持久化与同步到扩展/daemon）
+function onTerminalNameInput(value) {
+  const trimmed = String(value || '').trim()
+  localTerminalName.value = trimmed
+  emit('update:terminalName', trimmed)
+  emit('saveTerminalNameSetting', trimmed)
+}
 
 // 隐藏工作目录开关变更
 function handleHideWorkingDirChange() {

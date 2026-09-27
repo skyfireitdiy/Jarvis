@@ -70,6 +70,8 @@ type Manager struct {
 	gateways map[string]string
 	// tokens 记录每个网关最近一次设置的 Token，供 Status 判断 token 有效性。
 	tokens map[string]string
+	// names 记录每个网关最近一次设置的「终端名称」，供 Connect 时注入 hello。
+	names map[string]string
 }
 
 // NewManager 创建多网关连接管理器。
@@ -99,6 +101,7 @@ func NewManagerWithOptions(mopts ManagerOptions) *Manager {
 		clients:       make(map[string]*Client),
 		gateways:      make(map[string]string),
 		tokens:        make(map[string]string),
+		names:         make(map[string]string),
 	}
 }
 
@@ -107,6 +110,14 @@ func NewManagerWithOptions(mopts ManagerOptions) *Manager {
 // 若该网关已有连接，则先停掉旧 Client 再重建（同网关只保留最新连接），
 // 不影响其他网关。gateway 或 token 为空时直接返回（no-op）。
 func (m *Manager) Connect(gateway, token string) {
+	m.ConnectWithName(gateway, token, "")
+}
+
+// ConnectWithName 在 Connect 的基础上带上「终端名称」。
+//
+// name 会随 hello 帧上报给网关，使网关能区分不同终端（为空则网关侧回退 hostname）。
+// name 为空时保留该网关此前已记录的名称，便于「只更新 token」的推送不丢失名称。
+func (m *Manager) ConnectWithName(gateway, token, name string) {
 	key := auth.GatewayKey(gateway)
 	if key == "" || token == "" {
 		return
@@ -117,9 +128,13 @@ func (m *Manager) Connect(gateway, token string) {
 	// 避免在持锁状态下执行可能阻塞的 Stop（并避免与 Status 互相阻塞）。
 	m.mu.Lock()
 	old := m.clients[key]
+	if name == "" {
+		name = m.names[key]
+	}
 	opts := m.opts
 	opts.Gateway = normalized
 	opts.Token = token
+	opts.Name = name
 	// 为每个网关单独注入回调，使上层能区分是哪个网关触发的。
 	// 用 normalized 作为回调里的 gateway，与 Status() 展示的地址一致。
 	if m.onStateChange != nil {
@@ -135,6 +150,7 @@ func (m *Manager) Connect(gateway, token string) {
 	m.clients[key] = client
 	m.gateways[key] = normalized
 	m.tokens[key] = token
+	m.names[key] = name
 	m.mu.Unlock()
 
 	if old != nil {
@@ -155,6 +171,7 @@ func (m *Manager) Disconnect(gateway string) {
 	delete(m.clients, key)
 	delete(m.gateways, key)
 	delete(m.tokens, key)
+	delete(m.names, key)
 	m.mu.Unlock()
 
 	if client != nil {
@@ -172,6 +189,7 @@ func (m *Manager) DisconnectAll() {
 	m.clients = make(map[string]*Client)
 	m.gateways = make(map[string]string)
 	m.tokens = make(map[string]string)
+	m.names = make(map[string]string)
 	m.mu.Unlock()
 
 	for _, c := range clients {

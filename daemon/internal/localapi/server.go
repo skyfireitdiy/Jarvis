@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"jarvis-daemon/internal/auth"
@@ -76,6 +77,9 @@ func withCORS(next http.Handler) http.Handler {
 type authRequest struct {
 	Gateway string `json:"gateway"`
 	Token   string `json:"token"`
+	// Name 是前端设置的「终端名称」（默认计算机名），随 hello 上报给网关。
+	// 可选：为空时保留该网关已有名称。
+	Name string `json:"name"`
 }
 
 // logoutRequest 的 gateway 可选：带则只登出该网关，不带则登出全部。
@@ -109,9 +113,10 @@ func (s *Server) handleAuth(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	s.store.Set(req.Gateway, req.Token)
-	s.manager.Connect(req.Gateway, req.Token)
-	log.Printf("[localapi] 收到认证推送: gateway=%s token=%s...", req.Gateway, maskToken(req.Token))
+	s.store.SetWithName(req.Gateway, req.Token, req.Name)
+	s.manager.ConnectWithName(req.Gateway, req.Token, req.Name)
+	log.Printf("[localapi] 收到认证推送: gateway=%s token=%s... name=%q",
+		req.Gateway, maskToken(req.Token), req.Name)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"success":        true,
 		"status":         "connecting",
@@ -142,7 +147,19 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"success":        true,
 		"gateways":       gateways,
 		"daemon_version": s.version,
+		// hostname 供前端在用户未设置「终端名称」时作为默认值
+		// （浏览器无法直接读取系统主机名，故由守护进程提供）。
+		"hostname": localHostname(),
 	})
+}
+
+// localHostname 返回本机主机名；获取失败时返回空串（前端会保持名称为空）。
+func localHostname() string {
+	host, err := os.Hostname()
+	if err != nil {
+		return ""
+	}
+	return host
 }
 
 // handleLogout 登出：请求体可带 gateway 指定单个网关；不带则清空全部。

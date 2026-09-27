@@ -1041,6 +1041,7 @@
       :nodeOptions="availableNodeOptions"
       :nodeDisplayNames="nodeDisplayNames"
       :hideWorkingDir="hideWorkingDir"
+      :terminalName="terminalName"
       @update:visible="showSettingsModal = $event"
       @update:autoLoginEnabled="autoLoginEnabled = $event"
       @saveAutoLoginSetting="saveAutoLoginSetting"
@@ -1050,6 +1051,8 @@
       @saveNodeDisplayNames="saveNodeDisplayNames"
       @update:hideWorkingDir="hideWorkingDir = $event"
       @saveHideWorkingDirSetting="saveHideWorkingDirSetting"
+      @update:terminalName="terminalName = $event"
+      @saveTerminalNameSetting="saveTerminalNameSetting"
       @confirmClearHistory="confirmClearHistory"
       @disconnectAll="disconnectAll"
     />
@@ -8869,6 +8872,50 @@ function getWorkingDirDisplay(workingDir) {
   if (hideWorkingDir.value) return WORKING_DIR_HIDDEN_PLACEHOLDER
   return workingDir || ''
 }
+// 终端名称：用于在网关侧区分不同终端（Agent 可按名称定位到这台机器）。
+// 存 localStorage 后同时暴露给：①浏览器扩展（__jarvisAuthBridge.getName）
+// ②本机 daemon（随 /api/auth 推送）。默认值取本机计算机名，浏览器无法直接读
+// 系统主机名，故向本机 daemon 的 /api/status 查询（daemon 由 os.Hostname() 提供）。
+const TERMINAL_NAME_STORAGE_KEY = 'jarvis_terminal_name'
+function loadTerminalName() {
+  try {
+    return String(localStorage.getItem(TERMINAL_NAME_STORAGE_KEY) || '').trim()
+  } catch (error) {
+    console.warn('[TERMINAL] Failed to load terminal name:', error)
+    return ''
+  }
+}
+const terminalName = ref(loadTerminalName())
+function saveTerminalNameSetting(nextValue = terminalName.value) {
+  terminalName.value = String(nextValue || '').trim()
+  try {
+    localStorage.setItem(TERMINAL_NAME_STORAGE_KEY, terminalName.value)
+  } catch (error) {
+    console.warn('[TERMINAL] Failed to save terminal name:', error)
+  }
+  // 名称变化后立即重新推送一次给本机 daemon（扩展是主动读 bridge，无需推送）
+  syncTokenToDaemon(auth.value.token, window.__jarvisAuthBridge.getGateway())
+}
+// 首次进入且用户未配置名称时，用本机 daemon 上报的计算机名作为默认值。
+// 仅在未配置（localStorage 无值）时写入，避免覆盖用户自定义名称。
+async function initTerminalNameFromDaemon() {
+  if (loadTerminalName()) return
+  try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 1500)
+    const resp = await fetch(`${getDaemonUrl()}/api/status`, {
+      signal: controller.signal,
+      credentials: 'omit',
+    })
+    clearTimeout(timer)
+    const data = await resp.json()
+    const hostname = String(data?.hostname || '').trim()
+    if (hostname) saveTerminalNameSetting(hostname)
+  } catch (e) {
+    // daemon 不存在或未启动属预期情况，保持名称为空（网关侧回退到 hostname）
+    console.debug('[TERMINAL] init terminal name from daemon skipped:', e?.message || e)
+  }
+}
 const newAgentNodeId = ref('master')
 const selectedTerminalNodeId = ref('master')
 
@@ -16673,6 +16720,8 @@ function sendHeartbeat() {
 // 以便扩展把 Token 关联到正确的网关。
 window.__jarvisAuthBridge = {
   getToken: () => auth.value.token || null,
+  // 终端名称：供扩展随 hello 上报给网关，使网关能区分不同终端。
+  getName: () => terminalName.value || null,
   getGateway: () => {
     const parsed = parseGatewayAddress(gatewayUrl.value)
     if (!parsed) return null
@@ -16711,7 +16760,8 @@ function getDaemonUrl() {
 }
 
 // 把当前登录态同步到本机 daemon。
-// token 非空 → POST /api/auth {gateway, token}；token 为空 → POST /api/logout {gateway}。
+// token 非空 → POST /api/auth {gateway, token, name}；token 为空 → POST /api/logout {gateway}。
+// name 即「终端名称」，daemon 会在向网关登录（hello 帧）时带上，供网关区分终端。
 // 完全 fire-and-forget：不 await、不抛错、不弹 toast、不阻塞主流程；daemon 不存在时静默。
 function syncTokenToDaemon(token, gateway) {
   try {
@@ -16723,7 +16773,9 @@ function syncTokenToDaemon(token, gateway) {
     fetch(`${daemonUrl}${isLogout ? '/api/logout' : '/api/auth'}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(isLogout ? { gateway } : { gateway, token }),
+      body: JSON.stringify(
+        isLogout ? { gateway } : { gateway, token, name: terminalName.value || '' },
+      ),
       signal: controller.signal,
       credentials: 'omit',
     })
@@ -16754,6 +16806,8 @@ watch(
 onMounted(() => {
   // 阶段4：恢复上次的编辑器分割布局（非法数据自动回退默认单 leaf）
   restoreWorkspacePaneLayout()
+  // 终端名称：用户从未配置过时，用本机 daemon 上报的计算机名作为默认值
+  initTerminalNameFromDaemon()
   // 不再在页面加载时创建终端，改为动态创建
 
   // 启动心跳机制

@@ -142,10 +142,14 @@ class BrowserExtensionManager:
             session_user_id = user_id if user_id is not None else first.get("user_id")
             tabs_meta = first.get("tabs") or []
             now = time.time()
+            # 终端名称：由用户在 Jarvis 网页设置页配置，扩展缓存后随 hello 上报，
+            # 用于让网关/Agent 以用户可读的名称识别终端（为空时回退 hostname）。
+            terminal_name = str(first.get("name") or "").strip()
             self._sessions[session_id] = {
                 "websocket": websocket,
                 "user_id": session_user_id,
                 "client_id": client_id,
+                "name": terminal_name,
                 "tabs_meta": tabs_meta,
                 "connected_at": now,
                 "last_seen": now,
@@ -192,6 +196,8 @@ class BrowserExtensionManager:
                         session["client_id"] = (
                             str(message.get("client_id") or "").strip() or client_id
                         )
+                        if message.get("name") is not None:
+                            session["name"] = str(message.get("name") or "").strip()
                 else:
                     logger.debug("[BROWSER-EXT] unknown message type: %s", msg_type)
         except Exception as exc:
@@ -369,6 +375,7 @@ class BrowserExtensionManager:
                     "session_id": session_id,
                     "client_id": session.get("client_id"),
                     "user_id": session.get("user_id"),
+                    "name": session.get("name") or "",
                     "connected_at": session.get("connected_at"),
                     "extension_version": session.get("extension_version"),
                     "browser_info": session.get("browser_info") or {},
@@ -386,6 +393,7 @@ class BrowserExtensionManager:
             "session_id": session_id,
             "client_id": session.get("client_id"),
             "user_id": session.get("user_id"),
+            "name": session.get("name") or "",
             "connected_at": session.get("connected_at"),
             "extension_version": session.get("extension_version"),
             "browser_info": session.get("browser_info") or {},
