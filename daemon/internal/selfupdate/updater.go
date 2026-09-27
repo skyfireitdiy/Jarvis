@@ -112,6 +112,16 @@ func Run(opts Options) error {
 		// Windows 上目标被占用时会返回「已保留待替换文件」，此时改走 helper。
 		if pid, herr := SpawnApplyHelper("", newBinary, opts.TargetPath, opts.Restart); herr == nil && pid > 0 {
 			log.Printf("[selfupdate] 已启动更新 helper（pid=%d），将在进程退出后完成替换", pid)
+			// 关键：helper 要等目标文件不再被占用才能替换，而当前进程正占着它。
+			// 因此必须主动重启服务（Stop 会终止本进程），否则 helper 会一直等到
+			// 60 秒超时、替换失败退出，更新永远无法生效。
+			if opts.Restart {
+				report(StateRestarting, "")
+				if rerr := restartService(); rerr != nil {
+					// 重启失败不算更新失败（文件待 helper 替换），只记日志。
+					log.Printf("[selfupdate] 重启服务失败（helper 将在进程退出后替换，可手动重启）: %v", rerr)
+				}
+			}
 			report(StateDone, "")
 			return nil
 		}
