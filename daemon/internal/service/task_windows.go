@@ -93,6 +93,10 @@ func (s *taskService) Uninstall() (string, error) {
 }
 
 // Start 以分离进程启动守护进程并记录 PID。
+//
+// 启动的是**固定安装路径**（~/.jarvis/bin/jarvis-daemon.exe）的可执行文件，而不是
+// 当前进程路径：计划任务指向的也是该固定路径，两者必须一致，否则用户从下载目录执行
+// start 会启动另一个副本，与服务管理（stop/status）观察到的进程对不上。
 func (s *taskService) Start() (string, error) {
 	pidPath, err := PidFilePath()
 	if err != nil {
@@ -102,9 +106,12 @@ func (s *taskService) Start() (string, error) {
 		return "", fmt.Errorf("服务已在运行（PID: %d）", pid)
 	}
 
-	execPath, err := ResolveExecPath(Options{})
+	execPath, err := InstalledBinaryPath()
 	if err != nil {
 		return "", err
+	}
+	if _, statErr := os.Stat(execPath); statErr != nil {
+		return "", fmt.Errorf("未找到已安装的可执行文件 %s，请先执行 install", execPath)
 	}
 	cmd := exec.Command(execPath, BuildRunArgs(Options{})...)
 	cmd.SysProcAttr = detachedProcAttr()

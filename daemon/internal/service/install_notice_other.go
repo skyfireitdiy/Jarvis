@@ -7,3 +7,8 @@ package service
 func InstallNotice() string {
 	return ""
 }
+
+// StartHint 在非 Windows 平台返回空串（Linux 通过 systemctl 管理，无需完整路径）。
+func StartHint() string {
+	return ""
+}

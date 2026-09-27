@@ -118,7 +118,11 @@ func cmdInstall(args []string) error {
 		return err
 	}
 	fmt.Printf("[daemon] %s\n", msg)
-	fmt.Println("[daemon] 提示：使用 jarvis-daemon start 启动服务")
+	if hint := service.StartHint(); hint != "" {
+		fmt.Printf("[daemon] %s\n", hint)
+	} else {
+		fmt.Println("[daemon] 提示：使用 jarvis-daemon start 启动服务")
+	}
 	return nil
 }
 
