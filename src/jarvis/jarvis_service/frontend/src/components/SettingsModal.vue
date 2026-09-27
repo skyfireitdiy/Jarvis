@@ -92,6 +92,19 @@
         </div>
       </div>
 
+      <!-- 自动安装/更新浏览器扩展 -->
+      <div class="form-group">
+        <div class="toggle-wrapper">
+          <label class="toggle-switch">
+            <input type="checkbox" v-model="localAutoInstallBrowserExt" @change="handleAutoInstallBrowserExtChange" class="toggle-input" />
+            <span class="toggle-slider"></span>
+          </label>
+          <div class="toggle-info">
+            <span class="toggle-label-text">自动安装/更新浏览器扩展</span>
+            <span class="form-help">默认关闭。开启后，本机 daemon 会在网关上的扩展版本变化时自动下载并覆盖本地扩展目录；不会重启浏览器，需在 chrome://extensions 点击「刷新」使新版本生效。</span>
+          </div>
+        </div>
+      </div>
       <!-- 终端名称 -->
       <div class="form-group">
         <label>终端名称</label>
@@ -216,6 +229,7 @@ const props = defineProps({
   nodeOptions: { type: Array, default: () => [] },
   nodeDisplayNames: { type: Object, default: () => ({}) },
   hideWorkingDir: { type: Boolean, default: false },
+  autoInstallBrowserExt: { type: Boolean, default: false },
   terminalName: { type: String, default: '' }
 })
 
@@ -231,6 +245,8 @@ const emit = defineEmits([
   'saveNodeDisplayNames',
   'update:hideWorkingDir',
   'saveHideWorkingDirSetting',
+  'update:autoInstallBrowserExt',
+  'saveAutoInstallBrowserExtSetting',
   'update:terminalName',
   'saveTerminalNameSetting'
 ])
@@ -240,6 +256,7 @@ const localAutoLoginEnabled = ref(props.autoLoginEnabled)
 const localNotifyOnExit = ref(props.notifyOnExit)
 const localNotifyOnInput = ref(props.notifyOnInput)
 const localHideWorkingDir = ref(props.hideWorkingDir)
+const localAutoInstallBrowserExt = ref(props.autoInstallBrowserExt)
 const localTerminalName = ref(props.terminalName)
 const changePasswordForm = ref({ old_password: '', new_password: '', confirm_password: '' })
 const loading = ref(false)
@@ -311,6 +328,9 @@ watch(() => props.nodeDisplayNames, (newVal) => {
 watch(() => props.hideWorkingDir, (newVal) => {
   localHideWorkingDir.value = newVal
 })
+watch(() => props.autoInstallBrowserExt, (newVal) => {
+  localAutoInstallBrowserExt.value = newVal
+})
 
 watch(() => props.terminalName, (newVal) => {
   localTerminalName.value = newVal
@@ -328,6 +348,11 @@ function onTerminalNameInput(value) {
 function handleHideWorkingDirChange() {
   emit('update:hideWorkingDir', localHideWorkingDir.value)
   emit('saveHideWorkingDirSetting', localHideWorkingDir.value)
+}
+// 自动安装/更新浏览器扩展开关变更（父组件负责持久化到 localStorage 并推送给本机 daemon）
+function handleAutoInstallBrowserExtChange() {
+  emit('update:autoInstallBrowserExt', localAutoInstallBrowserExt.value)
+  emit('saveAutoInstallBrowserExtSetting', localAutoInstallBrowserExt.value)
 }
 
 // 节点显示名输入：更新本地副本并向上同步（父组件负责持久化）

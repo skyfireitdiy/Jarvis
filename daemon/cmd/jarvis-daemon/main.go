@@ -272,11 +272,24 @@ var browserExtSyncMu sync.Mutex
 // maybeAutoSyncBrowserExt 在网关下发扩展最新版本且与本地不一致时，异步同步扩展包。
 //
 // 设计要点：
+//   - 受「自动安装/更新浏览器扩展」开关约束：开关关闭（默认）时直接跳过，
+//     不下载、不起协程。开关由用户在 Web 设置界面显式打开后随登录态推送给
+//     本机守护进程（只存内存态，不落盘），故守护进程重启后回到关闭，等待
+//     前端再次推送——未收到推送一律不自动同步，这是安全默认；
 //   - 立即返回，把下载/解压放到独立 goroutine（下载可能耗时数秒），不阻塞 WS 读循环；
 //   - 版本一致时直接跳过，避免每次重连都重复下载；
 //   - 任何失败只记日志，绝不影响连接与既有能力；
 //   - 不重启浏览器：仅把新版本落盘，由用户在 chrome://extensions 手动刷新。
+//
+// 注意：本开关只约束此处的「自动同步」；手动能力 browser.ext.sync 由用户显式
+// 调用，不受该开关约束。
 func maybeAutoSyncBrowserExt(gateway, latestVersion string) {
+	// 开关判断必须放在函数入口、goroutine 之外：关闭时提前返回，避免无谓起协程。
+	if !capability.AutoInstallBrowserExt() {
+		log.Printf("[daemon] 自动安装/更新浏览器扩展已关闭，跳过自动同步（网关 %s，网关版本 %q）",
+			gateway, latestVersion)
+		return
+	}
 	latestVersion = strings.TrimSpace(latestVersion)
 	if latestVersion == "" {
 		// 网关未提供版本（旧版网关或读取失败），无法判断是否需要更新。

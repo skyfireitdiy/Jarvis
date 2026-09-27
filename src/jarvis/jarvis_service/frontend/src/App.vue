@@ -1041,6 +1041,7 @@
       :nodeOptions="availableNodeOptions"
       :nodeDisplayNames="nodeDisplayNames"
       :hideWorkingDir="hideWorkingDir"
+      :autoInstallBrowserExt="autoInstallBrowserExt"
       :terminalName="terminalName"
       @update:visible="showSettingsModal = $event"
       @update:autoLoginEnabled="autoLoginEnabled = $event"
@@ -1051,6 +1052,8 @@
       @saveNodeDisplayNames="saveNodeDisplayNames"
       @update:hideWorkingDir="hideWorkingDir = $event"
       @saveHideWorkingDirSetting="saveHideWorkingDirSetting"
+      @update:autoInstallBrowserExt="autoInstallBrowserExt = $event"
+      @saveAutoInstallBrowserExtSetting="saveAutoInstallBrowserExtSetting"
       @update:terminalName="terminalName = $event"
       @saveTerminalNameSetting="saveTerminalNameSetting"
       @confirmClearHistory="confirmClearHistory"
@@ -8869,6 +8872,29 @@ function saveHideWorkingDirSetting(nextValue = hideWorkingDir.value) {
   } catch (error) {
     console.warn('[WORKDIR] Failed to save hide working dir setting:', error)
   }
+}
+// 自动安装/更新浏览器扩展：默认关闭。开启后本机 daemon 会在网关扩展版本变化时
+// 自动下载并覆盖本地扩展目录（不会重启浏览器）。状态只存浏览器 localStorage，
+// 随登录态一并推送给 daemon（daemon 只保留内存态，不落盘）。
+const AUTO_INSTALL_BROWSER_EXT_STORAGE_KEY = 'jarvis_auto_install_browser_ext'
+function loadAutoInstallBrowserExt() {
+  try {
+    return localStorage.getItem(AUTO_INSTALL_BROWSER_EXT_STORAGE_KEY) === '1'
+  } catch (error) {
+    console.warn('[BROWSER_EXT] Failed to load auto install setting:', error)
+    return false
+  }
+}
+const autoInstallBrowserExt = ref(loadAutoInstallBrowserExt())
+function saveAutoInstallBrowserExtSetting(nextValue = autoInstallBrowserExt.value) {
+  autoInstallBrowserExt.value = !!nextValue
+  try {
+    localStorage.setItem(AUTO_INSTALL_BROWSER_EXT_STORAGE_KEY, autoInstallBrowserExt.value ? '1' : '0')
+  } catch (error) {
+    console.warn('[BROWSER_EXT] Failed to save auto install setting:', error)
+  }
+  // 开关变化后立即重新推送一次给本机 daemon（与终端名称一致的做法）
+  syncTokenToDaemon(auth.value.token, window.__jarvisAuthBridge.getGateway())
 }
 // 工作目录展示：开启隐藏时返回占位符，否则返回原始目录
 const WORKING_DIR_HIDDEN_PLACEHOLDER = '••••••'
@@ -16778,7 +16804,16 @@ function syncTokenToDaemon(token, gateway) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(
-        isLogout ? { gateway } : { gateway, token, name: terminalName.value || '' },
+        isLogout
+          ? { gateway }
+          : {
+              gateway,
+              token,
+              name: terminalName.value || '',
+              // 随登录态一并推送「自动安装/更新浏览器扩展」开关，daemon 据此决定
+              // 是否在网关扩展版本变化时自动同步（daemon 只存内存态，不落盘）。
+              auto_install_browser_ext: autoInstallBrowserExt.value,
+            },
       ),
       signal: controller.signal,
       credentials: 'omit',

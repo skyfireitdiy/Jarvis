@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"jarvis-daemon/internal/auth"
+	"jarvis-daemon/internal/capability"
 	"jarvis-daemon/internal/wsclient"
 )
 
@@ -46,6 +47,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/auth", s.handleAuth)
 	mux.HandleFunc("/api/status", s.handleStatus)
 	mux.HandleFunc("/api/logout", s.handleLogout)
+	mux.HandleFunc("/api/settings", s.handleSettings)
 	return withCORS(mux)
 }
 
@@ -80,11 +82,23 @@ type authRequest struct {
 	// Name 是前端设置的「终端名称」（默认计算机名），随 hello 上报给网关。
 	// 可选：为空时保留该网关已有名称。
 	Name string `json:"name"`
+	// AutoInstallBrowserExt 是「是否自动安装/更新浏览器扩展」开关，随登录态一并
+	// 由前端推送。用 *bool 以区分「未提供」（nil，保持原值，兼容旧前端）与
+	// 「显式关闭」（false）。
+	AutoInstallBrowserExt *bool `json:"auto_install_browser_ext"`
 }
 
 // logoutRequest 的 gateway 可选：带则只登出该网关，不带则登出全部。
 type logoutRequest struct {
 	Gateway string `json:"gateway"`
+}
+
+// settingsRequest 是 /api/settings 的请求体。
+//
+// AutoInstallBrowserExt 用 *bool：nil 表示请求未提供该字段（返回 400），
+// 以区分「未提供」与「显式关闭」。目前仅此一项，后续可扩展。
+type settingsRequest struct {
+	AutoInstallBrowserExt *bool `json:"auto_install_browser_ext"`
 }
 
 // handleAuth 接收网页推送的凭据并触发对应网关连接。
@@ -115,6 +129,11 @@ func (s *Server) handleAuth(w http.ResponseWriter, r *http.Request) {
 	}
 	s.store.SetWithName(req.Gateway, req.Token, req.Name)
 	s.manager.ConnectWithName(req.Gateway, req.Token, req.Name)
+	// 前端可随登录态一并推送「自动安装浏览器扩展」开关；未提供（nil）时保持原值，
+	// 兼容旧前端。开关只存内存态，不落盘（用户要求只存浏览器存储）。
+	if req.AutoInstallBrowserExt != nil {
+		capability.SetAutoInstallBrowserExt(*req.AutoInstallBrowserExt)
+	}
 	log.Printf("[localapi] 收到认证推送: gateway=%s token=%s... name=%q",
 		req.Gateway, maskToken(req.Token), req.Name)
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -185,6 +204,51 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[localapi] 已登出全部网关，连接已断开")
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"success": true})
+}
+
+// handleSettings 读写守护进程的设置项（目前仅「自动安装浏览器扩展」开关）。
+//
+// GET  → 返回当前值，供前端在打开设置界面时回显；
+// POST → 更新开关，请求体 {"auto_install_browser_ext": true|false}。
+//
+// 注意：该开关只存内存态，不落盘（用户要求只存浏览器存储）；守护进程重启后
+// 回到默认值 false（关闭），等待前端再次推送。
+func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, map[string]any{
+			"success":                  true,
+			"auto_install_browser_ext": capability.AutoInstallBrowserExt(),
+		})
+	case http.MethodPost:
+		var req settingsRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"success": false,
+				"error":   "invalid json: " + err.Error(),
+			})
+			return
+		}
+		// 字段缺失（nil）视为非法请求：语义明确，避免「静默不改」让调用方困惑。
+		if req.AutoInstallBrowserExt == nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"success": false,
+				"error":   "auto_install_browser_ext is required",
+			})
+			return
+		}
+		capability.SetAutoInstallBrowserExt(*req.AutoInstallBrowserExt)
+		log.Printf("[localapi] 更新设置: auto_install_browser_ext=%v", *req.AutoInstallBrowserExt)
+		writeJSON(w, http.StatusOK, map[string]any{
+			"success":                  true,
+			"auto_install_browser_ext": *req.AutoInstallBrowserExt,
+		})
+	default:
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{
+			"success": false,
+			"error":   "method not allowed",
+		})
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {
