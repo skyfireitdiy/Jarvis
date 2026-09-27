@@ -40,11 +40,16 @@ func TestBuildPowerShellScriptStructure(t *testing.T) {
 	script := buildPowerShellScript("schtasks", []string{"/Create", "/TN", "Jarvis-Daemon"})
 
 	idxExec := strings.Index(script, "$out = & schtasks")
+	idxCode := strings.Index(script, "$code = $LASTEXITCODE")
 	idxSetEnc := strings.Index(script, "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8")
 	idxWrite := strings.Index(script, "[Console]::Out.Write($out)")
+	idxExit := strings.Index(script, "exit $code")
 
 	if idxExec < 0 {
 		t.Fatalf("脚本未包含执行命令片段: %q", script)
+	}
+	if idxCode < 0 {
+		t.Fatalf("脚本未包含捕获退出码片段: %q", script)
 	}
 	if idxSetEnc < 0 {
 		t.Fatalf("脚本未包含设置 UTF-8 输出编码片段: %q", script)
@@ -52,10 +57,15 @@ func TestBuildPowerShellScriptStructure(t *testing.T) {
 	if idxWrite < 0 {
 		t.Fatalf("脚本未包含写出片段: %q", script)
 	}
-	// 关键顺序：执行 → 改编码 → 写出。
-	if !(idxExec < idxSetEnc && idxSetEnc < idxWrite) {
-		t.Errorf("脚本片段顺序错误（应为 执行 < 改编码 < 写出）：exec=%d setEnc=%d write=%d\n%s",
-			idxExec, idxSetEnc, idxWrite, script)
+	if idxExit < 0 {
+		t.Fatalf("脚本未包含透传退出码片段: %q", script)
+	}
+	// 关键顺序：执行 → 捕获退出码 → 改编码 → 写出 → 透传退出码。
+	// 捕获 $LASTEXITCODE 必须在执行之后（否则拿到的是上一条命令的退出码）；
+	// exit 必须在最后（否则后续语句不会执行）。
+	if !(idxExec < idxCode && idxCode < idxSetEnc && idxSetEnc < idxWrite && idxWrite < idxExit) {
+		t.Errorf("脚本片段顺序错误（应为 执行 < 捕获退出码 < 改编码 < 写出 < 透传退出码）：exec=%d code=%d setEnc=%d write=%d exit=%d\n%s",
+			idxExec, idxCode, idxSetEnc, idxWrite, idxExit, script)
 	}
 	// stderr 合并，保证失败原因也能被捕获。
 	if !strings.Contains(script, "2>&1") {

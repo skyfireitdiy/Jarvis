@@ -33,8 +33,10 @@ import (
 //
 //	$ErrorActionPreference='Continue';
 //	$out = & <name> <args...> 2>&1 | Out-String;   # 此时 OutputEncoding 仍是系统默认，正确解码子进程输出
+//	$code = $LASTEXITCODE;                          # 捕获外部命令退出码（管道不改变它）
 //	[Console]::OutputEncoding = [System.Text.Encoding]::UTF8;
 //	[Console]::Out.Write($out)                     # 用 UTF-8 写出，供 Go 侧直接读取
+//	exit $code                                      # 把外部命令的退出码透传给 Go
 //
 // 说明：
 //   - 第 1 步必须用**系统默认**的 [Console]::OutputEncoding 读取外部命令输出：
@@ -46,6 +48,11 @@ import (
 //   - 用 [Console]::Out.Write 而非 Write-Output，避免额外追加换行。
 //   - $ErrorActionPreference='Continue'：外部命令返回非零退出码时不让 PowerShell 中断，
 //     以便我们仍能读到它的输出文本。
+//   - **必须显式 exit $code**：因为 $ErrorActionPreference='Continue'，外部命令失败时
+//     PowerShell 默认仍以 0 退出，Go 的 cmd.Output() 会误判为成功（真机实测：schtasks
+//     创建失败却打印「计划任务已创建」）。用 $LASTEXITCODE 捕获并透传退出码后，
+//     Go 侧才能正确识别失败。注意 $LASTEXITCODE 要在执行外部命令后立即捕获，
+//     管道（| Out-String）不会改变它。
 func buildPowerShellScript(name string, args []string) string {
 	var b strings.Builder
 	b.WriteString("$ErrorActionPreference='Continue'; ")
@@ -56,8 +63,10 @@ func buildPowerShellScript(name string, args []string) string {
 		b.WriteString(quotePowerShellArg(a))
 	}
 	b.WriteString(" 2>&1 | Out-String; ")
+	b.WriteString("$code = $LASTEXITCODE; ")
 	b.WriteString("[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ")
-	b.WriteString("[Console]::Out.Write($out)")
+	b.WriteString("[Console]::Out.Write($out); ")
+	b.WriteString("exit $code")
 	return b.String()
 }
 
