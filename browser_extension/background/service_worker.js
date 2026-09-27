@@ -571,6 +571,93 @@ async function requestTokenFromPages(gateway) {
   return null;
 }
 
+/**
+ * 扫描所有标签页，收集「已登录且声明了网关地址」的 (gateway, token)。
+ *
+ * 用于自动发现用户已登录的网关：扩展无需用户手动填写网关地址，
+ * 只要浏览器里开着某个网关的 Jarvis 页面并处于登录态，即可自动纳入网关列表。
+ * 与 requestTokenFromPages 的区别：后者只针对指定网关探测，本函数返回全部命中项。
+ *
+ * @returns {Promise<Array<{gateway: string, token: string}>>}
+ */
+async function discoverGatewaysFromPages() {
+  const found = new Map(); // gatewayKey -> {gateway, token}
+  let tabs = [];
+  try {
+    tabs = await chrome.tabs.query({});
+  } catch (e) {
+    console.warn("[Jarvis] discover: query tabs failed", e);
+    return [];
+  }
+  for (const tab of tabs) {
+    if (!tab.id || !/^https?:/i.test(tab.url || "")) continue;
+    let resp = null;
+    try {
+      const results = await withTimeout(
+        chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: readAuthBridgeInMainWorld,
+          world: "MAIN",
+        }),
+        3000,
+        `executeScript timeout: ${tab.url}`,
+      );
+      resp = results && results[0] ? results[0].result : null;
+    } catch (e) {
+      // 该标签页无法注入（受限页面等），跳过
+      continue;
+    }
+    if (!resp || !resp.token) continue;
+    const g = normalizeGateway(resp.gateway);
+    if (!g) continue;
+    // 顺带缓存页面配置的终端名称，供 hello 上报
+    if (resp.name) await cacheTerminalName(resp.name);
+    const key = gatewayKey(g);
+    if (!found.has(key)) found.set(key, { gateway: g, token: resp.token });
+  }
+  return Array.from(found.values());
+}
+
+/**
+ * 自动把「页面已登录的网关」加入配置列表并连接。
+ *
+ * 触发时机：扩展启动/安装、service worker 冷启动（见 connectAll）。
+ * 幂等：已在配置列表中的网关不会重复写入，但会刷新其 Token 缓存。
+ * 单个网关连接失败不影响其它网关（静默记录日志）。
+ *
+ * @returns {Promise<string[]>} 本次新加入配置列表的网关地址
+ */
+async function autoDiscoverGateways() {
+  const discovered = await discoverGatewaysFromPages();
+  if (discovered.length === 0) return [];
+  const list = await loadGateways();
+  const configured = new Set(list.map(gatewayKey));
+  const added = [];
+  for (const { gateway, token } of discovered) {
+    const key = gatewayKey(gateway);
+    tokens.set(key, token);
+    if (!configured.has(key)) {
+      list.push(gateway);
+      configured.add(key);
+      added.push(gateway);
+    }
+  }
+  if (added.length > 0) {
+    await saveGateways(list);
+    console.log("[Jarvis] auto-added gateways from pages:", added.join(", "));
+    broadcastState();
+  }
+  // 连接所有发现的网关（含本次新增与已配置但页面重新探测到 Token 的）
+  for (const { gateway } of discovered) {
+    try {
+      await connect(gateway);
+    } catch (e) {
+      console.warn("[Jarvis] auto-connect discovered gateway failed", gateway, e);
+    }
+  }
+  return added;
+}
+
 /** 为 Promise 添加超时保护，避免个别标签页注入挂起拖垮整体流程。 */
 function withTimeout(promise, ms, message) {
   return new Promise((resolve, reject) => {
@@ -747,8 +834,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return false;
 });
 
-/** 冷启动：为所有已配置网关建立连接。 */
+/**
+ * 冷启动：先自动发现页面已登录的网关（免手工配置），再为所有已配置网关建立连接。
+ *
+ * 自动发现失败（如无任何 Jarvis 页面）不影响后续已配置网关的连接。
+ */
 async function connectAll() {
+  try {
+    await autoDiscoverGateways();
+  } catch (e) {
+    console.warn("[Jarvis] auto discover gateways failed", e);
+  }
   const list = await loadGateways();
   for (const gateway of list) {
     await connect(gateway);
@@ -758,6 +854,22 @@ async function connectAll() {
 // 扩展安装/启动时自动连接
 chrome.runtime.onStartup.addListener(() => {
   connectAll();
+});
+
+/**
+ * 标签页加载完成时触发一次自动发现。
+ *
+ * 覆盖「扩展先安装、Jarvis 页面后打开/后登录」的场景：冷启动时页面尚未登录，
+ * 探测不到网关；用户打开并登录 Jarvis 页面后，这里能自动把该网关纳入列表并连接。
+ * autoDiscoverGateways 幂等（已配置网关只刷新 Token 与复用连接），
+ * 故每次页面加载完成触发一次是安全的。
+ */
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status !== "complete") return;
+  if (!/^https?:/i.test(tab && tab.url ? tab.url : "")) return;
+  autoDiscoverGateways().catch((e) =>
+    console.warn("[Jarvis] auto discover on tab update failed", e),
+  );
 });
 
 chrome.runtime.onInstalled.addListener(() => {
