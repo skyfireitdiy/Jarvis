@@ -28,6 +28,7 @@ import (
 	"jarvis-daemon/internal/auth"
 	"jarvis-daemon/internal/capability"
 	"jarvis-daemon/internal/config"
+	"jarvis-daemon/internal/daemonlog"
 	"jarvis-daemon/internal/localapi"
 	"jarvis-daemon/internal/selfupdate"
 	"jarvis-daemon/internal/service"
@@ -180,6 +181,12 @@ func runDaemon(args []string) {
 	// 系统会分配一个可见的控制台窗口，用户桌面上会常驻一个黑框。
 	// 非 Windows 平台为空操作。
 	service.HideSelfConsole()
+
+	// 日志落盘：Windows 上由计划任务启动时 stderr 无接收方，日志会全部丢失。
+	// 这里同时写一份到 ~/.jarvis/logs/daemon.log，便于事后排查；失败仅降级为 stderr。
+	if logPath := daemonlog.Setup(); logPath != "" {
+		log.Printf("[daemon] 日志文件: %s", logPath)
+	}
 
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 	listenFlag := fs.String("listen", "", "本地 API 监听地址（覆盖配置文件）")
