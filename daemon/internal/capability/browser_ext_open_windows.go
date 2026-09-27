@@ -221,6 +221,7 @@ func ensureBrowserContentWindow(t browserTarget, exePath string) (uintptr, error
 
 	before := windowIDsOfPIDs(browserPIDs)
 	cmd := exec.Command(exe, "--new-window")
+	cmd.SysProcAttr = hideWindow()
 	if err := cmd.Start(); err != nil {
 		return 0, fmt.Errorf("启动 %s 失败: %w", t.name, err)
 	}
