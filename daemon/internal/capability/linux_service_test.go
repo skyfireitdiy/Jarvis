@@ -189,9 +189,15 @@ func TestLinuxServiceListReal(t *testing.T) {
 // TestLinuxServiceStatusReal 真机验证 status 查询。
 //
 // 只对 dbus.service 做只读查询（用户会话必备单元，不会因查询被改动）。
+// 前提：本机存在可用的 systemd 用户实例。CI runner 上 systemctl 二进制存在
+// 但没有用户实例，`systemctl --user show` 会以非 0 退出，此时跳过而非失败
+// ——该断言验证的是「解析真实输出」的能力，不是环境本身。
 func TestLinuxServiceStatusReal(t *testing.T) {
 	if _, err := exec.LookPath("systemctl"); err != nil {
 		t.Skip("本机无 systemctl，跳过")
+	}
+	if !hasUserSystemdInstance() {
+		t.Skip("本机无 systemd 用户实例（systemctl --user 不可用），跳过")
 	}
 
 	res, err := handleLinuxServiceStatus(map[string]any{"unit": "dbus.service"})
