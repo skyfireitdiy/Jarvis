@@ -62,7 +62,12 @@ func BuildCreateArgs(opts Options) ([]string, error) {
 }
 
 // Install 创建登录时触发的计划任务（不启动）。
+// 安装前先把可执行文件拷贝到固定安装目录 ~/.jarvis/bin，使计划任务指向的位置稳定。
 func (s *taskService) Install(opts Options) (string, error) {
+	opts, installedPath, err := PrepareInstalledBinary(opts)
+	if err != nil {
+		return "", err
+	}
 	args, err := BuildCreateArgs(opts)
 	if err != nil {
 		return "", err
@@ -70,7 +75,7 @@ func (s *taskService) Install(opts Options) (string, error) {
 	if _, err := runCmd("schtasks", args...); err != nil {
 		return "", fmt.Errorf("创建计划任务失败: %w", err)
 	}
-	return fmt.Sprintf("计划任务已创建：%s", TaskName), nil
+	return fmt.Sprintf("计划任务已创建：%s（可执行文件：%s）", TaskName, installedPath), nil
 }
 
 // Uninstall 停止服务并删除计划任务。
@@ -79,7 +84,12 @@ func (s *taskService) Uninstall() (string, error) {
 	if _, err := runCmd("schtasks", "/Delete", "/TN", TaskName, "/F"); err != nil {
 		return "", fmt.Errorf("删除计划任务失败: %w", err)
 	}
-	return fmt.Sprintf("计划任务已删除：%s", TaskName), nil
+	// 清理安装目录中的可执行文件（失败不阻断卸载，仅提示）。
+	cleanupNote := ""
+	if err := RemoveInstalledBinary(); err != nil {
+		cleanupNote = fmt.Sprintf("（可执行文件清理失败：%v）", err)
+	}
+	return fmt.Sprintf("计划任务已删除：%s%s", TaskName, cleanupNote), nil
 }
 
 // Start 以分离进程启动守护进程并记录 PID。

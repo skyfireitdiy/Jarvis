@@ -83,7 +83,12 @@ func buildServicePath(execPath string) string {
 }
 
 // Install 写入 unit 文件、daemon-reload 并 enable（不启动）。
+// 安装前先把可执行文件拷贝到固定安装目录 ~/.jarvis/bin，使 ExecStart 指向的位置稳定。
 func (s *systemdService) Install(opts Options) (string, error) {
+	opts, installedPath, err := PrepareInstalledBinary(opts)
+	if err != nil {
+		return "", err
+	}
 	content, err := BuildUnit(opts)
 	if err != nil {
 		return "", err
@@ -104,7 +109,7 @@ func (s *systemdService) Install(opts Options) (string, error) {
 	if _, err := runSystemctl("enable", ServiceName); err != nil {
 		return "", fmt.Errorf("启用服务失败: %w", err)
 	}
-	return fmt.Sprintf("服务已安装并设为开机自启：%s", unitPath), nil
+	return fmt.Sprintf("服务已安装并设为开机自启：%s（可执行文件：%s）", unitPath, installedPath), nil
 }
 
 // Uninstall 停止服务、取消自启并删除 unit 文件。
@@ -128,7 +133,12 @@ func (s *systemdService) Uninstall() (string, error) {
 	if _, err := runSystemctl("daemon-reload"); err != nil {
 		return "", fmt.Errorf("daemon-reload 失败: %w", err)
 	}
-	return fmt.Sprintf("服务已卸载：%s", unitPath), nil
+	// 清理安装目录中的可执行文件（失败不阻断卸载，仅提示）。
+	cleanupNote := ""
+	if err := RemoveInstalledBinary(); err != nil {
+		cleanupNote = fmt.Sprintf("（可执行文件清理失败：%v）", err)
+	}
+	return fmt.Sprintf("服务已卸载：%s%s", unitPath, cleanupNote), nil
 }
 
 // Start 启动服务。
