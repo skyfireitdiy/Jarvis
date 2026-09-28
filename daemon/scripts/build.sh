@@ -2,7 +2,7 @@
 #
 # jarvis-daemon 跨平台构建脚本。
 #
-# 默认产出 Linux 与 Windows 的服务程序（amd64 / arm64 各一份），
+# 默认产出 Linux 与 Windows 的服务程序（amd64 / arm64 各一份，Linux 额外含 arm32），
 # 全部为 CGO_ENABLED=0 静态链接，可直接投放到目标机器运行。
 #
 # 用法：
@@ -29,6 +29,7 @@ REPO_ROOT="$(cd "${MODULE_DIR}/.." && pwd)"
 DEFAULT_TARGETS=(
   "linux/amd64"
   "linux/arm64"
+  "linux/arm"
   "windows/amd64"
   "windows/arm64"
 )
@@ -46,7 +47,7 @@ usage() {
 选项:
   --version <版本号>   注入的版本号（默认自动探测）
   --targets <列表>     逗号分隔的目标，如 linux/amd64,windows/amd64
-                       默认: linux/amd64,linux/arm64,windows/amd64,windows/arm64
+                       默认: linux/amd64,linux/arm64,linux/arm,windows/amd64,windows/arm64
   --output <目录>      产物输出目录（默认 <daemon>/dist）
   --clean              构建前清空输出目录
   -h, --help           显示本帮助

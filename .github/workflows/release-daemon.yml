@@ -24,6 +24,9 @@ jobs:
           - goos: linux
             goarch: arm64
             ext: ""
+          - goos: linux
+            goarch: arm
+            ext: ""
           - goos: windows
             goarch: amd64
             ext: ".exe"
