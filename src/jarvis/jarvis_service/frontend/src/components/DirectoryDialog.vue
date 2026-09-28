@@ -1,8 +1,8 @@
 <template>
-  <div class="palette-overlay" v-if="visible">
-    <div class="palette-panel dir-modal">
-      <div class="dir-modal-header">
-        <h2>选择工作目录</h2>
+  <div :class="embedded ? 'dir-modal-embedded' : 'palette-overlay'" v-if="visible">
+    <div class="palette-panel dir-modal" :class="{ embedded }">
+      <div class="dir-modal-header" v-if="!embedded">
+        <h2>{{ title }}</h2>
         <button class="dir-close-btn" @click="$emit('cancel')">×</button>
       </div>
       <div class="path-header">
@@ -37,7 +37,7 @@
       <div class="empty-state" v-else>
         <p>该目录下没有子目录</p>
       </div>
-      <div class="dir-modal-actions">
+      <div class="dir-modal-actions" v-if="!embedded">
         <button class="btn secondary" @click="$emit('cancel')">取消</button>
         <button class="btn primary" @click="$emit('confirm')">确认</button>
       </div>
@@ -53,6 +53,16 @@ const props = defineProps({
   currentPath: String,
   selectedDir: String,
   searchText: String,
+  // 内嵌模式：不渲染遮罩与标题栏，由外层容器承载（用于「打开目录」复用同一套目录筛选 UI）
+  embedded: {
+    type: Boolean,
+    default: false
+  },
+  // 标题（仅非内嵌模式显示）
+  title: {
+    type: String,
+    default: '选择工作目录'
+  },
   filteredDirs: {
     type: Array,
     default: () => []
@@ -107,6 +117,25 @@ defineExpose({
   max-height: 72vh;
   display: flex;
   flex-direction: column;
+}
+
+/* 内嵌模式：不占全屏、不遮罩，撑满外层容器（供「打开目录」复用目录筛选 UI） */
+.dir-modal-embedded {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.dir-modal.embedded {
+  max-width: none;
+  width: 100%;
+  max-height: none;
+  flex: 1;
+  min-height: 0;
+  border: none;
+  border-radius: var(--tile-radius-sm, 4px);
+  box-shadow: none;
 }
 
 .dir-modal-header {

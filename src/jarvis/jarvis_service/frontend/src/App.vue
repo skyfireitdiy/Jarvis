@@ -213,7 +213,7 @@
                       class="tree-node-icon expand-arrow"
                       :class="{ expanded: expandedAgents.has(session.agent_id) }"
                     >▶</span>
-                    <span class="tree-node-icon agent-icon">📂</span>
+                    <span class="tree-node-icon agent-icon">🖥</span>
                     <span class="tree-node-text agent-name">{{ session.agent.name }}</span>
                     <span class="agent-node-id">{{ getWorkingDirDisplay(session.agent.working_dir) }}</span>
                     <button
@@ -1084,8 +1084,9 @@
       @search-keydown="handleDirSearchKeydown"
     />
     <!-- 目录树：按节点打开目录（无需创建 Agent） -->
-    <div v-if="showOpenDirDialog" class="palette-overlay open-dir-overlay" @click.self="closeOpenDirDialog">
-      <div class="palette-panel open-dir-modal">
+    <!-- 单弹窗布局：上方选节点 + 路径，下方内嵌目录筛选（复用创建 Agent 的 DirectoryDialog 逻辑） -->
+    <div v-if="showOpenDirDialog" class="open-dir-overlay" @click.self="closeOpenDirDialog">
+      <div class="open-dir-modal">
         <div class="open-dir-header">
           <h2>打开目录</h2>
           <button class="open-dir-close" @click="closeOpenDirDialog">×</button>
@@ -1111,28 +1112,23 @@
             placeholder="绝对路径，如 /home/user/project；也可在下方浏览选择"
             @keydown.enter.prevent="confirmOpenDir"
           >
-          <div class="open-dir-browse-header">
-            <span class="open-dir-browse-path" :title="openDirBrowsePath">{{ openDirBrowsePath || '~' }}</span>
-            <button class="open-dir-browse-btn" @click="goToParentOpenDirBrowse" title="上级目录">⬆</button>
-            <button class="open-dir-browse-btn" @click="fetchOpenDirBrowse(openDirBrowsePath)" title="刷新">⟳</button>
-          </div>
-          <div class="open-dir-browse-list">
-            <div v-if="openDirBrowseLoading" class="open-dir-browse-empty">加载中...</div>
-            <div v-else-if="openDirBrowseError" class="open-dir-browse-empty error">{{ openDirBrowseError }}</div>
-            <div v-else-if="!openDirBrowseItems.length" class="open-dir-browse-empty">该目录下没有子目录</div>
-            <template v-else>
-              <button
-                v-for="item in openDirBrowseItems"
-                :key="item.path"
-                class="open-dir-browse-item"
-                :class="{ selected: openDirPath === item.path }"
-                @click="enterOpenDirBrowse(item.path)"
-              >
-                <span class="open-dir-browse-icon">📁</span>
-                <span class="open-dir-browse-name">{{ item.name }}</span>
-                <span class="open-dir-browse-fullpath" :title="item.path">{{ item.path }}</span>
-              </button>
-            </template>
+          <!-- 目录筛选：内嵌 DirectoryDialog（与创建 Agent 的目录选择逻辑完全一致） -->
+          <div class="open-dir-browse-wrap">
+            <DirectoryDialog
+              ref="openDirDialogRef"
+              embedded
+              :visible="showOpenDirDialog"
+              :currentPath="currentDirPath"
+              :selectedDir="selectedDir"
+              :searchText="dirSearchText"
+              :filteredDirs="filteredDirList"
+              @update:searchText="dirSearchText = $event"
+              @refresh="fetchDirectories"
+              @go-parent="goToParentDir"
+              @select="onOpenDirSelect"
+              @enter="enterDirectory"
+              @search-keydown="handleDirSearchKeydown"
+            />
           </div>
         </div>
         <div class="open-dir-actions">
@@ -3135,34 +3131,10 @@ const showOpenDirDialog = ref(false)
 const openDirNodeId = ref('master')         // 目标节点
 const openDirPath = ref('')                 // 目标目录（绝对路径）
 const openDirInput = ref(null)              // 手填路径输入框引用
-// 弹窗内独立维护「浏览目录」的状态，避免与创建 Agent 的目录选择互相污染
-const openDirBrowsePath = ref('')
-const openDirBrowseItems = ref([])
-const openDirBrowseLoading = ref(false)
-const openDirBrowseError = ref('')
-// 浏览目录：按指定节点列目录（复用后端 directories 接口）
-async function fetchOpenDirBrowse(path = '') {
-  const nodeId = String(openDirNodeId.value || 'master').trim() || 'master'
-  openDirBrowseLoading.value = true
-  openDirBrowseError.value = ''
-  try {
-    const { host, port } = getGatewayAddress()
-    const params = new URLSearchParams({ path })
-    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, nodeId, `directories?${params.toString()}`))
-    const result = await response.json()
-    if (!response.ok || !result.success || !result.data) {
-      throw new Error(result.error?.message || '读取目录失败')
-    }
-    openDirBrowsePath.value = result.data.current_path || path
-    openDirBrowseItems.value = (result.data.items || []).filter(item => item.type === 'directory')
-  } catch (error) {
-    openDirBrowseError.value = error.message || '读取目录失败'
-    openDirBrowseItems.value = []
-  } finally {
-    openDirBrowseLoading.value = false
-  }
-}
-// 打开「按节点打开目录」弹窗
+const openDirDialogRef = ref(null)          // 「打开目录」弹窗内嵌的 DirectoryDialog 引用
+// 目录浏览复用创建 Agent 的目录筛选状态（currentDirPath/dirList/selectedDir/dirSearchText）与逻辑
+// 打开「按节点打开目录」弹窗（单弹窗：上选节点，下内嵌目录筛选）
+// 目录浏览复用创建 Agent 的目录筛选逻辑（DirectoryDialog + fetchDirectories 等），仅节点来源不同
 async function openOpenDirDialog() {
   showOpenDirDialog.value = true
   // 节点选项可能尚未加载（如未打开过创建 Agent 弹窗），这里补一次
@@ -3175,42 +3147,45 @@ async function openOpenDirDialog() {
     : (allowed[0]?.node_id || 'master')
   openDirNodeId.value = preferred
   openDirPath.value = ''
-  await fetchOpenDirBrowse('~')
-  nextTick(() => {
-    if (windowWidth.value > 768) openDirInput.value?.focus()
-  })
+  // 内嵌目录筛选：从根目录开始浏览（不再弹独立弹窗）
+  dirDialogContext.value = 'open-dir'
+  selectedDir.value = '~'
+  dirSearchText.value = ''
+  selectedDirIndex.value = -1
+  await fetchDirectories('~')
 }
 function closeOpenDirDialog() {
   showOpenDirDialog.value = false
+  // 复位场景，避免后续创建 Agent 的「选择目录」被误判为「打开目录」场景
+  dirDialogContext.value = 'create-agent'
+  resetDirectorySelectionState()
 }
 // 切换目标节点：重新按新节点浏览目录
 async function onOpenDirNodeChange(nodeId) {
   openDirNodeId.value = nodeId
   openDirPath.value = ''
-  await fetchOpenDirBrowse('~')
+  selectedDir.value = '~'
+  dirSearchText.value = ''
+  selectedDirIndex.value = -1
+  await fetchDirectories('~')
 }
-// 在浏览列表中进入目录
-async function enterOpenDirBrowse(path) {
+// 在目录筛选列表中选中某项：同步到路径输入框（复用创建 Agent 的 selectDirectory）
+function onOpenDirSelect(path) {
+  selectDirectory(path)
   openDirPath.value = path
-  await fetchOpenDirBrowse(path)
-}
-// 返回上级目录
-async function goToParentOpenDirBrowse() {
-  const normalized = String(openDirBrowsePath.value || '').replace(/\\/g, '/')
-  const parts = normalized.split('/').filter(Boolean)
-  if (!parts.length) return
-  parts.pop()
-  await fetchOpenDirBrowse('/' + parts.join('/'))
 }
 // 确认打开：以「手填路径」优先，其次「浏览选中目录」
 async function confirmOpenDir() {
   const nodeId = String(openDirNodeId.value || 'master').trim() || 'master'
-  const targetPath = String(openDirPath.value || openDirBrowsePath.value || '').trim()
+  const targetPath = String(openDirPath.value || selectedDir.value || '').trim()
   if (!targetPath) {
     showToast('请选择或输入目录路径', 'error')
     return
   }
   showOpenDirDialog.value = false
+  // 复位场景，避免后续创建 Agent 的「选择目录」被误判为「打开目录」场景
+  dirDialogContext.value = 'create-agent'
+  resetDirectorySelectionState()
   await openWorkspaceDir(nodeId, targetPath)
 }
 
@@ -4572,11 +4547,21 @@ async function openWorkspaceFile(path, agentId = null) {
   if (!session) {
     // 编辑器面板可能通过 Ctrl+E / 命令面板打开（只设 showWorkspacePanel，未创建会话）。
     // 此时按传入的 agentId 或当前 Agent 补建会话，避免点击文件静默无反应。
-    const targetAgent = (agentId && agentList.value.find(a => a.agent_id === agentId))
-      || getCurrentAgentOrNull()
-    if (!targetAgent) return
-    createWorkspaceForAgent(targetAgent)
-    if (!activeWorkspaceSession.value) return
+    // 注意：虚拟目录会话（未创建 Agent 时打开的目录）不在 agentList 中，且刷新后
+    // activeWorkspaceSession 为空（restoreVirtualWorkspaceDirs 只恢复会话不激活），
+    // 因此必须优先按 agentId 命中已存在的虚拟会话并激活，否则点击文件会静默无反应。
+    const virtualSession = agentId
+      ? workspaceSessions.value.find(s => s.agent_id === agentId && s.agent?.virtual === true)
+      : null
+    if (virtualSession) {
+      activeWorkspaceSessionId.value = agentId
+    } else {
+      const targetAgent = (agentId && agentList.value.find(a => a.agent_id === agentId))
+        || getCurrentAgentOrNull()
+      if (!targetAgent) return
+      createWorkspaceForAgent(targetAgent)
+      if (!activeWorkspaceSession.value) return
+    }
   }
   const activeSession = activeWorkspaceSession.value
   activeSession.tabs.push(tab)
@@ -4825,15 +4810,19 @@ function saveVirtualWorkspaceDirs() {
 }
 
 // 创建或复用某节点的虚拟目录会话，返回 { agentId, agent }
+// 注意：agent_id 由「节点 + 目录」共同决定（同一节点可同时打开多个目录），
+// 因此这里不能只按节点生成 id，否则同节点再次打开别的目录会复用并覆盖上一个会话。
 function ensureVirtualWorkspaceSession(nodeId, dirPath) {
   const targetNodeId = String(nodeId || 'master').trim() || 'master'
   const targetDir = String(dirPath || '').trim()
   if (!targetDir) return null
 
-  const agentId = `${VIRTUAL_WORKSPACE_PREFIX}${targetNodeId}`
+  const agentId = `${VIRTUAL_WORKSPACE_PREFIX}${targetNodeId}:${targetDir}`
+  // 节点名 + 目录名，便于在目录树中区分同一节点下的多个目录
+  const dirLabel = targetDir.replace(/\/+$/, '').split('/').pop() || targetDir
   const virtualAgent = {
     agent_id: agentId,
-    name: getNodeDisplayName(targetNodeId),
+    name: `${getNodeDisplayName(targetNodeId)} · ${dirLabel}`,
     node_id: targetNodeId,
     working_dir: targetDir,
     agent_type: 'virtual_dir',
@@ -4908,14 +4897,16 @@ function removeWorkspaceDir(agentId) {
   }
 
   workspaceSessions.value.splice(index, 1)
-  // 若移除的是当前激活会话，切到剩余的第一个会话；没有则收起编辑器
+  // 若移除的是当前激活会话，切到剩余的第一个会话；没有则清空激活态。
+  // 注意：这里只移除一个目录条目，工作区面板本身要继续保留（面板是承载目录树的容器），
+  // 不能像关闭编辑器会话那样把整个面板收起，否则用户会误以为「移除目录 = 关闭工作区」。
   if (activeWorkspaceSessionId.value === agentId) {
     activeWorkspaceSessionId.value = workspaceSessions.value.length > 0
       ? workspaceSessions.value[0].agent_id
       : null
     if (!activeWorkspaceSessionId.value) {
+      // 无剩余会话时仅复位主区域视图/分割/内嵌会话面板，面板保持打开并显示占位提示
       resetWorkspaceHostedPanelState()
-      showWorkspacePanel.value = false
     }
   }
   triggerRef(expandedAgents)
@@ -10834,7 +10825,14 @@ function cancelSessionDialog() {
 
 // 创建 Agent
 // 目录选择相关函数
+// 目录选择弹窗的当前使用场景：'create-agent'（创建 Agent 选工作目录）/ 'open-dir'（按节点打开目录）
+// 二者复用同一套目录筛选逻辑（fetchDirectories / filteredDirList / 键盘导航等），仅节点来源与确认后的去向不同
+const dirDialogContext = ref('create-agent')
+
 function getCreateAgentDirectoryNodeId() {
+  if (dirDialogContext.value === 'open-dir') {
+    return (openDirNodeId.value || '').trim()
+  }
   return (newAgentNodeId.value || '').trim()
 }
 
@@ -10857,8 +10855,16 @@ watch(newAgentNodeId, (newNodeId) => {
 }, { flush: 'sync' })
 
 async function openDirDialog() {
+  // 两种场景（创建 Agent / 打开目录）均以独立弹窗形式展示目录选择
+  const isOpenDir = dirDialogContext.value === 'open-dir'
   showDirDialog.value = true
-  selectedDir.value = newAgentDir.value || '~'
+  if (isOpenDir) {
+    // 「打开目录」：从根目录开始浏览，确认后回填到「打开目录」弹层
+    selectedDir.value = '~'
+  } else {
+    dirDialogContext.value = 'create-agent'
+    selectedDir.value = newAgentDir.value || '~'
+  }
   dirSearchText.value = '' // 清空搜索
   selectedDirIndex.value = -1
   await fetchDirectories(selectedDir.value)
@@ -10910,8 +10916,12 @@ function handleDirSearchKeydown(event) {
   const maxIndex = filteredDirList.value.length - 1
   
   if (event.key === 'Escape') {
-    // ESC 键关闭对话框
-    cancelDirDialog()
+    // ESC 键关闭当前场景的对话框
+    if (dirDialogContext.value === 'open-dir') {
+      closeOpenDirDialog()
+    } else {
+      cancelDirDialog()
+    }
     event.preventDefault()
     return
   }
@@ -10964,8 +10974,13 @@ function handleDirSearchKeydown(event) {
       enterDirectory(selectedPath)
       event.preventDefault()
     } else if (selectedDir.value) {
-      // 没有选中列表项，但已经有选中的目录，确认并关闭
-      confirmDirectory()
+      // 没有选中列表项，但已经有选中的目录，确认当前选择
+      if (dirDialogContext.value === 'open-dir') {
+        // 「打开目录」场景：直接以当前选中目录打开
+        confirmOpenDir()
+      } else {
+        confirmDirectory()
+      }
       event.preventDefault()
     }
     return
@@ -11003,7 +11018,12 @@ async function goToParentDir() {
 
 async function confirmDirectory() {
   if (selectedDir.value) {
-    newAgentDir.value = selectedDir.value
+    if (dirDialogContext.value === 'open-dir') {
+      // 「打开目录」场景：把选中的目录回填到「打开目录」弹层，但不关闭该弹层
+      openDirPath.value = selectedDir.value
+    } else {
+      newAgentDir.value = selectedDir.value
+    }
     // 保存工作目录到历史记录（按节点区分）
     saveRecentWorkDir(selectedDir.value, getCreateAgentDirectoryNodeId())
     showDirDialog.value = false
@@ -11015,6 +11035,8 @@ function cancelDirDialog() {
   selectedDir.value = null
   dirSearchText.value = ''
   selectedDirIndex.value = -1
+  // 复位场景，避免后续创建 Agent 的「选择目录」被误判为「打开目录」场景
+  dirDialogContext.value = 'create-agent'
 }
 
 // 打开创建 Agent 弹窗（可指定初始节点，如从大厅双击某节点进入）
@@ -11604,7 +11626,8 @@ function scrollToSelected() {
 // 滚动到选中的目录项
 function scrollToDirSelected() {
   nextTick(() => {
-    const dialog = dirDialogRef.value
+    // 「打开目录」用内嵌的 DirectoryDialog；「创建 Agent」用独立弹窗
+    const dialog = dirDialogContext.value === 'open-dir' ? openDirDialogRef.value : dirDialogRef.value
     if (!dialog) return
     const listContainer = dialog.dirListRef
     if (!listContainer) return
@@ -16965,6 +16988,8 @@ function handleGlobalKeydown(event) {
       cancelSessionDialog()
     } else if (showDirDialog.value) {
       cancelDirDialog()
+    } else if (showOpenDirDialog.value) {
+      closeOpenDirDialog()
     }
     
     // ESC 键也关闭移动端菜单
@@ -18643,12 +18668,27 @@ body::-webkit-scrollbar {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* 按节点打开目录的弹窗 */
+/* 按节点打开目录的弹窗：单弹窗（上选节点，下内嵌目录筛选）。
+   注意：这里必须自带居中定位样式，不能依赖 DirectoryDialog 的 scoped 类
+   （.palette-overlay/.palette-panel 带 data-v 属性，App.vue 拿不到）。 */
 .open-dir-overlay {
-  z-index: 3200;
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 8, 16, 0.55);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 2900;
+  padding: 10vh 20px 20px;
 }
 .open-dir-modal {
-  max-width: 560px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--tile-radius);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  max-width: 700px;
   width: 95%;
   max-height: 78vh;
   display: flex;
@@ -18685,6 +18725,7 @@ body::-webkit-scrollbar {
   flex-direction: column;
   gap: 6px;
   padding: 10px 12px;
+  flex: 1;
   min-height: 0;
   overflow: hidden;
 }
@@ -18710,98 +18751,13 @@ body::-webkit-scrollbar {
   outline: none;
   border-color: var(--color-border-active);
 }
-.open-dir-browse-header {
+/* 内嵌目录筛选容器：撑满弹窗剩余高度，内部 DirectoryDialog(embedded) 自带滚动 */
+.open-dir-browse-wrap {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
   margin-top: 4px;
-}
-.open-dir-browse-path {
-  flex: 1;
-  min-width: 0;
-  padding: 5px 8px;
-  background: var(--color-bg-primary);
-  border-radius: var(--tile-radius-sm, 4px);
-  font-family: 'Consolas', 'Microsoft YaHei', monospace;
-  font-size: 11px;
-  color: var(--color-text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.open-dir-browse-btn {
-  flex: none;
-  padding: 5px 9px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--tile-radius-sm, 4px);
-  background: transparent;
-  color: var(--color-text-secondary);
-  font-size: 12px;
-  cursor: pointer;
-}
-.open-dir-browse-btn:hover {
-  color: var(--color-text-primary);
-  background: var(--color-bg-hover);
-}
-.open-dir-browse-list {
-  flex: 1;
-  min-height: 120px;
-  max-height: 40vh;
-  overflow-y: auto;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--tile-radius-sm, 4px);
-  padding: 4px;
-}
-.open-dir-browse-empty {
-  padding: 16px 8px;
-  text-align: center;
-  font-size: 12px;
-  color: var(--color-text-secondary);
-}
-.open-dir-browse-empty.error {
-  color: var(--color-danger, #f56c6c);
-}
-.open-dir-browse-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 6px 8px;
-  border: none;
-  border-radius: var(--tile-radius-sm, 4px);
-  background: transparent;
-  color: var(--color-text-primary);
-  font-size: 12px;
-  text-align: left;
-  cursor: pointer;
-}
-.open-dir-browse-item:hover {
-  background: var(--color-bg-hover);
-}
-.open-dir-browse-item.selected {
-  background: var(--color-bg-hover);
-  box-shadow: inset 0 0 0 1px var(--color-border-active);
-}
-.open-dir-browse-icon {
-  flex: none;
-  font-size: 13px;
-}
-.open-dir-browse-name {
-  flex: none;
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.open-dir-browse-fullpath {
-  flex: 1;
-  min-width: 0;
-  font-size: 11px;
-  color: var(--color-text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: right;
 }
 .open-dir-actions {
   display: flex;
