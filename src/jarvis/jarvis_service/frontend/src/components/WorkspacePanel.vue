@@ -90,6 +90,7 @@
             class="workspace-tab"
             :class="{ active: activeTabPath === tab.path }"
             @click="$emit('activateTab', tab.path)"
+            @contextmenu.prevent.stop="$emit('tabContextMenu', tab.path, $event)"
           >
             <span class="workspace-tab-name">{{ tab.name }}</span>
             <span v-if="tab.isDirty" class="workspace-tab-dirty">●</span>
@@ -173,6 +174,7 @@ const emit = defineEmits([
   'close',
   'activateTab',
   'closeTab',
+  'tabContextMenu',
   'setSidebarView',
   'setMainView',
   'startResize',

@@ -59,6 +59,7 @@
         @close="closeWorkspacePanel"
         @activateTab="activateWorkspaceTab"
         @closeTab="closeWorkspaceTab"
+        @tabContextMenu="(path, event) => openTabContextMenu(null, path, event)"
         @setSidebarView="toggleWorkspaceSidebarView"
         @setMainView="toggleWorkspaceMainView"
         @startResize="startWorkspacePanelResize"
@@ -566,6 +567,7 @@
                       class="workspace-tab"
                       :class="{ active: workspaceViewPanes.get(pane.id) === tab.path }"
                       @click="activateWorkspacePane(pane.id); activateWorkspaceTab(tab.path)"
+                      @contextmenu.prevent.stop="openTabContextMenu(pane.id, tab.path, $event)"
                     >
                       <span class="workspace-tab-name">{{ tab.name }}</span>
                       <span v-if="tab.isDirty" class="workspace-tab-dirty">●</span>
@@ -1407,6 +1409,27 @@
         class="file-tree-context-item"
         :disabled="act.enabled === false"
         @click="runFileTreeContextAction(act)"
+      >
+        <span class="file-tree-context-icon">{{ act.icon }}</span>
+        <span class="file-tree-context-label">{{ act.label }}</span>
+      </button>
+    </div>
+
+    <!-- 编辑器标签栏右键菜单：关闭右侧所有 / 关闭所有 / 仅保留当前 -->
+    <div
+      v-if="tabContextMenu.visible"
+      class="file-tree-context-menu"
+      :style="{ left: tabContextMenu.x + 'px', top: tabContextMenu.y + 'px' }"
+      @pointerdown.stop
+      @click.stop
+      @contextmenu.prevent.stop
+    >
+      <button
+        v-for="act in tabContextActions"
+        :key="act.id"
+        class="file-tree-context-item"
+        :disabled="act.enabled === false"
+        @click="runTabContextAction(act)"
       >
         <span class="file-tree-context-icon">{{ act.icon }}</span>
         <span class="file-tree-context-label">{{ act.label }}</span>
@@ -4877,11 +4900,13 @@ function confirmCloseDirtyWorkspaceTab(path) {
   })
 }
 
-async function closeWorkspaceTab(path, paneId = null) {
+// skipDirtyConfirm：批量关闭（标签栏右键菜单）时调用方已统一确认过一次，
+// 避免每个脏标签再逐个弹窗。
+async function closeWorkspaceTab(path, paneId = null, skipDirtyConfirm = false) {
   const tab = getWorkspaceTabByPath(path)
   if (!tab) return
 
-  if (tab.isDirty) {
+  if (tab.isDirty && !skipDirtyConfirm) {
     const confirmed = await confirmCloseDirtyWorkspaceTab(path)
     if (!confirmed) return
   }
@@ -4951,6 +4976,92 @@ async function closeWorkspaceTab(path, paneId = null) {
         workspaceViewPanes.delete(pid)
       }
     }
+  }
+}
+
+// ===== 编辑器标签栏右键菜单：关闭右侧所有 / 关闭所有 / 仅保留当前 =====
+// paneId 为 null 表示未分割态（标签栏由全局 workspaceTabs 驱动，渲染在 WorkspacePanel.vue）；
+// 否则为该 pane 的独立标签列表（getPaneTabs）。
+const tabContextMenu = ref({ visible: false, x: 0, y: 0, paneId: null, path: '' })
+
+function closeTabContextMenu() {
+  if (tabContextMenu.value.visible) {
+    tabContextMenu.value = { ...tabContextMenu.value, visible: false }
+  }
+}
+
+function openTabContextMenu(paneId, path, event) {
+  if (!path) return
+  tabContextMenu.value = {
+    visible: true,
+    x: event?.clientX || 0,
+    y: event?.clientY || 0,
+    paneId: paneId || null,
+    path,
+  }
+  // 点击空白处关闭（与目录树右键菜单同款：pointerdown 一次即解绑）
+  document.addEventListener('pointerdown', closeTabContextMenu, { once: true })
+}
+
+// 当前右键菜单对应的标签 path 列表（按显示顺序）
+function getTabContextPaths() {
+  const menu = tabContextMenu.value
+  if (menu.paneId) return getPaneTabs(menu.paneId).map(t => t.path)
+  return workspaceTabs.value.map(t => t.path)
+}
+
+const tabContextActions = computed(() => {
+  const paths = getTabContextPaths()
+  const index = paths.indexOf(tabContextMenu.value.path)
+  const hasRight = index >= 0 && index < paths.length - 1
+  const hasOthers = paths.length > 1
+  return [
+    { id: 'close-right', icon: '⇥', label: '关闭右侧所有', enabled: hasRight },
+    { id: 'close-all', icon: '✕', label: '关闭所有', enabled: hasOthers },
+    { id: 'keep-current', icon: '◎', label: '仅保留当前', enabled: hasOthers },
+  ]
+})
+
+async function runTabContextAction(act) {
+  if (!act || act.enabled === false) return
+  const menu = { ...tabContextMenu.value }
+  const paneId = menu.paneId
+  const paths = getTabContextPaths()
+  const index = paths.indexOf(menu.path)
+  if (index === -1) {
+    closeTabContextMenu()
+    return
+  }
+
+  let targets = []
+  if (act.id === 'close-right') {
+    targets = paths.slice(index + 1)
+  } else if (act.id === 'close-all') {
+    targets = paths.slice()
+  } else if (act.id === 'keep-current') {
+    targets = paths.filter(p => p !== menu.path)
+  }
+  closeTabContextMenu()
+  if (!targets.length) return
+
+  // 批量关闭：若其中含未保存标签，统一确认一次（避免逐个弹窗）
+  const dirtyCount = targets.filter(p => getWorkspaceTabByPath(p)?.isDirty).length
+  if (dirtyCount > 0) {
+    const confirmed = await new Promise((resolve) => {
+      showConfirm(
+        `有 ${dirtyCount} 个标签存在未保存修改，确定关闭吗？`,
+        () => resolve(true),
+        () => resolve(false),
+        false
+      )
+    })
+    if (!confirmed) return
+  }
+
+  // 逐个关闭（closeWorkspaceTab 内部已处理模型/LSP/pane 绑定清理）；
+  // 脏标签已在上方统一确认过，这里跳过逐个确认。
+  for (const path of targets) {
+    await closeWorkspaceTab(path, paneId, true)
   }
 }
 
