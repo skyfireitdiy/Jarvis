@@ -184,9 +184,9 @@
               <!-- 类型图标 -->
               <text :x="n.x" :y="n.y" text-anchor="middle" dominant-baseline="central"
                     class="topo-access-ico">{{ n.icon }}</text>
-              <!-- 标签文字：左列靠左、右列靠右，向画布内部延伸，避免被画布边缘裁切 -->
-              <text :x="n.x" :y="n.y + ACCESS_R + 16" :text-anchor="n.anchor" class="topo-node-label">{{ n.short }}</text>
-              <text :x="n.x" :y="n.y + ACCESS_R + 29" :text-anchor="n.anchor" class="topo-node-count">{{ n.sub }}</text>
+              <!-- 标签文字：顶部行在节点下方、底部行在节点上方，居中显示，避免被画布边缘裁切 -->
+              <text :x="n.x" :y="n.labelAbove ? n.y - ACCESS_R - 16 : n.y + ACCESS_R + 16" :text-anchor="n.anchor" class="topo-node-label">{{ n.short }}</text>
+              <text :x="n.x" :y="n.labelAbove ? n.y - ACCESS_R - 29 : n.y + ACCESS_R + 29" :text-anchor="n.anchor" class="topo-node-count">{{ n.sub }}</text>
             </g>
 
             <!-- 中心 master（与子节点同款服务器机箱，仅靠颜色/尺寸区分主次） -->
@@ -327,6 +327,10 @@ const layout = computed(() => layoutTopology(model.value, W, H, {
   centerHalfH: CENTER_H / 2,
   nodeHalfH: NODE_R * 0.86,
   minGap: 14,
+  // 缩小环形半径，让子节点更靠中间，给顶部/底部接入端（浏览器扩展/后台服务）
+  // 留出更大间隙——移动端 SVG 会整体缩放，间隙不足时接入端会与子节点「挨着」。
+  // 桌面端 0.34 → 0.26 后顶部间隙约 32px→83px，移动端(约0.31缩放)视觉约 10px→26px。
+  radius: Math.min(W, H) * 0.26,
 }))
 const counts = computed(() => model.value.counts)
 // 参与绘制的 agent（已停止的不绘制，仅作数据显示）
@@ -401,29 +405,29 @@ const lines = computed(() =>
   }))
 )
 
-// 接入端节点：浏览器扩展（左列）、后台服务（右列），各自垂直方向均匀分布。
+// 接入端节点：浏览器扩展（上行）、后台服务（下行），各自水平方向均匀分布。
 // 数据源均为网关会话列表（props.extensionSessions / props.daemonSessions），
 // 名称取会话的 name，故这里展示的是「整个网络接入的」客户端，而非仅本机。
 const LOCAL_NODE_R = NODE_R
-// 距画布左右边缘的水平留白（留足空间，避免节点下方标签的文字被画布边缘裁切）
+// 距画布上/下边缘的垂直留白（留足空间，避免节点标签文字被画布边缘裁切）
 const LOCAL_NODE_MARGIN = 56
 // 接入端节点用圆形（普通节点是服务器机箱），半径略小于机箱半高以留出标签空间
-const ACCESS_R = NODE_R * 0.86
-// 同列多个节点之间的垂直间距（含机箱高度）
+const ACCESS_R = NODE_R * 0.67
+// 同一行多个节点之间的水平间距（含机箱宽度）
 const ACCESS_NODE_GAP = NODE_R * 1.72 + 30
 
-// 单列节点的纵向坐标：以 master 的 y 为中心均匀分布，并限制在画布内
-function accessColumnYs(count, centerY) {
+// 单行节点的横向坐标：以 master 的 x 为中心均匀分布，并限制在画布内
+function accessRowXs(count, centerX) {
   if (count <= 0) return []
   const total = (count - 1) * ACCESS_NODE_GAP
-  const start = centerY - total / 2
-  const minY = NODE_R * 0.86 + 22
-  const maxY = Math.max(minY, H - NODE_R * 0.86 - 40)
-  const ys = []
+  const start = centerX - total / 2
+  const minX = LOCAL_NODE_R + 22
+  const maxX = Math.max(minX, W - LOCAL_NODE_R - 22)
+  const xs = []
   for (let i = 0; i < count; i++) {
-    ys.push(Math.min(Math.max(start + i * ACCESS_NODE_GAP, minY), maxY))
+    xs.push(Math.min(Math.max(start + i * ACCESS_NODE_GAP, minX), maxX))
   }
-  return ys
+  return xs
 }
 
 // 会话展示名：优先网关会话里的 name，缺失时按类型回退
@@ -440,11 +444,25 @@ function accessShortName(name) {
 }
 
 const localNodes = computed(() => {
-  const cy = layout.value.center.y
-  const leftX = LOCAL_NODE_MARGIN + LOCAL_NODE_R
-  const rightX = W - LOCAL_NODE_MARGIN - LOCAL_NODE_R
-  const extYs = accessColumnYs(props.extensionSessions.length, cy)
-  const daemonYs = accessColumnYs(props.daemonSessions.length, cy)
+  const cx = layout.value.center.x
+  // 接入端放在环形子节点之外（更靠画布边缘），避免与子节点重叠：
+  // 顶部接入端放在所有子节点上边缘之上、底部接入端放在所有子节点下边缘之下，
+  // 并各自留出标签空间；同时不超出画布边缘留白。
+  // 子节点是服务器机箱，取其机箱半高（NODE_R）作为环形子节点的上下边界
+  const childTop = nodePoints.value.length
+    ? Math.min(...nodePoints.value.map(n => n.y - NODE_R))
+    : layout.value.center.y
+  const childBottom = nodePoints.value.length
+    ? Math.max(...nodePoints.value.map(n => n.y + NODE_R))
+    : layout.value.center.y
+  // 接入端尽量远离环形子节点（间隙加大），同时圆心不越出画布边缘留白。
+  // ACCESS_GAP 是接入端圆心到子节点机箱边缘的目标距离；移动端 SVG 会整体缩放，
+  // 间隙不足时接入端会与子节点「挨着」，故这里给足余量（配合缩小环形半径）。
+  const ACCESS_GAP = 110
+  const topY = Math.max(ACCESS_R, Math.min(LOCAL_NODE_MARGIN + ACCESS_R, childTop - ACCESS_GAP))
+  const bottomY = Math.min(H - ACCESS_R, Math.max(H - LOCAL_NODE_MARGIN - ACCESS_R, childBottom + ACCESS_GAP))
+  const extXs = accessRowXs(props.extensionSessions.length, cx)
+  const daemonXs = accessRowXs(props.daemonSessions.length, cx)
   const nodes = []
   props.extensionSessions.forEach((s, i) => {
     const name = accessSessionName(s, '浏览器扩展')
@@ -452,18 +470,19 @@ const localNodes = computed(() => {
     const browserLabel = formatBrowserLabel(s && s.browser_info, s && s.extension_version)
     nodes.push({
       id: `ext-${s.session_id || i}`,
-      x: leftX,
-      y: extYs[i],
+      x: extXs[i],
+      y: topY,
       masterX: layout.value.center.x,
-      masterY: cy,
+      masterY: layout.value.center.y,
       state: 'online',
       color: nodeColor('online'),
       fill: 'rgba(8,18,30,0.95)',
       short: accessShortName(name),
       sub: browserLabel || '浏览器扩展',
       icon: '🧩',
-      // 左列节点靠左对齐，标签文字向画布内部延伸，避免被左边缘裁切
-      anchor: 'start',
+      // 顶部行节点靠上，标签文字在节点下方（朝中间），节点已推远故不与环形子节点相撞
+      anchor: 'middle',
+      labelAbove: false,
       title: `浏览器扩展 · ${name}${browserLabel ? ` · ${browserLabel}` : ''}`,
     })
   })
@@ -476,18 +495,19 @@ const localNodes = computed(() => {
     const detail = [platform, versionLabel].filter(Boolean).join(' · ')
     nodes.push({
       id: `daemon-${s.session_id || i}`,
-      x: rightX,
-      y: daemonYs[i],
+      x: daemonXs[i],
+      y: bottomY,
       masterX: layout.value.center.x,
-      masterY: cy,
+      masterY: layout.value.center.y,
       state: 'online',
       color: nodeColor('online'),
       fill: 'rgba(8,18,30,0.95)',
       short: accessShortName(name),
       sub: detail || '后台服务',
       icon: '🖥',
-      // 右列节点靠右对齐，标签文字向画布内部延伸，避免被右边缘裁切
-      anchor: 'end',
+      // 底部行节点靠下，标签文字在节点上方（朝中间），节点已推远故不与环形子节点相撞
+      anchor: 'middle',
+      labelAbove: true,
       title: `后台服务 · ${name}${detail ? ` · ${detail}` : ''}`,
     })
   })

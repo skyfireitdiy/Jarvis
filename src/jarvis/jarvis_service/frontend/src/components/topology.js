@@ -179,7 +179,12 @@ export function layoutTopology(model, width, height, options = {}) {
   const nodeHalfH = Number(options.nodeHalfH) || 0;
   const minGap = Number(options.minGap) || 0;
   const minRadius = centerHalfH + nodeHalfH + minGap;
-  const radius = Math.max(Math.min(w, h) * 0.34, minRadius);
+  // 支持调用方覆盖环形半径（如大图需让子节点更靠中间、给接入端留出更大空间）；
+  // 未传时按画布尺寸自适应，且不小于 minRadius
+  const radius = Math.max(
+    Number(options.radius) || Math.min(w, h) * 0.34,
+    minRadius,
+  );
   const nodes = (model && model.nodes) || [];
   const count = nodes.length;
   const positioned = nodes.map((node, index) => {

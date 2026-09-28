@@ -39,7 +39,7 @@
         />
       </g>
 
-      <!-- 接入端：浏览器扩展（左列）/ 后台服务（右列），每个在线会话一个圆点 -->
+      <!-- 接入端：浏览器扩展（上行）/ 后台服务（下行），每个在线会话一个圆点 -->
       <!-- 96×96 空间极小，仅画点不画名字，名称通过 title 悬停查看 -->
       <g v-for="n in accessPoints" :key="n.id" class="pt-mini-node">
         <title>{{ n.title }}</title>
@@ -156,33 +156,33 @@ const lines = computed(() =>
   }))
 )
 
-// 接入端小点：浏览器扩展（左列）/ 后台服务（右列），每个在线会话一个点。
+// 接入端小点：浏览器扩展（上行）/ 后台服务（下行），每个在线会话一个点。
 // 数据来自网关会话列表（props），名称仅用于 title 悬停提示（96×96 放不下文字）。
 const accessPoints = computed(() => {
-  const cy = layout.value.center.y
-  const leftX = 6
-  const rightX = W - 6
+  const cx = layout.value.center.x
+  const topY = 6
+  const bottomY = H - 6
   const gap = 8
   const place = (count) => {
     if (count <= 0) return []
     const total = (count - 1) * gap
-    const start = cy - total / 2
-    const ys = []
+    const start = cx - total / 2
+    const xs = []
     for (let i = 0; i < count; i++) {
-      ys.push(Math.min(Math.max(start + i * gap, 5), H - 5))
+      xs.push(Math.min(Math.max(start + i * gap, 5), W - 5))
     }
-    return ys
+    return xs
   }
-  const extYs = place(props.extensionSessions.length)
-  const daemonYs = place(props.daemonSessions.length)
+  const extXs = place(props.extensionSessions.length)
+  const daemonXs = place(props.daemonSessions.length)
   const points = []
   props.extensionSessions.forEach((s, i) => {
     const name = String((s && s.name) || '').trim() || '浏览器扩展'
     const browserLabel = formatBrowserLabel(s && s.browser_info, s && s.extension_version)
     points.push({
       id: `ext-${s.session_id || i}`,
-      x: leftX,
-      y: extYs[i],
+      x: extXs[i],
+      y: topY,
       color: nodeColor('online'),
       fill: 'rgba(8,18,30,0.95)',
       title: `浏览器扩展 · ${name}${browserLabel ? ` · ${browserLabel}` : ''}`,
@@ -192,8 +192,8 @@ const accessPoints = computed(() => {
     const name = String((s && s.name) || '').trim() || '后台服务'
     points.push({
       id: `daemon-${s.session_id || i}`,
-      x: rightX,
-      y: daemonYs[i],
+      x: daemonXs[i],
+      y: bottomY,
       color: nodeColor('online'),
       fill: 'rgba(8,18,30,0.95)',
       title: `后台服务 · ${name}`,

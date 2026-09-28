@@ -162,7 +162,7 @@
           >{{ n.version }}</text>
         </g>
 
-        <!-- 接入端节点：左列=浏览器扩展，右列=本地后台服务（圆形造型，与网关机箱节点明显区分） -->
+        <!-- 接入端节点：上行=浏览器扩展，下行=本地后台服务（圆形造型，与网关机箱节点明显区分） -->
         <!-- 名称/版本/平台均来自网关会话（扩展 hello 上报 name、daemon hello 上报 name/hostname） -->
         <g
           v-for="n in accessNodes"
@@ -177,9 +177,9 @@
           <!-- 类型图标 -->
           <text :x="n.x" :y="n.y" text-anchor="middle" dominant-baseline="central"
                 class="lobby-access-ico">{{ n.icon }}</text>
-          <!-- 标签文字：左列靠左、右列靠右，向舞台内部延伸，避免被舞台边缘裁切 -->
-          <text :x="n.x" :y="n.y + LOCAL_NODE_RH + 16" :text-anchor="n.anchor" class="lobby-node-label">{{ n.short }}</text>
-          <text :x="n.x" :y="n.y + LOCAL_NODE_RH + 29" :text-anchor="n.anchor" class="lobby-node-count">{{ n.sub }}</text>
+          <!-- 标签文字：顶部行在节点下方、底部行在节点上方，居中显示，避免被舞台边缘裁切 -->
+          <text :x="n.x" :y="n.labelAbove ? n.y - LOCAL_NODE_RH - 16 : n.y + LOCAL_NODE_RH + 16" :text-anchor="n.anchor" class="lobby-node-label">{{ n.short }}</text>
+          <text :x="n.x" :y="n.labelAbove ? n.y - LOCAL_NODE_RH - 29 : n.y + LOCAL_NODE_RH + 29" :text-anchor="n.anchor" class="lobby-node-count">{{ n.sub }}</text>
         </g>
       </svg>
     </div>
@@ -1029,32 +1029,33 @@ const nodeLinks = computed(() => {
   return links
 })
 
-// ===== 接入端节点：浏览器扩展（左列） / 本地后台服务（右列） =====
+// ===== 接入端节点：浏览器扩展（上行） / 本地后台服务（下行） =====
 // 二者不属于网关节点（availableNodeOptions），而是「接入本网关的客户端」：
 // - 浏览器扩展：网关 /api/browser-ext/sessions 返回的在线扩展会话（可能多台设备/多个浏览器）；
 // - 本地后台服务（daemon）：网关 /api/daemon/sessions 返回的在线 daemon 会话（可能多台机器）。
 // 名称取会话里的 name（用户配置的终端名，daemon 缺省回退 hostname），全部来自网关，
 // 因此这里展示的是「整个网络接入的」客户端，而不是仅本机。
-// 位置：分列舞台左右边缘，各自在垂直方向均匀分布，用曲线连到 master 机箱。
+// 位置：分列舞台上下边缘（扩展在上、daemon 在下），各自在水平方向均匀分布，用直线连到 master 机箱。
 const LOCAL_NODE_RW = 30
-const LOCAL_NODE_RH = NODE_RH
-// 距舞台左右边缘的水平留白（留足空间，避免节点下方标签的文字被舞台边缘裁切）
+// 接入端节点半径（圆形，略小于子节点机箱半高以留出标签空间，也便于更靠画布边缘）
+const LOCAL_NODE_RH = NODE_RH * 0.77
+// 距舞台上下边缘的垂直留白（留足空间，避免节点标签文字被舞台边缘裁切）
 const LOCAL_NODE_MARGIN = 56
-// 同列多个节点之间的垂直间距（含机箱高度）
+// 同一行多个节点之间的水平间距（含机箱宽度）
 const ACCESS_NODE_GAP = LOCAL_NODE_RH * 2 + 26
 
-// 单列节点的纵向坐标：以 master 的 y 为中心均匀分布，并限制在舞台内
-function accessColumnYs(count, centerY, stageH) {
+// 单行节点的横向坐标：以 master 的 x 为中心均匀分布，并限制在舞台内
+function accessRowXs(count, centerX, stageW) {
   if (count <= 0) return []
   const total = (count - 1) * ACCESS_NODE_GAP
-  const start = centerY - total / 2
-  const minY = LOCAL_NODE_RH + 18
-  const maxY = Math.max(minY, stageH - LOCAL_NODE_RH - 34)
-  const ys = []
+  const start = centerX - total / 2
+  const minX = LOCAL_NODE_RW + 18
+  const maxX = Math.max(minX, stageW - LOCAL_NODE_RW - 18)
+  const xs = []
   for (let i = 0; i < count; i++) {
-    ys.push(Math.min(Math.max(start + i * ACCESS_NODE_GAP, minY), maxY))
+    xs.push(Math.min(Math.max(start + i * ACCESS_NODE_GAP, minX), maxX))
   }
-  return ys
+  return xs
 }
 
 // 会话展示名：优先网关会话里的 name，缺失时按类型回退
@@ -1076,10 +1077,20 @@ const accessNodes = computed(() => {
   if (!w || !h) return []
   const masterPos = nodeLayout.value.get('master')
   if (!masterPos) return []
-  const leftX = LOCAL_NODE_MARGIN + LOCAL_NODE_RW
-  const rightX = w - LOCAL_NODE_MARGIN - LOCAL_NODE_RW
-  const extYs = accessColumnYs(extensionSessions.value.length, masterPos.y, h)
-  const daemonYs = accessColumnYs(daemonSessions.value.length, masterPos.y, h)
+  // 接入端放在环形子节点之外（更靠舞台边缘），避免与子节点重叠：
+  // 顶部接入端放在所有子节点上边缘之上、底部接入端放在所有子节点下边缘之下，
+  // 并各自留出标签空间；同时不超出舞台边缘留白。
+  const childTop = nodeItems.value.length
+    ? Math.min(...nodeItems.value.map(n => n.y - n.rh))
+    : masterPos.y
+  const childBottom = nodeItems.value.length
+    ? Math.max(...nodeItems.value.map(n => n.y + n.rh))
+    : masterPos.y
+  // 接入端尽量远离环形子节点（间隙加大），同时圆心不越出舞台边缘留白
+  const topY = Math.max(LOCAL_NODE_RH, Math.min(LOCAL_NODE_MARGIN + LOCAL_NODE_RH, childTop - 55))
+  const bottomY = Math.min(h - LOCAL_NODE_RH, Math.max(h - LOCAL_NODE_MARGIN - LOCAL_NODE_RH, childBottom + 55))
+  const extXs = accessRowXs(extensionSessions.value.length, masterPos.x, w)
+  const daemonXs = accessRowXs(daemonSessions.value.length, masterPos.x, w)
   const nodes = []
   extensionSessions.value.forEach((s, i) => {
     const name = accessSessionName(s, '浏览器扩展')
@@ -1087,16 +1098,17 @@ const accessNodes = computed(() => {
     const browserLabel = formatBrowserLabel(s && s.browser_info, s && s.extension_version)
     nodes.push({
       id: `ext-${s.session_id || i}`,
-      x: leftX,
-      y: extYs[i],
+      x: extXs[i],
+      y: topY,
       state: 'online',
       color: nodeColor('online'),
       fill: 'rgba(8,18,30,0.7)',
       short: accessShortName(name),
       sub: browserLabel || '浏览器扩展',
       icon: '🧩',
-      // 左列节点靠左对齐，标签文字向舞台内部延伸，避免被左边缘裁切
-      anchor: 'start',
+      // 顶部行节点靠上，标签文字在节点下方（朝中间），节点已推远故不与环形子节点相撞
+      anchor: 'middle',
+      labelAbove: false,
       title: `浏览器扩展 · ${name}${browserLabel ? ` · ${browserLabel}` : ''}`,
       masterX: masterPos.x,
       masterY: masterPos.y,
@@ -1111,16 +1123,17 @@ const accessNodes = computed(() => {
     const detail = [platform, versionLabel].filter(Boolean).join(' · ')
     nodes.push({
       id: `daemon-${s.session_id || i}`,
-      x: rightX,
-      y: daemonYs[i],
+      x: daemonXs[i],
+      y: bottomY,
       state: 'online',
       color: nodeColor('online'),
       fill: 'rgba(8,18,30,0.7)',
       short: accessShortName(name),
       sub: detail || '后台服务',
       icon: '🖥',
-      // 右列节点靠右对齐，标签文字向舞台内部延伸，避免被右边缘裁切
-      anchor: 'end',
+      // 底部行节点靠下，标签文字在节点上方（朝中间），节点已推远故不与环形子节点相撞
+      anchor: 'middle',
+      labelAbove: true,
       title: `后台服务 · ${name}${detail ? ` · ${detail}` : ''}`,
       masterX: masterPos.x,
       masterY: masterPos.y,
