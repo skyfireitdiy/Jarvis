@@ -4720,11 +4720,35 @@ function focusFileTreeContainer() {
   })
 }
 
-// 切到编辑器侧边栏的全局搜索并聚焦输入框（mode 为 'content' 内容搜索 / 'filename' 文件名搜索）
+// 取当前选中的文本，用于打开全局搜索时预填搜索框。
+// 优先取 Monaco 编辑器选区（编辑器聚焦时），否则回退到页面 DOM 选区
+// （如会话输出 / 聊天内容里选中的文字）。返回折叠空白后的单行文本，无选中返回空串。
+function getSelectedTextForSearch() {
+  let raw = ''
+  const view = getActiveWorkspaceView()
+  if (view && typeof view.getSelection === 'function') {
+    const selection = view.getSelection()
+    const model = view.getModel()
+    if (selection && model && !selection.isEmpty()) {
+      raw = model.getValueInRange(selection)
+    }
+  }
+  if (!raw) {
+    const domSelection = window.getSelection && window.getSelection()
+    if (domSelection) raw = domSelection.toString()
+  }
+  // 搜索框是单行输入：把选区里的换行/连续空白折叠为单个空格，避免多行内容撑坏查询
+  return raw.replace(/\s+/g, ' ').trim()
+}
+
+// 切到编辑器侧边栏的全局搜索并聚焦输入框（mode 为 'content' 内容搜索 / 'filename' 文件名搜索）。
+// 若当前有选中文字，则预填到搜索框（选中内容优先于原有查询）。
 function openWorkspaceGlobalSearch(mode = 'content') {
   if (!showWorkspacePanel.value) return
   setWorkspaceSidebarView('search')
   setGlobalSearchMode(mode)
+  const selectedText = getSelectedTextForSearch()
+  if (selectedText) globalSearchQuery.value = selectedText
   nextTick(() => {
     const input = document.querySelector('.workspace-global-search-input')
     if (input) input.focus()
@@ -16232,8 +16256,8 @@ function handleGlobalKeydown(event) {
   // Ctrl/Cmd + Shift + F 快速抵达编辑器侧边栏的「内容搜索」（编辑器未打开时不响应）
   if (isModifierPressed && !event.altKey && event.shiftKey && event.code === 'KeyF') {
     if (!showWorkspacePanel.value) return
-    // 输入框内保留默认行为（避免打断输入）
-    if (isEditableElement(event.target)) return
+    // 输入框内保留默认行为（避免打断输入）；编辑器内例外——允许在编辑器里选中文字后直接搜索
+    if (isEditableElement(event.target) && !isMonacoEditorFocused()) return
     event.preventDefault()
     openWorkspaceGlobalSearch('content')
     return
@@ -16242,8 +16266,8 @@ function handleGlobalKeydown(event) {
   // Ctrl/Cmd + Shift + P 快速抵达编辑器侧边栏的「文件名搜索」（编辑器未打开时不响应）
   if (isModifierPressed && !event.altKey && event.shiftKey && event.code === 'KeyP') {
     if (!showWorkspacePanel.value) return
-    // 输入框内保留默认行为（避免打断输入）
-    if (isEditableElement(event.target)) return
+    // 输入框内保留默认行为（避免打断输入）；编辑器内例外——允许在编辑器里选中文字后直接搜索
+    if (isEditableElement(event.target) && !isMonacoEditorFocused()) return
     event.preventDefault()
     openWorkspaceGlobalSearch('filename')
     return
