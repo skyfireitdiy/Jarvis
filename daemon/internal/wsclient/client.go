@@ -25,6 +25,7 @@ import (
 	"jarvis-daemon/internal/buildinfo"
 	"jarvis-daemon/internal/capability"
 	"jarvis-daemon/internal/handler"
+	"jarvis-daemon/internal/proxy"
 )
 
 // 网关鉴权失败时使用的关闭码（与网关 app.py 的扩展 WS 端点一致）。
@@ -267,6 +268,8 @@ func (c *Client) connectAndServe(ctx context.Context) error {
 	dialer := websocket.Dialer{
 		Subprotocols:     protocols,
 		HandshakeTimeout: 15 * time.Second,
+		// 走环境变量 / 系统代理（Windows）配置的代理，否则网关在代理后不可达。
+		Proxy: proxy.ProxyFunc(),
 	}
 	conn, resp, err := dialer.DialContext(ctx, wsURL, http.Header{})
 	if err != nil {

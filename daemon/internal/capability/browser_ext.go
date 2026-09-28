@@ -23,6 +23,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"jarvis-daemon/internal/proxy"
 )
 
 // BrowserExtDirName 是扩展在本地的固定目录名（位于 ~/.jarvis 下）。
@@ -75,7 +77,7 @@ func DownloadBrowserExtZip(gateway, token string) ([]byte, error) {
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	client := &http.Client{Timeout: browserExtDownloadTimeout}
+	client := &http.Client{Timeout: browserExtDownloadTimeout, Transport: proxy.Transport()}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("下载扩展包失败（%s）: %w", url, err)
@@ -122,7 +124,7 @@ func httpGetJSON(gateway, apiPath, token string) (map[string]any, error) {
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	client := &http.Client{Timeout: browserExtDownloadTimeout}
+	client := &http.Client{Timeout: browserExtDownloadTimeout, Transport: proxy.Transport()}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("请求 %s 失败: %w", url, err)

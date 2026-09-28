@@ -29,6 +29,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"jarvis-daemon/internal/proxy"
 )
 
 // 下载与网络相关常量。
@@ -157,7 +159,7 @@ func Download(client *http.Client, version, rawURL, destPath, wantSHA256 string)
 		return err
 	}
 	if client == nil {
-		client = &http.Client{Timeout: downloadTimeout}
+		client = &http.Client{Timeout: downloadTimeout, Transport: proxy.Transport()}
 	}
 
 	req, err := http.NewRequest(http.MethodGet, safeURL, nil)

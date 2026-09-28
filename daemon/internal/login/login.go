@@ -20,6 +20,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"jarvis-daemon/internal/proxy"
 )
 
 // loginTimeout 是登录请求的整体超时。
@@ -115,7 +117,7 @@ func Login(gateway, username, password string) (LoginResult, error) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: loginTimeout}
+	client := &http.Client{Timeout: loginTimeout, Transport: proxy.Transport()}
 	resp, err := client.Do(req)
 	if err != nil {
 		return LoginResult{}, fmt.Errorf("登录请求失败（%s）: %w", url, err)
@@ -201,7 +203,8 @@ func PushAuth(listen, gateway, token, name string) error {
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: pushTimeout}
+	// 目标为本机回环地址，显式绕过代理（用户可能配置了系统代理）。
+	client := &http.Client{Timeout: pushTimeout, Transport: proxy.DirectTransport()}
 	resp, err := client.Do(req)
 	if err != nil {
 		// 本地服务未启动时通常是 connection refused，这里给出可操作的提示。
