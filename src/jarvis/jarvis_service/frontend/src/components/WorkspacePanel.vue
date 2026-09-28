@@ -96,6 +96,23 @@
             <span v-if="tab.isDirty" class="workspace-tab-dirty">●</span>
             <button class="workspace-tab-close" @click.stop="$emit('closeTab', tab.path)">✕</button>
           </div>
+          <!-- 未分割态同样提供保存 / 只读开关（作用于当前激活文件），
+               与已分割态各 pane 的工具栏保持一致，避免「未分割时无法切换可编辑」。 -->
+          <div class="workspace-pane-actions">
+            <button
+              class="workspace-pane-action"
+              :disabled="!hasActiveTab"
+              @click.stop="$emit('save')"
+              title="保存当前文件"
+            >💾</button>
+            <button
+              class="workspace-pane-action"
+              :class="{ editable: isEditable }"
+              :disabled="!hasActiveTab"
+              @click.stop="$emit('toggleEditable')"
+              :title="isEditable ? '切换到只读模式' : '切换到编辑模式'"
+            >{{ isEditable ? '🔓' : '🔒' }}</button>
+          </div>
         </div>
         <!-- 自由分割模式：由 App.vue 提供整棵 pane 树（含每个 leaf 的内容），
              此时不再渲染原有的单视图内容，避免两套渲染路径并存。 -->
@@ -163,7 +180,9 @@ const props = defineProps({
   mainView: { type: String, default: 'file' },
   resizeDirections: Array,
   diff: Object,
-  isAdmin: { type: Boolean, default: false }
+  isAdmin: { type: Boolean, default: false },
+  isEditable: { type: Boolean, default: false },
+  hasActiveTab: { type: Boolean, default: false }
 })
 
 const emit = defineEmits([
@@ -175,6 +194,7 @@ const emit = defineEmits([
   'activateTab',
   'closeTab',
   'tabContextMenu',
+  'toggleEditable',
   'setSidebarView',
   'setMainView',
   'startResize',
@@ -335,6 +355,42 @@ defineExpose({
   font-size: 12px;
   line-height: 1;
   padding: 0;
+}
+/* 未分割态标签栏右侧的保存 / 只读按钮（与已分割态 pane 工具栏同款） */
+.workspace-pane-actions {
+  position: sticky;
+  right: 0;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: 6px;
+  background: var(--color-bg-secondary, #1e1e1e);
+}
+.workspace-pane-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.workspace-pane-action:hover:not(:disabled) {
+  background: var(--color-bg-hover, rgba(255, 255, 255, 0.08));
+}
+.workspace-pane-action.editable {
+  color: var(--color-accent, #4a9eff);
+}
+.workspace-pane-action:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .workspace-main {
