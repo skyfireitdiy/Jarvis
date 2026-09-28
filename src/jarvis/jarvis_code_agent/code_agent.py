@@ -48,6 +48,7 @@ from jarvis.jarvis_utils.config import is_use_analysis
 from jarvis.jarvis_utils.config import is_use_methodology
 from jarvis.jarvis_utils.config import set_config
 from jarvis.jarvis_utils.git_utils import detect_large_code_deletion
+from jarvis.jarvis_utils.git_utils import advance_start_commit
 from jarvis.jarvis_utils.git_utils import find_git_root_and_cd
 from jarvis.jarvis_utils.git_utils import get_commits_between
 from jarvis.jarvis_utils.git_utils import get_diff
@@ -630,6 +631,8 @@ git reset --hard {start_commit}
 
             # 自动完成路径已提交（_execute_auto_complete），此处避免重复提交
             if not getattr(self, "_auto_commit_done", False):
+                # 收尾兜底：用户可能在任务期间手动提交，前移起始点后再做提交确认
+                self._advance_start_commit_if_needed()
                 end_commit = get_latest_commit_hash()
                 commits = self.git_manager.show_commit_between(
                     self.start_commit, end_commit
@@ -665,6 +668,20 @@ git reset --hard {start_commit}
                 save_exception(e, module="jarvis_code_agent.code_agent", function="run")
                 pass
 
+    def _advance_start_commit_if_needed(self) -> None:
+        """若存在用户手动提交，则把任务起始 commit 前移到最新的手动提交
+
+        只有 "CheckPoint #" 开头的临时提交被视为 CodeAgent 自动产出；其余
+        提交（用户手动提交、GitCommitTool 正式提交）都视为手动提交，应作为
+        新的任务起始点保留，避免后续 squash / reset 误伤。
+        """
+        new_start = advance_start_commit(self.start_commit)
+        if new_start and new_start != self.start_commit:
+            PrettyOutput.auto_print(
+                f"ℹ️ 检测到手动提交，任务起始点已更新为 {new_start[:7]}"
+            )
+            self.start_commit = new_start
+
     def _on_after_tool_call(
         self,
         agent: Agent,
@@ -676,6 +693,9 @@ git reset --hard {start_commit}
         """工具调用后回调函数。"""
         # 重置全局标记，允许在此流程中重新进行文件确认
         reset_confirm_add_new_files_flag()
+
+        # 用户可能在任务进行中手动提交，及时把任务起始点前移，避免误伤其提交
+        self._advance_start_commit_if_needed()
 
         final_ret = ""
         diff = get_diff()

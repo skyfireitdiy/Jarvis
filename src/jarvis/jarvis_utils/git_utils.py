@@ -642,6 +642,61 @@ def get_latest_commit_hash() -> str:
         return ""
 
 
+# 自动提交（临时 checkpoint）的提交信息前缀。
+# 只有该前缀的提交才被视为 CodeAgent 自动产生的临时提交，可被压缩合并；
+# 其余提交（包括用户手动提交，以及 GitCommitTool 生成的正式提交）一律视为
+# 手动提交，会作为新的任务起始点保留。
+AUTO_COMMIT_PREFIX = "CheckPoint #"
+
+
+def is_auto_commit_message(message: str) -> bool:
+    """判断提交信息是否为 CodeAgent 自动产生的临时提交
+
+    参数:
+        message: 提交信息（git log 的 subject 行）
+
+    返回:
+        bool: 以 "CheckPoint #" 开头返回 True（临时提交），否则返回 False
+    """
+    return (message or "").strip().startswith(AUTO_COMMIT_PREFIX)
+
+
+def advance_start_commit(start_commit: Optional[str]) -> Optional[str]:
+    """将任务起始 commit 前移到最新的手动提交
+
+    场景：CodeAgent 运行期间，用户可能手动执行了 git commit（或产生了
+    GitCommitTool 生成的正式提交）。这些提交不属于「本次任务」的产出，
+    若仍以旧的 start_commit 为起点，会导致后续 squash / reset 误伤它们。
+
+    因此从 start_commit（不含）到 HEAD 之间按时间顺序（旧→新）扫描，
+    一旦遇到非临时提交（即手动提交），就把起始点前移到该提交；取最后
+    一个手动提交，其后的临时 checkpoint 仍算作本次任务的产出。
+
+    参数:
+        start_commit: 当前记录的起始 commit hash，可为 None
+
+    返回:
+        Optional[str]: 前移后的起始 commit hash；无需前移时原样返回
+    """
+    if not start_commit:
+        return start_commit
+
+    latest = get_latest_commit_hash()
+    if not latest or latest == start_commit:
+        return start_commit
+
+    # git log 默认按时间倒序输出，反转后即为从旧到新的顺序
+    commits = get_commits_between(start_commit, latest)
+    if not commits:
+        return start_commit
+
+    new_start = start_commit
+    for commit_hash, message in reversed(commits):
+        if not is_auto_commit_message(message):
+            new_start = commit_hash
+    return new_start
+
+
 def get_modified_line_ranges() -> Dict[str, List[Tuple[int, int]]]:
     """从Git差异中获取所有更改文件的修改行范围
 
