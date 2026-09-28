@@ -22,4 +22,6 @@ func registerPlatformCapabilities(reg *Registry) {
 	registerLinuxService(reg)
 	registerLinuxGUI(reg)
 	registerLinuxBrowserExt(reg)
+	// OCR 文字识别：逻辑跨平台共享（图片经网关识别），仅 Platform 字段不同
+	registerOcr(reg, PlatformLinux)
 }

@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sort"
 	"strings"
 	"sync"
 	"syscall"
@@ -551,6 +552,19 @@ func runDaemon(args []string) {
 			return "", false
 		}
 		return creds.Token, true
+	})
+	// 注入「已认证网关列表」，供 ocr.recognize 在未显式指定 gateway 时回退使用。
+	// 排序保证顺序稳定（多网关时取地址最小的那个），避免每次调用结果漂移。
+	capability.SetOcrGatewayLister(func() []string {
+		creds := store.List()
+		out := make([]string, 0, len(creds))
+		for _, c := range creds {
+			if c.Gateway != "" && c.Token != "" {
+				out = append(out, c.Gateway)
+			}
+		}
+		sort.Strings(out)
+		return out
 	})
 
 	// 网关黑白名单：由 daemon 自身配置（config.yaml），仅限本机通过

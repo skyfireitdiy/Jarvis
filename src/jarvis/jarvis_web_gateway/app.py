@@ -2459,6 +2459,122 @@ def create_app(
             },
         }
 
+    @app.post("/api/ocr", dependencies=[Depends(verify_token)])
+    async def api_ocr(request: Request) -> Dict[str, Any]:
+        """OCR 文字识别接口：把 base64 图片交给网关侧的 OCR 工具识别为纯文本。
+
+        请求体：
+            {
+              "image_base64": str,   # 必填，图片内容的 base64（可含 data URL 前缀）
+              "filename": str,       # 可选，用于推断扩展名，默认 "image.png"
+              "backend": str,        # 可选，auto/tesseract/rapidocr/paddleocr/easyocr/vision
+              "lang": str,           # 可选，默认 "eng"；tesseract 可传 "chi_sim+eng"
+              "psm": int,            # 可选，tesseract 页面分割模式
+              "detail": bool         # 可选，是否返回逐行/坐标信息
+            }
+
+        返回：{"success": bool, "text": str, "backend": str, "lines": list, "error": str}
+
+        设计说明：
+        - 只接受 base64 图片内容，**不接受本地路径/URL**：网关与调用方（如 daemon）
+          通常不在同一台机器，路径在网关侧无意义；URL 则由调用方自行下载后转 base64。
+        - 复用项目既有 OcrTool（不修改其代码），故其多后端与优雅降级能力一并继承。
+        - OcrTool.execute 是同步阻塞的（可能跑 tesseract CLI 或调模型），
+          这里用 asyncio.to_thread 放到线程池，避免阻塞事件循环。
+        """
+        import base64
+        import tempfile
+
+        try:
+            body = await request.json()
+        except Exception:
+            return {"success": False, "error": "invalid json body"}
+
+        image_base64 = body.get("image_base64")
+        if not image_base64 or not isinstance(image_base64, str):
+            return {"success": False, "error": "image_base64 is required"}
+
+        # 兼容 data URL 前缀（如 "data:image/png;base64,xxxx"）
+        if image_base64.startswith("data:") and "," in image_base64:
+            image_base64 = image_base64.split(",", 1)[1]
+
+        # 图片大小上限：与 OCR 工具保持一致（CONTENT_CONFIG.max_image_size，默认 20 MiB）
+        try:
+            from jarvis.jarvis_platform.content_types import CONTENT_CONFIG
+
+            max_size = int(CONTENT_CONFIG.get("max_image_size", 20 * 1024 * 1024))
+        except Exception:
+            max_size = 20 * 1024 * 1024
+
+        try:
+            raw = base64.b64decode(image_base64, validate=False)
+        except Exception as exc:
+            return {"success": False, "error": f"image_base64 解码失败: {exc}"}
+
+        if len(raw) > max_size:
+            return {
+                "success": False,
+                "error": (
+                    f"图片过大：{len(raw)} 字节，超过上限 {max_size} 字节"
+                    f"（约 {max_size // (1024 * 1024)} MiB）"
+                ),
+            }
+
+        # 推断扩展名（白名单校验，非白名单回退 .png）
+        from jarvis.jarvis_tools.ocr import _SUPPORTED_EXTS
+
+        filename = str(body.get("filename") or "image.png").strip()
+        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+        if ext not in _SUPPORTED_EXTS:
+            ext = "png"
+
+        backend = str(body.get("backend") or "auto").strip().lower() or "auto"
+        lang = str(body.get("lang") or "eng").strip() or "eng"
+        psm = body.get("psm")
+        detail = bool(body.get("detail", False))
+
+        tmp_path = None
+        try:
+            fd, tmp_path = tempfile.mkstemp(prefix="jarvis_gw_ocr_", suffix=f".{ext}")
+            with os.fdopen(fd, "wb") as f:
+                f.write(raw)
+
+            from jarvis.jarvis_tools.ocr import OcrTool
+
+            tool = OcrTool()
+            args: Dict[str, Any] = {
+                "image": tmp_path,
+                "backend": backend,
+                "lang": lang,
+                "detail": detail,
+            }
+            if psm is not None:
+                args["psm"] = psm
+
+            # OcrTool.execute 同步阻塞，放线程池执行，避免卡住事件循环
+            result = await asyncio.to_thread(tool.execute, args)
+
+            if not result.get("success"):
+                return {
+                    "success": False,
+                    "error": result.get("stderr") or "OCR 识别失败",
+                }
+            return {
+                "success": True,
+                "text": result.get("text", ""),
+                "backend": result.get("backend", backend),
+                "lines": result.get("lines", []),
+                "error": "",
+            }
+        except Exception as exc:
+            return {"success": False, "error": f"OCR 执行异常: {exc}"}
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+
     @app.post("/api/browser-ext/scripts/save", dependencies=[Depends(verify_token)])
     async def api_browser_ext_script_save(request: Request) -> Dict[str, Any]:
         """把脚本源码保存到网关数据目录下的 browser_scripts/。
