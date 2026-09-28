@@ -81,89 +81,42 @@ daemon(action="list_capabilities", session_id="<sid>")
 
 ### 2. 按任务选能力
 
-| 目标                              | 能力                                   | 关键参数                                          |
-| --------------------------------- | -------------------------------------- | ------------------------------------------------- |
-| 列出窗口（拿 window_id/pid/标题） | `windows.window.list`                  | `filter`（**匹配标题，不匹配进程名**）            |
-| 聚焦窗口                          | `windows.window.focus`                 | `window_id`（**HWND 十六进制串**）或 `title`      |
-| 关闭窗口                          | `windows.window.close`                 | `window_id`                                       |
-| 点击                              | `windows.input.click`                  | `x`/`y`（**屏幕绝对坐标**）、`button`、`count`    |
-| 按键组合                          | `windows.input.keys`                   | `keys`（如 `ctrl+f`、`Return`、`ctrl+alt+Right`） |
-| 输入文本                          | `windows.input.type`                   | `text`、`delay_ms`                                |
-| 剪贴板读写                        | `windows.clipboard.get` / `.set`       | `text`                                            |
-| 跑 PowerShell/cmd                 | `windows.script.exec`                  | `script`、`interpreter`、`timeout_ms`             |
-| 列进程                            | `windows.process.list`                 | `filter`（匹配进程名或 PID）                      |
-| 结束进程                          | `windows.process.kill`                 | `pid`、`force`                                    |
-| 列已安装应用                      | `windows.app.list`                     | `filter`（名称或发布者）                          |
-| 文件读写列                        | `windows.fs.read` / `.write` / `.list` | `path` 等                                         |
-| 大文件分块传输                    | `windows.fs.transfer.*`                | `path`、`offset`、`length`、`data`、`sha256`      |
-| 服务管理                          | `windows.service.*`                    | `unit`（需管理员权限才能启停）                    |
-| 截图                              | `windows.screenshot`                   | `path`（**只截主屏，返回体不含图像**）            |
-| 系统信息                          | `windows.system.info`                  | 无                                                |
+| 目标                              | 能力                                    | 关键参数                                                                              |
+| --------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------- |
+| 列出窗口（拿 window_id/pid/标题） | `windows.window.list`                   | `filter`（**匹配标题，不匹配进程名**）                                                |
+| 聚焦窗口                          | `windows.window.focus`                  | `window_id`（**HWND 十六进制串**）或 `title`                                          |
+| 关闭窗口                          | `windows.window.close`                  | `window_id`                                                                           |
+| 点击                              | `windows.input.click`                   | `x`/`y`（**屏幕绝对坐标**）、`button`、`count`                                        |
+| 按键组合                          | `windows.input.keys`                    | `keys`（如 `ctrl+f`、`Return`、`ctrl+alt+Right`）                                     |
+| 输入文本                          | `windows.input.type`                    | `text`、`delay_ms`                                                                    |
+| 剪贴板读写                        | `windows.clipboard.get` / `.set`        | `text`                                                                                |
+| 跑 PowerShell/cmd                 | `windows.script.exec`                   | `script`、`interpreter`、`timeout_ms`                                                 |
+| 列进程                            | `windows.process.list`                  | `filter`（匹配进程名或 PID）                                                          |
+| 结束进程                          | `windows.process.kill`                  | `pid`、`force`                                                                        |
+| 列已安装应用                      | `windows.app.list`                      | `filter`（名称或发布者）                                                              |
+| 文件读写列                        | `windows.fs.read` / `.write` / `.list`  | `path` 等                                                                             |
+| 跨机传文件（daemon↔节点）         | `fs.transfer.push` / `fs.transfer.pull` | `gateway`、`node_id`、`local_path`、`remote_path`（详见 `daemon_file_transfer` 规则） |
+| 服务管理                          | `windows.service.*`                     | `unit`（需管理员权限才能启停）                                                        |
+| 截图                              | `windows.screenshot`                    | `path`（**只截主屏，返回体不含图像**）                                                |
+| 系统信息                          | `windows.system.info`                   | 无                                                                                    |
 
-### 3. 文件传输（大文件 / 双向）
+### 3. 文件读写与跨机传输
 
-`windows.fs.read` / `.write` 面向「看内容」，单次上限 8 MiB，不适合搬文件。
-搬文件（尤其是二进制、大文件、需要校验完整性）请用 `windows.fs.transfer.*` 四个能力。
-Linux 侧完全对称，把前缀换成 `linux.` 即可（参数与返回字段逐字一致）。
+**本机内读写**用 `windows.fs.read` / `.write` / `.list`：
 
-| 能力                         | 用途                  | 关键参数                                       | 主要返回字段                                                  |
-| ---------------------------- | --------------------- | ---------------------------------------------- | ------------------------------------------------------------- |
-| `windows.fs.transfer.stat`   | 传输前查元信息 / 比对 | `path`                                         | `exists`、`size`、`mtime`、`sha256`、`is_dir`                 |
-| `windows.fs.transfer.read`   | 分块读（下载）        | `path`、`offset`、`length`                     | `data`（base64）、`bytes_read`、`eof`、`chunk_sha256`、`size` |
-| `windows.fs.transfer.write`  | 分块写（上传 / 续传） | `path`、`offset`、`data`（base64）、`truncate` | `written_bytes`、`size`、`truncated`                          |
-| `windows.fs.transfer.verify` | 落盘后校验完整性      | `path`、`sha256`                               | `match`、`size`、`actual_sha256`                              |
+- `windows.fs.read`：读文件内容，单次上限 8 MiB，二进制自动 base64（`is_binary=true`）。
+- `windows.fs.write`：写文件，支持覆盖/追加、自动建父目录；`encoding=base64` 时按 base64 解码写入。
+- `windows.fs.list`：列目录，支持递归与深度限制。
 
-**约束（必须记住）：**
+> 这三个能力面向「看内容 / 写小文件」，**不适合搬大文件**（内容要经过 Agent 上下文）。
 
-- 单文件上限 **512 MiB**；`stat` / `read` / `write` / `verify` 都会校验，超限直接报错。
-- 单块上限 **8 MiB**，默认块 **1 MiB**（`length` 不传即 1 MiB）。
-- `offset` 不能为负。`offset` 超出文件尾**不报错**，返回 `bytes_read=0` + `eof=true`。
-- `length<=0` 表示「读到文件尾」；`length` 超过剩余部分时自动取剩余并置 `eof=true`。
-- `write` 的 `data` 是 **base64**；首块传 `truncate=true` 清空已有内容，后续块传 `truncate=false`。
-- 断点续传：从 `stat` 拿到已传大小，把 `offset` 设到那里继续写即可（`truncate=false`）。
+**跨机传文件**用 `fs.transfer.push` / `fs.transfer.pull`（Linux/Windows 通用，无平台前缀）：
 
-**推荐流程（下载：真机 → 本地）：**
+- 数据通路是 **daemon ↔ agent 节点**（`/api/node/{node_id}/file-transfer/*`），`node_id` 必须是网关注册的 agent 节点，**不是 daemon 的 client_id**。
+- daemon ↔ daemon 之间传文件需借 agent 节点中转（源机 push → 目标机 pull）。
+- 单次上限 512 MiB；`chunk_size` 受网关 nginx 1 MB body 限制，**必须显式传 524288**。
 
-```text
-# 1) 先看文件是否存在、多大、校验和是多少
-daemon(action="call", session_id="<sid>", name="windows.fs.transfer.stat",
-       params={"path": "C:\\data\\big.bin"})
-
-# 2) 按 1 MiB 循环分块读，直到 eof=true
-daemon(action="call", session_id="<sid>", name="windows.fs.transfer.read",
-       params={"path": "C:\\data\\big.bin", "offset": 0, "length": 1048576})
-#    → 拿到 data(base64) 后本地拼接，offset += bytes_read，重复直到 eof
-
-# 3) 本地拼完后，用第 1 步的 sha256 比对；或反过来对真机文件调 verify
-daemon(action="call", session_id="<sid>", name="windows.fs.transfer.verify",
-       params={"path": "C:\\data\\big.bin", "sha256": "<第1步拿到的 sha256>"})
-```
-
-**推荐流程（上传：本地 → 真机）：**
-
-```text
-# 1) 先 stat 目标路径，确认是否已存在部分内容（决定 offset 起点）
-daemon(action="call", session_id="<sid>", name="windows.fs.transfer.stat",
-       params={"path": "C:\\data\\upload.bin"})
-
-# 2) 首块 truncate=true，后续块 truncate=false 并按 offset 定位
-daemon(action="call", session_id="<sid>", name="windows.fs.transfer.write",
-       params={"path": "C:\\data\\upload.bin", "offset": 0,
-               "data": "<base64 首块>", "truncate": true})
-daemon(action="call", session_id="<sid>", name="windows.fs.transfer.write",
-       params={"path": "C:\\data\\upload.bin", "offset": 1048576,
-               "data": "<base64 第二块>", "truncate": false})
-
-# 3) 传完 verify 校验
-daemon(action="call", session_id="<sid>", name="windows.fs.transfer.verify",
-       params={"path": "C:\\data\\upload.bin", "sha256": "<本地算出的 sha256>"})
-```
-
-**注意：**
-
-- 传输完的临时文件必须清理（见「你必须执行的操作」第 6 节）。
-- 上层不做 `pull`/`push` 封装，分块循环由调用方控制——这样断点续传与进度上报都更灵活。
-- 超过 512 MiB 的文件应改用独立通道（如 `windows.script.exec` 调 `curl`/`scp`），不要用本能力硬传。
+完整用法、参数、全部已知坑（502 / 413 / 凭据 / 超时）见 **`daemon_file_transfer` 规则**，此处不重复。
 
 ### 4. 定位 UI 元素（核心方法论）
 

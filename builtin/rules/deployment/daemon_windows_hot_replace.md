@@ -105,7 +105,8 @@ daemon(action="call", session_id="<目标sid>", name="fs.transfer.pull",
        params={"gateway": "https://<网关>", "node_id": "<源节点ID，通常为 master>",
                "remote_path": "jarvis-daemon-new.exe",   # 源节点 transfers/ 下的相对路径
                "local_path": "C:\\Users\\<user>\\.jarvis\\bin\\jarvis-daemon-new.exe",
-               "mode": "file"})
+               "mode": "file",
+               "chunk_size": 524288})   # 见下方「chunk_size 必填」说明
 # 返回摘要的 sha256 应与源节点产物 sha256 一致，据此校验
 
 # 4) 复制为 .helper.exe → 启动 helper（helper 必须从新文件运行）
@@ -126,6 +127,12 @@ daemon(action="call", session_id="<目标sid>", name="windows.process.kill",
 - `fs.transfer.pull` = **「指定远端节点 → 发起方本机」**；`fs.transfer.push` = **「发起方本机 → 指定远端节点」**。
 - 本场景产物在**网关节点**、要送进**目标机**，所以由**目标机**发起 `pull`（`node_id` 指向网关节点）。
 - 若产物在**执行方本机**、要送到别的节点，才用 `push`。
+
+**chunk_size 必填（否则大概率 HTTP 413）**：
+
+- 传输按 base64 分块（体积膨胀 4/3）。网关 nginx 默认 `client_max_body_size 1M`，而 daemon 默认 `chunk_size` 为 1MiB → 实际请求体约 1.33MB → 被 nginx 拒绝，报 **HTTP 413**。
+- 因此**必须显式传 `chunk_size: 524288`（512KiB）**，两端 push/pull 都要传。daemon 侧允许 1MiB~8MiB（`NormalizeTransferChunkSize`），但受 nginx 限制，512KiB 是安全值。
+- 大文件传输耗时较长，`daemon(action="call")` 默认 30s 会超时（实际传输可能仍在继续），请把 `timeout` 放大到 120s 以上。
 
 **helper 子命令签名（精确）：**
 
