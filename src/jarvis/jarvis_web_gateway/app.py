@@ -7590,6 +7590,352 @@ def create_app(
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
+    # ------------------------------------------------------------------
+    # 节点文件直传（file-transfer）：daemon 与节点之间搬运大文件
+    # ------------------------------------------------------------------
+    # 背景：daemon 侧 fs.transfer.push/pull 在 daemon 内部循环分块，经网关
+    # WS 转发到目标节点，字节不进入 Agent 上下文。因 WS 转发 body 是 JSON
+    # 字符串，二进制统一用 base64 承载，单块上限 8MiB（base64 后约 10.7MiB，
+    # 低于 uvicorn 默认 16MiB 的 WS 消息上限）。
+    #
+    # 安全：节点侧所有落盘路径必须收敛到 ~/.jarvis/transfers/ 之下，绝对路径
+    # 去根后保留原结构（/data/a.txt -> transfers/data/a.txt），相对路径直接
+    # 拼接；任何试图逃出该目录的路径（.. 穿越）都会被拒绝。
+    _TRANSFER_MAX_CHUNK_BYTES = 8 * 1024 * 1024
+
+    # dir 模式打包缓存：{tar_path: (source_path, mtime, size)}。
+    # download 分块请求每块都会到达本函数，若每次都重新打包整个目录，大目录
+    # 会被打包 N 次（N=分块数），代价极高。这里按 tar 路径缓存，命中且源目录
+    # mtime 未变时直接复用；分块读到 eof 后删除 tar 并清缓存。
+    _transfer_dir_tar_cache: Dict[str, Any] = {}
+
+    def _transfer_pack_dir(source_path: str) -> str:
+        """把目录打包为 <source>.outgoing.tar 并返回 tar 路径（带缓存）。"""
+        import tarfile
+
+        tar_path = source_path.rstrip("/\\") + ".outgoing.tar"
+        try:
+            mtime = os.path.getmtime(source_path)
+        except OSError:
+            mtime = None
+        cached = _transfer_dir_tar_cache.get(tar_path)
+        if (
+            cached is not None
+            and os.path.isfile(tar_path)
+            and cached[0] == source_path
+            and cached[1] == mtime
+        ):
+            return tar_path
+        # 以目录名作为 tar 内顶层目录，保留相对结构
+        with tarfile.open(tar_path, "w") as tar:
+            tar.add(source_path, arcname=os.path.basename(source_path))
+        _transfer_dir_tar_cache[tar_path] = (
+            source_path,
+            mtime,
+            os.path.getsize(tar_path),
+        )
+        return tar_path
+
+    def _transfer_cleanup_dir_tar(tar_path: str) -> None:
+        """删除 dir 模式临时 tar 并清缓存（幂等）。"""
+        _transfer_dir_tar_cache.pop(tar_path, None)
+        try:
+            os.remove(tar_path)
+        except OSError:
+            pass
+
+    def _transfer_root_dir() -> str:
+        """返回文件直传的收敛根目录（~/.jarvis/transfers）。"""
+        from jarvis.jarvis_utils.config import get_data_dir
+
+        root = os.path.join(get_data_dir(), "transfers")
+        os.makedirs(root, exist_ok=True)
+        return root
+
+    def _resolve_transfer_path(raw_path: str) -> str:
+        """把用户传入的路径收敛到 transfers 根目录之下。
+
+        - 绝对路径：去掉根（含 Windows 盘符），保留原路径结构后拼接；
+        - 相对路径：直接拼接；
+        - 任何规范化后逃出根目录的路径（如 ../../etc/passwd）都会抛 ValueError。
+        """
+        root = os.path.realpath(_transfer_root_dir())
+        text = str(raw_path or "").strip()
+        if not text:
+            raise ValueError("path is required")
+
+        # Windows 盘符（C:\... 或 C:/...）需要单独剥离，os.path.isabs 在
+        # POSIX 下不认盘符，但节点可能是 Windows，故统一处理。
+        drive, rest = os.path.splitdrive(text)
+        if drive or os.path.isabs(text):
+            # 去掉根与盘符，仅保留相对结构
+            relative = rest.lstrip("/\\") if drive else text.lstrip("/\\")
+        else:
+            relative = text
+
+        candidate = os.path.realpath(os.path.join(root, relative))
+        # 用 commonpath 校验是否仍在根目录内，防止 .. 穿越
+        if candidate != root and os.path.commonpath([root, candidate]) != root:
+            raise ValueError(f"path escapes transfer root: {raw_path}")
+        return candidate
+
+    async def _handle_file_transfer_upload(payload: Dict[str, Any]) -> Dict[str, Any]:
+        """处理文件直传的上传分块：把 base64 分块按 offset 写入目标文件。
+
+        payload 字段：
+          - path: 目标路径（会被收敛到 transfers 根目录下）
+          - data: base64 编码的分块数据
+          - offset: 写入偏移（>=0）
+          - mode: "file" | "dir"（dir 表示 data 是 tar 分块）
+          - truncate: 首块传 True 时清空目标文件
+          - final: dir 模式下最后一块传 True 时解包 tar 到目标目录
+        """
+        import base64
+        import hashlib
+        import tarfile
+
+        try:
+            raw_path = str(payload.get("path", "")).strip()
+            try:
+                target_path = _resolve_transfer_path(raw_path)
+            except ValueError as exc:
+                return {
+                    "success": False,
+                    "error": {"code": "INVALID_PATH", "message": str(exc)},
+                }
+
+            mode = str(payload.get("mode") or "file").strip().lower()
+            if mode not in ("file", "dir"):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_MODE",
+                        "message": "mode must be 'file' or 'dir'",
+                    },
+                }
+
+            data_b64 = payload.get("data")
+            if not isinstance(data_b64, str):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_DATA",
+                        "message": "data must be a base64 string",
+                    },
+                }
+            try:
+                chunk = base64.b64decode(data_b64)
+            except Exception as exc:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_DATA",
+                        "message": f"invalid base64 data: {exc}",
+                    },
+                }
+
+            if len(chunk) > _TRANSFER_MAX_CHUNK_BYTES:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "CHUNK_TOO_LARGE",
+                        "message": f"chunk exceeds {_TRANSFER_MAX_CHUNK_BYTES} bytes",
+                    },
+                }
+
+            try:
+                offset = int(payload.get("offset") or 0)
+            except (TypeError, ValueError):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_OFFSET",
+                        "message": "offset must be an integer",
+                    },
+                }
+            if offset < 0:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_OFFSET",
+                        "message": "offset must be >= 0",
+                    },
+                }
+
+            # dir 模式：分块先落到 <目标>.incoming.tar，最后一块再解包
+            write_path = target_path + ".incoming.tar" if mode == "dir" else target_path
+            os.makedirs(os.path.dirname(write_path) or ".", exist_ok=True)
+
+            truncate = bool(payload.get("truncate"))
+            # 首块 truncate 或文件不存在时用 "wb"，否则用 "r+b" 定位写入。
+            # truncate 分支同样 seek 到 offset：truncate 只表示"从零开始重建"，
+            # 并不隐含 offset==0，调用方仍可能带非零 offset 追加写入。
+            if truncate or not os.path.exists(write_path):
+                with open(write_path, "wb") as fh:
+                    if offset:
+                        fh.seek(offset)
+                    fh.write(chunk)
+            else:
+                with open(write_path, "r+b") as fh:
+                    fh.seek(offset)
+                    fh.write(chunk)
+
+            written = len(chunk)
+            size = os.path.getsize(write_path)
+            chunk_sha256 = hashlib.sha256(chunk).hexdigest()
+
+            # dir 模式最后一块：解包 tar 到目标目录并删除临时 tar
+            if mode == "dir" and bool(payload.get("final")):
+                os.makedirs(target_path, exist_ok=True)
+                with tarfile.open(write_path, "r") as tar:
+                    _safe_extract_tar(tar, target_path)
+                os.remove(write_path)
+
+            return {
+                "success": True,
+                "data": {
+                    "path": target_path,
+                    "offset": offset,
+                    "written": written,
+                    "size": size,
+                    "sha256": chunk_sha256,
+                },
+            }
+        except PermissionError:
+            return {
+                "success": False,
+                "error": {"code": "PERMISSION_DENIED", "message": "Permission denied"},
+            }
+        except Exception as exc:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(exc)},
+            }
+
+    def _safe_extract_tar(tar: Any, dest_dir: str) -> None:
+        """解包 tar 到 dest_dir，拒绝任何逃出目标目录的成员（防 tar 穿越）。"""
+        root = os.path.realpath(dest_dir)
+        for member in tar.getmembers():
+            member_path = os.path.realpath(os.path.join(root, member.name))
+            if member_path != root and os.path.commonpath([root, member_path]) != root:
+                raise ValueError(f"tar member escapes dest dir: {member.name}")
+        try:
+            # Python 3.12+ 支持 filter；"tar" 保留权限/时间等元数据，同时拒绝
+            # 绝对路径与 .. 穿越，与本函数的手工校验互补。旧版本无此参数。
+            tar.extractall(root, filter="tar")
+        except TypeError:
+            tar.extractall(root)
+
+    async def _handle_file_transfer_download(payload: Dict[str, Any]) -> Dict[str, Any]:
+        """处理文件直传的下载分块：读取文件（或目录 tar）的 offset 起 length 字节。
+
+        payload 字段：
+          - path: 源路径（会被收敛到 transfers 根目录下）
+          - offset: 起始偏移（>=0）
+          - length: 读取长度（<= 8MiB）
+          - mode: "file" | "dir"（dir 表示把目录打包为 tar 后分块）
+        """
+        import base64
+        import hashlib
+        import tarfile
+
+        try:
+            raw_path = str(payload.get("path", "")).strip()
+            try:
+                source_path = _resolve_transfer_path(raw_path)
+            except ValueError as exc:
+                return {
+                    "success": False,
+                    "error": {"code": "INVALID_PATH", "message": str(exc)},
+                }
+
+            mode = str(payload.get("mode") or "file").strip().lower()
+            if mode not in ("file", "dir"):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_MODE",
+                        "message": "mode must be 'file' or 'dir'",
+                    },
+                }
+
+            try:
+                offset = int(payload.get("offset") or 0)
+                length = int(payload.get("length") or _TRANSFER_MAX_CHUNK_BYTES)
+            except (TypeError, ValueError):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_RANGE",
+                        "message": "offset/length must be integers",
+                    },
+                }
+            if offset < 0 or length < 0:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_RANGE",
+                        "message": "offset/length must be >= 0",
+                    },
+                }
+            if length > _TRANSFER_MAX_CHUNK_BYTES:
+                length = _TRANSFER_MAX_CHUNK_BYTES
+
+            # dir 模式：把目录打包为 tar 落到 <path>.outgoing.tar 后按文件读取
+            read_path = source_path
+            is_dir_tar = False
+            if mode == "dir":
+                if not os.path.isdir(source_path):
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "NOT_A_DIRECTORY",
+                            "message": f"not a directory: {raw_path}",
+                        },
+                    }
+                # 分块请求会多次到达，打包结果按源目录 mtime 缓存复用
+                read_path = _transfer_pack_dir(source_path)
+                is_dir_tar = True
+            elif not os.path.isfile(source_path):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "NOT_FOUND",
+                        "message": f"file not found: {raw_path}",
+                    },
+                }
+
+            total_size = os.path.getsize(read_path)
+            with open(read_path, "rb") as fh:
+                fh.seek(offset)
+                chunk = fh.read(length)
+
+            eof = offset + len(chunk) >= total_size
+            # dir 模式最后一块读完后清理临时 tar，避免残留
+            if is_dir_tar and eof:
+                _transfer_cleanup_dir_tar(read_path)
+            return {
+                "success": True,
+                "data": {
+                    "path": source_path,
+                    "offset": offset,
+                    "size": total_size,
+                    "eof": eof,
+                    "data": base64.b64encode(chunk).decode("ascii"),
+                    "sha256": hashlib.sha256(chunk).hexdigest(),
+                },
+            }
+        except PermissionError:
+            return {
+                "success": False,
+                "error": {"code": "PERMISSION_DENIED", "message": "Permission denied"},
+            }
+        except Exception as exc:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(exc)},
+            }
+
     async def _handle_file_write_request(payload: Dict[str, Any]) -> Dict[str, Any]:
         try:
             file_path = str(payload.get("path", "")).strip()
@@ -8568,6 +8914,48 @@ def create_app(
                             ),
                         }
             result = await _handle_file_upload(payload)
+        elif normalized_method == "POST" and normalized_path == "/file-transfer/upload":
+            # 文件直传（上传分块）：权限与 /upload 一致，由 master 统一把关
+            if node_config.is_master:
+                _xfer_user_info = getattr(_mock_req.state, "user_info", None)
+                _xfer_user_id = (
+                    _xfer_user_info.get("user_id", "") if _xfer_user_info else ""
+                )
+                if _xfer_user_id and _xfer_user_id != "system":
+                    if not permission_manager.check_permission(
+                        _xfer_user_id, "file:upload"
+                    ):
+                        return {
+                            "success": False,
+                            "status_code": 403,
+                            "headers": {"content-type": "application/json"},
+                            "body": json.dumps(
+                                {"error": "Permission denied: file:upload"}
+                            ),
+                        }
+            result = await _handle_file_transfer_upload(payload)
+        elif (
+            normalized_method == "POST" and normalized_path == "/file-transfer/download"
+        ):
+            # 文件直传（下载分块）：读取权限与 file-content 一致，master 统一把关
+            if node_config.is_master:
+                _xfer_dl_user_info = getattr(_mock_req.state, "user_info", None)
+                _xfer_dl_user_id = (
+                    _xfer_dl_user_info.get("user_id", "") if _xfer_dl_user_info else ""
+                )
+                if _xfer_dl_user_id and _xfer_dl_user_id != "system":
+                    if not permission_manager.check_permission(
+                        _xfer_dl_user_id, "file:upload"
+                    ):
+                        return {
+                            "success": False,
+                            "status_code": 403,
+                            "headers": {"content-type": "application/json"},
+                            "body": json.dumps(
+                                {"error": "Permission denied: file:upload"}
+                            ),
+                        }
+            result = await _handle_file_transfer_download(payload)
         elif normalized_path.startswith("/data/"):
             from jarvis.jarvis_web_gateway.data_storage import (
                 save_data,

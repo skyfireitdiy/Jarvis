@@ -27,6 +27,8 @@ func registerPlatformCapabilities(reg *Registry) {
 	registerWindowsScript(reg)
 	registerWindowsFS(reg)
 	registerWindowsTransfer(reg)
+	// 跨机文件直传（push/pull）：逻辑跨平台共享，仅 Platform 字段不同
+	registerTransferRemote(reg, PlatformWindows)
 	registerWindowsService(reg)
 	registerWindowsBrowserExt(reg)
 }

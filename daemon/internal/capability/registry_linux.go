@@ -19,6 +19,8 @@ func registerPlatformCapabilities(reg *Registry) {
 	registerLinuxSystem(reg)
 	registerLinuxFS(reg)
 	registerLinuxTransfer(reg)
+	// 跨机文件直传（push/pull）：逻辑跨平台共享，仅 Platform 字段不同
+	registerTransferRemote(reg, PlatformLinux)
 	registerLinuxService(reg)
 	registerLinuxGUI(reg)
 	registerLinuxBrowserExt(reg)
