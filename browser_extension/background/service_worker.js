@@ -45,6 +45,111 @@ const NOTIFIED_VERSION_KEY = "notified_extension_version";
 // 供 hello 上报给网关（网关据此区分不同终端）。页面未打开时用缓存值。
 const TERMINAL_NAME_KEY = "terminal_name";
 
+// chrome.storage.local 中保存「网关黑白名单」的键，形如 {mode, patterns}。
+//
+// 为什么需要：autoDiscoverGateways 会把「浏览器里已登录的网关」自动纳入列表并
+// 连接，用户偶尔登录一次的网关也会被长期连接。名单用于把这类网关挡在门外。
+// mode 语义与 daemon 侧 gatewayfilter 包保持一致：
+//   off       不限制（默认）
+//   whitelist 仅允许命中 patterns 的网关
+//   blacklist 仅拒绝命中 patterns 的网关
+// patterns 匹配对象是 host:port（忽略协议差异），支持 * 与 ? 通配符。
+const GATEWAY_FILTER_KEY = "gateway_filter";
+
+/** 读取网关黑白名单配置（缺省为 off + 空名单）。 */
+async function loadGatewayFilter() {
+  try {
+    const cfg = await chrome.storage.local.get([GATEWAY_FILTER_KEY]);
+    const raw = cfg[GATEWAY_FILTER_KEY];
+    if (!raw || typeof raw !== "object") return { mode: "off", patterns: [] };
+    const mode = normalizeFilterMode(raw.mode);
+    const patterns = Array.isArray(raw.patterns)
+      ? raw.patterns.map((p) => String(p || "").trim()).filter(Boolean)
+      : [];
+    return { mode, patterns };
+  } catch (e) {
+    console.warn("[Jarvis] read gateway filter failed", e);
+    return { mode: "off", patterns: [] };
+  }
+}
+
+/** 保存网关黑白名单配置。 */
+async function saveGatewayFilter(mode, patterns) {
+  const value = {
+    mode: normalizeFilterMode(mode),
+    patterns: Array.isArray(patterns)
+      ? patterns.map((p) => String(p || "").trim()).filter(Boolean)
+      : [],
+  };
+  await chrome.storage.local.set({ [GATEWAY_FILTER_KEY]: value });
+  return value;
+}
+
+/** 归一化名单模式：非法值一律回退 off（与 daemon 侧 NormalizeMode 一致）。 */
+function normalizeFilterMode(mode) {
+  const m = String(mode || "")
+    .trim()
+    .toLowerCase();
+  if (m === "whitelist" || m === "blacklist") return m;
+  return "off";
+}
+
+/**
+ * 通配符匹配：'*' 匹配任意长度（含空），'?' 恰好匹配一个字符。
+ *
+ * 大小写不敏感；pattern 与 hostPort 均先 trim。
+ * 用双指针 + 回溯实现（最坏 O(n*m)），刻意不用 RegExp：避免用户输入的
+ * 特殊字符（如 '.'、'('）被当作正则元字符导致语义偏差。
+ * 与 daemon 侧 gatewayfilter.Match 行为保持一致。
+ */
+function wildcardMatch(pattern, hostPort) {
+  const p = String(pattern || "")
+    .trim()
+    .toLowerCase();
+  const s = String(hostPort || "")
+    .trim()
+    .toLowerCase();
+  let pi = 0;
+  let si = 0;
+  let star = -1;
+  let mark = 0;
+  while (si < s.length) {
+    if (pi < p.length && (p[pi] === "?" || p[pi] === s[si])) {
+      pi++;
+      si++;
+    } else if (pi < p.length && p[pi] === "*") {
+      star = pi;
+      mark = si;
+      pi++;
+    } else if (star !== -1) {
+      pi = star + 1;
+      mark++;
+      si = mark;
+    } else {
+      return false;
+    }
+  }
+  while (pi < p.length && p[pi] === "*") pi++;
+  return pi === p.length;
+}
+
+/**
+ * 判断某网关是否允许建立连接（网关黑白名单）。
+ *
+ * 与 daemon 侧 Filter.Allows 语义一致：
+ *   off       → 一律允许；
+ *   whitelist → 命中任一 pattern 才允许（空名单 = 全拒）；
+ *   blacklist → 命中任一 pattern 则拒绝（空名单 = 全允许）。
+ */
+async function gatewayFilterAllows(gateway) {
+  const { mode, patterns } = await loadGatewayFilter();
+  if (mode === "off") return true;
+  const key = gatewayKey(gateway);
+  if (!key) return true;
+  const hit = patterns.some((p) => wildcardMatch(p, key));
+  return mode === "whitelist" ? hit : !hit;
+}
+
 /** 读取已配置的网关列表。 */
 async function loadGateways() {
   const cfg = await chrome.storage.local.get(["gateways"]);
@@ -360,6 +465,14 @@ async function connect(gateway, force = false) {
     console.warn("[Jarvis] empty gateway, skip connect");
     return;
   }
+  // 网关黑白名单拦截：这是所有连接的唯一入口（自动发现、popup 点击、
+  // 鉴权失败重连都走这里），故只在此处判定即可覆盖全部路径。
+  // 只阻止「新连接」，不主动断开已在连的旧连接（与 daemon 侧语义一致）。
+  if (!(await gatewayFilterAllows(g))) {
+    console.warn("[Jarvis] gateway blocked by filter, skip connect:", g);
+    setState(g, "disconnected");
+    throw new Error(`网关 ${g} 不在允许名单内（已被网关黑白名单拦截）。`);
+  }
   if (!force) {
     const current = clients.get(g);
     if (current && current.isAlive()) {
@@ -476,11 +589,22 @@ async function refreshTokenFromPages(gateway) {
  * 比对时忽略协议差异，只比较 host 与端口。
  */
 function gatewayKey(gateway) {
-  const g = normalizeGateway(gateway);
+  let g = String(gateway || "").trim();
+  if (!g) return "";
+  // 显式识别 ws:// 与 wss://：daemon/扩展连接的网关地址天然可能是 WebSocket
+  // 形式，若交给 normalizeGateway 会被误加 "http://" 前缀，导致 URL 解析把
+  // "ws" 当成主机名、端口丢失，黑白名单随之失配。
+  if (/^wss?:\/\//i.test(g)) {
+    g = g.replace(/\/+$/, "");
+  } else {
+    g = normalizeGateway(g);
+  }
   if (!g) return "";
   try {
     const url = new URL(g);
-    const port = url.port || (url.protocol === "https:" ? "443" : "80");
+    const port =
+      url.port ||
+      (url.protocol === "https:" || url.protocol === "wss:" ? "443" : "80");
     return `${url.hostname}:${port}`;
   } catch (e) {
     return g;
@@ -652,7 +776,11 @@ async function autoDiscoverGateways() {
     try {
       await connect(gateway);
     } catch (e) {
-      console.warn("[Jarvis] auto-connect discovered gateway failed", gateway, e);
+      console.warn(
+        "[Jarvis] auto-connect discovered gateway failed",
+        gateway,
+        e,
+      );
     }
   }
   return added;
@@ -720,6 +848,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   if (message.type === "jarvis_get_status") {
     sendResponse({ success: true, gateways: listStatus() });
+    return true;
+  }
+  // 网关黑白名单：读取（popup 打开时回填表单）
+  if (message.type === "jarvis_get_gateway_filter") {
+    loadGatewayFilter()
+      .then((v) => sendResponse({ success: true, ...v }))
+      .catch((e) => sendResponse({ success: false, error: String(e) }));
+    return true;
+  }
+  // 网关黑白名单：保存（popup 提交表单）
+  if (message.type === "jarvis_set_gateway_filter") {
+    saveGatewayFilter(message.mode, message.patterns)
+      .then((v) => {
+        // 名单变化后，对当前「已配置但被拒」的网关不主动断开（符合只阻止
+        // 新连接的语义）；仅广播一次状态，便于 popup 刷新。
+        broadcastState();
+        sendResponse({ success: true, ...v });
+      })
+      .catch((e) => sendResponse({ success: false, error: String(e) }));
     return true;
   }
   if (message.type === "jarvis_remove_gateway") {

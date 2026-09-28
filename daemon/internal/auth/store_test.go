@@ -20,6 +20,11 @@ func TestNormalizeGateway(t *testing.T) {
 		{"127.0.0.1:8000/", "http://127.0.0.1:8000"},
 		{"HTTP://Host:8000/", "HTTP://Host:8000"},
 		{"jvs-ai.cn", "http://jvs-ai.cn"},
+		// ws/wss 必须原样保留：若被误加 http:// 前缀，GatewayKey 会把 "ws"
+		// 当成主机名，凭据索引键错误且连接必然失败。
+		{"ws://127.0.0.1:8000", "ws://127.0.0.1:8000"},
+		{"wss://jvs-ai.cn/", "wss://jvs-ai.cn"},
+		{"  ws://h:9//  ", "ws://h:9"},
 	}
 	for _, c := range cases {
 		if got := NormalizeGateway(c.in); got != c.want {
@@ -51,6 +56,28 @@ func TestGatewayKeyIgnoresScheme(t *testing.T) {
 	}
 	if got := GatewayKey(""); got != "" {
 		t.Errorf("空输入应返回空键，实际 %q", got)
+	}
+}
+
+// TestGatewayKeyWebSocketScheme 回归测试：ws/wss 与 http/https 应视为同一网关，
+// 且 ws→80、wss→443。修复前 ws:// 会被误加 http:// 前缀，键变成 "ws:80"。
+func TestGatewayKeyWebSocketScheme(t *testing.T) {
+	if got := GatewayKey("ws://h.example:8000"); got != "h.example:8000" {
+		t.Errorf("ws 带端口应取 host:port，实际 %q", got)
+	}
+	if got := GatewayKey("wss://h.example:8000"); got != "h.example:8000" {
+		t.Errorf("wss 带端口应取 host:port，实际 %q", got)
+	}
+	// 协议差异（含 ws/wss 与 http/https）应视为同一网关。
+	if a, b := GatewayKey("ws://h.example:443"), GatewayKey("https://h.example:443"); a != b {
+		t.Errorf("ws 与 https 同端口应同键：%q != %q", a, b)
+	}
+	// 端口缺省时的默认端口。
+	if got := GatewayKey("ws://h.example"); got != "h.example:80" {
+		t.Errorf("ws 默认端口应为 80，实际 %q", got)
+	}
+	if got := GatewayKey("wss://h.example"); got != "h.example:443" {
+		t.Errorf("wss 默认端口应为 443，实际 %q", got)
 	}
 }
 

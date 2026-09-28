@@ -20,6 +20,10 @@ const els = {
   scriptUrl: document.getElementById("scriptUrl"),
   scriptInstallUrlBtn: document.getElementById("scriptInstallUrlBtn"),
   scriptList: document.getElementById("scriptList"),
+  // 网关黑白名单
+  gfMode: document.getElementById("gfMode"),
+  gfPatterns: document.getElementById("gfPatterns"),
+  gfSaveBtn: document.getElementById("gfSaveBtn"),
 };
 
 /** 追加一条诊断日志到 popup 面板（同时输出到 console）。 */
@@ -417,6 +421,57 @@ async function scriptAction(action, id) {
   refreshScripts();
 }
 
+// ---------------- 网关黑白名单 ----------------
+//
+// 与 background 的约定：{ type: "jarvis_get_gateway_filter" } 返回
+// { success, mode, patterns }；{ type: "jarvis_set_gateway_filter", mode, patterns }
+// 保存并返回保存后的实际值。配置存 chrome.storage.local 的 gateway_filter 键。
+
+/** 从 background 读取名单并回填表单。 */
+async function refreshGatewayFilter() {
+  try {
+    const resp = await chrome.runtime.sendMessage({
+      type: "jarvis_get_gateway_filter",
+    });
+    if (resp && resp.success) {
+      els.gfMode.value = resp.mode || "off";
+      els.gfPatterns.value = Array.isArray(resp.patterns)
+        ? resp.patterns.join("\n")
+        : "";
+      log(`名单已加载：mode=${resp.mode || "off"}`);
+    } else {
+      log(`名单加载失败：${(resp && resp.error) || "background 无响应"}`);
+    }
+  } catch (e) {
+    log(`名单加载异常：${(e && e.message) || String(e)}`);
+  }
+}
+
+/** 把表单内容保存到 background（每行一条 pattern，忽略空行）。 */
+async function saveGatewayFilter() {
+  const mode = els.gfMode.value;
+  const patterns = String(els.gfPatterns.value || "")
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  try {
+    const resp = await chrome.runtime.sendMessage({
+      type: "jarvis_set_gateway_filter",
+      mode,
+      patterns,
+    });
+    if (resp && resp.success) {
+      log(`名单已保存：mode=${resp.mode}，共 ${resp.patterns.length} 条规则`);
+    } else {
+      const err = (resp && resp.error) || "未知错误";
+      log(`名单保存失败：${err}`);
+      alert("保存失败：" + err);
+    }
+  } catch (e) {
+    log(`名单保存异常：${(e && e.message) || String(e)}`);
+  }
+}
+
 els.connectBtn.addEventListener("click", connect);
 els.confirmYes.addEventListener("click", () => hideConfirm());
 els.confirmNo.addEventListener("click", () => hideConfirm());
@@ -433,6 +488,9 @@ els.gwList.addEventListener("click", (event) => {
 
 // 脚本管理：安装按钮
 els.scriptInstallBtn.addEventListener("click", installScript);
+
+// 网关黑白名单：保存按钮
+els.gfSaveBtn.addEventListener("click", saveGatewayFilter);
 
 // 脚本管理：从 URL 安装按钮
 els.scriptInstallUrlBtn.addEventListener("click", installScriptFromUrl);
@@ -477,3 +535,4 @@ chrome.runtime.onMessage.addListener((message) => {
 log("popup 已打开，开始查询状态");
 refreshStatus();
 refreshScripts();
+refreshGatewayFilter();

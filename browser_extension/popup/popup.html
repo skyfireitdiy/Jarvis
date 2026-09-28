@@ -191,6 +191,41 @@
 
     <div class="gw-list" id="gwList"></div>
 
+    <!-- 网关黑白名单：阻止「偶尔登录一次」的网关被自动发现后长期连接 -->
+    <div class="log-title">
+      <span>网关黑白名单</span>
+    </div>
+    <label for="gfMode">模式</label>
+    <select id="gfMode">
+      <option value="off">关闭（不限制）</option>
+      <option value="whitelist">白名单（仅允许名单内）</option>
+      <option value="blacklist">黑名单（仅拒绝名单内）</option>
+    </select>
+    <label for="gfPatterns">匹配规则（每行一条，host:port，支持 * 与 ?）</label>
+    <textarea
+      id="gfPatterns"
+      rows="4"
+      placeholder="*.example.com:*&#10;192.168.1.10:8080"
+      style="
+        width: 100%;
+        box-sizing: border-box;
+        padding: 6px;
+        margin-bottom: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 11px;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        resize: vertical;
+      "
+    ></textarea>
+    <div class="row">
+      <button id="gfSaveBtn">保存名单</button>
+    </div>
+    <div class="hint">
+      默认关闭。白名单生效时仅允许名单内的网关连接（空名单 = 全部拒绝）；
+      黑名单生效时仅拒绝名单内的网关。名单变化只影响新连接，不会断开已建立的连接。
+    </div>
+
     <!-- 高危动作二次确认（占位：后续由 background 触发显示） -->
     <div class="confirm-box" id="confirmBox">
       <div class="title">⚠️ 高危操作确认</div>

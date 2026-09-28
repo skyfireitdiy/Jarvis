@@ -42,7 +42,12 @@ func TestNormalizeGateway(t *testing.T) {
 		"http://127.0.0.1:8000/": "http://127.0.0.1:8000",
 		"jvs-ai.cn":              "https://jvs-ai.cn",
 		"  jvs-ai.cn//  ":        "https://jvs-ai.cn",
-		"":                       "",
+		// ws/wss 必须原样保留：若被误加 https:// 前缀，url.Parse 会把 "ws"
+		// 当成主机名，连接必然失败。
+		"ws://127.0.0.1:8000": "ws://127.0.0.1:8000",
+		"wss://jvs-ai.cn/":    "wss://jvs-ai.cn",
+		"  ws://h:9//  ":      "ws://h:9",
+		"":                    "",
 	}
 	for in, want := range cases {
 		if got := NormalizeGateway(in); got != want {
@@ -56,6 +61,10 @@ func TestBuildWSURL(t *testing.T) {
 		"https://jvs-ai.cn":      "wss://jvs-ai.cn/api/daemon/ws",
 		"http://127.0.0.1:8000":  "ws://127.0.0.1:8000/api/daemon/ws",
 		"http://127.0.0.1:8000/": "ws://127.0.0.1:8000/api/daemon/ws",
+		// 已是 ws(s) 的地址应幂等转换，不产生 "ws://ws://..." 这类畸形 URL。
+		"ws://127.0.0.1:8000":  "ws://127.0.0.1:8000/api/daemon/ws",
+		"wss://jvs-ai.cn":      "wss://jvs-ai.cn/api/daemon/ws",
+		"ws://127.0.0.1:8000/": "ws://127.0.0.1:8000/api/daemon/ws",
 	}
 	for in, want := range cases {
 		got, err := BuildWSURL(in)

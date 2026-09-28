@@ -565,18 +565,24 @@ func BuildWSURL(gateway string) (string, error) {
 }
 
 // NormalizeGateway 规范化网关地址：补协议、去尾部斜杠。
+//
+// 显式识别 ws:// 与 wss://：网关地址天然可能是 WebSocket 形式。若不识别会被
+// 误加 "https://" 前缀，得到 "https://ws://host:9999"，url.Parse 会把 "ws"
+// 当成主机名，连接必然失败（静默故障）。ws/wss 原样保留，由 ToWSURL 处理。
 func NormalizeGateway(gateway string) string {
 	g := strings.TrimSpace(gateway)
 	if g == "" {
 		return ""
 	}
-	if !strings.HasPrefix(g, "http://") && !strings.HasPrefix(g, "https://") {
+	lower := strings.ToLower(g)
+	if !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") &&
+		!strings.HasPrefix(lower, "ws://") && !strings.HasPrefix(lower, "wss://") {
 		g = "https://" + g
 	}
 	return strings.TrimRight(g, "/")
 }
 
-// ToWSURL 把 http(s) 转换为 ws(s)。
+// ToWSURL 把 http(s) 转换为 ws(s)；已是 ws(s) 的原样返回（幂等）。
 func ToWSURL(gateway string) string {
 	if strings.HasPrefix(gateway, "https://") {
 		return "wss://" + strings.TrimPrefix(gateway, "https://")

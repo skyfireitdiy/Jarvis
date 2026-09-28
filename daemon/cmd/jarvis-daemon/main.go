@@ -14,10 +14,13 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -32,8 +35,10 @@ import (
 	"jarvis-daemon/internal/capability"
 	"jarvis-daemon/internal/config"
 	"jarvis-daemon/internal/daemonlog"
+	"jarvis-daemon/internal/gatewayfilter"
 	"jarvis-daemon/internal/localapi"
 	"jarvis-daemon/internal/login"
+	"jarvis-daemon/internal/proxy"
 	"jarvis-daemon/internal/selfupdate"
 	"jarvis-daemon/internal/service"
 	"jarvis-daemon/internal/webui"
@@ -94,6 +99,8 @@ func runSubcommand(name string, args []string) error {
 		return cmdSelfUpdateApply(args)
 	case "login":
 		return cmdLogin(args)
+	case "gateway-filter":
+		return cmdGatewayFilter(args)
 	case "help", "-h", "--help":
 		printUsage()
 		return nil
@@ -247,6 +254,162 @@ func cmdLogin(args []string) error {
 	return nil
 }
 
+// cmdGatewayFilter 读写网关黑白名单。
+//
+// 用法：
+//
+//	jarvis-daemon gateway-filter get
+//	jarvis-daemon gateway-filter set -mode whitelist -pattern "*.example.com:*" -pattern "192.168.*:*"
+//
+// 实现方式：向本机守护进程的 /api/gateway-filter 发 HTTP 请求（该接口仅限
+// 本机访问），而不是直接改内存——这样与「运行中的 daemon」保持单一数据源，
+// 改完立即生效并落盘。目标固定为本机回环（127.0.0.1），显式绕过系统代理。
+func cmdGatewayFilter(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("用法: jarvis-daemon gateway-filter <get|set> [选项]")
+	}
+	action := args[0]
+	rest := args[1:]
+
+	fs := flag.NewFlagSet("gateway-filter", flag.ContinueOnError)
+	modeFlag := fs.String("mode", "", "名单模式：off / whitelist / blacklist（set 必填）")
+	listenFlag := fs.String("listen", "", "本地 API 监听地址（覆盖配置文件）")
+	configFlag := fs.String("config", "", "配置文件路径（默认 ~/.jarvis/daemon/config.yaml）")
+	var patterns patternFlags
+	fs.Var(&patterns, "pattern", "匹配模式（host:port，支持 * 与 ?）；可重复指定")
+	if err := fs.Parse(rest); err != nil {
+		return err
+	}
+
+	// 本地监听地址：命令行优先，其次配置文件，最后回退默认值。
+	cfgPath := *configFlag
+	if cfgPath == "" {
+		cfgPath = config.DefaultPath()
+	}
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		return fmt.Errorf("加载配置失败: %w", err)
+	}
+	listen := strings.TrimSpace(*listenFlag)
+	if listen == "" {
+		listen = strings.TrimSpace(cfg.Listen)
+	}
+	if listen == "" {
+		listen = config.DefaultListen
+	}
+
+	switch action {
+	case "get":
+		mode, pats, err := fetchGatewayFilter(listen)
+		if err != nil {
+			return err
+		}
+		printGatewayFilter(mode, pats)
+		return nil
+	case "set":
+		mode := strings.TrimSpace(*modeFlag)
+		if mode == "" {
+			return fmt.Errorf("set 需要 -mode（off / whitelist / blacklist）")
+		}
+		if !gatewayfilter.ValidMode(mode) {
+			return fmt.Errorf("mode 必须是 off / whitelist / blacklist 之一，当前为 %q", mode)
+		}
+		mode, pats, err := pushGatewayFilter(listen, mode, patterns)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("[daemon] 已更新网关黑白名单\n")
+		printGatewayFilter(mode, pats)
+		return nil
+	default:
+		return fmt.Errorf("未知操作: %s（应为 get 或 set）", action)
+	}
+}
+
+// patternFlags 收集可重复的 -pattern 参数。
+type patternFlags []string
+
+func (p *patternFlags) String() string { return strings.Join(*p, ",") }
+func (p *patternFlags) Set(v string) error {
+	*p = append(*p, v)
+	return nil
+}
+
+// printGatewayFilter 以可读形式打印名单。
+func printGatewayFilter(mode string, patterns []string) {
+	fmt.Printf("mode: %s\n", mode)
+	if len(patterns) == 0 {
+		fmt.Printf("patterns: （空）\n")
+		return
+	}
+	fmt.Printf("patterns:\n")
+	for _, p := range patterns {
+		fmt.Printf("  - %s\n", p)
+	}
+}
+
+// gatewayFilterResponse 是 /api/gateway-filter 的响应体。
+type gatewayFilterResponse struct {
+	Success  bool     `json:"success"`
+	Mode     string   `json:"mode"`
+	Patterns []string `json:"patterns"`
+	Error    string   `json:"error"`
+}
+
+// gatewayFilterHTTPClient 返回一个「绕过系统代理」的 HTTP 客户端。
+//
+// 目标固定为本机回环，若走系统代理会连不上（代理不转发回环），故显式直连。
+func gatewayFilterHTTPClient() *http.Client {
+	return &http.Client{Timeout: 5 * time.Second, Transport: proxy.DirectTransport()}
+}
+
+// fetchGatewayFilter 向本机守护进程查询当前名单。
+func fetchGatewayFilter(listen string) (string, []string, error) {
+	url := "http://" + listen + "/api/gateway-filter"
+	resp, err := gatewayFilterHTTPClient().Get(url)
+	if err != nil {
+		return "", nil, fmt.Errorf("查询失败：本地后台服务未运行（%s），请先启动 jarvis-daemon（%v）", listen, err)
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	var out gatewayFilterResponse
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return "", nil, fmt.Errorf("解析响应失败: %w（原始响应: %s）", err, strings.TrimSpace(string(raw)))
+	}
+	if !out.Success {
+		return "", nil, fmt.Errorf("查询失败: %s", out.Error)
+	}
+	return out.Mode, out.Patterns, nil
+}
+
+// pushGatewayFilter 向本机守护进程提交新的名单。
+func pushGatewayFilter(listen, mode string, patterns []string) (string, []string, error) {
+	body, err := json.Marshal(map[string]any{"mode": mode, "patterns": patterns})
+	if err != nil {
+		return "", nil, fmt.Errorf("序列化请求失败: %w", err)
+	}
+	url := "http://" + listen + "/api/gateway-filter"
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return "", nil, fmt.Errorf("构造请求失败: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := gatewayFilterHTTPClient().Do(req)
+	if err != nil {
+		return "", nil, fmt.Errorf("更新失败：本地后台服务未运行（%s），请先启动 jarvis-daemon（%v）", listen, err)
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	var out gatewayFilterResponse
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return "", nil, fmt.Errorf("解析响应失败: %w（原始响应: %s）", err, strings.TrimSpace(string(raw)))
+	}
+	if !out.Success {
+		return "", nil, fmt.Errorf("更新失败（HTTP %d）: %s", resp.StatusCode, out.Error)
+	}
+	return out.Mode, out.Patterns, nil
+}
+
 // printUsage 打印用法说明。
 func printUsage() {
 	fmt.Print(`jarvis-daemon - Jarvis 本地守护进程
@@ -260,6 +423,7 @@ func printUsage() {
   jarvis-daemon restart          重启服务
   jarvis-daemon status           查看服务状态
   jarvis-daemon login [选项]     用用户名密码登录网关并向本地服务推送凭据
+  jarvis-daemon gateway-filter <get|set> [选项]  读写网关黑白名单（仅限本机）
   jarvis-daemon self-update-apply [选项]  自动更新 helper（内部使用，勿手动调用）
 
 选项（run / install 共用）:
@@ -389,6 +553,15 @@ func runDaemon(args []string) {
 		return creds.Token, true
 	})
 
+	// 网关黑白名单：由 daemon 自身配置（config.yaml），仅限本机通过
+	// /api/gateway-filter 或 `jarvis-daemon gateway-filter` 修改。
+	// 刻意不走前端页面推送：前端与 daemon 可能不同机，推送语义不通。
+	// 名单只阻止「新连接」，已在连的旧连接不主动断开（见 ConnectWithName）。
+	gwFilter := gatewayfilter.New(cfg.GatewayFilterMode, cfg.GatewayFilterPatterns)
+	if mode, patterns := gwFilter.Snapshot(); mode != gatewayfilter.ModeOff {
+		log.Printf("[daemon] 网关黑白名单已启用: mode=%s patterns=%v", mode, patterns)
+	}
+
 	manager := wsclient.NewManagerWithOptions(wsclient.ManagerOptions{
 		Options: wsclient.Options{
 			// Gateway/Token 由 Connect 按具体网关覆盖，这里不预设。
@@ -399,6 +572,8 @@ func runDaemon(args []string) {
 			ReconnectMin:      cfg.ReconnectMin,
 			ReconnectMax:      cfg.ReconnectMax,
 		},
+		// 黑白名单拦截：不允许的网关不建立连接。
+		AllowGateway: gwFilter.Allows,
 		OnGatewayStateChange: func(gateway, state string) {
 			log.Printf("[daemon] 连接状态: %s (%s)", state, gateway)
 		},
@@ -439,6 +614,20 @@ func runDaemon(args []string) {
 	// 开关由关闭变为打开时，补做一次扩展同步检查：daemon 只在 hello_ack 时检查
 	// 一次开关，而前端推送开关通常晚于 hello_ack，若不补查会一直判定为「已关闭」。
 	api.SetOnBrowserExtEnabled(func() { onBrowserExtSwitchEnabled(manager) })
+	// 网关黑白名单：读取当前内存态；更新时同时改内存态并持久化到 config.yaml。
+	// 接口本身在 localapi 内已强制校验来源回环（仅限本机访问）。
+	api.SetGatewayFilter(
+		func() (string, []string) { return gwFilter.Snapshot() },
+		func(mode string, patterns []string) (string, []string, error) {
+			gwFilter.Set(mode, patterns)
+			actualMode, actualPatterns := gwFilter.Snapshot()
+			if err := config.UpdateGatewayFilter(cfgPath, actualMode, actualPatterns); err != nil {
+				// 内存态已更新但落盘失败：返回错误让调用方知晓（重启后会丢失）。
+				return actualMode, actualPatterns, err
+			}
+			return actualMode, actualPatterns, nil
+		},
+	)
 
 	srv := localapi.NewHTTPServer(cfg.Listen, api.Handler())
 

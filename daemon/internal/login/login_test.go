@@ -235,10 +235,35 @@ func TestNormalizeGateway(t *testing.T) {
 		{"http://a:1///", "http://a:1"},
 		{"", ""},
 		{"   ", ""},
+		// ws/wss 原样保留：推送凭据时 daemon 侧能识别，不能在此被破坏。
+		{"ws://a:1", "ws://a:1"},
+		{"wss://a:1/", "wss://a:1"},
 	}
 	for _, c := range cases {
 		if got := NormalizeGateway(c.in); got != c.want {
 			t.Errorf("NormalizeGateway(%q) = %q, 期望 %q", c.in, got, c.want)
+		}
+	}
+}
+
+// TestHTTPGateway 登录接口是 HTTP 语义，ws/wss 需映射为 http/https，
+// 否则 http.Client 会报 "unsupported protocol scheme ws"。
+func TestHTTPGateway(t *testing.T) {
+	cases := []struct {
+		in   string
+		want string
+	}{
+		{"ws://a:1", "http://a:1"},
+		{"wss://a:1", "https://a:1"},
+		{"WS://A:1", "http://A:1"},
+		{"WSS://A:1", "https://A:1"},
+		{"http://a:1", "http://a:1"},
+		{"https://a:1", "https://a:1"},
+		{"", ""},
+	}
+	for _, c := range cases {
+		if got := HTTPGateway(c.in); got != c.want {
+			t.Errorf("HTTPGateway(%q) = %q, 期望 %q", c.in, got, c.want)
 		}
 	}
 }

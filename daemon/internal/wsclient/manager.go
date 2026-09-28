@@ -1,6 +1,7 @@
 package wsclient
 
 import (
+	"log"
 	"sort"
 	"sync"
 
@@ -53,6 +54,14 @@ type ManagerOptions struct {
 	//
 	// 与 OnGatewayHelloAck 独立：前者用于扩展自动更新，本回调用于 daemon 自动更新。
 	OnGatewayDaemonUpdate func(gateway, sessionID string, info map[string]any)
+	// AllowGateway 判断某网关是否允许建立连接（网关黑白名单）。
+	//
+	// 返回 false 时 ConnectWithName 会跳过该网关、不创建连接（已在连的旧连接
+	// 不主动断开，符合「只阻止新连接」的语义）。
+	//
+	// 为 nil 表示不限制（默认）。刻意用函数值而非具体类型：wsclient 不应反向
+	// 依赖 config / gatewayfilter 包，由上层注入判定逻辑即可。
+	AllowGateway func(gateway string) bool
 }
 
 // Manager 管理多个网关的 WebSocket 连接。
@@ -78,6 +87,9 @@ type Manager struct {
 	onHelloAck func(gateway, sessionID, latestExtensionVersion string)
 	// onDaemonUpdate 是带 gateway 维度的 daemon 更新指令回调（daemon_update）。
 	onDaemonUpdate func(gateway, sessionID string, info map[string]any)
+	// allowGateway 判断某网关是否允许连接（网关黑白名单）；nil 表示不限制。
+	// 由 ManagerOptions.AllowGateway 注入，ConnectWithName 建立连接前调用。
+	allowGateway func(gateway string) bool
 	// clients 以 auth.GatewayKey 为键。
 	clients map[string]*Client
 	// gateways 记录每个键对应的原始网关地址，供 Status 展示与 Disconnect 反查。
@@ -116,6 +128,7 @@ func NewManagerWithOptions(mopts ManagerOptions) *Manager {
 		onSession:      mopts.OnGatewaySession,
 		onHelloAck:     mopts.OnGatewayHelloAck,
 		onDaemonUpdate: mopts.OnGatewayDaemonUpdate,
+		allowGateway:   mopts.AllowGateway,
 		clients:        make(map[string]*Client),
 		gateways:       make(map[string]string),
 		tokens:         make(map[string]string),
@@ -146,6 +159,13 @@ func (m *Manager) Connect(gateway, token string) {
 func (m *Manager) ConnectWithName(gateway, token, name string) {
 	key := auth.GatewayKey(gateway)
 	if key == "" || token == "" {
+		return
+	}
+	// 网关黑白名单拦截：不允许的网关直接跳过，不创建连接。
+	// 刻意放在加锁之前：判定由上层注入（可能读配置），不应占用 Manager 锁；
+	// 且只阻止「新连接」，已在连的旧连接不主动断开（符合用户要求的语义）。
+	if m.allowGateway != nil && !m.allowGateway(gateway) {
+		log.Printf("[wsclient] 网关不在允许名单内，跳过连接: %s", gateway)
 		return
 	}
 	normalized := auth.NormalizeGateway(gateway)

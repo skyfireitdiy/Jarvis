@@ -27,25 +27,32 @@ type Credentials struct {
 	Name string
 }
 
-// NormalizeGateway 规范化网关地址：去除首尾空白；无 http(s):// 前缀时补 http://；
+// NormalizeGateway 规范化网关地址：去除首尾空白；无协议前缀时补 http://；
 // 去除尾部斜杠。与扩展的 normalizeGateway 语义一致。
+//
+// 显式识别 ws:// 与 wss://：网关地址天然可能是 WebSocket 形式（如
+// ws://host:9999）。若不识别会被误加 "http://" 前缀，得到
+// "http://ws://host:9999"，后续 url.Parse 会把 "ws" 当成主机名、端口丢失，
+// 导致凭据索引键错误且连接必然失败（静默故障）。
 func NormalizeGateway(gateway string) string {
 	g := strings.TrimSpace(gateway)
 	if g == "" {
 		return ""
 	}
 	lower := strings.ToLower(g)
-	if !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") {
+	if !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") &&
+		!strings.HasPrefix(lower, "ws://") && !strings.HasPrefix(lower, "wss://") {
 		g = "http://" + g
 	}
 	return strings.TrimRight(g, "/")
 }
 
 // GatewayKey 返回用于索引凭据的网关键：解析 URL 后取 hostname:port
-// （端口缺省时 https→443、http→80）。
+// （端口缺省时 https/wss→443、http/ws→80）。
 //
 // 刻意忽略协议差异：http://host:443 与 https://host:443 视为同一网关，
 // 因为前端页面声明的网关与用户填写的网关可能在协议上不一致。
+// 同理 ws/wss 与 http/https 也视为同一网关（WebSocket 只是传输层差异）。
 // 解析失败时回退为 NormalizeGateway 的结果。
 func GatewayKey(gateway string) string {
 	g := NormalizeGateway(gateway)
@@ -58,7 +65,7 @@ func GatewayKey(gateway string) string {
 	}
 	port := u.Port()
 	if port == "" {
-		if strings.EqualFold(u.Scheme, "https") {
+		if strings.EqualFold(u.Scheme, "https") || strings.EqualFold(u.Scheme, "wss") {
 			port = "443"
 		} else {
 			port = "80"

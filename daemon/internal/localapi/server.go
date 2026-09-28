@@ -9,12 +9,15 @@ package localapi
 import (
 	"encoding/json"
 	"log"
+	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"jarvis-daemon/internal/auth"
 	"jarvis-daemon/internal/capability"
+	"jarvis-daemon/internal/gatewayfilter"
 	"jarvis-daemon/internal/wsclient"
 )
 
@@ -32,6 +35,25 @@ type Server struct {
 	//
 	// 可为 nil（未注入时不做任何事），便于测试与最小改动。
 	onBrowserExtEnabled func()
+	// getGatewayFilter 返回当前网关黑白名单（mode, patterns）。
+	// 由 main 注入（读同一份 gatewayfilter.Filter）；nil 时返回 off + nil。
+	getGatewayFilter func() (string, []string)
+	// setGatewayFilter 更新网关黑白名单并持久化；返回更新后的实际值与错误。
+	// 由 main 注入（更新 gatewayfilter.Filter 并写回 config.yaml）；
+	// nil 时接口返回 501，避免「看起来成功实则没生效」。
+	setGatewayFilter func(mode string, patterns []string) (string, []string, error)
+}
+
+// SetGatewayFilter 注入网关黑白名单的读取与更新回调；由 main 在装配时调用。
+//
+// 用注入而非直接依赖 config/gatewayfilter：localapi 只负责 HTTP 层，
+// 名单的持有与落盘由上层决定，便于测试与解耦。
+func (s *Server) SetGatewayFilter(
+	get func() (string, []string),
+	set func(mode string, patterns []string) (string, []string, error),
+) {
+	s.getGatewayFilter = get
+	s.setGatewayFilter = set
 }
 
 // SetOnBrowserExtEnabled 注入「扩展开关被打开」时的回调；由 main 在装配时调用。
@@ -69,6 +91,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/status", s.handleStatus)
 	mux.HandleFunc("/api/logout", s.handleLogout)
 	mux.HandleFunc("/api/settings", s.handleSettings)
+	// 网关黑白名单：**仅限本机访问**（handler 内校验来源回环）。
+	// 与 /api/auth 等不同，本接口不供远程网页/其他机器调用：名单是 daemon
+	// 自身的配置，且接口无鉴权，暴露出去等于任何人都能改。
+	mux.HandleFunc("/api/gateway-filter", s.handleGatewayFilter)
 	return withCORS(mux)
 }
 
@@ -271,6 +297,120 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 			"error":   "method not allowed",
 		})
 	}
+}
+
+// gatewayFilterRequest 是 POST /api/gateway-filter 的请求体。
+//
+// Mode 与 Patterns 都按「显式提供」处理：mode 非法直接 400（语义明确，
+// 不静默回退），patterns 允许为空数组（表示清空名单）。
+type gatewayFilterRequest struct {
+	Mode     string   `json:"mode"`
+	Patterns []string `json:"patterns"`
+}
+
+// handleGatewayFilter 读写网关黑白名单（仅限本机访问）。
+//
+// GET  → {"success":true,"mode":<mode>,"patterns":[...]}
+// POST → 请求体 {"mode":"off|whitelist|blacklist","patterns":[...]}，
+//
+//	更新内存态并持久化到 config.yaml，返回更新后的实际值。
+//
+// 安全：本接口无鉴权，故**强制校验请求来源为回环地址**，非回环一律 403。
+// 这是纵深防御：即便未来 listen 被放开到非回环，本接口也不会被外部调用。
+// 刻意不信任 X-Forwarded-For / X-Real-IP（可被任意伪造），只看 TCP 层的
+// RemoteAddr。
+func (s *Server) handleGatewayFilter(w http.ResponseWriter, r *http.Request) {
+	if !isLoopbackRequest(r) {
+		writeJSON(w, http.StatusForbidden, map[string]any{
+			"success": false,
+			"error":   "仅允许本机访问",
+		})
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		mode, patterns := "off", []string(nil)
+		if s.getGatewayFilter != nil {
+			mode, patterns = s.getGatewayFilter()
+		}
+		if patterns == nil {
+			patterns = []string{}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"success":  true,
+			"mode":     mode,
+			"patterns": patterns,
+		})
+	case http.MethodPost:
+		if s.setGatewayFilter == nil {
+			writeJSON(w, http.StatusNotImplemented, map[string]any{
+				"success": false,
+				"error":   "网关黑白名单未启用",
+			})
+			return
+		}
+		var req gatewayFilterRequest
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"success": false,
+				"error":   "invalid json: " + err.Error(),
+			})
+			return
+		}
+		if !gatewayfilter.ValidMode(req.Mode) {
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"success": false,
+				"error":   "mode 必须是 off / whitelist / blacklist 之一",
+			})
+			return
+		}
+		mode, patterns, err := s.setGatewayFilter(req.Mode, req.Patterns)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"success": false,
+				"error":   "保存失败: " + err.Error(),
+			})
+			return
+		}
+		if patterns == nil {
+			patterns = []string{}
+		}
+		log.Printf("[localapi] 更新网关黑白名单: mode=%s patterns=%v", mode, patterns)
+		writeJSON(w, http.StatusOK, map[string]any{
+			"success":  true,
+			"mode":     mode,
+			"patterns": patterns,
+		})
+	default:
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{
+			"success": false,
+			"error":   "method not allowed",
+		})
+	}
+}
+
+// isLoopbackRequest 判断请求是否来自本机回环地址。
+//
+// 只看 r.RemoteAddr（TCP 连接的真实对端），不接受 X-Forwarded-For 等
+// 可伪造的代理头。接受 127.0.0.0/8、::1 与 localhost。
+func isLoopbackRequest(r *http.Request) bool {
+	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
+	if err != nil {
+		// RemoteAddr 可能不带端口（少见），退化为整串判断。
+		host = strings.TrimSpace(r.RemoteAddr)
+	}
+	host = strings.Trim(host, "[]")
+	if host == "" {
+		return false
+	}
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	return ip.IsLoopback()
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

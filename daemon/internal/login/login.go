@@ -81,8 +81,26 @@ type loginResponse struct {
 //
 // 与 internal/auth.NormalizeGateway 的「去尾斜杠」部分语义一致，但这里不补
 // http:// 前缀——登录需要用户给出真实可达的地址，静默补全反而容易掩盖错误。
+// ws:// 与 wss:// 原样保留（推送凭据时 daemon 侧能识别），仅在真正发 HTTP
+// 登录请求时由 HTTPGateway 转换。
 func NormalizeGateway(gateway string) string {
 	return strings.TrimRight(strings.TrimSpace(gateway), "/")
+}
+
+// HTTPGateway 把网关地址转换为可用于 HTTP 请求的形式。
+//
+// 登录接口是 HTTP 语义，但用户可能按 WebSocket 习惯填写 ws:// 或 wss://
+// （两者只是传输层差异，主机与端口相同）。若不转换，http.Client 会直接报
+// "unsupported protocol scheme ws"。http(s) 与其他形式原样返回。
+func HTTPGateway(gateway string) string {
+	lower := strings.ToLower(gateway)
+	if strings.HasPrefix(lower, "wss://") {
+		return "https://" + gateway[len("wss://"):]
+	}
+	if strings.HasPrefix(lower, "ws://") {
+		return "http://" + gateway[len("ws://"):]
+	}
+	return gateway
 }
 
 // Login 用用户名密码登录网关，成功时返回 JWT 及用户信息。
@@ -110,7 +128,7 @@ func Login(gateway, username, password string) (LoginResult, error) {
 		return LoginResult{}, fmt.Errorf("序列化登录请求失败: %w", err)
 	}
 
-	url := gateway + "/api/auth/login"
+	url := HTTPGateway(gateway) + "/api/auth/login"
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return LoginResult{}, fmt.Errorf("构造登录请求失败: %w", err)
