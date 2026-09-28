@@ -243,27 +243,7 @@
         <span class="pet-lobby-display-label">本地后台服务</span>
       </button>
     </div>
-
-    <!-- 无 Agent 时的空状态引导：新用户第一次进入大厅时给出明确的下一步 -->
-    <!-- 需等首次列表拉取完成再判断，否则有 Agent 时会先闪现再消失 -->
-    <div v-if="agentsLoaded && !hasAnyAgent" class="pet-lobby-empty">
-      <div class="pet-lobby-empty-title">还没有 Agent</div>
-      <div class="pet-lobby-empty-desc">
-        Agent 是 Jarvis 里的 AI 助手，每个 Agent 都是一只可以对话的宠物。<br />
-        创建第一个 Agent 后，它就会出现在这片大厅里。
-      </div>
-      <div class="pet-lobby-empty-actions">
-        <button class="pet-lobby-empty-btn primary" type="button" @click="createFirstAgent">
-          ➕ 创建第一个 Agent
-        </button>
-        <button class="pet-lobby-empty-btn" type="button" @click="emit('openOnboarding', 'welcome')">
-          🎓 查看新手引导
-        </button>
-      </div>
-      <div class="pet-lobby-empty-hint">
-        提示：按 <b>Ctrl+P</b> 打开命令面板，可以搜索并执行几乎所有操作。
-      </div>
-    </div>
+    <!-- 无 Agent 时的空状态引导：暂时移除（两端都不展示），后续会重新设计 -->
     <!-- 宠物群 -->
     <div
       v-for="pet in petAgents"
@@ -1029,17 +1009,6 @@ const agentStatusStat = computed(() => {
     .filter(state => counts[state] > 0)
     .map(state => ({ state, label: AGENT_STAT_LABEL[state], count: counts[state], color: agentColor(state) }))
 })
-
-// 是否已有任意 Agent：为 false 时在大厅展示空状态引导
-const hasAnyAgent = computed(() => (props.agents || []).length > 0)
-
-// 空状态「创建第一个 Agent」：在第一个在线节点上创建（无节点时交由父组件兜底）
-function createFirstAgent() {
-  const nodes = nodeItems.value || []
-  const target = nodes.find(n => n.state === 'online') || nodes[0]
-  emit('createAgentOnNode', target ? target.node_id : '')
-}
-
 // 节点间连线：master → 其余节点
 const nodeLinks = computed(() => {
   const links = []

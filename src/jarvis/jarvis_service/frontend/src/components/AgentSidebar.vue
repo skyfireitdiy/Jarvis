@@ -14,7 +14,8 @@
       </div>
     </div>
     <div class="agent-list">
-      <div class="hello-user-banner" aria-hidden="true">
+      <!-- 欢迎横幅：移动端不展示（屏幕空间有限，较占地方） -->
+      <div v-if="windowWidth > 768" class="hello-user-banner" aria-hidden="true">
         <span class="hello-user-glow">Hello, {{ currentUserName || '' }}</span>
         <span class="hello-user-sub">✦ 你好，{{ currentUserName || '' }} ✦</span>
       </div>
