@@ -128,6 +128,11 @@
             </div>
             <div v-else-if="workspaceSidebarView === 'files'" class="workspace-sidebar-content">
               <div class="workspace-file-tree-panel">
+                <!-- 按节点打开任意目录（无需创建 Agent 即可浏览/编辑文件） -->
+                <button class="workspace-open-dir-btn" @click="openOpenDirDialog" title="选择节点与目录并打开">
+                  <span class="workspace-open-dir-icon">📂</span>
+                  <span>打开目录</span>
+                </button>
                 <!-- 活跃 Agent 节点列表 -->
                 <div
                   v-for="agent in activeAgents"
@@ -176,6 +181,61 @@
                           :style="{ paddingLeft: `${8 + visibleNode.depth * 20}px` }"
                           @click.stop="selectFileTreeNode(agent.agent_id, visibleNode.node); handleFileTreeNodeClick(agent.agent_id, visibleNode.node)"
                           @contextmenu.prevent.stop="openFileTreeContextMenu(agent, visibleNode.node, $event)"
+                        >
+                          <span
+                            v-if="visibleNode.node.type === 'directory'"
+                            class="tree-node-icon expand-arrow"
+                            :class="{ expanded: visibleNode.node.expanded }"
+                          >▶</span>
+                          <span v-else class="tree-node-icon"></span>
+                          <span
+                            class="tree-node-icon"
+                            :class="visibleNode.node.type === 'directory' ? 'folder-icon' : 'file-icon'"
+                          >{{ visibleNode.node.type === 'directory' ? '📁' : '📄' }}</span>
+                          <span
+                            class="tree-node-text"
+                            :class="visibleNode.node.type === 'directory' ? 'directory' : 'file'"
+                          >{{ visibleNode.node.name }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <!-- 虚拟目录会话（未创建 Agent 时直接打开的目录） -->
+                <div
+                  v-for="session in virtualWorkspaceSessions"
+                  :key="session.agent_id"
+                  class="workspace-agent-node virtual-dir"
+                >
+                  <div class="tree-node-content agent-node-content" @click.stop="toggleAgentExpanded(session.agent_id)">
+                    <span
+                      class="tree-node-icon expand-arrow"
+                      :class="{ expanded: expandedAgents.has(session.agent_id) }"
+                    >▶</span>
+                    <span class="tree-node-icon agent-icon">📂</span>
+                    <span class="tree-node-text agent-name">{{ session.agent.name }}</span>
+                    <span class="agent-node-id">{{ getWorkingDirDisplay(session.agent.working_dir) }}</span>
+                  </div>
+                  <div v-if="expandedAgents.has(session.agent_id)" class="agent-file-tree">
+                    <div class="workspace-file-tree-root" @click.stop="ensureWorkspaceSidebarFileTree(session.agent)" @contextmenu.prevent.stop="openFileTreeContextMenu(session.agent, null, $event)">
+                      {{ getWorkingDirDisplay(session.agent.working_dir) }}
+                    </div>
+                    <div v-if="!(fileTreeState.get(session.agent_id)?.length > 0)" class="workspace-file-tree-empty">
+                      当前工作目录下暂无可显示内容
+                    </div>
+                    <div v-else class="workspace-file-tree-list" tabindex="0" :data-agent-id="session.agent_id" @keydown="handleFileTreeKeydown($event, session.agent_id)">
+                      <div
+                        v-for="visibleNode in getVisibleFileTreeNodes(session.agent_id)"
+                        :key="visibleNode.node.path"
+                        class="tree-node workspace-tree-node"
+                        :data-node-path="visibleNode.node.path"
+                      >
+                        <div
+                          class="tree-node-content"
+                          :class="{ 'keyboard-selected': fileTreeSelectedAgentId === session.agent_id && fileTreeSelectedPath === visibleNode.node.path }"
+                          :style="{ paddingLeft: `${8 + visibleNode.depth * 20}px` }"
+                          @click.stop="selectFileTreeNode(session.agent_id, visibleNode.node); handleFileTreeNodeClick(session.agent_id, visibleNode.node)"
+                          @contextmenu.prevent.stop="openFileTreeContextMenu(session.agent, visibleNode.node, $event)"
                         >
                           <span
                             v-if="visibleNode.node.type === 'directory'"
@@ -274,9 +334,9 @@
                     </div>
                   </div>
                 </template>
-                <!-- 无 Agent 提示 -->
-                <div v-if="agentList.length === 0" class="workspace-file-tree-empty">
-                  暂无 Agent，请先创建 Agent
+                <!-- 无 Agent 提示（已通过「打开目录」打开虚拟目录时不再提示） -->
+                <div v-if="agentList.length === 0 && virtualWorkspaceSessions.length === 0" class="workspace-file-tree-empty">
+                  暂无 Agent，请先创建 Agent，或点击上方「打开目录」
                 </div>
               </div>
             </div>
@@ -1016,7 +1076,64 @@
       @enter="enterDirectory"
       @search-keydown="handleDirSearchKeydown"
     />
-
+    <!-- 目录树：按节点打开目录（无需创建 Agent） -->
+    <div v-if="showOpenDirDialog" class="palette-overlay open-dir-overlay" @click.self="closeOpenDirDialog">
+      <div class="palette-panel open-dir-modal">
+        <div class="open-dir-header">
+          <h2>打开目录</h2>
+          <button class="open-dir-close" @click="closeOpenDirDialog">×</button>
+        </div>
+        <div class="open-dir-body">
+          <label class="open-dir-label">节点</label>
+          <select
+            class="open-dir-node-select"
+            :value="openDirNodeId"
+            @change="onOpenDirNodeChange($event.target.value)"
+          >
+            <option v-if="!filteredNodeOptionsForCreateAgent.length" value="" disabled>暂无可用节点</option>
+            <option v-for="node in filteredNodeOptionsForCreateAgent" :key="node.node_id" :value="node.node_id">
+              {{ getNodeDisplayName(node.node_id) }}
+            </option>
+          </select>
+          <label class="open-dir-label">目录路径</label>
+          <input
+            ref="openDirInput"
+            v-model="openDirPath"
+            class="open-dir-path-input"
+            type="text"
+            placeholder="绝对路径，如 /home/user/project；也可在下方浏览选择"
+            @keydown.enter.prevent="confirmOpenDir"
+          >
+          <div class="open-dir-browse-header">
+            <span class="open-dir-browse-path" :title="openDirBrowsePath">{{ openDirBrowsePath || '~' }}</span>
+            <button class="open-dir-browse-btn" @click="goToParentOpenDirBrowse" title="上级目录">⬆</button>
+            <button class="open-dir-browse-btn" @click="fetchOpenDirBrowse(openDirBrowsePath)" title="刷新">⟳</button>
+          </div>
+          <div class="open-dir-browse-list">
+            <div v-if="openDirBrowseLoading" class="open-dir-browse-empty">加载中...</div>
+            <div v-else-if="openDirBrowseError" class="open-dir-browse-empty error">{{ openDirBrowseError }}</div>
+            <div v-else-if="!openDirBrowseItems.length" class="open-dir-browse-empty">该目录下没有子目录</div>
+            <template v-else>
+              <button
+                v-for="item in openDirBrowseItems"
+                :key="item.path"
+                class="open-dir-browse-item"
+                :class="{ selected: openDirPath === item.path }"
+                @click="enterOpenDirBrowse(item.path)"
+              >
+                <span class="open-dir-browse-icon">📁</span>
+                <span class="open-dir-browse-name">{{ item.name }}</span>
+                <span class="open-dir-browse-fullpath" :title="item.path">{{ item.path }}</span>
+              </button>
+            </template>
+          </div>
+        </div>
+        <div class="open-dir-actions">
+          <button class="btn secondary" @click="closeOpenDirDialog">取消</button>
+          <button class="btn primary" @click="confirmOpenDir">打开</button>
+        </div>
+      </div>
+    </div>
     <!-- 连接弹窗 -->
     <ConnectModal
       :visible="showConnectModal"
@@ -2343,6 +2460,10 @@ const activeWorkspaceTabPath = computed(() => {
 const activeWorkspaceSession = computed(() => {
   return workspaceSessions.value.find(s => s.agent_id === activeWorkspaceSessionId.value) || null
 })
+// 虚拟目录会话（未创建 Agent 时直接打开的目录），供目录树额外渲染
+const virtualWorkspaceSessions = computed(() => {
+  return workspaceSessions.value.filter(s => s.agent?.virtual === true)
+})
 const editorModels = new Map() // path -> { model: ITextModel, content: string, language: string }
 let cmEditorView = null // Monaco editor instance（保留变量名以兼容既有引用）
 let workspaceFileHeartbeatTimer = null
@@ -2980,6 +3101,90 @@ const selectedDirIndex = ref(-1)           // 当前选中的目录索引，-1 �
 
 const recentWorkDirs = ref([])             // 最近使用的工作目录列表（最多20个，去重）
 const renameInput = ref(null)               // 重命名输入框引用
+// ===== 目录树：按节点打开任意目录（无需创建 Agent 即可浏览/编辑文件） =====
+// 弹窗状态：节点 + 目录路径（手填或浏览选择）
+const showOpenDirDialog = ref(false)
+const openDirNodeId = ref('master')         // 目标节点
+const openDirPath = ref('')                 // 目标目录（绝对路径）
+const openDirInput = ref(null)              // 手填路径输入框引用
+// 弹窗内独立维护「浏览目录」的状态，避免与创建 Agent 的目录选择互相污染
+const openDirBrowsePath = ref('')
+const openDirBrowseItems = ref([])
+const openDirBrowseLoading = ref(false)
+const openDirBrowseError = ref('')
+// 浏览目录：按指定节点列目录（复用后端 directories 接口）
+async function fetchOpenDirBrowse(path = '') {
+  const nodeId = String(openDirNodeId.value || 'master').trim() || 'master'
+  openDirBrowseLoading.value = true
+  openDirBrowseError.value = ''
+  try {
+    const { host, port } = getGatewayAddress()
+    const params = new URLSearchParams({ path })
+    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, nodeId, `directories?${params.toString()}`))
+    const result = await response.json()
+    if (!response.ok || !result.success || !result.data) {
+      throw new Error(result.error?.message || '读取目录失败')
+    }
+    openDirBrowsePath.value = result.data.current_path || path
+    openDirBrowseItems.value = (result.data.items || []).filter(item => item.type === 'directory')
+  } catch (error) {
+    openDirBrowseError.value = error.message || '读取目录失败'
+    openDirBrowseItems.value = []
+  } finally {
+    openDirBrowseLoading.value = false
+  }
+}
+// 打开「按节点打开目录」弹窗
+async function openOpenDirDialog() {
+  showOpenDirDialog.value = true
+  // 节点选项可能尚未加载（如未打开过创建 Agent 弹窗），这里补一次
+  if (!availableNodeOptions.value.length) {
+    try { await fetchNodeStatus() } catch (error) { /* 失败时保持空列表，弹窗内会提示 */ }
+  }
+  const allowed = filteredNodeOptionsForCreateAgent.value
+  const preferred = allowed.some(n => n.node_id === openDirNodeId.value)
+    ? openDirNodeId.value
+    : (allowed[0]?.node_id || 'master')
+  openDirNodeId.value = preferred
+  openDirPath.value = ''
+  await fetchOpenDirBrowse('~')
+  nextTick(() => {
+    if (windowWidth.value > 768) openDirInput.value?.focus()
+  })
+}
+function closeOpenDirDialog() {
+  showOpenDirDialog.value = false
+}
+// 切换目标节点：重新按新节点浏览目录
+async function onOpenDirNodeChange(nodeId) {
+  openDirNodeId.value = nodeId
+  openDirPath.value = ''
+  await fetchOpenDirBrowse('~')
+}
+// 在浏览列表中进入目录
+async function enterOpenDirBrowse(path) {
+  openDirPath.value = path
+  await fetchOpenDirBrowse(path)
+}
+// 返回上级目录
+async function goToParentOpenDirBrowse() {
+  const normalized = String(openDirBrowsePath.value || '').replace(/\\/g, '/')
+  const parts = normalized.split('/').filter(Boolean)
+  if (!parts.length) return
+  parts.pop()
+  await fetchOpenDirBrowse('/' + parts.join('/'))
+}
+// 确认打开：以「手填路径」优先，其次「浏览选中目录」
+async function confirmOpenDir() {
+  const nodeId = String(openDirNodeId.value || 'master').trim() || 'master'
+  const targetPath = String(openDirPath.value || openDirBrowsePath.value || '').trim()
+  if (!targetPath) {
+    showToast('请选择或输入目录路径', 'error')
+    return
+  }
+  showOpenDirDialog.value = false
+  await openWorkspaceDir(nodeId, targetPath)
+}
 
 // 最近使用的工作目录管理（localStorage持久化存储）
 // 元素格式：{ path: string, nodeId: string }，按节点区分
@@ -3041,7 +3246,7 @@ function toggleAgentExpanded(agentId) {
   } else {
     expandedAgents.value.add(agentId)
     // 展开时确保该 Agent 的文件树已初始化
-    const agent = agentList.value.find(a => a.agent_id === agentId)
+    const agent = agentList.value.find(a => a.agent_id === agentId) || getVirtualWorkspaceAgent(agentId)
     if (agent && !fileTreeState.value.has(agentId)) {
       initFileTree(agentId, agent.working_dir)
     }
@@ -4160,7 +4365,7 @@ async function fetchFileContent(path, agentId = null) {
   // 如果提供了agentId，使用对应的node_id；否则使用当前激活编辑器会话的node_id
   let targetNodeId
   if (agentId) {
-    const agent = agentList.value.find(a => a.agent_id === agentId)
+    const agent = agentList.value.find(a => a.agent_id === agentId) || getVirtualWorkspaceAgent(agentId)
     if (!agent) {
       throw new Error(`找不到Agent: ${agentId}`)
     }
@@ -4188,7 +4393,7 @@ async function fetchFileStat(path, agentId = null) {
   // 如果提供了agentId，使用对应的node_id；否则使用当前激活编辑器会话的node_id
   let targetNodeId
   if (agentId) {
-    const agent = agentList.value.find(a => a.agent_id === agentId)
+    const agent = agentList.value.find(a => a.agent_id === agentId) || getVirtualWorkspaceAgent(agentId)
     if (!agent) {
       throw new Error(`找不到Agent: ${agentId}`)
     }
@@ -4539,6 +4744,71 @@ function createWorkspaceForAgent(agent) {
   activeWorkspaceSessionId.value = agentId
   showWorkspacePanel.value = true
 
+}
+
+// 虚拟目录会话的 agent_id 前缀：未创建 Agent 时直接打开某节点的目录
+const VIRTUAL_WORKSPACE_PREFIX = '__node__:'
+
+// 从虚拟会话的 agent_id 还原出伪 agent 信息（含 node_id/working_dir），供文件树与文件读写复用
+function getVirtualWorkspaceAgent(agentId) {
+  const key = String(agentId || '')
+  if (!key.startsWith(VIRTUAL_WORKSPACE_PREFIX)) return null
+  const session = workspaceSessions.value.find(s => s.agent_id === key)
+  return session?.agent || null
+}
+
+// 目录树/文件操作统一取 agent：优先真实 Agent，其次虚拟目录会话
+function resolveFileTreeAgent(agentId) {
+  return agentList.value.find(a => a.agent_id === agentId) || getVirtualWorkspaceAgent(agentId)
+}
+
+// 打开「某节点的某目录」为编辑器工作区（不需要先创建 Agent）
+async function openWorkspaceDir(nodeId, dirPath) {
+  const targetNodeId = String(nodeId || 'master').trim() || 'master'
+  const targetDir = String(dirPath || '').trim()
+  if (!targetDir) return
+
+  const agentId = `${VIRTUAL_WORKSPACE_PREFIX}${targetNodeId}`
+  const virtualAgent = {
+    agent_id: agentId,
+    name: getNodeDisplayName(targetNodeId),
+    node_id: targetNodeId,
+    working_dir: targetDir,
+    agent_type: 'virtual_dir',
+    virtual: true
+  }
+
+  let session = workspaceSessions.value.find(s => s.agent_id === agentId)
+  if (!session) {
+    session = {
+      agent_id: agentId,
+      agent_name: virtualAgent.name,
+      agent: virtualAgent,
+      tabs: [],
+      activeTabPath: null,
+      editorModels: new Map(),
+      cmEditorView: null,
+      isEditable: false,
+      showSidebar: true,
+      sidebarView: 'files'
+    }
+    workspaceSessions.value.push(session)
+  } else {
+    // 复用已有虚拟会话时刷新节点与目录
+    session.agent = virtualAgent
+    session.agent_name = virtualAgent.name
+  }
+
+  activeWorkspaceSessionId.value = agentId
+  showWorkspacePanel.value = true
+  setActivePaneView('file')
+  showWorkspaceFileView()
+  workspaceSidebarView.value = 'files'
+
+  // 初始化该目录的文件树
+  await initFileTree(agentId, targetDir)
+  ensureWorkspaceSidebarFileTree(agentId, virtualAgent)
+  showToast(`已打开目录：${targetDir}`, 'success')
 }
 
 
@@ -5566,7 +5836,7 @@ function closeFileTreeContextMenu() {
 function getFileTreeContextDirPath() {
   const menu = fileTreeContextMenu.value
   if (menu.node && menu.node.type === 'directory' && menu.node.path) return menu.node.path
-  const agent = agentList.value.find(a => a.agent_id === menu.agentId)
+  const agent = resolveFileTreeAgent(menu.agentId)
   return agent?.working_dir || ''
 }
 
@@ -5586,7 +5856,7 @@ function getFileTreeContextDirNode() {
 
 // 绝对路径转相对 working_dir 的路径（不在工作目录内时返回空串）
 function toWorkingDirRelativePath(agentId, absPath) {
-  const agent = agentList.value.find(a => a.agent_id === agentId)
+  const agent = resolveFileTreeAgent(agentId)
   const workingDir = String(agent?.working_dir || '').replace(/\/+$/, '')
   const normalized = String(absPath || '').replace(/\/+$/, '')
   if (!workingDir || !normalized) return ''
@@ -5658,7 +5928,7 @@ const fileTreeContextActions = computed(() => {
 
 // 把绝对路径转为相对 working_dir 的 glob（用于「在当前目录下查找」）
 function buildDirSearchGlob(agentId, dirPath) {
-  const agent = agentList.value.find(a => a.agent_id === agentId)
+  const agent = resolveFileTreeAgent(agentId)
   const workingDir = String(agent?.working_dir || '').replace(/\/$/, '')
   const normalizedDir = String(dirPath || '').replace(/\/$/, '')
   if (!workingDir || !normalizedDir || normalizedDir === workingDir) return ''
@@ -5671,7 +5941,7 @@ function buildDirSearchGlob(agentId, dirPath) {
 async function runFileTreeContextAction(action) {
   if (!action || action.enabled === false) return
   const menu = { ...fileTreeContextMenu.value }
-  const agent = agentList.value.find(a => a.agent_id === menu.agentId)
+  const agent = resolveFileTreeAgent(menu.agentId)
   closeFileTreeContextMenu()
   if (!agent) return
 
@@ -5809,7 +6079,7 @@ async function runFileTreeContextAction(action) {
 
 // 刷新指定目录节点（node 为 null 时刷新工作目录根）
 async function refreshFileTreeDir(agentId, node) {
-  const agent = agentList.value.find(a => a.agent_id === agentId)
+  const agent = resolveFileTreeAgent(agentId)
   if (!agent) return
   if (!node) {
     fileTreeState.value.delete(agentId)
@@ -5827,7 +6097,7 @@ async function refreshFileTreeDir(agentId, node) {
 // 调用后端创建文件/目录接口（不覆盖已存在路径）
 async function createFileOrDirectory(agentId, absPath, kind) {
   const { host, port } = getGatewayAddress()
-  const agent = agentList.value.find(a => a.agent_id === agentId)
+  const agent = resolveFileTreeAgent(agentId)
   if (!agent) {
     throw new Error(`找不到Agent: ${agentId}`)
   }
@@ -5849,7 +6119,7 @@ async function createFileOrDirectory(agentId, absPath, kind) {
 // 调用后端删除文件/目录接口（目录需 recursive 才可递归删除）
 async function deleteFileOrDirectory(agentId, absPath, recursive = false) {
   const { host, port } = getGatewayAddress()
-  const agent = agentList.value.find(a => a.agent_id === agentId)
+  const agent = resolveFileTreeAgent(agentId)
   if (!agent) {
     throw new Error(`找不到Agent: ${agentId}`)
   }
@@ -5871,7 +6141,7 @@ async function deleteFileOrDirectory(agentId, absPath, recursive = false) {
 // 调用后端重命名/移动文件/目录接口（不覆盖已存在路径）
 async function renameFileOrDirectory(agentId, absPath, newAbsPath) {
   const { host, port } = getGatewayAddress()
-  const agent = agentList.value.find(a => a.agent_id === agentId)
+  const agent = resolveFileTreeAgent(agentId)
   if (!agent) {
     throw new Error(`找不到Agent: ${agentId}`)
   }
@@ -5895,7 +6165,7 @@ async function renameFileOrDirectory(agentId, absPath, newAbsPath) {
 // 列出目录下的直接子项（复用 directories 接口）
 async function listDirectoryEntries(agentId, dirPath) {
   const { host, port } = getGatewayAddress()
-  const agent = agentList.value.find(a => a.agent_id === agentId)
+  const agent = resolveFileTreeAgent(agentId)
   if (!agent) throw new Error(`找不到Agent: ${agentId}`)
   if (!agent.node_id) throw new Error(`Agent没有node_id: ${agentId}`)
   const targetNodeId = String(agent.node_id).trim()
@@ -6009,7 +6279,7 @@ async function pasteFileTreeClipboard(agentId, destDir) {
 // 写入文件内容（粘贴用，覆盖目标路径）
 async function writeFileContent(agentId, absPath, content) {
   const { host, port } = getGatewayAddress()
-  const agent = agentList.value.find(a => a.agent_id === agentId)
+  const agent = resolveFileTreeAgent(agentId)
   if (!agent) throw new Error(`找不到Agent: ${agentId}`)
   if (!agent.node_id) throw new Error(`Agent没有node_id: ${agentId}`)
   const targetNodeId = String(agent.node_id).trim()
@@ -12097,7 +12367,8 @@ async function loadFileTreeNode(agentId, node) {
   try {
     const { host, port } = getGatewayAddress()
     // 使用当前Agent的node_id，而不是编辑器会话的node_id
-    const agent = agentList.value.find(a => a.agent_id === agentId)
+    // 虚拟目录会话（未创建 Agent 时直接打开某节点的目录）不在 agentList 中，从其 agent 信息里取 node_id
+    const agent = agentList.value.find(a => a.agent_id === agentId) || getVirtualWorkspaceAgent(agentId)
     if (!agent) {
       console.error('[FILETREE] 找不到Agent:', agentId)
       return
@@ -18104,12 +18375,231 @@ body::-webkit-scrollbar {
   min-height: 0;
   overflow: auto;
 }
-
 .workspace-file-tree-empty {
   padding: 12px;
   color: var(--color-text-secondary);
   font-size: 12px;
   text-align: center;
+}
+/* 目录树顶部「打开目录」入口 */
+.workspace-open-dir-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px;
+  padding: 7px 10px;
+  border: 1px dashed var(--color-border-subtle);
+  border-radius: var(--tile-radius-sm, 4px);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.workspace-open-dir-btn:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-active);
+}
+.workspace-open-dir-icon {
+  font-size: 13px;
+}
+/* 虚拟目录会话（未创建 Agent 时直接打开的目录） */
+.workspace-agent-node.virtual-dir .agent-node-id {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 按节点打开目录的弹窗 */
+.open-dir-overlay {
+  z-index: 3200;
+}
+.open-dir-modal {
+  max-width: 560px;
+  width: 95%;
+  max-height: 78vh;
+  display: flex;
+  flex-direction: column;
+}
+.open-dir-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.open-dir-header h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.open-dir-close {
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.open-dir-close:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-hover);
+}
+.open-dir-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  min-height: 0;
+  overflow: hidden;
+}
+.open-dir-label {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+.open-dir-node-select,
+.open-dir-path-input {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--tile-radius-sm, 4px);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  box-sizing: border-box;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.open-dir-node-select:focus,
+.open-dir-path-input:focus {
+  outline: none;
+  border-color: var(--color-border-active);
+}
+.open-dir-browse-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+.open-dir-browse-path {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  background: var(--color-bg-primary);
+  border-radius: var(--tile-radius-sm, 4px);
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.open-dir-browse-btn {
+  flex: none;
+  padding: 5px 9px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--tile-radius-sm, 4px);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+.open-dir-browse-btn:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-hover);
+}
+.open-dir-browse-list {
+  flex: 1;
+  min-height: 120px;
+  max-height: 40vh;
+  overflow-y: auto;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--tile-radius-sm, 4px);
+  padding: 4px;
+}
+.open-dir-browse-empty {
+  padding: 16px 8px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.open-dir-browse-empty.error {
+  color: var(--color-danger, #f56c6c);
+}
+.open-dir-browse-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--tile-radius-sm, 4px);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.open-dir-browse-item:hover {
+  background: var(--color-bg-hover);
+}
+.open-dir-browse-item.selected {
+  background: var(--color-bg-hover);
+  box-shadow: inset 0 0 0 1px var(--color-border-active);
+}
+.open-dir-browse-icon {
+  flex: none;
+  font-size: 13px;
+}
+.open-dir-browse-name {
+  flex: none;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.open-dir-browse-fullpath {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
+.open-dir-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 10px 12px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+.open-dir-actions .btn {
+  padding: 7px 16px;
+  border: none;
+  border-radius: var(--tile-radius-sm, 4px);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.open-dir-actions .btn.secondary {
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-subtle);
+}
+.open-dir-actions .btn.secondary:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+.open-dir-actions .btn.primary {
+  background: var(--color-accent);
+  color: #060911;
 }
 
 /* Agent 节点样式 */
