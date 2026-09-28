@@ -5910,7 +5910,10 @@ function openFileTreeContextMenu(agent, node, event) {
 const fileTreeContextActions = computed(() => {
   const hasAgent = Boolean(fileTreeContextMenu.value.agentId)
   const hasNode = Boolean(fileTreeContextMenu.value.node)
+  // 粘贴可用性：剪贴板存在，且与目标节点相同（同节点跨目录允许，跨节点不支持）
+  const menuNodeId = String(resolveFileTreeAgent(fileTreeContextMenu.value.agentId)?.node_id || '').trim()
   const canPaste = hasAgent && Boolean(fileTreeClipboard.value)
+    && (!fileTreeClipboard.value.nodeId || !menuNodeId || fileTreeClipboard.value.nodeId === menuNodeId)
   return [
     { id: 'new-file', label: '新建文件', icon: '📄', enabled: hasAgent },
     { id: 'new-folder', label: '新建文件夹', icon: '📁', enabled: hasAgent },
@@ -6232,13 +6235,15 @@ async function resolvePasteName(agentId, destDir, name) {
 async function setFileTreeClipboard(mode, agentId, node) {
   if (!node || !node.path) return
   const kind = node.type === 'directory' ? 'directory' : 'file'
+  // 记录来源节点：粘贴时以 node_id 判定是否跨节点（同节点跨目录允许，跨节点不支持）
+  const sourceNodeId = String(resolveFileTreeAgent(agentId)?.node_id || '').trim()
   try {
     if (kind === 'directory') {
       const children = await collectDirectorySnapshot(agentId, node.path)
-      fileTreeClipboard.value = { mode, agentId, path: node.path, name: node.name, kind, children }
+      fileTreeClipboard.value = { mode, agentId, nodeId: sourceNodeId, path: node.path, name: node.name, kind, children }
     } else {
       const content = await fetchFileContent(node.path, agentId)
-      fileTreeClipboard.value = { mode, agentId, path: node.path, name: node.name, kind, content }
+      fileTreeClipboard.value = { mode, agentId, nodeId: sourceNodeId, path: node.path, name: node.name, kind, content }
     }
     showToast(mode === 'cut' ? '已剪切，可在目标目录粘贴' : '已复制，可在目标目录粘贴', 'success')
   } catch (error) {
@@ -6250,8 +6255,10 @@ async function setFileTreeClipboard(mode, agentId, node) {
 async function pasteFileTreeClipboard(agentId, destDir) {
   const clip = fileTreeClipboard.value
   if (!clip) return
-  if (clip.agentId !== agentId) {
-    showToast('暂不支持跨 Agent 粘贴', 'error')
+  // 以 node_id 判定：同节点跨目录允许；跨节点需要文件内容传输，暂不支持
+  const targetNodeId = String(resolveFileTreeAgent(agentId)?.node_id || '').trim()
+  if (clip.nodeId && targetNodeId && clip.nodeId !== targetNodeId) {
+    showToast('暂不支持跨节点粘贴', 'error')
     return
   }
   const normalizedDest = String(destDir).replace(/\/+$/, '')
