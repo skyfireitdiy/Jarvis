@@ -216,6 +216,11 @@
                     <span class="tree-node-icon agent-icon">📂</span>
                     <span class="tree-node-text agent-name">{{ session.agent.name }}</span>
                     <span class="agent-node-id">{{ getWorkingDirDisplay(session.agent.working_dir) }}</span>
+                    <button
+                      class="agent-node-remove"
+                      title="移除该目录"
+                      @click.stop="removeWorkspaceDir(session.agent_id)"
+                    >✕</button>
                   </div>
                   <div v-if="expandedAgents.has(session.agent_id)" class="agent-file-tree">
                     <div class="workspace-file-tree-root" @click.stop="ensureWorkspaceSidebarFileTree(session.agent)" @contextmenu.prevent.stop="openFileTreeContextMenu(session.agent, null, $event)">
@@ -4772,6 +4777,10 @@ function createWorkspaceForAgent(agent) {
 // 虚拟目录会话的 agent_id 前缀：未创建 Agent 时直接打开某节点的目录
 const VIRTUAL_WORKSPACE_PREFIX = '__node__:'
 
+// 已打开目录记录的持久化 key：刷新后自动恢复，无需重新添加。
+// 仅存 node_id + working_dir（agent_id 由二者推导），避免持久化整个会话对象。
+const VIRTUAL_DIRS_STORAGE_KEY = 'jarvis_virtual_workspace_dirs'
+
 // 从虚拟会话的 agent_id 还原出伪 agent 信息（含 node_id/working_dir），供文件树与文件读写复用
 function getVirtualWorkspaceAgent(agentId) {
   const key = String(agentId || '')
@@ -4785,11 +4794,41 @@ function resolveFileTreeAgent(agentId) {
   return agentList.value.find(a => a.agent_id === agentId) || getVirtualWorkspaceAgent(agentId)
 }
 
-// 打开「某节点的某目录」为编辑器工作区（不需要先创建 Agent）
-async function openWorkspaceDir(nodeId, dirPath) {
+// 读取持久化的「已打开目录」记录
+function loadVirtualWorkspaceDirs() {
+  try {
+    const raw = localStorage.getItem(VIRTUAL_DIRS_STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter(item => item && item.node_id && item.working_dir)
+      .map(item => ({ node_id: String(item.node_id), working_dir: String(item.working_dir) }))
+  } catch (e) {
+    return []
+  }
+}
+
+// 把当前虚拟目录会话写回 localStorage（以实际会话为准，移除后自然消失）
+function saveVirtualWorkspaceDirs() {
+  try {
+    const dirs = virtualWorkspaceSessions.value
+      .map(s => ({
+        node_id: String(s.agent?.node_id || '').trim(),
+        working_dir: String(s.agent?.working_dir || '').trim(),
+      }))
+      .filter(item => item.node_id && item.working_dir)
+    localStorage.setItem(VIRTUAL_DIRS_STORAGE_KEY, JSON.stringify(dirs))
+  } catch (e) {
+    // localStorage 不可用（隐私模式 / 配额满）时静默降级
+  }
+}
+
+// 创建或复用某节点的虚拟目录会话，返回 { agentId, agent }
+function ensureVirtualWorkspaceSession(nodeId, dirPath) {
   const targetNodeId = String(nodeId || 'master').trim() || 'master'
   const targetDir = String(dirPath || '').trim()
-  if (!targetDir) return
+  if (!targetDir) return null
 
   const agentId = `${VIRTUAL_WORKSPACE_PREFIX}${targetNodeId}`
   const virtualAgent = {
@@ -4821,6 +4860,14 @@ async function openWorkspaceDir(nodeId, dirPath) {
     session.agent = virtualAgent
     session.agent_name = virtualAgent.name
   }
+  return { agentId, agent: virtualAgent }
+}
+
+// 打开「某节点的某目录」为编辑器工作区（不需要先创建 Agent）
+async function openWorkspaceDir(nodeId, dirPath) {
+  const created = ensureVirtualWorkspaceSession(nodeId, dirPath)
+  if (!created) return
+  const { agentId, agent: virtualAgent } = created
 
   activeWorkspaceSessionId.value = agentId
   showWorkspacePanel.value = true
@@ -4829,9 +4876,63 @@ async function openWorkspaceDir(nodeId, dirPath) {
   workspaceSidebarView.value = 'files'
 
   // 初始化该目录的文件树
-  await initFileTree(agentId, targetDir)
-  ensureWorkspaceSidebarFileTree(agentId, virtualAgent)
-  showToast(`已打开目录：${targetDir}`, 'success')
+  await initFileTree(agentId, virtualAgent.working_dir)
+  // 记录持久化，刷新后自动恢复
+  saveVirtualWorkspaceDirs()
+  showToast(`已打开目录：${virtualAgent.working_dir}`, 'success')
+}
+
+// 移除一个已打开的目录（关闭其虚拟会话并清理文件树状态），并同步持久化记录
+function removeWorkspaceDir(agentId) {
+  const index = workspaceSessions.value.findIndex(s => s.agent_id === agentId)
+  if (index === -1) return
+  const session = workspaceSessions.value[index]
+  if (session.agent?.virtual !== true) return
+
+  // 清理该会话的文件树 / 展开态 / 加载态
+  fileTreeState.value.delete(agentId)
+  fileTreeExpanded.value.delete(agentId)
+  fileTreeLoading.value.delete(agentId)
+  expandedAgents.value.delete(agentId)
+  if (fileTreeSelectedAgentId.value === agentId) {
+    fileTreeSelectedAgentId.value = null
+    fileTreeSelectedPath.value = null
+  }
+  if (selectedAgentId.value === agentId) selectedAgentId.value = null
+
+  // 释放编辑器模型与实例
+  session.editorModels?.clear()
+  if (session.cmEditorView) {
+    session.cmEditorView.dispose()
+    session.cmEditorView = null
+  }
+
+  workspaceSessions.value.splice(index, 1)
+  // 若移除的是当前激活会话，切到剩余的第一个会话；没有则收起编辑器
+  if (activeWorkspaceSessionId.value === agentId) {
+    activeWorkspaceSessionId.value = workspaceSessions.value.length > 0
+      ? workspaceSessions.value[0].agent_id
+      : null
+    if (!activeWorkspaceSessionId.value) {
+      resetWorkspaceHostedPanelState()
+      showWorkspacePanel.value = false
+    }
+  }
+  triggerRef(expandedAgents)
+  saveVirtualWorkspaceDirs()
+  showToast('已移除目录', 'success')
+}
+
+// 刷新后恢复上次打开的目录记录（在连接成功、鉴权可用后调用）
+async function restoreVirtualWorkspaceDirs() {
+  const dirs = loadVirtualWorkspaceDirs()
+  if (!dirs.length) return
+  for (const dir of dirs) {
+    const created = ensureVirtualWorkspaceSession(dir.node_id, dir.working_dir)
+    if (!created) continue
+    // 仅恢复会话与文件树，不抢占当前激活会话、不弹提示
+    await initFileTree(created.agentId, created.agent.working_dir)
+  }
 }
 
 
@@ -6025,6 +6126,8 @@ const fileTreeContextActions = computed(() => {
   const menuNodeId = String(resolveFileTreeAgent(fileTreeContextMenu.value.agentId)?.node_id || '').trim()
   const canPaste = hasAgent && Boolean(fileTreeClipboard.value)
     && (!fileTreeClipboard.value.nodeId || !menuNodeId || fileTreeClipboard.value.nodeId === menuNodeId)
+  // 「移除」仅对「打开目录」产生的虚拟目录会话可用（真实 Agent 不在此处移除）
+  const isVirtualDir = resolveFileTreeAgent(fileTreeContextMenu.value.agentId)?.virtual === true
   return [
     { id: 'new-file', label: '新建文件', icon: '📄', enabled: hasAgent },
     { id: 'new-folder', label: '新建文件夹', icon: '📁', enabled: hasAgent },
@@ -6037,6 +6140,7 @@ const fileTreeContextActions = computed(() => {
     { id: 'copy-relative-path', label: '复制相对路径', icon: '🔗', enabled: hasAgent },
     { id: 'rename', label: '重命名', icon: '✏️', enabled: hasNode },
     { id: 'delete', label: '删除', icon: '🗑️', enabled: hasNode },
+    { id: 'remove-dir', label: '移除目录', icon: '🚪', enabled: isVirtualDir },
   ]
 })
 
@@ -6058,6 +6162,11 @@ async function runFileTreeContextAction(action) {
   const agent = resolveFileTreeAgent(menu.agentId)
   closeFileTreeContextMenu()
   if (!agent) return
+
+  if (action.id === 'remove-dir') {
+    removeWorkspaceDir(agent.agent_id)
+    return
+  }
 
   if (action.id === 'new-file' || action.id === 'new-folder') {
     const kind = action.id === 'new-file' ? 'file' : 'directory'
@@ -9757,6 +9866,8 @@ async function connect() {
     localStorage.setItem('jarvis_gateway_url', gatewayUrl.value)
     startAgentListRefresh()
     startNodeStatusRefresh()
+    // 恢复上次「打开目录」的虚拟目录记录（鉴权已可用）
+    restoreVirtualWorkspaceDirs()
     // 刷新用户信息（确保display_name等字段最新），随后拉取权限（依赖 userInfo.user_id）
     refreshUserInfo().finally(() => { fetchUserPermissions() })
     // 登录成功后自动连接所有在线的 agent
@@ -18806,6 +18917,31 @@ body::-webkit-scrollbar {
   background: var(--color-bg-tertiary);
   padding: 2px 6px;
   border-radius: 4px;
+}
+
+/* 虚拟目录节点的「移除」按钮：默认隐藏，悬停该行时显示 */
+.agent-node-remove {
+  flex: none;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+.agent-node-content:hover .agent-node-remove {
+  display: inline-flex;
+}
+.agent-node-remove:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-danger, #f56c6c);
 }
 
 .agent-file-tree {
