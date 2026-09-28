@@ -2343,7 +2343,7 @@ const rulesLoadedContent = ref('')    // 已加载规则的具体内容
 const BASE_Z_INDEX = 1000
 const ACTIVE_Z_INDEX = 1100
 
-const EDITOR_SIDEBAR_DEFAULT_WIDTH = 320
+const EDITOR_SIDEBAR_DEFAULT_WIDTH = 360
 const EDITOR_SIDEBAR_MIN_WIDTH = 200
 const EDITOR_SIDEBAR_MAX_WIDTH = 560
 const EDITOR_SIDEBAR_STORAGE_KEY = 'jarvis_workspace_sidebar_width'
