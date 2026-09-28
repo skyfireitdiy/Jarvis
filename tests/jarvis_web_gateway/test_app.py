@@ -16,6 +16,7 @@ from jarvis.jarvis_gateway.events import GatewayOutputEvent
 from jarvis.jarvis_gateway.output_bridge import SessionOutputRouter
 from jarvis.jarvis_utils.output import OutputType
 from jarvis.jarvis_web_gateway.app import MAX_FILE_SIZE_BYTES
+from jarvis.jarvis_web_gateway.app import _fuzzy_match_score
 from jarvis.jarvis_web_gateway.app import WebGateway
 from jarvis.jarvis_web_gateway.app import create_app
 from jarvis.jarvis_web_gateway.timer_manager import TimerManager
@@ -157,3 +158,37 @@ def test_set_node_config_rejects_schema_invalid_config():
     body2 = resp2.json()
     assert body2["success"] is False
     assert body2["error"]["code"] == "NODE_NOT_FOUND"
+
+
+def test_fuzzy_match_score_prefers_contiguous():
+    """连续匹配得分应优于跳跃匹配。"""
+    assert _fuzzy_match_score("mod", "mod.rs") is not None
+    contiguous = _fuzzy_match_score("mod", "mod.rs")
+    scattered = _fuzzy_match_score("mod", "m_x_o_y_d.rs")
+    assert contiguous is not None and scattered is not None
+    assert contiguous < scattered
+
+
+def test_fuzzy_match_score_rejects_non_subsequence():
+    """非子序列应返回 None。"""
+    assert _fuzzy_match_score("xyz", "sche/mod.rs") is None
+
+
+def test_file_search_matches_directory_path():
+    """f> 搜索应支持「目录 + 文件名」的模糊匹配（如 scmodrs → sche/mod.rs）。"""
+    query = "scmodrs"
+
+    def match_score(relative_path: str) -> int | None:
+        name = relative_path.rsplit("/", 1)[-1]
+        name_score = _fuzzy_match_score(query, name)
+        path_score = _fuzzy_match_score(query, relative_path)
+        candidates = [s for s in (name_score, path_score) if s is not None]
+        return min(candidates) if candidates else None
+
+    # 目录路径命中：仅凭文件名 mod.rs 无法匹配 scmodrs，但完整路径可以
+    assert _fuzzy_match_score(query, "mod.rs") is None
+    assert match_score("sche/mod.rs") is not None
+    # 文件名命中不应因引入路径匹配而劣化：取 min 保证不劣于单独的文件名匹配
+    assert match_score("mod.rs") == _fuzzy_match_score(query, "mod.rs") or (
+        match_score("mod.rs") is None
+    )

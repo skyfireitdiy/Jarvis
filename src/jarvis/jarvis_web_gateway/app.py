@@ -7134,13 +7134,25 @@ def create_app(
                 except (ValueError, OSError):
                     continue
                 name = relative_path.name
-                score = _fuzzy_match_score(
-                    query if case_sensitive else query.lower(),
+                matched_query = query if case_sensitive else query.lower()
+                # 同时匹配文件名与完整相对路径：文件名命中优先（分数更优），
+                # 路径命中用于支持「目录 + 文件名」的模糊搜索（如 scmodrs → sche/mod.rs）。
+                name_score = _fuzzy_match_score(
+                    matched_query,
                     name if case_sensitive else name.lower(),
                 )
-                if score is None:
+                path_score = _fuzzy_match_score(
+                    matched_query,
+                    str(relative_path)
+                    if case_sensitive
+                    else str(relative_path).lower(),
+                )
+                candidates = [
+                    score for score in (name_score, path_score) if score is not None
+                ]
+                if not candidates:
                     continue
-                scored_results.append((score, str(relative_path), name))
+                scored_results.append((min(candidates), str(relative_path), name))
 
             scored_results.sort(key=lambda item: (item[0], item[1]))
             limited = scored_results[:max_results]
