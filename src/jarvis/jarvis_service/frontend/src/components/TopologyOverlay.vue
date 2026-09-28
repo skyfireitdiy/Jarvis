@@ -494,23 +494,14 @@ const localNodes = computed(() => {
   return nodes
 })
 
-// 曲线连线：master → 各接入端节点。控制点在水平中段上下错开，使连线呈明显弧线，
-// 与节点间直线（lines）区分；左右两侧弧向相反，视觉对称。
+// 直线连线：master → 各接入端节点，直接连接两点。
 const localLinks = computed(() =>
-  localNodes.value.map(n => {
-    const midX = (n.masterX + n.x) / 2
-    const span = Math.abs(n.x - n.masterX)
-    const bow = Math.min(Math.max(span * 0.16, 24), 80)
-    const dir = n.x < n.masterX ? -1 : 1
-    const c1y = n.masterY + dir * bow
-    const c2y = n.y + dir * bow
-    return {
-      id: n.id,
-      d: `M ${n.masterX} ${n.masterY} C ${midX} ${c1y}, ${midX} ${c2y}, ${n.x} ${n.y}`,
-      state: n.state,
-      hot: hovered.value === n.id,
-    }
-  })
+  localNodes.value.map(n => ({
+    id: n.id,
+    d: `M ${n.masterX} ${n.masterY} L ${n.x} ${n.y}`,
+    state: n.state,
+    hot: hovered.value === n.id,
+  }))
 )
 
 // 节点 -> agent 连线：每个 agent 连回其所属节点（master 连到中心）

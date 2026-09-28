@@ -1160,26 +1160,14 @@ const accessNodes = computed(() => {
   return nodes
 })
 
-// 曲线连线：master 机箱 → 各接入端节点。
-// 用三次贝塞尔：控制点在水平中段分别上下错开，使连线呈明显弧线，
-// 与节点间直线（nodeLinks）区分开；左右两侧弧向相反，视觉上更对称。
+// 直线连线：master 机箱 → 各接入端节点，直接连接两点。
 const accessLinks = computed(() =>
-  accessNodes.value.map(n => {
-    const midX = (n.masterX + n.x) / 2
-    const span = Math.abs(n.x - n.masterX)
-    // 弧高：随水平跨度自适应，并限制上限，避免小屏时弧线过大
-    const bow = Math.min(Math.max(span * 0.16, 24), 80)
-    // 左侧节点向上拱、右侧节点向下拱（以 master 为基准）
-    const dir = n.x < n.masterX ? -1 : 1
-    const c1y = n.masterY + dir * bow
-    const c2y = n.y + dir * bow
-    return {
-      key: `access-${n.id}`,
-      d: `M ${n.masterX} ${n.masterY} C ${midX} ${c1y}, ${midX} ${c2y}, ${n.x} ${n.y}`,
-      color: n.color,
-      offline: n.state === 'offline',
-    }
-  }),
+  accessNodes.value.map(n => ({
+    key: `access-${n.id}`,
+    d: `M ${n.masterX} ${n.masterY} L ${n.x} ${n.y}`,
+    color: n.color,
+    offline: n.state === 'offline',
+  })),
 )
 
 // Agent 与所属节点的连线：宠物中心 → 节点坐标（颜色取 agent 状态色）
