@@ -8856,6 +8856,7 @@ const commandPaletteCtx = computed(() => ({
   openAdminRestartService: () => openAdminSystemAction('restart'),
   openAdminSyncConfig: () => openAdminSystemAction('sync-config'),
   openAdminNodeSecret: () => openAdminSystemAction('node-secret'),
+  openAdminConfigFile: () => openAdminSystemAction('config-file'),
   openWorkspaceAgentList,
   toggleTerminalPanel,
   toggleChatPanel,

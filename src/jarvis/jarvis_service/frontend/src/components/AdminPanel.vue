@@ -9,6 +9,7 @@
         <button class="admin-tab" :class="{ active: activeTab === 'users' }" @click="switchTab('users')">用户管理</button>
         <button class="admin-tab" :class="{ active: activeTab === 'groups' }" @click="switchTab('groups')">权限组</button>
         <button class="admin-tab" :class="{ active: activeTab === 'system' }" @click="switchTab('system')">系统配置</button>
+        <button class="admin-tab" :class="{ active: activeTab === 'config' }" @click="switchTab('config')">配置文件</button>
       </div>
       <!-- 用户管理 -->
       <div v-if="activeTab === 'users'" class="tab-content">
@@ -214,6 +215,35 @@
             <span class="form-help">此私钥用于子节点连接主网关时的身份认证，请妥善保管</span>
           </div>
         </div>
+      </div>
+      <!-- 配置文件 -->
+      <div v-if="activeTab === 'config'" class="tab-content">
+        <!-- 配置文件编辑 -->
+        <div class="form-group">
+          <label>配置文件编辑</label>
+          <div class="form-help" style="margin-bottom:10px">基于 JSON Schema 动态生成表单编辑配置文件（~/.jarvis/config.yaml），支持纯文本预览（需 admin:config 权限）。</div>
+          <button class="ghost-btn" @click="openConfigEditor">编辑配置文件</button>
+        </div>
+        <!-- 配置备份与恢复 -->
+        <div class="form-group">
+          <label>配置备份与恢复</label>
+          <div class="form-help" style="margin-bottom:10px">将某个节点的配置导出为 JSON 备份，或从备份文件恢复（需 admin:config 权限，导入前会自动备份现有配置）。</div>
+          <div class="config-backup-row">
+            <select v-model="backupNodeId" class="node-select">
+              <option value="" disabled>选择节点</option>
+              <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">{{ node.node_id }}</option>
+            </select>
+            <div class="config-backup-actions">
+              <button class="ghost-btn" @click="exportConfig" :disabled="!backupNodeId || exporting">
+                {{ exporting ? '导出中…' : '导出配置' }}
+              </button>
+              <button class="ghost-btn" @click="triggerImportFile" :disabled="!backupNodeId || importing">
+                {{ importing ? '导入中…' : '导入配置' }}
+              </button>
+            </div>
+            <input ref="importFileEl" type="file" accept=".json,application/json" style="display:none" @change="onImportFileChange" />
+          </div>
+        </div>
         <!-- 配置同步 -->
         <div class="form-group" v-if="availableNodeOptions.length > 0">
           <label>配置同步</label>
@@ -235,6 +265,16 @@
           </div>
         </div>
       </div>
+      <!-- 配置文件编辑器弹窗 -->
+      <ConfigEditorModal
+        :visible="showConfigEditor"
+        :fetchWithAuth="props.fetchWithAuth"
+        :gatewayUrl="props.gatewayUrl"
+        :getHttpProtocol="props.getHttpProtocol"
+        :showToast="props.showToast"
+        :nodeId="backupNodeId || 'master'"
+        @update:visible="showConfigEditor = $event"
+      />
       <div class="modal-actions">
         <button class="ghost-btn" @click="close">关闭</button>
       </div>
@@ -244,6 +284,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import ConfigEditorModal from './ConfigEditorModal.vue'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -292,6 +333,12 @@ const localSyncConfigSourceNode = ref('')
 const nodeSecret = ref('')
 const isLoadingSecret = ref(false)
 const showSecret = ref(false)
+// 配置文件相关状态
+const showConfigEditor = ref(false)
+const backupNodeId = ref('')
+const exporting = ref(false)
+const importing = ref(false)
+const importFileEl = ref(null)
 
 // 权限Schema：资源→动作列表
 const permissionSchema = {
@@ -352,15 +399,19 @@ function switchTab(tab) {
   showGroupAssign.value = false
 }
 
-// 供外部（命令面板）调用：切到系统配置并触发对应操作
+// 供外部（命令面板）调用：切到对应 tab 并触发对应操作
 function openSystemAction(kind) {
+  if (kind === 'config-file' || kind === 'sync-config') {
+    switchTab('config')
+    if (kind === 'config-file') openConfigEditor()
+    else if (kind === 'sync-config') syncConfig()
+    return
+  }
   switchTab('system')
   if (kind === 'restart') {
     confirmRestartGateway()
   } else if (kind === 'restart-all') {
     confirmRestartAllNodes()
-  } else if (kind === 'sync-config') {
-    syncConfig()
   } else if (kind === 'node-secret') {
     fetchNodeSecret()
   } else if (kind === 'update-code') {
@@ -660,6 +711,73 @@ async function fetchNodeSecret() {
 
 function toggleSecretMask() {
   showSecret.value = !showSecret.value
+}
+
+// ===== 配置文件功能 =====
+function openConfigEditor() {
+  showConfigEditor.value = true
+}
+// 导出配置：从选中节点拉取配置并下载为 JSON 文件
+async function exportConfig() {
+  if (!backupNodeId.value) { props.showToast('请先选择节点', 'warning'); return }
+  exporting.value = true
+  try {
+    const resp = await props.fetchWithAuth(buildApiUrl(`/api/nodes/${backupNodeId.value}/config`), { method: 'GET' })
+    const result = await resp.json()
+    if (!resp.ok || !result.success) {
+      throw new Error(result.error?.message || '获取配置失败')
+    }
+    const config = result.data?.config || {}
+    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `jarvis-config-${backupNodeId.value}-${new Date().toISOString().slice(0, 10)}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    props.showToast(`已导出 ${Object.keys(config).length} 项配置`, 'success')
+  } catch (e) {
+    props.showToast('导出失败: ' + (e.message || '未知错误'), 'error')
+  } finally {
+    exporting.value = false
+  }
+}
+// 触发文件选择
+function triggerImportFile() {
+  if (!backupNodeId.value) { props.showToast('请先选择节点', 'warning'); return }
+  importFileEl.value?.click()
+}
+// 读取导入文件并应用到选中节点
+async function onImportFileChange(event) {
+  const file = event.target.files?.[0]
+  event.target.value = '' // 允许重复选择同一文件
+  if (!file) return
+  try {
+    const text = await file.text()
+    const parsed = JSON.parse(text) // 校验 JSON 格式
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      throw new Error('配置文件必须是 JSON 对象')
+    }
+    if (!backupNodeId.value) { props.showToast('请先选择节点', 'warning'); return }
+    importing.value = true
+    const sections = Object.keys(parsed)
+    if (sections.length === 0) { props.showToast('配置文件中没有可导入的内容', 'warning'); return }
+    const resp = await props.fetchWithAuth(buildApiUrl(`/api/nodes/${backupNodeId.value}/config`), {
+      method: 'POST',
+      body: JSON.stringify({ config_sections: sections, config_data: parsed }),
+    })
+    const result = await resp.json()
+    if (!resp.ok || !result.success) {
+      throw new Error(result.error?.message || '导入配置失败')
+    }
+    props.showToast(`已导入 ${sections.length} 项配置到 ${backupNodeId.value}`, 'success')
+  } catch (e) {
+    props.showToast('导入失败: ' + (e.message || '未知错误'), 'error')
+  } finally {
+    importing.value = false
+  }
 }
 
 async function copyNodeSecret() {
@@ -1123,5 +1241,40 @@ const maskedNodeSecret = computed(() => {
   outline: none;
   border-color: var(--accent, #20c8ff);
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+/* 配置备份与恢复 */
+.config-backup-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.config-backup-row .node-select {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-secondary, #0b1424);
+  border: none;
+  border-radius: 6px;
+  color: var(--text-primary, #d6e4f0);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.config-backup-row .node-select:focus {
+  outline: none;
+  border-color: var(--accent, #20c8ff);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.config-backup-actions {
+  display: flex;
+  gap: 8px;
+}
+.config-backup-actions .ghost-btn {
+  flex: 1;
+  text-align: center;
+}
+.config-backup-actions .ghost-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 </style>

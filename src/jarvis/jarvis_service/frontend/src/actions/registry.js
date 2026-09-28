@@ -747,6 +747,18 @@ export const ACTIONS = [
     run: (ctx) => ctx.openAdminNodeSecret && ctx.openAdminNodeSecret(),
   },
   {
+    id: "admin-edit-config",
+    label: "编辑配置文件",
+    shortcut: "Ctrl+Alt+Shift+F",
+    condition: "需 admin:config 权限",
+    en: "Edit Config File",
+    group: "管理",
+    icon: "⚙",
+    keywords: ["配置", "文件", "模型", "模型组", "config", "edit", "llm"],
+    enabled: (ctx) => !!ctx?.hasPermission && ctx.hasPermission("admin:config"),
+    run: (ctx) => ctx.openAdminConfigFile && ctx.openAdminConfigFile(),
+  },
+  {
     id: "admin-open-panel",
     label: "打开管理面板",
     shortcut: "Ctrl+Alt+Shift+A",
