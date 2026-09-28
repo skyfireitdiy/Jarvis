@@ -33,6 +33,19 @@ func handleLinuxSystemInfo(_ map[string]any) (any, error) {
 	return CollectSystemInfo()
 }
 
+// CollectSystemInfoFast 采集不依赖任何外部命令的「零成本」系统信息。
+//
+// 与 Windows 不同，Linux 的系统信息全部来自 /proc 伪文件与标准库，读取本就
+// 毫秒级，因此这里直接复用 CollectSystemInfo 的结果（字段完全一致），
+// 仅用于与 Windows 保持同一接口，供 hello 首帧调用。
+func CollectSystemInfoFast() map[string]any {
+	info, _ := CollectSystemInfo()
+	if info == nil {
+		info = map[string]any{}
+	}
+	return info
+}
+
 // CollectSystemInfo 采集本机系统信息。
 //
 // 该函数同时服务于 linux.system.info 能力与守护进程注册时的 hello 上报，

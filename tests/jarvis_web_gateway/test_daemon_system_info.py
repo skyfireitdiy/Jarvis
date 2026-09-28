@@ -271,3 +271,86 @@ def test_list_sessions_without_build_info_returns_empty_dict():
     detail = manager.get_session("s1")
     assert detail is not None
     assert detail["build_info"] == {}
+
+
+def test_system_info_update_merges_into_session(client, auth_token):
+    """hello 后补发的 system_info_update 应合并进会话缓存。
+
+    背景：hello 首帧只带「快速版」系统信息（避免握手超时），完整信息随后用
+    system_info_update 补发。网关需合并（而非覆盖），使派生字段 hostname/platform
+    同步刷新。
+    """
+    with client.websocket_connect(
+        "/api/daemon/ws", subprotocols=_token_subprotocol(auth_token)
+    ) as ws:
+        # hello 只带零成本字段（快速版）。
+        ws.send_json(
+            {
+                "type": "hello",
+                "client_id": "daemon-fast-1",
+                "extension_version": "0.0.1-test",
+                "system_info": {"hostname": "fast-host", "arch": "amd64"},
+                "tabs": [],
+            }
+        )
+        ack = ws.receive_json()
+        assert ack.get("type") == "hello_ack"
+
+        # 随后补发完整系统信息。
+        ws.send_json(
+            {
+                "type": "system_info_update",
+                "system_info": {
+                    "os_name": "Windows 10 Pro",
+                    "os_version": "10.0.19045",
+                    "mem_total_kb": 16000000,
+                },
+            }
+        )
+        # 再发一条 hello_ack 无关消息确保 update 已被处理（用 ping/pong 同步）。
+        ws.send_json({"type": "ping"})
+        pong = ws.receive_json()
+        assert pong.get("type") == "pong"
+
+        manager = client.app.state.daemon_capability_manager
+        sessions = manager.list_sessions()
+        assert len(sessions) == 1
+        session = sessions[0]
+        # 合并结果应同时含 hello 的快速字段与 update 的完整字段。
+        assert session["system_info"]["hostname"] == "fast-host"
+        assert session["system_info"]["arch"] == "amd64"
+        assert session["system_info"]["os_name"] == "Windows 10 Pro"
+        assert session["system_info"]["mem_total_kb"] == 16000000
+        # 派生字段 platform 应随 os_name 刷新。
+        assert session["platform"] == "Windows 10 Pro"
+
+
+def test_system_info_update_ignored_when_not_dict(client, auth_token):
+    """system_info_update 的 system_info 非 dict 时应安全忽略，不抛异常、不污染会话。"""
+    with client.websocket_connect(
+        "/api/daemon/ws", subprotocols=_token_subprotocol(auth_token)
+    ) as ws:
+        ws.send_json(
+            {
+                "type": "hello",
+                "client_id": "daemon-badupd-1",
+                "extension_version": "0.0.1-test",
+                "system_info": {"hostname": "keep-host"},
+                "tabs": [],
+            }
+        )
+        ack = ws.receive_json()
+        assert ack.get("type") == "hello_ack"
+
+        # 非法 update：system_info 是字符串而非 dict。
+        ws.send_json({"type": "system_info_update", "system_info": "not-a-dict"})
+        # 用 ping/pong 同步，确保非法消息已被处理且连接未断。
+        ws.send_json({"type": "ping"})
+        pong = ws.receive_json()
+        assert pong.get("type") == "pong"
+
+        manager = client.app.state.daemon_capability_manager
+        sessions = manager.list_sessions()
+        assert len(sessions) == 1
+        # 会话原 system_info 未被污染。
+        assert sessions[0]["system_info"] == {"hostname": "keep-host"}

@@ -41,6 +41,14 @@ LatestVersionProvider = Callable[[], Optional[str]]
 # 会话心跳超时（秒）：超过该时长未收到任何消息则清理会话
 HEARTBEAT_TIMEOUT = 60.0
 
+# 守护进程连接后等待首帧 hello 的超时（秒）。
+#
+# 为什么是 30s（原为 10s）：Windows 上 daemon 采集完整系统信息需拉起 PowerShell
+# （冷启动数秒），旧版 daemon 会在发 hello 前同步等待采集完成，10s 上限在慢机上
+# 易被撞破，导致 daemon 被 close(4400) 后反复重连。放宽到 30s 给慢机留足余量；
+# 新版 daemon 已改为 hello 只上报「快速版」系统信息（毫秒级），此放宽仅作兜底。
+HELLO_FIRST_FRAME_TIMEOUT = 30.0
+
 # 单次能力调用默认超时（秒）
 DEFAULT_CALL_TIMEOUT = 30.0
 
@@ -359,8 +367,16 @@ class DaemonCapabilityManager:
         self._ensure_cleanup_task()
         try:
             # 首帧必须是 hello
+            #
+            # 超时放宽到 30s（原为 10s）：Windows 上 daemon 采集完整系统信息要拉起
+            # PowerShell（冷启动数秒），若 hello 首帧等待采集完成，10s 上限容易在
+            # 慢机器上被撞破，导致 daemon 被 close(4400) 后反复重连。放宽后给慢机
+            # 留足余量；新版 daemon 已把 hello 改为上报「快速版」系统信息（毫秒级），
+            # 这里的放宽只是对旧版 daemon 的兜底。
             try:
-                first = await asyncio.wait_for(websocket.receive_json(), timeout=10)
+                first = await asyncio.wait_for(
+                    websocket.receive_json(), timeout=HELLO_FIRST_FRAME_TIMEOUT
+                )
             except Exception:
                 await self._send_error(
                     websocket, "INVALID_MESSAGE", "first message must be hello"
@@ -518,6 +534,33 @@ class DaemonCapabilityManager:
                         version or "?",
                         error or "",
                     )
+                elif msg_type == "system_info_update":
+                    # 系统信息增量补发（单向）：daemon 的 hello 首帧只带「快速版」
+                    # 系统信息（毫秒级，避免握手超时），完整信息（OS 版本/内存/启动
+                    # 时间等）随后用该消息补发。这里合并进会话缓存，使
+                    # /api/daemon/sessions 能反映完整信息。**绝不回复**（daemon 不
+                    # 等待；旧网关忽略未知类型亦兼容）。
+                    update = message.get("system_info")
+                    if isinstance(update, dict) and session is not None:
+                        merged = session.get("system_info")
+                        if not isinstance(merged, dict):
+                            merged = {}
+                        merged.update(update)
+                        session["system_info"] = merged
+                        # 同步刷新便于展示的派生字段（与 hello 注册时保持一致）。
+                        hostname = str(merged.get("hostname") or "").strip()
+                        if hostname:
+                            session["hostname"] = hostname
+                        platform = str(
+                            merged.get("os_name") or merged.get("platform") or ""
+                        ).strip()
+                        if platform:
+                            session["platform"] = platform
+                        logger.info(
+                            "[DAEMON] system_info_update: session_id=%s fields=%d",
+                            session_id,
+                            len(update),
+                        )
                 elif msg_type == "ping":
                     await websocket.send_json({"type": "pong"})
                 elif msg_type == "hello":

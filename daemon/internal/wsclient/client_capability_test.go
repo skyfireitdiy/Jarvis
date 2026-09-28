@@ -70,6 +70,20 @@ func readJSONWithTimeout(t *testing.T, conn *websocket.Conn) map[string]any {
 	}
 }
 
+// readJSONSkippingSystemInfo 读取下一帧 JSON，跳过 daemon 主动补发的
+// system_info_update（握手后 daemon 会异步补发完整系统信息，可能先于测试
+// 期望的消息到达，故需要跳过）。
+func readJSONSkippingSystemInfo(t *testing.T, conn *websocket.Conn) map[string]any {
+	t.Helper()
+	for {
+		msg := readJSONWithTimeout(t, conn)
+		if msg["type"] == "system_info_update" {
+			continue
+		}
+		return msg
+	}
+}
+
 // waitForConn 等待服务端拿到连接。
 func waitForConn(t *testing.T, connCh <-chan *websocket.Conn) *websocket.Conn {
 	t.Helper()
@@ -134,7 +148,7 @@ func TestCapabilityList(t *testing.T) {
 	if err := serverConn.WriteJSON(map[string]any{"type": "capability.list"}); err != nil {
 		t.Fatalf("发送 capability.list 失败: %v", err)
 	}
-	reply := readJSONWithTimeout(t, serverConn)
+	reply := readJSONSkippingSystemInfo(t, serverConn)
 
 	if reply["type"] != "capability.list.result" {
 		t.Fatalf("期望 type=capability.list.result，实际 %v", reply["type"])
@@ -192,7 +206,7 @@ func TestCapabilityCallSuccess(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("发送 capability.call 失败: %v", err)
 	}
-	reply := readJSONWithTimeout(t, serverConn)
+	reply := readJSONSkippingSystemInfo(t, serverConn)
 
 	if reply["type"] != "capability.call.result" {
 		t.Fatalf("期望 type=capability.call.result，实际 %v", reply["type"])
@@ -243,7 +257,7 @@ func TestCapabilityCallUnknown(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("发送 capability.call 失败: %v", err)
 	}
-	reply := readJSONWithTimeout(t, serverConn)
+	reply := readJSONSkippingSystemInfo(t, serverConn)
 
 	if reply["type"] != "capability.call.result" {
 		t.Fatalf("期望 type=capability.call.result，实际 %v", reply["type"])
@@ -423,15 +437,89 @@ func TestSlowCapabilityCallDoesNotBlockList(t *testing.T) {
 		ch <- readResult{msg: m}
 	}()
 
-	select {
-	case r := <-ch:
-		if r.err != nil {
-			t.Fatalf("读取消息失败: %v", r.err)
+	// 在 1 秒内等待 capability.list.result，中途跳过 daemon 主动补发的
+	// system_info_update（异步补发，可能先到）。
+	deadline := time.After(1 * time.Second)
+	for {
+		select {
+		case r := <-ch:
+			if r.err != nil {
+				t.Fatalf("读取消息失败: %v", r.err)
+			}
+			if r.msg["type"] == "system_info_update" {
+				// 跳过，继续等目标消息。
+				ch = make(chan readResult, 1)
+				go func() {
+					_, data, err := serverConn.ReadMessage()
+					if err != nil {
+						ch <- readResult{err: err}
+						return
+					}
+					var m map[string]any
+					if err := json.Unmarshal(data, &m); err != nil {
+						ch <- readResult{err: err}
+						return
+					}
+					ch <- readResult{msg: m}
+				}()
+				continue
+			}
+			if r.msg["type"] != "capability.list.result" {
+				t.Fatalf("期望先收到 capability.list.result，实际 %v", r.msg["type"])
+			}
+			return
+		case <-deadline:
+			t.Fatal("capability.list 在 1 秒内未得到响应：耗时能力阻塞了读循环")
 		}
-		if r.msg["type"] != "capability.list.result" {
-			t.Fatalf("期望先收到 capability.list.result，实际 %v", r.msg["type"])
+	}
+}
+
+// TestHelloSystemInfoFastAndUpdate 验证 hello 首帧只带「快速版」系统信息，
+// 且在握手后异步补发 system_info_update（完整系统信息）。
+//
+// 背景：Windows 上完整系统信息采集要拉起 PowerShell（数秒），若在 hello 同步
+// 等待会撞上网关首帧超时（10s）而被 close(4400)，表现为反复重连。故 hello 只带
+// 零成本字段，完整信息随后补发。
+func TestHelloSystemInfoFastAndUpdate(t *testing.T) {
+	gateway, connCh := startCapabilityTestServer(t)
+	reg := newEchoRegistry(t)
+
+	client := New(Options{
+		Gateway:  gateway,
+		Token:    "test-token",
+		ClientID: "test-daemon",
+		Version:  "0.0.0-test",
+		Registry: reg,
+	})
+	client.Start()
+	defer client.Stop()
+
+	serverConn := waitForConn(t, connCh)
+
+	// 首帧必须是 hello，且携带 system_info（快速版）。
+	hello := readJSONWithTimeout(t, serverConn)
+	if hello["type"] != "hello" {
+		t.Fatalf("期望首帧为 hello，实际 %v", hello["type"])
+	}
+	if _, ok := hello["system_info"].(map[string]any); !ok {
+		t.Fatalf("期望 hello 携带 system_info 对象，实际 %T", hello["system_info"])
+	}
+
+	// 随后应收到 system_info_update（完整系统信息补发）。
+	// 期间可能先收到其它消息（如无），这里循环跳过非目标消息。
+	deadline := time.After(5 * time.Second)
+	for {
+		select {
+		case <-deadline:
+			t.Fatal("未在 5 秒内收到 system_info_update")
+		default:
 		}
-	case <-time.After(1 * time.Second):
-		t.Fatal("capability.list 在 1 秒内未得到响应：耗时能力阻塞了读循环")
+		msg := readJSONWithTimeout(t, serverConn)
+		if msg["type"] == "system_info_update" {
+			if _, ok := msg["system_info"].(map[string]any); !ok {
+				t.Fatalf("system_info_update 的 system_info 应为对象，实际 %T", msg["system_info"])
+			}
+			return
+		}
 	}
 }

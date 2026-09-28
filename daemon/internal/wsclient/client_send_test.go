@@ -65,7 +65,7 @@ func TestSendFrame(t *testing.T) {
 		t.Fatalf("Send 失败: %v", err)
 	}
 
-	msg := readJSONWithTimeout(t, serverConn)
+	msg := readJSONSkippingSystemInfo(t, serverConn)
 	if msg["type"] != "daemon.update.status" {
 		t.Fatalf("期望 type=daemon.update.status，实际 %v", msg["type"])
 	}

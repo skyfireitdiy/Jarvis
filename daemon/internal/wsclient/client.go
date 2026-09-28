@@ -313,13 +313,14 @@ func (c *Client) connectAndServe(ctx context.Context) error {
 	if c.opts.Name != "" {
 		hello["name"] = c.opts.Name
 	}
-	if sysInfo, err := capability.CollectSystemInfo(); err != nil {
-		log.Printf("[wsclient] 采集系统信息失败，hello 将不含 system_info: %v", err)
-	} else {
-		hello["system_info"] = sysInfo
-		log.Printf("[wsclient] hello 将上报 system_info: hostname=%v fields=%d",
-			sysInfo["hostname"], len(sysInfo))
-	}
+	// 系统信息：**必须用快速版**（CollectSystemInfoFast），只含零成本字段
+	// （hostname/arch/cpu_count/user/home 等），毫秒级返回，保证 hello 首帧
+	// 立即发出。完整版 CollectSystemInfo 在 Windows 上要拉起 PowerShell 采集
+	// OS 版本/内存/启动时间（冷启动数秒），若在此同步等待，极易撞上网关的首帧
+	// 超时（10s）而被 close(4400) 断开，表现为「连上后约 10s 才发 hello，随即
+	// 反复重连」。完整系统信息由后续的 system_info_update 消息增量补发。
+	hello["system_info"] = capability.CollectSystemInfoFast()
+	log.Printf("[wsclient] hello 将上报 system_info（快速版）")
 	// 在 hello 中直接携带能力列表。
 	//
 	// 为什么必须放在 hello 里：网关的 /api/daemon/sessions 只读取会话缓存中的
@@ -342,6 +343,17 @@ func (c *Client) connectAndServe(ctx context.Context) error {
 	if err := c.writeJSON(conn, hello); err != nil {
 		return fmt.Errorf("发送 hello 失败: %w", err)
 	}
+
+	// 完整系统信息增量补发。
+	//
+	// hello 首帧只带「快速版」系统信息（零成本字段），以保证握手不被拖慢；
+	// 完整信息（Windows 上含 OS 版本/内存/启动时间，需拉起 PowerShell）在后台
+	// 采集完成后用 system_info_update 消息补发。网关收到后合并进会话缓存，
+	// 使 /api/daemon/sessions 能反映完整信息。
+	//
+	// 注意：这里用独立 goroutine，**不阻塞读循环**；采集失败/超时则不发该消息
+	// （字段可缺，不影响会话）。旧网关忽略未知消息类型，天然兼容。
+	go c.sendFullSystemInfo(conn)
 
 	// 心跳
 	hbCtx, hbCancel := context.WithCancel(ctx)
@@ -504,6 +516,35 @@ func (c *Client) handleCommand(conn *websocket.Conn, msg map[string]any) {
 			log.Printf("[wsclient] 回结果失败: %v", err)
 		}
 	}()
+}
+
+// sendFullSystemInfo 采集完整系统信息并通过 system_info_update 消息补发。
+//
+// 为什么单独补发：hello 首帧必须尽快发出（网关对首帧有超时），而完整系统信息
+// 在 Windows 上要拉起 PowerShell（冷启动数秒）。因此 hello 只带零成本字段，
+// 完整信息由本方法在后台采集后补发，网关合并进会话缓存。
+//
+// 失败处理：采集出错则不发该消息（系统信息属可选展示字段，缺失不影响会话）。
+// 注意：采集可能耗时数秒，故在独立 goroutine 中执行，不阻塞读循环。
+func (c *Client) sendFullSystemInfo(conn *websocket.Conn) {
+	info, err := capability.CollectSystemInfo()
+	if err != nil {
+		log.Printf("[wsclient] 完整系统信息采集失败，跳过补发: %v", err)
+		return
+	}
+	if len(info) == 0 {
+		return
+	}
+	msg := map[string]any{
+		"type":        "system_info_update",
+		"system_info": info,
+	}
+	if err := c.writeJSON(conn, msg); err != nil {
+		// 连接可能已断开，属正常情况，仅记录。
+		log.Printf("[wsclient] 补发 system_info_update 失败: %v", err)
+		return
+	}
+	log.Printf("[wsclient] 已补发 system_info_update: fields=%d", len(info))
 }
 
 // heartbeatLoop 周期性发送 ping。

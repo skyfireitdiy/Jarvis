@@ -8,6 +8,19 @@ import (
 	"runtime"
 )
 
+// CollectSystemInfoFast 采集不依赖任何外部命令的「零成本」系统信息。
+//
+// macOS 的系统信息全部来自标准库，读取本就毫秒级，因此这里直接复用
+// CollectSystemInfo 的结果（字段完全一致），仅用于与 Windows 保持同一接口，
+// 供 hello 首帧调用。
+func CollectSystemInfoFast() map[string]any {
+	info, _ := CollectSystemInfo()
+	if info == nil {
+		info = map[string]any{}
+	}
+	return info
+}
+
 // CollectSystemInfo 采集 macOS 主机的基础系统信息。
 //
 // 仅使用标准库可稳定获取的字段；无法获取的字段省略而非报错，
