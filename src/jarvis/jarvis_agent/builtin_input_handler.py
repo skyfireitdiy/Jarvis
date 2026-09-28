@@ -913,6 +913,19 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             else:
                 PrettyOutput.auto_print("❌ 模型切换失败或已取消。")
             return "", True
+        elif tag == "SwitchProxyNode":
+            # 处理切换节点代理命令（仅在主 agent 中可用）
+            if not getattr(agent, "allow_savesession", False):
+                PrettyOutput.auto_print(
+                    "⚠️ SwitchProxyNode 命令仅在 jvs/jca 主程序中可用。"
+                )
+                return "", True
+
+            if switch_proxy_node(agent):
+                PrettyOutput.auto_print("✅ 节点代理切换成功。")
+            else:
+                PrettyOutput.auto_print("❌ 节点代理切换失败或已取消。")
+            return "", True
         elif tag == "SubAgent":
             # 启动子Agent执行任务，执行完毕后询问用户是否将结果反馈给当前Agent
             try:
@@ -2445,6 +2458,114 @@ def switch_model(agent: Any) -> bool:
     else:
         PrettyOutput.auto_print("❌ 切换模型失败")
         return False
+
+
+def switch_proxy_node(agent: Any) -> bool:
+    """切换节点代理的主函数。
+
+    模型平台支持通过其他节点代理访问模型：当设置了 jglobals.proxy_node 与
+    jglobals.master_url 时，各平台的 base_url 会被改写为经 Gateway 转发的代理
+    地址。原代理节点可能随时间失效，此命令允许运行中切换到其他节点。
+
+    交互方式：先列出网关已知节点，用户输入数字序号选择；留空表示不使用代理
+    （即直连）。
+
+    参数:
+        agent: Agent 实例
+
+    返回:
+        bool: 是否切换成功
+    """
+    import json
+
+    import jarvis.jarvis_utils.globals as jglobals
+
+    # 代理依赖 master_url 拼接转发地址，未设置时无法使用
+    if not jglobals.master_url:
+        PrettyOutput.auto_print(
+            "❌ 未设置 master_url，无法使用节点代理。\n"
+            "   请以 --master-url 启动或设置 JARVIS_MASTER_URL 环境变量。"
+        )
+        return False
+
+    current_node = jglobals.proxy_node or "(未使用代理)"
+    PrettyOutput.auto_print(f"📌 当前节点代理: {current_node}")
+
+    # 获取网关节点列表（失败时降级为手工输入节点 ID）
+    node_ids: List[str] = []
+    try:
+        from jarvis.jarvis_tools.gateway_manager import GatewayManagerTool
+
+        if GatewayManagerTool.check():
+            result = GatewayManagerTool()._list_nodes()
+            if result.get("success"):
+                nodes = json.loads(result.get("stdout", "{}")).get("nodes", [])
+                for node in nodes:
+                    if isinstance(node, dict) and node.get("node_id"):
+                        node_ids.append(str(node["node_id"]))
+            else:
+                PrettyOutput.auto_print(
+                    f"⚠️ 获取节点列表失败: {result.get('stderr', '未知错误')}"
+                )
+        else:
+            PrettyOutput.auto_print("⚠️ Web Gateway 未连接，将使用手工输入节点 ID 模式")
+    except Exception as e:
+        PrettyOutput.auto_print(f"⚠️ 获取节点列表异常: {e}")
+
+    if node_ids:
+        # 展示节点列表（markdown 表格兼容终端与前端）
+        rows = [[str(idx), node_id] for idx, node_id in enumerate(node_ids, 1)]
+        _print_markdown_table("📋 可用节点", ["编号", "节点 ID"], rows)
+        prompt = (
+            "请输入要使用的节点代理序号（留空表示不使用代理，输入节点 ID 直接指定）: "
+        )
+    else:
+        prompt = "请输入要使用的节点代理节点 ID（留空表示不使用代理）: "
+
+    user_input = get_single_line_input(prompt)
+    if user_input is None:
+        PrettyOutput.auto_print("🚫 已取消切换")
+        return False
+
+    user_input = user_input.strip()
+
+    # 留空：不使用代理
+    if not user_input:
+        if jglobals.proxy_node is None:
+            PrettyOutput.auto_print("⚠️ 当前已未使用代理")
+            return False
+        jglobals.proxy_node = None
+        PrettyOutput.auto_print("🔄 已关闭节点代理，正在重建模型...")
+        if switch_platform_type(agent, get_platform_type_from_agent(agent)):
+            PrettyOutput.auto_print("✅ 已切换为直连（不使用代理）")
+            return True
+        PrettyOutput.auto_print("❌ 重建模型失败，代理设置已更新但可能未生效")
+        return False
+
+    # 解析输入：数字序号优先，否则视为节点 ID
+    new_node = ""
+    if user_input.isdigit() and node_ids:
+        idx = int(user_input)
+        if 1 <= idx <= len(node_ids):
+            new_node = node_ids[idx - 1]
+        else:
+            PrettyOutput.auto_print(f"❌ 序号超出范围（1-{len(node_ids)}）")
+            return False
+    else:
+        new_node = user_input
+
+    if new_node == jglobals.proxy_node:
+        PrettyOutput.auto_print("⚠️ 当前已使用该节点代理")
+        return False
+
+    # 更新代理节点并重建模型使新代理立即生效
+    jglobals.proxy_node = new_node
+    PrettyOutput.auto_print(f"🔄 正在切换到节点代理 '{new_node}'...")
+    if switch_platform_type(agent, get_platform_type_from_agent(agent)):
+        PrettyOutput.auto_print(f"✅ 已成功切换到节点代理 '{new_node}'")
+        return True
+    PrettyOutput.auto_print("❌ 重建模型失败，代理设置已更新但可能未生效")
+    return False
 
 
 def _safe_parse_value(value_str: str):

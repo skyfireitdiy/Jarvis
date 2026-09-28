@@ -184,6 +184,7 @@ BUILTIN_COMMANDS = [
     ("FixToolCall", "修复工具调用"),
     ("SwitchModelGroup", "切换模型组"),
     ("SwitchModel", "切换模型"),
+    ("SwitchProxyNode", "切换节点代理"),
     ("AddDir", "添加附加补全目录"),
     ("Btw", "临时聊天"),
     ("PrintConfig", "打印全局配置"),
