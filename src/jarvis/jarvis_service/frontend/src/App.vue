@@ -17615,11 +17615,11 @@ function handleGlobalKeydown(event) {
   }
 
   // Ctrl/Cmd + \ 左右分割当前激活 pane；Ctrl/Cmd + Shift + \ 上下分割
-  // 仅在编辑器已打开（file 视图）且非移动端时生效；未分割时先分割激活 pane。
+  // 只要工作区打开（不再限定编辑器 file 视图）且非移动端即生效；未分割时先分割激活 pane。
   if (isModifierPressed && !event.altKey && event.code === 'Backslash') {
     // Ctrl+Shift+\ 与 Monaco 的「跳转到匹配括号」冲突：编辑器聚焦时让位给编辑器
     if (event.shiftKey && isMonacoEditorFocused()) return
-    if (workspaceMainView.value === 'file' && windowWidth.value > 768) {
+    if (showWorkspacePanel.value && windowWidth.value > 768) {
       event.preventDefault()
       splitWorkspacePane(activePaneId.value, event.shiftKey ? 'column' : 'row')
       return
