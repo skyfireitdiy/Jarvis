@@ -8284,6 +8284,119 @@ def create_app(
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
+    async def _handle_file_upload_raw_request(
+        payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """把 base64 编码的文件内容按原文件名写入指定绝对路径（二进制安全）。
+
+        与 /upload 的区别：不做 uuid 重命名、不限 uploads 目录，直接写入调用方
+        给出的绝对路径，供前端目录树「上传」使用。
+        """
+        import base64
+
+        try:
+            file_path = str(payload.get("path", "")).strip()
+            if not file_path:
+                return {
+                    "success": False,
+                    "error": {"code": "INVALID_PATH", "message": "Path is required"},
+                }
+
+            target_path = pathlib.Path(file_path)
+            if not target_path.is_absolute():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_PATH",
+                        "message": "Path must be absolute",
+                    },
+                }
+
+            raw_data = payload.get("data")
+            if not isinstance(raw_data, str) or not raw_data:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_DATA",
+                        "message": "Data must be a non-empty base64 string",
+                    },
+                }
+
+            # 兼容 dataURL 前缀（data:...;base64,xxxx）
+            if "," in raw_data and raw_data.strip().lower().startswith("data:"):
+                raw_data = raw_data.split(",", 1)[1]
+
+            try:
+                file_bytes = base64.b64decode(raw_data, validate=True)
+            except Exception:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_DATA",
+                        "message": "Data is not valid base64",
+                    },
+                }
+
+            if len(file_bytes) > MAX_FILE_SIZE_BYTES:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "FILE_TOO_LARGE",
+                        "message": "File size exceeds 10MB limit",
+                    },
+                }
+
+            target_path = target_path.resolve(strict=False)
+            overwrite = bool(payload.get("overwrite", True))
+            if not overwrite and target_path.exists():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "ALREADY_EXISTS",
+                        "message": f"Path already exists: {target_path}",
+                    },
+                }
+
+            parent_directory = target_path.parent
+            if not parent_directory.exists():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "PARENT_DIRECTORY_NOT_FOUND",
+                        "message": f"Parent directory does not exist: {parent_directory}",
+                    },
+                }
+
+            if not parent_directory.is_dir():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "PARENT_NOT_A_DIRECTORY",
+                        "message": f"Parent path is not a directory: {parent_directory}",
+                    },
+                }
+
+            with open(target_path, "wb") as file:
+                file.write(file_bytes)
+
+            return {
+                "success": True,
+                "data": {
+                    "path": str(target_path),
+                    "bytes_written": len(file_bytes),
+                },
+            }
+        except PermissionError:
+            return {
+                "success": False,
+                "error": {"code": "PERMISSION_DENIED", "message": "Permission denied"},
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
     async def _handle_file_create_request(payload: Dict[str, Any]) -> Dict[str, Any]:
         try:
             file_path = str(payload.get("path", "")).strip()
@@ -9244,6 +9357,8 @@ def create_app(
             result = await _handle_file_stat_request(payload)
         elif normalized_method == "POST" and normalized_path == "/file-write":
             result = await _handle_file_write_request(payload)
+        elif normalized_method == "POST" and normalized_path == "/file-upload":
+            result = await _handle_file_upload_raw_request(payload)
         elif normalized_method == "POST" and normalized_path == "/file-create":
             result = await _handle_file_create_request(payload)
         elif normalized_method == "POST" and normalized_path == "/file-delete":
@@ -9551,6 +9666,11 @@ def create_app(
     async def write_file_content(request: Dict[str, Any]) -> Dict[str, Any]:
         """写入指定绝对路径文本文件的内容。"""
         return await _handle_file_write_request(request)
+
+    @app.post("/api/file-upload", dependencies=[Depends(verify_token)])
+    async def upload_file_raw(request: Dict[str, Any]) -> Dict[str, Any]:
+        """把 base64 编码的文件内容按原文件名写入指定绝对路径。"""
+        return await _handle_file_upload_raw_request(request)
 
     @app.post("/api/file-create", dependencies=[Depends(verify_token)])
     async def create_file_or_directory(request: Dict[str, Any]) -> Dict[str, Any]:

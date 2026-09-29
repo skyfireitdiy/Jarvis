@@ -4,10 +4,13 @@
 # 背景：历史上曾有 .jarvis/memory 中的真实 API token 被提交并推送到公开仓库。
 # 本 hook 在每次 git commit 前检查本次暂存的改动，发现疑似真实凭据即中止提交。
 #
-# 扫描器优先级：
-#   1. Gitleaks（推荐，规则更全）：若已安装，用 `gitleaks git --staged` 扫暂存区。
+# 扫描器（两者依次执行，任一命中即中止提交，互为补充）：
+#   1. Gitleaks（若已安装）：规则覆盖广（AWS/GitHub/私钥/高熵 token 等）。
 #      未安装时提示运行 scripts/install-gitleaks.sh 安装。
-#   2. 自研轻量扫描器（零依赖兜底）：.githooks/scan_staged_secrets.py。
+#   2. 自研轻量扫描器（零依赖）：补充 Gitleaks 默认规则未覆盖的「通用赋值型
+#      口令」场景（如 db_password = "..." / DB_PASSWORD="..."）。
+#   注意：两者是「与」关系而非「或」——装了 Gitleaks 后仍必须跑自研扫描器，
+#   否则通用明文口令会漏检（Gitleaks 默认规则不匹配 password 赋值）。
 #
 # 启用方式（每个克隆需执行一次）：
 #   git config core.hooksPath .githooks
@@ -26,25 +29,23 @@ fi
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
+# 先跑 Gitleaks（若已安装），再跑自研扫描器；两者任一命中即中止提交。
 GITLEAKS_BIN="$(command -v gitleaks || true)"
 if [ -z "$GITLEAKS_BIN" ]; then
-    # 未安装 gitleaks：降级到自研扫描器（零依赖，规则较少但能覆盖常见密钥）
-    echo "[pre-commit] 未检测到 gitleaks，使用自研轻量扫描器。" >&2
+    echo "[pre-commit] 未检测到 gitleaks，仅使用自研轻量扫描器。" >&2
     echo "[pre-commit] 建议安装 Gitleaks 以获得更全面的检测：bash scripts/install-gitleaks.sh" >&2
-    exec python3 "$REPO_ROOT/.githooks/scan_staged_secrets.py"
-fi
+else
+    # 使用 gitleaks 扫描暂存区。
+    # 注意：gitleaks git 子命令即使发现泄漏也返回 0，但配合 --report-path 时，
+    # 有泄漏返回 1、无泄漏返回 0（已实测验证），故可直接用退出码判断。
+    TMP_REPORT="$(mktemp)"
+    trap 'rm -f "$TMP_REPORT"' EXIT
 
-# 使用 gitleaks 扫描暂存区。
-# 注意：gitleaks git 子命令即使发现泄漏也返回 0，但配合 --report-path 时，
-# 有泄漏返回 1、无泄漏返回 0（已实测验证），故可直接用退出码判断。
-TMP_REPORT="$(mktemp)"
-trap 'rm -f "$TMP_REPORT"' EXIT
-
-if ! "$GITLEAKS_BIN" git --no-banner --staged --redact=20 \
-        --report-format json --report-path "$TMP_REPORT" . >/dev/null 2>&1; then
-    echo "[pre-commit] Gitleaks 检测到疑似真实凭据，已中止提交。" >&2
-    echo "[pre-commit] 详细报告（已脱敏）：" >&2
-    python3 - "$TMP_REPORT" <<'PYEOF'
+    if ! "$GITLEAKS_BIN" git --no-banner --staged --redact=20 \
+            --report-format json --report-path "$TMP_REPORT" . >/dev/null 2>&1; then
+        echo "[pre-commit] Gitleaks 检测到疑似真实凭据，已中止提交。" >&2
+        echo "[pre-commit] 详细报告（已脱敏）：" >&2
+        python3 - "$TMP_REPORT" <<'PYEOF'
 import json, sys
 try:
     findings = json.load(open(sys.argv[1]))
@@ -53,8 +54,11 @@ except Exception:
 for f in findings:
     print(f"  - {f.get('File','?')}:{f.get('StartLine','?')} 规则={f.get('RuleID','?')} 内容={f.get('Secret','')[:25]}")
 PYEOF
-    echo "[pre-commit] 请移除或修正上述疑似凭据后重试；如确为误报，请更新 .gitleaks.toml 白名单。" >&2
-    exit 1
+        echo "[pre-commit] 请移除或修正上述疑似凭据后重试；如确为误报，请更新 .gitleaks.toml 白名单。" >&2
+        exit 1
+    fi
 fi
 
-exit 0
+# 自研扫描器始终执行：补充 Gitleaks 默认规则未覆盖的通用赋值型口令
+# （如 db_password = "..." / DB_PASSWORD="..."）。命中时其自身以退出码 1 中止提交。
+exec python3 "$REPO_ROOT/.githooks/scan_staged_secrets.py"

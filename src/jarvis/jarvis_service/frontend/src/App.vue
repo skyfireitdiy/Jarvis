@@ -165,8 +165,12 @@
                   <div v-if="expandedAgents.has(agent.agent_id)" class="agent-file-tree">
                     <div
                       class="workspace-file-tree-root"
+                      :class="{ 'drag-drop-target': fileTreeDropTargetPath === String(agent.working_dir || '').replace(/\/+$/, '') }"
                       @click.stop="ensureWorkspaceSidebarFileTree(agent)"
                       @contextmenu.prevent.stop="openFileTreeContextMenu(agent, null, $event)"
+                      @dragover="handleFileTreeDragOver($event, agent.working_dir)"
+                      @dragleave="handleFileTreeDragLeave(agent.working_dir)"
+                      @drop="handleFileTreeDrop($event, agent.agent_id, agent.working_dir)"
                     >
                       {{ getWorkingDirDisplay(agent.working_dir) }}
                     </div>
@@ -182,10 +186,19 @@
                       >
                         <div
                           class="tree-node-content"
-                          :class="{ 'keyboard-selected': fileTreeSelectedAgentId === agent.agent_id && fileTreeSelectedPath === visibleNode.node.path }"
+                          :class="{
+                            'keyboard-selected': fileTreeSelectedAgentId === agent.agent_id && fileTreeSelectedPath === visibleNode.node.path,
+                            'drag-drop-target': visibleNode.node.type === 'directory' && fileTreeDropTargetPath === String(visibleNode.node.path).replace(/\/+$/, '')
+                          }"
                           :style="{ paddingLeft: `${8 + visibleNode.depth * 20}px` }"
+                          draggable="true"
                           @click.stop="selectFileTreeNode(agent.agent_id, visibleNode.node); handleFileTreeNodeClick(agent.agent_id, visibleNode.node)"
                           @contextmenu.prevent.stop="openFileTreeContextMenu(agent, visibleNode.node, $event)"
+                          @dragstart="handleFileTreeDragStart($event, agent.agent_id, visibleNode.node)"
+                          @dragend="handleFileTreeDragEnd"
+                          @dragover="visibleNode.node.type === 'directory' && handleFileTreeDragOver($event, visibleNode.node.path)"
+                          @dragleave="visibleNode.node.type === 'directory' && handleFileTreeDragLeave(visibleNode.node.path)"
+                          @drop="visibleNode.node.type === 'directory' && handleFileTreeDrop($event, agent.agent_id, visibleNode.node.path)"
                         >
                           <span
                             v-if="visibleNode.node.type === 'directory'"
@@ -227,7 +240,12 @@
                     >✕</button>
                   </div>
                   <div v-if="expandedAgents.has(session.agent_id)" class="agent-file-tree">
-                    <div class="workspace-file-tree-root" @click.stop="ensureWorkspaceSidebarFileTree(session.agent)" @contextmenu.prevent.stop="openFileTreeContextMenu(session.agent, null, $event)">
+                    <div class="workspace-file-tree-root"
+                      :class="{ 'drag-drop-target': fileTreeDropTargetPath === String(session.agent.working_dir || '').replace(/\/+$/, '') }"
+                      @click.stop="ensureWorkspaceSidebarFileTree(session.agent)" @contextmenu.prevent.stop="openFileTreeContextMenu(session.agent, null, $event)"
+                      @dragover="handleFileTreeDragOver($event, session.agent.working_dir)"
+                      @dragleave="handleFileTreeDragLeave(session.agent.working_dir)"
+                      @drop="handleFileTreeDrop($event, session.agent_id, session.agent.working_dir)">
                       {{ getWorkingDirDisplay(session.agent.working_dir) }}
                     </div>
                     <div v-if="!(fileTreeState.get(session.agent_id)?.length > 0)" class="workspace-file-tree-empty">
@@ -242,10 +260,19 @@
                       >
                         <div
                           class="tree-node-content"
-                          :class="{ 'keyboard-selected': fileTreeSelectedAgentId === session.agent_id && fileTreeSelectedPath === visibleNode.node.path }"
+                          :class="{
+                            'keyboard-selected': fileTreeSelectedAgentId === session.agent_id && fileTreeSelectedPath === visibleNode.node.path,
+                            'drag-drop-target': visibleNode.node.type === 'directory' && fileTreeDropTargetPath === String(visibleNode.node.path).replace(/\/+$/, '')
+                          }"
                           :style="{ paddingLeft: `${8 + visibleNode.depth * 20}px` }"
+                          draggable="true"
                           @click.stop="selectFileTreeNode(session.agent_id, visibleNode.node); handleFileTreeNodeClick(session.agent_id, visibleNode.node)"
                           @contextmenu.prevent.stop="openFileTreeContextMenu(session.agent, visibleNode.node, $event)"
+                          @dragstart="handleFileTreeDragStart($event, session.agent_id, visibleNode.node)"
+                          @dragend="handleFileTreeDragEnd"
+                          @dragover="visibleNode.node.type === 'directory' && handleFileTreeDragOver($event, visibleNode.node.path)"
+                          @dragleave="visibleNode.node.type === 'directory' && handleFileTreeDragLeave(visibleNode.node.path)"
+                          @drop="visibleNode.node.type === 'directory' && handleFileTreeDrop($event, session.agent_id, visibleNode.node.path)"
                         >
                           <span
                             v-if="visibleNode.node.type === 'directory'"
@@ -300,8 +327,12 @@
                         <div v-if="expandedAgents.has(agent.agent_id)" class="agent-file-tree">
                           <div
                             class="workspace-file-tree-root"
+                            :class="{ 'drag-drop-target': fileTreeDropTargetPath === String(agent.working_dir || '').replace(/\/+$/, '') }"
                             @click.stop="ensureWorkspaceSidebarFileTree(agent)"
                             @contextmenu.prevent.stop="openFileTreeContextMenu(agent, null, $event)"
+                            @dragover="handleFileTreeDragOver($event, agent.working_dir)"
+                            @dragleave="handleFileTreeDragLeave(agent.working_dir)"
+                            @drop="handleFileTreeDrop($event, agent.agent_id, agent.working_dir)"
                           >
                             {{ getWorkingDirDisplay(agent.working_dir) }}
                           </div>
@@ -317,10 +348,19 @@
                             >
                               <div
                                 class="tree-node-content"
-                                :class="{ 'keyboard-selected': fileTreeSelectedAgentId === agent.agent_id && fileTreeSelectedPath === visibleNode.node.path }"
+                                :class="{
+                                  'keyboard-selected': fileTreeSelectedAgentId === agent.agent_id && fileTreeSelectedPath === visibleNode.node.path,
+                                  'drag-drop-target': visibleNode.node.type === 'directory' && fileTreeDropTargetPath === String(visibleNode.node.path).replace(/\/+$/, '')
+                                }"
                                 :style="{ paddingLeft: `${8 + visibleNode.depth * 20}px` }"
+                                draggable="true"
                                 @click.stop="selectFileTreeNode(agent.agent_id, visibleNode.node); handleFileTreeNodeClick(agent.agent_id, visibleNode.node)"
                                 @contextmenu.prevent.stop="openFileTreeContextMenu(agent, visibleNode.node, $event)"
+                                @dragstart="handleFileTreeDragStart($event, agent.agent_id, visibleNode.node)"
+                                @dragend="handleFileTreeDragEnd"
+                                @dragover="visibleNode.node.type === 'directory' && handleFileTreeDragOver($event, visibleNode.node.path)"
+                                @dragleave="visibleNode.node.type === 'directory' && handleFileTreeDragLeave(visibleNode.node.path)"
+                                @drop="visibleNode.node.type === 'directory' && handleFileTreeDrop($event, agent.agent_id, visibleNode.node.path)"
                               >
                                 <span
                                   v-if="visibleNode.node.type === 'directory'"
@@ -1436,6 +1476,15 @@
         <span class="file-tree-context-label">{{ act.label }}</span>
       </button>
     </div>
+
+    <!-- 目录树「上传」用的隐藏文件选择框 -->
+    <input
+      ref="fileTreeUploadInput"
+      type="file"
+      multiple
+      style="display: none"
+      @change="onFileTreeUploadInputChange"
+    >
 
     <!-- 编辑器标签栏右键菜单：关闭右侧所有 / 关闭所有 / 仅保留当前 -->
     <div
@@ -6375,6 +6424,10 @@ const fileTreeContextMenu = ref({ visible: false, x: 0, y: 0, agentId: '', node:
 // 目录树应用内剪贴板：{ mode: 'copy'|'cut', agentId, path, name, kind, content?, children? }
 const fileTreeClipboard = ref(null)
 
+// 目录树「上传」：隐藏 file input 与其上下文（记录目标 Agent 与目录）
+const fileTreeUploadInput = ref(null)
+const fileTreeUploadContext = ref({ agentId: '', dirPath: '' })
+
 // 通用输入弹窗状态（如新建文件/文件夹命名）
 const inputPrompt = ref({
   visible: false,
@@ -6468,7 +6521,7 @@ async function copyTextToClipboard(text) {
 function openFileTreeContextMenu(agent, node, event) {
   if (!agent || !event) return
   const MENU_W = 220
-  const MENU_H = 360
+  const MENU_H = 420
   let x = event.clientX
   let y = event.clientY
   if (x + MENU_W > window.innerWidth) x = Math.max(window.innerWidth - MENU_W, 0)
@@ -6496,11 +6549,15 @@ const fileTreeContextActions = computed(() => {
     && (!fileTreeClipboard.value.nodeId || !menuNodeId || fileTreeClipboard.value.nodeId === menuNodeId)
   // 「移除」仅对「打开目录」产生的虚拟目录会话可用（真实 Agent 不在此处移除）
   const isVirtualDir = resolveFileTreeAgent(fileTreeContextMenu.value.agentId)?.virtual === true
+  // 「下载」仅对文件节点可用（目录/根不支持）
+  const isFileNode = fileTreeContextMenu.value.node?.type === 'file'
   return [
     { id: 'new-file', label: '新建文件', icon: '📄', enabled: hasAgent },
     { id: 'new-folder', label: '新建文件夹', icon: '📁', enabled: hasAgent },
     { id: 'find-in-folder', label: '在当前目录下查找', icon: '🔍', enabled: hasAgent },
     { id: 'refresh', label: '刷新', icon: '🔄', enabled: hasAgent },
+    { id: 'upload', label: '上传', icon: '⬆️', enabled: hasAgent },
+    { id: 'download', label: '下载', icon: '⬇️', enabled: isFileNode },
     { id: 'copy', label: '复制', icon: '📑', enabled: hasNode },
     { id: 'cut', label: '剪切', icon: '✂️', enabled: hasNode },
     { id: 'paste', label: '粘贴', icon: '📥', enabled: canPaste },
@@ -6574,6 +6631,24 @@ async function runFileTreeContextAction(action) {
 
   if (action.id === 'refresh') {
     await refreshFileTreeDir(agent.agent_id, menu.node)
+    return
+  }
+
+  if (action.id === 'upload') {
+    // 上传目标目录：目录节点用自身路径，文件节点/根回退到工作目录
+    const dirPath = getFileTreeContextDirPath() || agent.working_dir
+    if (!dirPath) {
+      showToast('无法确定上传目录', 'error')
+      return
+    }
+    uploadFileToDir(agent.agent_id, dirPath)
+    return
+  }
+
+  if (action.id === 'download') {
+    const targetPath = getFileTreeContextTargetPath()
+    if (!targetPath) return
+    await downloadFileFromNode(agent.agent_id, targetPath)
     return
   }
 
@@ -6665,6 +6740,103 @@ async function runFileTreeContextAction(action) {
       () => {},
       false
     )
+  }
+}
+
+// 触发隐藏 file input，选择要上传到指定目录的本地文件
+function uploadFileToDir(agentId, dirPath) {
+  fileTreeUploadContext.value = { agentId, dirPath }
+  const input = fileTreeUploadInput.value
+  if (!input) return
+  // 重置 value，允许重复选择同一个文件
+  input.value = ''
+  input.click()
+}
+
+// 读取本地文件为 dataURL（后端 /file-upload 支持 dataURL 前缀，二进制安全）
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(reader.error || new Error('读取文件失败'))
+    reader.readAsDataURL(file)
+  })
+}
+
+// 隐藏 file input 变更：逐个上传到目标目录（保留原文件名），完成后刷新目录树
+async function onFileTreeUploadInputChange(event) {
+  const input = event?.target
+  const files = Array.from(input?.files || [])
+  const { agentId, dirPath } = fileTreeUploadContext.value
+  if (input) input.value = ''
+  if (!files.length || !agentId || !dirPath) return
+  const agent = resolveFileTreeAgent(agentId)
+  if (!agent || !agent.node_id) {
+    showToast('找不到目标 Agent 节点', 'error')
+    return
+  }
+  const { host, port } = getGatewayAddress()
+  const targetNodeId = String(agent.node_id).trim()
+  const baseDir = String(dirPath).replace(/\/+$/, '')
+  let okCount = 0
+  const errors = []
+  for (const file of files) {
+    try {
+      const data = await readFileAsDataUrl(file)
+      const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, 'file-upload'), {
+        method: 'POST',
+        body: JSON.stringify({ path: `${baseDir}/${file.name}`, data, node_id: targetNodeId })
+      })
+      const result = await response.json()
+      if (!response.ok || !result.success) {
+        throw new Error(result.error?.message || '上传失败')
+      }
+      okCount += 1
+    } catch (error) {
+      errors.push(`${file.name}: ${error.message || '上传失败'}`)
+    }
+  }
+  await refreshFileTreeDir(agentId, getFileTreeContextDirNode())
+  if (errors.length === 0) {
+    showToast(`已上传 ${okCount} 个文件`, 'success')
+  } else if (okCount > 0) {
+    showToast(`已上传 ${okCount} 个文件，${errors.length} 个失败：${errors[0]}`, 'error')
+  } else {
+    showToast(errors[0] || '上传失败', 'error')
+  }
+}
+
+// 下载节点上的文件到本地浏览器（走 /file-content，仅支持文本 ≤10MB）
+async function downloadFileFromNode(agentId, filePath) {
+  const agent = resolveFileTreeAgent(agentId)
+  if (!agent || !agent.node_id) {
+    showToast('找不到目标 Agent 节点', 'error')
+    return
+  }
+  const { host, port } = getGatewayAddress()
+  const targetNodeId = String(agent.node_id).trim()
+  try {
+    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, 'file-content'), {
+      method: 'POST',
+      body: JSON.stringify({ path: filePath, node_id: targetNodeId })
+    })
+    const result = await response.json()
+    if (!response.ok || !result.success || !result.data) {
+      throw new Error(result.error?.message || '下载失败')
+    }
+    const content = result.data.content || ''
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+    const objectUrl = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = objectUrl
+    link.download = String(filePath).split('/').filter(Boolean).pop() || 'download.txt'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(objectUrl)
+    showToast('已开始下载', 'success')
+  } catch (error) {
+    showToast(error.message || '下载失败', 'error')
   }
 }
 
@@ -6869,6 +7041,139 @@ async function pasteFileTreeClipboard(agentId, destDir) {
   } catch (error) {
     showToast(error.message || '粘贴失败', 'error')
   }
+}
+
+// ===== 目录树拖放（HTML5 DnD）：普通拖放=移动，按住 Ctrl/⌘=复制 =====
+// 硬约束：只允许在同一个目录树内操作（同一 node_id），跨 Agent/跨节点一律拒绝。
+// 拖放状态：{ agentId, nodeId, path, name, kind }，仅存活于一次拖拽过程。
+const fileTreeDragState = ref(null)
+// 当前高亮的放置目标目录路径（用于视觉反馈）
+const fileTreeDropTargetPath = ref('')
+
+// 拖拽开始：记录源节点信息（不做任何后端读取，避免拖拽卡顿）
+function handleFileTreeDragStart(event, agentId, node) {
+  if (!node || !node.path) return
+  const sourceNodeId = String(resolveFileTreeAgent(agentId)?.node_id || '').trim()
+  fileTreeDragState.value = {
+    agentId,
+    nodeId: sourceNodeId,
+    path: node.path,
+    name: node.name,
+    kind: node.type === 'directory' ? 'directory' : 'file',
+  }
+  fileTreeDropTargetPath.value = ''
+  if (event.dataTransfer) {
+    // 部分浏览器要求设置数据才会触发 drop
+    event.dataTransfer.effectAllowed = 'copyMove'
+    try { event.dataTransfer.setData('text/plain', node.path) } catch (e) { /* 忽略 */ }
+  }
+}
+
+// 拖拽结束：清理状态与高亮
+function handleFileTreeDragEnd() {
+  fileTreeDragState.value = null
+  fileTreeDropTargetPath.value = ''
+}
+
+// 放置目标是否为合法目录：同节点、非源自身、非源目录的子孙、且不是源所在目录本身
+function isValidFileTreeDropTarget(targetDirPath) {
+  const drag = fileTreeDragState.value
+  if (!drag || !targetDirPath) return false
+  const normalizedTarget = String(targetDirPath).replace(/\/+$/, '')
+  const normalizedSource = String(drag.path).replace(/\/+$/, '')
+  // 不能放到自身（目录拖到自己上）
+  if (normalizedTarget === normalizedSource) return false
+  // 不能放到源所在目录（原地无变化）
+  const sourceParent = normalizedSource.split('/').slice(0, -1).join('/') || '/'
+  if (normalizedTarget === sourceParent) return false
+  // 目录不能拖进自己的子孙目录（会导致自嵌套）
+  if (drag.kind === 'directory' && normalizedTarget.startsWith(normalizedSource + '/')) return false
+  return true
+}
+
+// 拖到目录节点/根节点上方：高亮（仅合法目标）
+function handleFileTreeDragOver(event, dirPath) {
+  const drag = fileTreeDragState.value
+  if (!drag) return
+  // 跨节点直接拒绝（不显示可放置反馈）
+  const targetNodeId = String(resolveFileTreeAgent(drag.agentId)?.node_id || '').trim()
+  if (drag.nodeId && targetNodeId && drag.nodeId !== targetNodeId) return
+  if (!isValidFileTreeDropTarget(dirPath)) return
+  event.preventDefault()
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = (event.ctrlKey || event.metaKey) ? 'copy' : 'move'
+  }
+  fileTreeDropTargetPath.value = String(dirPath).replace(/\/+$/, '')
+}
+
+// 离开放置目标：清除高亮（仅当离开的正是当前高亮目标）
+function handleFileTreeDragLeave(dirPath) {
+  const normalized = String(dirPath || '').replace(/\/+$/, '')
+  if (fileTreeDropTargetPath.value === normalized) fileTreeDropTargetPath.value = ''
+}
+
+// 放置：按住 Ctrl/⌘ 为复制，否则为移动；同目录树内操作
+async function handleFileTreeDrop(event, agentId, destDir) {
+  event.preventDefault()
+  const drag = fileTreeDragState.value
+  fileTreeDropTargetPath.value = ''
+  if (!drag) return
+  // 硬约束：仅同一目录树（同 node_id）内允许
+  const targetNodeId = String(resolveFileTreeAgent(agentId)?.node_id || '').trim()
+  if (drag.nodeId && targetNodeId && drag.nodeId !== targetNodeId) {
+    showToast('仅支持在同一目录树内拖放', 'error')
+    fileTreeDragState.value = null
+    return
+  }
+  if (!isValidFileTreeDropTarget(destDir)) {
+    fileTreeDragState.value = null
+    return
+  }
+  const normalizedDest = String(destDir).replace(/\/+$/, '')
+  const isCopy = event.ctrlKey || event.metaKey
+  fileTreeDragState.value = null
+  try {
+    if (isCopy) {
+      // 复制：读取源内容（目录递归）→ 以不冲突的名称写入目标目录
+      const snapshot = drag.kind === 'directory'
+        ? { kind: 'directory', children: await collectDirectorySnapshot(agentId, drag.path) }
+        : { kind: 'file', content: await fetchFileContent(drag.path, agentId) }
+      const finalName = await resolvePasteName(agentId, normalizedDest, drag.name)
+      await writeClipboardNode(agentId, normalizedDest, { ...snapshot, name: finalName })
+      showToast('已复制', 'success')
+    } else {
+      // 移动：复用 file-rename（不覆盖已存在路径）
+      const targetPath = `${normalizedDest}/${drag.name}`
+      await renameFileOrDirectory(agentId, drag.path, targetPath)
+      showToast('已移动', 'success')
+    }
+    // 刷新目标目录；移动时源目录也需刷新
+    await refreshFileTreeDir(agentId, resolveFileTreeDirNodeByPath(agentId, normalizedDest))
+    if (!isCopy) {
+      const sourceParent = String(drag.path).replace(/\/+$/, '').split('/').slice(0, -1).join('/') || '/'
+      if (sourceParent !== normalizedDest) {
+        await refreshFileTreeDir(agentId, resolveFileTreeDirNodeByPath(agentId, sourceParent))
+      }
+    }
+  } catch (error) {
+    showToast(error.message || (isCopy ? '复制失败' : '移动失败'), 'error')
+  }
+}
+
+// 由绝对路径找到对应的已加载目录树节点（找不到返回 null，表示刷新工作目录根）
+function resolveFileTreeDirNodeByPath(agentId, dirPath) {
+  const agent = resolveFileTreeAgent(agentId)
+  const workingDir = String(agent?.working_dir || '').replace(/\/+$/, '')
+  const normalized = String(dirPath || '').replace(/\/+$/, '')
+  if (!workingDir || !normalized || normalized === workingDir) return null
+  const nodes = fileTreeState.value.get(agentId) || []
+  const stack = [...nodes]
+  while (stack.length) {
+    const node = stack.pop()
+    if (node.type === 'directory' && String(node.path).replace(/\/+$/, '') === normalized) return node
+    if (Array.isArray(node.children) && node.children.length) stack.push(...node.children)
+  }
+  return null
 }
 
 // 写入文件内容（粘贴用，覆盖目标路径）
@@ -20864,6 +21169,18 @@ body::-webkit-scrollbar {
   background: var(--color-bg-active, rgba(64, 128, 255, 0.18));
   outline: 1px solid var(--color-accent, rgba(64, 128, 255, 0.6));
   outline-offset: -1px;
+}
+
+/* 目录树拖放：合法放置目标高亮（拖到目录节点/工作目录根时显示） */
+.tree-node-content.drag-drop-target,
+.workspace-file-tree-root.drag-drop-target {
+  background: var(--color-bg-active, rgba(64, 128, 255, 0.18));
+  outline: 1px solid var(--color-accent, rgba(64, 128, 255, 0.8));
+  outline-offset: -1px;
+}
+/* 拖拽中的源节点弱化，提示正在被拖动 */
+.tree-node-content[draggable="true"]:active {
+  opacity: 0.6;
 }
 
 /* 目录树列表容器可聚焦以接收键盘事件，但不显示默认描边 */

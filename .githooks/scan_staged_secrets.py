@@ -35,14 +35,21 @@ SECRET_PATTERNS: List[Tuple[str, re.Pattern]] = [
     # Google API key
     ("Google API key", re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b")),
     # 私钥块
-    ("私钥文件内容", re.compile(r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----")),
+    (
+        "私钥文件内容",
+        re.compile(r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----"),
+    ),
     # 通用「赋值型」密钥：key/secret/token/password = 长随机串
+    # 注意：前缀边界用 (?<![A-Za-z0-9]) 而非 \b——下划线属于 \w，若用 \b，
+    # db_password / DB_PASSWORD / my_api_key 等常见命名会因「_ 与 p 之间无词边界」而漏检。
     (
         "疑似硬编码密钥/口令",
         re.compile(
             r"""(?ix)
-            \b(?:api[_-]?key|secret[_-]?key|access[_-]?token|auth[_-]?token|
-                 private[_-]?key|client[_-]?secret|passwd|password)\b
+            (?<![A-Za-z0-9])
+            (?:api[_-]?key|secret[_-]?key|access[_-]?token|auth[_-]?token|
+               private[_-]?key|client[_-]?secret|passwd|password)
+            \b
             \s*[:=]\s*
             ["']([A-Za-z0-9_\-/+=]{20,})["']
             """
@@ -69,9 +76,30 @@ WHITELIST_PATTERNS: List[re.Pattern] = [
 
 # 二进制/资源文件后缀直接跳过，避免误报与性能浪费
 SKIP_SUFFIXES = (
-    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".pdf", ".zip",
-    ".gz", ".tar", ".jar", ".woff", ".woff2", ".ttf", ".eot", ".mp4",
-    ".mp3", ".wasm", ".so", ".dll", ".dylib", ".exe", ".bin", ".db",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".webp",
+    ".ico",
+    ".pdf",
+    ".zip",
+    ".gz",
+    ".tar",
+    ".jar",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".eot",
+    ".mp4",
+    ".mp3",
+    ".wasm",
+    ".so",
+    ".dll",
+    ".dylib",
+    ".exe",
+    ".bin",
+    ".db",
 )
 
 
@@ -111,7 +139,7 @@ def scan() -> int:
 
     for raw in diff.splitlines():
         if raw.startswith("+++ b/"):
-            current_file = raw[len("+++ b/"):]
+            current_file = raw[len("+++ b/") :]
             continue
         if raw.startswith("+++ "):
             current_file = raw[6:]
@@ -152,9 +180,18 @@ def scan() -> int:
         print(f, file=sys.stderr)
     print("", file=sys.stderr)
     print("处理方式：", file=sys.stderr)
-    print("  1. 确认是真实凭据 → 从代码中移除，改用环境变量/配置文件（勿入库）", file=sys.stderr)
-    print("  2. 确认是测试样本/占位符 → 加入 .githooks/scan_staged_secrets.py 白名单", file=sys.stderr)
-    print("  3. 确需提交（如安全测试数据）→ JARVIS_ALLOW_SECRETS=1 git commit ...", file=sys.stderr)
+    print(
+        "  1. 确认是真实凭据 → 从代码中移除，改用环境变量/配置文件（勿入库）",
+        file=sys.stderr,
+    )
+    print(
+        "  2. 确认是测试样本/占位符 → 加入 .githooks/scan_staged_secrets.py 白名单",
+        file=sys.stderr,
+    )
+    print(
+        "  3. 确需提交（如安全测试数据）→ JARVIS_ALLOW_SECRETS=1 git commit ...",
+        file=sys.stderr,
+    )
     print("", file=sys.stderr)
     return 1
 
