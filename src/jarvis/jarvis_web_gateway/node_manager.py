@@ -1113,10 +1113,156 @@ class NodeConnectionManager:
                 request_id=request_id,
             )
 
+    def _handle_parse_orchestration_request(
+        self, raw_path: str, request_id: Optional[str]
+    ) -> Dict[str, Any]:
+        """读取并解析编排 YAML 文件（child 端），返回 agents 列表。"""
+        try:
+            if not raw_path or raw_path == "~":
+                target_path = pathlib.Path.home()
+            else:
+                target_path = pathlib.Path(raw_path).expanduser()
+            target_path = target_path.resolve()
+
+            if not target_path.exists():
+                return build_node_message(
+                    DIRECTORY_LIST_RESPONSE,
+                    {
+                        "success": False,
+                        "error": {
+                            "code": "NOT_FOUND",
+                            "message": f"File does not exist: {raw_path}",
+                        },
+                    },
+                    request_id=request_id,
+                )
+            if not target_path.is_file():
+                return build_node_message(
+                    DIRECTORY_LIST_RESPONSE,
+                    {
+                        "success": False,
+                        "error": {
+                            "code": "NOT_A_FILE",
+                            "message": f"Path is not a file: {raw_path}",
+                        },
+                    },
+                    request_id=request_id,
+                )
+
+            max_size = 5 * 1024 * 1024
+            if target_path.stat().st_size > max_size:
+                return build_node_message(
+                    DIRECTORY_LIST_RESPONSE,
+                    {
+                        "success": False,
+                        "error": {
+                            "code": "FILE_TOO_LARGE",
+                            "message": f"File exceeds {max_size} bytes",
+                        },
+                    },
+                    request_id=request_id,
+                )
+
+            with open(target_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            try:
+                config = yaml.safe_load(content)
+            except yaml.YAMLError as e:
+                return build_node_message(
+                    DIRECTORY_LIST_RESPONSE,
+                    {
+                        "success": False,
+                        "error": {
+                            "code": "YAML_PARSE_ERROR",
+                            "message": f"Invalid YAML: {e}",
+                        },
+                    },
+                    request_id=request_id,
+                )
+
+            if not isinstance(config, dict):
+                return build_node_message(
+                    DIRECTORY_LIST_RESPONSE,
+                    {
+                        "success": False,
+                        "error": {
+                            "code": "INVALID_ORCHESTRATION",
+                            "message": "Orchestration file must be a YAML mapping",
+                        },
+                    },
+                    request_id=request_id,
+                )
+
+            agents = config.get("agents")
+            if agents is None:
+                return build_node_message(
+                    DIRECTORY_LIST_RESPONSE,
+                    {
+                        "success": False,
+                        "error": {
+                            "code": "INVALID_ORCHESTRATION",
+                            "message": "Missing 'agents' field in orchestration file",
+                        },
+                    },
+                    request_id=request_id,
+                )
+            if not isinstance(agents, list):
+                return build_node_message(
+                    DIRECTORY_LIST_RESPONSE,
+                    {
+                        "success": False,
+                        "error": {
+                            "code": "INVALID_ORCHESTRATION",
+                            "message": "'agents' field must be a list",
+                        },
+                    },
+                    request_id=request_id,
+                )
+
+            return build_node_message(
+                DIRECTORY_LIST_RESPONSE,
+                {
+                    "success": True,
+                    "data": {
+                        "path": str(target_path),
+                        "agents": agents,
+                    },
+                },
+                request_id=request_id,
+            )
+        except PermissionError:
+            return build_node_message(
+                DIRECTORY_LIST_RESPONSE,
+                {
+                    "success": False,
+                    "error": {
+                        "code": "PERMISSION_DENIED",
+                        "message": "Permission denied",
+                    },
+                },
+                request_id=request_id,
+            )
+        except Exception as exc:
+            logger.exception(
+                "[NODE] parse orchestration failed path=%s error=%r", raw_path, exc
+            )
+            return build_node_message(
+                DIRECTORY_LIST_RESPONSE,
+                {
+                    "success": False,
+                    "error": {"code": "INTERNAL_ERROR", "message": str(exc)},
+                },
+                request_id=request_id,
+            )
+
     def _handle_directory_list_request(self, message: Dict[str, Any]) -> Dict[str, Any]:
         payload = message.get("payload") or {}
         request_id = message.get("request_id")
         raw_path = str(payload.get("path") or "").strip()
+        # 编排文件解析请求复用本消息类型：仅需读取并解析 YAML，返回 agents 列表
+        if payload.get("parse_orchestration"):
+            return self._handle_parse_orchestration_request(raw_path, request_id)
         logger.info(
             "[NODE] _handle_directory_list_request path=%s request_id=%s",
             raw_path,

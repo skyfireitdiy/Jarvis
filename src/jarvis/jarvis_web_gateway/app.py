@@ -9007,6 +9007,113 @@ def create_app(
                 "error": {"code": "INTERNAL_ERROR", "message": repr(e)},
             }
 
+    async def _handle_parse_orchestration_request(
+        payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """读取并解析编排 YAML 文件，返回配置中的 agents 列表。
+
+        供前端「编排」功能使用：用户选择编排文件后，读取其内容并解析出
+        agents 列表，前端据此自动填充表单。仅做读取与解析，不创建 Agent。
+        """
+        import pathlib
+
+        try:
+            path = str(payload.get("path", "")).strip()
+            if not path:
+                return {
+                    "success": False,
+                    "error": {"code": "INVALID_PATH", "message": "path is required"},
+                }
+
+            target_path = pathlib.Path(path).expanduser().resolve()
+            if not target_path.exists():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "NOT_FOUND",
+                        "message": f"File does not exist: {path}",
+                    },
+                }
+            if not target_path.is_file():
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "NOT_A_FILE",
+                        "message": f"Path is not a file: {path}",
+                    },
+                }
+
+            # 大小上限：编排文件应远小于此值，避免误读大文件
+            max_size = 5 * 1024 * 1024
+            if target_path.stat().st_size > max_size:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "FILE_TOO_LARGE",
+                        "message": f"File exceeds {max_size} bytes",
+                    },
+                }
+
+            with open(target_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            try:
+                config = yaml.safe_load(content)
+            except yaml.YAMLError as e:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "YAML_PARSE_ERROR",
+                        "message": f"Invalid YAML: {e}",
+                    },
+                }
+
+            if not isinstance(config, dict):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_ORCHESTRATION",
+                        "message": "Orchestration file must be a YAML mapping",
+                    },
+                }
+
+            agents = config.get("agents")
+            if agents is None:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_ORCHESTRATION",
+                        "message": "Missing 'agents' field in orchestration file",
+                    },
+                }
+            if not isinstance(agents, list):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_ORCHESTRATION",
+                        "message": "'agents' field must be a list",
+                    },
+                }
+
+            return {
+                "success": True,
+                "data": {
+                    "path": str(target_path),
+                    "agents": agents,
+                },
+            }
+        except PermissionError:
+            return {
+                "success": False,
+                "error": {"code": "PERMISSION_DENIED", "message": "Permission denied"},
+            }
+        except Exception as e:
+            logger.exception("[ORCHESTRATION] parse failed: %r", e)
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": repr(e)},
+            }
+
     async def _dispatch_node_http_request(
         method: str,
         path: str,
@@ -9076,6 +9183,8 @@ def create_app(
 
         if normalized_method == "GET" and normalized_path == "/directories":
             result = await _handle_directories_request(payload)
+        elif normalized_method == "POST" and normalized_path == "/parse-orchestration":
+            result = await _handle_parse_orchestration_request(payload)
         elif normalized_method == "POST" and normalized_path == "/file-content":
             result = await _handle_file_content_request(payload)
         elif normalized_method == "POST" and normalized_path == "/file-stat":
@@ -9514,6 +9623,70 @@ def create_app(
             return await _handle_directories_request({"path": path})
         except Exception as e:
             logger.exception("[DIRECTORIES] list_directories failed: %r", e)
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": repr(e)},
+            }
+
+    @app.post("/api/parse-orchestration", dependencies=[Depends(verify_token)])
+    async def parse_orchestration(request: Dict[str, Any]) -> Dict[str, Any]:
+        """读取并解析指定路径的编排 YAML 文件，返回其中的 agents 列表。
+
+        支持跨节点：node_id 非本地时转发到目标节点执行。
+        """
+        try:
+            path = str(request.get("path") or "").strip()
+            resolved_node_id = str(request.get("node_id") or "").strip()
+            target_node_id = resolved_node_id or node_runtime.local_node_id
+
+            if target_node_id not in (node_runtime.local_node_id, "master"):
+                logger.info(
+                    "[ORCHESTRATION] remote parse request path=%s target_node_id=%s",
+                    path,
+                    target_node_id,
+                )
+                node_info = node_runtime.node_registry.get(target_node_id)
+                if node_info is None:
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "NODE_NOT_FOUND",
+                            "message": f"Node not found: {target_node_id}",
+                        },
+                    }
+                if node_info.status != "online":
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "NODE_OFFLINE",
+                            "message": f"Node is offline: {target_node_id}",
+                        },
+                    }
+                response = await node_connection_manager.send_request_to_node(
+                    target_node_id,
+                    DIRECTORY_LIST_REQUEST,
+                    {
+                        "path": path,
+                        "parse_orchestration": True,
+                    },
+                )
+                payload = response.get("payload") or {}
+                if payload.get("success"):
+                    return {"success": True, "data": payload.get("data") or {}}
+                error = payload.get("error") or {}
+                return {
+                    "success": False,
+                    "error": {
+                        "code": error.get("code", "PARSE_ORCHESTRATION_FAILED"),
+                        "message": error.get(
+                            "message", "Remote orchestration parse failed"
+                        ),
+                    },
+                }
+
+            return await _handle_parse_orchestration_request({"path": path})
+        except Exception as e:
+            logger.exception("[ORCHESTRATION] parse_orchestration failed: %r", e)
             return {
                 "success": False,
                 "error": {"code": "INTERNAL_ERROR", "message": repr(e)},
