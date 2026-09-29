@@ -7,7 +7,7 @@
 
 agents:
   - name: "jsec_rule_developer"
-    type: "code_agent"
+    type: "agent"
     working_dir: "."
     task: |
       你是 JSec 规则开发Agent。你是被动执行者，接收来自对抗Agent的反馈来改进检测能力。
