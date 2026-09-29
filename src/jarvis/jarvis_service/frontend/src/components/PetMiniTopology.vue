@@ -75,7 +75,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { buildTopology, layoutTopology, formatBrowserLabel } from './topology.js'
 
 const props = defineProps({
@@ -103,6 +103,14 @@ const layout = computed(() => layoutTopology(model.value, W, H, {
   nodeHalfH: 5.5,
   minGap: 3,
 }))
+
+// 接入端布局按屏幕方向响应式：宽>高（PC）时左右两列、高>宽（移动）时上下两行
+const isPortrait = ref(typeof window !== 'undefined' && window.innerHeight > window.innerWidth)
+function updateOrientation() {
+  isPortrait.value = window.innerHeight > window.innerWidth
+}
+onMounted(() => window.addEventListener('resize', updateOrientation))
+onBeforeUnmount(() => window.removeEventListener('resize', updateOrientation))
 
 const NODE_COLORS = {
   online: '#34d99b',
@@ -158,31 +166,45 @@ const lines = computed(() =>
 
 // 接入端小点：浏览器扩展（上行）/ 后台服务（下行），每个在线会话一个点。
 // 数据来自网关会话列表（props），名称仅用于 title 悬停提示（96×96 放不下文字）。
+// 布局按屏幕方向响应式：宽>高（PC）时左右两列、高>宽（移动）时上下两行。
 const accessPoints = computed(() => {
   const cx = layout.value.center.x
-  const topY = 6
-  const bottomY = H - 6
+  const cy = layout.value.center.y
   const gap = 8
-  const place = (count) => {
+  // 纵向（移动）：扩展顶行、daemon 底行，各自水平均匀分布
+  const placeRow = (count, fixedY) => {
     if (count <= 0) return []
     const total = (count - 1) * gap
     const start = cx - total / 2
     const xs = []
     for (let i = 0; i < count; i++) {
-      xs.push(Math.min(Math.max(start + i * gap, 5), W - 5))
+      xs.push({ x: Math.min(Math.max(start + i * gap, 5), W - 5), y: fixedY })
     }
     return xs
   }
-  const extXs = place(props.extensionSessions.length)
-  const daemonXs = place(props.daemonSessions.length)
+  // 横向（PC）：扩展左列、daemon 右列，各自垂直均匀分布
+  const placeCol = (count, fixedX) => {
+    if (count <= 0) return []
+    const total = (count - 1) * gap
+    const start = cy - total / 2
+    const ys = []
+    for (let i = 0; i < count; i++) {
+      ys.push({ x: fixedX, y: Math.min(Math.max(start + i * gap, 5), H - 5) })
+    }
+    return ys
+  }
+  const portrait = isPortrait.value
+  const extPos = portrait ? placeRow(props.extensionSessions.length, 6) : placeCol(props.extensionSessions.length, 6)
+  const daemonPos = portrait ? placeRow(props.daemonSessions.length, H - 6) : placeCol(props.daemonSessions.length, W - 6)
   const points = []
   props.extensionSessions.forEach((s, i) => {
     const name = String((s && s.name) || '').trim() || '浏览器扩展'
     const browserLabel = formatBrowserLabel(s && s.browser_info, s && s.extension_version)
+    const p = extPos[i] || { x: cx, y: 6 }
     points.push({
       id: `ext-${s.session_id || i}`,
-      x: extXs[i],
-      y: topY,
+      x: p.x,
+      y: p.y,
       color: nodeColor('online'),
       fill: 'rgba(8,18,30,0.95)',
       title: `浏览器扩展 · ${name}${browserLabel ? ` · ${browserLabel}` : ''}`,
@@ -190,10 +212,11 @@ const accessPoints = computed(() => {
   })
   props.daemonSessions.forEach((s, i) => {
     const name = String((s && s.name) || '').trim() || '后台服务'
+    const p = daemonPos[i] || { x: cx, y: H - 6 }
     points.push({
       id: `daemon-${s.session_id || i}`,
-      x: daemonXs[i],
-      y: bottomY,
+      x: p.x,
+      y: p.y,
       color: nodeColor('online'),
       fill: 'rgba(8,18,30,0.95)',
       title: `后台服务 · ${name}`,

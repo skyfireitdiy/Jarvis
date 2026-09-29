@@ -177,9 +177,13 @@
           <!-- 类型图标 -->
           <text :x="n.x" :y="n.y" text-anchor="middle" dominant-baseline="central"
                 class="lobby-access-ico">{{ n.icon }}</text>
-          <!-- 标签文字：顶部行在节点下方、底部行在节点上方，居中显示，避免被舞台边缘裁切 -->
-          <text :x="n.x" :y="n.labelAbove ? n.y - LOCAL_NODE_RH - 16 : n.y + LOCAL_NODE_RH + 16" :text-anchor="n.anchor" class="lobby-node-label">{{ n.short }}</text>
-          <text :x="n.x" :y="n.labelAbove ? n.y - LOCAL_NODE_RH - 29 : n.y + LOCAL_NODE_RH + 29" :text-anchor="n.anchor" class="lobby-node-count">{{ n.sub }}</text>
+          <!-- 标签文字：纵向时上下放置（顶部行在下、底部行在上）、横向时左右放置（左列在右、右列在左），均朝中间 -->
+          <text :x="n.labelAbove === null ? (n.anchor === 'start' ? n.x + LOCAL_NODE_RH + 16 : n.x - LOCAL_NODE_RH - 16) : n.x"
+                :y="n.labelAbove === null ? n.y : (n.labelAbove ? n.y - LOCAL_NODE_RH - 16 : n.y + LOCAL_NODE_RH + 16)"
+                :text-anchor="n.anchor" class="lobby-node-label">{{ n.short }}</text>
+          <text :x="n.labelAbove === null ? (n.anchor === 'start' ? n.x + LOCAL_NODE_RH + 16 : n.x - LOCAL_NODE_RH - 16) : n.x"
+                :y="n.labelAbove === null ? n.y + 13 : (n.labelAbove ? n.y - LOCAL_NODE_RH - 29 : n.y + LOCAL_NODE_RH + 29)"
+                :text-anchor="n.anchor" class="lobby-node-count">{{ n.sub }}</text>
         </g>
       </svg>
     </div>
@@ -799,7 +803,11 @@ const MOBILE_BREAKPOINT = 768
 const isMobile = ref(typeof window !== 'undefined' && window.innerWidth <= MOBILE_BREAKPOINT)
 function updateIsMobile() {
   isMobile.value = window.innerWidth <= MOBILE_BREAKPOINT
+  // 接入端布局按屏幕方向响应式：宽>高（PC）时左右两列、高>宽（移动）时上下两行
+  isPortrait.value = window.innerHeight > window.innerWidth
 }
+// 屏幕是否为竖向（高>宽）：true 时接入端上下两行，false（PC 宽>高）时左右两列
+const isPortrait = ref(typeof window !== 'undefined' && window.innerHeight > window.innerWidth)
 
 // 精灵显示：petsHidden=是否隐藏全部精灵，持久化到 localStorage
 // 输出显隐完全由单个 Agent 的 hiddenOutputIds 控制（不再有全局输出开关）
@@ -1058,6 +1066,20 @@ function accessRowXs(count, centerX, stageW) {
   return xs
 }
 
+// 单列节点的纵向坐标：以 master 的 y 为中心均匀分布，并限制在舞台内
+function accessColumnYs(count, centerY, stageH) {
+  if (count <= 0) return []
+  const total = (count - 1) * ACCESS_NODE_GAP
+  const start = centerY - total / 2
+  const minY = LOCAL_NODE_RH + 18
+  const maxY = Math.max(minY, stageH - LOCAL_NODE_RH - 18)
+  const ys = []
+  for (let i = 0; i < count; i++) {
+    ys.push(Math.min(Math.max(start + i * ACCESS_NODE_GAP, minY), maxY))
+  }
+  return ys
+}
+
 // 会话展示名：优先网关会话里的 name，缺失时按类型回退
 function accessSessionName(session, fallback) {
   const name = String((session && session.name) || '').trim()
@@ -1078,37 +1100,58 @@ const accessNodes = computed(() => {
   const masterPos = nodeLayout.value.get('master')
   if (!masterPos) return []
   // 接入端放在环形子节点之外（更靠舞台边缘），避免与子节点重叠：
-  // 顶部接入端放在所有子节点上边缘之上、底部接入端放在所有子节点下边缘之下，
-  // 并各自留出标签空间；同时不超出舞台边缘留白。
+  // 子节点是服务器机箱，取其机箱半高（n.rh）作为环形子节点的边界
   const childTop = nodeItems.value.length
     ? Math.min(...nodeItems.value.map(n => n.y - n.rh))
     : masterPos.y
   const childBottom = nodeItems.value.length
     ? Math.max(...nodeItems.value.map(n => n.y + n.rh))
     : masterPos.y
-  // 接入端尽量远离环形子节点（间隙加大），同时圆心不越出舞台边缘留白
-  const topY = Math.max(LOCAL_NODE_RH, Math.min(LOCAL_NODE_MARGIN + LOCAL_NODE_RH, childTop - 55))
-  const bottomY = Math.min(h - LOCAL_NODE_RH, Math.max(h - LOCAL_NODE_MARGIN - LOCAL_NODE_RH, childBottom + 55))
-  const extXs = accessRowXs(extensionSessions.value.length, masterPos.x, w)
-  const daemonXs = accessRowXs(daemonSessions.value.length, masterPos.x, w)
+  const childLeft = nodeItems.value.length
+    ? Math.min(...nodeItems.value.map(n => n.x - n.rw))
+    : masterPos.x
+  const childRight = nodeItems.value.length
+    ? Math.max(...nodeItems.value.map(n => n.x + n.rw))
+    : masterPos.x
+  // 布局按屏幕方向响应式：宽>高（PC）时左右两列、高>宽（移动）时上下两行
+  const portrait = isPortrait.value
+  let extPos = []
+  let daemonPos = []
+  if (portrait) {
+    // 纵向（移动）：扩展顶行、daemon 底行，各自水平均匀分布
+    const topY = Math.max(LOCAL_NODE_RH, Math.min(LOCAL_NODE_MARGIN + LOCAL_NODE_RH, childTop - 55))
+    const bottomY = Math.min(h - LOCAL_NODE_RH, Math.max(h - LOCAL_NODE_MARGIN - LOCAL_NODE_RH, childBottom + 55))
+    const extXs = accessRowXs(extensionSessions.value.length, masterPos.x, w)
+    const daemonXs = accessRowXs(daemonSessions.value.length, masterPos.x, w)
+    extPos = extXs.map(x => ({ x, y: topY, labelAbove: false, anchor: 'middle' }))
+    daemonPos = daemonXs.map(x => ({ x, y: bottomY, labelAbove: true, anchor: 'middle' }))
+  } else {
+    // 横向（PC）：扩展左列、daemon 右列，各自垂直均匀分布
+    const leftX = LOCAL_NODE_MARGIN + LOCAL_NODE_RH
+    const rightX = w - LOCAL_NODE_MARGIN - LOCAL_NODE_RH
+    const extYs = accessColumnYs(extensionSessions.value.length, masterPos.y, h)
+    const daemonYs = accessColumnYs(daemonSessions.value.length, masterPos.y, h)
+    extPos = extYs.map(y => ({ x: leftX, y, labelAbove: null, anchor: 'start' }))
+    daemonPos = daemonYs.map(y => ({ x: rightX, y, labelAbove: null, anchor: 'end' }))
+  }
   const nodes = []
   extensionSessions.value.forEach((s, i) => {
     const name = accessSessionName(s, '浏览器扩展')
     // 副标题展示「浏览器名 主版本 · 扩展版本」，让用户区分不同浏览器/设备
     const browserLabel = formatBrowserLabel(s && s.browser_info, s && s.extension_version)
+    const p = extPos[i] || { x: masterPos.x, y: masterPos.y, labelAbove: false, anchor: 'middle' }
     nodes.push({
       id: `ext-${s.session_id || i}`,
-      x: extXs[i],
-      y: topY,
+      x: p.x,
+      y: p.y,
       state: 'online',
       color: nodeColor('online'),
       fill: 'rgba(8,18,30,0.7)',
       short: accessShortName(name),
       sub: browserLabel || '浏览器扩展',
       icon: '🧩',
-      // 顶部行节点靠上，标签文字在节点下方（朝中间），节点已推远故不与环形子节点相撞
-      anchor: 'middle',
-      labelAbove: false,
+      labelAbove: p.labelAbove,
+      anchor: p.anchor,
       title: `浏览器扩展 · ${name}${browserLabel ? ` · ${browserLabel}` : ''}`,
       masterX: masterPos.x,
       masterY: masterPos.y,
@@ -1121,19 +1164,19 @@ const accessNodes = computed(() => {
     // daemon 上报的版本可能自带 v 前缀（如 v5.0.5），避免拼成 vv5.0.5
     const versionLabel = version ? (/^v/i.test(version) ? version : `v${version}`) : ''
     const detail = [platform, versionLabel].filter(Boolean).join(' · ')
+    const p = daemonPos[i] || { x: masterPos.x, y: masterPos.y, labelAbove: true, anchor: 'middle' }
     nodes.push({
       id: `daemon-${s.session_id || i}`,
-      x: daemonXs[i],
-      y: bottomY,
+      x: p.x,
+      y: p.y,
       state: 'online',
       color: nodeColor('online'),
       fill: 'rgba(8,18,30,0.7)',
       short: accessShortName(name),
       sub: detail || '后台服务',
       icon: '🖥',
-      // 底部行节点靠下，标签文字在节点上方（朝中间），节点已推远故不与环形子节点相撞
-      anchor: 'middle',
-      labelAbove: true,
+      labelAbove: p.labelAbove,
+      anchor: p.anchor,
       title: `后台服务 · ${name}${detail ? ` · ${detail}` : ''}`,
       masterX: masterPos.x,
       masterY: masterPos.y,

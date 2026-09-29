@@ -184,9 +184,13 @@
               <!-- 类型图标 -->
               <text :x="n.x" :y="n.y" text-anchor="middle" dominant-baseline="central"
                     class="topo-access-ico">{{ n.icon }}</text>
-              <!-- 标签文字：顶部行在节点下方、底部行在节点上方，居中显示，避免被画布边缘裁切 -->
-              <text :x="n.x" :y="n.labelAbove ? n.y - ACCESS_R - 16 : n.y + ACCESS_R + 16" :text-anchor="n.anchor" class="topo-node-label">{{ n.short }}</text>
-              <text :x="n.x" :y="n.labelAbove ? n.y - ACCESS_R - 29 : n.y + ACCESS_R + 29" :text-anchor="n.anchor" class="topo-node-count">{{ n.sub }}</text>
+              <!-- 标签文字：纵向时上下放置（顶部行在下、底部行在上）、横向时左右放置（左列在右、右列在左），均朝中间 -->
+              <text :x="n.labelAbove === null ? (n.anchor === 'start' ? n.x + ACCESS_R + 16 : n.x - ACCESS_R - 16) : n.x"
+                    :y="n.labelAbove === null ? n.y : (n.labelAbove ? n.y - ACCESS_R - 16 : n.y + ACCESS_R + 16)"
+                    :text-anchor="n.anchor" class="topo-node-label">{{ n.short }}</text>
+              <text :x="n.labelAbove === null ? (n.anchor === 'start' ? n.x + ACCESS_R + 16 : n.x - ACCESS_R - 16) : n.x"
+                    :y="n.labelAbove === null ? n.y + 13 : (n.labelAbove ? n.y - ACCESS_R - 29 : n.y + ACCESS_R + 29)"
+                    :text-anchor="n.anchor" class="topo-node-count">{{ n.sub }}</text>
             </g>
 
             <!-- 中心 master（与子节点同款服务器机箱，仅靠颜色/尺寸区分主次） -->
@@ -430,6 +434,20 @@ function accessRowXs(count, centerX) {
   return xs
 }
 
+// 单列节点的纵向坐标：以 master 的 y 为中心均匀分布，并限制在画布内
+function accessColumnYs(count, centerY) {
+  if (count <= 0) return []
+  const total = (count - 1) * ACCESS_NODE_GAP
+  const start = centerY - total / 2
+  const minY = ACCESS_R + 22
+  const maxY = Math.max(minY, H - ACCESS_R - 22)
+  const ys = []
+  for (let i = 0; i < count; i++) {
+    ys.push(Math.min(Math.max(start + i * ACCESS_NODE_GAP, minY), maxY))
+  }
+  return ys
+}
+
 // 会话展示名：优先网关会话里的 name，缺失时按类型回退
 function accessSessionName(session, fallback) {
   const name = String((session && session.name) || '').trim()
@@ -445,44 +463,66 @@ function accessShortName(name) {
 
 const localNodes = computed(() => {
   const cx = layout.value.center.x
+  const cy = layout.value.center.y
   // 接入端放在环形子节点之外（更靠画布边缘），避免与子节点重叠：
-  // 顶部接入端放在所有子节点上边缘之上、底部接入端放在所有子节点下边缘之下，
-  // 并各自留出标签空间；同时不超出画布边缘留白。
-  // 子节点是服务器机箱，取其机箱半高（NODE_R）作为环形子节点的上下边界
+  // 子节点是服务器机箱，取其机箱半高（NODE_R）作为环形子节点的边界
   const childTop = nodePoints.value.length
     ? Math.min(...nodePoints.value.map(n => n.y - NODE_R))
-    : layout.value.center.y
+    : cy
   const childBottom = nodePoints.value.length
     ? Math.max(...nodePoints.value.map(n => n.y + NODE_R))
-    : layout.value.center.y
+    : cy
+  const childLeft = nodePoints.value.length
+    ? Math.min(...nodePoints.value.map(n => n.x - NODE_R))
+    : cx
+  const childRight = nodePoints.value.length
+    ? Math.max(...nodePoints.value.map(n => n.x + NODE_R))
+    : cx
   // 接入端尽量远离环形子节点（间隙加大），同时圆心不越出画布边缘留白。
   // ACCESS_GAP 是接入端圆心到子节点机箱边缘的目标距离；移动端 SVG 会整体缩放，
   // 间隙不足时接入端会与子节点「挨着」，故这里给足余量（配合缩小环形半径）。
   const ACCESS_GAP = 110
-  const topY = Math.max(ACCESS_R, Math.min(LOCAL_NODE_MARGIN + ACCESS_R, childTop - ACCESS_GAP))
-  const bottomY = Math.min(H - ACCESS_R, Math.max(H - LOCAL_NODE_MARGIN - ACCESS_R, childBottom + ACCESS_GAP))
-  const extXs = accessRowXs(props.extensionSessions.length, cx)
-  const daemonXs = accessRowXs(props.daemonSessions.length, cx)
+  // 布局按屏幕方向响应式：宽>高（PC）时左右两列、高>宽（移动）时上下两行
+  const portrait = isPortrait.value
+  let extPos = []
+  let daemonPos = []
+  if (portrait) {
+    // 纵向（移动）：扩展顶行、daemon 底行，各自水平均匀分布
+    const topY = Math.max(ACCESS_R, Math.min(LOCAL_NODE_MARGIN + ACCESS_R, childTop - ACCESS_GAP))
+    const bottomY = Math.min(H - ACCESS_R, Math.max(H - LOCAL_NODE_MARGIN - ACCESS_R, childBottom + ACCESS_GAP))
+    const extXs = accessRowXs(props.extensionSessions.length, cx)
+    const daemonXs = accessRowXs(props.daemonSessions.length, cx)
+    extPos = extXs.map(x => ({ x, y: topY, labelAbove: false, anchor: 'middle' }))
+    daemonPos = daemonXs.map(x => ({ x, y: bottomY, labelAbove: true, anchor: 'middle' }))
+  } else {
+    // 横向（PC）：扩展左列、daemon 右列，各自垂直均匀分布
+    const leftX = LOCAL_NODE_MARGIN + ACCESS_R
+    const rightX = W - LOCAL_NODE_MARGIN - ACCESS_R
+    const extYs = accessColumnYs(props.extensionSessions.length, cy)
+    const daemonYs = accessColumnYs(props.daemonSessions.length, cy)
+    extPos = extYs.map(y => ({ x: leftX, y, labelAbove: null, anchor: 'start' }))
+    daemonPos = daemonYs.map(y => ({ x: rightX, y, labelAbove: null, anchor: 'end' }))
+  }
   const nodes = []
   props.extensionSessions.forEach((s, i) => {
     const name = accessSessionName(s, '浏览器扩展')
     // 副标题展示「浏览器名 主版本 · 扩展版本」，让用户区分不同浏览器/设备
     const browserLabel = formatBrowserLabel(s && s.browser_info, s && s.extension_version)
+    const p = extPos[i] || { x: cx, y: cy, labelAbove: false, anchor: 'middle' }
     nodes.push({
       id: `ext-${s.session_id || i}`,
-      x: extXs[i],
-      y: topY,
-      masterX: layout.value.center.x,
-      masterY: layout.value.center.y,
+      x: p.x,
+      y: p.y,
+      masterX: cx,
+      masterY: cy,
       state: 'online',
       color: nodeColor('online'),
       fill: 'rgba(8,18,30,0.95)',
       short: accessShortName(name),
       sub: browserLabel || '浏览器扩展',
       icon: '🧩',
-      // 顶部行节点靠上，标签文字在节点下方（朝中间），节点已推远故不与环形子节点相撞
-      anchor: 'middle',
-      labelAbove: false,
+      labelAbove: p.labelAbove,
+      anchor: p.anchor,
       title: `浏览器扩展 · ${name}${browserLabel ? ` · ${browserLabel}` : ''}`,
     })
   })
@@ -493,28 +533,26 @@ const localNodes = computed(() => {
     // daemon 上报的版本可能自带 v 前缀（如 v5.0.5），避免拼成 vv5.0.5
     const versionLabel = version ? (/^v/i.test(version) ? version : `v${version}`) : ''
     const detail = [platform, versionLabel].filter(Boolean).join(' · ')
+    const p = daemonPos[i] || { x: cx, y: cy, labelAbove: true, anchor: 'middle' }
     nodes.push({
       id: `daemon-${s.session_id || i}`,
-      x: daemonXs[i],
-      y: bottomY,
-      masterX: layout.value.center.x,
-      masterY: layout.value.center.y,
+      x: p.x,
+      y: p.y,
+      masterX: cx,
+      masterY: cy,
       state: 'online',
       color: nodeColor('online'),
       fill: 'rgba(8,18,30,0.95)',
       short: accessShortName(name),
       sub: detail || '后台服务',
       icon: '🖥',
-      // 底部行节点靠下，标签文字在节点上方（朝中间），节点已推远故不与环形子节点相撞
-      anchor: 'middle',
-      labelAbove: true,
+      labelAbove: p.labelAbove,
+      anchor: p.anchor,
       title: `后台服务 · ${name}${detail ? ` · ${detail}` : ''}`,
     })
   })
   return nodes
 })
-
-// 直线连线：master → 各接入端节点，直接连接两点。
 const localLinks = computed(() =>
   localNodes.value.map(n => ({
     id: n.id,
@@ -593,8 +631,20 @@ function onKeydown(e) {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onKeydown, true))
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown, true))
+// 接入端布局按屏幕方向响应式：宽>高（PC）时左右两列、高>宽（移动）时上下两行
+const isPortrait = ref(typeof window !== 'undefined' && window.innerHeight > window.innerWidth)
+function updateOrientation() {
+  isPortrait.value = window.innerHeight > window.innerWidth
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown, true)
+  window.addEventListener('resize', updateOrientation)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown, true)
+  window.removeEventListener('resize', updateOrientation)
+})
 
 defineExpose({ close })
 </script>
