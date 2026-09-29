@@ -436,7 +436,7 @@
                     未找到匹配结果
                   </div>
                   <div v-for="result in globalSearchResults" :key="result.file_path" class="workspace-global-search-file-group">
-                    <div class="workspace-global-search-file-path" @click="openWorkspaceFile(resolveAgentRelativePath(result.file_path))">
+                    <div class="workspace-global-search-file-path" @click="openWorkspaceFile(resolveAgentRelativePath(result.file_path, effectiveGlobalSearchAgentId.value))">
                       {{ result.file_path }}
                       <span class="workspace-global-search-file-count">({{ result.matches.length }})</span>
                     </div>
@@ -4424,9 +4424,16 @@ function releaseLspBinding(path) {
   disposeClient(binding.serverId, binding.root)
 }
 
-function resolveAgentRelativePath(relativePath) {
+function resolveAgentRelativePath(relativePath, agentId = null) {
   if (!relativePath) return ''
-  const workingDir = currentAgent.value?.working_dir || ''
+  // 优先用指定 Agent 的工作目录解析（命令面板/搜索场景应使用其对应的 Agent，
+  // 而非 currentAgent——两者可能不一致，导致拼出相对路径触发 Monaco「path must be absolute」）。
+  let workingDir = ''
+  if (agentId) {
+    const agent = agentList.value.find(a => a.agent_id === agentId)
+    workingDir = agent?.working_dir || ''
+  }
+  if (!workingDir) workingDir = currentAgent.value?.working_dir || ''
   if (!workingDir) return relativePath
   return `${workingDir.replace(/\/$/, '')}/${String(relativePath).replace(/^\//, '')}`
 }
@@ -4702,11 +4709,11 @@ function setGlobalSearchMode(mode) {
 }
 
 function openFileSearchResult(filePath) {
-  openWorkspaceFile(resolveAgentRelativePath(filePath), effectiveGlobalSearchAgentId.value)
+  openWorkspaceFile(resolveAgentRelativePath(filePath, effectiveGlobalSearchAgentId.value), effectiveGlobalSearchAgentId.value)
 }
 
 async function openGlobalSearchResult(filePath, lineNumber, matchStart = 0, matchEnd = matchStart) {
-  const absolutePath = resolveAgentRelativePath(filePath)
+  const absolutePath = resolveAgentRelativePath(filePath, effectiveGlobalSearchAgentId.value)
   // 使用全局搜索侧边栏选中的 Agent
   await openWorkspaceFile(absolutePath, effectiveGlobalSearchAgentId.value)
   await nextTick()
@@ -10115,7 +10122,7 @@ function openCommandPaletteFileResult(item) {
   if (!item || !item.file_path) return
   const agentId = commandPaletteCurrentAgentId.value
   showCommandPalette.value = false
-  openWorkspaceFile(resolveAgentRelativePath(item.file_path), agentId)
+  openWorkspaceFile(resolveAgentRelativePath(item.file_path, agentId), agentId)
 }
 const showTopologyOverlay = ref(false) // 网络拓扑大图浮层
 
@@ -17565,8 +17572,9 @@ function handleGlobalKeydown(event) {
       (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
     const dirMap = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' }
     const dir = dirMap[event.key]
-    // 编辑器聚焦时让位给 Monaco 原生键位（Ctrl+Alt+↑/↓ 为「在上/下方插入光标」多光标编辑），不覆盖
-    if (isMonacoEditorFocused()) return
+    // 编辑器聚焦且处于可编辑模式时，让位给 Monaco 原生键位（Ctrl+Alt+↑/↓ 为「在上/下方插入光标」多光标编辑）；
+    // 若编辑器为只读模式（多光标本就不生效），则不让位，继续用方向键移动激活的分割区域
+    if (isMonacoEditorFocused() && isWorkspaceEditable.value) return
     event.preventDefault()
     showCommandPalette.value = false
     const inWorkspace = getFocusedZoneKey() === 'workspace' || getNamedPanelFocusKey() === 'workspace'
