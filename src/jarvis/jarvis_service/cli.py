@@ -10,6 +10,7 @@ import sys
 import subprocess
 import threading
 import time
+import uuid
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -1244,6 +1245,61 @@ def load_or_create_master_node_secret() -> tuple[str, bool]:
     return generated_secret, True
 
 
+GATEWAY_TOKEN_RELATIVE_PATH = Path("gateway_token")
+JWT_SECRET_RELATIVE_PATH = Path("jwt_secret")
+
+
+def load_or_create_gateway_token() -> str:
+    """读取或创建 Gateway Token（JARVIS_AUTH_TOKEN），持久化到 data 目录。
+
+    供 jwg 子进程继承使用，保证网关重启后客户端 Token 仍有效。
+    """
+    path = Path(get_data_dir()) / GATEWAY_TOKEN_RELATIVE_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        existing = path.read_text(encoding="utf-8").strip()
+        if existing:
+            return existing
+    token = str(uuid.uuid4())
+    path.write_text(f"{token}\n", encoding="utf-8")
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
+    return token
+
+
+def load_or_create_jwt_secret() -> str:
+    """读取或创建 JWT 签名密钥（JARVIS_JWT_SECRET），持久化到 data 目录。
+
+    供 jwg 子进程继承使用，保证网关重启后客户端 JWT Token 仍可验签。
+    """
+    path = Path(get_data_dir()) / JWT_SECRET_RELATIVE_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        existing = path.read_text(encoding="utf-8").strip()
+        if existing:
+            return existing
+    secret = secrets.token_urlsafe(AUTO_GENERATED_SECRET_NBYTES)
+    path.write_text(f"{secret}\n", encoding="utf-8")
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
+    return secret
+
+
+def ensure_service_tokens() -> None:
+    """在 service 进程内生成/加载并持久化 Token，写入环境变量供 jwg 子进程继承。
+
+    若环境变量已显式设置（如用户手动配置），则优先尊重用户配置，不覆盖。
+    """
+    if not os.environ.get("JARVIS_AUTH_TOKEN"):
+        os.environ["JARVIS_AUTH_TOKEN"] = load_or_create_gateway_token()
+    if not os.environ.get("JARVIS_JWT_SECRET"):
+        os.environ["JARVIS_JWT_SECRET"] = load_or_create_jwt_secret()
+
+
 def build_service_config(
     gateway_host: Optional[str] = None,
     gateway_port: Optional[int] = None,
@@ -1423,6 +1479,9 @@ def _start_restart_command_server(controller: ServiceController) -> None:
 def run_service(config: ServiceConfig) -> None:
     """启动 Jarvis 服务循环。"""
     acquire_single_instance_lock()
+    # 在 service 进程内生成/加载并持久化 Token，写入环境变量供 jwg 子进程继承，
+    # 保证网关重启后客户端 Token 仍有效。
+    ensure_service_tokens()
     controller = ServiceController(config)
     signal.signal(signal.SIGINT, controller.request_exit)
     signal.signal(signal.SIGTERM, controller.request_exit)

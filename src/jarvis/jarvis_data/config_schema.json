@@ -305,8 +305,8 @@
     },
     "request_timeout": {
       "type": "number",
-      "description": "SDK 请求超时时间（秒）。未配置或为 0 时不显式设置，使用各 SDK 默认超时",
-      "default": 0
+      "description": "SDK 请求超时时间（秒）。未配置或为 0 时使用默认值 300（5 分钟），避免因服务器原因导致请求永久阻塞；显式配置有效值则优先使用配置值",
+      "default": 300
     },
     "builtin_input_handler_dirs": {
       "type": "array",

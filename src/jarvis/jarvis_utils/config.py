@@ -1320,19 +1320,21 @@ def get_request_timeout() -> Optional[float]:
     """
     获取 SDK 请求超时（秒）。
 
-    request_timeout 配置缺失或为 0/空时返回 None，表示不显式设置、使用各 SDK 默认超时。
+    request_timeout 配置缺失或为 0/空时返回默认值 300（5 分钟），
+    避免因服务器原因导致请求永久阻塞；用户显式配置了有效值则优先使用配置值。
 
     返回：
-        Optional[float]: 请求超时秒数；未配置时为 None
+        Optional[float]: 请求超时秒数；未配置时返回默认 300 秒
     """
+    DEFAULT_REQUEST_TIMEOUT = 300.0
     value = GLOBAL_CONFIG_DATA.get("request_timeout")
     if value is None or value == "":
-        return None
+        return DEFAULT_REQUEST_TIMEOUT
     try:
         timeout = float(value)
     except (TypeError, ValueError):
-        return None
-    return timeout if timeout > 0 else None
+        return DEFAULT_REQUEST_TIMEOUT
+    return timeout if timeout > 0 else DEFAULT_REQUEST_TIMEOUT
 
 
 def get_build_validation_timeout() -> int:
