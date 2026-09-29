@@ -51,6 +51,7 @@
     v-else
     class="workspace-pane-leaf"
     :class="{ 'workspace-pane-leaf-active': node.id === activePaneId }"
+    :data-pane-id="node.id"
     @mousedown="$emit('activate', node.id)"
   >
     <WorkspacePaneHeader

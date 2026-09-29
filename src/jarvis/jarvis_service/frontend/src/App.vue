@@ -2768,14 +2768,91 @@ function findWorkspacePaneParent(node, paneId) {
   }
   return null
 }
-function activateWorkspacePane(paneId) {
+function activateWorkspacePane(paneId, { moveFocus = false } = {}) {
   if (!findWorkspacePaneById(workspacePaneTree.value, paneId)) return
   if (activePaneId.value === paneId) return
   activePaneId.value = paneId
   // 激活 pane 会切换 Monaco 容器（只有激活 pane 渲染真实容器），需重建视图
   nextTick(() => {
     remountMonacoEditor()
+    // 方向键切换时，把键盘焦点也移到新 pane 的内容上（否则焦点停留在旧 pane）
+    if (moveFocus) focusWorkspacePane(paneId)
   })
+}
+// 把键盘焦点移到指定 pane 的内容上（用于方向键切换激活区域后让焦点跟随）
+// file/diff pane 聚焦其 Monaco 编辑器实例；其它（session/chat/terminal/empty）聚焦 pane 内首个可聚焦元素
+function focusWorkspacePane(paneId) {
+  const pane = findWorkspacePaneById(workspacePaneTree.value, paneId)
+  if (!pane) return
+  if (pane.view === 'file') {
+    const view = editorViews.get(paneId)
+    if (view && typeof view.focus === 'function') {
+      view.focus()
+      return
+    }
+  }
+  if (pane.view === 'diff') {
+    const entry = diffEditorViews.get(paneId)
+    if (entry && entry.editor && typeof entry.editor.focus === 'function') {
+      entry.editor.focus()
+      return
+    }
+  }
+  const leafEl = document.querySelector(`.workspace-pane-leaf[data-pane-id="${paneId}"]`)
+  if (leafEl) focusFirstIn(leafEl)
+}
+// 在 pane 树中找到从根到指定 leaf 的路径（含根与 leaf 的所有节点）
+function findWorkspacePanePath(node, paneId, path = []) {
+  if (!node) return null
+  if (node.type === 'leaf') {
+    return node.id === paneId ? [...path, node] : null
+  }
+  for (const child of node.children || []) {
+    const result = findWorkspacePanePath(child, paneId, [...path, node])
+    if (result) return result
+  }
+  return null
+}
+// 返回 node 子树中在 dir 方向上最边缘的 leaf（用于方向导航落到目标子树内的具体 pane）
+function findWorkspacePaneEdgeLeaf(node, dir) {
+  if (!node) return null
+  if (node.type === 'leaf') return node
+  const row = node.direction === 'row'
+  const col = node.direction === 'column'
+  let childIdx = 0
+  if ((dir === 'left' && row) || (dir === 'up' && col)) childIdx = 0
+  else if ((dir === 'right' && row) || (dir === 'down' && col)) childIdx = 1
+  return findWorkspacePaneEdgeLeaf(node.children[childIdx], dir)
+}
+// 用 Ctrl+Alt+方向键在分割 pane 之间切换激活区域
+// dir: 'left'|'right'|'up'|'down'；返回是否已切换（未分割或无可切换 pane 时返回 false）
+function moveActivePaneInDirection(dir) {
+  if (!isWorkspaceSplit.value) return false
+  const path = findWorkspacePanePath(workspacePaneTree.value, activePaneId.value)
+  if (!path || path.length < 2) return false
+  const leaf = path[path.length - 1]
+  // 从 leaf 的父 split 起向上回溯，找第一个满足方向条件的 split
+  for (let i = path.length - 2; i >= 0; i--) {
+    const node = path[i]
+    if (node.type !== 'split') continue
+    const childIdx = node.children.findIndex(c => !!findWorkspacePaneById(c, leaf.id))
+    if (childIdx < 0) continue
+    const row = node.direction === 'row'
+    const col = node.direction === 'column'
+    const match =
+      (dir === 'left' && row && childIdx === 1) ||
+      (dir === 'right' && row && childIdx === 0) ||
+      (dir === 'up' && col && childIdx === 1) ||
+      (dir === 'down' && col && childIdx === 0)
+    if (!match) continue
+    const targetChild = node.children[1 - childIdx]
+    const targetLeaf = findWorkspacePaneEdgeLeaf(targetChild, dir)
+    if (targetLeaf) {
+      activateWorkspacePane(targetLeaf.id, { moveFocus: true })
+      return true
+    }
+  }
+  return false
 }
 // 以 direction 方向切分指定 leaf：把该 leaf 替换为 split，原 leaf 保留在首位，
 // 新 leaf 成为激活 pane。
@@ -17486,12 +17563,19 @@ function handleGlobalKeydown(event) {
   // （Session Panel / 集成终端 / 编辑器）。使用 Ctrl+Alt 组合，避免与输入框/其它控件的方向键行为冲突
   if (event.ctrlKey && event.altKey && !event.shiftKey &&
       (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
-    // 编辑器聚焦时让位给 Monaco 原生键位（Ctrl+Alt+↑/↓ 为「在上/下方插入光标」多光标编辑）
+    const dirMap = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' }
+    const dir = dirMap[event.key]
+    // 编辑器聚焦时让位给 Monaco 原生键位（Ctrl+Alt+↑/↓ 为「在上/下方插入光标」多光标编辑），不覆盖
     if (isMonacoEditorFocused()) return
     event.preventDefault()
     showCommandPalette.value = false
-    const dirMap = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' }
-    const dir = dirMap[event.key]
+    const inWorkspace = getFocusedZoneKey() === 'workspace' || getNamedPanelFocusKey() === 'workspace'
+    // 工作区：切换激活的分割区域（pane）
+    if (inWorkspace && showWorkspacePanel.value) {
+      if (moveActivePaneInDirection(dir)) return
+      return
+    }
+    // 大厅：切换 Agent
     const lobby = petLobbyRef.value
     if (lobby && typeof lobby.selectAgentInDirection === 'function' && lobby.selectAgentInDirection(dir)) {
       return
