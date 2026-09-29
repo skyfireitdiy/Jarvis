@@ -17,7 +17,7 @@
           @click="$emit('switch', session.terminal_id)"
         >
           <span class="terminal-tab-title">{{ session.interpreter }}</span>
-          <button class="terminal-tab-close" @click.stop="$emit('closeTerminal', session.terminal_id)">✕</button>
+          <button class="terminal-tab-close" tabindex="-1" @mousedown.prevent @click.stop="$emit('closeTerminal', session.terminal_id)">✕</button>
         </div>
       </div>
       <div class="terminal-panel-actions">
@@ -33,8 +33,8 @@
             {{ formatNodeLabel(node) }}
           </option>
         </select>
-        <button class="terminal-create-btn" @click="$emit('createTerminal')" :disabled="!socket" title="新建终端">➕</button>
-        <button class="terminal-create-btn" @click="$emit('close')" title="关闭面板">✕</button>
+        <button class="terminal-create-btn" tabindex="-1" @mousedown.prevent @click="$emit('createTerminal')" :disabled="!socket" title="新建终端">➕</button>
+        <button class="terminal-create-btn" tabindex="-1" @mousedown.prevent @click="$emit('close')" title="关闭面板">✕</button>
       </div>
     </div>
 

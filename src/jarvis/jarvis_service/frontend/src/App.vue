@@ -80,8 +80,8 @@
             <div class="workspace-sidebar-resize-handle" @mousedown="startWorkspaceSidebarResize($event)"></div>
             <div class="workspace-sidebar-header">
               <span class="workspace-sidebar-title">{{ workspaceSidebarView === 'search' ? '全局搜索' : (workspaceSidebarView === 'git' ? 'Git' : (workspaceSidebarView === 'agents' ? 'Agent 列表' : '目录树')) }}</span>
-              <button class="icon-btn-small workspace-sidebar-close-mobile" @click="closeWorkspaceSidebar" title="关闭侧边栏">✕</button>
-              <button class="icon-btn-small workspace-sidebar-close-desktop" @click="closeWorkspaceSidebar" title="关闭侧边栏">✕</button>
+              <button class="icon-btn-small workspace-sidebar-close-mobile" tabindex="-1" @mousedown.prevent @click="closeWorkspaceSidebar" title="关闭侧边栏">✕</button>
+              <button class="icon-btn-small workspace-sidebar-close-desktop" tabindex="-1" @mousedown.prevent @click="closeWorkspaceSidebar" title="关闭侧边栏">✕</button>
             </div>
             <div v-if="workspaceSidebarView === 'agents'" class="workspace-sidebar-content workspace-sidebar-agents">
               <AgentSidebar
@@ -592,13 +592,15 @@
                     >
                       <span class="workspace-tab-name">{{ tab.name }}</span>
                       <span v-if="tab.isDirty" class="workspace-tab-dirty">●</span>
-                      <button class="workspace-tab-close" @click.stop="closeWorkspaceTab(tab.path, pane.id)">✕</button>
+                      <button class="workspace-tab-close" tabindex="-1" @mousedown.prevent @click.stop="closeWorkspaceTab(tab.path, pane.id)">✕</button>
                     </div>
                     <!-- 每个 pane 自己的保存 / 只读开关：作用于本 pane 当前文件 -->
                     <div class="workspace-pane-actions">
                       <button
                         class="workspace-pane-action"
                         :disabled="!workspaceViewPanes.get(pane.id)"
+                        tabindex="-1"
+                        @mousedown.prevent
                         @click.stop="savePaneWorkspaceFile(pane.id)"
                         title="保存本区域文件"
                       >💾</button>
@@ -606,6 +608,8 @@
                         class="workspace-pane-action"
                         :class="{ editable: isWorkspaceEditable }"
                         :disabled="!workspaceViewPanes.get(pane.id)"
+                        tabindex="-1"
+                        @mousedown.prevent
                         @click.stop="toggleWorkspaceEditable()"
                         :title="isWorkspaceEditable ? '切换到只读模式' : '切换到编辑模式'"
                       >{{ isWorkspaceEditable ? '🔓' : '🔒' }}</button>

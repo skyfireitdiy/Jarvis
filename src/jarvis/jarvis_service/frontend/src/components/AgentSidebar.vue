@@ -7,11 +7,11 @@
     <div class="agent-sidebar-header">
       <h3>Agent 列表</h3>
       <div class="sidebar-header-actions">
-        <button class="icon-btn" :class="{ active: isBatchMode }" @click="$emit('toggleBatchMode')" title="批量选择模式">☑</button>
-        <button class="icon-btn" @click="openManageGroups" title="管理分组">📁</button>
-        <button class="icon-btn" @click="$emit('orchestrate')" title="编排：从编排文件批量创建 Agent">🧩</button>
-        <button class="icon-btn" @click="$emit('createAgent')" title="创建新 Agent">➕</button>
-        <button v-if="!embedded" class="icon-btn" @click="$emit('close')" title="关闭侧边栏">✕</button>
+        <button class="icon-btn" tabindex="-1" :class="{ active: isBatchMode }" @mousedown.prevent @click="$emit('toggleBatchMode')" title="批量选择模式">☑</button>
+        <button class="icon-btn" tabindex="-1" @mousedown.prevent @click="openManageGroups" title="管理分组">📁</button>
+        <button class="icon-btn" tabindex="-1" @mousedown.prevent @click="$emit('orchestrate')" title="编排：从编排文件批量创建 Agent">🧩</button>
+        <button class="icon-btn" tabindex="-1" @mousedown.prevent @click="$emit('createAgent')" title="创建新 Agent">➕</button>
+        <button v-if="!embedded" class="icon-btn" tabindex="-1" @mousedown.prevent @click="$emit('close')" title="关闭侧边栏">✕</button>
       </div>
     </div>
     <div class="agent-list">

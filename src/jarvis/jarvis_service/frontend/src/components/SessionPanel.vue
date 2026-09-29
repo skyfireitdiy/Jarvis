@@ -4,7 +4,7 @@
     <div v-if="!agent" class="session-panel-empty">
       <div class="empty-icon">▦</div>
       <div class="empty-text">点击左侧 Agent 在此打开</div>
-      <button class="empty-close-btn" @click.stop="$emit('close-panel')" title="关闭面板">✕</button>
+      <button class="empty-close-btn" tabindex="-1" @mousedown.prevent @click.stop="$emit('close-panel')" title="关闭面板">✕</button>
     </div>
 
     <!-- 有 Agent 的会话 -->
@@ -15,7 +15,7 @@
         <span class="session-agent-status" :class="getStatusClass(agent)">{{ getStatusLabel(agent) }}</span>
         <!-- 操作图标已迁移至 Ctrl+P 命令面板「当前 Agent」组 -->
         <div class="session-header-actions">
-          <button class="session-close-panel-btn" @click.stop="$emit('close-panel')" title="关闭面板">✕</button>
+          <button class="session-close-panel-btn" tabindex="-1" @mousedown.prevent @click.stop="$emit('close-panel')" title="关闭面板">✕</button>
         </div>
       </div>
 

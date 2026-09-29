@@ -13,7 +13,7 @@
       </div>
       <span class="chat-username">{{ myName }}</span>
       <div class="chat-panel-actions">
-        <button class="icon-btn small" @click="$emit('close')" title="关闭面板">✕</button>
+        <button class="icon-btn small" tabindex="-1" @mousedown.prevent @click="$emit('close')" title="关闭面板">✕</button>
       </div>
     </div>
 
@@ -24,9 +24,9 @@
         <div class="chat-sidebar-header">
           <span>聊天室</span>
           <div class="chat-sidebar-actions">
-            <button class="icon-btn small" @click="showCreateRoomInput" title="创建聊天室">➕</button>
-            <button class="icon-btn small" @click="$emit('clearMessages', 'all')" title="清空全部记录">🗑</button>
-            <button class="icon-btn small" @click="sidebarCollapsed = true" title="收起侧边栏">◀</button>
+            <button class="icon-btn small" tabindex="-1" @mousedown.prevent @click="showCreateRoomInput" title="创建聊天室">➕</button>
+            <button class="icon-btn small" tabindex="-1" @mousedown.prevent @click="$emit('clearMessages', 'all')" title="清空全部记录">🗑</button>
+            <button class="icon-btn small" tabindex="-1" @mousedown.prevent @click="sidebarCollapsed = true" title="收起侧边栏">◀</button>
           </div>
         </div>
 

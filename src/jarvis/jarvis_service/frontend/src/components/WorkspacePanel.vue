@@ -14,7 +14,7 @@
         <h3>工作区</h3>
       </div>
       <div class="workspace-panel-actions">
-        <button class="icon-btn close-btn" @click.stop="$emit('close')" title="关闭">✕</button>
+        <button class="icon-btn close-btn" tabindex="-1" @mousedown.prevent @click.stop="$emit('close')" title="关闭">✕</button>
       </div>
     </div>
     <div class="workspace-main">
@@ -22,6 +22,8 @@
         <button
           class="workspace-activity-button"
           :class="{ active: showSidebar && sidebarView === 'agents' }"
+          tabindex="-1"
+          @mousedown.prevent
           @click="$emit('setSidebarView', 'agents')"
           title="Agent 列表"
         >
@@ -30,18 +32,24 @@
         <button
           class="workspace-activity-button"
           :class="{ active: showSidebar && sidebarView === 'files' }"
+          tabindex="-1"
+          @mousedown.prevent
           @click="$emit('setSidebarView', 'files')"
           title="目录树"
         >📁</button>
         <button
           class="workspace-activity-button"
           :class="{ active: showSidebar && sidebarView === 'search' }"
+          tabindex="-1"
+          @mousedown.prevent
           @click="$emit('setSidebarView', 'search')"
           title="全局搜索"
         >🔎</button>
         <button
           class="workspace-activity-button"
           :class="{ active: showSidebar && sidebarView === 'git' }"
+          tabindex="-1"
+          @mousedown.prevent
           @click="$emit('setSidebarView', 'git')"
           title="Git"
         >
@@ -52,28 +60,38 @@
         <button
           class="workspace-activity-button"
           :class="{ active: mainView === 'chat' }"
+          tabindex="-1"
+          @mousedown.prevent
           @click="$emit('setMainView', 'chat')"
           title="聊天室"
         >💬</button>
         <button
           class="workspace-activity-button"
           :class="{ active: mainView === 'terminal' }"
+          tabindex="-1"
+          @mousedown.prevent
           @click="$emit('setMainView', 'terminal')"
           title="终端"
         >⌨️</button>
         <button
           class="workspace-activity-button"
+          tabindex="-1"
+          @mousedown.prevent
           @click="$emit('openSettings')"
           title="设置 (Ctrl+Alt+,)"
         >⚙</button>
         <button
           class="workspace-activity-button"
+          tabindex="-1"
+          @mousedown.prevent
           @click="$emit('openDocs')"
           title="使用文档 (Ctrl+Alt+Shift+H)"
         >❓</button>
         <button
           v-if="isAdmin"
           class="workspace-activity-button"
+          tabindex="-1"
+          @mousedown.prevent
           @click="$emit('openAdmin')"
           title="管理 (Ctrl+Alt+Shift+A)"
         >🛡️</button>
@@ -94,7 +112,7 @@
           >
             <span class="workspace-tab-name">{{ tab.name }}</span>
             <span v-if="tab.isDirty" class="workspace-tab-dirty">●</span>
-            <button class="workspace-tab-close" @click.stop="$emit('closeTab', tab.path)">✕</button>
+            <button class="workspace-tab-close" tabindex="-1" @mousedown.prevent @click.stop="$emit('closeTab', tab.path)">✕</button>
           </div>
           <!-- 未分割态同样提供保存 / 只读开关（作用于当前激活文件），
                与已分割态各 pane 的工具栏保持一致，避免「未分割时无法切换可编辑」。 -->
@@ -102,6 +120,8 @@
             <button
               class="workspace-pane-action"
               :disabled="!hasActiveTab"
+              tabindex="-1"
+              @mousedown.prevent
               @click.stop="$emit('save')"
               title="保存当前文件"
             >💾</button>
@@ -109,6 +129,8 @@
               class="workspace-pane-action"
               :class="{ editable: isEditable }"
               :disabled="!hasActiveTab"
+              tabindex="-1"
+              @mousedown.prevent
               @click.stop="$emit('toggleEditable')"
               :title="isEditable ? '切换到只读模式' : '切换到编辑模式'"
             >{{ isEditable ? '🔓' : '🔒' }}</button>
@@ -128,15 +150,15 @@
               <span class="workspace-diff-title" :title="diff.filePath">{{ diff.filePath }}</span>
               <span v-if="diff.commitHash" class="workspace-diff-hash">{{ diff.commitHash.slice(0, 7) }}</span>
               <span v-if="diff.truncated" class="workspace-diff-truncated">（已截断）</span>
-              <button class="workspace-diff-nav" @click="$emit('diffNavPrev')" title="上一个差异">▲</button>
-              <button class="workspace-diff-nav" @click="$emit('diffNavNext')" title="下一个差异">▼</button>
-              <button class="workspace-diff-toggle" @click="$emit('toggleDiffShowFull')" :title="diff.showFull ? '只显示变更上下文区域' : '显示文件全文'">
+              <button class="workspace-diff-nav" tabindex="-1" @mousedown.prevent @click="$emit('diffNavPrev')" title="上一个差异">▲</button>
+              <button class="workspace-diff-nav" tabindex="-1" @mousedown.prevent @click="$emit('diffNavNext')" title="下一个差异">▼</button>
+              <button class="workspace-diff-toggle" tabindex="-1" @mousedown.prevent @click="$emit('toggleDiffShowFull')" :title="diff.showFull ? '只显示变更上下文区域' : '显示文件全文'">
                 {{ diff.showFull ? '仅上下文' : '全文' }}
               </button>
-              <button class="workspace-diff-toggle" @click="$emit('toggleDiffSideBySide')">
+              <button class="workspace-diff-toggle" tabindex="-1" @mousedown.prevent @click="$emit('toggleDiffSideBySide')">
                 {{ diff.sideBySide ? '内联' : '并排' }}
               </button>
-              <button class="workspace-diff-close" @click="$emit('closeDiff')" title="关闭 diff">✕</button>
+              <button class="workspace-diff-close" tabindex="-1" @mousedown.prevent @click="$emit('closeDiff')" title="关闭 diff">✕</button>
             </div>
             <div v-if="diff.loading" class="workspace-diff-status">加载 diff...</div>
             <div v-else-if="diff.error" class="workspace-diff-status error">{{ diff.error }}</div>

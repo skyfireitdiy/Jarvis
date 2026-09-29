@@ -5,12 +5,14 @@
     <span class="workspace-pane-leaf-title">{{ getTitle ? getTitle(node) : (node.view === 'session' ? '会话' : '文件') }}</span>
     <span v-if="getStatus && getStatus(node)" class="workspace-pane-leaf-status">{{ getStatus(node) }}</span>
     <div class="workspace-pane-leaf-actions">
-      <button v-if="canSplit" class="workspace-pane-leaf-btn" title="左右分" @click.stop="$emit('split', node.id, 'row')">◫</button>
-      <button v-if="canSplit" class="workspace-pane-leaf-btn" title="上下分" @click.stop="$emit('split', node.id, 'column')">⬓</button>
+      <button v-if="canSplit" tabindex="-1" class="workspace-pane-leaf-btn" title="左右分" @mousedown.prevent @click.stop="$emit('split', node.id, 'row')">◫</button>
+      <button v-if="canSplit" tabindex="-1" class="workspace-pane-leaf-btn" title="上下分" @mousedown.prevent @click.stop="$emit('split', node.id, 'column')">⬓</button>
       <button
         v-if="canClose"
+        tabindex="-1"
         class="workspace-pane-leaf-btn"
         title="关闭此区域"
+        @mousedown.prevent
         @click.stop="$emit('close', node.id)"
       >✕</button>
     </div>
