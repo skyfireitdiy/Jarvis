@@ -158,6 +158,8 @@ coverage.xml
 .jarvis/rag
 .jarvis/task_lists
 .jarvis/knowledge_graph
+# 记忆文件可能包含真实凭据/密钥，禁止入库
+.jarvis/memory
 goals
 site
 .jarvis/sessions

@@ -1514,9 +1514,11 @@ class WebSocketConnectionManager:
             elif message_type == "chat_get_room_members":
                 await self._handle_chat_get_room_members(payload, websocket)
             elif message_type == "chat_send_private":
-                await self._handle_chat_send_private(payload, websocket)
+                await self._handle_chat_send_private(payload, websocket, session_id)
             elif message_type == "chat_get_private_history":
-                await self._handle_chat_get_private_history(payload, websocket)
+                await self._handle_chat_get_private_history(
+                    payload, websocket, session_id
+                )
             else:
                 await websocket.send_json(
                     {
@@ -1771,11 +1773,39 @@ class WebSocketConnectionManager:
         )
 
     async def _handle_chat_send_private(
-        self, payload: Dict[str, Any], websocket: WebSocket
+        self,
+        payload: Dict[str, Any],
+        websocket: WebSocket,
+        session_id: Optional[str] = None,
     ) -> None:
-        """发送私聊消息。"""
-        sender_id = payload.get("sender_id", "")
+        """发送私聊消息。
+
+        安全：发送者强制使用认证用户对应的 client_id，忽略客户端传入的
+        sender_id，防止冒充他人发送私聊（身份伪造）。
+        """
         receiver_id = payload.get("receiver_id", "")
+        # 解析当前认证用户的 client_id
+        sender_id = None
+        if session_id:
+            auth_payload = self._auth_store.get(session_id)
+            if auth_payload and isinstance(auth_payload, dict):
+                user_info = auth_payload.get("user_info")
+                if user_info and isinstance(user_info, dict):
+                    auth_user_id = user_info.get("user_id")
+                    if auth_user_id:
+                        client_info = self._chat_manager.get_client_by_user_id(
+                            auth_user_id
+                        )
+                        if client_info:
+                            sender_id = client_info.get("client_id")
+        if not sender_id:
+            await websocket.send_json(
+                {
+                    "type": "chat_send_private_response",
+                    "payload": {"success": False, "error": "发送者未注册"},
+                }
+            )
+            return
         content = payload.get("content", "")
         image_url = payload.get("image_url", "")
         result = await self._chat_manager.send_private(
@@ -1786,12 +1816,35 @@ class WebSocketConnectionManager:
         )
 
     async def _handle_chat_get_private_history(
-        self, payload: Dict[str, Any], websocket: WebSocket
+        self,
+        payload: Dict[str, Any],
+        websocket: WebSocket,
+        session_id: Optional[str] = None,
     ) -> None:
-        """获取私聊历史消息。"""
-        client_id = payload.get("client_id", "")
+        """获取私聊历史消息。
+
+        安全：会话一方强制使用认证用户的 user_id，忽略客户端传入的 client_id，
+        防止越权读取他人私聊（IDOR）。
+        """
         other_id = payload.get("other_id", "")
-        result = self._chat_manager.get_private_history(client_id, other_id)
+        # 解析当前认证用户
+        auth_user_id = None
+        if session_id:
+            auth_payload = self._auth_store.get(session_id)
+            if auth_payload and isinstance(auth_payload, dict):
+                user_info = auth_payload.get("user_info")
+                if user_info and isinstance(user_info, dict):
+                    auth_user_id = user_info.get("user_id")
+        if not auth_user_id:
+            await websocket.send_json(
+                {
+                    "type": "chat_get_private_history_response",
+                    "payload": {"success": False, "error": "无权访问该私聊会话"},
+                }
+            )
+            return
+        # 强制以认证用户的 user_id 作为会话一方：客户端传什么都只能查到自己参与的会话
+        result = self._chat_manager.get_private_history(auth_user_id, other_id)
         await websocket.send_json(
             {"type": "chat_get_private_history_response", "payload": result}
         )

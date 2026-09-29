@@ -560,9 +560,12 @@ class ChatManager:
             "sent_count": sent_count,
         }
 
-    def get_private_history(self, client_id: str, other_id: str) -> Dict[str, Any]:
-        """获取私聊历史消息。"""
-        session_id = self._find_private_session(client_id, other_id)
+    def get_private_history(self, user_id: str, other_id: str) -> Dict[str, Any]:
+        """获取私聊历史消息。
+
+        参数均为 user_id：私聊会话统一以 user_id 为标识（见 send_private）。
+        """
+        session_id = self._find_private_session(user_id, other_id)
         if not session_id:
             return {"success": True, "messages": []}
         return {
@@ -571,11 +574,11 @@ class ChatManager:
             "messages": self._chat_private_sessions[session_id]["messages"],
         }
 
-    def _find_private_session(self, client_a: str, client_b: str) -> Optional[str]:
-        """查找两个客户端之间的私聊会话。"""
+    def _find_private_session(self, user_a: str, user_b: str) -> Optional[str]:
+        """查找两个用户之间的私聊会话（按 user_id 匹配）。"""
         for sid, session in self._chat_private_sessions.items():
-            if (
-                session["client_a"] == client_a and session["client_b"] == client_b
-            ) or (session["client_a"] == client_b and session["client_b"] == client_a):
+            if (session["client_a"] == user_a and session["client_b"] == user_b) or (
+                session["client_a"] == user_b and session["client_b"] == user_a
+            ):
                 return sid
         return None

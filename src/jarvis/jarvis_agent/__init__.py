@@ -1648,29 +1648,10 @@ class Agent:
         return content or ""
 
     def _fire_after_tool_call(self) -> None:
-        """触发 AFTER_TOOL_CALL：先调用订阅回调，再广播事件（镜像文本协议路径）。"""
-        try:
-            listeners = self.event_bus._listeners.get(AFTER_TOOL_CALL, [])
-            for _, _, callback in list(listeners):
-                try:
-                    callback(
-                        agent=self,
-                        current_response="",
-                        need_return=False,
-                        tool_prompt="",
-                    )
-                except Exception as e:
-                    save_exception(
-                        e,
-                        module="jarvis_agent.__init__",
-                        function="_fire_after_tool_call",
-                    )
-                    pass
-        except Exception as e:
-            save_exception(
-                e, module="jarvis_agent.__init__", function="_fire_after_tool_call"
-            )
-            pass
+        """触发 AFTER_TOOL_CALL：emit 会按优先级调用所有订阅回调。
+
+        （此前先手动遍历 _listeners 再 emit，导致同一批回调被派发两次）
+        """
         try:
             self.event_bus.emit(
                 AFTER_TOOL_CALL,
@@ -3853,6 +3834,7 @@ class Agent:
 
         # 使用临时模型实例调用模型，以避免污染历史记录
         try:
+
             def _select_with_normal_model() -> str:
                 """现有流程：用临时模型筛选工具编号。"""
                 temp_model = self._create_temp_model("你是辅助筛选工具的助手。")

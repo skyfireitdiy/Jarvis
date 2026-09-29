@@ -57,7 +57,11 @@ class _FakeBus:
         self.emitted = []
 
     def emit(self, event, **kwargs):
+        # 对齐真实 EventBus.emit 语义：按优先级调用订阅回调（仅调用一次）
         self.emitted.append(event)
+        for _, _, cb in self._listeners.get(event, []):
+            if cb:
+                cb(**kwargs)
 
 
 def test_fire_after_tool_call_invokes_listener_and_emits():
@@ -80,9 +84,7 @@ def test_confirm_deny_returns_rejection():
     a, store = _make()
     a.execute_tool_confirm = True
     a.confirm_callback = lambda *x, **k: False
-    out = a._execute_native_batch(
-        [{"id": "1", "name": "read_code", "arguments": {}}]
-    )
+    out = a._execute_native_batch([{"id": "1", "name": "read_code", "arguments": {}}])
     assert "拒绝" in out[0]
 
 

@@ -1,0 +1,26 @@
+# Gitleaks 扫描配置
+#
+# 说明：本文件用于统一 Gitleaks 的扫描规则与白名单，供
+#   - 提交前钩子 .githooks/pre-commit（staged 扫描）
+#   - 全历史扫描（gitleaks git --log-opts="--all"）
+# 共用，保证两处行为一致。
+#
+# [extend] useDefault = true 表示在 Gitleaks 内置默认规则集基础上扩展。
+# 必须保留：若只写 [allowlist] 而不 extend，Gitleaks 会认为规则集为空，
+# 导致所有检测失效（已实测踩坑）。
+#
+# 白名单（allowlist）仅用于排除「确定非真实凭据」的误报路径，避免每次扫描
+# 都产生噪音。被排除的均为：
+#   - tests/jarvis_sec/datasets/  —— 故意构造的泄漏样本测试夹具（sk-...、RSA 私钥等）
+#   - browser_extension/manifest.json —— RSA 公钥（非私钥），被 generic-api-key 误报
+#
+# 注意：真实凭据（如 .jarvis/memory 中的 API key）绝不可加入此白名单。
+
+[extend]
+useDefault = true
+
+[allowlist]
+paths = [
+    '''^tests/jarvis_sec/datasets/''',
+    '''^browser_extension/manifest\.json$''',
+]
