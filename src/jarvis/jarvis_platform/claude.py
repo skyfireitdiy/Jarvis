@@ -482,7 +482,7 @@ class ClaudeModel(BasePlatform):
 
         # 重试循环：渲染管线检测到输出陷入重复（返回空 content 且无 tool_calls）时重试，
         # 与文本协议路径 chat_until_success 的 while_true 重试机制对齐。
-        max_retries = 6
+        max_retries = 7
         for attempt in range(max_retries):
             # 与文本协议路径 while_true/while_success 对齐：每轮开始前检查中断信号，
             # 用户点击“人工介入”后立即停止重试，避免继续空转重试。
