@@ -9177,6 +9177,15 @@ function SIDEBAR_TOUR_STEPS() {
       target: '.workspace-sidebar-agents',
       placement: 'right',
     },
+    {
+      id: 'sidebar-orchestrate',
+      icon: '🧩',
+      title: '编排：批量创建 Agent',
+      desc: '点击侧边栏顶部的「🧩」，选择节点与编排文件（YAML）后解析，会为文件中每个 Agent 生成一个可编辑表单，确认后一键批量创建。',
+      hint: '每个 Agent 可单独设置名称、类型、工作目录、模型组、目标节点等；任务描述填写后 Agent 启动即执行（无交互模式下必填）。',
+      target: '.workspace-sidebar-agents',
+      placement: 'right',
+    },
   ]
 }
 
