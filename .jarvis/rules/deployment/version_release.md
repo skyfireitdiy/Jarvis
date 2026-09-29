@@ -92,14 +92,20 @@ description: 当需要发布新版本或管理版本号时触发。每当用户�
 
 **执行步骤：**
 
-1. 执行命令获取最新tag：
+1. 读取 `src/jarvis/__init__.py` 中之 `__version__`：
 
 ```bash
-git describe --tags --abbrev=0
+grep -oP '__version__\s*=\s*"\K[^"]+' src/jarvis/__init__.py
 ```
 
-1. 若无tag，用默认版本 `v1.0.0`
-   **预期输出：** 最新版本号（如 `v1.1.1`）
+1. 该值即为当前版本号（不带 `v` 前缀，如 `6.0.6`）；于 ReleaseNote 及 tag 中展示时补上 `v` 前缀（如 `v6.0.6`）
+   **预期输出：** 当前版本号（如 `6.0.6`，展示为 `v6.0.6`）
+
+**注意事项：**
+
+- **必**：以 `src/jarvis/__init__.py` 之 `__version__` 为版本号唯一权威来源
+- **禁**：用 `git describe --tags` 或 git tag 获取当前版本号（tag 可能被清理或缺失，不可靠）
+- `setup.py`、`pyproject.toml`、`browser_extension/manifest.json` 中之版本号由发布脚本同步，勿单独作为来源
 
 ### 操作2：获取当前日期
 
@@ -148,18 +154,21 @@ pytest -v --tb=short
 1. 首先获取变更统计信息：
 
 ```bash
-git diff <latest_tag> HEAD --stat
+git diff <base> HEAD --stat
 ```
 
 1. 然后获取完整之代码差异：
 
 ```bash
-git diff <latest_tag> HEAD
+git diff <base> HEAD
 ```
 
 **注意事项：**
 
-- `<latest_tag>` 替换为操作1获取之版本号
+- `<base>` 为变更起始基准，按以下优先级确定：
+  1. 若存在上一版本之 tag（`git describe --tags --abbrev=0` 有输出），用该 tag
+  2. 若无 tag，用 ReleaseNote.md 中上一版本对应之提交（可用 `git log --oneline --grep='Bump version'` 定位）
+  3. 若仍无法确定，用最近一次 `Bump version` 提交作为基准
 - 若输出过大，可限制行数（如 `| head -n 500`）
 
 ### 操作5：学习ReleaseNote格式
@@ -187,8 +196,8 @@ head -n 200 {{ jarvis_src_dir }}/ReleaseNote.md
 1. **计算新版本号**（据用户提供之版本类型）：
 
 ```python
-# 版本号计算逻辑
-major, minor, patch = map(int, latest_version[1:].split('.'))
+# current_version 来自操作1，即 src/jarvis/__init__.py 中之 __version__（不带 v 前缀，如 "6.0.6"）
+major, minor, patch = map(int, current_version.split('.'))
 if version_type == 'major':
     new_version = f"v{major + 1}.0.0"
 elif version_type == 'minor':
@@ -261,7 +270,7 @@ else:
 
 完成任务后，汝必确认：
 
-- [ ] 最新版本号获取成功（格式正确：vX.Y.Z）
+- [ ] 最新版本号获取成功（来源：`src/jarvis/__init__.py` 之 `__version__`，格式 `X.Y.Z`，展示补 `v` 前缀）
 - [ ] 日期获取成功（格式正确：YYYY-MM-DD）
 - [ ] pytest测试全部通过（无失败用例）
 - [ ] 代码变更已获取（用了git diff而非git log）
@@ -288,7 +297,8 @@ else:
 
 ### Q2：若无git tag如何？
 
-用默认版本号 `v1.0.0` 作为基准版本。
+版本号不依赖 git tag，直接读 `src/jarvis/__init__.py` 之 `__version__` 即可，无需回退默认版本。
+仅在获取**代码变更基准**（操作4）时，若 tag 缺失，改用 ReleaseNote.md 上一版本对应之提交或最近一次 `Bump version` 提交作为基准。
 
 ### Q3：如何确定版本类型（major/minor/patch）？
 
