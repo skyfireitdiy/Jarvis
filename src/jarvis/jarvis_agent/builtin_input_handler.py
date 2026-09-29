@@ -39,6 +39,7 @@ from jarvis.jarvis_utils.git_utils import (
     get_latest_commit_hash,
     get_diff_between_commits,
     find_git_root,
+    advance_start_commit,
 )
 
 
@@ -1171,6 +1172,17 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                     }
                 )
             else:
+                # 任务期间可能已有正式提交（用户手动提交或此前 <Commit> 产生）。
+                # 先把任务起始点前移到最后一个非临时提交，避免后续
+                # handle_commit_confirmation 的 reset --mixed 误伤这些正式提交。
+                new_start = advance_start_commit(start_commit)
+                if new_start and new_start != start_commit:
+                    start_commit = new_start
+                    agent.start_commit = new_start
+                    PrettyOutput.auto_print(
+                        f"ℹ️ 检测到正式提交，任务起始点已更新为 {new_start[:7]}"
+                    )
+
                 commits = git_manager.show_commit_between(start_commit, end_commit)
 
                 # 调用 handle_commit_confirmation 处理提交确认
