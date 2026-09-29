@@ -9122,7 +9122,7 @@ function PANEL_TOUR_STEPS() {
       icon: '🪟',
       title: '关闭面板',
       desc: '按 Ctrl+W 关闭当前焦点所在的面板，回到宠物大厅；编辑器内可左右/上下分割出多个区域，每个区域独立承载文件、会话、终端或聊天。',
-      hint: '编辑器内按 Ctrl+\\ 左右分割、Ctrl+Shift+\\ 上下分割；分割后 Ctrl+W 关闭当前激活的区域。',
+      hint: '编辑器内按 Ctrl+\\ 左右分割、Ctrl+- 上下分割；分割后 Ctrl+W 关闭当前激活的区域。',
       target: '.session-panel',
       placement: 'top',
     },
@@ -17614,14 +17614,23 @@ function handleGlobalKeydown(event) {
     }
   }
 
-  // Ctrl/Cmd + \ 左右分割当前激活 pane；Ctrl/Cmd + Shift + \ 上下分割
+  // Ctrl/Cmd + \ 左右分割当前激活 pane；Ctrl/Cmd + - 上下分割
   // 只要工作区打开（不再限定编辑器 file 视图）且非移动端即生效；未分割时先分割激活 pane。
-  if (isModifierPressed && !event.altKey && event.code === 'Backslash') {
-    // Ctrl+Shift+\ 与 Monaco 的「跳转到匹配括号」冲突：编辑器聚焦时让位给编辑器
-    if (event.shiftKey && isMonacoEditorFocused()) return
+  // 上下分割改用 Ctrl+-（替代原 Ctrl+Shift+\，避免与 Monaco「跳转到匹配括号」冲突；
+  // 同时覆盖 Monaco 的 Ctrl+- 缩小字号，用户不需要缩放）。
+  if (isModifierPressed && !event.altKey && !event.shiftKey && event.code === 'Backslash') {
     if (showWorkspacePanel.value && windowWidth.value > 768) {
       event.preventDefault()
-      splitWorkspacePane(activePaneId.value, event.shiftKey ? 'column' : 'row')
+      splitWorkspacePane(activePaneId.value, 'row')
+      return
+    }
+  }
+  // Ctrl/Cmd + - 上下分割（主键盘减号 Minus / 小键盘减号 NumpadSubtract）
+  if (isModifierPressed && !event.altKey && !event.shiftKey &&
+      (event.code === 'Minus' || event.code === 'NumpadSubtract')) {
+    if (showWorkspacePanel.value && windowWidth.value > 768) {
+      event.preventDefault()
+      splitWorkspacePane(activePaneId.value, 'column')
       return
     }
   }
