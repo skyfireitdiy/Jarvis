@@ -92,6 +92,7 @@ from jarvis.jarvis_web_gateway.node_protocol import (
     AGENT_LIST_REQUEST,
     AGENT_STOP_REQUEST,
     AGENT_DELETE_REQUEST,
+    AGENT_REGENERATE_REQUEST,
     NODE_HTTP_PROXY_REQUEST,
     AGENT_WS_OPEN_REQUEST,
     AGENT_WS_SEND_REQUEST,
@@ -6304,6 +6305,97 @@ def create_app(
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
+    # HTTP API：Agent 无损重生（保存会话→删除→重建）
+    @app.post("/api/agents/{agent_id}/regenerate", dependencies=[Depends(verify_token)])
+    async def regenerate_agent(
+        agent_id: str, request: Request, node_id: str = ""
+    ) -> Dict[str, Any]:
+        """无损重生 Agent：网关侧完成保存会话→删除→重建整个流程。
+
+        重生后 agent_id 不变，仅 port 可能变化；由网关完成所有流程，
+        使 Agent 能够无损重生自己而不中断流程。
+        """
+        # 权限检查：只有 owner 或 admin 可以重生 Agent
+        user_info = getattr(request.state, "user_info", None)
+        if user_info and user_info.get("user_id") != "system":
+            is_admin = user_info.get("is_admin", False)
+            if not is_admin:
+                agent_info = agent_manager.get_agent(agent_id)
+                if (
+                    agent_info
+                    and agent_info.owner_id
+                    and agent_info.owner_id != user_info.get("user_id")
+                ):
+                    if not permission_manager.check_permission(
+                        user_info["user_id"], "agent:delete"
+                    ):
+                        return {
+                            "success": False,
+                            "error": {
+                                "code": "FORBIDDEN",
+                                "message": "You can only regenerate your own agents",
+                            },
+                        }
+        try:
+            resolved_target_node = str(node_id or "").strip()
+            route = node_runtime.agent_route_registry.get(agent_id)
+            if not resolved_target_node and route is not None:
+                resolved_target_node = str(route.node_id or "").strip()
+            if resolved_target_node and resolved_target_node not in (
+                node_runtime.local_node_id,
+                "master",
+            ):
+                response = await node_connection_manager.send_request_to_node(
+                    resolved_target_node,
+                    AGENT_REGENERATE_REQUEST,
+                    {"agent_id": agent_id},
+                )
+                payload = response.get("payload") or {}
+                if not payload.get("success"):
+                    error = payload.get("error") or {}
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": error.get("code", "AGENT_REGENERATE_FAILED"),
+                            "message": error.get(
+                                "message", "Remote agent regenerate failed"
+                            ),
+                        },
+                    }
+                # 远程重生后 port 可能变化，重新注册路由
+                result = payload.get("result") or {}
+                new_agent = result.get("new_agent") or {}
+                if new_agent.get("agent_id"):
+                    node_runtime.agent_route_registry.register(
+                        AgentRouteInfo(
+                            agent_id=new_agent["agent_id"],
+                            node_id=new_agent.get("node_id", resolved_target_node),
+                            status=new_agent.get("status", "running"),
+                            working_dir=new_agent.get("working_dir"),
+                            port=new_agent.get("port"),
+                        )
+                    )
+                return {"success": True, "data": result}
+            # 本地重生
+            result = agent_manager.regenerate_agent(agent_id)
+            new_agent = result.get("new_agent") or {}
+            if new_agent.get("agent_id"):
+                node_runtime.agent_route_registry.register(
+                    AgentRouteInfo(
+                        agent_id=new_agent["agent_id"],
+                        node_id=new_agent.get("node_id", node_runtime.local_node_id),
+                        status=new_agent.get("status", "running"),
+                        working_dir=new_agent.get("working_dir"),
+                        port=new_agent.get("port"),
+                    )
+                )
+            return {"success": True, "data": result}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
     # HTTP API：获取可恢复的 session 列表
     @app.get("/api/agents/{agent_id}/sessions", dependencies=[Depends(verify_token)])
     async def list_agent_sessions(
@@ -9187,6 +9279,15 @@ def create_app(
                         "message": "Unsupported method",
                     },
                 }
+        elif (
+            normalized_path.startswith("/agents/")
+            and normalized_path.endswith("/regenerate")
+            and normalized_method == "POST"
+        ):
+            agent_id = normalized_path[len("/agents/") : -len("/regenerate")].strip("/")
+            result = await regenerate_agent(
+                agent_id, _mock_req, str(payload.get("node_id") or "")
+            )
         elif normalized_path.startswith("/http_proxy/"):
             # 远程节点 HTTP 代理：转发请求到外部 API
             # 路径格式：/http_proxy/{target_url}

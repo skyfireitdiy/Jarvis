@@ -2144,12 +2144,9 @@ class GatewayManagerTool:
     ) -> Dict[str, Any]:
         """无损重生指定 Agent。
 
-        通过以下步骤实现 Agent 的无损重生：
-        1. 获取 Agent 完整配置信息（名称、工作目录、类型、模型组等）
-        2. 调用 Agent 的 /sessions/save 端点保存会话
-        3. 删除 Agent
-        4. 使用相同参数重建 Agent，补充 restore_session=session_file
-        5. 返回新 Agent 信息
+        通过网关侧新增的 POST /api/agents/{agent_id}/regenerate 接口完成
+        「保存会话 → 删除 → 重建」整个流程。该流程在网关进程内执行，
+        不会因删除 Agent 进程而中断，使 Agent 能够无损重生自己。
 
         参数:
             agent_id: 要重生的 Agent ID（必填）
@@ -2165,122 +2162,58 @@ class GatewayManagerTool:
         if err:
             return err
 
-        # 1. 获取 Agent 列表，找到目标 Agent 的配置信息
-        list_result = self._list_agents()
-        if not list_result["success"]:
-            return list_result
-
-        # 解析 Agent 列表
-        try:
-            agents_data = json.loads(list_result["stdout"])
-            agents = agents_data.get("agents", [])
-        except (json.JSONDecodeError, KeyError):
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": "Failed to parse agents list",
-            }
-
-        # 查找目标 Agent
-        target_agent = None
-        for agent in agents:
-            if agent.get("agent_id") == agent_id:
-                target_agent = agent
-                break
-
-        if not target_agent:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": f"Agent {agent_id} not found",
-            }
-
-        # 解析节点 ID
+        # 解析节点 ID（校验目标节点是否存在；子节点场景由网关按 node_id 转发）
         try:
             resolved_node_id = self._resolve_node_id(agent_id, node_id)
         except ValueError as e:
             return {"success": False, "stdout": "", "stderr": str(e)}
 
-        # 2. 保存 Agent 的会话
-        # 构建保存会话的请求
-        session_file = None  # 默认无会话文件
-        save_session_path = f"/api/agent/{agent_id}/sessions/save"
-        # 构建 query 参数
-        query_params: Dict[str, str] = {}
+        # 调用网关侧重生接口。请求始终发往 master，node_id 作为 query 参数
+        # 传递：目标在子节点时由 master 路由转发到对应子节点执行重生。
+        regenerate_path = f"/api/agents/{agent_id}/regenerate"
         if resolved_node_id:
-            query_params["node_id"] = resolved_node_id
-        save_result = self._request_gateway(
+            regenerate_path += f"?node_id={resolved_node_id}"
+
+        result = self._request_gateway(
             method="POST",
-            path=save_session_path,
-            params=query_params if query_params else None,
-            error_prefix=f"Failed to save session for agent {agent_id}",
+            path=regenerate_path,
+            error_prefix=f"Failed to regenerate agent {agent_id}",
         )
 
-        # 解析保存结果，获取会话文件路径
-        # 保存失败不阻断重生流程，仅跳过会话恢复
-        if save_result.get("success"):
-            try:
-                save_data = save_result["data"]
-                if save_data.get("success"):
-                    session_file = save_data.get("session_file")
-            except (KeyError, TypeError):
-                pass
+        if not result["success"]:
+            return {"success": False, "stdout": "", "stderr": result["error"]}
 
-        if not session_file:
-            # 没有可恢复的会话，仍继续重生（不恢复会话）
-            pass
+        gateway_data = result["data"]
+        if not gateway_data.get("success"):
+            error_info = gateway_data.get("error", {})
+            error_msg = (
+                error_info.get("message", "unknown error")
+                if isinstance(error_info, dict)
+                else str(error_info)
+            )
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"Gateway returned error: {error_msg}",
+            }
 
-        # 3. 删除 Agent
-        delete_result = self._delete_agent(agent_id=agent_id, node_id=resolved_node_id)
-        if not delete_result["success"]:
-            return delete_result
-
-        # 4. 使用相同参数重建 Agent，补充 restore_session 参数
-        # 从目标 Agent 配置中提取参数
-        create_params = {
-            "agent_type": target_agent.get("agent_type"),
-            "working_dir": target_agent.get("working_dir"),
-            "name": target_agent.get("name"),
-            "llm_group": target_agent.get("llm_group"),
-            "tool_group": target_agent.get("tool_group"),
-            "config_file": target_agent.get("config_file"),
-            "task": target_agent.get("task"),
-            "additional_args": target_agent.get("additional_args"),
-            "worktree": target_agent.get("worktree", False),
-            "quick_mode": target_agent.get("quick_mode", False),
-            "restore": bool(session_file),
-            "restore_session": session_file if session_file else None,
-            "no_interaction_mode": target_agent.get("no_interaction_mode", False),
-            "node_id": resolved_node_id,
+        # 成功：返回重生结果（新 Agent 信息 + 保存的会话文件）
+        regen_result = gateway_data.get("data") or {}
+        new_agent = regen_result.get("new_agent") or {}
+        session_file = regen_result.get("session_file")
+        return {
+            "success": True,
+            "stdout": json.dumps(
+                {
+                    "message": f"Agent {agent_id} regenerated successfully",
+                    "session_file": session_file,
+                    "new_agent": new_agent,
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            "stderr": "",
         }
-
-        # 创建新 Agent
-        create_result = self._create_agent(**create_params)
-        if not create_result["success"]:
-            return create_result
-
-        # 5. 返回新 Agent 信息
-        try:
-            new_agent_data = json.loads(create_result["stdout"])
-            return {
-                "success": True,
-                "stdout": json.dumps(
-                    {
-                        "message": f"Agent {agent_id} regenerated successfully",
-                        "session_file": session_file,
-                        "new_agent": new_agent_data,
-                    },
-                    ensure_ascii=False,
-                    indent=2,
-                ),
-                "stderr": "",
-            }
-        except json.JSONDecodeError:
-            return {
-                "success": True,
-                "stdout": create_result["stdout"],
-                "stderr": "",
-            }
 
     # ------------------------------------------------------------------
     # 聊天室操作

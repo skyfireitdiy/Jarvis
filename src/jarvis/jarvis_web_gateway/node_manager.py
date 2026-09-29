@@ -40,6 +40,8 @@ from .node_protocol import (
     AGENT_STOP_RESPONSE,
     AGENT_DELETE_REQUEST,
     AGENT_DELETE_RESPONSE,
+    AGENT_REGENERATE_REQUEST,
+    AGENT_REGENERATE_RESPONSE,
     AGENT_WS_CLOSE_REQUEST,
     AGENT_WS_CLOSE_RESPONSE,
     AGENT_WS_OPEN_REQUEST,
@@ -250,6 +252,10 @@ class NodeConnectionManager:
                     continue
                 if message_type == AGENT_DELETE_REQUEST:
                     response = self._handle_agent_delete_request(next_message)
+                    await websocket.send_json(response)
+                    continue
+                if message_type == AGENT_REGENERATE_REQUEST:
+                    response = self._handle_agent_regenerate_request(next_message)
                     await websocket.send_json(response)
                     continue
                 if message_type == AGENT_WS_REQUEST:
@@ -743,6 +749,43 @@ class NodeConnectionManager:
                 {
                     "success": False,
                     "error": {"code": "AGENT_DELETE_FAILED", "message": str(exc)},
+                },
+                request_id=request_id,
+            )
+
+    def _handle_agent_regenerate_request(
+        self, message: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """处理 Agent 无损重生请求（保存会话→删除→重建）。
+
+        重生后 agent_id 不变，仅 port 可能变化；由网关侧完成整个流程，
+        使 Agent 能够无损重生自己而不中断流程。
+        """
+        payload = message.get("payload") or {}
+        request_id = message.get("request_id")
+        agent_id = str(payload.get("agent_id") or "").strip()
+        try:
+            result = self._agent_manager.regenerate_agent(agent_id)
+            return build_node_message(
+                AGENT_REGENERATE_RESPONSE,
+                {"success": True, "result": result},
+                request_id=request_id,
+            )
+        except KeyError as exc:
+            return build_node_message(
+                AGENT_REGENERATE_RESPONSE,
+                {
+                    "success": False,
+                    "error": {"code": "AGENT_NOT_FOUND", "message": str(exc)},
+                },
+                request_id=request_id,
+            )
+        except Exception as exc:
+            return build_node_message(
+                AGENT_REGENERATE_RESPONSE,
+                {
+                    "success": False,
+                    "error": {"code": "AGENT_REGENERATE_FAILED", "message": str(exc)},
                 },
                 request_id=request_id,
             )
@@ -1744,6 +1787,14 @@ class ChildNodeClient:
                 if message_type == AGENT_DELETE_REQUEST:
                     response = (
                         self._node_connection_manager._handle_agent_delete_request(
+                            next_message
+                        )
+                    )
+                    await self._ws.send(json.dumps(response))
+                    continue
+                if message_type == AGENT_REGENERATE_REQUEST:
+                    response = (
+                        self._node_connection_manager._handle_agent_regenerate_request(
                             next_message
                         )
                     )

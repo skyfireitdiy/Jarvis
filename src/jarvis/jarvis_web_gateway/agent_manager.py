@@ -497,6 +497,75 @@ class AgentManager:
 
         return {"agent_id": agent_id, "status": "deleted"}
 
+    def regenerate_agent(self, agent_id: str) -> Dict[str, Any]:
+        """无损重生指定 Agent。
+
+        在网关侧完成「保存会话 → 删除 → 重建」整个流程，使 Agent 能够
+        无损重生自身（不因删除自己导致流程中断）。重建后使用保存的会话
+        恢复现场，配置（模型组/工具组/任务等）保持不变。
+
+        Args:
+            agent_id: 要重生的 Agent ID
+
+        Returns:
+            Dict[str, Any]: 重生结果，含新 Agent 信息与保存的会话文件
+
+        Raises:
+            KeyError: Agent 不存在
+        """
+        if agent_id not in self._agents:
+            raise KeyError(f"Agent not found: {agent_id}")
+
+        agent_info = self._agents[agent_id]
+
+        # 1. 保存会话（代理到 Agent 进程的 /sessions/save 接口）
+        session_file = None
+        try:
+            import urllib.request
+
+            req = urllib.request.Request(
+                f"http://127.0.0.1:{agent_info.port}/sessions/save",
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                if data.get("success"):
+                    session_file = data.get("session_file")
+        except Exception as e:
+            # 保存失败不阻断重生，仅跳过会话恢复
+            logging.getLogger(__name__).warning(
+                f"Failed to save session for agent {agent_id}: {e}"
+            )
+
+        # 2. 删除 Agent
+        self.delete_agent(agent_id)
+
+        # 3. 用原配置重建（含恢复会话）
+        new_agent = self.create_agent(
+            agent_type=agent_info.agent_type,
+            working_dir=agent_info.working_dir,
+            name=agent_info.name,
+            llm_group=agent_info.llm_group,
+            tool_group=agent_info.tool_group,
+            config_file=agent_info.config_file,
+            task=agent_info.task,
+            additional_args=agent_info.additional_args,
+            worktree=agent_info.worktree,
+            node_id=agent_info.node_id,
+            quick_mode=agent_info.quick_mode,
+            restore_session=session_file if session_file else False,
+            no_interaction_mode=agent_info.no_interaction_mode,
+            proxy_node=agent_info.proxy_node,
+            owner_id=agent_info.owner_id,
+            access_acl=agent_info.access_acl,
+        )
+
+        return {
+            "success": True,
+            "new_agent": new_agent,
+            "session_file": session_file,
+        }
+
     def get_agent_list(self) -> List[Dict[str, Any]]:
         """获取 Agent 列表。
 
