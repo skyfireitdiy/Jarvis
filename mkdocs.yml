@@ -244,6 +244,7 @@ nav:
   - 对比与分析:
       - Jarvis vs Codex CLI: compare/jarvis_vs_codex_cli.md
       - Jarvis vs Claude Code: compare/jarvis_vs_claude_code_agent.md
+      - Jarvis vs OpenViking: compare/jarvis_vs_openviking.md
       - Code Agent 演进计划: compare/jarvis_code_agent_evolution_plan.md
       - Jarvis 深度分析报告: Jarvis深度分析报告.md
       - 目标保持机制分析: 目标保持机制分析.md
