@@ -212,6 +212,36 @@ def has_uncommitted_changes(cwd: Optional[str] = None) -> bool:
     return working_changes or staged_changes
 
 
+def find_recent_non_checkout_commit() -> str:
+    """从当前 HEAD 往回找最近一个非自动提交（非 CheckPoint）的 commit hash
+
+    场景：任务记录的初始 commit 因历史被改写（reset/rebase/压缩等）而失效，
+    导致 git log <start>..<end> 报 Invalid revision range。此时回退到最近一个
+    非临时提交（即用户手动提交或 GitCommitTool 生成的正式提交）作为新的起点。
+
+    返回：
+        str: 最近的非自动提交 commit hash；找不到或出错时返回空字符串
+    """
+    try:
+        result = subprocess.run(
+            ["git", "log", "--pretty=format:%H|%s", "-n", "200"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=False,
+        )
+        if result.returncode != 0:
+            return ""
+        output = decode_output(result.stdout)
+        for line in output.splitlines():
+            if "|" in line:
+                commit_hash, message = line.split("|", 1)
+                if not is_auto_commit_message(message):
+                    return commit_hash
+    except Exception:
+        pass
+    return ""
+
+
 def get_commits_between(start_hash: str, end_hash: str) -> List[Tuple[str, str]]:
     """获取两个提交哈希值之间的提交列表
 
@@ -232,6 +262,30 @@ def get_commits_between(start_hash: str, end_hash: str) -> List[Tuple[str, str]]
         )
         if result.returncode != 0:
             error_msg = decode_output(result.stderr)
+            # 获取失败（如 Invalid revision range，说明 start_hash 已不在当前历史中）：
+            # 将起始 commit 修正为当前最近的非自动提交（非 CheckPoint）commit 后重试，
+            # 避免因历史被改写导致初始 commit 失效而无法获取提交历史。
+            fallback_start = find_recent_non_checkout_commit()
+            if fallback_start and fallback_start != start_hash:
+                result = subprocess.run(
+                    [
+                        "git",
+                        "log",
+                        f"{fallback_start}..{end_hash}",
+                        "--pretty=format:%H|%s",
+                    ],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=False,
+                )
+                if result.returncode == 0:
+                    output = decode_output(result.stdout)
+                    commits = []
+                    for line in output.splitlines():
+                        if "|" in line:
+                            commit_hash, message = line.split("|", 1)
+                            commits.append((commit_hash, message))
+                    return commits
             PrettyOutput.auto_print(f"❌ 获取commit历史失败: {error_msg}")
             return []
 
