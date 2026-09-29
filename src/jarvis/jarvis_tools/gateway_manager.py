@@ -177,6 +177,18 @@ class GatewayManagerTool:
                 "type": "boolean",
                 "description": "是否启用无交互模式（create_agent 操作可选，默认为 false，启用时 task 必填）",
             },
+            "owner_id": {
+                "type": "string",
+                "description": "Agent 属主用户 ID（create_agent 操作可选）。未指定时自动推断为当前 Agent 的 owner，通常无需手动指定",
+            },
+            "proxy_node": {
+                "type": "string",
+                "description": "代理节点 ID（create_agent 操作可选）",
+            },
+            "access_acl": {
+                "type": "object",
+                "description": '访问控制（create_agent 操作可选），形如 {"read": ["user_id"], "interact": ["user_id"]}',
+            },
             # timer 操作的参数
             "timer_id": {
                 "type": "string",
@@ -255,6 +267,9 @@ class GatewayManagerTool:
         restore: bool = False,
         restore_session: Optional[Union[bool, str]] = None,
         no_interaction_mode: bool = False,
+        owner_id: Optional[str] = None,
+        proxy_node: Optional[str] = None,
+        access_acl: Optional[Dict[str, Any]] = None,
         timer_id: Optional[str] = None,
         schedule: Optional[Dict[str, Any]] = None,
         timer_action_type: Optional[str] = None,
@@ -289,6 +304,9 @@ class GatewayManagerTool:
             quick_mode: 快速模式（create_agent）
             restore_session: 恢复会话（create_agent）
             no_interaction_mode: 无交互模式（create_agent）
+            owner_id: Agent 属主用户 ID（create_agent，未指定时自动推断）
+            proxy_node: 代理节点 ID（create_agent）
+            access_acl: 访问控制（create_agent）
             timer_id: 定时任务 ID（get_timer、delete_timer）
             schedule: 调度配置（create_timer）
             timer_action_type: 定时任务动作类型（create_timer）
@@ -327,6 +345,9 @@ class GatewayManagerTool:
             quick_mode = args.get("quick_mode", False)
             restore_session = args.get("restore_session")
             no_interaction_mode = args.get("no_interaction_mode", False)
+            owner_id = args.get("owner_id")
+            proxy_node = args.get("proxy_node")
+            access_acl = args.get("access_acl")
             timer_id = args.get("timer_id")
             schedule = args.get("schedule")
             timer_action_type = args.get("timer_action_type")
@@ -366,6 +387,9 @@ class GatewayManagerTool:
                     restore_session=restore_session,
                     no_interaction_mode=no_interaction_mode,
                     node_id=node_id,
+                    owner_id=owner_id,
+                    proxy_node=proxy_node,
+                    access_acl=access_acl,
                 )
             elif action == "list_directory":
                 return self._list_directory(path=path, node_id=node_id)
@@ -945,6 +969,9 @@ class GatewayManagerTool:
         restore_session: Optional[Union[bool, str]] = None,
         no_interaction_mode: bool = False,
         node_id: Optional[str] = None,
+        owner_id: Optional[str] = None,
+        proxy_node: Optional[str] = None,
+        access_acl: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """创建新的 Agent。
 
@@ -965,6 +992,9 @@ class GatewayManagerTool:
             restore_session: 是否恢复上一次会话
             no_interaction_mode: 是否启用无交互模式（启用时 task 必填）
             node_id: 目标节点 ID
+            owner_id: Agent 属主用户 ID（可选，未指定时自动推断为当前 Agent 的 owner）
+            proxy_node: 代理节点 ID（可选）
+            access_acl: 访问控制（可选，形如 {"read": [...], "interact": [...]}）
 
         返回:
             Dict[str, Any]: 创建结果
@@ -1006,6 +1036,9 @@ class GatewayManagerTool:
             restore_session=restore_session,
             no_interaction_mode=no_interaction_mode,
             node_id=node_id,
+            owner_id=self._resolve_owner_id(owner_id),
+            proxy_node=proxy_node,
+            access_acl=access_acl,
         )
 
         result = self._request_gateway(
@@ -1146,6 +1179,57 @@ class GatewayManagerTool:
 
         return None
 
+    def _resolve_owner_id(self, owner_id: Optional[str]) -> Optional[str]:
+        """解析创建 Agent 的属主用户 ID。
+
+        若调用方显式指定了 owner_id，则直接使用；
+        否则通过 GET /api/agents 反查当前 Agent（jglobals.agent_id）的 owner_id，
+        使经编排等方式创建的 Agent 归属发起者，而非默认落到 system。
+
+        参数:
+            owner_id: 显式指定的属主用户 ID（可选）
+
+        返回:
+            Optional[str]: 属主用户 ID，无法解析时返回 None（由网关侧兜底）
+        """
+        if owner_id:
+            return owner_id
+
+        current_agent_id = jglobals.agent_id
+        if not current_agent_id:
+            return None
+
+        try:
+            result = self._request_gateway(
+                method="GET",
+                path="/api/agents",
+                error_prefix="Failed to resolve owner id",
+            )
+            if not result["success"]:
+                return None
+
+            gateway_data = result["data"]
+            if not isinstance(gateway_data, dict) or not gateway_data.get("success"):
+                return None
+
+            # 兼容 data 为列表或 {"agents": [...]} 两种形态
+            data_field = gateway_data.get("data", {})
+            if isinstance(data_field, list):
+                agents_list = data_field
+            elif isinstance(data_field, dict):
+                agents_list = data_field.get("agents", [])
+            else:
+                agents_list = []
+
+            for agent in agents_list:
+                if str(agent.get("agent_id", "")) == str(current_agent_id):
+                    resolved = agent.get("owner_id")
+                    return resolved or None
+        except Exception:
+            return None
+
+        return None
+
     def _build_create_agent_body(
         self,
         agent_type: Optional[str] = None,
@@ -1162,6 +1246,9 @@ class GatewayManagerTool:
         restore_session: Optional[Union[bool, str]] = None,
         no_interaction_mode: bool = False,
         node_id: Optional[str] = None,
+        owner_id: Optional[str] = None,
+        proxy_node: Optional[str] = None,
+        access_acl: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """构建创建 Agent 的请求体，只包含非空参数。"""
         body: Dict[str, Any] = {
@@ -1192,6 +1279,12 @@ class GatewayManagerTool:
             body["no_interaction_mode"] = True
         if node_id:
             body["node_id"] = node_id
+        if owner_id:
+            body["owner_id"] = owner_id
+        if proxy_node:
+            body["proxy_node"] = proxy_node
+        if access_acl:
+            body["access_acl"] = access_acl
         return body
 
     def _list_directory(

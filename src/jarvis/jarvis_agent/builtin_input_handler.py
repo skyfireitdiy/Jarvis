@@ -689,6 +689,11 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                         no_interaction_mode=bool(
                             agent_cfg.get("no_interaction_mode", False)
                         ),
+                        # 跨节点/代理/访问控制透传；owner 归属由 gateway_manager
+                        # 自动推断为当前 Agent 的 owner，与编排文件作者无关
+                        node_id=agent_cfg.get("node_id"),
+                        proxy_node=agent_cfg.get("proxy_node"),
+                        access_acl=agent_cfg.get("access_acl"),
                     )
                     if result.get("success"):
                         success_count += 1

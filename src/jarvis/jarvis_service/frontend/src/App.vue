@@ -461,13 +461,25 @@
                   class="workspace-sidebar-agent-select"
                   :value="effectiveGitAgentId || ''"
                   title="选择 Git 的 Agent"
-                  @change="gitAgentId = $event.target.value"
+                  @change="onGitAgentChange($event.target.value)"
                 >
                   <option value="" disabled>选择 Agent</option>
                   <option v-for="agent in activeAgents" :key="agent.agent_id" :value="agent.agent_id">
                     {{ agent.name || agent.agent_id }}
                   </option>
                 </select>
+                <!-- Git 管理目录：默认 Agent 根目录，也可指定任意 Git 目录（复用「打开目录」选择） -->
+                <div class="workspace-git-dir-row">
+                  <button class="workspace-open-dir-btn workspace-git-dir-btn" @click="openGitDirDialog" title="选择节点与目录作为 Git 管理目标">
+                    <span class="workspace-open-dir-icon">📂</span>
+                    <span>选择 Git 目录</span>
+                  </button>
+                  <div v-if="gitCustomDir" class="workspace-git-dir-current" :title="gitCustomDir.path">
+                    <span class="workspace-git-dir-label">目录</span>
+                    <span class="workspace-git-dir-path">{{ gitCustomDir.path }}</span>
+                    <button class="icon-btn-small" @click="clearGitCustomDir" title="清除自定义目录，回到 Agent 根目录">✕</button>
+                  </div>
+                </div>
                 <div class="workspace-git-toolbar">
                   <span class="workspace-git-branch" :title="gitCurrentBranch || '未知分支'">
                     <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.492 2.492 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25Zm-6 0a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Zm8.25-.75a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5ZM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z"/></svg>
@@ -1091,7 +1103,7 @@
     <div v-if="showOpenDirDialog" class="open-dir-overlay" @click.self="closeOpenDirDialog">
       <div class="open-dir-modal">
         <div class="open-dir-header">
-          <h2>打开目录</h2>
+          <h2>{{ openDirSource === 'git' ? '选择 Git 目录' : '打开目录' }}</h2>
           <button class="open-dir-close" @click="closeOpenDirDialog">×</button>
         </div>
         <div class="open-dir-body">
@@ -1136,7 +1148,7 @@
         </div>
         <div class="open-dir-actions">
           <button class="btn secondary" @click="closeOpenDirDialog">取消</button>
-          <button class="btn primary" @click="confirmOpenDir">打开</button>
+          <button class="btn primary" @click="confirmOpenDir">{{ openDirSource === 'git' ? '确定' : '打开' }}</button>
         </div>
       </div>
     </div>
@@ -3135,6 +3147,34 @@ const openDirNodeId = ref('master')         // 目标节点
 const openDirPath = ref('')                 // 目标目录（绝对路径）
 const openDirInput = ref(null)              // 手填路径输入框引用
 const openDirDialogRef = ref(null)          // 「打开目录」弹窗内嵌的 DirectoryDialog 引用
+// 打开目录弹窗的来源：'workspace'=目录树打开工作区 / 'git'=Git 面板选择 Git 管理目录
+const openDirSource = ref('workspace')
+// Git 面板自定义 Git 管理目录（用户指定，优先于 Agent 根目录）：{ nodeId, path }
+const gitCustomDir = ref(null)
+// 自定义 Git 目录的持久化 key：刷新后自动恢复
+const GIT_CUSTOM_DIR_STORAGE_KEY = 'jarvis_git_custom_dir'
+function loadGitCustomDir() {
+  try {
+    const raw = localStorage.getItem(GIT_CUSTOM_DIR_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || !parsed.nodeId || !parsed.path) return null
+    return { nodeId: String(parsed.nodeId), path: String(parsed.path) }
+  } catch (e) {
+    return null
+  }
+}
+function saveGitCustomDir() {
+  try {
+    if (gitCustomDir.value?.nodeId && gitCustomDir.value?.path) {
+      localStorage.setItem(GIT_CUSTOM_DIR_STORAGE_KEY, JSON.stringify(gitCustomDir.value))
+    } else {
+      localStorage.removeItem(GIT_CUSTOM_DIR_STORAGE_KEY)
+    }
+  } catch (e) {
+    // localStorage 不可用（隐私模式 / 配额满）时静默降级
+  }
+}
 // 目录浏览复用创建 Agent 的目录筛选状态（currentDirPath/dirList/selectedDir/dirSearchText）与逻辑
 // 打开「按节点打开目录」弹窗（单弹窗：上选节点，下内嵌目录筛选）
 // 目录浏览复用创建 Agent 的目录筛选逻辑（DirectoryDialog + fetchDirectories 等），仅节点来源不同
@@ -3157,11 +3197,31 @@ async function openOpenDirDialog() {
   selectedDirIndex.value = -1
   await fetchDirectories('~')
 }
+// 打开 Git 面板的「选择 Git 目录」弹窗（复用打开目录弹窗的节点+目录选择逻辑）
+async function openGitDirDialog() {
+  openDirSource.value = 'git'
+  await openOpenDirDialog()
+}
 function closeOpenDirDialog() {
   showOpenDirDialog.value = false
   // 复位场景，避免后续创建 Agent 的「选择目录」被误判为「打开目录」场景
   dirDialogContext.value = 'create-agent'
+  openDirSource.value = 'workspace'
   resetDirectorySelectionState()
+}
+// 清除 Git 面板的自定义 Git 管理目录，回到按 Agent 根目录管理
+function clearGitCustomDir() {
+  gitCustomDir.value = null
+  saveGitCustomDir()
+  if (workspaceSidebarView.value === 'git') refreshGitView()
+}
+// Git 面板选择 Agent：清除自定义 Git 目录（回到按该 Agent 根目录管理）
+function onGitAgentChange(agentId) {
+  gitAgentId.value = agentId
+  if (gitCustomDir.value) {
+    gitCustomDir.value = null
+    saveGitCustomDir()
+  }
 }
 // 切换目标节点：重新按新节点浏览目录
 async function onOpenDirNodeChange(nodeId) {
@@ -3189,6 +3249,14 @@ async function confirmOpenDir() {
   // 复位场景，避免后续创建 Agent 的「选择目录」被误判为「打开目录」场景
   dirDialogContext.value = 'create-agent'
   resetDirectorySelectionState()
+  if (openDirSource.value === 'git') {
+    // Git 面板：把选中的目录设为 Git 管理目标，并刷新 Git 视图
+    openDirSource.value = 'workspace'
+    gitCustomDir.value = { nodeId, path: targetPath }
+    saveGitCustomDir()
+    if (workspaceSidebarView.value === 'git') refreshGitView()
+    return
+  }
   await openWorkspaceDir(nodeId, targetPath)
 }
 
@@ -5268,13 +5336,15 @@ function getGitTargetAgent() {
   return agentList.value.find(a => a.agent_id === agentId) || null
 }
 
-// 取 Git 目标 Agent 的 node_id
+// 取 Git 目标 Agent 的 node_id（自定义 Git 目录优先，其次目标 Agent 的 node_id）
 function getGitTargetNodeId() {
+  if (gitCustomDir.value?.nodeId) return String(gitCustomDir.value.nodeId).trim()
   return String(getGitTargetAgent()?.node_id || '').trim()
 }
 
-// 取 Git 工作目录（目标 Agent 的 working_dir）
+// 取 Git 工作目录（自定义 Git 目录优先，其次目标 Agent 的 working_dir）
 function getGitWorkingDir() {
+  if (gitCustomDir.value?.path) return String(gitCustomDir.value.path).trim()
   return String(getGitTargetAgent()?.working_dir || '').trim()
 }
 
@@ -9862,6 +9932,8 @@ async function connect() {
     startNodeStatusRefresh()
     // 恢复上次「打开目录」的虚拟目录记录（鉴权已可用）
     restoreVirtualWorkspaceDirs()
+    // 恢复 Git 面板上次指定的自定义 Git 管理目录
+    gitCustomDir.value = loadGitCustomDir()
     // 刷新用户信息（确保display_name等字段最新），随后拉取权限（依赖 userInfo.user_id）
     refreshUserInfo().finally(() => { fetchUserPermissions() })
     // 登录成功后自动连接所有在线的 agent
@@ -19132,6 +19204,38 @@ body::-webkit-scrollbar {
   height: 100%;
   min-height: 0;
   font-size: 12px;
+}
+
+/* Git 面板：自定义 Git 管理目录行（复用「打开目录」选择任意目录） */
+.workspace-git-dir-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--border-color, #2a2a2a);
+}
+.workspace-git-dir-btn {
+  margin: 6px 0 0;
+}
+.workspace-git-dir-current {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 0 6px;
+  font-size: 12px;
+}
+.workspace-git-dir-label {
+  flex-shrink: 0;
+  color: var(--text-secondary, #b0b0b0);
+}
+.workspace-git-dir-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary, #e0e0e0);
 }
 
 .workspace-git-toolbar {

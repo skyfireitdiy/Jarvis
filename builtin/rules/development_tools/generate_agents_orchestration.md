@@ -28,19 +28,26 @@ description: 当需要生成Agents编排文件以批量创建Agent时触发。�
 
 #### Agent配置字段
 
-| 字段名                | 类型   | 必填   | 默认值    | 说明               |
-| --------------------- | ------ | ------ | --------- | ------------------------------------------------------ |
-| `name`                | string | 否     | `agent_N` | Agent名称，用以标识与显示                             |
-| `type`                | string | 否     | `code_agent` | Agent类型，如`agent`、`code_agent`等                       |
-| `working_dir`         | string | **是** | -         | 工作目录，Agent之工作路径                             |
-| `llm_group`           | string | 否     | `default` | 模型组名称          |
-| `tool_group`          | string | 否     | `default` | 工具组名称                                             |
-| `config_file`         | string | 否     | -         | 配置文件路径                                           |
-| `task`                | string | 否     | -         | 初始任务描述                                           |
-| `additional_args`     | string | 否     | -         | 附加参数                                               |
-| `worktree`            | bool   | 否     | `false`   | 是否用git worktree                                  |
-| `quick_mode`          | bool   | 否     | `false`   | 是否启用快速模式                                       |
-| `no_interaction_mode` | bool   | 否     | `false`   | 是否启用无交互模式（启用时task必填，**不推荐用**） |
+| 字段名                | 类型   | 必填   | 默认值         | 说明                                                         |
+| --------------------- | ------ | ------ | -------------- | ------------------------------------------------------------ |
+| `name`                | string | 否     | `agent_N`      | Agent名称，用以标识与显示                                    |
+| `type`                | string | 否     | `code_agent`   | Agent类型，如`agent`、`code_agent`等                         |
+| `working_dir`         | string | **是** | -              | 工作目录，Agent之工作路径                                    |
+| `llm_group`           | string | 否     | `default`      | 模型组名称                                                   |
+| `tool_group`          | string | 否     | `default`      | 工具组名称                                                   |
+| `config_file`         | string | 否     | -              | 配置文件路径                                                 |
+| `task`                | string | 否     | -              | 初始任务描述                                                 |
+| `additional_args`     | string | 否     | -              | 附加参数                                                     |
+| `worktree`            | bool   | 否     | `false`        | 是否用git worktree                                           |
+| `quick_mode`          | bool   | 否     | `false`        | 是否启用快速模式                                             |
+| `no_interaction_mode` | bool   | 否     | `false`        | 是否启用无交互模式（启用时task必填，**不推荐用**）           |
+| `node_id`             | string | 否     | 执行者所在节点 | 目标节点ID，指定Agent创建于哪个节点                          |
+| `proxy_node`          | string | 否     | -              | 代理节点ID                                                   |
+| `access_acl`          | object | 否     | -              | 访问控制，形如`{read: [user_id...], interact: [user_id...]}` |
+
+**关于归属（owner）：**
+
+编排文件**不提供**`owner_id`字段。所创建Agent之归属，由**执行`@OrganizeAgents`之Agent的owner**决定，与编排文件之作者无关。此设计避免「写文件者凭空获得他人Agent之权限」。
 
 ### 3. 字段约束
 
@@ -62,6 +69,8 @@ description: 当需要生成Agents编排文件以批量创建Agent时触发。�
 4. 需指定模型组否？
 5. 需设置初始任务否？
 6. 需无交互模式否？（仅当明确需无人值守运行时方启用，默认不启用）
+7. 需指定目标节点（`node_id`）否？（默认创建于执行者所在节点）
+8. 需设置访问控制（`access_acl`）否？
 
 ### 操作 2：编写编排文件
 
@@ -222,6 +231,8 @@ agents:
 - [ ] 如有用`no_interaction_mode: true`的Agent，确认含`task`字段
 - [ ] 所有路径用正确格式
 - [ ] YAML语法正确（无缩进错误）
+- [ ] 如需跨节点创建，确认`node_id`对应节点在线
+- [ ] 未使用`owner_id`字段（归属由执行者决定）
 
 ## 使用方式
 
