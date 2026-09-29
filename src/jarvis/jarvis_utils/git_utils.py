@@ -448,7 +448,7 @@ def revert_change() -> None:
         PrettyOutput.auto_print(f"❌ 恢复更改失败: {str(e)}")
 
 
-def detect_large_code_deletion(threshold: int = 30) -> Optional[Dict[str, int]]:
+def detect_large_code_deletion(threshold: int = 200) -> Optional[Dict[str, int]]:
     """检测是否有大量代码删除
 
     参数:
@@ -531,7 +531,7 @@ def detect_large_code_deletion(threshold: int = 30) -> Optional[Dict[str, int]]:
 # confirm_large_code_deletion函数已废弃，统一使用大模型询问
 
 
-def check_large_code_deletion(threshold: int = 30) -> bool:
+def check_large_code_deletion(threshold: int = 200) -> bool:
     """检查是否有大量代码删除
 
     参数:
