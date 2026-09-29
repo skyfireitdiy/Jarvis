@@ -17888,13 +17888,16 @@ function isFocusableTarget(el) {
   if (!el || typeof el.focus !== 'function') return false
   if (el.disabled) return false
   if (el.hasAttribute && el.hasAttribute('disabled')) return false
+  // tabindex="-1" 的控件（如区域分割/关闭、标题栏按钮）刻意不参与焦点导航，
+  // 聚焦兜底时也应跳过，避免焦点落到这些"不抢焦点"的按钮上
+  if (el.getAttribute && el.getAttribute('tabindex') === '-1') return false
   return true
 }
 
 // 在区域内查找首个可聚焦元素并聚焦；找不到则回退聚焦容器
 function focusFirstIn(el, selector) {
   if (!el) return
-  const defaultSel = 'textarea, input, [contenteditable="true"], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  const defaultSel = 'textarea, input, [contenteditable="true"], button:not([disabled]):not([tabindex="-1"]), [tabindex]:not([tabindex="-1"])'
   const list = selector ? el.querySelectorAll(`${selector}:not([disabled])`) : el.querySelectorAll(defaultSel)
   for (const target of list) {
     if (isFocusableTarget(target)) {
