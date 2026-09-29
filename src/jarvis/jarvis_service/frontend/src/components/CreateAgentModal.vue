@@ -150,9 +150,9 @@
               </div>
             </div>
           </div>
-          <div class="form-group" v-if="noInteractionMode">
-            <label>任务描述 <span class="required">*</span></label>
-            <textarea :value="taskDescription" @input="$emit('update:taskDescription', $event.target.value)" class="form-control" rows="4" placeholder="请输入任务描述..." :class="{ 'error-border': noInteractionMode && !taskDescription.trim() }"></textarea>
+          <div class="form-group">
+            <label>任务描述 <span v-if="noInteractionMode" class="required">*</span></label>
+            <textarea :value="taskDescription" @input="$emit('update:taskDescription', $event.target.value)" class="form-control" rows="4" placeholder="可选；填写后 Agent 启动即执行该任务（无交互模式下必填）" :class="{ 'error-border': noInteractionMode && !taskDescription.trim() }"></textarea>
             <div class="form-help" v-if="noInteractionMode && !taskDescription.trim()" style="color: var(--color-error);">无交互模式下必须提供任务描述</div>
           </div>
         </div>

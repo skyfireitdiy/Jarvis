@@ -21,7 +21,7 @@
           @keydown="$emit('search-keydown', $event)"
         />
       </div>
-      <div class="dir-list" ref="dirListRef" v-if="filteredDirs.length > 0">
+      <div class="dir-list" ref="dirListRef" v-if="filteredDirs.length > 0 || (fileSelectable && fileList.length > 0)">
         <div
           v-for="dir in filteredDirs"
           :key="dir.path"
@@ -33,9 +33,21 @@
           <div class="dir-name">{{ dir.name }}</div>
           <div class="dir-path">{{ dir.path }}</div>
         </div>
+        <!-- 文件项（仅 fileSelectable 模式渲染，用于选择编排文件等场景） -->
+        <div
+          v-for="file in (fileSelectable ? fileList : [])"
+          :key="file.path"
+          class="dir-item file-item"
+          :class="{ selected: selectedFile === file.path }"
+          @click="$emit('select-file', file.path)"
+        >
+          <div class="dir-icon">{{ fileIcon }}</div>
+          <div class="dir-name">{{ file.name }}</div>
+          <div class="dir-path">{{ file.path }}</div>
+        </div>
       </div>
       <div class="empty-state" v-else>
-        <p>该目录下没有子目录</p>
+        <p>{{ fileSelectable ? '该目录下没有子目录或文件' : '该目录下没有子目录' }}</p>
       </div>
       <div class="dir-modal-actions" v-if="!embedded">
         <button class="btn secondary" @click="$emit('cancel')">取消</button>
@@ -66,10 +78,30 @@ const props = defineProps({
   filteredDirs: {
     type: Array,
     default: () => []
+  },
+  // 文件选择模式：为 true 时在目录列表下方渲染 fileList 中的文件项（用于选择编排文件等场景）
+  fileSelectable: {
+    type: Boolean,
+    default: false
+  },
+  // 文件列表（仅 fileSelectable 为 true 时渲染），每项含 name/path
+  fileList: {
+    type: Array,
+    default: () => []
+  },
+  // 已选中的文件路径（用于高亮）
+  selectedFile: {
+    type: String,
+    default: ''
+  },
+  // 文件项图标
+  fileIcon: {
+    type: String,
+    default: '📄'
   }
 })
 
-const emit = defineEmits(['update:visible', 'update:searchText', 'cancel', 'confirm', 'refresh', 'go-parent', 'select', 'enter', 'search-keydown'])
+const emit = defineEmits(['update:visible', 'update:searchText', 'cancel', 'confirm', 'refresh', 'go-parent', 'select', 'enter', 'search-keydown', 'select-file'])
 
 const searchInput = ref(null)
 const dirListRef = ref(null)
@@ -255,6 +287,12 @@ defineExpose({
 
 .dir-item.selected:hover {
   background: var(--color-bg-hover);
+}
+
+/* 文件项：与目录项区分（图标为文件，名称用次要色） */
+.file-item .dir-name {
+  font-weight: 400;
+  color: var(--color-text-secondary);
 }
 
 .dir-icon {

@@ -113,6 +113,7 @@
                 @close="setWorkspaceSidebarView('files')"
                 @toggleBatchMode="toggleBatchMode"
                 @createAgent="openCreateAgentModal"
+                @orchestrate="openOrchestrateModal"
                 @agentClick="onWorkspaceSidebarAgentClick"
                 @agentContextMenu="onSidebarAgentContextMenu"
                 @toggleSelectAgent="toggleSelectAgent"
@@ -1084,6 +1085,7 @@
     <!-- 目录选择对话框 -->
     <DirectoryDialog
       ref="dirDialogRef"
+      :class="{ 'dir-dialog-above-orchestrate': dirDialogContext === 'orchestrate' }"
       :visible="showDirDialog"
       :currentPath="currentDirPath"
       :selectedDir="selectedDir"
@@ -1459,6 +1461,184 @@
       @close="finishTour"
       @finish="finishTour"
     />
+    <!-- 编排弹窗：选节点 + 编排文件 → 解析出 Agent 列表（每个一个标签页，可编辑）→ 一键创建 -->
+    <div v-if="showOrchestrateModal" class="orchestrate-overlay" @click.self="closeOrchestrateModal">
+      <div class="orchestrate-modal">
+        <div class="orchestrate-header">
+          <h2>编排：批量创建 Agent</h2>
+          <button class="orchestrate-close" @click="closeOrchestrateModal">×</button>
+        </div>
+        <div class="orchestrate-body">
+          <!-- 顶部：节点 + 编排文件路径 + 解析 -->
+          <div class="orchestrate-source">
+            <div class="orchestrate-source-row">
+              <label class="orchestrate-label">节点</label>
+              <select v-model="orchestrateNodeId" class="orchestrate-node-select" @change="onOrchestrateNodeChange">
+                <option v-if="!filteredNodeOptionsForCreateAgent.length" value="" disabled>暂无可用节点</option>
+                <option v-for="node in filteredNodeOptionsForCreateAgent" :key="node.node_id" :value="node.node_id">
+                  {{ getNodeDisplayName(node.node_id) }}
+                </option>
+              </select>
+            </div>
+            <div class="orchestrate-source-row">
+              <label class="orchestrate-label">编排文件</label>
+              <input
+                v-model="orchestrateFilePath"
+                class="orchestrate-path-input"
+                type="text"
+                placeholder="节点上的 YAML 文件绝对路径，如 /home/user/orchestration.yaml"
+                @keydown.enter.prevent="parseOrchestrationFile"
+              >
+              <button class="btn secondary" @click="toggleOrchestrateBrowser">
+                {{ orchestrateShowBrowser ? '收起' : '浏览' }}
+              </button>
+              <button class="btn primary" :disabled="orchestrateLoading" @click="parseOrchestrationFile">
+                {{ orchestrateLoading ? '解析中…' : '解析' }}
+              </button>
+            </div>
+            <!-- 文件浏览面板：内嵌 DirectoryDialog（目录 + .yaml/.yml 文件，逻辑与「打开目录」一致） -->
+            <div v-if="orchestrateShowBrowser" class="orchestrate-browse-wrap">
+              <DirectoryDialog
+                ref="orchestrateDialogRef"
+                embedded
+                :visible="orchestrateShowBrowser"
+                :currentPath="orchestrateCurrentDirPath"
+                :selectedDir="orchestrateHighlightedDir"
+                :searchText="orchestrateDirSearchText"
+                :filteredDirs="orchestrateFilteredDirs"
+                fileSelectable
+                :fileList="orchestrateFilteredFiles"
+                :selectedFile="orchestrateHighlightedFile"
+                fileIcon="📄"
+                @update:searchText="orchestrateDirSearchText = $event"
+                @refresh="fetchOrchestrateEntries"
+                @go-parent="goToOrchestrateParentDir"
+                @enter="enterOrchestrateDir"
+                @select-file="onOrchestrateSelectFile"
+                @search-keydown="handleOrchestrateSearchKeydown"
+              />
+            </div>
+          </div>
+
+          <div v-if="orchestrateError" class="orchestrate-error">{{ orchestrateError }}</div>
+
+          <!-- 标签页：每个 Agent 一个 -->
+          <div v-if="orchestrateAgents.length" class="orchestrate-tabs">
+            <button
+              v-for="(agent, index) in orchestrateAgents"
+              :key="index"
+              class="orchestrate-tab"
+              :class="{ active: index === orchestrateActiveIndex }"
+              @click="orchestrateActiveIndex = index"
+            >
+              <span class="orchestrate-tab-name">{{ agent.name || ('Agent ' + (index + 1)) }}</span>
+              <span class="orchestrate-tab-close" @click.stop="removeOrchestrateAgent(index)">×</span>
+            </button>
+            <button class="orchestrate-tab-add" title="新增一个 Agent" @click="addOrchestrateAgent">＋</button>
+          </div>
+
+          <!-- 当前标签页的表单 -->
+          <div v-if="orchestrateAgents[orchestrateActiveIndex]" class="orchestrate-form">
+            <div class="orchestrate-field">
+              <label class="orchestrate-label">名称</label>
+              <input v-model="orchestrateAgents[orchestrateActiveIndex].name" class="orchestrate-input" type="text" placeholder="留空自动生成">
+            </div>
+            <div class="orchestrate-field">
+              <label class="orchestrate-label">Agent 类型</label>
+              <select v-model="orchestrateAgents[orchestrateActiveIndex].type" class="orchestrate-input">
+                <option value="agent">通用 agent</option>
+                <option value="code_agent">code_agent</option>
+              </select>
+            </div>
+            <div class="orchestrate-field orchestrate-field-wide">
+              <label class="orchestrate-label">工作目录</label>
+              <div class="orchestrate-dir-row">
+                <input v-model="orchestrateAgents[orchestrateActiveIndex].workingDir" class="orchestrate-input" type="text" placeholder="绝对路径">
+                <button class="btn secondary" @click="openOrchestrateDirDialog">选择目录</button>
+              </div>
+            </div>
+            <div class="orchestrate-field">
+              <label class="orchestrate-label">模型组</label>
+              <input v-model="orchestrateAgents[orchestrateActiveIndex].llmGroup" class="orchestrate-input" type="text" placeholder="default">
+            </div>
+            <div class="orchestrate-field">
+              <label class="orchestrate-label">工具组</label>
+              <input v-model="orchestrateAgents[orchestrateActiveIndex].toolGroup" class="orchestrate-input" type="text" placeholder="default">
+            </div>
+            <div class="orchestrate-field">
+              <label class="orchestrate-label">配置文件</label>
+              <input v-model="orchestrateAgents[orchestrateActiveIndex].configFile" class="orchestrate-input" type="text" placeholder="可选，Agent 启动用的 --config-file 路径">
+              <!-- 最近使用的配置文件（按节点过滤） -->
+              <div v-if="orchestrateFilteredRecentConfigFiles.length > 0" class="orchestrate-recent-section">
+                <div class="orchestrate-recent-title">最近使用的配置文件</div>
+                <div class="orchestrate-recent-list">
+                  <span
+                    v-for="(item, index) in orchestrateFilteredRecentConfigFiles"
+                    :key="index"
+                    class="orchestrate-recent-tag"
+                    @click="orchestrateAgents[orchestrateActiveIndex].configFile = item.path"
+                    :title="item.path">
+                    {{ item.path.split('/').filter(Boolean).pop() || item.path }}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div class="orchestrate-field">
+              <label class="orchestrate-label">目标节点</label>
+              <select v-model="orchestrateAgents[orchestrateActiveIndex].nodeId" class="orchestrate-input">
+                <option v-for="node in filteredNodeOptionsForCreateAgent" :key="node.node_id" :value="node.node_id">
+                  {{ getNodeDisplayName(node.node_id) }}
+                </option>
+              </select>
+            </div>
+            <div class="orchestrate-field">
+              <label class="orchestrate-label">代理节点</label>
+              <select v-model="orchestrateAgents[orchestrateActiveIndex].proxyNode" class="orchestrate-input">
+                <option value="">无代理（直接调用）</option>
+                <option v-for="node in filteredNodeOptionsForCreateAgent" :key="node.node_id" :value="node.node_id">
+                  {{ getNodeDisplayName(node.node_id) }}
+                </option>
+              </select>
+            </div>
+            <div class="orchestrate-field orchestrate-field-wide">
+              <label class="orchestrate-label">任务描述</label>
+              <textarea v-model="orchestrateAgents[orchestrateActiveIndex].task" class="orchestrate-textarea" rows="3" placeholder="无交互模式下必填"></textarea>
+            </div>
+            <div class="orchestrate-field orchestrate-field-wide orchestrate-checks">
+              <label class="orchestrate-check"><input v-model="orchestrateAgents[orchestrateActiveIndex].worktree" type="checkbox"> worktree（仅 code_agent）</label>
+              <label class="orchestrate-check"><input v-model="orchestrateAgents[orchestrateActiveIndex].quickMode" type="checkbox"> 极速模式</label>
+              <label class="orchestrate-check"><input v-model="orchestrateAgents[orchestrateActiveIndex].restoreSession" type="checkbox"> 恢复会话</label>
+              <label class="orchestrate-check"><input v-model="orchestrateAgents[orchestrateActiveIndex].noInteractionMode" type="checkbox"> 无交互模式</label>
+            </div>
+          </div>
+          <div v-else class="orchestrate-empty">选择编排文件并解析，或点击 ＋ 新增 Agent</div>
+
+          <!-- 创建结果 -->
+          <div v-if="orchestrateResults.length" class="orchestrate-results">
+            <div
+              v-for="(r, index) in orchestrateResults"
+              :key="index"
+              class="orchestrate-result"
+              :class="r.ok ? 'ok' : 'fail'"
+            >
+              <span>{{ r.ok ? '✓' : '✕' }}</span>
+              <span class="orchestrate-result-name">{{ r.name }}</span>
+              <span v-if="!r.ok" class="orchestrate-result-error">{{ r.error }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="orchestrate-actions">
+          <button class="btn secondary" @click="closeOrchestrateModal">取消</button>
+          <button
+            class="btn primary"
+            :disabled="orchestrateCreating || !orchestrateAgents.length"
+            @click="createAllOrchestrateAgents"
+          >
+            {{ orchestrateCreating ? '创建中…' : `一键创建（${orchestrateAgents.length}）` }}
+          </button>
+        </div>
+      </div>
+    </div>
     <!-- Toast 提示 -->
     <transition name="toast-fade">
       <div v-if="toast.show" class="toast" :class="`toast-${toast.type}`">
@@ -3296,6 +3476,42 @@ function saveRecentWorkDir(path, nodeId) {
     localStorage.setItem('jarvis_recent_work_dirs', JSON.stringify(recentWorkDirs.value))
   } catch (error) {
     console.error('[HISTORY DIR] 保存历史记录失败:', error)
+  }
+}
+// 最近使用的配置文件管理（localStorage持久化存储，供编排弹窗使用）
+// 元素格式：{ path: string, nodeId: string }，按节点区分
+const recentConfigFiles = ref([])
+function loadRecentConfigFiles() {
+  try {
+    const stored = localStorage.getItem('jarvis_recent_config_files')
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      const isValid = Array.isArray(parsed) && parsed.every(item =>
+        item && typeof item === 'object' && typeof item.path === 'string' && typeof item.nodeId === 'string'
+      )
+      recentConfigFiles.value = isValid ? parsed : []
+    } else {
+      recentConfigFiles.value = []
+    }
+  } catch (error) {
+    console.error('[HISTORY CONFIG] 加载历史记录失败:', error)
+    recentConfigFiles.value = []
+  }
+}
+function saveRecentConfigFile(path, nodeId) {
+  try {
+    const normalizedPath = String(path || '').trim()
+    if (!normalizedPath) return
+    const normalizedNodeId = String(nodeId || '').trim() || 'master'
+    // 去重：过滤掉已存在的同节点同路径
+    const filtered = recentConfigFiles.value.filter(item =>
+      !(item.path === normalizedPath && item.nodeId === normalizedNodeId)
+    )
+    // 新路径加到最前面，只保留最近20个
+    recentConfigFiles.value = [{ path: normalizedPath, nodeId: normalizedNodeId }, ...filtered].slice(0, 20)
+    localStorage.setItem('jarvis_recent_config_files', JSON.stringify(recentConfigFiles.value))
+  } catch (error) {
+    console.error('[HISTORY CONFIG] 保存历史记录失败:', error)
   }
 }
 // 文件树状态管理
@@ -9443,6 +9659,7 @@ function isAnyModalOpen() {
     showToolsModal.value ||
     showEditAccessModal.value ||
     showTopologyOverlay.value ||
+    showOrchestrateModal.value ||
     confirmDialog.value
   )
 }
@@ -10900,13 +11117,16 @@ function cancelSessionDialog() {
 
 // 创建 Agent
 // 目录选择相关函数
-// 目录选择弹窗的当前使用场景：'create-agent'（创建 Agent 选工作目录）/ 'open-dir'（按节点打开目录）
-// 二者复用同一套目录筛选逻辑（fetchDirectories / filteredDirList / 键盘导航等），仅节点来源与确认后的去向不同
+// 目录选择弹窗的当前使用场景：'create-agent'（创建 Agent 选工作目录）/ 'open-dir'（按节点打开目录）/ 'orchestrate'（编排选工作目录）
+// 三者复用同一套目录筛选逻辑（fetchDirectories / filteredDirList / 键盘导航等），仅节点来源与确认后的去向不同
 const dirDialogContext = ref('create-agent')
 
 function getCreateAgentDirectoryNodeId() {
   if (dirDialogContext.value === 'open-dir') {
     return (openDirNodeId.value || '').trim()
+  }
+  if (dirDialogContext.value === 'orchestrate') {
+    return (orchestrateNodeId.value || '').trim()
   }
   return (newAgentNodeId.value || '').trim()
 }
@@ -10930,12 +11150,16 @@ watch(newAgentNodeId, (newNodeId) => {
 }, { flush: 'sync' })
 
 async function openDirDialog() {
-  // 两种场景（创建 Agent / 打开目录）均以独立弹窗形式展示目录选择
+  // 三种场景（创建 Agent / 打开目录 / 编排选目录）均以独立弹窗形式展示目录选择
   const isOpenDir = dirDialogContext.value === 'open-dir'
   showDirDialog.value = true
   if (isOpenDir) {
     // 「打开目录」：从根目录开始浏览，确认后回填到「打开目录」弹层
     selectedDir.value = '~'
+  } else if (dirDialogContext.value === 'orchestrate') {
+    // 编排场景：以编排弹窗所选节点为浏览来源，初始路径取当前编辑的 Agent 工作目录
+    const active = orchestrateAgents.value[orchestrateActiveIndex.value]
+    selectedDir.value = (active && active.workingDir) || '~'
   } else {
     dirDialogContext.value = 'create-agent'
     selectedDir.value = newAgentDir.value || '~'
@@ -11096,6 +11320,10 @@ async function confirmDirectory() {
     if (dirDialogContext.value === 'open-dir') {
       // 「打开目录」场景：把选中的目录回填到「打开目录」弹层，但不关闭该弹层
       openDirPath.value = selectedDir.value
+    } else if (dirDialogContext.value === 'orchestrate') {
+      // 编排场景：把选中的目录回填到当前 Agent 标签页的工作目录
+      const active = orchestrateAgents.value[orchestrateActiveIndex.value]
+      if (active) active.workingDir = selectedDir.value
     } else {
       newAgentDir.value = selectedDir.value
     }
@@ -11110,7 +11338,7 @@ function cancelDirDialog() {
   selectedDir.value = null
   dirSearchText.value = ''
   selectedDirIndex.value = -1
-  // 复位场景，避免后续创建 Agent 的「选择目录」被误判为「打开目录」场景
+  // 复位场景，避免后续创建 Agent 的「选择目录」被误判为「打开目录」/「编排」场景
   dirDialogContext.value = 'create-agent'
 }
 
@@ -11125,6 +11353,8 @@ async function openCreateAgentModal(initialNodeId = '') {
   ])
   // 加载最近使用的工作目录
   loadRecentWorkDirs()
+  // 加载最近使用的配置文件（编排弹窗用）
+  loadRecentConfigFiles()
   const target = typeof initialNodeId === 'string' ? initialNodeId.trim() : ''
   // 校验目标节点在可创建范围内，否则回退到默认节点（master）
   const allowed = filteredNodeOptionsForCreateAgent.value.some(n => n.node_id === target)
@@ -11391,6 +11621,9 @@ async function createAgentWithOptions(options = {}) {
     proxyNode = '',
     accessAclRead = [],
     accessAclInteract = [],
+    toolGroup = '',
+    configFile = '',
+    additionalArgs = '',
   } = options
 
   const trimmedDir = String(workingDir || '').trim()
@@ -11428,6 +11661,10 @@ async function createAgentWithOptions(options = {}) {
           read: accessAclRead,
           interact: accessAclInteract,
         } : undefined,
+        // 编排场景专用字段：非空才写入 body，避免覆盖后端默认值
+        tool_group: String(toolGroup || '').trim() || undefined,
+        config_file: String(configFile || '').trim() || undefined,
+        additional_args: String(additionalArgs || '').trim() || undefined,
       })
     })
     if (!response.ok) {
@@ -11485,7 +11722,8 @@ async function createAgent() {
     quickMode: newAgentQuickMode.value,
     restoreSession: newAgentRestoreSession.value,
     noInteractionMode: newAgentNoInteractionMode.value,
-    task: newAgentNoInteractionMode.value ? newAgentTaskDescription.value : '',
+    // 任务描述与是否无交互模式无关：填写即传（无交互模式仅额外要求任务必填）
+    task: newAgentTaskDescription.value,
     nodeId: newAgentNodeId.value,
     proxyNode: newAgentProxyNode.value,
     accessAclRead: newAgentAccessAclRead.value,
@@ -11554,6 +11792,416 @@ async function submitQuickCreateAgent({ task, agentType = 'agent', workingDir = 
     await afterAgentCreated(result.agent)
   } finally {
     quickCreateAgentLoading.value = false
+  }
+}
+
+// ===== 编排：从编排 YAML 批量创建 Agent =====
+// 流程：选节点 + 编排文件 → 后端解析出 agents → 每个 Agent 一个标签页表单（自动填充、可编辑）
+// → 一键逐个创建。owner 由后端按执行者自动归属，前端不传 owner_id。
+const showOrchestrateModal = ref(false)          // 编排弹窗
+const orchestrateNodeId = ref('master')          // 编排文件所在节点（也是创建 Agent 的默认节点）
+const orchestrateFilePath = ref('')              // 编排文件绝对路径
+const orchestrateAgents = ref([])                // 解析出的 Agent 表单列表（每项对应一个标签页）
+const orchestrateActiveIndex = ref(0)            // 当前激活的标签页索引
+const orchestrateLoading = ref(false)            // 解析中
+const orchestrateError = ref('')                 // 解析错误
+const orchestrateCreating = ref(false)           // 批量创建中
+const orchestrateResults = ref([])               // 批量创建结果 [{ name, ok, error }]
+// 编排文件浏览面板：目录 + 文件合并列表（复用 DirectoryDialog，fileSelectable 模式）
+const orchestrateFileEntries = ref([])           // 当前目录下的目录与文件项（{name,path,type}）
+const orchestrateSelectedFile = ref('')          // 面板中当前选中的文件路径
+const orchestrateDialogRef = ref(null)           // 内嵌 DirectoryDialog 引用
+const orchestrateShowBrowser = ref(false)        // 是否展开文件浏览面板
+const orchestrateCurrentDirPath = ref('')        // 浏览面板当前目录路径
+const orchestrateDirSearchText = ref('')         // 浏览面板搜索文本
+const orchestrateSelectedIndex = ref(-1)         // 浏览面板键盘导航选中项索引（-1 未选中）
+// 编排文件允许的扩展名（仅展示这些文件供选择）
+const ORCHESTRATE_FILE_EXTENSIONS = ['.yaml', '.yml']
+
+// 把编排文件里的单个 agent 配置映射为可编辑表单对象（字段缺失时按后端默认值兜底）
+function buildOrchestrateAgentForm(raw = {}, fallbackNodeId = 'master') {
+  const type = raw.type === 'agent' ? 'agent' : 'code_agent'
+  const acl = raw.access_acl && typeof raw.access_acl === 'object' ? raw.access_acl : {}
+  return {
+    name: String(raw.name || ''),
+    type,
+    workingDir: String(raw.working_dir || '.'),
+    llmGroup: String(raw.llm_group || 'default'),
+    toolGroup: String(raw.tool_group || 'default'),
+    configFile: String(raw.config_file || ''),
+    task: String(raw.task || ''),
+    additionalArgs: String(raw.additional_args || ''),
+    worktree: !!raw.worktree,
+    quickMode: !!raw.quick_mode,
+    restoreSession: !!raw.restore_session,
+    noInteractionMode: !!raw.no_interaction_mode,
+    nodeId: String(raw.node_id || fallbackNodeId || 'master'),
+    proxyNode: String(raw.proxy_node || ''),
+    accessAclRead: Array.isArray(acl.read) ? acl.read.map(String) : [],
+    accessAclInteract: Array.isArray(acl.interact) ? acl.interact.map(String) : [],
+  }
+}
+
+// 打开编排弹窗：加载节点选项并初始化默认节点
+async function openOrchestrateModal() {
+  orchestrateError.value = ''
+  orchestrateResults.value = []
+  orchestrateAgents.value = []
+  orchestrateActiveIndex.value = 0
+  orchestrateFilePath.value = ''
+  showOrchestrateModal.value = true
+  // 加载最近使用的配置文件（按节点过滤展示）
+  loadRecentConfigFiles()
+  if (!availableNodeOptions.value.length) {
+    try { await fetchNodeStatus() } catch (error) { /* 失败时保持空列表，弹窗内会提示 */ }
+  }
+  const allowed = filteredNodeOptionsForCreateAgent.value
+  orchestrateNodeId.value = allowed.some(n => n.node_id === orchestrateNodeId.value)
+    ? orchestrateNodeId.value
+    : (getDefaultCreateAgentNodeId() || 'master')
+}
+
+function closeOrchestrateModal() {
+  showOrchestrateModal.value = false
+  orchestrateError.value = ''
+  orchestrateResults.value = []
+  orchestrateAgents.value = []
+  orchestrateActiveIndex.value = 0
+  orchestrateFilePath.value = ''
+  // 复位文件浏览面板状态
+  orchestrateShowBrowser.value = false
+  orchestrateFileEntries.value = []
+  orchestrateSelectedFile.value = ''
+  orchestrateCurrentDirPath.value = ''
+  orchestrateDirSearchText.value = ''
+  orchestrateSelectedIndex.value = -1
+  // 复位目录选择场景，避免污染创建 Agent 的「选择目录」
+  dirDialogContext.value = 'create-agent'
+}
+
+// 解析编排文件：调后端接口读取 YAML 并取出 agents 列表
+async function parseOrchestrationFile() {
+  const path = String(orchestrateFilePath.value || '').trim()
+  if (!path) {
+    orchestrateError.value = '请输入编排文件路径'
+    return
+  }
+  orchestrateLoading.value = true
+  orchestrateError.value = ''
+  orchestrateResults.value = []
+  try {
+    const { host, port } = getGatewayAddress()
+    const nodeId = String(orchestrateNodeId.value || 'master').trim() || 'master'
+    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, nodeId, 'parse-orchestration'), {
+      method: 'POST',
+      body: JSON.stringify({ path, node_id: nodeId }),
+    })
+    const result = await response.json().catch(() => ({}))
+    if (!response.ok || !result.success || !result.data) {
+      orchestrateError.value = result.error?.message || '解析编排文件失败'
+      return
+    }
+    const agents = Array.isArray(result.data.agents) ? result.data.agents : []
+    if (!agents.length) {
+      orchestrateError.value = '编排文件中没有 agents'
+      return
+    }
+    orchestrateAgents.value = agents.map(raw => buildOrchestrateAgentForm(raw, nodeId))
+    orchestrateFilePath.value = String(result.data.path || path)
+    orchestrateActiveIndex.value = 0
+  } catch (error) {
+    orchestrateError.value = error.message || '解析编排文件失败'
+  } finally {
+    orchestrateLoading.value = false
+  }
+}
+
+// 新增一个空白 Agent 标签页
+function addOrchestrateAgent() {
+  orchestrateAgents.value.push(buildOrchestrateAgentForm({}, orchestrateNodeId.value))
+  orchestrateActiveIndex.value = orchestrateAgents.value.length - 1
+}
+
+// 删除指定标签页的 Agent
+function removeOrchestrateAgent(index) {
+  if (index < 0 || index >= orchestrateAgents.value.length) return
+  orchestrateAgents.value.splice(index, 1)
+  if (orchestrateActiveIndex.value >= orchestrateAgents.value.length) {
+    orchestrateActiveIndex.value = Math.max(0, orchestrateAgents.value.length - 1)
+  }
+}
+
+// 一键创建：逐个调用 createAgentWithOptions，汇总每个 Agent 的结果
+async function createAllOrchestrateAgents() {
+  if (orchestrateCreating.value) return
+  if (!orchestrateAgents.value.length) {
+    orchestrateError.value = '没有可创建的 Agent'
+    return
+  }
+  // 创建前统一校验：工作目录必填；非交互模式必须有任务描述
+  for (let i = 0; i < orchestrateAgents.value.length; i++) {
+    const form = orchestrateAgents.value[i]
+    const label = form.name || form.workingDir || `Agent ${i + 1}`
+    if (!String(form.workingDir || '').trim()) {
+      orchestrateError.value = `「${label}」工作目录不能为空`
+      orchestrateActiveIndex.value = i
+      return
+    }
+    if (form.noInteractionMode && !String(form.task || '').trim()) {
+      orchestrateError.value = `「${label}」启用了无交互模式，必须填写任务描述`
+      orchestrateActiveIndex.value = i
+      return
+    }
+  }
+  orchestrateCreating.value = true
+  orchestrateError.value = ''
+  orchestrateResults.value = []
+  const created = []
+  try {
+    for (const form of orchestrateAgents.value) {
+      const result = await createAgentWithOptions({
+        agentType: form.type,
+        workingDir: form.workingDir,
+        name: form.name,
+        llmGroup: form.llmGroup,
+        worktree: form.worktree,
+        quickMode: form.quickMode,
+        restoreSession: form.restoreSession,
+        noInteractionMode: form.noInteractionMode,
+        // 任务描述与是否无交互模式无关：填写即传给 Agent（无交互模式仅额外要求任务必填）
+        task: form.task,
+        nodeId: form.nodeId,
+        proxyNode: form.proxyNode,
+        accessAclRead: form.accessAclRead,
+        accessAclInteract: form.accessAclInteract,
+        toolGroup: form.toolGroup,
+        configFile: form.configFile,
+        additionalArgs: form.additionalArgs,
+      })
+      orchestrateResults.value.push({
+        name: form.name || form.workingDir || '未命名',
+        ok: !!result.ok,
+        error: result.ok ? '' : (result.error || '创建失败'),
+      })
+      if (result.ok) created.push(result.agent)
+      // 记录最近使用的配置文件（按目标节点区分），供下次编排快速选择
+      if (result.ok && form.configFile) {
+        saveRecentConfigFile(form.configFile, form.nodeId)
+      }
+    }
+    // 全部成功则关闭弹窗并收尾（加入列表、刷新、按场景打开 Panel）
+    const allOk = orchestrateResults.value.every(r => r.ok)
+    if (allOk && created.length) {
+      showOrchestrateModal.value = false
+      orchestrateAgents.value = []
+      orchestrateResults.value = []
+      for (const agent of created) {
+        agentList.value.unshift(agent)
+      }
+      await fetchAgentList()
+      startAgentListRefresh()
+      if (!hasNoPanel.value && created[0]) {
+        await openAgentInPanel(created[0])
+      }
+      showToast(`已创建 ${created.length} 个 Agent`, 'success')
+    } else {
+      const okCount = orchestrateResults.value.filter(r => r.ok).length
+      if (okCount) {
+        // 部分成功：刷新列表，保留失败项供用户修正后重试
+        await fetchAgentList()
+        startAgentListRefresh()
+      }
+      showToast(`创建完成：成功 ${okCount}/${orchestrateResults.value.length}`, okCount ? 'warning' : 'error')
+    }
+  } finally {
+    orchestrateCreating.value = false
+  }
+}
+
+// 为当前编排标签页选择工作目录：复用目录选择弹窗（orchestrate 场景）
+function openOrchestrateDirDialog() {
+  if (!orchestrateAgents.value.length) return
+  dirDialogContext.value = 'orchestrate'
+  openDirDialog()
+}
+
+// ===== 编排文件浏览面板（节点下拉 + 内嵌目录/文件浏览，参考「打开目录」）=====
+// 目录项（供 DirectoryDialog 的 filteredDirs 使用，支持搜索过滤）
+const orchestrateFilteredDirs = computed(() => {
+  const dirs = orchestrateFileEntries.value.filter(item => item.type === 'directory')
+  return filterOrchestrateEntries(dirs)
+})
+// 文件项（仅展示允许的扩展名，支持搜索过滤）
+const orchestrateFilteredFiles = computed(() => {
+  const files = orchestrateFileEntries.value.filter(item => item.type === 'file' && isOrchestrateFile(item.name))
+  return filterOrchestrateEntries(files)
+})
+// 键盘导航用的统一顺序列表：目录在前、文件在后（与面板渲染顺序一致）
+const orchestrateNavItems = computed(() => [
+  ...orchestrateFilteredDirs.value.map(d => ({ type: 'directory', path: d.path })),
+  ...orchestrateFilteredFiles.value.map(f => ({ type: 'file', path: f.path })),
+])
+// 当前编辑 Agent 目标节点下最近使用的配置文件（按节点过滤）
+const orchestrateFilteredRecentConfigFiles = computed(() => {
+  const active = orchestrateAgents.value[orchestrateActiveIndex.value]
+  if (!active || !active.nodeId) return []
+  return recentConfigFiles.value.filter(item => item && item.nodeId === active.nodeId)
+})
+function isOrchestrateFile(name) {
+  const lower = String(name || '').toLowerCase()
+  return ORCHESTRATE_FILE_EXTENSIONS.some(ext => lower.endsWith(ext))
+}
+function filterOrchestrateEntries(items) {
+  const keyword = String(orchestrateDirSearchText.value || '').toLowerCase().trim()
+  if (!keyword) return items
+  return items.filter(item =>
+    String(item.name || '').toLowerCase().includes(keyword) ||
+    String(item.path || '').toLowerCase().includes(keyword)
+  )
+}
+// 拉取指定目录下的目录与文件（保留文件，与 fetchDirectories 的「仅目录」行为隔离）
+async function fetchOrchestrateEntries(path = '') {
+  try {
+    const { host, port } = getGatewayAddress()
+    const params = new URLSearchParams({ path })
+    const nodeId = String(orchestrateNodeId.value || 'master').trim() || 'master'
+    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, nodeId, `directories?${params.toString()}`))
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}))
+      orchestrateError.value = error.error?.message || '获取目录列表失败'
+      return
+    }
+    const result = await response.json()
+    if (result.success && result.data) {
+      orchestrateCurrentDirPath.value = result.data.current_path || ''
+      orchestrateFileEntries.value = Array.isArray(result.data.items) ? result.data.items : []
+    }
+  } catch (error) {
+    orchestrateError.value = error.message || '获取目录列表出错'
+  }
+}
+// 展开/收起编排文件浏览面板
+async function toggleOrchestrateBrowser() {
+  orchestrateShowBrowser.value = !orchestrateShowBrowser.value
+  if (!orchestrateShowBrowser.value) return
+  orchestrateDirSearchText.value = ''
+  orchestrateSelectedFile.value = ''
+  orchestrateSelectedIndex.value = -1
+  await fetchOrchestrateEntries(orchestrateInitialBrowsePath())
+}
+// 计算浏览初始路径：已填路径为文件时取父目录，否则取自身；为空则从家目录开始
+function orchestrateInitialBrowsePath() {
+  const filled = String(orchestrateFilePath.value || '').trim()
+  if (!filled) return '~'
+  if (isOrchestrateFile(filled)) {
+    const idx = filled.replace(/\\/g, '/').lastIndexOf('/')
+    return idx > 0 ? filled.slice(0, idx) : '~'
+  }
+  return filled
+}
+// 在面板中进入某目录
+async function enterOrchestrateDir(path) {
+  orchestrateSelectedFile.value = ''
+  orchestrateDirSearchText.value = ''
+  orchestrateSelectedIndex.value = -1
+  await fetchOrchestrateEntries(path)
+}
+// 返回上级目录
+async function goToOrchestrateParentDir() {
+  const normalized = String(orchestrateCurrentDirPath.value || '').replace(/\\/g, '/')
+  const parts = normalized.split('/').filter(p => p)
+  if (!parts.length) return
+  parts.pop()
+  orchestrateSelectedIndex.value = -1
+  await fetchOrchestrateEntries('/' + parts.join('/'))
+}
+// 选中文件：回填编排文件路径
+function onOrchestrateSelectFile(path) {
+  orchestrateSelectedFile.value = path
+  orchestrateFilePath.value = path
+}
+// 浏览面板搜索框键盘事件：Esc 收起面板；上下键在目录/文件列表中导航；回车进入目录或选中文件
+function handleOrchestrateSearchKeydown(event) {
+  if (event.key === 'Escape') {
+    orchestrateShowBrowser.value = false
+    event.preventDefault()
+    return
+  }
+  // 带 Ctrl/Alt/Meta 修饰键时不做列表导航
+  if (event.ctrlKey || event.altKey || event.metaKey) return
+  const items = orchestrateNavItems.value
+  const maxIndex = items.length - 1
+
+  if (event.key === 'ArrowDown') {
+    if (orchestrateSelectedIndex.value < maxIndex) {
+      orchestrateSelectedIndex.value++
+    } else if (orchestrateSelectedIndex.value === -1 && maxIndex >= 0) {
+      orchestrateSelectedIndex.value = 0
+    }
+    syncOrchestrateKeyboardSelection()
+    scrollToOrchestrateSelected()
+    event.preventDefault()
+    return
+  }
+  if (event.key === 'ArrowUp') {
+    if (orchestrateSelectedIndex.value > 0) {
+      orchestrateSelectedIndex.value--
+    } else if (orchestrateSelectedIndex.value === -1) {
+      orchestrateSelectedIndex.value = maxIndex
+    } else {
+      orchestrateSelectedIndex.value = -1
+    }
+    syncOrchestrateKeyboardSelection()
+    scrollToOrchestrateSelected()
+    event.preventDefault()
+    return
+  }
+  if (event.key === 'Enter') {
+    const item = items[orchestrateSelectedIndex.value]
+    if (item) {
+      if (item.type === 'directory') {
+        enterOrchestrateDir(item.path)
+      } else {
+        onOrchestrateSelectFile(item.path)
+      }
+      event.preventDefault()
+    }
+  }
+}
+// 键盘导航高亮同步：目录项高亮用 selectedDir，文件项高亮用 selectedFile
+const orchestrateHighlightedDir = computed(() => {
+  const item = orchestrateNavItems.value[orchestrateSelectedIndex.value]
+  return item && item.type === 'directory' ? item.path : ''
+})
+const orchestrateHighlightedFile = computed(() => {
+  const item = orchestrateNavItems.value[orchestrateSelectedIndex.value]
+  return item && item.type === 'file' ? item.path : ''
+})
+// 把当前键盘选中项同步到 DirectoryDialog 的高亮 props
+function syncOrchestrateKeyboardSelection() {
+  const item = orchestrateNavItems.value[orchestrateSelectedIndex.value]
+  if (item && item.type === 'file') {
+    orchestrateSelectedFile.value = item.path
+  }
+}
+// 滚动到键盘选中的列表项（DirectoryDialog 内 .dir-item.selected）
+function scrollToOrchestrateSelected() {
+  nextTick(() => {
+    const el = orchestrateDialogRef.value?.$el?.querySelector?.('.dir-item.selected')
+    el?.scrollIntoView?.({ block: 'nearest' })
+  })
+}
+// 搜索文本变化时重置键盘选中索引（过滤后列表已变，旧索引无意义）
+watch(orchestrateDirSearchText, () => {
+  orchestrateSelectedIndex.value = -1
+})
+// 切换编排节点：重新拉取文件列表
+async function onOrchestrateNodeChange() {
+  orchestrateFilePath.value = ''
+  orchestrateSelectedFile.value = ''
+  orchestrateSelectedIndex.value = -1
+  if (orchestrateShowBrowser.value) {
+    await fetchOrchestrateEntries('~')
   }
 }
 // 打开补全列表
@@ -18072,6 +18720,11 @@ body::-webkit-scrollbar {
   display: none;
 }
 
+/* 目录选择弹窗从「编排」弹窗内打开时，需盖在编排弹窗（z-index:3000）之上 */
+.palette-overlay.dir-dialog-above-orchestrate {
+  z-index: 3100;
+}
+
 
 </style>
 
@@ -23047,4 +23700,261 @@ body::-webkit-scrollbar {
 }
 
 /* ========== Rules 浮动窗口样式结束 ========== */
+
+/* ========== 编排弹窗样式 ========== */
+.orchestrate-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+}
+.orchestrate-modal {
+  width: min(900px, 94vw);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+.orchestrate-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid #30363d;
+}
+.orchestrate-header h2 {
+  margin: 0;
+  font-size: 16px;
+  color: #e6edf3;
+}
+.orchestrate-close {
+  background: transparent;
+  border: none;
+  color: #8ba3b8;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+.orchestrate-close:hover { color: #e6edf3; }
+.orchestrate-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 18px;
+}
+.orchestrate-source {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.orchestrate-source-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+/* 编排文件浏览面板：内嵌 DirectoryDialog，固定高度以承载滚动列表 */
+.orchestrate-browse-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 320px;
+  min-height: 0;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.orchestrate-label {
+  flex: 0 0 auto;
+  min-width: 68px;
+  color: #8ba3b8;
+  font-size: 13px;
+}
+.orchestrate-node-select,
+.orchestrate-path-input,
+.orchestrate-input,
+.orchestrate-textarea {
+  flex: 1;
+  min-width: 0;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #e6edf3;
+  padding: 7px 10px;
+  font-size: 13px;
+}
+.orchestrate-textarea {
+  resize: vertical;
+  font-family: inherit;
+}
+.orchestrate-error {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: rgba(248, 81, 73, 0.12);
+  border: 1px solid rgba(248, 81, 73, 0.4);
+  border-radius: 6px;
+  color: #ff7b72;
+  font-size: 13px;
+}
+.orchestrate-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid #30363d;
+  padding-bottom: 8px;
+}
+.orchestrate-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px 6px 0 0;
+  color: #8ba3b8;
+  padding: 6px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  max-width: 220px;
+}
+.orchestrate-tab.active {
+  background: #1f6feb;
+  border-color: #1f6feb;
+  color: #fff;
+}
+.orchestrate-tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.orchestrate-tab-close {
+  font-size: 15px;
+  line-height: 1;
+  opacity: 0.7;
+}
+.orchestrate-tab-close:hover { opacity: 1; }
+.orchestrate-tab-add {
+  background: transparent;
+  border: 1px dashed #30363d;
+  border-radius: 6px;
+  color: #8ba3b8;
+  padding: 6px 10px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.orchestrate-tab-add:hover { color: #e6edf3; border-color: #8ba3b8; }
+.orchestrate-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.orchestrate-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.orchestrate-field-wide {
+  grid-column: 1 / -1;
+}
+.orchestrate-field .orchestrate-label {
+  min-width: 0;
+}
+.orchestrate-dir-row {
+  display: flex;
+  gap: 8px;
+}
+/* 最近使用的配置文件（按节点过滤）标签 */
+.orchestrate-recent-section {
+  margin-top: 8px;
+}
+.orchestrate-recent-title {
+  font-size: 12px;
+  color: #8ba3b8;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+.orchestrate-recent-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.orchestrate-recent-tag {
+  display: inline-block;
+  padding: 4px 8px;
+  background-color: #16263a;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #d6e4f0;
+  cursor: pointer;
+  transition: all 0.2s;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.orchestrate-recent-tag:hover {
+  background-color: #20c8ff;
+  color: #fff;
+}
+.orchestrate-checks {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.orchestrate-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #c9d1d9;
+  font-size: 13px;
+  cursor: pointer;
+}
+.orchestrate-empty {
+  padding: 24px;
+  text-align: center;
+  color: #8ba3b8;
+  font-size: 13px;
+}
+.orchestrate-results {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.orchestrate-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+.orchestrate-result.ok {
+  background: rgba(63, 185, 80, 0.12);
+  color: #3fb950;
+}
+.orchestrate-result.fail {
+  background: rgba(248, 81, 73, 0.12);
+  color: #ff7b72;
+}
+.orchestrate-result-name { color: #e6edf3; }
+.orchestrate-result-error { color: #ff7b72; opacity: 0.85; }
+.orchestrate-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 18px;
+  border-top: 1px solid #30363d;
+}
+@media (max-width: 640px) {
+  .orchestrate-form { grid-template-columns: 1fr; }
+  .orchestrate-source-row { flex-wrap: wrap; }
+}
+/* ========== 编排弹窗样式结束 ========== */
 </style>

@@ -9,6 +9,7 @@
       <div class="sidebar-header-actions">
         <button class="icon-btn" :class="{ active: isBatchMode }" @click="$emit('toggleBatchMode')" title="批量选择模式">☑</button>
         <button class="icon-btn" @click="openManageGroups" title="管理分组">📁</button>
+        <button class="icon-btn" @click="$emit('orchestrate')" title="编排：从编排文件批量创建 Agent">🧩</button>
         <button class="icon-btn" @click="$emit('createAgent')" title="创建新 Agent">➕</button>
         <button v-if="!embedded" class="icon-btn" @click="$emit('close')" title="关闭侧边栏">✕</button>
       </div>
@@ -417,6 +418,7 @@ const emit = defineEmits([
   'close',
   'toggleBatchMode',
   'createAgent',
+  'orchestrate',
   'agentClick',
   'agentContextMenu',
   'toggleSelectAgent',
