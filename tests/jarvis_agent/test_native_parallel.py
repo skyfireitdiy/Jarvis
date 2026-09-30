@@ -74,6 +74,11 @@ def test_fire_after_tool_call_invokes_listener_and_emits():
     bus = _FakeBus(listener)
     a = object.__new__(Agent)
     a.event_bus = bus
+    # 重构后 _fire_after_tool_call 委托给 self._callback_loader，
+    # 用 object.__new__ 构造的实例需补齐该属性
+    from jarvis.jarvis_agent.callback_loader import CallbackLoader
+
+    a._callback_loader = CallbackLoader(a)
     a._fire_after_tool_call()
     assert called["agent"] is a
     assert called["kwargs"]["current_response"] == ""

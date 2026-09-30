@@ -17,7 +17,9 @@ class TestSlidingWindowCompression:
         model.messages = []
         model.get_messages = Mock(return_value=[])
         model.get_remaining_token_count = Mock(return_value=1000)
-        model.chat_until_success = Mock(return_value="压缩后的摘要内容")
+        model.chat_until_success = Mock(
+            return_value="这是一段足够长的压缩摘要内容，用于通过长度校验。"
+        )
 
         # 添加 set_messages 方法，让它真正修改 messages 属性
         def set_messages_impl(messages):
@@ -44,7 +46,9 @@ class TestSlidingWindowCompression:
 
         # Mock _create_temp_model方法
         temp_model = Mock()
-        temp_model.chat_until_success = Mock(return_value="压缩后的摘要内容")
+        temp_model.chat_until_success = Mock(
+            return_value="这是一段足够长的压缩摘要内容，用于通过长度校验。"
+        )
         ag._create_temp_model = Mock(return_value=temp_model)
 
         # Mock _format_compressed_summary方法
@@ -62,6 +66,12 @@ class TestSlidingWindowCompression:
         ag._sliding_window_compression = RealAgent._sliding_window_compression.__get__(
             ag, Mock
         )
+
+        # 重构后 _sliding_window_compression 委托给 self._history_compressor，
+        # 真实方法绑定到 mock 时需要补齐该属性
+        from jarvis.jarvis_agent.history_compressor import HistoryCompressor
+
+        ag._history_compressor = HistoryCompressor(ag)
 
         return ag
 

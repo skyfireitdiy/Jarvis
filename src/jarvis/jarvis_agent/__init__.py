@@ -5,9 +5,6 @@ import json
 import os
 import platform
 import re
-import subprocess
-import sys
-import traceback
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -21,17 +18,17 @@ from typing import Union
 
 # 第三方库导入
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
+from jarvis.jarvis_agent.callback_loader import CallbackLoader
+from jarvis.jarvis_agent.model_switcher import ModelSwitcher
 from jarvis.jarvis_agent.event_bus import EventBus
 from jarvis.jarvis_agent.events import AFTER_ADDON_PROMPT
 from jarvis.jarvis_agent.events import AFTER_HISTORY_CLEAR
 from jarvis.jarvis_agent.events import AFTER_MODEL_CALL
 from jarvis.jarvis_agent.events import AFTER_SUMMARY
-from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
 from jarvis.jarvis_agent.events import BEFORE_ADDON_PROMPT
 from jarvis.jarvis_agent.events import BEFORE_HISTORY_CLEAR
 from jarvis.jarvis_agent.events import BEFORE_MODEL_CALL
 from jarvis.jarvis_agent.events import BEFORE_SUMMARY
-from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL
 from jarvis.jarvis_agent.events import BEFORE_TOOL_FILTER
 from jarvis.jarvis_agent.events import INTERRUPT_TRIGGERED
 from jarvis.jarvis_agent.events import TASK_COMPLETED
@@ -51,8 +48,11 @@ from jarvis.jarvis_utils.config import is_enable_request_classification
 from jarvis.jarvis_agent.prompt_builder import build_action_prompt
 from jarvis.jarvis_agent.prompt_builder import get_tool_registry
 from jarvis.jarvis_agent.prompt_manager import PromptManager
+from jarvis.jarvis_agent.history_compressor import HistoryCompressor
 from jarvis.jarvis_agent.prompts import DEFAULT_SUMMARY_PROMPT
-from jarvis.jarvis_agent.prompts import SUMMARY_REQUEST_PROMPT
+
+# 保持对外 re-export（历史摘要/压缩实现已迁至 history_compressor.py）
+from jarvis.jarvis_agent.prompts import SUMMARY_REQUEST_PROMPT as SUMMARY_REQUEST_PROMPT
 from jarvis.jarvis_agent.protocols import OutputHandlerProtocol
 from jarvis.jarvis_agent.run_loop import AgentRunLoop, ensure_str
 from jarvis.jarvis_agent.session_manager import SessionManager
@@ -71,10 +71,6 @@ from jarvis.jarvis_tools.registry import ToolRegistry
 
 # jarvis_utils 相关
 from jarvis.jarvis_utils.config import get_addon_prompt_threshold
-from jarvis.jarvis_utils.config import get_after_tool_call_cb_dirs
-from jarvis.jarvis_utils.config import get_before_tool_call_cb_dirs
-from jarvis.jarvis_utils.config import get_before_model_call_cb_dirs
-from jarvis.jarvis_utils.config import get_summary_cb_dirs
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_normal_platform_name
 from jarvis.jarvis_utils.config import get_tool_filter_threshold
@@ -874,6 +870,9 @@ class Agent:
             self
         )  # 文件和方法论管理器：处理文件上传和方法论加载
         self.prompt_manager = PromptManager(self)  # 提示词管理器：构建和管理系统提示词
+        self._history_compressor = HistoryCompressor(self)  # 历史摘要/压缩处理器
+        self._callback_loader = CallbackLoader(self)  # 回调/事件加载处理器
+        self._model_switcher = ModelSwitcher(self)  # 模型/平台切换处理器
 
         # 初始化任务列表管理器（使用当前工作目录作为 root_dir，如果子类已设置 root_dir 则使用子类的）
         root_dir = getattr(self, "root_dir", None) or os.getcwd()
@@ -937,62 +936,13 @@ class Agent:
         ]
         self.multiline_inputer = multiline_inputer or get_multiline_input
 
+    # ------------------------------------------------------------------
+    # 模型/平台切换：委托至 ModelSwitcher（实现见 model_switcher.py）
+    # 保留同名方法，保证对外接口（含 run_loop / code_agent 的反向调用）不变。
+    # ------------------------------------------------------------------
     def _switch_model_by_difficulty(self, difficulty: str) -> None:
-        """根据任务难度切换模型
-
-        参数:
-            difficulty: 任务难度等级（easy/medium/hard）
-        """
-        # 如果用户手动切换过模型，则禁用自动切换
-        if getattr(self, "_manual_model_switch", False):
-            return
-
-        # 难度到模型类型的映射：只做质量升级（hard->smart），不做廉价降级，
-        # 避免难度误判把真实任务丢给 cheap 档模型而牺牲质量。
-        difficulty_to_model_type = {
-            "easy": "normal",
-            "medium": "normal",
-            "hard": "smart",
-        }
-
-        model_type = difficulty_to_model_type.get(difficulty, "normal")
-        current_model_type = getattr(self, "_model_type", "normal")
-
-        # 如果模型类型没有变化，不需要切换
-        if model_type == current_model_type:
-            return
-
-        # 延迟导入以避免循环依赖
-        from jarvis.jarvis_agent.builtin_input_handler import switch_platform_type
-
-        # 使用通用的 switch_platform_type 函数进行切换
-        success = switch_platform_type(self, model_type, preserve_model_group=True)
-
-        if success:
-            # 更新模型类型标记
-            self._model_type = model_type
-
-            # 如果有系统提示词，设置到新模型
-            if hasattr(self, "system_prompt") and self.system_prompt:
-                # 使用 prompt_manager 重新构建系统提示词（包含方法论等）
-                if hasattr(self, "prompt_manager") and self.prompt_manager:
-                    prompt_text = self.prompt_manager.build_system_prompt(self)
-                    self.model.set_system_prompt(prompt_text)
-                else:
-                    self.model.set_system_prompt(self.system_prompt)
-
-            # 输出切换信息
-            model_type_display = {
-                "cheap": "经济",
-                "normal": "标准",
-                "smart": "智能",
-            }.get(model_type, model_type)
-            PrettyOutput.auto_print(
-                f"🔄 根据任务难度（{difficulty}）切换模型类型: {model_type_display} ({model_type})"
-            )
-
-        else:
-            PrettyOutput.auto_print("⚠️ 模型切换失败，保持当前模型")
+        """根据任务难度切换模型（委托至 ModelSwitcher）"""
+        return self._model_switcher.switch_model_by_difficulty(difficulty)
 
     def _classify_and_switch_model(
         self,
@@ -1000,72 +950,16 @@ class Agent:
         classify_fn: Callable,
         get_prompt_fn: Callable,
     ) -> None:
-        """执行需求分类、模型切换、采样温度适配和系统提示词更新的统一流程
-
-        参数:
-            user_input: 用户输入的需求描述
-            classify_fn: 分类函数，签名为 (user_input) -> (scenario, difficulty, temperature)
-            get_prompt_fn: 获取系统提示词函数，签名为 (scenario) -> str
-        """
-        try:
-            scenario, difficulty, temperature = classify_fn(user_input)
-
-            # 根据难度切换模型（可能重建 self.model）
-            self._switch_model_by_difficulty(difficulty)
-
-            # 按任务性质调整采样温度（须在可能的重建之后应用）
-            self._apply_task_temperature(temperature)
-
-            # 根据分类结果获取对应的系统提示词并更新
-            scenario_system_prompt = get_prompt_fn(scenario)
-            if scenario_system_prompt != self.system_prompt:
-                self.system_prompt = scenario_system_prompt
-                # 更新模型的系统提示词
-                if self.model:
-                    # 使用 prompt_manager 重新构建系统提示词（包含方法论等）
-                    if self.prompt_manager:
-                        prompt_text = self.prompt_manager.build_system_prompt(self)
-                        self.model.set_system_prompt(prompt_text)
-                    else:
-                        self.model.set_system_prompt(self.system_prompt)
-        except Exception as e:
-            PrettyOutput.auto_print(f"⚠️ 需求分类失败: {e}，使用默认配置")
+        """执行需求分类、模型切换、采样温度适配和系统提示词更新（委托至 ModelSwitcher）"""
+        return self._model_switcher.classify_and_switch_model(
+            user_input=user_input,
+            classify_fn=classify_fn,
+            get_prompt_fn=get_prompt_fn,
+        )
 
     def _apply_task_temperature(self, temperature: Optional[float]) -> None:
-        """按任务性质把推荐采样温度应用到当前模型（带范围保护）。
-
-        温度只改当前 Agent 自己的平台实例（registry 每次新建），不影响其它 Agent。
-        """
-        try:
-            model = getattr(self, "model", None)
-            if model is None:
-                return
-            if temperature is None:
-                return
-            # 尊重用户在 llm_config 里显式锁定的 temperature：显式配置优先于自动调整
-            try:
-                from jarvis.jarvis_utils.config import get_llm_config
-
-                pinned = get_llm_config(getattr(model, "platform_type", "normal")).get(
-                    "temperature"
-                )
-            except Exception:
-                pinned = None
-            if pinned is not None:
-                return
-            # 范围保护：拒绝明显异常的数值，避免把采样推到极端
-            try:
-                temp = float(temperature)
-            except (TypeError, ValueError):
-                return
-            temp = min(max(temp, 0.1), 1.5)
-            if not hasattr(model, "temperature"):
-                return
-            model.temperature = temp
-            PrettyOutput.auto_print(f"🌡️ 按任务性质调整采样温度: {temp}")
-        except Exception:
-            # 温度调整失败不影响主流程
-            pass
+        """按任务性质把推荐采样温度应用到当前模型（委托至 ModelSwitcher）"""
+        return self._model_switcher.apply_task_temperature(temperature)
 
     def _setup_system_prompt(self) -> None:
         """设置系统提示词"""
@@ -1159,161 +1053,13 @@ class Agent:
             # Fallback for custom handlers that only accept one argument
             return self.multiline_inputer(tip)
 
+    # ------------------------------------------------------------------
+    # 回调/事件加载：委托至 CallbackLoader（实现见 callback_loader.py）
+    # 保留同名方法，保证对外接口不变。
+    # ------------------------------------------------------------------
     def _load_after_tool_callbacks(self) -> None:
-        """
-        扫描 after_tool_call_cb_dirs 中的 Python 文件并动态注册回调。
-        约定优先级（任一命中即注册）：
-        - 模块级可调用对象: after_tool_call_cb
-        - 工厂方法返回单个或多个可调用对象: get_after_tool_call_cb(), register_after_tool_call_cb()
-        """
-        try:
-            dirs = get_after_tool_call_cb_dirs()
-            if not dirs:
-                return
-            for d in dirs:
-                p_dir = Path(d)
-                if not p_dir.exists() or not p_dir.is_dir():
-                    continue
-                for file_path in p_dir.glob("*.py"):
-                    if file_path.name == "__init__.py":
-                        continue
-                    parent_dir = str(file_path.parent)
-                    added_path = False
-                    try:
-                        if parent_dir not in sys.path:
-                            sys.path.insert(0, parent_dir)
-                            added_path = True
-                        module_name = file_path.stem
-
-                        # 解析文件头部的 requirements 注释
-                        requirements: List[str] = []
-                        try:
-                            with open(file_path, "r", encoding="utf-8") as f:
-                                for line in f:
-                                    line = line.strip()
-                                    if line.startswith("# requirements:"):
-                                        deps_str = line[
-                                            len("# requirements:") :
-                                        ].strip()
-                                        if deps_str:
-                                            requirements = deps_str.split()
-                                        break
-                        except Exception as e:
-                            PrettyOutput.auto_print(
-                                f"⚠️ 读取回调文件依赖声明失败 [{file_path.name}]: {e}"
-                            )
-
-                        # 安装依赖
-                        if requirements:
-                            PrettyOutput.auto_print(
-                                f"🔧 正在安装回调文件依赖 [{file_path.name}]: {', '.join(requirements)}"
-                            )
-                            try:
-                                result = subprocess.run(
-                                    ["uv", "pip", "install"] + requirements,
-                                    capture_output=True,
-                                    text=True,
-                                    timeout=120,
-                                )
-                                if result.returncode == 0:
-                                    PrettyOutput.auto_print(
-                                        f"✅ 依赖安装成功 [{file_path.name}]"
-                                    )
-                                else:
-                                    PrettyOutput.auto_print(
-                                        f"❌ 依赖安装失败 [{file_path.name}]: {result.stderr.strip()}"
-                                    )
-                            except subprocess.TimeoutExpired:
-                                PrettyOutput.auto_print(
-                                    f"❌ 依赖安装超时 [{file_path.name}] (超过 120 秒)"
-                                )
-                            except Exception as e:
-                                PrettyOutput.auto_print(
-                                    f"❌ 依赖安装异常 [{file_path.name}]: {e}"
-                                )
-
-                        module = __import__(module_name)
-                        PrettyOutput.auto_print(
-                            f"📦 从配置文件加载回调文件：{file_path}"
-                        )
-
-                        candidates: List[Callable[[Any], None]] = []
-
-                        # 1) 直接导出的回调
-                        if hasattr(module, "after_tool_call_cb"):
-                            obj = getattr(module, "after_tool_call_cb")
-                            if callable(obj):
-                                candidates.append(obj)
-
-                        # 2) 工厂方法：get_after_tool_call_cb()
-                        if hasattr(module, "get_after_tool_call_cb"):
-                            factory = getattr(module, "get_after_tool_call_cb")
-                            if callable(factory):
-                                try:
-                                    ret = factory()
-                                    if callable(ret):
-                                        candidates.append(ret)
-                                    elif isinstance(ret, (list, tuple)):
-                                        for c in ret:
-                                            if callable(c):
-                                                candidates.append(c)
-                                except Exception as e:
-                                    PrettyOutput.auto_print(
-                                        f"⚠️ 回调工厂方法 get_after_tool_call_cb 执行错误 [{type(e).__name__}]: {e}"
-                                    )
-
-                        # 3) 工厂方法：register_after_tool_call_cb()
-                        if hasattr(module, "register_after_tool_call_cb"):
-                            factory2 = getattr(module, "register_after_tool_call_cb")
-                            if callable(factory2):
-                                try:
-                                    ret2 = factory2()
-                                    if callable(ret2):
-                                        candidates.append(ret2)
-                                    elif isinstance(ret2, (list, tuple)):
-                                        for c in ret2:
-                                            if callable(c):
-                                                candidates.append(c)
-                                except Exception as e:
-                                    PrettyOutput.auto_print(
-                                        f"⚠️ 回调工厂方法 register_after_tool_call_cb 执行错误 [{type(e).__name__}]: {e}"
-                                    )
-
-                        for cb in candidates:
-                            try:
-
-                                def _make_wrapper(
-                                    callback: Callable[[Any], None],
-                                ) -> Callable[..., None]:
-                                    def _wrapper(**kwargs: Any) -> None:
-                                        try:
-                                            agent = kwargs.get("agent")
-                                            callback(agent)
-                                        except Exception as e:
-                                            PrettyOutput.auto_print(
-                                                f"⚠️ 回调函数执行错误 [{type(e).__name__}]: {e}"
-                                            )
-
-                                    return _wrapper
-
-                                self.event_bus.subscribe(
-                                    AFTER_TOOL_CALL, _make_wrapper(cb)
-                                )
-                            except Exception as e:
-                                PrettyOutput.auto_print(
-                                    f"⚠️ 回调函数订阅错误 [{type(e).__name__}]: {e}"
-                                )
-
-                    except Exception as e:
-                        PrettyOutput.auto_print(f"⚠️ 从 {file_path} 加载回调失败: {e}")
-                    finally:
-                        if added_path:
-                            try:
-                                sys.path.remove(parent_dir)
-                            except ValueError:
-                                pass
-        except Exception as e:
-            PrettyOutput.auto_print(f"⚠️ 加载回调目录时发生错误: {e}")
+        """扫描 after_tool_call_cb_dirs 并注册回调（委托至 CallbackLoader）"""
+        return self._callback_loader.load_after_tool_callbacks()
 
     def _load_event_callbacks(
         self,
@@ -1322,204 +1068,17 @@ class Agent:
         callback_names: List[str],
         target: str = "event_bus",
     ) -> None:
-        """
-        通用的回调加载方法，支持从配置目录扫描并注册回调。
-
-        参数:
-            event_name: 事件名称（如 BEFORE_TOOL_CALL）
-            config_getter: 配置目录获取函数（如 get_before_tool_call_cb_dirs）
-            callback_names: 回调函数名称列表（优先级从高到低）
-                           例如: ["before_tool_call_cb", "get_before_tool_call_cb", "register_before_tool_call_cb"]
-            target: 回调注册目标，决定回调存储位置：
-                - "event_bus": 注册到 EventBus（通知型，默认）
-                - "hook": 注册到 hooks 列表（拦截型，返回 False 拦截）
-                - "modifier": 注册到 modifiers 列表（修改型，返回修改后的值）
-        """
-        try:
-            dirs = config_getter()
-            if not dirs:
-                return
-            for d in dirs:
-                p_dir = Path(d)
-                if not p_dir.exists() or not p_dir.is_dir():
-                    continue
-                for file_path in p_dir.glob("*.py"):
-                    if file_path.name == "__init__.py":
-                        continue
-                    parent_dir = str(file_path.parent)
-                    added_path = False
-                    try:
-                        if parent_dir not in sys.path:
-                            sys.path.insert(0, parent_dir)
-                            added_path = True
-                        module_name = file_path.stem
-
-                        # 解析文件头部的 requirements 注释
-                        requirements: List[str] = []
-                        try:
-                            with open(file_path, "r", encoding="utf-8") as f:
-                                for line in f:
-                                    line = line.strip()
-                                    if line.startswith("# requirements:"):
-                                        deps_str = line[
-                                            len("# requirements:") :
-                                        ].strip()
-                                        if deps_str:
-                                            requirements = deps_str.split()
-                                        break
-                        except Exception as e:
-                            PrettyOutput.auto_print(
-                                f"⚠️ 解析回调文件依赖失败 [{file_path.name}]: {e}"
-                            )
-
-                        # 安装依赖
-                        if requirements:
-                            PrettyOutput.auto_print(
-                                f"🔧 正在安装回调文件依赖 [{file_path.name}]: {', '.join(requirements)}"
-                            )
-                            try:
-                                result = subprocess.run(
-                                    ["uv", "pip", "install"] + requirements,
-                                    capture_output=True,
-                                    text=True,
-                                    timeout=120,
-                                )
-                                if result.returncode == 0:
-                                    PrettyOutput.auto_print(
-                                        f"✅ 依赖安装成功 [{file_path.name}]"
-                                    )
-                                else:
-                                    PrettyOutput.auto_print(
-                                        f"❌ 依赖安装失败 [{file_path.name}]: {result.stderr.strip()}"
-                                    )
-                            except subprocess.TimeoutExpired:
-                                PrettyOutput.auto_print(
-                                    f"❌ 依赖安装超时 [{file_path.name}] (超过 120 秒)"
-                                )
-                            except Exception as e:
-                                PrettyOutput.auto_print(
-                                    f"❌ 依赖安装异常 [{file_path.name}]: {e}"
-                                )
-
-                        module = __import__(module_name)
-                        PrettyOutput.auto_print(
-                            f"📦 从配置文件加载回调文件：{file_path}"
-                        )
-
-                        candidates: List[Callable] = []
-
-                        # 按优先级尝试获取回调
-                        for callback_name in callback_names:
-                            if hasattr(module, callback_name):
-                                obj = getattr(module, callback_name)
-                                if callable(obj):
-                                    try:
-                                        ret = (
-                                            obj()
-                                            if callback_name.startswith(
-                                                ("get_", "register_")
-                                            )
-                                            else obj
-                                        )
-                                        if callable(ret):
-                                            candidates.append(ret)
-                                        elif isinstance(ret, (list, tuple)):
-                                            for c in ret:
-                                                if callable(c):
-                                                    candidates.append(c)
-                                    except Exception as e:
-                                        PrettyOutput.auto_print(
-                                            f"⚠️ 调用工厂方法 {callback_name}() 失败 [{file_path.name}]: {e}"
-                                        )
-
-                        # 根据目标类型注册回调
-                        for cb in candidates:
-                            try:
-                                if target == "hook":
-                                    # Hook：拦截型，注册到 hooks 列表
-                                    if event_name == BEFORE_TOOL_CALL:
-                                        self._before_tool_call_hooks.append(cb)
-                                    # 同时注册到 EventBus 作为通知
-                                    self.event_bus.subscribe(event_name, cb)
-                                elif target == "modifier":
-                                    # Modifier：修改型，注册到 modifiers 列表
-                                    if event_name == BEFORE_MODEL_CALL:
-                                        self._before_model_call_modifiers.append(cb)
-                                    elif event_name == BEFORE_SUMMARY:
-                                        self._before_summary_modifiers.append(cb)
-                                else:
-                                    # Event：通知型，注册到 EventBus
-                                    self.event_bus.subscribe(event_name, cb)
-                            except Exception as e:
-                                PrettyOutput.auto_print(
-                                    f"⚠️ 注册回调失败 [{file_path.name}]: {e}\n{traceback.format_exc()}"
-                                )
-
-                    except Exception as e:
-                        PrettyOutput.auto_print(
-                            f"⚠️ 加载回调文件失败 [{file_path}]: {e}\n{traceback.format_exc()}"
-                        )
-                    finally:
-                        if added_path:
-                            try:
-                                sys.path.remove(parent_dir)
-                            except ValueError:
-                                pass
-        except Exception as e:
-            PrettyOutput.auto_print(
-                f"⚠️ 加载 {event_name} 回调目录失败: {e}\n{traceback.format_exc()}"
-            )
+        """通用的回调加载方法（委托至 CallbackLoader）"""
+        return self._callback_loader.load_event_callbacks(
+            event_name=event_name,
+            config_getter=config_getter,
+            callback_names=callback_names,
+            target=target,
+        )
 
     def _load_all_event_callbacks(self) -> None:
-        """
-        加载所有事件回调（包括 before_tool_call、before_model_call、summary 等）。
-        """
-        # 加载 before_tool_call 回调（Hook：拦截型 + Event 通知）
-        self._load_event_callbacks(
-            event_name=BEFORE_TOOL_CALL,
-            config_getter=get_before_tool_call_cb_dirs,
-            callback_names=[
-                "before_tool_call_cb",
-                "get_before_tool_call_cb",
-                "register_before_tool_call_cb",
-            ],
-            target="hook",
-        )
-
-        # 加载 before_model_call 回调（Modifier：修改型）
-        self._load_event_callbacks(
-            event_name=BEFORE_MODEL_CALL,
-            config_getter=get_before_model_call_cb_dirs,
-            callback_names=[
-                "before_model_call_cb",
-                "get_before_model_call_cb",
-                "register_before_model_call_cb",
-            ],
-            target="modifier",
-        )
-
-        # 加载 before_summary 回调（Modifier：修改型）
-        self._load_event_callbacks(
-            event_name=BEFORE_SUMMARY,
-            config_getter=get_summary_cb_dirs,
-            callback_names=[
-                "before_summary_cb",
-                "get_before_summary_cb",
-                "register_before_summary_cb",
-            ],
-            target="modifier",
-        )
-
-        # 加载 after_summary 回调（Event：通知型）
-        self._load_event_callbacks(
-            event_name=AFTER_SUMMARY,
-            config_getter=get_summary_cb_dirs,
-            callback_names=[
-                "after_summary_cb",
-                "get_after_summary_cb",
-                "register_after_summary_cb",
-            ],
-        )
+        """加载所有事件回调（委托至 CallbackLoader）"""
+        return self._callback_loader.load_all_event_callbacks()
 
     def save_session(self) -> bool:
         """Saves the current session state by delegating to the session manager."""
@@ -1648,23 +1207,8 @@ class Agent:
         return content or ""
 
     def _fire_after_tool_call(self) -> None:
-        """触发 AFTER_TOOL_CALL：emit 会按优先级调用所有订阅回调。
-
-        （此前先手动遍历 _listeners 再 emit，导致同一批回调被派发两次）
-        """
-        try:
-            self.event_bus.emit(
-                AFTER_TOOL_CALL,
-                agent=self,
-                current_response="",
-                need_return=False,
-                tool_prompt="",
-            )
-        except Exception as e:
-            save_exception(
-                e, module="jarvis_agent.__init__", function="_fire_after_tool_call"
-            )
-            pass
+        """触发 AFTER_TOOL_CALL（委托至 CallbackLoader）"""
+        return self._callback_loader.fire_after_tool_call()
 
     def _exec_native_one(self, call: Dict[str, Any]) -> str:
         """串行执行单个原生工具调用（含确认门控与拒绝处理）。"""
@@ -2037,936 +1581,63 @@ class Agent:
 
         return response
 
+    # ------------------------------------------------------------------
+    # 历史摘要/压缩：委托至 HistoryCompressor（实现见 history_compressor.py）
+    # 保留同名方法，保证对外接口（含 run_loop / code_agent 的反向调用）不变。
+    # ------------------------------------------------------------------
     def _validate_summary(self, summary: str) -> tuple[bool, list[str]]:
-        """检查摘要是否可接受。
-
-        仅做基础长度检查，不再强制命中固定关键词，避免无谓的重写循环与额外推理成本。
-
-        返回:
-            tuple[bool, list[str]]: (是否通过, 问题列表)。仅当内容过短或为空时判定失败。
-        """
-        if not summary:
-            return False, ["总结内容为空"]
-        if len(summary.strip()) < 20:
-            return False, ["总结内容过短"]
-        return True, []
+        """检查摘要是否可接受（委托至 HistoryCompressor）"""
+        return self._history_compressor.validate_summary(summary)
 
     def generate_summary(self, for_token_limit: bool = False) -> str:
-        """生成对话历史摘要
-
-        参数:
-            for_token_limit: 如果为True，表示由于token限制触发的summary，使用SUMMARY_REQUEST_PROMPT
-                            如果为False，表示任务完成时的summary，使用用户传入的summary_prompt
-
-        返回:
-            str: 包含对话摘要的字符串
-
-        注意:
-            仅生成摘要，不修改对话状态
-        """
-
-        try:
-            if not self.model:
-                raise RuntimeError("Model not initialized")
-
-            if for_token_limit:
-                PrettyOutput.auto_print(
-                    "🔍 开始生成对话历史摘要... (原因: Token限制触发)"
-                )
-            else:
-                PrettyOutput.auto_print(
-                    "🔍 开始生成对话历史摘要... (原因: 任务完成触发)"
-                )
-
-            if for_token_limit:
-                # token限制触发的summary：使用SUMMARY_REQUEST_PROMPT进行上下文压缩
-                # 对于多模态内容，只提取文本部分进行总结
-                if isinstance(self.session.prompt, list):
-                    text_parts = [
-                        b.get("text", "")
-                        for b in self.session.prompt
-                        if b.get("type") == "text"
-                    ]
-                    prompt_text = "\n".join(text_parts)
-                else:
-                    prompt_text = self.session.prompt
-                prompt_to_use = prompt_text + "\n" + SUMMARY_REQUEST_PROMPT
-            else:
-                # 任务完成时的summary：使用用户传入的summary_prompt或DEFAULT_SUMMARY_PROMPT
-                safe_summary_prompt = self.summary_prompt or ""
-                if (
-                    isinstance(safe_summary_prompt, str)
-                    and safe_summary_prompt.strip() != ""
-                ):
-                    prompt_to_use = safe_summary_prompt
-                else:
-                    prompt_to_use = DEFAULT_SUMMARY_PROMPT
-
-            # 如果是CodeAgent且有start_commit，在prompt中追加提示，只总结该commit之后的目标
-            if hasattr(self, "start_commit") and self.start_commit:
-                start_commit_hint = (
-                    f"\n\n<start_commit_context>\n"
-                    f"本次任务之初始 Git Commit 为：`{self.start_commit}`\n"
-                    f"请仅总结该 commit 之后的任务目标、变更与进展，"
-                    f"无需总结该 commit 之前的历史内容。\n"
-                    f"</start_commit_context>"
-                )
-                prompt_to_use += start_commit_hint
-
-            # 生成总结，最多重试 2 次
-            max_retries = 2
-            retry_count = 0
-            summary = ""
-
-            while retry_count <= max_retries:
-                summary = self.model.chat_until_success(prompt_to_use)
-                # 防御：可能返回空响应 (None 或空字符串)，统一为空字符串并告警
-                if not summary:
-                    try:
-                        PrettyOutput.auto_print("⚠️  模型返回空响应")
-                    except Exception as e:
-                        save_exception(
-                            e,
-                            module="jarvis_agent.__init__",
-                            function="generate_summary",
-                        )
-                        pass
-                    summary = ""
-                    break  # 空响应不重试
-
-                # 仅在 token 限制触发的总结时做基础长度校验
-                if for_token_limit and retry_count < max_retries:
-                    if not self._validate_summary(summary)[0]:
-                        retry_count += 1
-                        PrettyOutput.auto_print(
-                            f"⚠️  总结为空或过短，第{retry_count}次重试"
-                        )
-                        continue  # 重新生成
-
-                # 验证通过或达到最大重试次数，退出循环
-                break
-
-            if summary:
-                # 使用 Rich Panel 打印总结内容
-                try:
-                    import jarvis.jarvis_utils.globals as G
-
-                    title = f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{self.model.model_name or 'LLM'} 对话总结[/bold cyan]"
-                    PrettyOutput.print_markdown(
-                        summary, title=title, border_style="cyan"
-                    )
-                except Exception:
-                    # 如果 Rich Panel 打印失败，使用普通方式打印总结
-                    try:
-                        PrettyOutput.auto_print(f"📋 对话总结:\n{summary}")
-                    except Exception:
-                        # 如果普通打印也失败，至少打印一个提示
-                        PrettyOutput.auto_print("⚠️  总结内容打印失败")
-                        PrettyOutput.auto_print(
-                            f"📋 总结内容（前 500 字符）: {summary[:500]}..."
-                        )
-            return summary
-        except KeyboardInterrupt:
-            raise  # 中断信号直接向上传播
-        except Exception:
-            # 检查是否为中断导致的异常
-            from jarvis.jarvis_utils.utils import get_interrupt
-
-            if get_interrupt() > 0:
-                raise KeyboardInterrupt("用户中断")
-            PrettyOutput.auto_print("❌ 总结对话历史失败")
-            return ""
-
-    def _print_compression_summary(self, summary: str, compression_type: str) -> None:
-        """使用 Panel 打印压缩摘要
-
-        参数:
-            summary: 压缩后的摘要内容
-            compression_type: 压缩类型（如"滑动窗口压缩"、"重要性评分压缩"等）
-        """
-        try:
-            import jarvis.jarvis_utils.globals as G
-
-            title = f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{self.model.model_name or 'LLM'} {compression_type}摘要[/bold cyan]"
-            PrettyOutput.print_markdown(summary, title=title, border_style="cyan")
-        except Exception:
-            # 如果格式化输出失败，回退到简单打印
-            PrettyOutput.auto_print(f"📋 {compression_type}摘要:\n{summary}")
-
-    def _sliding_window_compression(self, window_size: Optional[int] = None) -> bool:
-        """滑动窗口压缩：保留最近的用户/工具消息2条和助手消息3条，压缩更早的对话
-
-        参数:
-            window_size: 滑动窗口大小（保留的消息总数，默认5条：用户/工具2条+助手3条），如果为None则使用配置值
-
-        返回:
-            bool: 如果成功执行压缩返回True，否则返回False
-
-        注意:
-            - 只压缩用户和助手消息，系统消息始终保留
-            - 保留最近的用户/工具消息2条和助手消息3条（共5条，奇数以避免连续的同role消息）
-            - 如果消息数量不足，不执行压缩
-            - 压缩后的历史摘要会作为一条用户消息插入到历史中
-        """
-        from jarvis.jarvis_utils.config import get_sliding_window_size
-
-        if window_size is None:
-            window_size = get_sliding_window_size()
-
-        # 用户/工具消息和助手消息保留奇数条（避免连续的同role消息）
-        # 保留用户/工具消息2条，助手消息3条，共5条（奇数）
-        # 注：实际保留数量由 window_size 参数控制
-
-        try:
-            # 获取对话历史
-            history = self.model.get_messages()
-            if not history:
-                return False
-
-            # 找到系统消息的结束位置（系统消息通常在开头，需要保留）
-            system_end_idx = 0
-            for i, msg in enumerate(history):
-                if msg.get("role", "").lower() != "system":
-                    system_end_idx = i
-                    break
-            else:
-                # 如果所有消息都是系统消息，无法压缩
-                return False
-
-            # 系统消息（需要保留）
-            system_messages = history[:system_end_idx]
-            # 非系统消息（需要压缩的部分）
-            non_system_messages = history[system_end_idx:]
-
-            # 只对非系统消息进行窗口压缩
-            if len(non_system_messages) < window_size:
-                return False
-
-            # 截取最后window_size条非系统消息
-            recent_messages = non_system_messages[-window_size:]
-
-            # 如果非系统消息数量不足窗口大小的2倍，不需要压缩
-            # （需要至少2倍，因为压缩后还需要保留窗口）
-            if len(non_system_messages) <= window_size * 2:
-                return False
-
-            # 分离更早的非系统消息（不在保留列表中的消息）
-            # 多截取一条，是因为 s u a u a u a u a u a u a
-            old_messages = non_system_messages[: -window_size + 1]
-
-            if not old_messages:
-                return False
-
-            # 压缩更早的消息
-            try:
-                # 创建临时模型，使用与当前会话相同的模型
-                # （不传入系统提示词，因为会通过 set_messages 设置）
-                temp_model = self._create_temp_model()
-
-                # 使用 set_messages 设置对话历史，包含系统消息和需要压缩的旧消息
-                messages_to_set = system_messages + old_messages
-                temp_model.set_messages(messages_to_set)
-
-                # 使用 SUMMARY_REQUEST_PROMPT 进行压缩（避免污染当前对话）
-                # 仅当摘要为空/过短时做有限重试，超限放弃本次压缩
-                MAX_COMPRESS_RETRIES = 3
-                compressed_summary = ""
-                for retry_count in range(MAX_COMPRESS_RETRIES):
-                    if retry_count == 0:
-                        compressed_summary = temp_model.chat_until_success(
-                            SUMMARY_REQUEST_PROMPT
-                        )
-                    else:
-                        compressed_summary = temp_model.chat_until_success(
-                            "上一条摘要为空或过短，请依据上述对话历史重新生成一份完整、可继续执行的摘要。"
-                        )
-
-                    if not compressed_summary or not compressed_summary.strip():
-                        PrettyOutput.auto_print("⚠滑动窗口压缩：生成摘要失败，跳过压缩")
-                        return False
-
-                    # 仅做基础长度校验：通过即退出
-                    if self._validate_summary(compressed_summary.strip())[0]:
-                        break
-                else:
-                    PrettyOutput.auto_print(
-                        f"⚠滑动窗口压缩：摘要过短已达最大重试次数({MAX_COMPRESS_RETRIES})，放弃本次压缩"
-                    )
-                    return False
-
-                # 打印压缩摘要
-                self._print_compression_summary(
-                    compressed_summary.strip(), "滑动窗口压缩"
-                )
-
-                # 格式化压缩摘要，添加Pin、记忆、Git diff等额外信息
-                formatted_summary = self._format_compressed_summary(
-                    compressed_summary.strip()
-                )
-
-                # 构建压缩后的消息（作为用户消息插入）
-                compressed_msg = {
-                    "role": "user",
-                    "content": formatted_summary,
-                }
-
-                # 重建消息列表：系统消息 + 压缩摘要 + 最近的非系统消息
-                new_history = system_messages + [compressed_msg] + recent_messages
-
-                # 更新模型的消息历史，使用 set_messages 方法确保正确更新 conversation_turn
-                if hasattr(self.model, "set_messages"):
-                    self.model.set_messages(new_history)
-                    # 清理预压缩状态（防止残留过期状态影响后续压缩）
-                    self._pre_compressed_summary = None
-                    self._pre_compress_snapshot_count = 0
-                    self._pre_compressing = False
-                    # 统计保留的消息类型
-                    user_tool_count_kept = sum(
-                        1
-                        for msg in recent_messages
-                        if msg.get("role", "").lower() in ["user", "tool"]
-                    )
-                    assistant_count_kept = sum(
-                        1
-                        for msg in recent_messages
-                        if msg.get("role", "").lower() == "assistant"
-                    )
-                    PrettyOutput.auto_print(
-                        f"✅ 滑动窗口压缩完成：压缩了 {len(old_messages)} 条消息，"
-                        f"保留了最近 {user_tool_count_kept} 条用户/工具消息和 {assistant_count_kept} 条助手消息（共 {len(recent_messages)} 条）"
-                    )
-                    return True
-                else:
-                    # 模型不支持 set_messages 方法，压缩失败
-                    return False
-
-            except Exception as e:
-                PrettyOutput.auto_print(
-                    f"⚠️ 滑动窗口压缩失败: {str(e)}，将回退到完整摘要压缩"
-                )
-                return False
-
-        except Exception as e:
-            PrettyOutput.auto_print(f"⚠️ 滑动窗口压缩出错: {str(e)}")
-            return False
-
-    def _start_background_pre_compression(self) -> None:
-        """启动后台预压缩：在75%阈值时提前生成摘要，90%真正触发时直接使用。
-
-        该方法快照当前消息，创建临时模型（静默模式），在后台线程中生成摘要。
-        完成后将格式化摘要存入 _pre_compressed_summary，供真正压缩时使用。
-        """
-        import threading
-
-        # 如果已在压缩中或已有预压缩结果，不重复启动
-        if self._pre_compressing or self._pre_compressed_summary:
-            return
-
-        try:
-            # 获取对话历史
-            history = self.model.get_messages()
-            if not history:
-                return
-
-            # 找到系统消息的结束位置
-            system_end_idx = 0
-            for i, msg in enumerate(history):
-                if msg.get("role", "").lower() != "system":
-                    system_end_idx = i
-                    break
-            else:
-                return  # 所有消息都是系统消息，无法压缩
-
-            # 快照消息
-            system_messages = history[:system_end_idx]
-            non_system_messages = history[system_end_idx:]
-
-            # 使用与 _sliding_window_compression 相同的窗口大小
-            from jarvis.jarvis_utils.config import get_sliding_window_size
-
-            window_size = get_sliding_window_size()
-
-            # 如果非系统消息数量不足，不需要预压缩
-            if len(non_system_messages) < window_size * 2:
-                return
-            # 分离需要压缩的部分（窗口大小之前的消息）
-            old_messages = non_system_messages[: -window_size + 1]
-
-            if not old_messages:
-                return
-
-            # 记录快照消息数量
-            self._pre_compress_snapshot_count = len(history)
-            self._pre_compressing = True
-
-            def _background_compress() -> None:
-                """后台线程执行压缩摘要生成"""
-                try:
-                    # 创建临时模型，静默模式
-                    temp_model = self._create_temp_model()
-                    temp_model.set_suppress_output(True)
-
-                    # 使用 set_messages 设置对话历史
-                    messages_to_set = system_messages + old_messages
-                    temp_model.set_messages(messages_to_set)
-
-                    # 使用 SUMMARY_REQUEST_PROMPT 生成摘要
-                    compressed_summary = temp_model.chat_until_success(
-                        SUMMARY_REQUEST_PROMPT
-                    )
-
-                    if not compressed_summary or not compressed_summary.strip():
-                        self._pre_compressing = False
-                        return
-
-                    # 仅当摘要为空/过短时有限重试（无旧关键词补充模式）
-                    for retry_count in range(3):
-                        if retry_count > 0:
-                            compressed_summary = temp_model.chat_until_success(
-                                "上一条摘要为空或过短，请依据上述对话历史重新生成一份完整、可继续执行的摘要。"
-                            )
-                        if not compressed_summary or not compressed_summary.strip():
-                            break
-                        if self._validate_summary(compressed_summary.strip())[0]:
-                            break
-
-                    if not compressed_summary or not compressed_summary.strip():
-                        self._pre_compressing = False
-                        return
-
-                    # 格式化压缩摘要（静默，不打印）
-                    formatted_summary = self._format_compressed_summary(
-                        compressed_summary.strip()
-                    )
-
-                    # 存储预压缩结果前检查是否已被外部取消（如前台已自行压缩）
-                    if self._pre_compressing:
-                        self._pre_compressed_summary = formatted_summary
-                except Exception:
-                    pass
-                finally:
-                    self._pre_compressing = False
-
-            # 启动后台线程
-            thread = threading.Thread(
-                target=_background_compress,
-                name="background-pre-compression",
-                daemon=True,
-            )
-            thread.start()
-
-        except Exception:
-            # 预压缩失败不影响主流程
-            self._pre_compressing = False
-
-    def _check_and_use_pre_compressed_summary(self) -> bool:
-        """检查并使用预压缩摘要重建会话。
-
-        当90%真正触发压缩时调用此方法。若预压缩已完成，直接使用预生成摘要重建消息历史；
-        若仍在压缩中，等待其完成后再使用。
-
-        返回:
-            bool: 如果成功使用预压缩摘要重建会话返回True，否则返回False
-        """
-        try:
-            # 如果正在预压缩，等待完成（最多等待60秒）
-            if self._pre_compressing:
-                import time
-
-                wait_count = 0
-                while self._pre_compressing and wait_count < 120:  # 最多等60秒
-                    time.sleep(0.5)
-                    wait_count += 1
-
-            # 检查是否有预压缩结果
-            if not self._pre_compressed_summary:
-                # 清理预压缩状态（可能等待超时或后台压缩失败）
-                self._pre_compressed_summary = None
-                self._pre_compress_snapshot_count = 0
-                self._pre_compressing = False
-                return False
-
-            # 获取当前消息
-            history = self.model.get_messages()
-            if not history:
-                # 清理预压缩状态
-                self._pre_compressed_summary = None
-                self._pre_compress_snapshot_count = 0
-                self._pre_compressing = False
-                return False
-
-            # 找到系统消息的结束位置
-            system_end_idx = 0
-            for i, msg in enumerate(history):
-                if msg.get("role", "").lower() != "system":
-                    system_end_idx = i
-                    break
-            else:
-                # 清理预压缩状态
-                self._pre_compressed_summary = None
-                self._pre_compress_snapshot_count = 0
-                self._pre_compressing = False
-                return False
-
-            system_messages = history[:system_end_idx]
-            non_system_messages = history[system_end_idx:]
-
-            # 使用与 _sliding_window_compression 相同的窗口大小
-            from jarvis.jarvis_utils.config import get_sliding_window_size
-
-            window_size = get_sliding_window_size()
-
-            # 根据快照点划分消息：
-            # 快照时记录的消息数量之前的非系统消息为"已压缩部分"（由预压缩摘要覆盖），
-            # 快照之后新增的消息应保留为 recent_messages
-            if self._pre_compress_snapshot_count > 0:
-                # 快照点 = 系统消息数 + 快照时非系统消息数
-                snapshot_non_system_count = max(
-                    0, self._pre_compress_snapshot_count - system_end_idx
-                )
-                # 快照点之后新增的非系统消息
-                recent_messages = non_system_messages[snapshot_non_system_count:]
-                # 若快照后无新增消息，则保留最后 window_size 条作为上下文衔接
-                if not recent_messages:
-                    recent_messages = non_system_messages[-window_size:]
-            else:
-                # 无快照记录时，回退到滑动窗口逻辑
-                recent_messages = non_system_messages[-window_size:]
-
-            # 构建压缩后的消息
-            compressed_msg = {
-                "role": "user",
-                "content": self._pre_compressed_summary,
-            }
-
-            # 重建消息列表：系统消息 + 压缩摘要 + 快照后新增的消息
-            new_history = system_messages + [compressed_msg] + recent_messages
-
-            # 更新模型的消息历史
-            if hasattr(self.model, "set_messages"):
-                self.model.set_messages(new_history)
-                # 清理预压缩状态
-                self._pre_compressed_summary = None
-                self._pre_compress_snapshot_count = 0
-                self._pre_compressing = False
-                return True
-
-            # 模型不支持 set_messages，清理预压缩状态
-            self._pre_compressed_summary = None
-            self._pre_compress_snapshot_count = 0
-            self._pre_compressing = False
-            return False
-
-        except Exception:
-            # 异常时清理预压缩状态，避免残留过期状态
-            self._pre_compressed_summary = None
-            self._pre_compress_snapshot_count = 0
-            self._pre_compressing = False
-            return False
-
-    def _format_compressed_summary(self, compressed_summary: str) -> str:
-        """格式化压缩后的摘要，添加Pin、记忆、Git diff等额外信息
-
-        参数:
-            compressed_summary: 压缩后的摘要内容
-
-        返回:
-            str: 格式化后的完整摘要内容
-        """
-        formatted_summary = f"[历史摘要] {compressed_summary}"
-
-        # 添加用户固定的重要内容
-        user_fixed_content = []
-
-        # 添加用户通过 <Pin> 标记固定的重要内容
-        if self.pin_content.strip():
-            user_fixed_content.append(f"**用户固定内容**：\n{self.pin_content.strip()}")
-
-        # 添加最近的记忆
-        if hasattr(self, "recent_memories") and self.recent_memories:
-            user_fixed_content.append(
-                f"**最近记忆**：\n{chr(10).join(self.recent_memories)}"
-            )
-
-        # 如果有任何固定内容，添加到摘要中（放在最前面，确保优先级）
-        if user_fixed_content:
-            pin_section = f"\n\n## 🎯 用户的原始需求和要求（必须始终牢记）\n{chr(10).join(user_fixed_content)}"
-            formatted_summary = pin_section + "\n\n" + formatted_summary
-
-        # 获取git diff统计信息
-        git_diff_stat = ""
-        git_view_command = ""
-        try:
-            from jarvis.jarvis_agent.run_loop import AgentRunLoop
-
-            if hasattr(self, "_agent_run_loop") and isinstance(
-                self._agent_run_loop, AgentRunLoop
-            ):
-                agent_run_loop = self._agent_run_loop
-                # 获取diff统计信息
-                git_diff_stat = agent_run_loop.get_git_diff_stat()
-
-                # 生成查看命令
-                if hasattr(self, "start_commit") and self.start_commit:
-                    git_view_command = f"git diff {self.start_commit}..HEAD"
-            # 若 _agent_run_loop 不存在（如后台线程中），跳过 git diff 统计
-        except Exception:
-            # 非关键流程，失败时不影响主要功能
-            pass
-
-        # 添加git diff统计信息到摘要中 - 只显示有效的代码变更统计
-        is_valid_git_stat = (
-            git_diff_stat
-            and git_diff_stat.strip()
-            and not git_diff_stat.startswith("获取git diff统计失败")
-            and "没有检测到代码变更" not in git_diff_stat
+        """生成对话历史摘要（委托至 HistoryCompressor）"""
+        return self._history_compressor.generate_summary(
+            for_token_limit=for_token_limit
         )
 
-        if is_valid_git_stat:
-            diff_section = f"\n\n## 代码变更统计\n```\n{git_diff_stat}\n```"
-            if git_view_command:
-                diff_section += f"\n\n查看完整差异：```bash\n{git_view_command}\n```"
-            formatted_summary += diff_section
+    def _print_compression_summary(self, summary: str, compression_type: str) -> None:
+        """使用 Panel 打印压缩摘要（委托至 HistoryCompressor）"""
+        return self._history_compressor.print_compression_summary(
+            summary, compression_type
+        )
 
-        # 获取任务列表信息
-        task_list_info = ""
-        try:
-            # 获取所有任务列表的摘要信息
-            task_lists_summary: List[Dict[str, Any]] = []
-            for task_list_id, task_list in self.task_list_manager.task_lists.items():
-                summary_dict = self.task_list_manager.get_task_list_summary(
-                    task_list_id
-                )
-                if summary_dict and isinstance(summary_dict, dict):
-                    task_lists_summary.append(summary_dict)
+    def _sliding_window_compression(self, window_size: Optional[int] = None) -> bool:
+        """滑动窗口压缩（委托至 HistoryCompressor）"""
+        return self._history_compressor.sliding_window_compression(
+            window_size=window_size
+        )
 
-            if task_lists_summary:
-                task_list_info = "\n\n## 任务列表状态\n"
-                for summary_dict in task_lists_summary:
-                    task_list_info += (
-                        f"\n- 目标: {summary_dict.get('main_goal', '未知')}"
-                    )
-                    task_list_info += (
-                        f"\n- 总任务数: {summary_dict.get('total_tasks', 0)}"
-                    )
-                    task_list_info += f"\n- 待执行: {summary_dict.get('pending', 0)}"
-                    task_list_info += f"\n- 执行中: {summary_dict.get('running', 0)}"
-                    task_list_info += f"\n- 已完成: {summary_dict.get('completed', 0)}"
-                    task_list_info += f"\n- 失败: {summary_dict.get('failed', 0)}"
-                    task_list_info += (
-                        f"\n- 已放弃: {summary_dict.get('abandoned', 0)}\n"
-                    )
-        except Exception:
-            # 非关键流程，失败时不影响主要功能
-            pass
+    def _start_background_pre_compression(self) -> None:
+        """启动后台预压缩（委托至 HistoryCompressor）"""
+        return self._history_compressor.start_background_pre_compression()
 
-        # 将任务列表信息添加到摘要中
-        if task_list_info:
-            formatted_summary += task_list_info
+    def _check_and_use_pre_compressed_summary(self) -> bool:
+        """检查并使用预压缩摘要重建会话（委托至 HistoryCompressor）"""
+        return self._history_compressor.check_and_use_pre_compressed_summary()
 
-        # 获取初始 commit 信息（仅对 CodeAgent）
-        initial_commit_info = ""
-        try:
-            if hasattr(self, "start_commit") and self.start_commit:
-                initial_commit_info = f"\n\n**🔖 初始 Git Commit（安全回退点）**：\n本次任务开始时的初始 commit 是：`{self.start_commit}`\n\n**⚠️ 重要提示**：如果文件被破坏得很严重无法恢复，可以使用以下命令重置到这个初始 commit：\n```bash\ngit reset --hard {self.start_commit}\n```\n这将丢弃所有未提交的更改，将工作区恢复到任务开始时的状态。请谨慎使用此命令，确保这是你真正想要的操作。"
-        except Exception:
-            # 非关键流程，失败时不影响主要功能
-            pass
-
-        if initial_commit_info:
-            formatted_summary += initial_commit_info
-
-        return formatted_summary
+    def _format_compressed_summary(self, compressed_summary: str) -> str:
+        """格式化压缩后的摘要（委托至 HistoryCompressor）"""
+        return self._history_compressor.format_compressed_summary(compressed_summary)
 
     def _adaptive_compression(self) -> bool:
-        """自适应压缩：使用滑动窗口压缩策略
-
-        返回:
-            bool: 如果成功执行压缩返回True，否则返回False
-        """
-        try:
-            # 先尝试使用预压缩摘要（后台预压缩在75%时已启动）
-            if self._check_and_use_pre_compressed_summary():
-                PrettyOutput.auto_print("✅ 使用后台预压缩摘要完成上下文压缩")
-                return True
-
-            # 预压缩不可用（等待超时或后台压缩失败），清理预压缩状态后回退到滑动窗口压缩
-            self._pre_compressed_summary = None
-            self._pre_compress_snapshot_count = 0
-            self._pre_compressing = False
-            return self._sliding_window_compression()
-        except Exception:
-            # 异常时清理预压缩状态，避免残留过期状态
-            self._pre_compressed_summary = None
-            self._pre_compress_snapshot_count = 0
-            self._pre_compressing = False
-            PrettyOutput.auto_print("⚠ 自适应压缩失败，回退到滑动窗口压缩")
-            return False
+        """自适应压缩（委托至 HistoryCompressor）"""
+        return self._history_compressor.adaptive_compression()
 
     def _summarize_and_clear_history(
         self, trigger_reason: str = "Token限制触发"
     ) -> str:
-        """总结当前对话并清理历史记录
-
-        该方法将:
-        1. 提示用户保存重要记忆
-        2. 调用 generate_summary 生成摘要
-        3. 清除对话历史
-        4. 保留系统消息
-        5. 添加摘要作为新上下文
-        6. 重置对话长度计数器
-
-        参数:
-            trigger_reason: 触发摘要的原因
-
-        返回:
-            str: 包含对话摘要的字符串
-
-        注意:
-            当上下文长度超过最大值时使用
-        """
-        # 保存触发原因到实例变量，供后续方法使用
-        self._summary_trigger_reason = trigger_reason
-
-        # 不再支持文件上传，直接使用摘要方式处理历史
-        return self._handle_history_with_summary()
-
-    def _handle_history_with_summary(self) -> str:
-        """使用摘要方式处理历史"""
-        # 使用保存的触发原因
-        trigger_reason = getattr(self, "_summary_trigger_reason", "Token限制触发")
-        # 根据触发原因决定是否为token限制触发
-        is_for_token_limit = trigger_reason in [
-            "Token限制触发",
-            "对话轮次限制触发",
-            "其他限制触发",
-        ]
-        summary = self.generate_summary(for_token_limit=is_for_token_limit)
-
-        # 获取git diff统计信息
-        git_diff_stat = ""
-        git_view_command = ""
-        try:
-            from jarvis.jarvis_agent.run_loop import AgentRunLoop
-
-            if hasattr(self, "_agent_run_loop") and isinstance(
-                self._agent_run_loop, AgentRunLoop
-            ):
-                agent_run_loop = self._agent_run_loop
-            else:
-                # 创建临时 AgentRunLoop 实例来获取 git diff
-                agent_run_loop = AgentRunLoop(self)
-
-            # 获取diff统计信息
-            git_diff_stat = agent_run_loop.get_git_diff_stat()
-
-            # 生成查看命令
-            if hasattr(self, "start_commit") and self.start_commit:
-                git_view_command = f"git diff {self.start_commit}..HEAD"
-        except Exception as e:
-            git_diff_stat = f"获取git diff统计失败: {str(e)}"
-
-        # 先获取格式化的摘要消息
-        formatted_summary = ""
-        if summary:
-            formatted_summary = self._format_summary_message(summary)
-
-        # 添加git diff统计信息到摘要中 - 只显示有效的代码变更统计
-        is_valid_git_stat = (
-            git_diff_stat
-            and git_diff_stat.strip()
-            and
-            # 过滤错误信息（获取失败等）
-            not git_diff_stat.startswith("获取git diff统计失败")
-            and
-            # 过滤无变更提示
-            "没有检测到代码变更" not in git_diff_stat
+        """总结当前对话并清理历史记录（委托至 HistoryCompressor）"""
+        return self._history_compressor.summarize_and_clear_history(
+            trigger_reason=trigger_reason
         )
 
-        if is_valid_git_stat:
-            diff_section = f"\n\n## 代码变更统计\n```\n{git_diff_stat}\n```"
-            if git_view_command:
-                diff_section += f"\n\n查看完整差异：```bash\n{git_view_command}\n```"
-            formatted_summary += diff_section
-
-        # 关键流程：直接调用 memory_manager 确保记忆提示
-        try:
-            self.memory_manager._ensure_memory_prompt(agent=self)
-        except Exception as e:
-            save_exception(
-                e,
-                module="jarvis_agent.__init__",
-                function="_handle_history_with_summary",
-            )
-            pass
-
-            # 非关键流程：广播清理历史前事件（用于日志、监控等）
-            try:
-                self.event_bus.emit(BEFORE_HISTORY_CLEAR, agent=self)
-            except Exception as e:
-                save_exception(
-                    e,
-                    module="jarvis_agent.__init__",
-                    function="_handle_history_with_summary",
-                )
-                pass
-
-        # 清理历史（但不清理prompt，因为prompt会在builtin_input_handler中设置）
-        if self.model:
-            self.model.reset()
-            # 重置后重新设置系统提示词，确保系统约束仍然生效
-            self._setup_system_prompt()
-        # 清理预压缩状态（前台总结已清理历史，预压缩摘要基于旧快照已过期）
-        self._pre_compressed_summary = None
-        self._pre_compress_snapshot_count = 0
-        self._pre_compressing = False
-        # 重置会话
-        self.session.clear_history()
-        # 重置 addon_prompt 跳过轮数计数器
-        self._addon_prompt_skip_rounds = 0
-        # 重置没有工具调用的计数器
-        self._no_tool_call_count = 0
-        # 打开input handler开关，让下一轮可以处理pin_content中的特殊标记
-        self.run_input_handlers_next_turn = True
-
-        # 获取任务列表信息（用于历史记录）
-        task_list_info = ""
-        try:
-            # 获取所有任务列表的摘要信息
-            task_lists_summary: List[Dict[str, Any]] = []
-            for task_list_id, task_list in self.task_list_manager.task_lists.items():
-                summary_dict = self.task_list_manager.get_task_list_summary(
-                    task_list_id
-                )
-                if summary_dict and isinstance(summary_dict, dict):
-                    task_lists_summary.append(summary_dict)
-
-            if task_lists_summary:
-                task_list_info = "\\n\\n## 任务列表状态\\n"
-                for summary_dict in task_lists_summary:
-                    task_list_info += (
-                        f"\\n- 目标: {summary_dict.get('main_goal', '未知')}"
-                    )
-                    task_list_info += (
-                        f"\\n- 总任务数: {summary_dict.get('total_tasks', 0)}"
-                    )
-                    task_list_info += f"\\n- 待执行: {summary_dict.get('pending', 0)}"
-                    task_list_info += f"\\n- 执行中: {summary_dict.get('running', 0)}"
-                    task_list_info += f"\\n- 已完成: {summary_dict.get('completed', 0)}"
-                    task_list_info += f"\\n- 失败: {summary_dict.get('failed', 0)}"
-                    task_list_info += (
-                        f"\\n- 已放弃: {summary_dict.get('abandoned', 0)}\\n"
-                    )
-        except Exception:
-            # 非关键流程，失败时不影响主要功能
-            pass
-
-        # 非关键流程：广播清理历史后的事件（用于日志、监控等）
-        try:
-            self.event_bus.emit(AFTER_HISTORY_CLEAR, agent=self)
-        except Exception as e:
-            save_exception(
-                e,
-                module="jarvis_agent.__init__",
-                function="_handle_history_with_summary",
-            )
-            pass
-
-        # 将任务列表信息添加到摘要中
-        if task_list_info:
-            formatted_summary += task_list_info
-
-        # 添加用户固定的重要内容
-        user_fixed_content = []
-
-        # 添加用户通过 <Pin> 标记固定的其他重要内容
-        # pin_content 可能包含用户通过 <Pin> 标记追加的内容，这些内容作为补充
-        if self.pin_content.strip():
-            pin_content_stripped = self.pin_content.strip()
-            user_fixed_content.append(f"**用户固定内容**：\n{pin_content_stripped}")
-
-        # 添加最近的记忆
-        if hasattr(self, "recent_memories") and self.recent_memories:
-            user_fixed_content.append(
-                f"**最近记忆**：\n{chr(10).join(self.recent_memories)}"
-            )
-
-        # 如果有任何固定内容，添加到摘要中（放在最前面，确保优先级）
-        if user_fixed_content:
-            pin_section = f"\n\n## 🎯 用户的原始需求和要求（必须始终牢记）\n{chr(10).join(user_fixed_content)}"
-            # 将固定内容放在最前面，确保最高优先级
-            formatted_summary = pin_section + formatted_summary
-
-        return formatted_summary
+    def _handle_history_with_summary(self) -> str:
+        """使用摘要方式处理历史（委托至 HistoryCompressor）"""
+        return self._history_compressor.handle_history_with_summary()
 
     def _format_summary_message(self, summary: str) -> str:
-        """格式化摘要消息"""
-        # 获取任务列表信息
-        task_list_info = self._get_task_list_info()
-
-        # 获取已加载的规则信息（文件路径和描述）
-        rules_section = ""
-        loaded_rule_infos = []
-        for rule_name in sorted(self.rules_manager.loaded_rules):
-            rule_path = self.rules_manager.get_rule_file_path(rule_name)
-            description = self.rules_manager._extract_rule_description(rule_path)
-            if description:
-                loaded_rule_infos.append(
-                    f"- {rule_name}: {description} (路径: {rule_path})"
-                )
-            else:
-                loaded_rule_infos.append(f"- {rule_name} (路径: {rule_path})")
-
-        if loaded_rule_infos:
-            rules_info = "\n".join(loaded_rule_infos)
-            rules_section = f"\n\n\n**📋 当前已加载的规则列表：**\n\n{rules_info}\n\n提示：如需查看规则的详细内容，用 `load_rule` 工具加载对应的规则文件。\n\n"
-
-        # 获取会话文件路径信息
-        session_file_info = ""
-        try:
-            from jarvis.jarvis_utils.dialogue_recorder import get_global_recorder
-            from pathlib import Path
-
-            recorder = get_global_recorder()
-            session_file_path = recorder.get_session_file_path()
-            if Path(session_file_path).exists():
-                session_file_info = f"\n\n**📁 完整对话历史文件**：\n完整的对话历史已保存在下面这个文件中，需要查更详细的上下文时可以直接读取：\n`{session_file_path}`\n\n该文件包含先前所有对话的完整记录（JSONL 格式），每行一条消息，含时间戳、角色与内容。"
-        except Exception:
-            # 非关键流程，失败时不影响主要功能
-            pass
-
-        # 获取初始 commit 信息（仅对 CodeAgent）
-        initial_commit_info = ""
-        try:
-            if hasattr(self, "start_commit") and self.start_commit:
-                initial_commit_info = f"\n\n**🔖 初始 Git Commit（安全回退点）**：\n本次任务开始时的初始 commit 是：`{self.start_commit}`\n\n**⚠️ 重要提示**：如果文件被破坏得很严重无法恢复，可以使用以下命令重置到这个初始 commit：\n```bash\ngit reset --hard {self.start_commit}\n```\n这将丢弃所有未提交的更改，将工作区恢复到任务开始时的状态。请谨慎使用此命令，确保这是你真正想要的操作。"
-        except Exception:
-            # 非关键流程，失败时不影响主要功能
-            pass
-
-        formatted_message = f"""
-以下是从先前对话提取的要点摘要：
-
-<content>
-{summary}
-</content>{rules_section}
-
-**重要约束**：
-- 一切操作依据工具实际返回的结果，禁止推测、假设或虚构；每个结论都要有验证依据。
-- 工具调用：一次可调用一个或多个**互不依赖**的工具；存在依赖时先执行被依赖的工具，等待结果后再继续。
-- 需要编译/构建/测试验证的代码改动，必须验证通过后才能视为完成；不要因为"代码写了"就宣称任务完成。
-
-**🎯 核心任务目标提醒**：
-请始终牢记用户的最新任务目标（见上方"用户原始需求与要求"部分）。所有操作都围绕该目标进行；若当前进度偏离最新目标，请及时调整方向。注意：用户的目标可能在对话过程中变化，请以最新表述为准。
-
-请基于以上信息继续推进任务。注意：这是先前对话的摘要，上下文因超限已重置。请直接继续，无需重复已完成步骤；如需更多信息，可询问用户。{session_file_info}{initial_commit_info}
-        """
-
-        # 如果有任务列表信息，添加到消息后面
-        if task_list_info:
-            formatted_message += f"\n\n{task_list_info}"
-
-        return formatted_message
+        """格式化摘要消息（委托至 HistoryCompressor）"""
+        return self._history_compressor.format_summary_message(summary)
 
     def _get_task_list_info(self) -> str:
         """获取并格式化当前任务列表信息
@@ -3627,37 +2298,11 @@ class Agent:
     def _create_temp_model(
         self, system_prompt: str = "", force_model_type: Optional[str] = None
     ) -> BasePlatform:
-        """创建一个用于执行一次性任务的临时模型实例，以避免污染主会话。
-
-        默认使用与调用方相同的模型配置，也可以强制指定模型类型。
-
-        参数:
-            system_prompt: 系统提示词，可选。如果调用方会通过 set_messages 设置包含系统消息的对话历史，
-                          则无需传入此参数（set_messages 会覆盖此处设置的系统提示词）。
-            force_model_type: 强制使用的模型类型（smart/normal/cheap），可选。
-                            如果指定，将使用该类型的模型而不是当前模型类型。
-        """
-        # 确定要使用的模型类型
-        if force_model_type:
-            # 使用强制指定的模型类型
-            platform_registry = PlatformRegistry()
-            if force_model_type == "smart":
-                temp_model = platform_registry.get_smart_platform()
-            elif force_model_type == "cheap":
-                temp_model = platform_registry.get_cheap_platform()
-            else:  # normal
-                temp_model = platform_registry.get_normal_platform()
-        else:
-            # 使用与调用方相同的模型配置
-            temp_model = PlatformRegistry().create_platform(self.model.platform_type)
-
-        if not temp_model:
-            raise RuntimeError("创建临时模型失败。")
-
-        if system_prompt:
-            temp_model.set_system_prompt(system_prompt)
-        temp_model.set_suppress_output(False)  # 关闭抑制输出，显示压缩过程
-        return temp_model
+        """创建一个用于执行一次性任务的临时模型实例（委托至 ModelSwitcher）"""
+        return self._model_switcher.create_temp_model(
+            system_prompt=system_prompt,
+            force_model_type=force_model_type,
+        )
 
     def _has_user_specified_rules(self) -> bool:
         """判断用户是否已指定规则
