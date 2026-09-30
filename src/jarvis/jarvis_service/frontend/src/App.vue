@@ -14342,6 +14342,25 @@ function stopAgentListRefresh() {
 
 // ========== Agent 管理方法结束 ==========
 
+// 同步指定 Agent 的输入模式与提示到全局/面板状态
+// 用于 input_request 到达时更新 UI（多行 textarea 与单行 input 的切换依据）
+function syncAgentInputMode(targetAgentId, payload) {
+  if (!targetAgentId) return
+  inputTip.value = payload.tip || ''
+  inputMode.value = payload.mode || 'multi'
+  if (payload.preset) {
+    inputText.value = payload.preset
+  }
+  // 同步到 Panel 隔离状态
+  panelInputTips.value.set(targetAgentId, payload.tip || '')
+  panelInputModes.value.set(targetAgentId, payload.mode || 'multi')
+  panelInputPasswords.value.set(targetAgentId, payload.is_password || false)
+  if (payload.preset) {
+    panelInputTexts.value.set(targetAgentId, payload.preset)
+  }
+  pendingInputAgentId.value = targetAgentId
+}
+
 function handleMessage(message, agentId = null) {
   const { type, payload, seq } = message
   // 调试：记录所有收到的消息类型
@@ -14587,6 +14606,10 @@ function handleMessage(message, agentId = null) {
         inputBuffers.value.delete(requestAgentId)
         sendInputResult(bufferedText, payload.request_id, requestAgentId, payload.mode)
       }
+      // 缓冲区内容已消费，但输入模式仍需同步（否则多行输入框不会即时切为单行）
+      if (isCurrentAgent(targetAgentId)) {
+        syncAgentInputMode(targetAgentId, payload)
+      }
       return
     }
     
@@ -14610,18 +14633,7 @@ function handleMessage(message, agentId = null) {
     
     // 如果是当前Agent，更新全局UI状态并显示输入框
     if (isCurrentAgent(targetAgentId)) {
-      inputTip.value = payload.tip || ''
-      inputMode.value = payload.mode || 'multi'
-      inputText.value = payload.preset || inputText.value
-      // 同步到 Panel 隔离状态
-      panelInputTips.value.set(targetAgentId, payload.tip || '')
-      panelInputModes.value.set(targetAgentId, payload.mode || 'multi')
-      panelInputPasswords.value.set(targetAgentId, payload.is_password || false)
-      if (payload.preset) {
-        panelInputTexts.value.set(targetAgentId, payload.preset)
-      }
-      pendingInputAgentId.value = targetAgentId
-
+      syncAgentInputMode(targetAgentId, payload)
       // 聚焦输入框（弹窗或宠物环形菜单打开时不抢焦点）
       const targetPanel = panels.value.find(p => p.agentId === targetAgentId)
       const sp = targetPanel ? sessionPanelRefs.get(targetPanel.id) : null
