@@ -5068,7 +5068,7 @@ async function saveWorkspaceTab(path) {
     console.error('[EDITOR] Failed to refresh file stat after save:', error)
   }
 
-  showToast('文件已保存', 'success')
+  showToast(`${getNodeDisplayName(targetNodeId)}节点的${path}已保存`, 'success')
 }
 
 async function saveActiveWorkspaceTab() {
@@ -17926,8 +17926,11 @@ function handleGlobalKeydown(event) {
   }
 
   // Ctrl/Cmd + S 保存当前编辑器标签
+  // 仅当焦点确实落在编辑器工作区（含 Monaco 编辑器 / 标签栏 / 侧边栏）时才保存；
+  // 否则不拦截，避免在前端主界面误触发「文件已保存」提示。
   if (isModifierPressed && !event.altKey && event.key === 's') {
-    if (showWorkspacePanel.value && activeWorkspaceTab.value && !activeWorkspaceTab.value.loading) {
+    if (getFocusedZoneKey() === 'workspace' &&
+        showWorkspacePanel.value && activeWorkspaceTab.value && !activeWorkspaceTab.value.loading) {
       event.preventDefault()
       saveActiveWorkspaceTab()
     }
