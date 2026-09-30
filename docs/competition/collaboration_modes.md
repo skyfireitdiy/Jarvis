@@ -14,11 +14,10 @@
 > **代码仓库**：Gitee（https://gitee.com/skyfireitdiy/Jarvis）/ GitHub（https://github.com/skyfireitdiy/Jarvis）
 > **技术栈**：
 >
-> - **AI 核心**：多模型自动调度 · tree-sitter 符号级代码理解（8 语言 AST）· 五类影响分析 · 工具自举
-> - **后端服务**：Python 3.12 · FastAPI · WebSocket · SQLite（Agent 引擎 / 网关 / CLI）
+> - **后端服务**：Python 3.12 · FastAPI · WebSocket · SQLite · tree-sitter（8 语言符号级代码理解）
 > - **前端**：Vue 3 · JavaScript
-> - **浏览器扩展**：Chrome/Edge Manifest V3，操作真实浏览器（复用登录态）+ 类油猴页面脚本
-> - **后台守护服务**：Go，本机能力体系（文件 / 进程 / Windows GUI 自动化 / OCR）
+> - **浏览器扩展**：Chrome/Edge Manifest V3（真实浏览器操作 + 类油猴页面脚本）
+> - **后台守护服务**：Go（本机能力：文件 / 进程 / Windows GUI 自动化 / OCR）
 
 > **核心亮点**：
 >
