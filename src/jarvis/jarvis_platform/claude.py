@@ -9,6 +9,9 @@ from typing import Tuple
 from typing import Union
 
 from anthropic import Anthropic
+from anthropic import APIConnectionError
+from anthropic import APITimeoutError
+from anthropic import InternalServerError
 from anthropic.types import MessageParam
 
 from jarvis.jarvis_platform.base import BasePlatform
@@ -16,6 +19,55 @@ from jarvis.jarvis_platform.content_types import ContentBlock
 from jarvis.jarvis_platform.native_tools import sanitize_message, to_anthropic_messages
 from jarvis.jarvis_utils.output import PrettyOutput
 import jarvis.jarvis_utils.globals as jglobals
+
+
+def _is_rate_limit_error(e: Exception) -> bool:
+    """判断异常是否为限流/过载错误（HTTP 429 或 529）。
+
+    兼容 anthropic SDK 的 RateLimitError 及任何带 status_code 的异常。
+    """
+    try:
+        from anthropic import RateLimitError as _AnthropicRateLimitError
+
+        _rate_limit_cls: Any = _AnthropicRateLimitError
+    except Exception:
+        _rate_limit_cls = None
+    if _rate_limit_cls is not None and isinstance(e, _rate_limit_cls):
+        return True
+    status = getattr(e, "status_code", None)
+    if status in (429, 529):
+        return True
+    body = getattr(e, "response", None)
+    if body is not None and hasattr(body, "status_code"):
+        return getattr(body, "status_code", None) in (429, 529)
+    return False
+
+
+def _is_retryable_error(e: Exception) -> bool:
+    """判断异常是否为可重试的临时性错误。
+
+    可重试：限流/过载（429/529）、服务端错误（5xx）、网络连接/超时。
+    不可重试：鉴权/权限/参数等确定性错误（4xx）、普通业务异常（如 tools unsupported）。
+    """
+    # 网络层/超时错误：可重试
+    if isinstance(e, (APIConnectionError, APITimeoutError)):
+        return True
+    # 限流/过载：可重试
+    if _is_rate_limit_error(e):
+        return True
+    # 服务端错误（5xx）：可重试
+    if isinstance(e, InternalServerError):
+        return True
+    # 其它带 status_code 的异常：5xx 可重试，4xx 不可重试
+    status = getattr(e, "status_code", None)
+    if isinstance(status, int):
+        return status >= 500
+    body = getattr(e, "response", None)
+    if body is not None and hasattr(body, "status_code"):
+        body_status = getattr(body, "status_code", None)
+        return isinstance(body_status, int) and body_status >= 500
+    # 无状态码的普通异常（如 RuntimeError "tools unsupported"）：默认不可重试
+    return False
 
 
 class ClaudeModel(BasePlatform):
@@ -583,6 +635,30 @@ class ClaudeModel(BasePlatform):
                 self.mark_native_supported()
                 return (content or None), (tool_calls or None)
             except Exception as e:
+                # 仅可重试的临时性错误才重试（复用外层 7 次循环，指数退避）。
+                # 429 限流/过载优先尊重 retry-after 头；重试耗尽后再走原逻辑。
+                # 不可重试的确定性错误（如鉴权失败、tools unsupported）直接走下方原逻辑。
+                if _is_retryable_error(e) and attempt < max_retries - 1:
+                    wait = 2**attempt
+                    if _is_rate_limit_error(e):
+                        retry_after = getattr(e, "headers", None)
+                        if retry_after:
+                            try:
+                                wait = max(
+                                    wait, float(retry_after.get("retry-after", 0))
+                                )
+                            except (ValueError, TypeError):
+                                pass
+                    PrettyOutput.auto_print(
+                        f"⚠️ 模型调用失败（{str(e)}），{wait:.0f}s 后重试 ({attempt + 1}/{max_retries})"
+                    )
+                    for _ in range(int(wait)):
+                        if get_interrupt() > 0:
+                            break
+                        time.sleep(1)
+                    if get_interrupt() > 0:
+                        break
+                    continue
                 if getattr(self, "_native_confirmed", False):
                     # 该模型曾被确认支持原生工具调用，不再降级到纯文本协议，
                     # 直接向上抛出，避免静默退化为弱能力路径。
