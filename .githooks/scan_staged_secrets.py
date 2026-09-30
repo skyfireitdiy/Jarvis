@@ -4,8 +4,8 @@
 设计原则：
 - 只检查本次暂存的「新增行」（diff 的 + 行），不检查整库历史，保证快速。
 - 命中真实凭据模式即退出码 1，中止提交，并打印文件/行号/脱敏后的片段。
-- 已知的测试样本与占位符会被白名单过滤，避免误报（例如安全扫描器的
-  漏洞数据集里故意硬编码的假 key）。
+- 检测规则与分享前扫描共用同一模块（jarvis_agent.share_secret_scanner），
+  避免两处规则漂移；白名单过滤测试样本/占位符，减少误报。
 - 绝不打印完整凭据：一律脱敏（保留首尾少量字符）。
 
 用法：由 .githooks/pre-commit 调用，无需手动执行。
@@ -13,105 +13,39 @@
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
-from typing import List, Tuple
 
 # ---------------------------------------------------------------------------
-# 检测规则：(名称, 正则)
-# 只保留「高置信度、低误报」的真实凭据形态。
+# 复用共享的检测规则模块。
+# 本脚本由 pre-commit 以 `python3 .githooks/scan_staged_secrets.py` 直接调用，
+# 运行时 sys.path 未必包含 src/，故在此按 __file__ 定位仓库根并注入 src。
+# import 失败时明确报错退出（绝不静默放行）。
 # ---------------------------------------------------------------------------
-SECRET_PATTERNS: List[Tuple[str, re.Pattern]] = [
-    # OpenAI / 类 OpenAI 的 sk- 密钥（真实长度远大于示例）
-    ("OpenAI/通用 sk- 密钥", re.compile(r"\bsk-[A-Za-z0-9_-]{32,}\b")),
-    # GitHub token
-    ("GitHub token", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}\b")),
-    ("GitHub fine-grained PAT", re.compile(r"\bgithub_pat_[A-Za-z0-9_]{60,}\b")),
-    # AWS Access Key（真实 AKIA 后跟 16 位大写字母数字；排除官方示例）
-    ("AWS Access Key", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
-    # Slack token
-    ("Slack token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b")),
-    # Google API key
-    ("Google API key", re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b")),
-    # 私钥块
-    (
-        "私钥文件内容",
-        re.compile(r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----"),
-    ),
-    # 通用「赋值型」密钥：key/secret/token/password = 长随机串
-    # 注意：前缀边界用 (?<![A-Za-z0-9]) 而非 \b——下划线属于 \w，若用 \b，
-    # db_password / DB_PASSWORD / my_api_key 等常见命名会因「_ 与 p 之间无词边界」而漏检。
-    (
-        "疑似硬编码密钥/口令",
-        re.compile(
-            r"""(?ix)
-            (?<![A-Za-z0-9])
-            (?:api[_-]?key|secret[_-]?key|access[_-]?token|auth[_-]?token|
-               private[_-]?key|client[_-]?secret|passwd|password)
-            \b
-            \s*[:=]\s*
-            ["']([A-Za-z0-9_\-/+=]{20,})["']
-            """
-        ),
-    ),
-]
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_SRC_DIR = os.path.join(_REPO_ROOT, "src")
+if _SRC_DIR not in sys.path:
+    sys.path.insert(0, _SRC_DIR)
 
-# ---------------------------------------------------------------------------
-# 白名单：明确是测试样本/占位符的片段，命中则忽略该行。
-# 每个条目是正则，匹配到即视为安全。
-# ---------------------------------------------------------------------------
-WHITELIST_PATTERNS: List[re.Pattern] = [
-    re.compile(r"AKIAIOSFODNN7EXAMPLE"),  # AWS 官方文档示例
-    re.compile(r"wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"),  # AWS 示例 secret
-    re.compile(r"sk-1234567890abcdef"),  # 明显假值
-    re.compile(r"sk-xxx+", re.IGNORECASE),
-    re.compile(r"your[-_]?(?:secret|api|token|key)", re.IGNORECASE),
-    re.compile(r"placeholder", re.IGNORECASE),
-    re.compile(r"example[-_]?(?:key|token|secret)", re.IGNORECASE),
-    re.compile(r"<[^>]*(?:key|token|secret|password)[^>]*>", re.IGNORECASE),
-    re.compile(r"\$\{[^}]*(?:KEY|TOKEN|SECRET|PASSWORD)[^}]*\}"),  # ${ENV_VAR}
-    re.compile(r"os\.environ|getenv|process\.env|System\.getenv"),  # 从环境变量读取
-]
-
-# 二进制/资源文件后缀直接跳过，避免误报与性能浪费
-SKIP_SUFFIXES = (
-    ".png",
-    ".jpg",
-    ".jpeg",
-    ".gif",
-    ".webp",
-    ".ico",
-    ".pdf",
-    ".zip",
-    ".gz",
-    ".tar",
-    ".jar",
-    ".woff",
-    ".woff2",
-    ".ttf",
-    ".eot",
-    ".mp4",
-    ".mp3",
-    ".wasm",
-    ".so",
-    ".dll",
-    ".dylib",
-    ".exe",
-    ".bin",
-    ".db",
-)
-
-
-def _mask(value: str) -> str:
-    """脱敏：只保留首尾少量字符，绝不输出完整凭据。"""
-    if len(value) <= 8:
-        return "*" * len(value)
-    return f"{value[:4]}...{value[-4:]}(len={len(value)})"
-
-
-def _is_whitelisted(line: str) -> bool:
-    return any(p.search(line) for p in WHITELIST_PATTERNS)
+try:
+    from jarvis.jarvis_agent.share_secret_scanner import (
+        SECRET_PATTERNS,
+        SKIP_SUFFIXES,
+        is_whitelisted,
+        mask,
+    )
+except Exception as _import_err:  # pragma: no cover - 环境异常兜底
+    print(
+        f"[scan-secrets] 无法加载共享扫描规则模块：{_import_err}",
+        file=sys.stderr,
+    )
+    print(
+        "[scan-secrets] 请确认仓库 src/ 目录完整，或检查 Python 环境。",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 
 def _staged_diff() -> str:
@@ -133,7 +67,7 @@ def scan() -> int:
     if not diff:
         return 0
 
-    findings: List[str] = []
+    findings: list[str] = []
     current_file = ""
     current_line_no = 0
 
@@ -158,7 +92,7 @@ def scan() -> int:
         line_no = current_line_no
         current_line_no += 1
 
-        if _is_whitelisted(line):
+        if is_whitelisted(line):
             continue
 
         for name, pattern in SECRET_PATTERNS:
@@ -166,7 +100,7 @@ def scan() -> int:
             if m:
                 snippet = m.group(0)
                 findings.append(
-                    f"  {current_file}:{line_no}  [{name}]  {_mask(snippet)}"
+                    f"  {current_file}:{line_no}  [{name}]  {mask(snippet)}"
                 )
 
     if not findings:
@@ -185,7 +119,7 @@ def scan() -> int:
         file=sys.stderr,
     )
     print(
-        "  2. 确认是测试样本/占位符 → 加入 .githooks/scan_staged_secrets.py 白名单",
+        "  2. 确认是测试样本/占位符 → 加入 share_secret_scanner.py 白名单",
         file=sys.stderr,
     )
     print(

@@ -10,6 +10,8 @@ from typing import Any
 from prompt_toolkit import prompt
 
 from jarvis.jarvis_agent import user_confirm
+from jarvis.jarvis_agent.share_secret_scanner import format_findings
+from jarvis.jarvis_agent.share_secret_scanner import scan_files
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.utils import decode_output
@@ -136,10 +138,72 @@ class ShareManager(ABC):
                 # 如果命令失败，可能是网络问题或其他错误
                 PrettyOutput.auto_print("⚠️ 无法连接到远程仓库，将跳过更新")
 
+    def _scan_staged_for_secrets(self) -> bool:
+        """扫描本次待提交的变更文件，拦截疑似真实凭据。
+
+        返回 True 表示通过（可继续提交），False 表示命中敏感信息需中止。
+        扫描范围仅限本次变更的文件（git status --porcelain），不扫全仓历史。
+        可用环境变量 JARVIS_ALLOW_SECRETS=1 显式绕过（语义对齐 git 提交前钩子）。
+        """
+        if os.environ.get("JARVIS_ALLOW_SECRETS", "0") == "1":
+            PrettyOutput.auto_print("⚠️ JARVIS_ALLOW_SECRETS=1，跳过分享前凭据扫描。")
+            return True
+
+        # 枚举本次变更的文件（相对中心仓库根路径）
+        status_result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=self.repo_path,
+            capture_output=True,
+            text=False,
+            check=True,
+        )
+        changed_files: list[str] = []
+        for raw_line in decode_output(status_result.stdout).splitlines():
+            if len(raw_line) < 4:
+                continue
+            # porcelain 格式：XY <path>；重命名行形如 "R  old -> new"，取新路径
+            path = raw_line[3:].strip()
+            if " -> " in path:
+                path = path.split(" -> ", 1)[1].strip()
+            # 去掉可能的引号包裹
+            path = path.strip('"')
+            if path:
+                changed_files.append(os.path.join(self.repo_path, path))
+
+        if not changed_files:
+            return True
+
+        findings = scan_files(changed_files)
+        if not findings:
+            return True
+
+        PrettyOutput.auto_print(
+            f"❌ 检测到疑似真实凭据，已中止分享（{self.get_resource_type()}）。"
+        )
+        PrettyOutput.auto_print("详细报告（已脱敏）：")
+        PrettyOutput.auto_print(format_findings(findings))
+        PrettyOutput.auto_print("处理方式：")
+        PrettyOutput.auto_print(
+            "  1. 确认是真实凭据 → 从待分享内容中移除，改用环境变量/配置文件"
+        )
+        PrettyOutput.auto_print(
+            "  2. 确认是测试样本/占位符 → 加入 share_secret_scanner.py 白名单"
+        )
+        PrettyOutput.auto_print(
+            "  3. 确需分享（如安全测试数据）→ JARVIS_ALLOW_SECRETS=1 重新执行"
+        )
+        return False
+
     def commit_and_push(self, count: int) -> None:
         """提交并推送更改"""
         PrettyOutput.auto_print("ℹ️ 正在提交更改...")
         subprocess.run(["git", "add", "."], cwd=self.repo_path, check=True)
+
+        # 分享前闸门：扫描待提交内容，命中敏感凭据则中止（不 commit、不 push）
+        if not self._scan_staged_for_secrets():
+            raise RuntimeError(
+                f"分享已中止：检测到疑似真实凭据（{self.get_resource_type()}）"
+            )
 
         commit_msg = f"Add {count} {self.get_resource_type()}(s) from local collection"
         subprocess.run(
