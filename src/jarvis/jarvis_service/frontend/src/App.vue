@@ -9142,8 +9142,11 @@ function getCurrentPanel() {
 // 命令面板「当前 Agent」组使用的 Agent ID：
 // 优先右键菜单锁定的 Agent；其次当前激活 Panel 内的 Agent；再次宠物大厅中选中的宠物对应的 Agent；最后回退到 currentAgentId
 const commandPaletteCurrentAgentId = computed(() => {
-  // 右键菜单打开时，菜单动作一律作用于被右键的那个 Agent（不改动面板与当前 Agent）
-  if (panelContextMenu.value.visible && contextMenuAgentId.value) return contextMenuAgentId.value
+  // 右键菜单（侧边栏 / Panel）锁定期间，菜单动作一律作用于被右键的那个 Agent（不改动面板与当前 Agent）。
+  // 注意：这里只判断 contextMenuAgentId，不能叠加 panelContextMenu.visible——
+  // 菜单项被点击时菜单会先收起（visible=false），若依赖 visible 就会在此回退到「当前活动 Agent」，
+  // 导致删除/重命名等操作作用到错误的 Agent。
+  if (contextMenuAgentId.value) return contextMenuAgentId.value
   // 宠物大厅（无嵌入面板）中，以大厅选中的宠物为准，避免被残留的分离面板干扰
   if (hasNoPanel.value && lobbyActiveAgentId.value) return lobbyActiveAgentId.value
   const panel = getCurrentPanel()
@@ -9855,11 +9858,20 @@ function onPanelContextMenu(panel, event) {
   }
 }
 
-// 点击菜单项：复用宠物右键的执行链路，然后关闭菜单
+// 点击菜单项：先收起菜单（避免确认框被菜单遮挡），再复用宠物右键的执行链路。
+// 关键：菜单动作通过 commandPaletteCurrentAgentId 定位「被右键的 Agent」，而该 computed
+// 依赖 contextMenuAgentId；closePanelContextMenu() 会把它清空，故这里先快照、
+// 收起菜单后恢复，动作执行完再复位——保证删除/重命名等始终作用于被右键的 Agent。
 function onPanelContextAction(action) {
   if (!action || action.enabled === false) return
+  const targetAgentId = contextMenuAgentId.value
   closePanelContextMenu()
-  onLobbyContextRun(action)
+  contextMenuAgentId.value = targetAgentId
+  try {
+    onLobbyContextRun(action)
+  } finally {
+    contextMenuAgentId.value = null
+  }
 }
 
 // 侧边栏 Agent 项右键：锁定该 Agent 为菜单作用对象，就地弹出操作菜单（不改变当前面板布局）
