@@ -21,6 +21,7 @@ uv.lock
 plantuml-images
 package-lock.json
 package.json
+!src/jarvis/jarvis_service/frontend/package-lock.json
 node_modules
 
 *.pyc
