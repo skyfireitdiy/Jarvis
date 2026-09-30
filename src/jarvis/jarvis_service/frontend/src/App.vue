@@ -1764,6 +1764,7 @@ import TopologyOverlay from './components/TopologyOverlay.vue'
 import PetLobby from './components/PetLobby.vue'
 import OnboardingTour from './components/OnboardingTour.vue'
 import { ACTIONS as actionDefs } from './actions/registry.js'
+import { resolveCurrentAgentId } from './utils/currentAgentResolver.js'
 
 const PLANTUML_SERVER_URL = 'https://www.plantuml.com/plantuml/svg/'
 const PLANTUML_BLOCK_LANGUAGE = 'plantuml'
@@ -9141,19 +9142,18 @@ function getCurrentPanel() {
 }
 // 命令面板「当前 Agent」组使用的 Agent ID：
 // 优先右键菜单锁定的 Agent；其次当前激活 Panel 内的 Agent；再次宠物大厅中选中的宠物对应的 Agent；最后回退到 currentAgentId
-const commandPaletteCurrentAgentId = computed(() => {
+// 解析逻辑抽到 utils/currentAgentResolver.js（纯函数，可单测），此处只负责收集各状态快照。
+const commandPaletteCurrentAgentId = computed(() => resolveCurrentAgentId({
   // 右键菜单（侧边栏 / Panel）锁定期间，菜单动作一律作用于被右键的那个 Agent（不改动面板与当前 Agent）。
-  // 注意：这里只判断 contextMenuAgentId，不能叠加 panelContextMenu.visible——
-  // 菜单项被点击时菜单会先收起（visible=false），若依赖 visible 就会在此回退到「当前活动 Agent」，
+  // 注意：只看 contextMenuAgentId，不能叠加 panelContextMenu.visible——
+  // 菜单项被点击时菜单会先收起（visible=false），若依赖 visible 就会回退到「当前活动 Agent」，
   // 导致删除/重命名等操作作用到错误的 Agent。
-  if (contextMenuAgentId.value) return contextMenuAgentId.value
-  // 宠物大厅（无嵌入面板）中，以大厅选中的宠物为准，避免被残留的分离面板干扰
-  if (hasNoPanel.value && lobbyActiveAgentId.value) return lobbyActiveAgentId.value
-  const panel = getCurrentPanel()
-  if (panel && panel.agentId) return panel.agentId
-  if (lobbyActiveAgentId.value) return lobbyActiveAgentId.value
-  return currentAgentId.value || null
-})
+  contextMenuAgentId: contextMenuAgentId.value,
+  lobbyActiveAgentId: lobbyActiveAgentId.value,
+  hasNoPanel: hasNoPanel.value,
+  activePanelAgentId: getCurrentPanel()?.agentId || null,
+  currentAgentId: currentAgentId.value,
+}))
 // 当前 Agent 对象（无选中时为 null）
 function getCurrentAgentOrNull() {
   const agentId = commandPaletteCurrentAgentId.value
