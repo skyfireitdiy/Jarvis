@@ -18,24 +18,39 @@
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import re
 import subprocess
 import sys
 
 # 复用共享规则模块（与本地钩子同源）。
+#
+# 注意：此处按「文件路径」直接加载，而非 `import jarvis.jarvis_agent...`。
+# 原因：share_secret_scanner.py 本身只用标准库，但一旦走包导入，Python 会先
+# 执行父包 jarvis/jarvis_agent/__init__.py，该文件连带导入大量模块（含 yaml
+# 等第三方依赖）。CI 中只需运行本扫描脚本、无需安装整个项目依赖，故绕过包
+# 初始化，直接加载该单文件，保持「零第三方依赖」。
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_SRC_DIR = os.path.join(_REPO_ROOT, "src")
-if _SRC_DIR not in sys.path:
-    sys.path.insert(0, _SRC_DIR)
+_SCANNER_PATH = os.path.join(
+    _REPO_ROOT, "src", "jarvis", "jarvis_agent", "share_secret_scanner.py"
+)
 
 try:
-    from jarvis.jarvis_agent.share_secret_scanner import (
-        SECRET_PATTERNS,
-        SKIP_SUFFIXES,
-        is_whitelisted,
-        mask,
+    _spec = importlib.util.spec_from_file_location(
+        "share_secret_scanner_standalone", _SCANNER_PATH
     )
+    if _spec is None or _spec.loader is None:
+        raise ImportError(f"无法从路径加载：{_SCANNER_PATH}")
+    _scanner = importlib.util.module_from_spec(_spec)
+    # 必须先注册到 sys.modules：模块内 @dataclass 依赖 cls.__module__ 可解析。
+    sys.modules[_spec.name] = _scanner
+    _spec.loader.exec_module(_scanner)
+
+    SECRET_PATTERNS = _scanner.SECRET_PATTERNS
+    SKIP_SUFFIXES = _scanner.SKIP_SUFFIXES
+    is_whitelisted = _scanner.is_whitelisted
+    mask = _scanner.mask
 except Exception as _import_err:  # pragma: no cover - 环境异常兜底
     print(f"[scan-secrets-ci] 无法加载共享扫描规则模块：{_import_err}", file=sys.stderr)
     sys.exit(2)
