@@ -8,6 +8,10 @@
 
 > **项目名称**：Jarvis AI 助手（jarvis-ai-assistant）
 > **开源协议**：MIT License
+> **项目规模**：564 个源文件 / 25.7 万行代码，覆盖 **CLI / Web / 浏览器扩展 / 后台服务**四端
+> **质量保障**：1685 个测试用例 · 六条 CI/CD 流水线 · 超 1 万次 Agent 自举提交 · 中兴通讯落地验证
+> **完成度**：可运行、可测试、可部署、可持续进化，经得起验证
+> **代码仓库**：Gitee（https://gitee.com/skyfireitdiy/Jarvis）/ GitHub（https://github.com/skyfireitdiy/Jarvis）
 > **技术栈**：
 >
 > - **AI 核心**：多模型自动调度 · tree-sitter 符号级代码理解（8 语言 AST）· 五类影响分析 · 工具自举
@@ -15,10 +19,6 @@
 > - **前端**：Vue 3 · JavaScript
 > - **浏览器扩展**：Chrome/Edge Manifest V3，操作真实浏览器（复用登录态）+ 类油猴页面脚本
 > - **后台守护服务**：Go，本机能力体系（文件 / 进程 / Windows GUI 自动化 / OCR）
->   **项目规模**：564 个源文件 / 25.7 万行代码，覆盖 **CLI / Web / 浏览器扩展 / 后台服务**四端
->   **质量保障**：1685 个测试用例 · 六条 CI/CD 流水线 · 超 1 万次 Agent 自举提交 · 中兴通讯落地验证
->   **完成度**：可运行、可测试、可部署、可持续进化，经得起验证
->   **代码仓库**：Gitee（https://gitee.com/skyfireitdiy/Jarvis）/ GitHub（https://github.com/skyfireitdiy/Jarvis）
 
 > **核心亮点**：
 >
