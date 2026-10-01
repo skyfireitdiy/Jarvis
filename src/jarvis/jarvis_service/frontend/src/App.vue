@@ -4410,6 +4410,11 @@ function buildEditorOptions() {
 
 // 内容变更 → 回写该文件对应的 tab（模型上记录了 path，多 pane 打开同一文件时天然同步）
 function bindWorkspaceViewEvents(view) {
+  // 重新聚焦编辑器时恢复原生快捷键控制（撤销 ESC「脱离」状态）：
+  // 用户重新进入编辑器编辑，Ctrl+A 应恢复为编辑器全选。
+  view.onDidFocusEditorText(() => {
+    editorShortcutLocked.value = false
+  })
   view.onDidChangeModelContent(() => {
     const model = view.getModel()
     if (!model) return
@@ -18256,6 +18261,11 @@ function isMonacoEditorFocused() {
   return !!el.closest('.monaco-editor')
 }
 
+// 编辑器是否已「脱离」全局快捷键控制：在 Monaco 编辑器里按 ESC 后置 true，
+// 使 Ctrl+A 不再被编辑器全选吃掉，而是触发命令面板（列出 Agent）。
+// 重新点击/聚焦编辑器时自动恢复为 false（见 bindWorkspaceViewEvents 的 onDidFocusEditorText）。
+const editorShortcutLocked = ref(false)
+
 // 全局键盘事件处理
 function handleGlobalKeydown(event) {
   const isModifierPressed = event.ctrlKey || event.metaKey
@@ -18274,9 +18284,14 @@ function handleGlobalKeydown(event) {
     return
   }
 
-  // Ctrl/Cmd + L 打开命令面板并直接展示 Agent 列表（预输入 a>）
-  if (isModifierPressed && !event.altKey && event.code === 'KeyL') {
+  // Ctrl/Cmd + A 打开命令面板并直接展示 Agent 列表（预输入 a>）
+  // 注意：Ctrl+A 是「全选」的通用快捷键，焦点在 Monaco 编辑器或输入框时须让位，
+  // 否则会把编辑器/输入框的全选行为吃掉。
+  // 例外：编辑器已按 ESC「脱离」快捷键控制（editorShortcutLocked）时不再让位，
+  // 让 Ctrl+A 触发命令面板，而不是在编辑器里全选。
+  if (isModifierPressed && !event.altKey && event.code === 'KeyA') {
     if (showConnectModal.value) return
+    if (!editorShortcutLocked.value && (isMonacoEditorFocused() || isEditableElement(event.target))) return
     event.preventDefault()
     commandPaletteFocusKey = getFocusedZoneKey()
     commandPaletteInitialQuery.value = 'a>'
@@ -18577,6 +18592,16 @@ function handleGlobalKeydown(event) {
     // 最低优先级：退出宠物大厅中已选中的宠物（无选中时不做任何事）
     if (petLobbyRef.value && typeof petLobbyRef.value.closeActivePanel === 'function') {
       petLobbyRef.value.closeActivePanel()
+    }
+
+    // 焦点仍在 Monaco 编辑器（无对话框/菜单需要关闭）时，按 ESC 让编辑器「脱离」
+    // 全局快捷键控制：置 editorShortcutLocked 并把焦点移出编辑器，
+    // 之后 Ctrl+A 不再被编辑器全选吃掉，而是触发命令面板（列出 Agent）。
+    // 重新点击/聚焦编辑器时自动恢复（见 bindWorkspaceViewEvents 的 onDidFocusEditorText）。
+    if (isMonacoEditorFocused()) {
+      editorShortcutLocked.value = true
+      const ae = document.activeElement
+      if (ae && typeof ae.blur === 'function') ae.blur()
     }
   }
 
