@@ -130,7 +130,7 @@ license: MIT # 可选：开源许可标识
 
 - `{% raw %}{{ git_root_dir }}{% endraw %}` 由 `git rev-parse` 求得，**取的是"当前工作目录所在仓库"的根**；在仓库外运行时会回退成当前工作目录，路径直接失效。它只适合指**用户自己项目**里的位置（如 `{% raw %}{{ git_root_dir }}{% endraw %}/.jarvis/rules/...`、`{% raw %}{{ git_root_dir }}{% endraw %}/project_info/...`）。
 - `{% raw %}{{ jarvis_src_dir }}{% endraw %}` 由源码位置上溯求得，**与运行目录无关**，是 Jarvis 自身资源唯一稳定的定位变量。
-- **禁止**：用 `{% raw %}{{ git_root_dir }}{% endraw %}` 指向 Jarvis 自身资源（`browser_extension/`、`docs/`、`builtin/rules/`、`ReleaseNote.md`、`.jarvis/` 等）。用户常在仓库外运行，此时 `git_root_dir` 会退化为当前目录，所有此类路径全部失效。
+- **禁止**：用 `{% raw %}{{ git_root_dir }}{% endraw %}` 指向 Jarvis 自身资源（`browser_extension/`、`docs/`、`builtin/rules/`、`CHANGELOG.md`、`.jarvis/` 等）。用户常在仓库外运行，此时 `git_root_dir` 会退化为当前目录，所有此类路径全部失效。
 - 正确用法：指向 Jarvis 自身资源一律用 `{% raw %}{{ jarvis_src_dir }}{% endraw %}`，且注意区分仓库根下资源（直接拼，如 `{% raw %}{{ jarvis_src_dir }}{% endraw %}/browser_extension/...`）与 Python 包内源码（须含 `src/jarvis`，如 `{% raw %}{{ jarvis_src_dir }}{% endraw %}/src/jarvis/jarvis_tools/...`）。
 
 ## 7. 配套脚本（按需）

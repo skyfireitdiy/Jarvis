@@ -922,7 +922,7 @@ def example():
    - `{{ jarvis_data_dir }}`：Jarvis 数据目录
    - 必须：尽量使用 jinja2 变量替代绝对路径
    - 禁止：在规则文档中硬编码绝对路径
-   - 禁止：用 `{{ git_root_dir }}` 指向 Jarvis 自身资源（browser_extension/、docs/、builtin/rules/、ReleaseNote.md、.jarvis/ 等）——
+   - 禁止：用 `{{ git_root_dir }}` 指向 Jarvis 自身资源（browser_extension/、docs/、builtin/rules/、CHANGELOG.md、.jarvis/ 等）——
      用户常在仓库外运行，此时 git_root_dir 会退化为当前目录，这类路径全部失效；指向 Jarvis 自身资源一律用 `{{ jarvis_src_dir }}`。
      `{{ git_root_dir }}` 只用于指向用户自己项目内的位置（如 `{{ git_root_dir }}/.jarvis/rules/...`、`{{ git_root_dir }}/project_info/...`）。
    - 必须：用 `{{ jarvis_src_dir }}` 时区分仓库根下资源（直接拼，如 `{{ jarvis_src_dir }}/browser_extension/...`）

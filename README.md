@@ -4,6 +4,8 @@
 
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI: Run Tests](https://github.com/skyfireitdiy/Jarvis/actions/workflows/test.yml/badge.svg)](https://github.com/skyfireitdiy/Jarvis/actions/workflows/test.yml)
+[![Docs](https://github.com/skyfireitdiy/Jarvis/actions/workflows/deploy-docs.yml/badge.svg)](https://github.com/skyfireitdiy/Jarvis/actions/workflows/deploy-docs.yml)
 
 > ## 🏆 第三届开放原子大赛总冠军
 >

@@ -10,7 +10,7 @@ description: 当需要发布新版本或管理版本号时触发。每当用户�
 本规则用于规范Jarvis项目之ReleaseNote更新流程，确保ReleaseNote之格式一致性及代码变更之准确性。
 **本规则仅支持单一模式**：
 
-- **仅更新ReleaseNote**：只更新ReleaseNote.md文件，**禁**创建git tag、**禁**push代码、**禁**修改项目版本号（如`__init__.py`、`setup.py`、`pyproject.toml`等文件）
+- **仅更新ReleaseNote**：只更新CHANGELOG.md文件，**禁**创建git tag、**禁**push代码、**禁**修改项目版本号（如`__init__.py`、`setup.py`、`pyproject.toml`等文件）
 
 ## 汝必遵守之原则
 
@@ -39,7 +39,7 @@ description: 当需要发布新版本或管理版本号时触发。每当用户�
 
 **要求说明：**
 
-- **必**：保持与现有ReleaseNote.md相同之格式结构
+- **必**：保持与现有CHANGELOG.md相同之格式结构
 - **必**：于文件头部插入新版本信息
 - **必**：用统一之分类（新功能、修复、优化、文档等）
 - **必**：遵循用户视角原则（见下方详细说明）
@@ -167,7 +167,7 @@ git diff <base> HEAD
 
 - `<base>` 为变更起始基准，按以下优先级确定：
   1. 若存在上一版本之 tag（`git describe --tags --abbrev=0` 有输出），用该 tag
-  2. 若无 tag，用 ReleaseNote.md 中上一版本对应之提交（可用 `git log --oneline --grep='Bump version'` 定位）
+  2. 若无 tag，用 CHANGELOG.md 中上一版本对应之提交（可用 `git log --oneline --grep='Bump version'` 定位）
   3. 若仍无法确定，用最近一次 `Bump version` 提交作为基准
 - 若输出过大，可限制行数（如 `| head -n 500`）
 
@@ -175,10 +175,10 @@ git diff <base> HEAD
 
 **执行步骤：**
 
-1. 读取ReleaseNote.md前200行：
+1. 读取CHANGELOG.md前200行：
 
 ```bash
-head -n 200 {{ jarvis_src_dir }}/ReleaseNote.md
+head -n 200 {{ jarvis_src_dir }}/CHANGELOG.md
 ```
 
 1. 参考历史版本格式（建议查看 v1.2.6 之前之版本）：
@@ -224,8 +224,8 @@ else:
 ---
 ```
 
-1. **于ReleaseNote.md头部插入新版本内容**：
-   - 读取现有ReleaseNote.md内容
+1. **于CHANGELOG.md头部插入新版本内容**：
+   - 读取现有CHANGELOG.md内容
    - 于文件开头插入新版本内容
    - 保持原有格式与分隔符
      **注意事项：**
@@ -255,7 +255,7 @@ else:
 - 发布类型必与操作7中计算之新版本号一致
 - 发布脚本会自动处理版本号更新、创建git tag等操作
   **预期输出：**
-- ReleaseNote.md已提交至git仓库
+- CHANGELOG.md已提交至git仓库
 - 发布脚本执行成功，版本号已更新
 - git tag已创建并推送
 
@@ -276,8 +276,8 @@ else:
 - [ ] 代码变更已获取（用了git diff而非git log）
 - [ ] ReleaseNote格式已学习（了解分类与图标使用）
 - [ ] 新版本号计算正确（据版本类型）
-- [ ] 新版本内容已插入至ReleaseNote.md头部
-- [ ] ReleaseNote.md文件格式完整（无语法错误）
+- [ ] 新版本内容已插入至CHANGELOG.md头部
+- [ ] CHANGELOG.md文件格式完整（无语法错误）
 - [ ] **ReleaseNote原有内容已完整保留（验证：检查文件中是否含所有历史版本记录）**
 - [ ] 发布脚本./script/publish.py执行成功
 - [ ] git tag已创建并推送
@@ -292,13 +292,13 @@ else:
 - 功能迭代后之版本发布
 - 定期之版本维护发布
   **发布流程包括**：
-- 更新ReleaseNote.md文件
+- 更新CHANGELOG.md文件
 - 执行发布脚本自动创建git tag、更新版本号、推送代码
 
 ### Q2：若无git tag如何？
 
 版本号不依赖 git tag，直接读 `src/jarvis/__init__.py` 之 `__version__` 即可，无需回退默认版本。
-仅在获取**代码变更基准**（操作4）时，若 tag 缺失，改用 ReleaseNote.md 上一版本对应之提交或最近一次 `Bump version` 提交作为基准。
+仅在获取**代码变更基准**（操作4）时，若 tag 缺失，改用 CHANGELOG.md 上一版本对应之提交或最近一次 `Bump version` 提交作为基准。
 
 ### Q3：如何确定版本类型（major/minor/patch）？
 
@@ -314,8 +314,8 @@ else:
 - **禁**手动push代码至远程仓库（由发布脚本自动推送）
 - **禁**跳过发布脚本手动执行发布流程
   **允许事项：**
-- ✅ 更新ReleaseNote.md文件内容
-- ✅ 于ReleaseNote.md头部插入新版本说明
+- ✅ 更新CHANGELOG.md文件内容
+- ✅ 于CHANGELOG.md头部插入新版本说明
 - ✅ 添加代码变更之详细描述
 - ✅ 执行./script/publish.py脚本完成发布（脚本会自动更新版本号、创建tag、推送代码）
 
@@ -331,6 +331,6 @@ else:
 
 ## 相关资源
 
-- ReleaseNote模板：`{{ jarvis_src_dir }}/ReleaseNote.md`
+- ReleaseNote模板：`{{ jarvis_src_dir }}/CHANGELOG.md`
 - Git命令参考：`git diff --help`
 - 语义化版本规范：<https://semver.org/lang/zh-CN/>
