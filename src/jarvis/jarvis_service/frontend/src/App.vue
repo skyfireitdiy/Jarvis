@@ -4409,48 +4409,66 @@ function buildEditorOptions() {
 }
 
 // 内容变更 → 回写该文件对应的 tab（模型上记录了 path，多 pane 打开同一文件时天然同步）
-// ===== 编辑位置历史（上一次/下一次编辑位置跳转，Ctrl+Alt+←/→）=====
-// VS Code 的 Last Edit Location：记录用户每次「编辑」的位置，可前后跳转。
+// ===== 光标历史（后退/前进，Ctrl+Alt+←/→）=====
+// VS Code 的 navigateBack / navigateForward：记录光标「跳转」到的位置，可前后导航。
 // Monaco standalone 无此内置功能，这里自行维护历史栈。
-// 元素：{ path, line, column }；editLocationIndex 为当前指针。
-const editLocationHistory = []
-let editLocationIndex = -1
-let lastEditLocationTime = 0
-const EDIT_LOCATION_MERGE_MS = 800 // 同文件连续编辑在此窗口内合并为一条记录
+// 元素：{ path, line, column }；cursorHistoryIndex 为当前指针。
+// 连续的光标移动（同文件、短时间）合并为一条记录，避免方向键逐字移动产生大量冗余；
+// 后退/前进跳转期间置 cursorNavGuard，防止跳转本身被回写进历史。
+const cursorHistory = []
+let cursorHistoryIndex = -1
+let lastCursorTime = 0
+let cursorNavGuard = false
+const CURSOR_MERGE_MS = 300 // 同文件连续光标移动在此窗口内合并为一条记录
 
-// 记录一次用户编辑位置。连续输入（同文件、短时间）合并更新当前记录，不新增。
-function recordEditLocation(path, line, column) {
+// 记录一次光标位置。连续移动（同文件、短时间）合并更新当前记录，不新增。
+function recordCursorLocation(path, line, column) {
   if (!path || !line) return
+  if (cursorNavGuard) return // 后退/前进跳转中，不把跳转结果写回历史
   const now = Date.now()
-  const current = editLocationHistory[editLocationIndex]
+  const current = cursorHistory[cursorHistoryIndex]
   // 与当前指针处完全相同 → 忽略
   if (current && current.path === path && current.line === line && current.column === column) return
-  // 同文件且短时间内的连续编辑 → 更新当前记录（光标随输入移动）
-  if (current && current.path === path && now - lastEditLocationTime < EDIT_LOCATION_MERGE_MS) {
-    editLocationHistory[editLocationIndex] = { path, line, column }
+  // 同文件且短时间内的连续移动 → 更新当前记录（光标随移动刷新）
+  if (current && current.path === path && now - lastCursorTime < CURSOR_MERGE_MS) {
+    cursorHistory[cursorHistoryIndex] = { path, line, column }
   } else {
     // 新增：截断指针之后的记录，追加新位置并前移指针
-    editLocationHistory.splice(editLocationIndex + 1, editLocationHistory.length - editLocationIndex - 1)
-    editLocationHistory.push({ path, line, column })
-    editLocationIndex = editLocationHistory.length - 1
+    cursorHistory.splice(cursorHistoryIndex + 1, cursorHistory.length - cursorHistoryIndex - 1)
+    cursorHistory.push({ path, line, column })
+    cursorHistoryIndex = cursorHistory.length - 1
   }
-  lastEditLocationTime = now
+  lastCursorTime = now
 }
 
-// 跳转到上一次编辑位置（指针回退）
-async function goToPreviousEditLocation() {
-  if (editLocationIndex <= 0) return
-  editLocationIndex -= 1
-  const loc = editLocationHistory[editLocationIndex]
-  if (loc) await revealInWorkspace(loc.path, loc.line, loc.column)
+// 后退到上一个光标位置（指针回退）
+async function goToPreviousCursorLocation() {
+  if (cursorHistoryIndex <= 0) return
+  cursorHistoryIndex -= 1
+  const loc = cursorHistory[cursorHistoryIndex]
+  if (loc) {
+    cursorNavGuard = true
+    try {
+      await revealInWorkspace(loc.path, loc.line, loc.column)
+    } finally {
+      cursorNavGuard = false
+    }
+  }
 }
 
-// 跳转到下一次编辑位置（指针前进）
-async function goToNextEditLocation() {
-  if (editLocationIndex >= editLocationHistory.length - 1) return
-  editLocationIndex += 1
-  const loc = editLocationHistory[editLocationIndex]
-  if (loc) await revealInWorkspace(loc.path, loc.line, loc.column)
+// 前进到下一个光标位置（指针前进）
+async function goToNextCursorLocation() {
+  if (cursorHistoryIndex >= cursorHistory.length - 1) return
+  cursorHistoryIndex += 1
+  const loc = cursorHistory[cursorHistoryIndex]
+  if (loc) {
+    cursorNavGuard = true
+    try {
+      await revealInWorkspace(loc.path, loc.line, loc.column)
+    } finally {
+      cursorNavGuard = false
+    }
+  }
 }
 
 function bindWorkspaceViewEvents(view) {
@@ -4468,11 +4486,16 @@ function bindWorkspaceViewEvents(view) {
     if (!tab) return
     tab.content = model.getValue()
     tab.isDirty = tab.content !== tab.originalContent
-    // 记录编辑位置：过滤程序化 setValue（isFlush）与撤销/重做，只记用户真实编辑
-    if (!e.isFlush && !e.isUndoing && !e.isRedoing) {
-      const pos = view.getPosition()
-      if (pos) recordEditLocation(path, pos.lineNumber, pos.column)
-    }
+  })
+  // 记录光标位置（供 Ctrl+Alt+←/→ 后退/前进导航）：
+  // 连续移动（同文件、短时间）合并为一条，跳转（跨文件/间隔）新增记录。
+  view.onDidChangeCursorPosition((e) => {
+    const model = view.getModel()
+    if (!model) return
+    const path = model.__jarvisPath
+    if (!path) return
+    const pos = e.position
+    if (pos) recordCursorLocation(path, pos.lineNumber, pos.column)
   })
   // 跳转到定义：用纯 F12（Monaco 在编辑器聚焦时会拦截该键，浏览器不弹开发者工具）。
   // 不用 Monaco 内置 revealDefinition——它只能跳到已加载的 model，无法自动打开
@@ -4488,22 +4511,22 @@ function bindWorkspaceViewEvents(view) {
       jumpToDefinition(ed)
     },
   })
-  // 上一次/下一次编辑位置跳转（Ctrl+Alt+←/→）。
+  // 后退/前进光标位置（Ctrl+Alt+←/→）。
   // 用 addAction 绑定：编辑器聚焦时优先于全局 Ctrl+Alt+方向键处理（切 pane/大厅）。
   view.addAction({
-    id: 'jarvis.goToPreviousEditLocation',
-    label: 'Go to Previous Edit Location',
+    id: 'jarvis.goToPreviousCursorLocation',
+    label: 'Go to Previous Cursor Location',
     keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.LeftArrow],
     run: () => {
-      goToPreviousEditLocation()
+      goToPreviousCursorLocation()
     },
   })
   view.addAction({
-    id: 'jarvis.goToNextEditLocation',
-    label: 'Go to Next Edit Location',
+    id: 'jarvis.goToNextCursorLocation',
+    label: 'Go to Next Cursor Location',
     keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.RightArrow],
     run: () => {
-      goToNextEditLocation()
+      goToNextCursorLocation()
     },
   })
 }
@@ -18492,9 +18515,13 @@ function handleGlobalKeydown(event) {
       (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
     const dirMap = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' }
     const dir = dirMap[event.key]
-    // 编辑器聚焦且处于可编辑模式时，让位给 Monaco 原生键位（Ctrl+Alt+↑/↓ 为「在上/下方插入光标」多光标编辑）；
-    // 若编辑器为只读模式（多光标本就不生效），则不让位，继续用方向键移动激活的分割区域
-    if (isMonacoEditorFocused() && isWorkspaceEditable.value) return
+    // 编辑器聚焦时让位给 Monaco 的 addAction（Ctrl+Alt+←/→ 为「上一次/下一次编辑位置」跳转，
+    // Ctrl+Alt+↑/↓ 为「在上/下方插入光标」多光标编辑）。左右方向键在只读模式下同样让位，
+    // 保证编辑位置跳转始终可用；上下方向键仅在可编辑模式让位（只读时多光标本就不生效，继续切 pane）。
+    if (isMonacoEditorFocused()) {
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') return
+      if (isWorkspaceEditable.value) return
+    }
     event.preventDefault()
     showCommandPalette.value = false
     const inWorkspace = getFocusedZoneKey() === 'workspace' || getNamedPanelFocusKey() === 'workspace'
