@@ -9703,6 +9703,9 @@ const commandPaletteCtx = computed(() => ({
   editCurrentAgentAccess: () => { const a = getCurrentAgentOrNull(); if (a) editAgentAccess(a) },
   regenerateCurrentAgent: () => { const a = getCurrentAgentOrNull(); if (a) regenerateAgent(a) },
   deleteCurrentAgent: () => { const a = getCurrentAgentOrNull(); if (a) deleteAgent(a.agent_id) },
+  // 编辑器选中内容 → 当前 Agent（命令面板动作 editor-send-selection-to-agent）
+  getEditorSelection,
+  sendSelectionToAgent,
   // 隐藏/显示当前 Agent 在大厅中的输出气泡（持久化在 PetLobby 内）
   toggleCurrentAgentOutput: () => {
     const a = getCurrentAgentOrNull()
@@ -14844,6 +14847,9 @@ function handleMessage(message, agentId = null) {
     }
   } else if (type === 'file_upload_response') {
     handleFileUploadResponse(payload)
+  } else if (type === 'editor_open_file') {
+    // Agent 请求在编辑器中打开文件并定位到指定行/列（结构化编辑器指令，非 eval_js 逃逸口）
+    handleEditorOpenFile(payload)
   } else if (type === 'eval_js_request') {
     // 回传必须用收到请求的连接来源 agentId（主网关消息为 null），不能用 targetAgentId
     handleEvalJsRequest(payload, agentId)
@@ -14872,6 +14878,71 @@ async function handleEvalJsRequest(payload, agentId = null) {
   if (replyWs && replyWs.readyState === WebSocket.OPEN) {
     replyWs.send(JSON.stringify({ type: 'eval_js_result', payload: response }))
   }
+}
+
+// Agent → 编辑器指令：打开文件并定位到指定行/列
+// payload: { agent_id, path, line?, column?, select_start?, select_end?, reveal? }
+async function handleEditorOpenFile(payload) {
+  const agentId = payload?.agent_id || currentAgentId.value
+  const path = resolveAgentRelativePath(payload?.path, agentId)
+  if (!path) return
+  await openWorkspaceFile(path, agentId)   // 复用现有入口（建会话/加载内容/激活标签）
+  await nextTick()
+  const modelData = editorModels.get(path)
+  const view = getActiveWorkspaceView()
+  if (!view || !modelData) return
+  const line = Number(payload?.line || 1)
+  const col = Number(payload?.column || 1)
+  if (payload?.reveal !== false) view.revealLineInCenter(line)
+  if (payload?.select_start != null && payload?.select_end != null) {
+    const startCol = Number(payload.select_start) + 1
+    const endCol = Math.max(startCol, Number(payload.select_end) + 1)
+    view.setSelection(new monaco.Selection(line, startCol, line, endCol))
+  }
+  view.setPosition({ lineNumber: line, column: col })
+  view.focus()
+}
+
+// 获取当前活跃编辑器中的选中内容（供命令面板动作 enabled 判断与 sendSelectionToAgent 使用）
+// 返回 null 表示无选中/无编辑器；否则返回 { path, text, startLine, endLine }
+function getEditorSelection() {
+  const view = getActiveWorkspaceView()
+  if (!view) return null
+  const model = view.getModel()
+  if (!model) return null
+  const selection = view.getSelection()
+  if (!selection || selection.isEmpty()) return null
+  const path = model.__jarvisPath || ''
+  const text = model.getValueInRange(selection)
+  if (!text || !text.trim()) return null
+  return { path, text, startLine: selection.startLineNumber, endLine: selection.endLineNumber }
+}
+
+// 把编辑器选中内容发给当前 Agent，让 Agent 分析/解释/修改
+function sendSelectionToAgent() {
+  const sel = getEditorSelection()
+  if (!sel) {
+    showToast('请先在编辑器中选中代码', 'info')
+    return
+  }
+  const agentId = currentAgentId.value
+  if (!agentId) {
+    showToast('请先选中当前 Agent', 'error')
+    return
+  }
+  const location = sel.path
+    ? `（文件: ${sel.path} 行 ${sel.startLine}-${sel.endLine}）`
+    : `（行 ${sel.startLine}-${sel.endLine}）`
+  const message = {
+    type: 'input_result',
+    payload: {
+      text: `请分析以下选中代码${location}：\n${sel.text}`,
+      agent_id: agentId,
+      display_name: chatName.value || username.value || '',
+      input_mode: 'single',
+    },
+  }
+  sendMessageToAgent(message, agentId)
 }
 
 // 将 JS 执行结果转换为可安全传输的 JSON 结构

@@ -366,6 +366,17 @@ export const ACTIONS = [
       ctx.toggleCurrentAgentOutput && ctx.toggleCurrentAgentOutput(),
   },
   {
+    id: "editor-send-selection-to-agent",
+    label: "让 Agent 分析选中代码",
+    condition: "需在编辑器中选中代码",
+    en: "Send Selection to Agent",
+    group: "当前 Agent",
+    icon: "🤖",
+    keywords: ["分析", "选中", "selection", "agent", "解释", "代码"],
+    enabled: (ctx) => !!ctx?.currentAgentId && !!ctx?.getEditorSelection,
+    run: (ctx) => ctx.sendSelectionToAgent && ctx.sendSelectionToAgent(),
+  },
+  {
     id: "interrupt-current",
     label: "中断当前 Agent",
     shortcut: "Ctrl+Alt+K",

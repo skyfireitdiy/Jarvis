@@ -279,7 +279,7 @@ else:
 - [ ] 新版本内容已插入至CHANGELOG.md头部
 - [ ] CHANGELOG.md文件格式完整（无语法错误）
 - [ ] **ReleaseNote原有内容已完整保留（验证：检查文件中是否含所有历史版本记录）**
-- [ ] 发布脚本./script/publish.py执行成功
+- [ ] 发布脚本./scripts/publish.py执行成功
 - [ ] git tag已创建并推送
 
 ## 常见问题
@@ -317,7 +317,7 @@ else:
 - ✅ 更新CHANGELOG.md文件内容
 - ✅ 于CHANGELOG.md头部插入新版本说明
 - ✅ 添加代码变更之详细描述
-- ✅ 执行./script/publish.py脚本完成发布（脚本会自动更新版本号、创建tag、推送代码）
+- ✅ 执行./scripts/publish.py脚本完成发布（脚本会自动更新版本号、创建tag、推送代码）
 
 ### Q5：ReleaseNote内容如何生成？
 

@@ -1194,7 +1194,7 @@ class task_list_manager:
 
             if action == "add_tasks":
                 result = self._handle_add_tasks(
-                    args, task_list_manager, agent_id, agent
+                    args, task_list_manager, agent_id, is_main_agent, agent
                 )
                 task_list_id_for_status = self._get_task_list_id(agent)
 
@@ -1250,7 +1250,12 @@ class task_list_manager:
             }
 
     def _handle_add_tasks(
-        self, args: Dict[str, Any], task_list_manager: Any, agent_id: str, agent: Any
+        self,
+        args: Dict[str, Any],
+        task_list_manager: Any,
+        agent_id: str,
+        is_main_agent: bool,
+        agent: Any,
     ) -> Dict[str, Any]:
         """处理批量添加任务（支持通过任务名称匹配依赖关系）"""
         # 禁止 sub_agent 创建 sub 类型任务，避免嵌套子 Agent
@@ -1269,6 +1274,35 @@ class task_list_manager:
                         }
         task_list_id = self._get_task_list_id(agent)
         tasks_info = args.get("tasks_info")
+
+        # 创建新任务列表时自动清除历史任务列表（创建新列表通常意味着之前的任务已完成）
+        if task_list_id:
+            existing_task_list = task_list_manager.get_task_list(task_list_id)
+            if existing_task_list:
+                # 只有主 Agent 才有权删除任务列表；子 Agent 无权自动清除
+                if not is_main_agent:
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": f"Agent 已存在任务列表（ID: {task_list_id}），当前为子 Agent 无权自动清除历史任务列表。请由主 Agent 先清除旧任务列表后再创建。",
+                    }
+                del_success, del_msg = task_list_manager.delete_task_list(
+                    task_list_id, is_main_agent
+                )
+                if not del_success:
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": f"自动清除历史任务列表失败: {del_msg}",
+                    }
+                # 清除 Agent 上残留的任务列表相关状态
+                self._set_task_list_id(agent, "")
+                self._set_running_task_id(agent, None)
+                self._unsubscribe_model_call_event(agent)
+                PrettyOutput.auto_print(
+                    f"🧹 检测到历史任务列表（ID: {task_list_id}），已自动清除，开始创建新的任务列表"
+                )
+                task_list_id = None
 
         if not task_list_id:
             # 验证：如果没有task_list且只有一个任务且agent不是main，则拒绝
@@ -1299,20 +1333,6 @@ class task_list_manager:
                     "stdout": "",
                     "stderr": "缺少 main_goal 参数：创建任务列表时必须提供 main_goal",
                 }
-
-            # 检查是否已有任务列表
-            existing_task_list_id = self._get_task_list_id(agent)
-            if existing_task_list_id:
-                # 检查任务列表是否还存在
-                existing_task_list = task_list_manager.get_task_list(
-                    existing_task_list_id
-                )
-                if existing_task_list:
-                    return {
-                        "success": False,
-                        "stdout": "",
-                        "stderr": f"Agent 已存在任务列表（ID: {existing_task_list_id}），每个 Agent 只能有一个任务列表。如需创建新列表，请先完成或放弃当前任务列表。",
-                    }
 
             # 创建任务列表
             task_list_id, success, error_msg = task_list_manager.create_task_list(

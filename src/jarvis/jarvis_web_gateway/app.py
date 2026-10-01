@@ -767,6 +767,21 @@ class WebGateway(BaseGateway):
         if waiter is not None:
             waiter.put(payload)
 
+    def publish_editor_command(
+        self, agent_id: str, command: str, payload: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """向所有前端广播编辑器指令（如打开文件/跳转行/展示 diff）。
+
+        command 决定消息类型：如 command='open_file' → type='editor_open_file'。
+        payload 会被并入消息 payload（agent_id 自动带上），前端据此定位 Agent 的
+        working_dir 与 node_id。session_id=None 触发路由器广播到所有活跃 session。
+        """
+        message = {
+            "type": f"editor_{command}",
+            "payload": {"agent_id": agent_id, **(payload or {})},
+        }
+        self._router.publish(message, session_id=None)
+
     def publish_execution_event(
         self,
         event: GatewayExecutionEvent,
