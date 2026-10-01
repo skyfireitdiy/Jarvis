@@ -140,12 +140,10 @@ const emptyText = computed(() => {
   return '无匹配命令'
 })
 
-function agentStatusIcon(agent) {
-  const ctx = props.ctx || {}
-  if (typeof ctx.isWaitingInput === 'function' && ctx.isWaitingInput(agent)) return '🚨'
-  const status = typeof ctx.getStatusClass === 'function' ? ctx.getStatusClass(agent) : 'running'
-  if (status === 'stopped') return '○'
-  return '●'
+// Agent 类型图标：code_agent 用 💻，普通 agent（agent）用 🤖，其余兜底 🤖。
+// 与大厅/树节点的 Agent 图标约定保持一致（App.vue 中 agent_type === 'agent' ? '🤖' : code_agent ? '💻'）。
+function agentTypeIcon(agent) {
+  return agent?.agent_type === 'code_agent' ? '💻' : '🤖'
 }
 
 // 将 Agent 列表转换为动作对象，复用命令面板的渲染与键盘导航
@@ -184,7 +182,7 @@ const agentEntries = computed(() => {
         label: agent?.name || agent?.agent_id,
         en: agent?.agent_id,
         group: '切换 Agent',
-        icon: agentStatusIcon(agent),
+        icon: agentTypeIcon(agent),
         keywords: [nodeLabel],
         meta: metaParts.join('   '),
         // 所有 Agent 都可选：可见的切过去（激活），不可见的在当前区域创建 Panel 并打开。
