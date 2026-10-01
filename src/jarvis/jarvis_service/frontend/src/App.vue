@@ -2908,6 +2908,48 @@ function moveActivePaneInDirection(dir) {
   }
   return false
 }
+// 找出「面积最大」的 pane（作为程序化分割的目标）：遍历所有 leaf，用其 DOM 的
+// getBoundingClientRect 计算面积（宽×高），返回面积最大的 leaf id。
+// 拿不到任何 DOM（未分割 / 尚未挂载）时回退当前激活 pane，保持与旧行为一致。
+function findLargestWorkspacePaneId() {
+  let largestId = activePaneId.value
+  let largestArea = -1
+  const walk = (node) => {
+    if (!node) return
+    if (node.type === 'leaf') {
+      const el = document.querySelector(`.workspace-pane-leaf[data-pane-id="${node.id}"]`)
+      if (el) {
+        const rect = el.getBoundingClientRect()
+        if (rect) {
+          const area = rect.width * rect.height
+          if (area > largestArea) {
+            largestArea = area
+            largestId = node.id
+          }
+        }
+      }
+      return
+    }
+    ;(node.children || []).forEach(walk)
+  }
+  walk(workspacePaneTree.value)
+  return largestId
+}
+// 计算「自动分割」的方向：取「面积最大」pane 的宽高，高大于宽则上下分（column），否则左右分（row）。
+// 用于点击侧边文件 / 打开面板等程序化分割（用户显式指定方向的快捷键不受影响）。
+// 拿不到 pane 的 DOM（未分割 / 尚未挂载）时回退 'row'，保持与旧行为一致。
+function computeSplitDirection() {
+  const paneId = findLargestWorkspacePaneId()
+  if (paneId) {
+    const el = document.querySelector(`.workspace-pane-leaf[data-pane-id="${paneId}"]`)
+    if (el) {
+      const rect = el.getBoundingClientRect()
+      if (rect && rect.height > rect.width) return 'column'
+    }
+  }
+  return 'row'
+}
+
 // 以 direction 方向切分指定 leaf：把该 leaf 替换为 split，原 leaf 保留在首位，
 // 新 leaf 成为激活 pane。
 // 注意：session / chat / terminal leaf 不能把承载内容复制给新 leaf（否则同一 Panel 或同一
@@ -3164,7 +3206,7 @@ function ensureAgentEditorPane(agentId) {
       return cur.id
     }
   }
-  splitWorkspacePane(activePaneId.value, 'row')
+  splitWorkspacePane(findLargestWorkspacePaneId(), computeSplitDirection())
   const newPane = activePane.value
   if (newPane) {
     newPane.view = 'file'
@@ -3227,7 +3269,7 @@ function ensureEditorPaneForFileOpen(agentId) {
       return filePane.id
     }
     // 3. 分割当前区域创建编辑器
-    splitWorkspacePane(activePaneId.value, 'row')
+    splitWorkspacePane(findLargestWorkspacePaneId(), computeSplitDirection())
     const newPane = activePane.value
     if (newPane) {
       newPane.view = 'file'
@@ -3239,11 +3281,72 @@ function ensureEditorPaneForFileOpen(agentId) {
   // 未分割：当前区域已是文件视图（空或有标签）→ 原地打开，交给 openWorkspaceFile 的 showWorkspaceFileView。
   if (workspaceMainView.value === 'file') return null
   // 未分割且当前区域是 session/chat/terminal → 分割创建编辑器（保留当前区域内容）。
-  splitWorkspacePane(activePaneId.value, 'row')
+  splitWorkspacePane(findLargestWorkspacePaneId(), computeSplitDirection())
   const newPane = activePane.value
   if (newPane) {
     newPane.view = 'file'
     if (agentId) newPane.agentId = agentId
+    return newPane.id
+  }
+  return null
+}
+
+// 为「打开面板视图」定位目标 pane（返回 paneId；未分割且原地打开时返回 null）：
+// 1) 当前活动区域为空 → 直接在当前区域创建（不分割）；
+// 2) 已存在承载该视图的 pane（chat/terminal 是 host 单例、session 按 panel 复用）→ 激活它；
+// 3) 否则分割当前区域，在新 pane 承载目标视图。
+function ensurePaneForView(view, sessionPanelId) {
+  // 2. 已存在承载该视图的 pane → 复用（chat/terminal host 单例、session 按 panel 复用）
+  if (view === 'chat' || view === 'terminal') {
+    const existing = findWorkspacePaneByView(view)
+    if (existing) {
+      activateWorkspacePane(existing.id)
+      return existing.id
+    }
+  } else if (view === 'session' && sessionPanelId) {
+    const existing = findWorkspacePaneBySessionPanelId(sessionPanelId)
+    if (existing) {
+      activateWorkspacePane(existing.id)
+      return existing.id
+    }
+  } else if (view === 'diff') {
+    // diff 每个 pane 一个独立实例（无 host 单例约束）：已存在 diff pane 则复用，避免覆盖当前区域。
+    const existing = findWorkspacePaneByView('diff')
+    if (existing) {
+      activateWorkspacePane(existing.id)
+      return existing.id
+    }
+  }
+  if (isWorkspaceSplit.value) {
+    const active = activePane.value
+    // 1. 当前活动区域为空 → 在当前区域创建
+    if (isPaneEmptyForFileOpen(active)) {
+      setActivePaneViewForPane(active, view, sessionPanelId)
+      activateWorkspacePane(active.id)
+      return active.id
+    }
+    // 3. 分割当前区域创建
+    splitWorkspacePane(findLargestWorkspacePaneId(), computeSplitDirection())
+    const newPane = activePane.value
+    if (newPane) {
+      setActivePaneViewForPane(newPane, view, sessionPanelId)
+      return newPane.id
+    }
+    return null
+  }
+  // 未分割：当前区域已是该视图 → 原地
+  if (workspaceMainView.value === view) return null
+  // 未分割且主区域是「空文件视图」（未打开任何文件）→ 原地创建，不分割。
+  // 否则空区域打开面板也会被分割，不符合「空则原地」的预期。
+  if (workspaceMainView.value === 'file' && workspaceTabs.value.length === 0) {
+    workspaceMainView.value = view
+    return null
+  }
+  // 未分割且当前区域有其他内容 → 分割创建
+  splitWorkspacePane(findLargestWorkspacePaneId(), computeSplitDirection())
+  const newPane = activePane.value
+  if (newPane) {
+    setActivePaneViewForPane(newPane, view, sessionPanelId)
     return newPane.id
   }
   return null
@@ -4767,26 +4870,25 @@ function setWorkspaceMainView(view) {
       return
     }
     if (view === 'session') return
-    // chat / terminal：交给「激活 pane」承载（host 单例，setActivePaneView 会先卸载其他 pane 上的同类型承载）
-    if (setActivePaneView(view)) return
-    collapseWorkspacePanes()
-    workspaceMainView.value = view
+    // chat / terminal：空则原地、已有则复用、否则分割（不覆盖当前区域）
+    ensurePaneForView(view)
     return
   }
-  if (workspaceMainView.value === view) return
-  // 自由分割只在「文件视图」下有意义：切到 chat/terminal 时先收起分割，
-  // 否则 pane 树仍会渲染，chat/terminal 内容无处显示。
-  if (view !== 'file' && isWorkspaceSplit.value) {
-    collapseWorkspacePanes()
-  }
-  workspaceMainView.value = view
-  // 切回文件视图时重排 Monaco；切到 chat/terminal 时无需处理编辑器
   if (view === 'file') {
+    // 未分割切回文件视图：原地切换并重排 Monaco
+    if (workspaceMainView.value !== 'file') {
+      workspaceMainView.value = 'file'
+    }
     nextTick(() => {
       layoutMonacoEditor()
       layoutGitDiffEditor()
     })
+    return
   }
+  if (workspaceMainView.value === view) return
+  // 未分割且当前区域有其他内容 → 分割创建（不覆盖当前区域）
+  ensurePaneForView(view)
+  return
 }
 
 // 在工作区中显示 chat / terminal（host 单例）：确保工作区面板已打开，再交给主区域或激活 pane 承载。
@@ -5991,10 +6093,12 @@ async function viewGitFileDiff(commitHash, filePath) {
   // 清掉上一份文件的全文缓存变量，避免在「仅上下文」模式下误用旧全文
   gitDiffOldText = ''
   gitDiffNewText = ''
-  // 已分割：diff 作为「激活 pane」的一种内容类型打开（与 file/session/chat/terminal 同等处理），
-  // 每个 pane 一个独立 DiffEditor 实例，互不干扰。
+  // 已分割：diff 作为「面板视图」打开（与 file/session/chat/terminal 同等策略）：
+  // 已存在 diff pane 则复用、当前区域空则原地创建、否则分割面积最大的 pane，
+  // 避免覆盖当前区域内容。每个 pane 一个独立 DiffEditor 实例，互不干扰。
   if (isWorkspaceSplit.value) {
-    const pane = activePane.value
+    const paneId = ensurePaneForView('diff')
+    const pane = paneId ? findWorkspacePaneById(workspacePaneTree.value, paneId) : null
     if (pane) {
       // 从 diff 切到 diff（换文件）时先释放旧实例，避免复用旧 model
       disposeDiffEditorForPane(pane.id)
@@ -7736,7 +7840,8 @@ function openAgentInActivePane(agent) {
   targetPanel.agentId = agent.agent_id
   activePanelId.value = targetPanel.id
   workspaceSessionPanelId.value = targetPanel.id
-  setActivePaneView('session', targetPanel.id)
+  // 空则原地、已有承载该 Panel 的 pane 则复用、否则分割（不覆盖当前区域）
+  ensurePaneForView('session', targetPanel.id)
   switchAgent(agent)
   nextTick(() => maybeStartTour('panel'))
   return true
@@ -7779,7 +7884,8 @@ function openAgentInPanel(agent, panelId = null) {
       if (hostingPane) {
         activateWorkspacePane(hostingPane.id)
       } else {
-        setActivePaneView('session', existingPanel.id)
+        // 空则原地、否则分割（不覆盖当前区域）
+        ensurePaneForView('session', existingPanel.id)
       }
       activePanelId.value = existingPanel.id
       switchAgent(agent)
@@ -7793,7 +7899,8 @@ function openAgentInPanel(agent, panelId = null) {
         targetPanel.agentId = agent.agent_id
         activePanelId.value = targetPanel.id
         workspaceSessionPanelId.value = targetPanel.id
-        setActivePaneView('session', targetPanel.id)
+        // 空则原地、已有承载该 Panel 的 pane 则复用、否则分割（不覆盖当前区域）
+        ensurePaneForView('session', targetPanel.id)
         switchAgent(agent)
         return
       }
@@ -7864,7 +7971,8 @@ function openAgentInCurrentPanel(agent) {
       if (hostingPane) {
         activateWorkspacePane(hostingPane.id)
       } else {
-        setActivePaneView('session', existingPanel.id)
+        // 空则原地、否则分割（不覆盖当前区域）
+        ensurePaneForView('session', existingPanel.id)
       }
       activePanelId.value = existingPanel.id
       workspaceSessionPanelId.value = existingPanel.id
@@ -9168,7 +9276,8 @@ function onWorkspaceSidebarAgentClick(agent) {
       if (hostingPane) {
         activateWorkspacePane(hostingPane.id)
       } else {
-        setActivePaneView('session', existingPanel.id)
+        // 空则原地、否则分割（不覆盖当前区域）
+        ensurePaneForView('session', existingPanel.id)
       }
     }
     activePanelId.value = existingPanel.id
@@ -9198,8 +9307,8 @@ function onWorkspaceSidebarAgentClick(agent) {
     closeAgentInPanel(targetPanel.id)
   }
   targetPanel.agentId = agent.agent_id
-  // 自由分割模式：把「激活 pane」切到 session 视图并承载该 Panel
-  setActivePaneView('session', targetPanel.id)
+  // 空则原地、已有承载该 Panel 的 pane 则复用、否则分割（不覆盖当前区域）
+  ensurePaneForView('session', targetPanel.id)
   activePanelId.value = targetPanel.id
   switchAgent(agent)
   workspaceSessionPanelId.value = targetPanel.id
