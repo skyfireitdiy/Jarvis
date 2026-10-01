@@ -18594,14 +18594,18 @@ function handleGlobalKeydown(event) {
       petLobbyRef.value.closeActivePanel()
     }
 
-    // 焦点仍在 Monaco 编辑器（无对话框/菜单需要关闭）时，按 ESC 让编辑器「脱离」
-    // 全局快捷键控制：置 editorShortcutLocked 并把焦点移出编辑器，
-    // 之后 Ctrl+A 不再被编辑器全选吃掉，而是触发命令面板（列出 Agent）。
-    // 重新点击/聚焦编辑器时自动恢复（见 bindWorkspaceViewEvents 的 onDidFocusEditorText）。
+    // 焦点在 Monaco 编辑器或可编辑输入框（无对话框/菜单需要关闭）时，按 ESC 移除焦点，
+    // 让编辑器/输入框「脱离」快捷键控制：之后 Ctrl+A 不再被全选/输入框吃掉，
+    // 而是触发命令面板（列出 Agent）。
+    // - Monaco 编辑器：置 editorShortcutLocked 兜底（其隐藏 textarea blur 后 isMonacoEditorFocused
+    //   可能仍为 true），重新聚焦编辑器时自动恢复（见 bindWorkspaceViewEvents 的 onDidFocusEditorText）。
+    // - 普通输入框（textarea/input/contentEditable）：直接 blur，焦点移出后 event.target 即不再是输入框。
+    const ae = document.activeElement
     if (isMonacoEditorFocused()) {
       editorShortcutLocked.value = true
-      const ae = document.activeElement
       if (ae && typeof ae.blur === 'function') ae.blur()
+    } else if (ae && isEditableElement(ae)) {
+      if (typeof ae.blur === 'function') ae.blur()
     }
   }
 
