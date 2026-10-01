@@ -5,7 +5,7 @@
  *  - 按 (serverId, workspaceRoot) 复用 WebSocket 连接
  *  - 自建 JSON-RPC 通道（id 自增 + Promise map），不依赖 monaco.lsp 的全量同步器
  *  - 文档同步（didOpen / didChange / didClose）只针对目标语言的 model
- *  - 注册 hover / completion / diagnostics 三个语言特性 provider，按语言隔离
+ *  - 注册 hover / completion / diagnostics / definition / formatting 语言特性 provider，按语言隔离
  *  - 失败静默降级：连接失败或服务器未安装时仅 console.warn，不影响编辑器
  *
  * ## 为什么自建（重要）
@@ -172,6 +172,8 @@ async function connectLspClient({ spec, workspaceRoot, deps }) {
       textDocument: {
         hover: { contentFormat: ["markdown", "plaintext"] },
         completion: { completionItem: { snippetSupport: true } },
+        definition: {},
+        documentFormatting: { dynamicRegistration: false },
         publishDiagnostics: {},
       },
     },
@@ -350,6 +352,48 @@ function registerLanguageFeatures(spec, capabilities) {
     });
   }
 
+  if (serverCaps.definitionProvider) {
+    monaco.languages.registerDefinitionProvider(language, {
+      provideDefinition: async (model, position) => {
+        const client = getClientForModel(model, spec);
+        if (!client) return null;
+        try {
+          const result = await client.request("textDocument/definition", {
+            textDocument: { uri: model.uri.toString(true) },
+            position: {
+              line: position.lineNumber - 1,
+              character: position.column - 1,
+            },
+          });
+          return toMonacoDefinition(result);
+        } catch {
+          return null;
+        }
+      },
+    });
+  }
+
+  if (serverCaps.documentFormattingProvider) {
+    monaco.languages.registerDocumentFormattingEditProvider(language, {
+      provideDocumentFormattingEdits: async (model, options) => {
+        const client = getClientForModel(model, spec);
+        if (!client) return [];
+        try {
+          const result = await client.request("textDocument/formatting", {
+            textDocument: { uri: model.uri.toString(true) },
+            options: {
+              tabSize: options?.tabSize ?? 4,
+              insertSpaces: options?.insertSpaces ?? true,
+            },
+          });
+          return toMonacoTextEdits(result);
+        } catch {
+          return [];
+        }
+      },
+    });
+  }
+
   registeredProviders.add(language);
 }
 
@@ -395,6 +439,72 @@ function toMonacoCompletionKind(kind) {
     25: monaco.languages.CompletionItemKind.TypeParameter,
   };
   return map[kind] ?? monaco.languages.CompletionItemKind.Text;
+}
+
+/** LSP 0-based 位置 → Monaco 1-based 位置。 */
+function toMonacoPosition(pos) {
+  return {
+    lineNumber: (pos?.line ?? 0) + 1,
+    column: (pos?.character ?? 0) + 1,
+  };
+}
+
+/** LSP 0-based range → Monaco 1-based IRange。 */
+function toMonacoRange(range) {
+  return {
+    startLineNumber: (range?.start?.line ?? 0) + 1,
+    startColumn: (range?.start?.character ?? 0) + 1,
+    endLineNumber: (range?.end?.line ?? 0) + 1,
+    endColumn: (range?.end?.character ?? 0) + 1,
+  };
+}
+
+/**
+ * 把 LSP textDocument/definition 结果归一化为 Monaco 可接受的
+ * Location | LocationLink[] | null。
+ *
+ * LSP 返回三种形态之一：
+ *  - Location {uri, range}
+ *  - Location[]（数组）
+ *  - LocationLink[] {originSelectionRange?, targetUri, targetRange, targetSelectionRange}
+ */
+function toMonacoDefinition(result) {
+  if (!result) return null;
+  const items = Array.isArray(result) ? result : [result];
+  if (items.length === 0) return null;
+  // 若含 LocationLink（有 targetUri）则整体按 LocationLink 处理
+  const isLink = items.some((it) => it && it.targetUri);
+  if (isLink) {
+    return items
+      .filter((it) => it && it.targetUri)
+      .map((it) => ({
+        uri: monaco.Uri.parse(it.targetUri),
+        range: toMonacoRange(it.targetRange),
+        originSelectionRange: it.originSelectionRange
+          ? toMonacoRange(it.originSelectionRange)
+          : undefined,
+        targetSelectionRange: it.targetSelectionRange
+          ? toMonacoRange(it.targetSelectionRange)
+          : undefined,
+      }));
+  }
+  return items
+    .filter((it) => it && it.uri)
+    .map((it) => ({
+      uri: monaco.Uri.parse(it.uri),
+      range: toMonacoRange(it.range),
+    }));
+}
+
+/**
+ * 把 LSP textDocument/formatting 的 TextEdit[] 归一化为 Monaco TextEdit[]。
+ * LSP TextEdit: {range, newText}；Monaco TextEdit: {range: IRange, text}。
+ */
+function toMonacoTextEdits(result) {
+  if (!Array.isArray(result)) return [];
+  return result
+    .filter((it) => it && it.range)
+    .map((it) => ({ range: toMonacoRange(it.range), text: it.newText ?? "" }));
 }
 
 /**
