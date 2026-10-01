@@ -18299,6 +18299,20 @@ function handleGlobalKeydown(event) {
     return
   }
 
+  // Ctrl/Cmd + F 打开命令面板并直接进入文件搜索（预输入 f>）
+  // 注意：Ctrl+F 是「查找」的通用快捷键，焦点在 Monaco 编辑器或输入框时须让位，
+  // 否则会把编辑器/输入框的原生查找行为吃掉。
+  // 例外：编辑器已按 ESC「脱离」快捷键控制（editorShortcutLocked）时不再让位。
+  if (isModifierPressed && !event.altKey && event.code === 'KeyF') {
+    if (showConnectModal.value) return
+    if (!editorShortcutLocked.value && (isMonacoEditorFocused() || isEditableElement(event.target))) return
+    event.preventDefault()
+    commandPaletteFocusKey = getFocusedZoneKey()
+    commandPaletteInitialQuery.value = 'f>'
+    showCommandPalette.value = true
+    return
+  }
+
   // Ctrl/Cmd + Alt + Shift + 方向键：在大厅中按方向选中节点（相对当前选中节点的位置，
   // 无选中时从该方向的反向边缘开始，如 → 取最左侧的第一个节点）。
   // 与节点操作快捷键（Ctrl+Alt+Shift+字母）保持一致的「加 Shift 即作用于节点」约定。
