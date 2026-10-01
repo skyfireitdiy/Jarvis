@@ -151,31 +151,20 @@ package "用户层" {
   component "用户 A" as ua
   component "用户 B" as ub
   component "用户 C" as uc
-  component "用户 D" as ud
-  component "用户 E" as ue
   component "..." as ux
-}
-
-package "用户本机执行面" {
-  component "浏览器扩展\n（Browser Bridge）\n复用登录态 · 操作真实标签页" as ext
-  component "本地后台服务\n（jarvis-daemon）\n文件/进程/服务 · GUI 自动化" as daemon
 }
 
 component "主网关（Master Gateway）\n用户交互 · 消息转发 · Agent 管理" as master
 
-package "子网关 1（节点 1）" as gw1 {
+package "用户本机执行面" {
+  component "浏览器扩展\nBrowser Bridge" as ext
+  component "本地后台服务\njarvis-daemon" as daemon
+}
+
+package "子网关（节点 1）" as gw1 {
   component "Agent A" as a1
-  component "Agent D" as a4
-}
-
-package "子网关 2（节点 2）" as gw2 {
   component "Agent B" as a2
-  component "Agent E" as a5
-}
-
-package "子网关 3（节点 3）" as gw3 {
   component "Agent C" as a3
-  component "Agent F" as a6
 }
 
 component "..." as gwx
@@ -183,17 +172,12 @@ component "..." as gwx
 ua --> master
 ub --> master
 uc --> master
-ud --> master
-ue --> master
 ux --> master
 
 master --> gw1
-master --> gw2
-master --> gw3
 master --> gwx
-
-ext -up-> master : WebSocket 主动连出
-daemon -up-> master : 本地回环 127.0.0.1:17800
+master -down-> ext
+master -down-> daemon
 
 @enduml
 ```
