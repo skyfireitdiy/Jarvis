@@ -2771,9 +2771,9 @@ const workspaceMainView = ref('file')
 const EDITOR_PANE_MIN_RATIO = 0.15
 const EDITOR_PANE_MAX_RATIO = 0.85
 let workspacePaneSeq = 0
-function createWorkspacePaneLeaf(view = 'file', sessionPanelId = null) {
+function createWorkspacePaneLeaf(view = 'file', sessionPanelId = null, agentId = null) {
   workspacePaneSeq += 1
-  return { type: 'leaf', id: `pane-${workspacePaneSeq}`, view, sessionPanelId }
+  return { type: 'leaf', id: `pane-${workspacePaneSeq}`, view, sessionPanelId, agentId }
 }
 // 根默认单 leaf：未分割时行为与改动前完全一致
 const workspacePaneTree = ref(createWorkspacePaneLeaf('file'))
@@ -3125,6 +3125,55 @@ function findWorkspacePaneByView(view, exceptPaneId = null) {
   walk(workspacePaneTree.value)
   return found
 }
+// 找出正在承载指定 Agent 的「文件编辑器」pane（view==='file' 且记录了该 agent_id）。
+// 用于 editor_open_file：Agent 打开文件时应复用其已有的编辑器面板，而非覆盖当前会话区域。
+function findAgentFilePane(agentId) {
+  if (!agentId) return null
+  let found = null
+  const walk = (node) => {
+    if (!node || found) return
+    if (node.type === 'leaf') {
+      if (node.view === 'file' && node.agentId === agentId) found = node
+      return
+    }
+    ;(node.children || []).forEach(walk)
+  }
+  walk(workspacePaneTree.value)
+  return found
+}
+
+// 为 editor_open_file 定位目标编辑器 pane，返回其 paneId（并确保它被激活且为 file 视图）：
+// 1) 该 Agent 已有文件编辑器面板 → 复用它（激活）；
+// 2) 当前激活 pane 已是 file 视图 → 直接复用它（记录 agentId）；
+// 3) 否则分割当前面板，在新 file 面板中打开（保留当前会话/聊天/终端不被覆盖）。
+function ensureAgentEditorPane(agentId) {
+  const existing = findAgentFilePane(agentId)
+  if (existing) {
+    activateWorkspacePane(existing.id)
+    return existing.id
+  }
+  // 未分割时根 leaf.view 恒为 'file'，实际内容由 workspaceMainView 承载（session/chat/terminal/file）。
+  // 只有当前确实是「文件视图」才直接复用；否则（会话/聊天/终端）需分割出新面板，避免覆盖。
+  const isFileView = isWorkspaceSplit.value
+    ? (activePane.value && activePane.value.view === 'file')
+    : workspaceMainView.value === 'file'
+  if (isFileView) {
+    const cur = activePane.value
+    if (cur) {
+      cur.agentId = agentId
+      return cur.id
+    }
+  }
+  splitWorkspacePane(activePaneId.value, 'row')
+  const newPane = activePane.value
+  if (newPane) {
+    newPane.view = 'file'
+    newPane.agentId = agentId
+    return newPane.id
+  }
+  return null
+}
+
 // 把「激活 pane」的视图切换为 view（file / session / chat / terminal / diff）。
 // 返回是否成功改写（未分割或没有激活 pane 时返回 false，调用方回退到旧路径）。
 function setActivePaneView(view, sessionPanelId = null) {
@@ -4480,6 +4529,9 @@ function releaseLspBinding(path) {
 
 function resolveAgentRelativePath(relativePath, agentId = null) {
   if (!relativePath) return ''
+  const raw = String(relativePath)
+  // 绝对路径直接返回，不做 working_dir 拼接（否则会把绝对路径当相对路径拼出重复前缀）
+  if (raw.startsWith('/')) return raw
   // 优先用指定 Agent 的工作目录解析（命令面板/搜索场景应使用其对应的 Agent，
   // 而非 currentAgent——两者可能不一致，导致拼出相对路径触发 Monaco「path must be absolute」）。
   let workingDir = ''
@@ -4488,8 +4540,8 @@ function resolveAgentRelativePath(relativePath, agentId = null) {
     workingDir = agent?.working_dir || ''
   }
   if (!workingDir) workingDir = currentAgent.value?.working_dir || ''
-  if (!workingDir) return relativePath
-  return `${workingDir.replace(/\/$/, '')}/${String(relativePath).replace(/^\//, '')}`
+  if (!workingDir) return raw
+  return `${workingDir.replace(/\/$/, '')}/${raw.replace(/^\//, '')}`
 }
 
 async function fetchGlobalSearchResults(agentId, payload) {
@@ -14886,6 +14938,9 @@ async function handleEditorOpenFile(payload) {
   const agentId = payload?.agent_id || currentAgentId.value
   const path = resolveAgentRelativePath(payload?.path, agentId)
   if (!path) return
+  // 先定位/创建该 Agent 的编辑器面板：复用其已有的 file 面板，或分割当前面板
+  // 在新 file 面板中打开——避免把当前会话/聊天/终端区域覆盖掉。
+  ensureAgentEditorPane(agentId)
   await openWorkspaceFile(path, agentId)   // 复用现有入口（建会话/加载内容/激活标签）
   await nextTick()
   const modelData = editorModels.get(path)
