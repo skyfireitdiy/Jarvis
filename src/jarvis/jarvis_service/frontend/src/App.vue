@@ -4409,13 +4409,57 @@ function buildEditorOptions() {
 }
 
 // 内容变更 → 回写该文件对应的 tab（模型上记录了 path，多 pane 打开同一文件时天然同步）
+// ===== 编辑位置历史（上一次/下一次编辑位置跳转，Ctrl+Alt+←/→）=====
+// VS Code 的 Last Edit Location：记录用户每次「编辑」的位置，可前后跳转。
+// Monaco standalone 无此内置功能，这里自行维护历史栈。
+// 元素：{ path, line, column }；editLocationIndex 为当前指针。
+const editLocationHistory = []
+let editLocationIndex = -1
+let lastEditLocationTime = 0
+const EDIT_LOCATION_MERGE_MS = 800 // 同文件连续编辑在此窗口内合并为一条记录
+
+// 记录一次用户编辑位置。连续输入（同文件、短时间）合并更新当前记录，不新增。
+function recordEditLocation(path, line, column) {
+  if (!path || !line) return
+  const now = Date.now()
+  const current = editLocationHistory[editLocationIndex]
+  // 与当前指针处完全相同 → 忽略
+  if (current && current.path === path && current.line === line && current.column === column) return
+  // 同文件且短时间内的连续编辑 → 更新当前记录（光标随输入移动）
+  if (current && current.path === path && now - lastEditLocationTime < EDIT_LOCATION_MERGE_MS) {
+    editLocationHistory[editLocationIndex] = { path, line, column }
+  } else {
+    // 新增：截断指针之后的记录，追加新位置并前移指针
+    editLocationHistory.splice(editLocationIndex + 1, editLocationHistory.length - editLocationIndex - 1)
+    editLocationHistory.push({ path, line, column })
+    editLocationIndex = editLocationHistory.length - 1
+  }
+  lastEditLocationTime = now
+}
+
+// 跳转到上一次编辑位置（指针回退）
+async function goToPreviousEditLocation() {
+  if (editLocationIndex <= 0) return
+  editLocationIndex -= 1
+  const loc = editLocationHistory[editLocationIndex]
+  if (loc) await revealInWorkspace(loc.path, loc.line, loc.column)
+}
+
+// 跳转到下一次编辑位置（指针前进）
+async function goToNextEditLocation() {
+  if (editLocationIndex >= editLocationHistory.length - 1) return
+  editLocationIndex += 1
+  const loc = editLocationHistory[editLocationIndex]
+  if (loc) await revealInWorkspace(loc.path, loc.line, loc.column)
+}
+
 function bindWorkspaceViewEvents(view) {
   // 重新聚焦编辑器时恢复原生快捷键控制（撤销 ESC「脱离」状态）：
   // 用户重新进入编辑器编辑，Ctrl+A 应恢复为编辑器全选。
   view.onDidFocusEditorText(() => {
     editorShortcutLocked.value = false
   })
-  view.onDidChangeModelContent(() => {
+  view.onDidChangeModelContent((e) => {
     const model = view.getModel()
     if (!model) return
     const path = model.__jarvisPath
@@ -4424,6 +4468,11 @@ function bindWorkspaceViewEvents(view) {
     if (!tab) return
     tab.content = model.getValue()
     tab.isDirty = tab.content !== tab.originalContent
+    // 记录编辑位置：过滤程序化 setValue（isFlush）与撤销/重做，只记用户真实编辑
+    if (!e.isFlush && !e.isUndoing && !e.isRedoing) {
+      const pos = view.getPosition()
+      if (pos) recordEditLocation(path, pos.lineNumber, pos.column)
+    }
   })
   // 跳转到定义：用纯 F12（Monaco 在编辑器聚焦时会拦截该键，浏览器不弹开发者工具）。
   // 不用 Monaco 内置 revealDefinition——它只能跳到已加载的 model，无法自动打开
@@ -4437,6 +4486,24 @@ function bindWorkspaceViewEvents(view) {
     contextMenuOrder: 1.5,
     run: (ed) => {
       jumpToDefinition(ed)
+    },
+  })
+  // 上一次/下一次编辑位置跳转（Ctrl+Alt+←/→）。
+  // 用 addAction 绑定：编辑器聚焦时优先于全局 Ctrl+Alt+方向键处理（切 pane/大厅）。
+  view.addAction({
+    id: 'jarvis.goToPreviousEditLocation',
+    label: 'Go to Previous Edit Location',
+    keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.LeftArrow],
+    run: () => {
+      goToPreviousEditLocation()
+    },
+  })
+  view.addAction({
+    id: 'jarvis.goToNextEditLocation',
+    label: 'Go to Next Edit Location',
+    keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.RightArrow],
+    run: () => {
+      goToNextEditLocation()
     },
   })
 }
