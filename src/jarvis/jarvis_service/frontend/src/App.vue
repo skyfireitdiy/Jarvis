@@ -6316,24 +6316,22 @@ async function viewGitFileDiff(commitHash, filePath) {
   // 清掉上一份文件的全文缓存变量，避免在「仅上下文」模式下误用旧全文
   gitDiffOldText = ''
   gitDiffNewText = ''
-  // 已分割：diff 作为「面板视图」打开（与 file/session/chat/terminal 同等策略）：
+  // diff 作为「面板视图」打开（与 file/session/chat/terminal 同等策略，不区分分割与否）：
   // 已存在 diff pane 则复用、当前区域空则原地创建、否则分割面积最大的 pane，
   // 避免覆盖当前区域内容。每个 pane 一个独立 DiffEditor 实例，互不干扰。
-  if (isWorkspaceSplit.value) {
-    const paneId = ensurePaneForView('diff')
-    const pane = paneId ? findWorkspacePaneById(workspacePaneTree.value, paneId) : null
-    if (pane) {
-      // 从 diff 切到 diff（换文件）时先释放旧实例，避免复用旧 model
-      disposeDiffEditorForPane(pane.id)
-      pane.view = 'diff'
-      pane.sessionPanelId = null
-      persistWorkspacePaneLayout()
-      gitDiffLoading.value = false
-      await loadDiffForPane(pane.id, commitHash, filePath)
-      return
-    }
+  const paneId = ensurePaneForView('diff')
+  const pane = paneId ? findWorkspacePaneById(workspacePaneTree.value, paneId) : null
+  if (pane) {
+    // 从 diff 切到 diff（换文件）时先释放旧实例，避免复用旧 model
+    disposeDiffEditorForPane(pane.id)
+    pane.view = 'diff'
+    pane.sessionPanelId = null
+    persistWorkspacePaneLayout()
+    gitDiffLoading.value = false
+    await loadDiffForPane(pane.id, commitHash, filePath)
+    return
   }
-  // 未分割：沿用原有单例路径（零回归）
+  // 未分割且当前区域为空文件视图（ensurePaneForView 原地创建，未分割）：沿用原有单例路径。
   // diff 属于「文件视图」：若主区域当前停在 chat/terminal/session，需先切回文件视图，
   // 否则 diff 会被这些内容挡住（workspaceMainView 与 workspaceDiff 两个状态需协调）。
   showWorkspaceFileView()
