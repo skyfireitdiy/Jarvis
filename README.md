@@ -30,6 +30,8 @@ Jarvis 是一个面向开发者的 **协作式 AI 开发平台**。它不只是�
 
 如果你希望 AI 不只是“给建议”，而是能在你的本地环境里 **帮助分析、执行、验证和沉淀经验**，Jarvis 就是为这种场景设计的。
 
+[![Jarvis：独当一面，与众共事（产品宣传片）](https://i1.hdslb.com/bfs/archive/bdb39567e7433316159204474c273f8a17c1954a.jpg@1200w_630h)](https://www.bilibili.com/video/BV1gjYF6MEZT/)
+
 ![Jarvis 多 Agent 界面](docs/competition/images/多Agent界面.png)
 
 ### 适合谁使用？
