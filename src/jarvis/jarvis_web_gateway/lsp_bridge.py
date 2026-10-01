@@ -430,47 +430,55 @@ def resolve_workspace_root(
 ) -> str:
     """解析并校验 workspace root。
 
-    规则：
-        1. ``raw_root`` 必须是存在的目录，否则忽略；
-        2. 否则在 ``fallback`` 中查找含 ``rootMarkers`` 的最近祖先目录；
-        3. 都不满足时返回 ``fallback`` 或当前工作目录。
+    以 ``raw_root``（前端传入，通常是文件所在目录）为起点，**向上**查找含
+    ``rootMarkers`` 的最近祖先目录作为项目根；找不到 marker 时回退到起点本身，
+    最后回退到 ``fallback`` 或当前工作目录。
+
+    之所以不直接采用 ``raw_root``：前端传入的是打开文件的所在目录，若直接作为
+    workspace root，语言服务器只能索引该目录，跨文件跳转定义/引用会失败（例如
+    ``src/jarvis/jarvis_sec/analysis.py`` 引用 ``src/jarvis/jarvis_utils/`` 的符号时，
+    workspace 根取 ``jarvis_sec`` 则找不到 ``jarvis_utils``）。向上查找项目根可让
+    语言服务器索引整个项目，跨文件语义才可用。
 
     Args:
-        raw_root: 前端通过 query 传入的 root
+        raw_root: 前端通过 query 传入的 root（查找起点，通常是文件所在目录）
         spec: 语言服务器清单
         fallback: 备选起点（通常是当前打开文件的所在目录）
 
     Returns:
         绝对路径字符串。
     """
+    # 确定查找起点：raw_root（若为存在的目录）优先，否则 fallback
+    start: Optional[Path] = None
     if raw_root:
         try:
             candidate = Path(raw_root).expanduser().resolve()
             if candidate.is_dir():
-                return str(candidate)
+                start = candidate
         except (OSError, ValueError):
             pass
 
-    markers = spec.get("rootMarkers") or []
-    if fallback and markers:
+    if start is None and fallback:
         try:
-            current = Path(fallback).expanduser().resolve()
+            candidate = Path(fallback).expanduser().resolve()
+            if candidate.is_file():
+                candidate = candidate.parent
+            start = candidate
         except (OSError, ValueError):
-            current = None
-        if current is not None:
-            if current.is_file():
-                current = current.parent
-            for directory in [current, *current.parents]:
-                for marker in markers:
+            pass
+
+    if start is None:
+        start = Path(os.getcwd())
+
+    # 从起点向上查找含 rootMarkers 的最近祖先目录作为项目根
+    markers = spec.get("rootMarkers") or []
+    if markers:
+        for directory in [start, *start.parents]:
+            for marker in markers:
+                try:
                     if (directory / marker).exists():
                         return str(directory)
-            return str(current)
+                except OSError:
+                    continue
 
-    if fallback:
-        try:
-            resolved = Path(fallback).expanduser().resolve()
-            return str(resolved.parent if resolved.is_file() else resolved)
-        except (OSError, ValueError):
-            pass
-
-    return os.getcwd()
+    return str(start)

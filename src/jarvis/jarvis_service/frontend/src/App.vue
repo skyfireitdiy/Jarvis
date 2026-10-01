@@ -1714,7 +1714,7 @@ import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker.js?worker
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker.js?worker'
 // LSP 接入：语言清单来自后端 /api/lsp/servers，前端不含任何语言硬编码
 import { loadLspServers, getServerByLanguage, getServerByPath } from './lsp/registry.js'
-import { ensureClient, disposeClient, disposeAll as disposeAllLspClients } from './lsp/manager.js'
+import { ensureClient, disposeClient, disposeAll as disposeAllLspClients, getDefinition } from './lsp/manager.js'
 
 // Monaco 在 vite 下必须显式提供 worker 工厂，否则编辑器无法启动
 self.MonacoEnvironment = {
@@ -4420,6 +4420,68 @@ function bindWorkspaceViewEvents(view) {
     tab.content = model.getValue()
     tab.isDirty = tab.content !== tab.originalContent
   })
+  // 跳转到定义：用纯 F12（Monaco 在编辑器聚焦时会拦截该键，浏览器不弹开发者工具）。
+  // 不用 Monaco 内置 revealDefinition——它只能跳到已加载的 model，无法自动打开
+  // 未打开的目标文件；这里拿到 LSP definition 结果后，若目标文件未打开则自行
+  // openWorkspaceFile 打开再定位。
+  view.addAction({
+    id: 'jarvis.goToDefinition',
+    label: 'Go to Definition',
+    keybindings: [monaco.KeyCode.F12],
+    contextMenuGroupId: 'navigation',
+    contextMenuOrder: 1.5,
+    run: (ed) => {
+      jumpToDefinition(ed)
+    },
+  })
+}
+
+// LSP file:// uri → 本地文件绝对路径（如 file:///home/a.py → /home/a.py）
+function lspUriToPath(uri) {
+  if (!uri) return ''
+  const raw = String(uri)
+  if (!raw.startsWith('file://')) return raw
+  return decodeURIComponent(raw.slice('file://'.length))
+}
+
+// 从 LSP definition 结果中取第一个目标 {path, line, column}（支持 Location / LocationLink[]）
+function pickFirstDefinitionTarget(result) {
+  if (!result) return null
+  const items = Array.isArray(result) ? result : [result]
+  for (const it of items) {
+    if (!it) continue
+    const uri = it.targetUri || it.uri
+    const range = it.targetRange || it.range
+    if (!uri || !range) continue
+    return {
+      path: lspUriToPath(uri),
+      line: (range.start?.line ?? 0) + 1,
+      column: (range.start?.character ?? 0) + 1,
+    }
+  }
+  return null
+}
+
+// Ctrl+F12 自定义跳转定义：拿到目标文件后，未打开则打开，再定位到目标行/列
+async function jumpToDefinition(ed) {
+  const model = ed && ed.getModel && ed.getModel()
+  const position = ed && ed.getPosition && ed.getPosition()
+  if (!model || !position) return
+  const result = await getDefinition(model, position)
+  const target = pickFirstDefinitionTarget(result)
+  if (!target || !target.path) return
+  // 目标文件已打开则直接激活，否则打开（复用现有入口：建会话/加载内容/激活标签）
+  if (!editorModels.has(target.path)) {
+    await openWorkspaceFile(target.path)
+  } else {
+    activateWorkspaceTab(target.path)
+  }
+  await nextTick()
+  const view = getActiveWorkspaceView()
+  if (!view) return
+  view.revealLineInCenter(target.line)
+  view.setPosition({ lineNumber: target.line, column: target.column })
+  view.focus()
 }
 
 // 把某个 pane 的实例绑定到它自己记录的文件；无文件则保持空编辑器（新 pane 为空）

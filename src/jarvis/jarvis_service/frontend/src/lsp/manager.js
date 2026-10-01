@@ -677,3 +677,41 @@ export function disposeAll() {
 export function getActiveClientCount() {
   return sessions.size;
 }
+
+/**
+ * 对指定 model 发起 textDocument/definition 请求，返回原始 LSP 结果。
+ *
+ * 供 Ctrl+F12 自定义跳转使用：Monaco 内置 revealDefinition 只能跳到
+ * 已加载的 model，无法自动打开未打开的目标文件，故由前端拿到目标
+ * uri + range 后自行打开文件并定位。
+ *
+ * @param {object} model Monaco ITextModel
+ * @param {{lineNumber: number, column: number}} position Monaco 1-based 光标位置
+ * @returns {Promise<object|null>} LSP Location | LocationLink[] | Location[] | null
+ */
+export async function getDefinition(model, position) {
+  if (!model || !position) return null;
+  const uri = String(model.uri.toString(true)).toLowerCase();
+  for (const entry of sessions.values()) {
+    let found = false;
+    for (const m of entry.models) {
+      if (String(m.uri.toString(true)).toLowerCase() === uri) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) continue;
+    try {
+      return await entry.client.request("textDocument/definition", {
+        textDocument: { uri: model.uri.toString(true) },
+        position: {
+          line: (position.lineNumber ?? 1) - 1,
+          character: (position.column ?? 1) - 1,
+        },
+      });
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
