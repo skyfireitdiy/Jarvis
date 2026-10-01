@@ -4529,6 +4529,16 @@ function bindWorkspaceViewEvents(view) {
       goToNextCursorLocation()
     },
   })
+  // Ctrl+P 打开 Monaco 内置命令面板（editor.action.quickCommand，默认 F1）。
+  // 全局 handler 在编辑器聚焦时让位给 Monaco，由这里的 addAction 接管 Ctrl+P。
+  view.addAction({
+    id: 'jarvis.openCommandPalette',
+    label: 'Command Palette',
+    keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyP],
+    run: (ed) => {
+      ed.trigger('keyboard', 'editor.action.quickCommand', null)
+    },
+  })
 }
 
 // LSP file:// uri → 本地文件绝对路径（如 file:///home/a.py → /home/a.py）
@@ -18448,9 +18458,12 @@ const editorShortcutLocked = ref(false)
 function handleGlobalKeydown(event) {
   const isModifierPressed = event.ctrlKey || event.metaKey
 
-  // Ctrl/Cmd + P 打开/关闭命令面板（登录界面不响应）
+  // Ctrl/Cmd + P：编辑器聚焦时让位给 Monaco（其内置命令面板 editor.action.quickCommand 由
+  // 我们额外绑定的 Ctrl+P addAction 触发）；否则打开 Jarvis 命令面板（登录界面不响应）
   if (isModifierPressed && !event.altKey && event.code === 'KeyP') {
     if (showConnectModal.value) return
+    // 编辑器聚焦时让位，让事件继续传播到 Monaco 触发其命令面板 addAction
+    if (isMonacoEditorFocused()) return
     event.preventDefault()
     if (!showCommandPalette.value) {
       // 打开前记录焦点所在区域，供"关闭/分离当前焦点面板"使用
