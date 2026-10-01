@@ -145,26 +145,7 @@
         <slot name="main-view-header"></slot>
         <slot name="main-view"></slot>
         <div v-show="mainView === 'file'" class="workspace-main-file-view">
-          <div v-if="diff" class="workspace-diff-view">
-            <div class="workspace-diff-header">
-              <span class="workspace-diff-title" :title="diff.filePath">{{ diff.filePath }}</span>
-              <span v-if="diff.commitHash" class="workspace-diff-hash">{{ diff.commitHash.slice(0, 7) }}</span>
-              <span v-if="diff.truncated" class="workspace-diff-truncated">（已截断）</span>
-              <button class="workspace-diff-nav" tabindex="-1" @mousedown.prevent @click="$emit('diffNavPrev')" title="上一个差异">▲</button>
-              <button class="workspace-diff-nav" tabindex="-1" @mousedown.prevent @click="$emit('diffNavNext')" title="下一个差异">▼</button>
-              <button class="workspace-diff-toggle" tabindex="-1" @mousedown.prevent @click="$emit('toggleDiffShowFull')" :title="diff.showFull ? '只显示变更上下文区域' : '显示文件全文'">
-                {{ diff.showFull ? '仅上下文' : '全文' }}
-              </button>
-              <button class="workspace-diff-toggle" tabindex="-1" @mousedown.prevent @click="$emit('toggleDiffSideBySide')">
-                {{ diff.sideBySide ? '内联' : '并排' }}
-              </button>
-              <button class="workspace-diff-close" tabindex="-1" @mousedown.prevent @click="$emit('closeDiff')" title="关闭 diff">✕</button>
-            </div>
-            <div v-if="diff.loading" class="workspace-diff-status">加载 diff...</div>
-            <div v-else-if="diff.error" class="workspace-diff-status error">{{ diff.error }}</div>
-            <div v-else ref="diffContainerRef" class="workspace-diff-monaco"></div>
-          </div>
-          <div v-else-if="tabs.length === 0" class="workspace-placeholder">
+          <div v-if="tabs.length === 0" class="workspace-placeholder">
             <div class="workspace-placeholder-icon">📝</div>
             <div class="workspace-placeholder-title">点击文件树中的文件打开代码编辑器</div>
             <div class="workspace-placeholder-text">支持 Monaco 语法高亮、智能提示、代码折叠、多标签切换与保存。</div>
@@ -201,7 +182,6 @@ const props = defineProps({
   sidebarView: String,
   mainView: { type: String, default: 'file' },
   resizeDirections: Array,
-  diff: Object,
   isAdmin: { type: Boolean, default: false },
   isEditable: { type: Boolean, default: false },
   hasActiveTab: { type: Boolean, default: false }
@@ -220,23 +200,16 @@ const emit = defineEmits([
   'setSidebarView',
   'setMainView',
   'startResize',
-  'toggleDiffSideBySide',
-  'closeDiff',
   'closeSidebar',
-  'toggleDiffShowFull',
-  'diffNavPrev',
-  'diffNavNext',
   'openSettings',
   'openDocs',
   'openAdmin'
 ])
 
 const editorContainerRef = ref(null)
-const diffContainerRef = ref(null)
 
 defineExpose({
-  editorContainerRef,
-  diffContainerRef
+  editorContainerRef
 })
 </script>
 
@@ -472,12 +445,12 @@ defineExpose({
 }
 
 .workspace-panel-content-main {
-  /* 标签固定在顶部，内容区各自滚动（Monaco/diff/嵌入视图内部都有自己的滚动容器），
+  /* 标签固定在顶部，内容区各自滚动（Monaco/嵌入视图内部都有自己的滚动容器），
      因此这里不整体滚动，避免标签随内容一起滚走。 */
   overflow: hidden;
 }
 
-/* 主区域文件视图：占满主区域，内部仍由 diff / 占位 / Monaco 容器各自撑开 */
+/* 主区域文件视图：占满主区域，内部由占位 / Monaco 容器各自撑开 */
 .workspace-main-file-view {
   flex: 1;
   min-height: 0;
@@ -518,100 +491,6 @@ defineExpose({
 .workspace-monaco-container {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
-}
-
-.workspace-diff-view {
-  flex: 1;
-  min-height: 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.workspace-diff-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-bg-secondary);
-  font-size: 12px;
-  flex-shrink: 0;
-}
-
-.workspace-diff-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--color-text-primary);
-}
-
-.workspace-diff-hash {
-  color: var(--color-text-secondary);
-  font-family: monospace;
-}
-
-.workspace-diff-truncated {
-  color: var(--color-warning, #e6a23c);
-}
-
-.workspace-diff-toggle,
-.workspace-diff-close {
-  flex-shrink: 0;
-  padding: 2px 8px;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  background: transparent;
-  color: var(--color-text-secondary);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.workspace-diff-toggle:hover,
-.workspace-diff-close:hover {
-  color: var(--color-text-primary);
-  border-color: var(--color-text-secondary);
-}
-
-.workspace-diff-nav {
-  flex-shrink: 0;
-  padding: 2px 6px;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  background: transparent;
-  color: var(--color-text-secondary);
-  font-size: 10px;
-  line-height: 1.4;
-  cursor: pointer;
-}
-
-.workspace-diff-nav:hover {
-  color: var(--color-text-primary);
-  border-color: var(--color-text-secondary);
-}
-
-.workspace-diff-status {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  color: var(--color-text-secondary);
-  font-size: 13px;
-}
-
-.workspace-diff-status.error {
-  color: var(--color-danger, #f56c6c);
-}
-
-.workspace-diff-monaco {
-  flex: 1;
-  min-height: 0;
-  min-width: 0;
   overflow: hidden;
 }
 

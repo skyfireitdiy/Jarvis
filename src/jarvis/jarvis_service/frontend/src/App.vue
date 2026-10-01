@@ -50,7 +50,6 @@
         :mainView="workspaceMainView"
         :resizeDirections="workspaceResizeDirections"
         :embedded="true"
-        :diff="workspaceDiff"
         :isAdmin="!!auth.userInfo?.is_admin"
         :isEditable="isWorkspaceEditable"
         :hasActiveTab="!!activeWorkspaceTabPath"
@@ -66,11 +65,6 @@
         @setSidebarView="toggleWorkspaceSidebarView"
         @setMainView="toggleWorkspaceMainView"
         @startResize="startWorkspacePanelResize"
-        @toggleDiffSideBySide="toggleGitDiffSideBySide"
-        @toggleDiffShowFull="toggleGitDiffShowFull"
-        @diffNavPrev="navigateGitDiff('prev')"
-        @diffNavNext="navigateGitDiff('next')"
-        @closeDiff="closeWorkspaceDiff"
         @openSettings="showSettingsModal = true; pushOverlayState()"
         @openDocs="openDocs()"
         @openAdmin="showAdminPanel = true; pushOverlayState()"
@@ -592,9 +586,9 @@
             </div>
           </aside>
         </template>
-        <!-- 自由分割：仅在已分割（>1 个 leaf）时提供 pane-tree 插槽，
-             未分割时该插槽不存在，WorkspacePanel 走原有渲染路径（零回归）。 -->
-        <template v-if="isWorkspaceSplit" #pane-tree>
+        <!-- 工作区恒为 pane 树（分割数量≥1）：唯一 leaf 承载主区域视图，
+             WorkspacePanel 恒走 pane 树渲染路径，不再存在未分割单例渲染。 -->
+        <template #pane-tree>
           <WorkspacePaneTree
             :node="workspacePaneTree"
             :activePaneId="activePaneId"
@@ -815,128 +809,6 @@
               </div>
             </template>
           </WorkspacePaneTree>
-        </template>
-        <!-- 未分割态的区域标题栏：与已分割时各 pane 的标题栏同源（WorkspacePaneHeader）。
-             未分割时内容由 workspaceMainView 承载，故用一个虚拟 node 反映真实视图，
-             使标题/状态文案与已分割时一致。canClose=false（唯一区域不可关闭）。 -->
-        <template #main-view-header>
-          <WorkspacePaneHeader
-            :node="workspaceMainViewHeaderNode"
-            :canSplit="canSplitWorkspacePane"
-            :canClose="false"
-            :getTitle="getWorkspacePaneTitle"
-            :getStatus="getWorkspacePaneStatus"
-            @split="splitWorkspacePane"
-          />
-        </template>
-        <!-- 编辑器主区域视图：聊天室 / 终端（嵌入模式，复用独立面板组件与状态） -->
-        <template #main-view>
-          <div v-if="workspaceMainView === 'chat'" class="workspace-main-embed-view">
-            <ChatPanel
-              :visible="true"
-              :interaction="chatPanelInteraction"
-              :panelStyle="{}"
-              :socket="socket"
-              :rooms="chatRooms"
-              :clients="chatClients"
-              :roomMembers="chatRoomMembers"
-              :myClientId="myClientId"
-              :isAdmin="auth.userInfo?.is_admin"
-              :currentUserId="auth.userInfo?.user_id"
-              :activeRoomId="activeChatRoomId"
-              :activePrivateId="activePrivateClientId"
-              :resizeDirections="[]"
-              :unreadCount="chatUnreadCount" :unreadMap="chatUnreadMap" :joinedRooms="chatJoinedRooms"
-              :myName="chatName"
-              :collapsed="chatPanelCollapsed"
-              :sidebarWidth="chatSidebarWidth"
-              :messages="activePrivateClientId ? (chatMessages['private_' + activePrivateClientId] || []) : (chatMessages[activeChatRoomId] || [])"
-              :embedded="true"
-              @focus="focusWindow"
-              @startMove="startChatPanelMove"
-              @close="setWorkspaceMainView('file')"
-              @createRoom="createChatRoom"
-              @joinRoom="joinChatRoom"
-              @sendMessage="sendChatMessage"
-              @selectPrivate="selectPrivateClient"
-              @startResize="startChatPanelResize"
-              @toggleCollapse="toggleChatPanelCollapse"
-              @leaveRoom="leaveChatRoom"
-              @deleteRoom="deleteChatRoom"
-              @renameRoom="renameChatRoom"
-              @startSidebarResize="startChatSidebarResize"
-              @clearMessages="clearChatMessages"
-            />
-          </div>
-          <div v-else-if="workspaceMainView === 'terminal'" class="workspace-main-embed-view">
-            <TerminalPanel
-              :visible="true"
-              :active="activeWindow === 'terminal'"
-              :interaction="terminalPanelInteraction"
-              :panelStyle="{}"
-              :nodeOptions="filteredNodeOptionsForCreateAgent"
-              :selectedNodeId="selectedTerminalNodeId"
-              :socket="socket"
-              :sessions="terminalSessions"
-              :activeId="activeTerminalId"
-              :resizeDirections="[]"
-              :formatNodeLabel="formatNodeOptionLabel"
-              :embedded="true"
-              @focus="focusWindow"
-              @startMove="startTerminalPanelMove"
-              @update:selectedNodeId="selectedTerminalNodeId = $event"
-              @createTerminal="createTerminalForSelectedNode"
-              @close="setWorkspaceMainView('file')"
-              @switch="switchTerminal"
-              @closeTerminal="closeTerminal"
-              @setHostRef="setTerminalHostRef"
-              @startResize="startTerminalPanelResize"
-            />
-          </div>
-          <div v-else-if="workspaceMainView === 'session'" class="workspace-main-embed-view">
-            <SessionPanel
-              v-if="workspaceSessionPanel"
-              :ref="el => setSessionPanelRef(workspaceSessionPanel?.id, el)"
-              :embedded="true"
-              :agent="getPanelAgent(workspaceSessionPanel)"
-              :messages="getPanelMessages(workspaceSessionPanel)"
-              :input-text="getPanelInputText(workspaceSessionPanel)"
-              :input-mode="getPanelInputMode(workspaceSessionPanel)"
-              :input-tip="getPanelInputTip(workspaceSessionPanel)"
-              :is-password="getPanelInputPassword(workspaceSessionPanel)"
-              :is-input-disabled="getPanelInputDisabled(workspaceSessionPanel)"
-              :is-waiting-multi-disabled="getPanelWaitingMultiDisabled(workspaceSessionPanel)"
-              :has-buffered-input="getPanelHasBufferedInput(workspaceSessionPanel)"
-              :agent-status="getPanelAgentStatus(workspaceSessionPanel)"
-              :active="workspaceSessionPanel.id === activePanelId"
-              :confirm-data="getPanelConfirmData(workspaceSessionPanel)"
-              :interaction="{ active: false }"
-              :resizeDirections="[]"
-              :panelStyle="{}"
-              @confirm="handlePanelConfirm(workspaceSessionPanel)"
-              @cancel-confirm="handlePanelCancelConfirm(workspaceSessionPanel)"
-              @activate="activatePanel(workspaceSessionPanel.id)"
-              @close-agent="closeAgentInPanel(workspaceSessionPanel.id)"
-              @close-panel="setWorkspaceMainView('file')"
-              @send="sendFromPanel(workspaceSessionPanel)"
-              @complete="completeFromPanel(workspaceSessionPanel)"
-              @open-completions="openCompletionsFromPanel(workspaceSessionPanel)"
-              @input-change="handlePanelInputChange(workspaceSessionPanel, $event)"
-              @keydown="handlePanelKeydown(workspaceSessionPanel, $event)"
-              @paste="handlePanelPaste(workspaceSessionPanel, $event)"
-              @show-buffer="showBufferPanel = true"
-              @clear-buffer="clearBufferFromPanel(workspaceSessionPanel)"
-              @set-output-list="setPanelOutputList(workspaceSessionPanel, $event)"
-              @set-terminal-ref="(executionId, el, agentId) => setPanelTerminalRef(workspaceSessionPanel, executionId, el, agentId)"
-              @show-toast="showToast"
-              @context-menu="onPanelContextMenu(workspaceSessionPanel, $event)"
-            />
-            <div v-else class="workspace-session-placeholder">
-              <div class="workspace-placeholder-icon">🗂</div>
-              <div class="workspace-placeholder-title">尚未选择会话</div>
-              <div class="workspace-placeholder-text">在左侧「Agent 列表」中点击一个 Agent，即可在此查看其会话。</div>
-            </div>
-          </div>
         </template>
       </WorkspacePanel>
 
@@ -2715,10 +2587,10 @@ const splitWorkspaceContainerRef = computed(() => {
   for (const [, hostEl] of splitWorkspaceContainerRefs.value) return hostEl
   return null
 })
-// 未分割时仍由 WorkspacePanel 内部渲染并通过 expose 暴露 editorContainerRef。
-const editorContainerRef = computed(() => splitWorkspaceContainerRef.value || workspacePanelRef.value?.editorContainerRef || null)
+// 工作区恒为 pane 树：Monaco 容器一律由各 file pane 的 setSplitWorkspaceContainerRef 注册。
+const editorContainerRef = computed(() => splitWorkspaceContainerRef.value)
 // 编辑器多实例管理（类似 terminalSessions）
-const workspaceSessions = ref([])  // [{ agent_id, agent_name, tabs: [], activeTabPath: null, editorModels: new Map(), cmEditorView: null }]
+const workspaceSessions = ref([])  // [{ agent_id, agent_name, tabs: [], activeTabPath: null, editorModels: new Map() }]
 const activeWorkspaceSessionId = ref(null)  // 当前激活的编辑器会话 agent_id
 
 // 保持向后兼容的计算属性
@@ -2738,7 +2610,6 @@ const virtualWorkspaceSessions = computed(() => {
   return workspaceSessions.value.filter(s => s.agent?.virtual === true)
 })
 const editorModels = new Map() // path -> { model: ITextModel, content: string, language: string }
-let cmEditorView = null // Monaco editor instance（保留变量名以兼容既有引用）
 let workspaceFileHeartbeatTimer = null
 const isWorkspaceEditable = ref(false)  // 编辑器可编辑开关，默认只读
 const EDITOR_FILE_HEARTBEAT_INTERVAL = 3000
@@ -2758,8 +2629,14 @@ const fileSearchResults = ref([])
 const showWorkspaceSidebar = ref(true)
 // 默认展示 Agent 列表（而非文件目录树）
 const workspaceSidebarView = ref('agents')
-// 编辑器主区域视图：'file' 显示代码编辑器/diff，'chat' 显示聊天室，'terminal' 显示终端
-const workspaceMainView = ref('file')
+// 编辑器主区域视图：'file' 显示代码编辑器/diff，'chat' 显示聊天室，'terminal' 显示终端。
+// 已统一为 pane 树模型：唯一 leaf 就是主区域，故主区域视图 = 唯一 leaf 的 view（派生）。
+// 已分割时主区域语义由各 pane 承载，这里返回 'file' 以兼容历史读点。
+const workspaceMainView = computed(() => {
+  const root = workspacePaneTree.value
+  if (root && root.type === 'leaf') return root.view
+  return 'file'
+})
 
 // ===== 编辑器主工作区「自由分割」（VS Code split 同款）=====
 // 布局模型：树形节点
@@ -2959,38 +2836,8 @@ function splitWorkspacePane(paneId, direction) {
   const parent = findWorkspacePaneParent(workspacePaneTree.value, paneId)
   const target = findWorkspacePaneById(workspacePaneTree.value, paneId)
   if (!target) return
-  // 未分割时 pane 树的 leaf.view 恒为 file，会话/聊天/终端内容实际由 workspaceMainView 承载。
-  // 切分后 #main-view 会被 #pane-tree 取代（WorkspacePanel 内二者互斥），若不先把当前主视图
-  // 固化到目标 leaf，内容会「凭空消失」。故此处把 workspaceMainView 迁移到 target。
-  if (!isWorkspaceSplit.value && workspaceMainView.value !== 'file') {
-    if (workspaceMainView.value === 'session' && workspaceSessionPanelId.value) {
-      target.view = 'session'
-      target.sessionPanelId = workspaceSessionPanelId.value
-    } else if (workspaceMainView.value === 'chat' || workspaceMainView.value === 'terminal') {
-      target.view = workspaceMainView.value
-      target.sessionPanelId = null
-    }
-    workspaceMainView.value = 'file'
-  }
-  // 未分割时的 diff 由单例 workspaceDiff + gitDiffEditor 承载（leaf.view 仍是 file）。
-  // 切分后 #main-view 被 #pane-tree 取代，若不把 diff 迁移到目标 leaf，两个 pane 都会是空的。
-  if (!isWorkspaceSplit.value && workspaceDiff.value) {
-    target.view = 'diff'
-    target.sessionPanelId = null
-    target.diff = {
-      commitHash: workspaceDiff.value.commitHash,
-      filePath: workspaceDiff.value.filePath,
-      diffText: gitDiffText.value,
-      loading: false,
-      error: workspaceDiff.value.error || '',
-      truncated: Boolean(workspaceDiff.value.truncated),
-      sideBySide: workspaceDiff.value.sideBySide,
-      showFull: workspaceDiff.value.showFull,
-    }
-    // 释放单例实例与状态，避免与 pane 实例并存（同一 diff 只应有一个宿主）
-    workspaceDiff.value = null
-    disposeGitDiffEditor()
-  }
+  // 已统一为 pane 树模型：未分割时唯一 leaf 就是主区域，其 view/内容由该 leaf 承载。
+  // 切分时 target 即该 leaf，内容自然保留，无需迁移。
   // 新 pane 一律为「空」leaf：不带 file/session/chat/terminal 任何属性，
   // 用户需显式打开文件/会话才会赋予内容（避免新 pane 凭空显示文件或会话）。
   const newLeaf = createWorkspacePaneLeaf('empty')
@@ -3012,9 +2859,8 @@ function splitWorkspacePane(paneId, direction) {
     workspacePaneTabs.set(target.id, workspaceTabs.value.map(t => t.path))
     workspacePaneTabsVersion.value += 1
   }
-  // 未分割时文件内容由单实例 cmEditorView 承载，workspaceViewPanes 没有记录；
-  // 分割后每个 pane 的实例都按 workspaceViewPanes 绑定模型，若不在这里把当前文件
-  // 绑到原 pane，两个 pane 都会 setModel(null) → 都看不到文件。
+  // 首次分割时把当前打开的文件绑到原 pane 的 workspaceViewPanes；
+  // 否则两个 pane 的实例都会 setModel(null) → 都看不到文件。
   if (target.view === 'file' && !workspaceViewPanes.has(target.id)) {
     const currentPath = activeWorkspaceTabPath.value
     if (currentPath) workspaceViewPanes.set(target.id, currentPath)
@@ -3061,45 +2907,8 @@ function closeWorkspacePane(paneId) {
   if (!findWorkspacePaneById(workspacePaneTree.value, activePaneId.value)) {
     activePaneId.value = findFirstWorkspacePaneId(workspacePaneTree.value)
   }
-  // 关闭后若回到未分割（只剩一个 leaf），#pane-tree 会被 #main-view 取代，
-  // 而 workspaceMainView 在 splitWorkspacePane 时已被置为 'file'。此时必须把唯一 leaf
-  // 承载的内容迁回 workspaceMainView，否则该内容（会话/聊天/终端/diff）会「凭空消失」。
-  if (!isWorkspaceSplit.value) {
-    const only = workspacePaneTree.value
-    if (only && only.type === 'leaf') {
-      if (only.view === 'session' && only.sessionPanelId) {
-        workspaceSessionPanelId.value = only.sessionPanelId
-        workspaceMainView.value = 'session'
-      } else if (only.view === 'chat' || only.view === 'terminal') {
-        workspaceMainView.value = only.view
-      } else if (only.view === 'diff' && only.diff) {
-        workspaceDiff.value = {
-          commitHash: only.diff.commitHash,
-          filePath: only.diff.filePath,
-          loading: false,
-          error: only.diff.error || '',
-          truncated: Boolean(only.diff.truncated),
-          sideBySide: only.diff.sideBySide,
-          showFull: only.diff.showFull,
-        }
-        gitDiffText.value = only.diff.diffText || ''
-        disposeDiffEditorForPane(only.id)
-        only.diff = null
-        only.view = 'empty'
-        workspaceMainView.value = 'file'
-      } else {
-        workspaceMainView.value = 'file'
-      }
-      // 未分割态的唯一 leaf 必须归位为 'file'：未分割时内容一律由 workspaceMainView 承载，
-      // leaf.view 只是「已分割」语义下的占位。若残留 'empty'（例如关闭的正是新分割出来的空 pane），
-      // 之后再次分割会因 target.view !== 'file' 而不把当前文件绑到原 pane，导致两个 pane 全空。
-      if (only.view !== 'file') {
-        only.view = 'file'
-        only.sessionPanelId = null
-        only.diff = null
-      }
-    }
-  }
+  // 已统一为 pane 树模型：关闭后回到未分割（只剩一个 leaf）时，该 leaf 就是主区域，
+  // 其 view/内容自然保留，无需迁回 workspaceMainView。
   persistWorkspacePaneLayout()
   nextTick(() => {
     remountMonacoEditor()
@@ -3291,6 +3100,16 @@ function ensureEditorPaneForFileOpen(agentId) {
   return null
 }
 
+// 把「主区域视图」设为 view：已统一为 pane 树模型，未分割时唯一 leaf 就是主区域，
+// workspaceMainView 派生自 leaf.view，故直接改写唯一 leaf 的 view 即可。
+function setMainViewOnLeaf(view, sessionPanelId = null) {
+  const root = workspacePaneTree.value
+  if (root && root.type === 'leaf') {
+    root.view = view
+    root.sessionPanelId = view === 'session' ? sessionPanelId : null
+  }
+}
+
 // 为「打开面板视图」定位目标 pane（返回 paneId；未分割且原地打开时返回 null）：
 // 1) 当前活动区域为空 → 直接在当前区域创建（不分割）；
 // 2) 已存在承载该视图的 pane（chat/terminal 是 host 单例、session 按 panel 复用）→ 激活它；
@@ -3334,12 +3153,13 @@ function ensurePaneForView(view, sessionPanelId) {
     }
     return null
   }
-  // 未分割：当前区域已是该视图 → 原地
+  // 未分割：唯一 leaf 就是主区域，其 view 即 workspaceMainView。
+  // 当前区域已是该视图 → 原地
   if (workspaceMainView.value === view) return null
   // 未分割且主区域是「空文件视图」（未打开任何文件）→ 原地创建，不分割。
   // 否则空区域打开面板也会被分割，不符合「空则原地」的预期。
   if (workspaceMainView.value === 'file' && workspaceTabs.value.length === 0) {
-    workspaceMainView.value = view
+    setMainViewOnLeaf(view, sessionPanelId)
     return null
   }
   // 未分割且当前区域有其他内容 → 分割创建
@@ -3427,16 +3247,6 @@ function getWorkspacePaneTitle(pane) {
   // 内容区是空占位符，标题也应显示「空区域」，与 view='empty' 的语义保持一致。
   return '空区域'
 }
-
-// 未分割态标题栏用的虚拟 node：未分割时内容由 workspaceMainView 承载，
-// 而 pane 树唯一 leaf 的 view 恒为 'file'（见 closeWorkspacePane 的不变量），
-// 直接传 leaf 会导致「打开会话时标题显示为文件」。故按 workspaceMainView 构造视图信息。
-const workspaceMainViewHeaderNode = computed(() => ({
-  type: 'leaf',
-  id: workspacePaneTree.value?.id || 'pane-root',
-  view: workspaceMainView.value,
-  sessionPanelId: workspaceSessionPanelId.value,
-}))
 
 // pane 状态文案（原顶部工具栏的状态提示，现随 pane 标题栏展示）：
 // 只对 file pane 有意义——取该 pane 自己绑定的文件对应的标签状态。
@@ -4302,7 +4112,6 @@ const EDITOR_TAB_SIZE = 4
 const editorViews = new Map()  // paneId -> monaco editor instance
 const workspaceViewPanes = new Map()  // paneId -> 该 pane 当前绑定的文件 path
 // 自由分割：每个 diff pane 一个独立 Monaco DiffEditor 实例（paneId -> { editor, originalModel, modifiedModel, oldText, newText }）。
-// 与未分割时的单例 gitDiffEditor 并存：未分割走单例路径，已分割走这里（多实例，互不干扰）。
 const diffEditorViews = new Map()
 const diffContainerRefs = ref(new Map())  // paneId -> 容器元素
 function setDiffContainerRef(paneId, el) {
@@ -4637,13 +4446,7 @@ function applyEditorViewModel(paneId, view) {
 }
 
 // 未分割时，Monaco 容器由 WorkspacePanel 内部渲染（editorContainerRef），沿用单实例路径。
-function ensureSingleMonacoEditor() {
-  if (cmEditorView || !editorContainerRef.value) return
-  cmEditorView = monaco.editor.create(editorContainerRef.value, buildEditorOptions())
-  bindWorkspaceViewEvents(cmEditorView)
-}
-
-// 已分割时，为每个 file pane 的容器建立/复用实例；容器集合变化时才创建或销毁。
+// 为每个 file pane 的容器建立/复用实例；容器集合变化时才创建或销毁。
 // 关键：ref 回调拿到的元素可能是「渲染中间态」元素（Vue 随后会替换掉它），把实例建在
 // 这种脱离文档的元素上会导致编辑器 DOM 永久悬空（容器里看不到编辑器）。因此这里不直接
 // 使用 ref 元素，而是按 data-pane-id 从文档中解析「当前真实挂载」的容器。
@@ -4688,11 +4491,7 @@ function ensureSplitMonacoEditors() {
 }
 
 function ensureMonacoEditor() {
-  if (isWorkspaceSplit.value) {
-    ensureSplitMonacoEditors()
-    return
-  }
-  ensureSingleMonacoEditor()
+  ensureSplitMonacoEditors()
 }
 
 // 每次 DOM 提交后（激活 pane / 分割树变化 / 标签变化）都重新补齐一次实例：
@@ -4701,7 +4500,7 @@ function ensureMonacoEditor() {
 watch(
   [activePaneId, workspacePaneTree, () => workspaceTabs.value.length, activeWorkspaceTabPath],
   () => {
-    if (isWorkspaceSplit.value) scheduleWorkspaceLayout()
+    scheduleWorkspaceLayout()
   },
   { flush: 'post', immediate: true },
 )
@@ -4722,7 +4521,7 @@ function scheduleWorkspaceLayout() {
   requestAnimationFrame(() => {
     workspaceLayoutScheduled = false
     layoutMonacoEditor()
-    if (isWorkspaceSplit.value && workspaceLayoutRetries < EDITOR_LAYOUT_MAX_RETRIES) {
+    if (workspaceLayoutRetries < EDITOR_LAYOUT_MAX_RETRIES) {
       const pending = [...splitWorkspaceContainerRefs.value.keys()].some((paneId) => {
         const container = resolveSplitWorkspaceContainer(paneId)
         if (!container) return false
@@ -4740,44 +4539,18 @@ function scheduleWorkspaceLayout() {
 }
 
 function layoutMonacoEditor() {
-  if (isWorkspaceSplit.value) {
-    ensureSplitMonacoEditors()
-    for (const [, view] of editorViews) {
-      if (view.getContainerDomNode?.()?.isConnected) view.layout()
-    }
-    return
+  ensureSplitMonacoEditors()
+  for (const [, view] of editorViews) {
+    if (view.getContainerDomNode?.()?.isConnected) view.layout()
   }
-  if (!cmEditorView) return
-  // 容器可能已被替换（如自由分割收起、主区域切走再切回文件视图）：旧视图仍挂在
-  // 已脱离文档的 DOM 上，此时 layout() 无效且内容不可见，需重建视图再排布。
-  const container = editorContainerRef.value
-  const domNode = cmEditorView.getDomNode?.()
-  if (container && (!domNode || !domNode.isConnected || domNode.parentElement !== container)) {
-    remountMonacoEditor()
-    return
-  }
-  cmEditorView.layout()
 }
 
 // 自由分割：Monaco 视图绑定在具体 DOM 容器上，分割/激活/关闭 pane 时容器会被替换，
 // 旧容器随 DOM 卸载后视图即失效。此处在容器变化后重建视图并恢复当前标签。
 // 说明：模型（editorModels）与内容不受影响，仅重建视图层。
 function remountMonacoEditor() {
-  if (isWorkspaceSplit.value) {
-    // 已分割：按容器集合差分补齐/复用实例（容器未变则复用，不会重建）
-    ensureSplitMonacoEditors()
-    return
-  }
-  if (!editorContainerRef.value) return
-  const currentPath = activeWorkspaceTabPath.value
-  if (cmEditorView) {
-    cmEditorView.dispose()
-    cmEditorView = null
-  }
-  ensureSingleMonacoEditor()
-  if (currentPath && cmEditorView) {
-    activateWorkspaceTab(currentPath)
-  }
+  // 按容器集合差分补齐/复用实例（容器未变则复用，不会重建）
+  ensureSplitMonacoEditors()
 }
 
 // 保存当前编辑器（激活 pane / 单实例）正在显示的文件的 view state（光标位置、滚动位置、选区、折叠）。
@@ -4787,7 +4560,7 @@ function saveCurrentEditorViewState() {
   if (!currentPath) return
   const modelData = editorModels.get(currentPath)
   if (!modelData) return
-  const view = isWorkspaceSplit.value ? editorViews.get(activePaneId.value) : cmEditorView
+  const view = editorViews.get(activePaneId.value)
   // 无 model 时 saveViewState 返回空状态，会覆盖已保存的 viewState（如 remountMonacoEditor 重建视图后）
   if (!view || !view.getModel()) return
   modelData.viewState = view.saveViewState()
@@ -4814,29 +4587,19 @@ function activateWorkspaceTab(path) {
     model.__jarvisPath = path
     modelData.model = model
   }
-  if (isWorkspaceSplit.value) {
-    // 只把「激活 pane」绑定到该文件；其他 pane 保持各自内容（新 pane 为空）
-    ensureSplitMonacoEditors()
-    const activeView = editorViews.get(activePaneId.value)
-    if (activeView) {
-      // 该文件登记到激活 pane 的标签列表（点击标签/打开文件都走这里）
-      addPaneTab(activePaneId.value, path)
-      workspaceViewPanes.set(activePaneId.value, path)
-      if (activeView.getModel() !== model) activeView.setModel(model)
-      restoreEditorViewState(activeView, path)
-      activeView.updateOptions({ readOnly: !isWorkspaceEditable.value })
-      nextTick(() => {
-        scheduleWorkspaceLayout()
-        activeView.focus()
-      })
-    }
-  } else if (cmEditorView) {
-    cmEditorView.setModel(model)
-    restoreEditorViewState(cmEditorView, path)
-    cmEditorView.updateOptions({ readOnly: !isWorkspaceEditable.value })
+  // 只把「激活 pane」绑定到该文件；其他 pane 保持各自内容（新 pane 为空）
+  ensureSplitMonacoEditors()
+  const activeView = editorViews.get(activePaneId.value)
+  if (activeView) {
+    // 该文件登记到激活 pane 的标签列表（点击标签/打开文件都走这里）
+    addPaneTab(activePaneId.value, path)
+    workspaceViewPanes.set(activePaneId.value, path)
+    if (activeView.getModel() !== model) activeView.setModel(model)
+    restoreEditorViewState(activeView, path)
+    activeView.updateOptions({ readOnly: !isWorkspaceEditable.value })
     nextTick(() => {
-      layoutMonacoEditor()
-      cmEditorView.focus()
+      scheduleWorkspaceLayout()
+      activeView.focus()
     })
   }
   // 模型就绪后尝试接入 LSP（失败静默降级，不影响编辑器）
@@ -5100,7 +4863,7 @@ function setWorkspaceMainView(view) {
   if (view === 'file') {
     // 未分割切回文件视图：原地切换并重排 Monaco
     if (workspaceMainView.value !== 'file') {
-      workspaceMainView.value = 'file'
+      setMainViewOnLeaf('file')
     }
     nextTick(() => {
       layoutMonacoEditor()
@@ -5125,12 +4888,12 @@ function showWorkspaceHostView(view) {
   setWorkspaceMainView(view)
 }
 
-// 让主区域回到「文件视图」（打开文件 / 打开 diff 时调用）。
+// 让主区域回到「文件视图」（打开文件时调用）。
 // 主区域的 file/chat/terminal/session 四种内容是互斥的，打开文件类内容必须先切回文件视图，
-// 否则会被 chat/terminal/session 内容挡住（workspaceMainView 与 workspaceDiff 状态需协调）。
+// 否则会被 chat/terminal/session 内容挡住。
 function showWorkspaceFileView() {
   if (workspaceMainView.value !== 'file') {
-    workspaceMainView.value = 'file'
+    setMainViewOnLeaf('file')
   }
   // 切回后容器尺寸可能变化，重排 Monaco（含 diff），确保内容正确渲染
   nextTick(() => {
@@ -5424,11 +5187,6 @@ async function openWorkspaceFile(path, agentId = null) {
   if (!targetPaneId) {
     showWorkspaceFileView()
   }
-  // 打开文件意味着退出 diff 模式：否则 file 视图会优先渲染残留的 diff，
-  // 用户点了文件却看不到文件内容。
-  if (workspaceDiff.value) {
-    closeWorkspaceDiff()
-  }
 
   const existingTab = getWorkspaceTabByPath(path)
   if (existingTab) {
@@ -5502,12 +5260,6 @@ async function openWorkspaceFile(path, agentId = null) {
       await new Promise(resolve => setTimeout(resolve, 50))
       retryCount++
     }
-    // 如果编辑器实例已不在 DOM 中（tabs 从空变为非空时 v-else 重建了容器），
-    // 需要销毁旧实例并重新创建，否则编辑器无法挂载到新容器。
-    if (cmEditorView && !cmEditorView.getDomNode()?.isConnected) {
-      cmEditorView.dispose()
-      cmEditorView = null
-    }
     ensureMonacoEditor()
     activateWorkspaceTab(path)
   } catch (error) {
@@ -5568,9 +5320,6 @@ async function savePaneWorkspaceFile(paneId) {
 
 function toggleWorkspaceEditable() {
   isWorkspaceEditable.value = !isWorkspaceEditable.value
-  if (cmEditorView) {
-    cmEditorView.updateOptions({ readOnly: !isWorkspaceEditable.value })
-  }
   for (const [, view] of editorViews) {
     view.updateOptions({ readOnly: !isWorkspaceEditable.value })
   }
@@ -5597,7 +5346,7 @@ function confirmCloseWorkspacePanel() {
 function resetWorkspaceHostedPanelState() {
   if (workspaceHostsTerminal.value) showTerminalPanel.value = false
   if (workspaceHostsChat.value) showChatPanel.value = false
-  workspaceMainView.value = 'file'
+  setMainViewOnLeaf('file')
   // 关闭编辑器时一并收起自由分割，避免下次打开残留多 pane 布局
   if (isWorkspaceSplit.value) collapseWorkspacePanes()
   // 内嵌会话 Panel 只在编辑器内部渲染：编辑器关闭后它们失去宿主，
@@ -5627,9 +5376,6 @@ async function closeWorkspacePanel() {
 
   hideWorkspaceHostedPanelState()
   showWorkspacePanel.value = false
-  // 面板收起后 Git diff 容器随之销毁，释放 Monaco diff 实例；但保留 workspaceDiff 数据，
-  // 再次打开编辑器时按该数据重新渲染，恢复关闭前的 diff 视图。
-  disposeGitDiffEditor()
 }
 
 // 为 Agent 创建/打开编辑器会话
@@ -5653,7 +5399,6 @@ function createWorkspaceForAgent(agent) {
       tabs: [],
       activeTabPath: null,
       editorModels: new Map(),
-      cmEditorView: null,
       isEditable: false,
       showSidebar: true,
       sidebarView: 'files'
@@ -5746,7 +5491,6 @@ function ensureVirtualWorkspaceSession(nodeId, dirPath) {
       tabs: [],
       activeTabPath: null,
       editorModels: new Map(),
-      cmEditorView: null,
       isEditable: false,
       showSidebar: true,
       sidebarView: 'files'
@@ -5797,12 +5541,8 @@ function removeWorkspaceDir(agentId) {
   }
   if (selectedAgentId.value === agentId) selectedAgentId.value = null
 
-  // 释放编辑器模型与实例
+  // 释放编辑器模型
   session.editorModels?.clear()
-  if (session.cmEditorView) {
-    session.cmEditorView.dispose()
-    session.cmEditorView = null
-  }
 
   workspaceSessions.value.splice(index, 1)
   // 若移除的是当前激活会话，切到剩余的第一个会话；没有则清空激活态。
@@ -5858,12 +5598,6 @@ async function closeWorkspaceSession(agentId) {
 
   // 清理编辑器模型
   session.editorModels.clear()
-
-  // 清理 Monaco 编辑器
-  if (session.cmEditorView) {
-    session.cmEditorView.dispose()
-    session.cmEditorView = null
-  }
 
   // 从数组中移除
   workspaceSessions.value.splice(sessionIndex, 1)
@@ -5968,9 +5702,6 @@ async function closeWorkspaceTab(path, paneId = null, skipDirtyConfirm = false) 
       // 否则 v-if/v-else 切换会导致 editorContainerRef 消失，
       // 后续打开文件时无法重新创建编辑器。
       // 仅清空模型即可（所有 pane 的实例一并清空）。
-      if (cmEditorView) {
-        cmEditorView.setModel(null)
-      }
       for (const [pid, view] of editorViews) {
         view.setModel(null)
         workspaceViewPanes.delete(pid)
@@ -6153,8 +5884,6 @@ const gitDiffText = ref('')
 const gitDiffLoading = ref(false)
 const gitDiffError = ref('')
 const gitDiffTruncated = ref(false)
-// 主区域 diff 视图状态（非空时编辑器主区域显示 diff，而非文件内容）
-const workspaceDiff = ref(null)
 // Monaco DiffEditor：并排/内联切换（桌面默认并排；移动端屏幕窄，默认内联）
 const gitDiffSideBySide = ref(window.innerWidth > 768)
 // diff 显示范围：false=只显示变更上下文区域（默认），true=显示文件全文
@@ -6267,8 +5996,6 @@ async function refreshGitView() {
   gitSelectedFile.value = null
   gitDiffText.value = ''
   gitDiffError.value = ''
-  workspaceDiff.value = null
-  disposeGitDiffEditor()
   await Promise.all([fetchGitLog(false), fetchGitBranches()])
 }
 
@@ -6279,8 +6006,6 @@ async function toggleGitCommitDetail(commit) {
     gitCommitFiles.value = []
     gitSelectedFile.value = null
     gitDiffText.value = ''
-    workspaceDiff.value = null
-    disposeGitDiffEditor()
     return
   }
   gitSelectedCommit.value = commit.hash
@@ -6288,8 +6013,6 @@ async function toggleGitCommitDetail(commit) {
   gitSelectedFile.value = null
   gitDiffText.value = ''
   gitDiffError.value = ''
-  workspaceDiff.value = null
-  disposeGitDiffEditor()
   const workingDir = getGitWorkingDir()
   if (!workingDir) return
   gitCommitDetailLoading.value = true
@@ -6331,44 +6054,17 @@ async function viewGitFileDiff(commitHash, filePath) {
     await loadDiffForPane(pane.id, commitHash, filePath)
     return
   }
-  // 未分割且当前区域为空文件视图（ensurePaneForView 原地创建，未分割）：沿用原有单例路径。
-  // diff 属于「文件视图」：若主区域当前停在 chat/terminal/session，需先切回文件视图，
-  // 否则 diff 会被这些内容挡住（workspaceMainView 与 workspaceDiff 两个状态需协调）。
-  showWorkspaceFileView()
-  // 切到主区域显示 diff（侧栏只保留文件列表）
-  workspaceDiff.value = {
-    commitHash,
-    filePath,
-    loading: true,
-    error: '',
-    truncated: false,
-    sideBySide: gitDiffSideBySide.value,
-    showFull: gitDiffShowFull.value,
-  }
-  try {
-    // 仅请求 diff 文本；全文（父版本/当前版本）在用户点击「全文」时再懒加载
-    const diffData = await callGitApi('git/diff', { path: workingDir, hash: commitHash, file: filePath })
-    gitDiffText.value = diffData.diff || ''
-    gitDiffTruncated.value = Boolean(diffData.truncated)
-    // 若当前处于「全文」模式（全局开关），则同时懒加载两侧全文，保证行号为绝对行号
-    if (gitDiffShowFull.value) {
-      const entry = await ensureGitDiffFullText(commitHash, filePath)
-      if (entry) gitDiffTruncated.value = Boolean(gitDiffTruncated.value || entry.truncated)
-    }
-    if (workspaceDiff.value) {
-      workspaceDiff.value.truncated = gitDiffTruncated.value
-      workspaceDiff.value.loading = false
-    }
-    await nextTick()
-    await renderGitDiffMonaco(filePath)
-  } catch (error) {
-    gitDiffError.value = error.message || '获取 diff 失败'
-    if (workspaceDiff.value) {
-      workspaceDiff.value.loading = false
-      workspaceDiff.value.error = gitDiffError.value
-    }
-  } finally {
+  // 未分割且原地创建（ensurePaneForView 返回 null）：唯一 leaf 就是主区域，
+  // diff 已承载到该 leaf，统一走 pane 路径。
+  const root = workspacePaneTree.value
+  if (root && root.type === 'leaf') {
+    disposeDiffEditorForPane(root.id)
+    root.view = 'diff'
+    root.sessionPanelId = null
+    persistWorkspacePaneLayout()
     gitDiffLoading.value = false
+    await loadDiffForPane(root.id, commitHash, filePath)
+    return
   }
 }
 
@@ -6401,215 +6097,12 @@ async function ensureGitDiffFullText(commitHash, filePath) {
   return entry
 }
 
-// 关闭主区域 diff 视图，回到文件内容
-function closeWorkspaceDiff() {
-  workspaceDiff.value = null
-  gitSelectedFile.value = null
-  disposeGitDiffEditor()
-  nextTick(() => layoutMonacoEditor())
-}
-
-// ===== Git diff 的 Monaco DiffEditor（只读）=====
-// 说明：优先使用「父版本全文 / 当前版本全文」两份完整文件渲染，
-// 这样行号即文件绝对行号；若全文不可得则降级为解析 unified diff。
-// 实例独立于主编辑器 cmEditorView。
-const gitDiffContainerRef = computed(() => workspacePanelRef.value?.diffContainerRef || null)
-let gitDiffEditor = null
-let gitDiffOriginalModel = null
-let gitDiffModifiedModel = null
 // 两侧全文（由 git/file-content 提供）
 let gitDiffOldText = ''
 let gitDiffNewText = ''
 
-// 释放当前 diff 的两个 model（编辑器实例复用，不销毁）
-function disposeGitDiffModels() {
-  if (gitDiffOriginalModel && !gitDiffOriginalModel.isDisposed()) gitDiffOriginalModel.dispose()
-  if (gitDiffModifiedModel && !gitDiffModifiedModel.isDisposed()) gitDiffModifiedModel.dispose()
-  gitDiffOriginalModel = null
-  gitDiffModifiedModel = null
-}
-
-// 彻底释放 diff 编辑器（模板 v-if 收起或组件卸载时调用）
-function disposeGitDiffEditor() {
-  disposeGitDiffModels()
-  gitDiffOldText = ''
-  gitDiffNewText = ''
-  gitDiffFullTextCache.clear()
-  if (gitDiffEditor) {
-    gitDiffEditor.dispose()
-    gitDiffEditor = null
-  }
-}
-
-// 确保 diff 编辑器实例存在（复用，不重复创建）
-function ensureGitDiffEditor() {
-  const container = gitDiffContainerRef.value
-  if (!container) return
-  // 切换文件时 loading 态会让容器被 v-if 卸载，随后重建为新的 DOM 节点；
-  // 旧实例仍挂在已脱离文档的旧节点上，必须销毁重建，否则渲染不可见。
-  if (gitDiffEditor && gitDiffEditor.getContainerDomNode() !== container) {
-    disposeGitDiffModels()
-    gitDiffEditor.dispose()
-    gitDiffEditor = null
-  }
-  if (gitDiffEditor) return
-  gitDiffEditor = monaco.editor.createDiffEditor(container, {
-    theme: 'blueDark',
-    fontFamily: EDITOR_FONT_FAMILY,
-    fontSize: 12,
-    lineHeight: 18,
-    readOnly: true,
-    originalEditable: false,
-    automaticLayout: true,
-    renderSideBySide: gitDiffSideBySide.value && !isNarrowGitDiffViewport(),
-    // 侧栏很窄，Monaco 默认会在空间不足时强制切到内联视图，
-    // 导致「并排」按钮点了没效果，因此桌面端显式关闭该自动降级；
-    // 移动端屏幕窄，反而需要它兜底（用户仍可手动切回并排）。
-    useInlineViewWhenSpaceIsLimited: isNarrowGitDiffViewport(),
-    // 侧栏较窄，关掉 minimap 与多余装饰，避免挤压内容
-    minimap: { enabled: false },
-    scrollBeyondLastLine: false,
-    renderOverviewRuler: false,
-    renderWhitespace: 'selection',
-    smoothScrolling: true,
-    folding: false,
-    lineNumbersMinChars: 3,
-    // 窄屏内联 diff 若关闭换行，长行会横向溢出导致内容看不全，故移动端开启自动换行
-    wordWrap: isNarrowGitDiffViewport() ? 'on' : 'off',
-  })
-}
-
-// 用当前两侧全文渲染 diff（容器未就绪时轮询等待；失败给出可见错误）
-async function renderGitDiffMonaco(filePath) {
-  // 主区域容器由 v-if 控制，切换后需等一帧；仍不可得则轮询等待（最多 500ms）
-  let container = gitDiffContainerRef.value
-  for (let i = 0; !container && i < 10; i++) {
-    await new Promise(resolve => setTimeout(resolve, 50))
-    container = gitDiffContainerRef.value
-  }
-  if (!container) {
-    const message = 'diff 容器未就绪，请重试'
-    gitDiffError.value = message
-    if (workspaceDiff.value) workspaceDiff.value.error = message
-    return
-  }
-  try {
-    ensureGitDiffEditor()
-    if (!gitDiffEditor) return
-    const language = getLanguageExtension(getLanguageFromFilename(filePath))
-    // 优先用全文（绝对行号）；全文缺失时降级解析 unified diff
-    let oldText = gitDiffOldText
-    let newText = gitDiffNewText
-    if (!oldText && !newText) {
-      const parsed = parseUnifiedDiff(gitDiffText.value, { absoluteLineNumbers: true })
-      oldText = parsed.oldText
-      newText = parsed.newText
-    }
-    // 默认只显示变更上下文区域：丢弃 hunk 之间的未变更代码，避免大段空白
-    if (!gitDiffShowFull.value && gitDiffText.value) {
-      const context = extractDiffContext(gitDiffText.value)
-      if (context.oldText || context.newText) {
-        oldText = context.oldText
-        newText = context.newText
-      }
-    }
-    disposeGitDiffModels()
-    gitDiffOriginalModel = monaco.editor.createModel(oldText, language)
-    gitDiffModifiedModel = monaco.editor.createModel(newText, language)
-    gitDiffEditor.setModel({ original: gitDiffOriginalModel, modified: gitDiffModifiedModel })
-    gitDiffEditor.updateOptions({ renderSideBySide: gitDiffSideBySide.value && !isNarrowGitDiffViewport() })
-    gitDiffEditor.layout()
-  } catch (error) {
-    console.warn('[GIT] render diff with monaco failed:', error)
-    const message = `diff 渲染失败：${error?.message || error}`
-    gitDiffError.value = message
-    if (workspaceDiff.value) workspaceDiff.value.error = message
-  }
-}
-
-// 并排 / 内联切换
-function toggleGitDiffSideBySide() {
-  gitDiffSideBySide.value = !gitDiffSideBySide.value
-  if (workspaceDiff.value) workspaceDiff.value.sideBySide = gitDiffSideBySide.value
-  if (gitDiffEditor) {
-    gitDiffEditor.updateOptions({ renderSideBySide: gitDiffSideBySide.value && !isNarrowGitDiffViewport() })
-  }
-}
-
-// 全文 / 仅变更上下文区域切换（默认仅上下文）
-async function toggleGitDiffShowFull() {
-  gitDiffShowFull.value = !gitDiffShowFull.value
-  if (workspaceDiff.value) workspaceDiff.value.showFull = gitDiffShowFull.value
-  if (!workspaceDiff.value?.filePath) return
-  // 切到「全文」时按需拉取两侧全文（首次较慢，之后走缓存）
-  if (gitDiffShowFull.value) {
-    const { commitHash, filePath } = workspaceDiff.value
-    const key = `${commitHash}|${filePath}`
-    if (!gitDiffFullTextCache.has(key)) {
-      workspaceDiff.value.loading = true
-      try {
-        const entry = await ensureGitDiffFullText(commitHash, filePath)
-        if (entry) {
-          gitDiffTruncated.value = Boolean(gitDiffTruncated.value || entry.truncated)
-          workspaceDiff.value.truncated = gitDiffTruncated.value
-        }
-      } catch (error) {
-        gitDiffError.value = error.message || '获取文件全文失败'
-        workspaceDiff.value.error = gitDiffError.value
-        workspaceDiff.value.loading = false
-        return
-      } finally {
-        if (workspaceDiff.value) workspaceDiff.value.loading = false
-      }
-    } else {
-      await ensureGitDiffFullText(commitHash, filePath)
-    }
-    await nextTick()
-  }
-  await renderGitDiffMonaco(workspaceDiff.value.filePath)
-}
-
-// 跳转到上一个 / 下一个差异（Monaco DiffEditor 内置导航）
-// direction: 'prev' | 'next'
-function navigateGitDiff(direction) {
-  if (!gitDiffEditor) return
-  const target = direction === 'prev' ? 'previous' : 'next'
-  // 优先使用 Monaco 内置导航（会同时滚动 original/modified 两侧）
-  if (typeof gitDiffEditor.goToDiff === 'function') {
-    gitDiffEditor.goToDiff(target)
-    return
-  }
-  // 兜底：老版本 Monaco 无 goToDiff 时，按变更块行号自行定位
-  const changes = gitDiffEditor.getLineChanges?.() || []
-  if (!changes.length) return
-  const modifiedEditor = gitDiffEditor.getModifiedEditor?.()
-  const originalEditor = gitDiffEditor.getOriginalEditor?.()
-  const visibleTop = Math.min(
-    modifiedEditor?.getVisibleRanges?.()[0]?.startLineNumber ?? Number.MAX_SAFE_INTEGER,
-    originalEditor?.getVisibleRanges?.()[0]?.startLineNumber ?? Number.MAX_SAFE_INTEGER,
-  )
-  const anchors = changes
-    .map(change => ({
-      line: change.modifiedStartLineNumber || change.originalStartLineNumber || 0,
-    }))
-    .filter(item => item.line > 0)
-    .sort((a, b) => a.line - b.line)
-  if (!anchors.length) return
-  let anchor = null
-  if (direction === 'next') {
-    anchor = anchors.find(item => item.line > visibleTop) || anchors[0]
-  } else {
-    const before = anchors.filter(item => item.line < visibleTop)
-    anchor = before.length ? before[before.length - 1] : anchors[anchors.length - 1]
-  }
-  if (!anchor) return
-  modifiedEditor?.revealLineInCenterIfOutsideViewport?.(anchor.line)
-  originalEditor?.revealLineInCenterIfOutsideViewport?.(anchor.line)
-}
-
 // 侧栏尺寸/视图变化时重排（复用主编辑器的 layout 时机）
 function layoutGitDiffEditor() {
-  if (gitDiffEditor) gitDiffEditor.layout()
   for (const [, entry] of diffEditorViews) {
     if (entry.editor && entry.editor.getContainerDomNode?.()?.isConnected) entry.editor.layout()
   }
@@ -6617,7 +6110,6 @@ function layoutGitDiffEditor() {
 
 // ===== 自由分割：diff pane 的多实例管理 =====
 // 每个 diff pane 一个独立 Monaco DiffEditor；diff 数据挂在 leaf.diff 上（commitHash/filePath/loading/error/truncated/sideBySide/showFull）。
-// 与未分割时的单例路径完全隔离：这里只操作 diffEditorViews，不碰 gitDiffEditor / workspaceDiff。
 
 // 释放某个 diff pane 的实例与 model
 function disposeDiffEditorForPane(paneId) {
@@ -7965,7 +7457,7 @@ function closePanel(panelId) {
         persistWorkspacePaneLayout()
       }
     } else if (workspaceMainView.value === 'session') {
-      workspaceMainView.value = 'file'
+      setMainViewOnLeaf('file')
     }
   }
   // 如果关闭的是当前激活的 Panel，激活相邻 Panel
@@ -9764,7 +9256,6 @@ function closeFocusedPanel() {
     // 与 closeWorkspacePanel 一致：关闭只是隐藏，保留状态以便再次打开时恢复
     hideWorkspaceHostedPanelState()
     showWorkspacePanel.value = false
-    disposeGitDiffEditor()
   } else if (key === 'chat') {
     showChatPanel.value = false
   } else if (key.startsWith('session:')) {
@@ -19128,11 +18619,6 @@ watch(showWorkspacePanel, async (visible) => {
       activateWorkspaceTab(activeWorkspaceTabPath.value)
     }
     nextTick(() => layoutMonacoEditor())
-    // 关闭编辑器只是隐藏：diff 数据被保留，容器重建后按原数据重新渲染，
-    // 恢复关闭前的 diff 视图（实例已在关闭时释放）。
-    if (workspaceDiff.value?.filePath && !workspaceDiff.value.loading) {
-      nextTick(() => renderGitDiffMonaco(workspaceDiff.value.filePath))
-    }
   } else {
     stopWorkspacePanelInteraction()
   }
@@ -19450,14 +18936,6 @@ onMounted(() => {
     if (!isWorkspaceSplit.value) {
       layoutMonacoEditor()
     }
-    // 视口跨过移动端断点时，diff 的并排/内联需重新应用（Monaco 不会自动跟随）
-    if (gitDiffEditor) {
-      gitDiffEditor.updateOptions({
-        renderSideBySide: gitDiffSideBySide.value && !isNarrowGitDiffViewport(),
-        wordWrap: isNarrowGitDiffViewport() ? 'on' : 'off',
-      })
-      gitDiffEditor.layout()
-    }
 
     const activeSession = terminalSessions.value.find(session => session.terminal_id === activeTerminalId.value)
     if (activeSession && activeSession.fitAddon && activeSession.terminal) {
@@ -19547,10 +19025,6 @@ onUnmounted(() => {
   stopLocalDaemonProbe()
   window.visualViewport?.removeEventListener('resize', visualViewportResizeHandler)
 
-  if (cmEditorView) {
-    cmEditorView.dispose()
-    cmEditorView = null
-  }
   for (const [, view] of editorViews) {
     view.dispose()
   }
@@ -19562,8 +19036,6 @@ onUnmounted(() => {
     }
   }
   editorModels.clear()
-  // 释放 Git diff 的 Monaco 实例
-  disposeGitDiffEditor()
   // 释放全部 LSP 连接，避免 WS 泄漏
   disposeAllLspClients()
   lspBindings.clear()
