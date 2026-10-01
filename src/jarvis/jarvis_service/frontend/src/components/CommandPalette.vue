@@ -26,7 +26,7 @@
                 v-for="entry in g.actions"
                 :key="entry.action.id"
                 class="cmd-item"
-                :class="{ 'is-active': entry.flatIndex === activeIndex, 'is-disabled': entry.disabled }"
+                :class="{ 'is-active': entry.flatIndex === activeIndex, 'is-disabled': entry.disabled, 'agent-running': entry.action.statusClass === 'running', 'agent-stopped': entry.action.statusClass === 'stopped' }"
                 :disabled="entry.disabled"
                 :ref="el => setItemRef(el, entry.flatIndex)"
                 @click="run(entry.action)"
@@ -140,8 +140,9 @@ const emptyText = computed(() => {
   return '无匹配命令'
 })
 
-// Agent 类型图标：code_agent 用 💻，普通 agent（agent）用 🤖，其余兜底 🤖。
-// 与大厅/树节点的 Agent 图标约定保持一致（App.vue 中 agent_type === 'agent' ? '🤖' : code_agent ? '💻'）。
+// Agent 图标：仅按类型区分（code_agent 💻 / 普通 agent 🤖），与大厅/树节点约定一致
+// （App.vue: agent_type === 'agent' ? '🤖' : code_agent ? '💻'）。
+// 运行状态用颜色区分（见 agentEntries 的 statusClass 与 .cmd-item-ico 的颜色样式）。
 function agentTypeIcon(agent) {
   return agent?.agent_type === 'code_agent' ? '💻' : '🤖'
 }
@@ -183,6 +184,8 @@ const agentEntries = computed(() => {
         en: agent?.agent_id,
         group: '切换 Agent',
         icon: agentTypeIcon(agent),
+        // 运行状态：用于图标颜色区分（运行中暗绿 / 非运行暗红），与排序的 isRunning 一致
+        statusClass: isRunning(agent) ? 'running' : 'stopped',
         keywords: [nodeLabel],
         meta: metaParts.join('   '),
         // 所有 Agent 都可选：可见的切过去（激活），不可见的在当前区域创建 Panel 并打开。
@@ -490,6 +493,20 @@ defineExpose({ focus: () => inputEl.value?.focus() })
   text-align: center;
   font-size: 14px;
   flex: none;
+}
+
+/* Agent 运行状态的整体颜色区分：运行中暗绿、非运行暗红（作用于整个列表项文字，
+   含标题与 meta/en 副文本，避免被 .cmd-item-meta/.cmd-item-en 的次级颜色覆盖） */
+.cmd-item.agent-running,
+.cmd-item.agent-running .cmd-item-meta,
+.cmd-item.agent-running .cmd-item-en {
+  color: #4a9a6a;
+}
+
+.cmd-item.agent-stopped,
+.cmd-item.agent-stopped .cmd-item-meta,
+.cmd-item.agent-stopped .cmd-item-en {
+  color: #b0574f;
 }
 
 .cmd-item-label {
