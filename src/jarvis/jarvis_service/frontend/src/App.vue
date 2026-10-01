@@ -4475,21 +4475,44 @@ async function jumpToDefinition(ed) {
   const result = await getDefinition(model, position)
   const target = pickFirstDefinitionTarget(result)
   if (!target || !target.path) return
-  // 目标文件已打开则直接激活，否则打开（复用现有入口：建会话/加载内容/激活标签）
-  if (!editorModels.has(target.path)) {
-    await openWorkspaceFile(target.path)
+  await revealInWorkspace(target.path, target.line, target.column)
+}
+
+// 在工作区中打开（或激活）目标文件并定位到指定行列。
+// 供 F12 跳转定义与 peek 双击跳转（registerEditorOpener）复用。
+async function revealInWorkspace(path, line, column) {
+  if (!path) return
+  // 判断是否已作为标签打开（而非 editorModels 是否有 model——ensureModelForUri
+  // 会预加载跨文件 model 但未建标签，若据此判断会误走 activateWorkspaceTab，
+  // 导致不新建标签、只把当前缓冲区替换为目标文件内容）。
+  // 有 tab 则激活，否则 openWorkspaceFile 新建标签并激活。
+  if (!getWorkspaceTabByPath(path)) {
+    await openWorkspaceFile(path)
   } else {
-    activateWorkspaceTab(target.path)
+    activateWorkspaceTab(path)
   }
   await nextTick()
   const view = getActiveWorkspaceView()
   if (!view) return
-  view.revealLineInCenter(target.line)
-  view.setPosition({ lineNumber: target.line, column: target.column })
+  view.revealLineInCenter(line)
+  view.setPosition({ lineNumber: line, column })
   view.focus()
 }
 
-// 把某个 pane 的实例绑定到它自己记录的文件；无文件则保持空编辑器（新 pane 为空）
+// 注册 Monaco 资源 opener：当 Monaco 需要打开当前 model 之外的资源时（如 peek
+// definition 窗口双击内容跳转、go-to-definition），回调这里。默认行为对未加载的
+// model 什么都不做，故必须自行打开目标文件并定位，否则 peek 双击无法跳转。
+// 返回 true 表示已处理，Monaco 不再走默认逻辑。
+monaco.editor.registerEditorOpener({
+  openCodeEditor: async (source, resource, selectionOrPosition) => {
+    const path = lspUriToPath(resource?.toString?.() || '')
+    if (!path) return false
+    const line = selectionOrPosition?.startLineNumber ?? selectionOrPosition?.lineNumber ?? 1
+    const column = selectionOrPosition?.startColumn ?? selectionOrPosition?.column ?? 1
+    await revealInWorkspace(path, line, column)
+    return true
+  },
+})
 function applyEditorViewModel(paneId, view) {
   const path = workspaceViewPanes.get(paneId)
   if (!path) {
