@@ -181,7 +181,7 @@ async function connectLspClient({ spec, workspaceRoot, deps }) {
   client.notify("initialized", {});
 
   // 按服务器能力注册语言特性 provider
-  registerLanguageFeatures(spec, capabilities || {});
+  registerLanguageFeatures(spec, capabilities || {}, deps);
   return client;
 }
 
@@ -280,11 +280,34 @@ function toMonacoSeverity(severity) {
  * 按服务器能力注册 hover / completion provider（每个语言只注册一次）。
  * provider 通过 `monaco.languages.registerXxxProvider(语言, ...)` 天然按语言隔离。
  */
-function registerLanguageFeatures(spec, capabilities) {
+function registerLanguageFeatures(spec, capabilities, deps) {
   const language = spec.monacoLanguage;
   if (!language || registeredProviders.has(language)) return;
 
   const serverCaps = capabilities?.capabilities || {};
+
+  /**
+   * 确保 definition 结果里的目标文件已存在 Monaco model（跨文件 peek 需要）。
+   * Monaco 内置 peek 通过 monaco.editor.getModel(uri) 取目标 model 来渲染内容；
+   * 若目标文件从未打开过，model 不存在 → peek 只显示文件名/行列号、内容空白。
+   * 这里在 provider 返回前异步加载目标文件并创建 model（不激活标签），
+   * 让 peek 能拿到内容。加载失败静默跳过（保持原有降级行为）。
+   */
+  async function ensureDefinitionModels(result) {
+    if (!deps?.ensureModelForUri) return;
+    const items = Array.isArray(result) ? result : [result];
+    for (const it of items) {
+      if (!it) continue;
+      const uri = it.targetUri || it.uri;
+      if (uri) {
+        try {
+          await deps.ensureModelForUri(uri);
+        } catch {
+          /* 忽略：单个目标加载失败不影响其余定义 */
+        }
+      }
+    }
+  }
 
   if (serverCaps.hoverProvider) {
     monaco.languages.registerHoverProvider(language, {
@@ -365,6 +388,8 @@ function registerLanguageFeatures(spec, capabilities) {
               character: position.column - 1,
             },
           });
+          // 跨文件 peek 需要目标 model 已就绪，先预加载再返回
+          await ensureDefinitionModels(result);
           return toMonacoDefinition(result);
         } catch {
           return null;

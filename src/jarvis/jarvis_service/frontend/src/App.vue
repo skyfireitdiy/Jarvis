@@ -4765,11 +4765,44 @@ async function activateLspForModel(path, modelData) {
     spec,
     workspaceRoot,
     model: modelData.model,
-    deps: { fetchWithAuth, getGatewayAddress, getWebSocketProtocol, buildWebSocketProtocols },
+    deps: { fetchWithAuth, getGatewayAddress, getWebSocketProtocol, buildWebSocketProtocols, ensureModelForUri },
   })
   if (client) {
     lspBindings.set(path, { serverId: spec.id, root: workspaceRoot })
   }
+}
+
+/**
+ * 确保 file:// uri 对应的 Monaco model 已存在（跨文件 peek definition 需要）。
+ *
+ * Monaco 内置 peek 通过 monaco.editor.getModel(uri) 取目标 model 渲染内容；
+ * 目标文件从未打开过时 model 不存在 → peek 只显示文件名/行列号、内容空白。
+ * 这里在 definition provider 返回前异步加载目标文件并创建 model（不激活标签、
+ * 不创建 workspace tab），让 peek 能拿到内容。已加载则直接复用。
+ *
+ * @param {string} uri LSP file:// uri
+ * @returns {Promise<void>}
+ */
+async function ensureModelForUri(uri) {
+  if (!uri) return
+  const raw = String(uri)
+  const path = raw.startsWith('file://') ? decodeURIComponent(raw.slice('file://'.length)) : raw
+  if (!path) return
+  const existing = editorModels.get(path)
+  if (existing && existing.model && !existing.model.isDisposed()) return
+  // 只读预览、非 master 节点：无法读取远端文件内容，跳过（保持原有降级）
+  if (getWorkspaceTargetNodeId() !== 'master') return
+  const content = await fetchFileContent(path)
+  const spec = getServerByPath(path)
+  const language = spec?.monacoLanguage || 'plaintext'
+  let model = existing?.model
+  if (!model || model.isDisposed()) {
+    model = monaco.editor.createModel(content, language, monaco.Uri.file(path))
+    model.__jarvisPath = path
+  } else {
+    model.setValue(content)
+  }
+  editorModels.set(path, { model, content, language })
 }
 
 /** 由文件路径推导 workspace 根目录（取所在目录，后端会校验其存在性）。 */
