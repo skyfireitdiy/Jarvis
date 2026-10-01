@@ -7417,14 +7417,9 @@ watch(showSettingsModal, (newVal) => {
 // Panel 布局管理
 const panels = ref([]) // [{ id, agentId: null }]
 const activePanelId = ref(null)
-const MAX_PANELS = 6
 
 // 创建新 Panel
 function createPanel() {
-  if (panels.value.length >= MAX_PANELS) {
-    showToast(`最多支持 ${MAX_PANELS} 个 Panel`, 'warning')
-    return
-  }
   const panel = {
     id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     agentId: null
@@ -7527,30 +7522,31 @@ function activatePanel(panelId) {
 // 已分割时把 Agent 打开到「激活 pane」中（需求：新建 Panel 落在激活区域；
 // 若该区域已有 Panel，则关闭旧的、新的覆盖）。返回 true 表示已处理。
 // 说明：只操作激活 pane，绝不动其他 pane 承载的 Panel（否则会把别的区域的会话清掉）。
+// 注意：激活 pane 已承载 Agent 会话时不再覆盖，而是开新面板（新 pane）保留当前会话，
+// 避免命令面板/侧边栏切换 Agent 时把当前会话覆盖掉。
 function openAgentInActivePane(agent) {
   const activePaneLeaf = activePane.value
   if (!activePaneLeaf) return false
-  // 激活 pane 已承载的 Panel：就地覆盖（清掉旧 Agent 的 Panel 级状态）
+  // 激活 pane 已承载的 Panel
   const hostedPanel = activePaneLeaf.view === 'session' && activePaneLeaf.sessionPanelId
     ? panels.value.find(p => p.id === activePaneLeaf.sessionPanelId)
     : null
-  let targetPanel = hostedPanel
-  if (targetPanel) {
-    if (targetPanel.agentId && targetPanel.agentId !== agent.agent_id) {
-      closeAgentInPanel(targetPanel.id)
-    }
-  } else {
-    if (panels.value.length >= MAX_PANELS) {
-      showToast(`最多支持 ${MAX_PANELS} 个 Panel`, 'warning')
+  // 激活 pane 已承载 Agent 会话：不覆盖。承载的正是该 Agent 则无需操作（已显示）；
+  // 否则开新面板（新 pane）承载，保留当前会话。
+  if (hostedPanel) {
+    if (hostedPanel.agentId === agent.agent_id) {
+      activateWorkspacePane(activePaneLeaf.id)
       return true
     }
-    targetPanel = {
-      id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      agentId: null
-    }
-    panels.value.push(targetPanel)
+    openAgentInNewPane(agent)
+    return true
   }
-  targetPanel.agentId = agent.agent_id
+  // 激活 pane 是文件/空区域：新建 Panel 落在激活 pane（覆盖文件视图是合理的）
+  const targetPanel = {
+    id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    agentId: agent.agent_id
+  }
+  panels.value.push(targetPanel)
   activePanelId.value = targetPanel.id
   workspaceSessionPanelId.value = targetPanel.id
   // 空则原地、已有承载该 Panel 的 pane 则复用、否则分割（不覆盖当前区域）
@@ -7558,6 +7554,24 @@ function openAgentInActivePane(agent) {
   switchAgent(agent)
   nextTick(() => maybeStartTour('panel'))
   return true
+}
+
+// 已分割且激活 pane 已承载 Agent 会话时：开新面板（新 pane），保留当前会话。
+// 新建 Panel 并让 ensurePaneForView 分割新 pane 承载它（不覆盖激活 pane 的会话）。
+// 调用方需保证 agent 不在任何既有 Panel 中（openAgentInActivePane 的各调用点均已提前处理）。
+function openAgentInNewPane(agent) {
+  if (!agent) return
+  const targetPanel = {
+    id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    agentId: agent.agent_id
+  }
+  panels.value.push(targetPanel)
+  activePanelId.value = targetPanel.id
+  workspaceSessionPanelId.value = targetPanel.id
+  // 空则原地、已有承载该 Panel 的 pane 则复用、否则分割（不覆盖当前区域）
+  ensurePaneForView('session', targetPanel.id)
+  switchAgent(agent)
+  nextTick(() => maybeStartTour('panel'))
 }
 
 // 在 Panel 中打开 Agent（替代 switchAgent）
@@ -7641,10 +7655,6 @@ function openAgentInPanel(agent, panelId = null) {
   }
   // 如果当前激活的 Panel 已有 Agent，创建新 Panel
   if (!targetPanel || targetPanel.agentId) {
-    if (panels.value.length >= MAX_PANELS) {
-      showToast(`最多支持 ${MAX_PANELS} 个 Panel`, 'warning')
-      return
-    }
     targetPanel = {
       id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       agentId: null
@@ -7705,10 +7715,6 @@ function openAgentInCurrentPanel(agent) {
   }
   let targetPanel = panels.value.find(p => p.id === activePanelId.value)
   if (!targetPanel) {
-    if (panels.value.length >= MAX_PANELS) {
-      showToast(`最多支持 ${MAX_PANELS} 个 Panel`, 'warning')
-      return
-    }
     targetPanel = { id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, agentId: null }
     panels.value.push(targetPanel)
   } else if (targetPanel.agentId && targetPanel.agentId !== agent.agent_id) {
@@ -7724,7 +7730,7 @@ function openAgentInCurrentPanel(agent) {
 
 // 「在新的 Panel 中打开 Agent」：命令面板按 Tab 时使用
 // - Agent 已在某个 Panel 中：激活它（避免重复打开同一 Agent）
-// - 否则始终新建 Panel；达到数量上限时回退到在当前 Panel 中打开
+// - 否则始终新建 Panel
 function openAgentInNewPanel(agent) {
   if (!agent) return
   if (windowWidth.value <= 768) {
@@ -7735,11 +7741,6 @@ function openAgentInNewPanel(agent) {
   if (existingPanel) {
     activePanelId.value = existingPanel.id
     switchAgent(agent)
-    return
-  }
-  if (panels.value.length >= MAX_PANELS) {
-    showToast(`最多支持 ${MAX_PANELS} 个 Panel，已在当前面板打开`, 'warning')
-    openAgentInCurrentPanel(agent)
     return
   }
   const targetPanel = { id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, agentId: null }
@@ -9009,10 +9010,6 @@ function onWorkspaceSidebarAgentClick(agent) {
   let targetPanel = workspaceSessionPanel.value
     || panels.value.find(p => p.id === activePanelId.value)
   if (!targetPanel) {
-    if (panels.value.length >= MAX_PANELS) {
-      showToast(`最多支持 ${MAX_PANELS} 个 Panel`, 'warning')
-      return
-    }
     targetPanel = { id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, agentId: null }
     panels.value.push(targetPanel)
   } else if (targetPanel.agentId && targetPanel.agentId !== agent.agent_id) {
