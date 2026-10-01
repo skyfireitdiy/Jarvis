@@ -3174,6 +3174,81 @@ function ensureAgentEditorPane(agentId) {
   return null
 }
 
+// 判断某个 pane 是否可视为「空区域」（点击侧边文件时优先在空区域原地创建编辑器）：
+// - view === 'empty'：显式空 pane；
+// - view === 'file' 但未绑定任何文件：新分割出的空 file pane / 刚打开编辑器（标题显示「空区域」）。
+function isPaneEmptyForFileOpen(pane) {
+  if (!pane) return false
+  if (pane.view === 'empty') return true
+  if (pane.view === 'file') {
+    return !workspaceViewPanes.has(pane.id) && !(pane.id === activePaneId.value && activeWorkspaceTabPath.value)
+  }
+  return false
+}
+
+// 找出「已打开的编辑器面板」：优先该 Agent 的 file pane，其次任意 file pane。
+// 用于点击侧边文件时复用已有编辑器面板，而非覆盖当前会话/聊天/终端区域。
+function findAnyFilePane(agentId) {
+  if (agentId) {
+    const agentPane = findAgentFilePane(agentId)
+    if (agentPane) return agentPane
+  }
+  let found = null
+  const walk = (node) => {
+    if (!node || found) return
+    if (node.type === 'leaf') {
+      if (node.view === 'file') found = node
+      return
+    }
+    ;(node.children || []).forEach(walk)
+  }
+  walk(workspacePaneTree.value)
+  return found
+}
+
+// 为「点击侧边文件打开」定位目标编辑器 pane（返回 paneId；未分割且原地打开时返回 null）：
+// 1) 当前活动区域为空 → 直接在当前区域创建编辑器（不分割）；
+// 2) 否则找已打开的编辑器面板 → 复用它（不打扰当前活动区域）；
+// 3) 否则分割当前区域，在新 pane 创建编辑器。
+function ensureEditorPaneForFileOpen(agentId) {
+  if (isWorkspaceSplit.value) {
+    const active = activePane.value
+    // 1. 当前活动区域为空 → 在当前区域创建编辑器
+    if (isPaneEmptyForFileOpen(active)) {
+      active.view = 'file'
+      if (agentId) active.agentId = agentId
+      activateWorkspacePane(active.id)
+      return active.id
+    }
+    // 2. 找已打开的编辑器面板 → 复用
+    const filePane = findAnyFilePane(agentId)
+    if (filePane) {
+      activateWorkspacePane(filePane.id)
+      return filePane.id
+    }
+    // 3. 分割当前区域创建编辑器
+    splitWorkspacePane(activePaneId.value, 'row')
+    const newPane = activePane.value
+    if (newPane) {
+      newPane.view = 'file'
+      if (agentId) newPane.agentId = agentId
+      return newPane.id
+    }
+    return null
+  }
+  // 未分割：当前区域已是文件视图（空或有标签）→ 原地打开，交给 openWorkspaceFile 的 showWorkspaceFileView。
+  if (workspaceMainView.value === 'file') return null
+  // 未分割且当前区域是 session/chat/terminal → 分割创建编辑器（保留当前区域内容）。
+  splitWorkspacePane(activePaneId.value, 'row')
+  const newPane = activePane.value
+  if (newPane) {
+    newPane.view = 'file'
+    if (agentId) newPane.agentId = agentId
+    return newPane.id
+  }
+  return null
+}
+
 // 把「激活 pane」的视图切换为 view（file / session / chat / terminal / diff）。
 // 返回是否成功改写（未分割或没有激活 pane 时返回 false，调用方回退到旧路径）。
 function setActivePaneView(view, sessionPanelId = null) {
@@ -4412,7 +4487,30 @@ function remountMonacoEditor() {
   }
 }
 
+// 保存当前编辑器（激活 pane / 单实例）正在显示的文件的 view state（光标位置、滚动位置、选区、折叠）。
+// Monaco 的 setModel 会重置光标与滚动，切换标签前必须先保存，否则切回来位置丢失。
+function saveCurrentEditorViewState() {
+  const currentPath = activeWorkspaceTabPath.value
+  if (!currentPath) return
+  const modelData = editorModels.get(currentPath)
+  if (!modelData) return
+  const view = isWorkspaceSplit.value ? editorViews.get(activePaneId.value) : cmEditorView
+  // 无 model 时 saveViewState 返回空状态，会覆盖已保存的 viewState（如 remountMonacoEditor 重建视图后）
+  if (!view || !view.getModel()) return
+  modelData.viewState = view.saveViewState()
+}
+
+// 恢复指定 pane 上目标文件的 view state（需在 setModel 之后调用）。
+function restoreEditorViewState(view, path) {
+  if (!view) return
+  const modelData = editorModels.get(path)
+  if (!modelData?.viewState) return
+  view.restoreViewState(modelData.viewState)
+}
+
 function activateWorkspaceTab(path) {
+  // 切换前先保存当前文件的 view state（光标+滚动），否则 setModel 重置后位置丢失
+  saveCurrentEditorViewState()
   const session = activeWorkspaceSession.value
   if (session) session.activeTabPath = path
   const modelData = editorModels.get(path)
@@ -4432,6 +4530,7 @@ function activateWorkspaceTab(path) {
       addPaneTab(activePaneId.value, path)
       workspaceViewPanes.set(activePaneId.value, path)
       if (activeView.getModel() !== model) activeView.setModel(model)
+      restoreEditorViewState(activeView, path)
       activeView.updateOptions({ readOnly: !isWorkspaceEditable.value })
       nextTick(() => {
         scheduleWorkspaceLayout()
@@ -4440,6 +4539,7 @@ function activateWorkspaceTab(path) {
     }
   } else if (cmEditorView) {
     cmEditorView.setModel(model)
+    restoreEditorViewState(cmEditorView, path)
     cmEditorView.updateOptions({ readOnly: !isWorkspaceEditable.value })
     nextTick(() => {
       layoutMonacoEditor()
@@ -4987,12 +5087,18 @@ async function openWorkspaceFile(path, agentId = null) {
   if (!path) return
 
   showWorkspacePanel.value = true
-  // 自由分割模式：把「激活 pane」切换到 file 视图（若该 pane 原本是会话，则替换为文件）。
-  // 未分割时 setActivePaneView 返回 false，走下方原有路径（零回归）。
-  setActivePaneView('file')
-  // 打开文件属于「文件视图」：若主区域当前停在 chat/terminal/session，需先切回文件视图，
-  // 否则文件（及 diff）会被这些内容挡住。
-  showWorkspaceFileView()
+  // 智能定位打开位置（点击侧边文件）：
+  //  1) 当前活动区域为空 → 在当前区域创建编辑器；
+  //  2) 否则复用已打开的编辑器面板（不覆盖当前会话/聊天/终端）；
+  //  3) 否则分割当前区域创建新编辑器。
+  // 返回 paneId 表示已定位到某分割 pane；返回 null 表示走未分割的原地路径。
+  const targetPaneId = ensureEditorPaneForFileOpen(agentId)
+  // 打开文件属于「文件视图」：未分割且原地打开时，若主区域停在 chat/terminal/session，
+  // 需先切回文件视图，否则文件（及 diff）会被这些内容挡住。
+  // （已分割时由 ensureEditorPaneForFileOpen 负责定位到 file pane，无需再切。）
+  if (!targetPaneId) {
+    showWorkspaceFileView()
+  }
   // 打开文件意味着退出 diff 模式：否则 file 视图会优先渲染残留的 diff，
   // 用户点了文件却看不到文件内容。
   if (workspaceDiff.value) {
