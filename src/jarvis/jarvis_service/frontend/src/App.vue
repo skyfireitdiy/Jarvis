@@ -9568,6 +9568,36 @@ function getFocusedPanelKey() {
   if (panel && panel.agentId) return `session:${panel.id}`
   return null
 }
+// 编辑器面板的 Ctrl+W 语义（VS Code 同款）：关闭「当前激活 pane」的文件；
+// 无文件可关时，分割态关闭该 pane、未分割态返回 false（由调用方关闭整个面板）。
+// 返回是否已处理（关闭了文件或 pane）。
+function handleWorkspaceCloseShortcut() {
+  if (!showWorkspacePanel.value) return false
+  if (isWorkspaceSplit.value) {
+    const pane = activePane.value
+    // file pane 有文件 → 关闭该文件（只影响激活 pane，不影响其他 pane）
+    if (pane && pane.view === 'file') {
+      const path = workspaceViewPanes.get(activePaneId.value)
+      if (path) {
+        closeWorkspaceTab(path, activePaneId.value)
+        return true
+      }
+    }
+    // 无文件可关：关闭该 pane（仅剩一个 pane 时不允许关闭，回退到关闭整个面板）
+    if (workspacePaneCount.value > 1) {
+      closeWorkspacePane(activePaneId.value)
+      return true
+    }
+    return false
+  }
+  // 未分割：主区域是文件视图且有打开文件 → 关闭当前文件；否则关闭整个面板
+  if (workspaceMainView.value === 'file' && activeWorkspaceTabPath.value) {
+    closeWorkspaceTab(activeWorkspaceTabPath.value)
+    return true
+  }
+  return false
+}
+
 // 关闭当前焦点所在的面板（会话/终端/编辑器/聊天）
 function closeFocusedPanel() {
   const key = getFocusedPanelKey()
@@ -9575,6 +9605,8 @@ function closeFocusedPanel() {
   if (key === 'terminal') {
     showTerminalPanel.value = false
   } else if (key === 'workspace') {
+    // 编辑器面板：Ctrl+W 优先关闭当前文件（VS Code 语义）；无文件时关闭整个面板
+    if (handleWorkspaceCloseShortcut()) return
     // 与 closeWorkspacePanel 一致：关闭只是隐藏，保留状态以便再次打开时恢复
     hideWorkspaceHostedPanelState()
     showWorkspacePanel.value = false
@@ -18500,12 +18532,14 @@ function handleGlobalKeydown(event) {
   // 焦点不在任何面板内（即处于宠物大厅）且有激活宠物时，改为「隐藏该 Agent 输出并取消选中」
   if (isModifierPressed && !event.altKey && event.code === 'KeyW') {
     event.preventDefault()
-    // 编辑器处于分割态且焦点在编辑器工作区内：Ctrl+W 优先关闭「激活 pane」（VS Code 语义）
+    // 编辑器处于分割态且焦点在编辑器工作区内：Ctrl+W 优先关闭「激活 pane 的文件」
+    // （VS Code 语义）；无文件则关闭该 pane。未分割态由 closeFocusedPanel 统一处理。
     if (isWorkspaceSplit.value && workspaceMainView.value === 'file' && windowWidth.value > 768) {
       const editorZone = getFocusedZoneKey()
       const namedKey = getNamedPanelFocusKey()
       if (editorZone === 'workspace' || namedKey === 'workspace') {
-        closeWorkspacePane(activePaneId.value)
+        if (handleWorkspaceCloseShortcut()) return
+        closeFocusedPanel()
         return
       }
     }
