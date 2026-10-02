@@ -37,6 +37,7 @@ import (
 	"jarvis-daemon/internal/config"
 	"jarvis-daemon/internal/daemonlog"
 	"jarvis-daemon/internal/gatewayfilter"
+	"jarvis-daemon/internal/jsruntime"
 	"jarvis-daemon/internal/localapi"
 	"jarvis-daemon/internal/login"
 	"jarvis-daemon/internal/proxy"
@@ -102,6 +103,8 @@ func runSubcommand(name string, args []string) error {
 		return cmdLogin(args)
 	case "gateway-filter":
 		return cmdGatewayFilter(args)
+	case "run-script":
+		return cmdRunScript(args)
 	case "help", "-h", "--help":
 		printUsage()
 		return nil
@@ -409,6 +412,133 @@ func pushGatewayFilter(listen, mode string, patterns []string) (string, []string
 		return "", nil, fmt.Errorf("更新失败（HTTP %d）: %s", resp.StatusCode, out.Error)
 	}
 	return out.Mode, out.Patterns, nil
+
+}
+
+// newRuntimeRegistry 创建当前平台的能力注册表，并注入运行所需的外部依赖。
+//
+// 复用点（见 docs/js-plugin-design.md §7）：run、run-script、script run 共用，
+// 避免重复造轮子。store 为 nil 时（如 run-script 无凭据存储场景）跳过 provider 注入，
+// browser.ext / ocr 等能力在未注入时会自行返回明确错误而非 panic。
+func newRuntimeRegistry(store *auth.Store) *capability.Registry {
+	registry := capability.NewRegistry()
+
+	// 把「按网关取 Token」注入能力层，使 browser.ext.sync 能自行从网关下载扩展包。
+	// 能力 Handler 签名无法携带凭据存储，故用注入方式解耦（capability 包不反向依赖 auth）。
+	if store != nil {
+		capability.SetBrowserExtCredentialProvider(func(gateway string) (string, bool) {
+			creds, err := store.Get(gateway)
+			if err != nil || creds.Token == "" {
+				return "", false
+			}
+			return creds.Token, true
+		})
+		// 注入「已认证网关列表」，供 ocr.recognize 在未显式指定 gateway 时回退使用。
+		// 排序保证顺序稳定（多网关时取地址最小的那个），避免每次调用结果漂移。
+		capability.SetOcrGatewayLister(func() []string {
+			creds := store.List()
+			out := make([]string, 0, len(creds))
+			for _, c := range creds {
+				if c.Gateway != "" && c.Token != "" {
+					out = append(out, c.Gateway)
+				}
+			}
+			sort.Strings(out)
+			return out
+		})
+	}
+
+	return registry
+}
+
+// cmdRunScript 执行一个 JS 脚本（run-script 子命令）。
+//
+// 用法：jarvis-daemon run-script <file.js> [--arg key=value ...]
+//   - <file.js>：脚本文件路径（必填）
+//   - --arg key=value：可选，注入脚本全局对象 jarvis.args（如 jarvis.args.path）
+//
+// 脚本内可调用 jarvis.cap / jarvis.caps 做自动化；print/console.log 输出到 stdout，
+// console.error 输出到 stderr；脚本顶层返回值打印到 stdout。
+func cmdRunScript(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("用法: jarvis-daemon run-script <file.js> [--arg key=value ...]")
+	}
+
+	fs := flag.NewFlagSet("run-script", flag.ContinueOnError)
+	argFlags := argFlags{}
+	fs.Var(&argFlags, "arg", "脚本参数 key=value（可重复指定）")
+	// 手动解析：第一个非 flag 参数是脚本文件路径，其余是 --arg。
+	// 用 fs.Parse 会因未知位置参数报错，故先分离脚本路径再解析选项。
+	scriptPath := ""
+	rest := make([]string, 0, len(args))
+	for _, a := range args {
+		if scriptPath == "" && !isFlag(a) {
+			scriptPath = a
+			continue
+		}
+		rest = append(rest, a)
+	}
+	if scriptPath == "" {
+		return fmt.Errorf("用法: jarvis-daemon run-script <file.js> [--arg key=value ...]")
+	}
+	if err := fs.Parse(rest); err != nil {
+		return err
+	}
+
+	// 读取脚本文件。
+	source, err := os.ReadFile(scriptPath)
+	if err != nil {
+		return fmt.Errorf("读取脚本 %s 失败: %w", scriptPath, err)
+	}
+
+	// 装配能力注册表（复用 run 流程的装配逻辑）。
+	registry := newRuntimeRegistry(nil)
+
+	// 创建运行时并注入 jarvis 能力对象。
+	r := jsruntime.New()
+	r.SetOutput(func(s string) { fmt.Print(s) }, func(s string) { fmt.Fprint(os.Stderr, s) })
+	if err := jsruntime.InstallBridge(r, registry); err != nil {
+		return fmt.Errorf("注入 jarvis 能力对象失败: %w", err)
+	}
+
+	// 注入脚本参数 jarvis.args。
+	if err := jsruntime.InstallScriptArgs(r, argFlags); err != nil {
+		return fmt.Errorf("注入 jarvis.args 失败: %w", err)
+	}
+
+	// 执行脚本。
+	result, err := r.RunScriptFile(scriptPath, string(source))
+	if err != nil {
+		// 脚本执行错误输出到 stderr（含堆栈），返回错误使退出码非 0。
+		fmt.Fprintf(os.Stderr, "[run-script] 执行失败: %v\n", err)
+		return fmt.Errorf("脚本执行失败: %v", err)
+	}
+
+	// 脚本顶层返回值非 undefined 时打印到 stdout。
+	if result != nil {
+		if s, ok := result.(string); ok {
+			fmt.Println(s)
+		} else {
+			fmt.Println(result)
+		}
+	}
+	return nil
+}
+
+// argFlags 收集 --arg key=value 参数。
+type argFlags map[string]string
+
+func (a argFlags) String() string { return "" }
+func (a argFlags) Set(v string) error {
+	if a == nil {
+		return nil
+	}
+	key, val, ok := strings.Cut(v, "=")
+	if !ok || key == "" {
+		return fmt.Errorf("--arg 需要 key=value 格式，实际: %q", v)
+	}
+	a[key] = val
+	return nil
 }
 
 // printUsage 打印用法说明。
@@ -425,6 +555,7 @@ func printUsage() {
   jarvis-daemon status           查看服务状态
   jarvis-daemon login [选项]     用用户名密码登录网关并向本地服务推送凭据
   jarvis-daemon gateway-filter <get|set> [选项]  读写网关黑白名单（仅限本机）
+  jarvis-daemon run-script <file.js> [--arg key=value ...]  执行 JS 脚本（可调用 jarvis 能力）
   jarvis-daemon self-update-apply [选项]  自动更新 helper（内部使用，勿手动调用）
 
 选项（run / install 共用）:
@@ -541,31 +672,8 @@ func runDaemon(args []string) {
 	selfupdate.CleanupAfterUpdate(version)
 
 	// 注册当前平台的能力，供网关下发指令时执行。
-	registry := capability.NewRegistry()
+	registry := newRuntimeRegistry(store)
 	log.Printf("[daemon] 已注册 %d 个平台能力", len(registry.ListForPlatform(capability.Current())))
-
-	// 把「按网关取 Token」注入能力层，使 browser.ext.sync 能自行从网关下载扩展包。
-	// 能力 Handler 签名无法携带凭据存储，故用注入方式解耦（capability 包不反向依赖 auth）。
-	capability.SetBrowserExtCredentialProvider(func(gateway string) (string, bool) {
-		creds, err := store.Get(gateway)
-		if err != nil || creds.Token == "" {
-			return "", false
-		}
-		return creds.Token, true
-	})
-	// 注入「已认证网关列表」，供 ocr.recognize 在未显式指定 gateway 时回退使用。
-	// 排序保证顺序稳定（多网关时取地址最小的那个），避免每次调用结果漂移。
-	capability.SetOcrGatewayLister(func() []string {
-		creds := store.List()
-		out := make([]string, 0, len(creds))
-		for _, c := range creds {
-			if c.Gateway != "" && c.Token != "" {
-				out = append(out, c.Gateway)
-			}
-		}
-		sort.Strings(out)
-		return out
-	})
 
 	// 网关黑白名单：由 daemon 自身配置（config.yaml），仅限本机通过
 	// /api/gateway-filter 或 `jarvis-daemon gateway-filter` 修改。
