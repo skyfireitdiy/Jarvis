@@ -18125,7 +18125,8 @@ function handleGlobalKeydown(event) {
 
   // Ctrl/Cmd + P：编辑器聚焦时让位给 Monaco（其内置命令面板 editor.action.quickCommand 由
   // 我们额外绑定的 Ctrl+P addAction 触发）；否则打开 Jarvis 命令面板（登录界面不响应）
-  if (isModifierPressed && !event.altKey && event.code === 'KeyP') {
+  // 排除 Shift：Ctrl+Shift+P 走下方「文件名搜索」分支（open-editor-file-search）
+  if (isModifierPressed && !event.altKey && !event.shiftKey && event.code === 'KeyP') {
     if (showConnectModal.value) return
     // 编辑器聚焦时让位，让事件继续传播到 Monaco 触发其命令面板 addAction
     if (isMonacoEditorFocused()) return
@@ -18147,7 +18148,8 @@ function handleGlobalKeydown(event) {
   // 让 Ctrl+A 触发命令面板，而不是在编辑器里全选。
   // 普通输入框（textarea/input/contentEditable）无条件让位：即使 editorShortcutLocked
   // 为 true（曾按 ESC 脱离编辑器），进入输入框后 Ctrl+A 仍应恢复为原生全选。
-  if (isModifierPressed && !event.altKey && event.code === 'KeyA') {
+  // 排除 Shift：Ctrl+Shift+A 不触发本分支（避免误拦截）
+  if (isModifierPressed && !event.altKey && !event.shiftKey && event.code === 'KeyA') {
     if (showConnectModal.value) return
     if (isEditableElement(event.target) || (!editorShortcutLocked.value && isMonacoEditorFocused())) return
     event.preventDefault()
@@ -18163,7 +18165,8 @@ function handleGlobalKeydown(event) {
   // 例外：编辑器已按 ESC「脱离」快捷键控制（editorShortcutLocked）时不再让位。
   // 普通输入框（textarea/input/contentEditable）无条件让位：即使 editorShortcutLocked
   // 为 true（曾按 ESC 脱离编辑器），进入输入框后 Ctrl+F 仍应恢复为原生查找。
-  if (isModifierPressed && !event.altKey && event.code === 'KeyF') {
+  // 排除 Shift：Ctrl+Shift+F 走下方「内容搜索」分支（open-editor-global-search）
+  if (isModifierPressed && !event.altKey && !event.shiftKey && event.code === 'KeyF') {
     if (showConnectModal.value) return
     if (isEditableElement(event.target) || (!editorShortcutLocked.value && isMonacoEditorFocused())) return
     event.preventDefault()
@@ -18374,7 +18377,8 @@ function handleGlobalKeydown(event) {
   // Ctrl/Cmd + W 关闭当前焦点所在的面板（需拦截浏览器原生关闭标签页行为）
   // 焦点在面板内（终端/编辑器/聊天/会话面板）时优先关闭该面板；
   // 焦点不在任何面板内（即处于宠物大厅）且有激活宠物时，改为「隐藏该 Agent 输出并取消选中」
-  if (isModifierPressed && !event.altKey && event.code === 'KeyW') {
+  // 排除 Shift：Ctrl+Shift+W 不触发本分支（避免误拦截浏览器/其它行为）
+  if (isModifierPressed && !event.altKey && !event.shiftKey && event.code === 'KeyW') {
     event.preventDefault()
     // 编辑器处于分割态且焦点在编辑器工作区内：Ctrl+W 优先关闭「激活 pane 的文件」
     // （VS Code 语义）；无文件则关闭该 pane。未分割态由 closeFocusedPanel 统一处理。
