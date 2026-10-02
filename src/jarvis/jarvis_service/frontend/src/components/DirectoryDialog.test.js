@@ -52,7 +52,7 @@ describe("DirectoryDialog 渲染", () => {
     expect(items).toHaveLength(2);
     expect(items[0].find(".dir-name").text()).toBe("a");
     expect(items[0].find(".dir-path").text()).toBe("/p/a");
-    expect(items[0].find(".dir-icon").text()).toBe("📁");
+    expect(items[0].find(".dir-icon svg").exists()).toBe(true);
   });
 
   test("selectedDir 命中的目录项带 selected 类", () => {
@@ -110,7 +110,7 @@ describe("DirectoryDialog 文件选择模式", () => {
     const files = wrapper.findAll(".file-item");
     expect(files).toHaveLength(2);
     expect(files[0].find(".dir-name").text()).toBe("a.yaml");
-    expect(files[0].find(".dir-icon").text()).toBe("📄");
+    expect(files[0].find(".dir-icon svg").exists()).toBe(true);
   });
 
   test("fileIcon 可自定义文件项图标", () => {

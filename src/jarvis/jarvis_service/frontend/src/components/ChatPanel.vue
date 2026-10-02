@@ -25,7 +25,7 @@
           <span>聊天室</span>
           <div class="chat-sidebar-actions">
             <button class="icon-btn small" tabindex="-1" @mousedown.prevent @click="showCreateRoomInput" title="创建聊天室">➕</button>
-            <button class="icon-btn small" tabindex="-1" @mousedown.prevent @click="$emit('clearMessages', 'all')" title="清空全部记录">🗑</button>
+            <button class="icon-btn small" tabindex="-1" @mousedown.prevent @click="$emit('clearMessages', 'all')" title="清空全部记录"><span v-html="CHAT_ICONS.trash"></span></button>
             <button class="icon-btn small" tabindex="-1" @mousedown.prevent @click="sidebarCollapsed = true" title="收起侧边栏">◀</button>
           </div>
         </div>
@@ -74,9 +74,9 @@
             </template>
             <div v-if="renamingRoomId !== room.room_id" class="chat-room-actions">
               <span class="chat-room-count">{{ room.member_count }}</span>
-              <button v-if="activeRoomId === room.room_id" class="icon-btn small chat-room-action-btn" @click.stop="$emit('leaveRoom', room.room_id)" title="退出聊天室">🚪</button>
-              <button v-if="room.created_by === currentUserId || isAdmin" class="icon-btn small chat-room-action-btn" @click.stop="handleRenameRoom(room)" title="重命名聊天室">✏️</button>
-              <button v-if="room.created_by === currentUserId || isAdmin" class="icon-btn small chat-room-action-btn" @click.stop="$emit('deleteRoom', room.room_id)" title="删除聊天室">🗑</button>
+              <button v-if="activeRoomId === room.room_id" class="icon-btn small chat-room-action-btn" @click.stop="$emit('leaveRoom', room.room_id)" title="退出聊天室"><span v-html="CHAT_ICONS.exit"></span></button>
+              <button v-if="room.created_by === currentUserId || isAdmin" class="icon-btn small chat-room-action-btn" @click.stop="handleRenameRoom(room)" title="重命名聊天室"><span v-html="CHAT_ICONS.edit"></span></button>
+              <button v-if="room.created_by === currentUserId || isAdmin" class="icon-btn small chat-room-action-btn" @click.stop="$emit('deleteRoom', room.room_id)" title="删除聊天室"><span v-html="CHAT_ICONS.trash"></span></button>
             </div>
           </div>
           <div v-if="rooms.length === 0" class="chat-empty">暂无聊天室</div>
@@ -136,7 +136,7 @@
       <div class="chat-main">
         <div class="chat-main-header">
           <span class="chat-main-title">{{ activeRoomId ? '聊天室消息' : (activePrivateId ? '私聊消息' : '消息') }}</span>
-          <button v-if="activeRoomId || activePrivateId" class="icon-btn small" @click="$emit('clearMessages', 'current')" title="清空当前记录">🗑</button>
+          <button v-if="activeRoomId || activePrivateId" class="icon-btn small" @click="$emit('clearMessages', 'current')" title="清空当前记录"><span v-html="CHAT_ICONS.trash"></span></button>
         </div>
         <div class="chat-messages" ref="messagesRef">
           <div
@@ -171,7 +171,7 @@
             <img :src="pendingImageUrl" class="chat-pending-image" />
             <button class="chat-pending-image-remove" @click="pendingImageUrl = ''" title="取消图片">✕</button>
           </div>
-          <button class="icon-btn chat-image-btn" @click="triggerImageUpload" title="发送图片">🖼</button>
+          <button class="icon-btn chat-image-btn" @click="triggerImageUpload" title="发送图片"><span v-html="CHAT_ICONS.image"></span></button>
           <input type="file" ref="imageInputRef" accept="image/*" style="display:none" @change="handleImageSelect" />
           <button class="icon-btn chat-send-btn" @click="sendMessage" :disabled="!socket || (!draftMessage.trim() && !pendingImageUrl)" title="发送">➤</button>
         </div>
@@ -199,6 +199,13 @@
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
 
+// 自绘 16x16 stroke 线性 SVG 图标（currentColor 继承主题色），与全局风格一致
+const CHAT_ICONS = {
+  trash: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4h11M6.5 4V2.5h3V4M4 4l.5 9.5h7L12 4M6.5 7v4M9.5 7v4"/></svg>',
+  exit: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.5H3.5a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1H6M10 5l3 3-3 3M13 8H6"/></svg>',
+  edit: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 2.5a1.5 1.5 0 0 1 2 2L5 13l-3 1 1-3z"/><path d="M9.5 4.5l2 2"/></svg>',
+  image: '<svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><circle cx="5.5" cy="6" r="1.2"/><path d="m3 12.5 3.5-3.5 2.5 2.5 2-2 2 2"/></svg>',
+}
 const props = defineProps({
   visible: Boolean,
   embedded: Boolean,

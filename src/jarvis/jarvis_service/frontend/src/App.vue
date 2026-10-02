@@ -129,7 +129,7 @@
               <div class="workspace-file-tree-panel">
                 <!-- 按节点打开任意目录（无需创建 Agent 即可浏览/编辑文件） -->
                 <button class="workspace-open-dir-btn" @click="openOpenDirDialog" title="选择节点与目录并打开">
-                  <span class="workspace-open-dir-icon">📂</span>
+                  <span class="workspace-open-dir-icon" v-html="UI_ICONS.folder"></span>
                   <span>打开目录</span>
                 </button>
                 <!-- 活跃 Agent 节点列表 -->
@@ -238,7 +238,7 @@
                       class="tree-node-icon expand-arrow"
                       :class="{ expanded: expandedAgents.has(session.agent_id) }"
                     >▶</span>
-                    <span class="tree-node-icon agent-icon">🖥</span>
+                    <span class="tree-node-icon agent-icon" v-html="UI_ICONS.monitor"></span>
                     <span class="tree-node-text agent-name">{{ session.agent.name }}</span>
                     <span class="agent-node-id">{{ getWorkingDirDisplay(session.agent.working_dir) }}</span>
                     <button
@@ -467,7 +467,7 @@
                     <span>全词匹配</span>
                   </label>
                   <div class="workspace-global-search-actions">
-                    <button class="icon-btn workspace-global-search-btn" @click="runGlobalSearch" :disabled="globalSearchLoading || !effectiveGlobalSearchAgentId || !globalSearchQuery.trim()" :title="globalSearchMode === 'filename' ? '文件名搜索' : '全局搜索'">🔍</button>
+                    <button class="icon-btn workspace-global-search-btn" @click="runGlobalSearch" :disabled="globalSearchLoading || !effectiveGlobalSearchAgentId || !globalSearchQuery.trim()" :title="globalSearchMode === 'filename' ? '文件名搜索' : '全局搜索'" v-html="UI_ICONS.search"></button>
                     <button class="icon-btn workspace-global-search-btn" @click="clearGlobalSearch" :disabled="globalSearchLoading" title="清空搜索">✕</button>
                   </div>
                 </div>
@@ -535,7 +535,7 @@
                 <!-- Git 管理目录：默认 Agent 根目录，也可指定任意 Git 目录（复用「打开目录」选择） -->
                 <div class="workspace-git-dir-row">
                   <button class="workspace-open-dir-btn workspace-git-dir-btn" @click="openGitDirDialog" title="选择节点与目录作为 Git 管理目标">
-                    <span class="workspace-open-dir-icon">📂</span>
+                    <span class="workspace-open-dir-icon" v-html="UI_ICONS.folder"></span>
                     <span>选择 Git 目录</span>
                   </button>
                   <div v-if="gitCustomDir" class="workspace-git-dir-current" :title="gitCustomDir.path">
@@ -666,7 +666,7 @@
                         @mousedown.prevent
                         @click.stop="savePaneWorkspaceFile(pane.id)"
                         title="保存本区域文件"
-                      >💾</button>
+                      ><span v-html="UI_ICONS.save"></span></button>
                       <button
                         class="workspace-pane-action"
                         :class="{ editable: isWorkspaceEditable }"
@@ -675,7 +675,7 @@
                         @mousedown.prevent
                         @click.stop="toggleWorkspaceEditable()"
                         :title="isWorkspaceEditable ? '切换到只读模式' : '切换到编辑模式'"
-                      >{{ isWorkspaceEditable ? '🔓' : '🔒' }}</button>
+                      ><span v-html="isWorkspaceEditable ? UI_ICONS.unlock : UI_ICONS.lock"></span></button>
                     </div>
                   </div>
                   <!-- Monaco 多实例：每个 file pane 各渲染一个真实编辑器容器（可编辑），
@@ -715,7 +715,7 @@
                       ></div>
                     </div>
                     <div v-else class="workspace-pane-placeholder" @click="activateWorkspacePane(pane.id)">
-                      <div class="workspace-placeholder-icon">🧾</div>
+                      <div class="workspace-placeholder-icon" v-html="UI_ICONS.receipt"></div>
                       <div class="workspace-placeholder-title">空 diff 区域</div>
                       <div class="workspace-placeholder-text">在左侧「Git」视图中点击提交里的文件，即可在此区域查看 diff。</div>
                     </div>
@@ -830,7 +830,7 @@
                     />
                   </div>
                   <div v-else class="workspace-pane-placeholder" @click="activateWorkspacePane(pane.id)">
-                    <div class="workspace-placeholder-icon">🗂</div>
+                    <div class="workspace-placeholder-icon" v-html="UI_ICONS.folderStack"></div>
                     <div class="workspace-placeholder-title">空会话区域</div>
                     <div class="workspace-placeholder-text">在左侧「Agent 列表」中点击一个 Agent，即可在此区域打开会话。</div>
                   </div>
@@ -1351,7 +1351,7 @@
           :disabled="act.enabled === false"
           @click="onPanelContextAction(act)"
         >
-          <span class="panel-context-icon">{{ act.icon }}</span>
+          <span class="panel-context-icon" v-html="act.icon"></span>
           <span class="panel-context-label">{{ act.label }}</span>
         </button>
       </div>
@@ -1373,7 +1373,7 @@
         :disabled="act.enabled === false"
         @click="runFileTreeContextAction(act)"
       >
-        <span class="file-tree-context-icon">{{ act.icon }}</span>
+        <span class="file-tree-context-icon" v-html="act.icon"></span>
         <span class="file-tree-context-label">{{ act.label }}</span>
       </button>
     </div>
@@ -1463,7 +1463,6 @@
                 fileSelectable
                 :fileList="orchestrateFilteredFiles"
                 :selectedFile="orchestrateHighlightedFile"
-                fileIcon="📄"
                 @update:searchText="orchestrateDirSearchText = $event"
                 @refresh="fetchOrchestrateEntries"
                 @go-parent="goToOrchestrateParentDir"
@@ -5786,6 +5785,36 @@ async function runTabContextAction(act) {
 // ===== 文件树节点图标：按文件类型区分（自绘 16x16 stroke 线性 SVG，与 agent 图标风格一致）=====
 // 目录/文件图标用 currentColor 继承 .folder-icon/.file-icon 的颜色。
 const FILE_TREE_FOLDER_SVG = '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 4.5v7.5a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1H8.2L6.7 4.5h-4.2a1 1 0 0 0-1 1z"/></svg>'
+// 文件树右键菜单图标（自绘 14x14 stroke 线性 SVG，currentColor 继承主题色）
+const FILE_TREE_CTX_ICONS = {
+  newFile: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 1.5h5l3 3v10H4z"/><path d="M9 1.5v3h3"/></svg>',
+  newFolder: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 4.5v7a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1H8.2L6.7 4.5H2.5a1 1 0 0 0-1 1z"/><path d="M8 7v3M6.5 8.5h3"/></svg>',
+  find: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3.5 3.5"/></svg>',
+  refresh: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9"/><path d="M13.5 2.5v3h-3"/></svg>',
+  upload: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 11V3.5M4.5 6 8 2.5 11.5 6"/><path d="M2.5 13.5h11"/></svg>',
+  download: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3.5V11M4.5 7.5 8 11l3.5-3.5"/><path d="M2.5 13.5h11"/></svg>',
+  copy: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1"/><path d="M10.5 5.5v-1a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h1"/></svg>',
+  cut: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="4.5" cy="12" r="2"/><circle cx="11.5" cy="12" r="2"/><path d="M6 11 13 3.5M10 11 3 3.5"/></svg>',
+  paste: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="10" height="11" rx="1"/><path d="M6 3V2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1"/><path d="M6 8h4M6 11h4"/></svg>',
+  copyPath: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="9" height="9" rx="1.5"/><path d="M5 12v.5A1.5 1.5 0 0 0 6.5 14h6a1.5 1.5 0 0 0 1.5-1.5v-6A1.5 1.5 0 0 0 12.5 5H12"/></svg>',
+  link: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 9.5 9.5 6.5"/><path d="M7 11 5.5 12.5a2.1 2.1 0 0 1-3-3L4 8.2"/><path d="M9 5l1.5-1.5a2.1 2.1 0 0 1 3 3L12 8.2"/></svg>',
+  rename: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13l.8-2.6 7.2-7.2a1.4 1.4 0 0 1 2 2l-7.2 7.2z"/><path d="M3 13h3.5"/></svg>',
+  trash: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4.5h10M6.5 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5"/><path d="M4.5 4.5l.7 8.3a1 1 0 0 0 1 .9h3.6a1 1 0 0 0 1-.9l.7-8.3"/><path d="M6.5 7.5v4M9.5 7.5v4"/></svg>',
+  removeDir: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4.5h10M6.5 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5"/><path d="M4.5 4.5l.7 8.3a1 1 0 0 0 1 .9h3.6a1 1 0 0 0 1-.9l.7-8.3"/><path d="M6 7.5l4 4M10 7.5l-4 4"/></svg>',
+}
+// 通用 UI 图标（自绘 stroke 线性 SVG，currentColor 继承主题色）
+const UI_ICONS = {
+  folder: '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 4.5v7a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1H8.2L6.7 4.5H2.5a1 1 0 0 0-1 1z"/></svg>',
+  monitor: '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2.5" width="12" height="8.5" rx="1.5"/><path d="M6 13.5h4M8 11v2.5"/></svg>',
+  search: '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3.5 3.5"/></svg>',
+  save: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2.5h9l1.5 1.5v9.5a1 1 0 0 1-1 1h-10a1 1 0 0 1-1-1v-10a1 1 0 0 1 1-1z"/><path d="M5 2.5v4h5v-4M5 13.5v-5h6v5"/></svg>',
+  lock: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>',
+  unlock: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 4.9-.8"/></svg>',
+  receipt: '<svg viewBox="0 0 16 16" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 1.5h8v13l-1.5-1-1.5 1-1.5-1-1.5 1-1.5-1z"/><path d="M6 5.5h4M6 8h4M6 10.5h2.5"/></svg>',
+  folderStack: '<svg viewBox="0 0 16 16" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5v7a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1H8.2L6.7 4.5H3.5a1 1 0 0 0-1 1z"/><path d="M5 13v.5a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V7.5"/></svg>',
+  eye: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/></svg>',
+  eyeOff: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><path d="M4 4 12 12M8 6.5a1.5 1.5 0 0 1 1.5 1.5"/></svg>',
+}
 // 细粒度扩展名 → 图标文件映射（图标源：material-icon-theme，位于 public/file-icons/）
 const FILE_TYPE_ICON_MAP = {
   // 编程语言
@@ -6598,20 +6627,20 @@ const fileTreeContextActions = computed(() => {
   // 「下载」仅对文件节点可用（目录/根不支持）
   const isFileNode = fileTreeContextMenu.value.node?.type === 'file'
   return [
-    { id: 'new-file', label: '新建文件', icon: '📄', enabled: hasAgent },
-    { id: 'new-folder', label: '新建文件夹', icon: '📁', enabled: hasAgent },
-    { id: 'find-in-folder', label: '在当前目录下查找', icon: '🔍', enabled: hasAgent },
-    { id: 'refresh', label: '刷新', icon: '🔄', enabled: hasAgent },
-    { id: 'upload', label: '上传', icon: '⬆️', enabled: hasAgent },
-    { id: 'download', label: '下载', icon: '⬇️', enabled: isFileNode },
-    { id: 'copy', label: '复制', icon: '📑', enabled: hasNode },
-    { id: 'cut', label: '剪切', icon: '✂️', enabled: hasNode },
-    { id: 'paste', label: '粘贴', icon: '📥', enabled: canPaste },
-    { id: 'copy-path', label: '复制路径', icon: '📋', enabled: hasAgent },
-    { id: 'copy-relative-path', label: '复制相对路径', icon: '🔗', enabled: hasAgent },
-    { id: 'rename', label: '重命名', icon: '✏️', enabled: hasNode },
-    { id: 'delete', label: '删除', icon: '🗑️', enabled: hasNode },
-    { id: 'remove-dir', label: '移除目录', icon: '🚪', enabled: isVirtualDir },
+    { id: 'new-file', label: '新建文件', icon: FILE_TREE_CTX_ICONS.newFile, enabled: hasAgent },
+    { id: 'new-folder', label: '新建文件夹', icon: FILE_TREE_CTX_ICONS.newFolder, enabled: hasAgent },
+    { id: 'find-in-folder', label: '在当前目录下查找', icon: FILE_TREE_CTX_ICONS.find, enabled: hasAgent },
+    { id: 'refresh', label: '刷新', icon: FILE_TREE_CTX_ICONS.refresh, enabled: hasAgent },
+    { id: 'upload', label: '上传', icon: FILE_TREE_CTX_ICONS.upload, enabled: hasAgent },
+    { id: 'download', label: '下载', icon: FILE_TREE_CTX_ICONS.download, enabled: isFileNode },
+    { id: 'copy', label: '复制', icon: FILE_TREE_CTX_ICONS.copy, enabled: hasNode },
+    { id: 'cut', label: '剪切', icon: FILE_TREE_CTX_ICONS.cut, enabled: hasNode },
+    { id: 'paste', label: '粘贴', icon: FILE_TREE_CTX_ICONS.paste, enabled: canPaste },
+    { id: 'copy-path', label: '复制路径', icon: FILE_TREE_CTX_ICONS.copyPath, enabled: hasAgent },
+    { id: 'copy-relative-path', label: '复制相对路径', icon: FILE_TREE_CTX_ICONS.link, enabled: hasAgent },
+    { id: 'rename', label: '重命名', icon: FILE_TREE_CTX_ICONS.rename, enabled: hasNode },
+    { id: 'delete', label: '删除', icon: FILE_TREE_CTX_ICONS.trash, enabled: hasNode },
+    { id: 'remove-dir', label: '移除目录', icon: FILE_TREE_CTX_ICONS.removeDir, enabled: isVirtualDir },
   ]
 })
 
@@ -9779,7 +9808,7 @@ function resolveActionLabel(action, ctx) {
 }
 function resolveActionIcon(action, ctx) {
   if (action.id === 'current-toggle-output') {
-    return ctx.isCurrentAgentOutputHidden && ctx.isCurrentAgentOutputHidden() ? '👁' : '🙈'
+    return ctx.isCurrentAgentOutputHidden && ctx.isCurrentAgentOutputHidden() ? UI_ICONS.eye : UI_ICONS.eyeOff
   }
   return action.icon
 }

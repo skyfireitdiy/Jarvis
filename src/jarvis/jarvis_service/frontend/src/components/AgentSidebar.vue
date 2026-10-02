@@ -7,10 +7,10 @@
     <div class="agent-sidebar-header">
       <h3>Agent 列表</h3>
       <div class="sidebar-header-actions">
-        <button class="icon-btn" tabindex="-1" :class="{ active: isBatchMode }" @mousedown.prevent @click="$emit('toggleBatchMode')" title="批量选择模式">☑</button>
-        <button class="icon-btn" tabindex="-1" @mousedown.prevent @click="openManageGroups" title="管理分组">📁</button>
-        <button class="icon-btn" tabindex="-1" @mousedown.prevent @click="$emit('orchestrate')" title="编排：从编排文件批量创建 Agent">🧩</button>
-        <button class="icon-btn" tabindex="-1" @mousedown.prevent @click="$emit('createAgent')" title="创建新 Agent">➕</button>
+        <button class="icon-btn" tabindex="-1" :class="{ active: isBatchMode }" @mousedown.prevent @click="$emit('toggleBatchMode')" title="批量选择模式" v-html="BTN_ICONS.check"></button>
+        <button class="icon-btn" tabindex="-1" @mousedown.prevent @click="openManageGroups" title="管理分组" v-html="BTN_ICONS.folder"></button>
+        <button class="icon-btn" tabindex="-1" @mousedown.prevent @click="$emit('orchestrate')" title="编排：从编排文件批量创建 Agent" v-html="BTN_ICONS.puzzle"></button>
+        <button class="icon-btn" tabindex="-1" @mousedown.prevent @click="$emit('createAgent')" title="创建新 Agent" v-html="BTN_ICONS.plus"></button>
         <button v-if="!embedded" class="icon-btn" tabindex="-1" @mousedown.prevent @click="$emit('close')" title="关闭侧边栏">✕</button>
       </div>
     </div>
@@ -66,11 +66,11 @@
               </div>
               <div class="agent-dir-line">
                 <span class="agent-dir" :title="workingDirDisplay(agent)">{{ workingDirDisplay(agent) }}</span>
-                <span class="agent-meta-tag">📍 {{ nodeDisplayLabel(agent) }}</span>
-                <span class="agent-meta-tag" v-if="agent.proxy_node">🔀 {{ getProxyNodeLabel(agent) }}</span>
-                <span class="agent-meta-tag" v-if="agent.llm_group">🧠 {{ agent.llm_group }}</span>
-                <span class="agent-meta-tag" v-if="agent.worktree">🌿</span>
-                <span class="agent-meta-tag" v-if="agent.quick_mode">⚡</span>
+                <span class="agent-meta-tag"><span class="meta-icon" v-html="SIDEBAR_ICONS.location"></span> {{ nodeDisplayLabel(agent) }}</span>
+                <span class="agent-meta-tag" v-if="agent.proxy_node"><span class="meta-icon" v-html="SIDEBAR_ICONS.proxy"></span> {{ getProxyNodeLabel(agent) }}</span>
+                <span class="agent-meta-tag" v-if="agent.llm_group"><span class="meta-icon" v-html="SIDEBAR_ICONS.llm"></span> {{ agent.llm_group }}</span>
+                <span class="agent-meta-tag" v-if="agent.worktree"><span class="meta-icon" v-html="SIDEBAR_ICONS.worktree"></span></span>
+                <span class="agent-meta-tag" v-if="agent.quick_mode"><span class="meta-icon" v-html="SIDEBAR_ICONS.quick"></span></span>
               </div>
               <!-- 列表项操作按钮（重命名/复制/权限/重生/删除）已移至 Ctrl+P 命令面板，此处不再显示 -->
             </div>
@@ -108,11 +108,11 @@
             </div>
             <div class="agent-dir-line">
               <span class="agent-dir" :title="workingDirDisplay(agent)">{{ workingDirDisplay(agent) }}</span>
-              <span class="agent-meta-tag">📍 {{ nodeDisplayLabel(agent) }}</span>
-              <span class="agent-meta-tag" v-if="agent.proxy_node">🔀 {{ getProxyNodeLabel(agent) }}</span>
-              <span class="agent-meta-tag" v-if="agent.llm_group">🧠 {{ agent.llm_group }}</span>
-              <span class="agent-meta-tag" v-if="agent.worktree">🌿</span>
-              <span class="agent-meta-tag" v-if="agent.quick_mode">⚡</span>
+              <span class="agent-meta-tag"><span class="meta-icon" v-html="SIDEBAR_ICONS.location"></span> {{ nodeDisplayLabel(agent) }}</span>
+              <span class="agent-meta-tag" v-if="agent.proxy_node"><span class="meta-icon" v-html="SIDEBAR_ICONS.proxy"></span> {{ getProxyNodeLabel(agent) }}</span>
+              <span class="agent-meta-tag" v-if="agent.llm_group"><span class="meta-icon" v-html="SIDEBAR_ICONS.llm"></span> {{ agent.llm_group }}</span>
+              <span class="agent-meta-tag" v-if="agent.worktree"><span class="meta-icon" v-html="SIDEBAR_ICONS.worktree"></span></span>
+              <span class="agent-meta-tag" v-if="agent.quick_mode"><span class="meta-icon" v-html="SIDEBAR_ICONS.quick"></span></span>
             </div>
             <!-- 列表项操作按钮（重命名/复制/权限/重生/删除）已移至 Ctrl+P 命令面板，此处不再显示 -->
           </div>
@@ -124,18 +124,10 @@
           已选 {{ selectedCount }} 个
         </div>
         <div class="batch-actions-buttons">
-          <button class="icon-btn-small" @click="$emit('toggleSelectAll')" :title="isAllSelected ? '取消全选' : '全选'">
-            {{ isAllSelected ? '⬜' : '☑' }}
-          </button>
-          <button class="icon-btn-small" @click="$emit('batchCopy')" title="批量复制">
-            📋
-          </button>
-          <button class="icon-btn-small" @click="openGroupModal" title="加入分组">
-            📁
-          </button>
-          <button class="icon-btn-small stop-btn" @click="$emit('batchDelete')" title="批量删除">
-            🗑
-          </button>
+          <button class="icon-btn-small" @click="$emit('toggleSelectAll')" :title="isAllSelected ? '取消全选' : '全选'" v-html="isAllSelected ? BTN_ICONS.unchecked : BTN_ICONS.check"></button>
+          <button class="icon-btn-small" @click="$emit('batchCopy')" title="批量复制" v-html="BTN_ICONS.copy"></button>
+          <button class="icon-btn-small" @click="openGroupModal" title="加入分组" v-html="BTN_ICONS.folder"></button>
+          <button class="icon-btn-small stop-btn" @click="$emit('batchDelete')" title="批量删除" v-html="BTN_ICONS.trash"></button>
           <button class="icon-btn-small" @click="$emit('toggleBatchMode')" title="退出批量模式">
             ✕
           </button>
@@ -168,7 +160,7 @@
           class="agent-group-item"
           @click="selectGroup(group.id)"
         >
-          <span class="agent-group-item-name">📁 {{ group.name }}</span>
+          <span class="agent-group-item-name"><span class="meta-icon" v-html="BTN_ICONS.folder"></span> {{ group.name }}</span>
           <span class="agent-group-item-count">({{ group.agentIds?.length || 0 }})</span>
         </div>
         <div class="agent-group-create">
@@ -209,12 +201,12 @@
             @blur="confirmRenameGroup"
           />
           <template v-else>
-            <span class="agent-group-item-name">📁 {{ group.name }}</span>
+            <span class="agent-group-item-name"><span class="meta-icon" v-html="BTN_ICONS.folder"></span> {{ group.name }}</span>
             <span class="agent-group-item-count">({{ group.agentIds?.length || 0 }})</span>
           </template>
           <span class="agent-group-item-actions" @click.stop>
-            <button class="icon-btn-small" title="重命名分组" @click="startRenameGroup(group)">✏️</button>
-            <button class="icon-btn-small" title="删除分组" @click="deleteGroup(group)">🗑️</button>
+            <button class="icon-btn-small" title="重命名分组" @click="startRenameGroup(group)" v-html="BTN_ICONS.edit"></button>
+            <button class="icon-btn-small" title="删除分组" @click="deleteGroup(group)" v-html="BTN_ICONS.trash"></button>
           </span>
         </div>
       </div>
@@ -224,6 +216,27 @@
 
 <script setup>
 import { ref, computed, watch, nextTick, defineProps, defineEmits } from 'vue'
+
+// 功能性图标：自绘 16x16 stroke 线性 SVG，currentColor 继承主题色（与 agent 类型图标风格一致）
+const SIDEBAR_ICONS = {
+  location: '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5a4.5 4.5 0 0 0-4.5 4.5c0 3.3 4.5 8.5 4.5 8.5s4.5-5.2 4.5-8.5A4.5 4.5 0 0 0 8 1.5z"/><circle cx="8" cy="6" r="1.5"/></svg>',
+  proxy: '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 13V7a2 2 0 0 1 2-2h6"/><path d="M10 2.5 13 5l-3 2.5"/></svg>',
+  llm: '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="8" height="8" rx="1.5"/><path d="M4 6.5H2.5M4 9.5H2.5M13.5 6.5H12M13.5 9.5H12M6.5 4V2.5M9.5 4V2.5M6.5 13.5V12M9.5 13.5V12"/><circle cx="8" cy="8" r="1.5"/></svg>',
+  worktree: '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 13.5V6a3 3 0 0 1 3-3h3"/><path d="M9.5 1.5 12.5 3l-3 1.5"/><circle cx="5.5" cy="13.5" r="1"/></svg>',
+  quick: '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 1.5 4 9h3l-1 5.5L11.5 7H8z"/></svg>'
+}
+// 通用小图标（按钮用，14px）
+const BTN_ICONS = {
+  check: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="m5 8 2 2 4-4"/></svg>',
+  unchecked: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/></svg>',
+  folder: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 4.5v7a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1H8.2L6.7 4.5H2.5a1 1 0 0 0-1 1z"/></svg>',
+  puzzle: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 3a1.5 1.5 0 0 1 3 0v1h2a1 1 0 0 1 1 1v2h1a1.5 1.5 0 0 1 0 3h-1v2a1 1 0 0 1-1 1H9.5v1a1.5 1.5 0 0 1-3 0v-1H4.5a1 1 0 0 1-1-1V9.5h-1a1.5 1.5 0 0 1 0-3h1V4.5a1 1 0 0 1 1-1h2z"/></svg>',
+  plus: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>',
+  close: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
+  copy: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 4.5h-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/><rect x="5.5" y="2.5" width="5" height="3" rx="0.5"/></svg>',
+  trash: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4.5h10M6.5 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5"/><path d="M4.5 4.5l.7 8.3a1 1 0 0 0 1 .9h3.6a1 1 0 0 0 1-.9l.7-8.3"/><path d="M6.5 7.5v4M9.5 7.5v4"/></svg>',
+  edit: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13l.8-2.6 7.2-7.2a1.4 1.4 0 0 1 2 2l-7.2 7.2z"/><path d="M3 13h3.5"/></svg>'
+}
 
 // 分组折叠状态管理 - 使用对象存储，避免 Set 响应式问题
 const collapsedGroupsMap = ref({})
@@ -1127,6 +1140,16 @@ defineExpose({
   background: var(--color-bg-hover);
   color: var(--color-text-secondary);
   white-space: nowrap;
+}
+
+.meta-icon {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-right: 2px;
+}
+.meta-icon svg {
+  width: 12px;
+  height: 12px;
 }
 
 .agent-node-label {

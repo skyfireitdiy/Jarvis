@@ -166,7 +166,7 @@
               @mousedown.prevent
               @click.stop="$emit('save')"
               title="保存当前文件"
-            >💾</button>
+            ><span v-html="WORKSPACE_ICONS.save"></span></button>
             <button
               class="workspace-pane-action"
               :class="{ editable: isEditable }"
@@ -175,7 +175,7 @@
               @mousedown.prevent
               @click.stop="$emit('toggleEditable')"
               :title="isEditable ? '切换到只读模式' : '切换到编辑模式'"
-            >{{ isEditable ? '🔓' : '🔒' }}</button>
+            ><span v-html="isEditable ? WORKSPACE_ICONS.unlock : WORKSPACE_ICONS.lock"></span></button>
           </div>
         </div>
         <!-- 自由分割模式：由 App.vue 提供整棵 pane 树（含每个 leaf 的内容），
@@ -188,7 +188,7 @@
         <slot name="main-view"></slot>
         <div v-show="mainView === 'file'" class="workspace-main-file-view">
           <div v-if="tabs.length === 0" class="workspace-placeholder">
-            <div class="workspace-placeholder-icon">📝</div>
+            <div class="workspace-placeholder-icon" v-html="WORKSPACE_ICONS.placeholder"></div>
             <div class="workspace-placeholder-title">点击文件树中的文件打开代码编辑器</div>
             <div class="workspace-placeholder-text">支持 Monaco 语法高亮、智能提示、代码折叠、多标签切换与保存。</div>
           </div>
@@ -208,6 +208,14 @@
 
 <script setup>
 import { ref, defineProps, defineEmits } from 'vue'
+
+// 自绘 16x16 stroke 线性 SVG 图标（currentColor 继承主题色），与全局风格一致
+const WORKSPACE_ICONS = {
+  save: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2.5h9l1.5 1.5v9.5a1 1 0 0 1-1 1h-10a1 1 0 0 1-1-1v-10a1 1 0 0 1 1-1z"/><path d="M5 2.5v4h5v-4M5 13.5v-5h6v5"/></svg>',
+  lock: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>',
+  unlock: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 4.9-.8"/></svg>',
+  placeholder: '<svg viewBox="0 0 16 16" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 1.5h8v13l-1.5-1-1.5 1-1.5-1-1.5 1-1.5-1z"/><path d="M6 5.5h4M6 8h4M6 10.5h2.5"/></svg>',
+}
 
 const props = defineProps({
   visible: Boolean,

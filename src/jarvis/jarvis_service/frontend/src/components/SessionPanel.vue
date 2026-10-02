@@ -53,15 +53,15 @@
               <span class="message-separator" v-if="(item.agent_name || item.agent_list) && item.timestamp"> · </span>
               <span class="message-time" v-if="item.timestamp">{{ formatMessageTime(item.timestamp) }}</span>
               <span class="message-separator" v-if="(item.agent_name || item.agent_list || item.timestamp) && (item.non_interactive !== undefined)"> · </span>
-              <span class="message-silent" v-if="item.non_interactive === true" title="静默模式">🔇</span>
-              <span class="message-silent" v-if="item.non_interactive === false" title="交互模式">🔊</span>
+              <span class="message-silent" v-if="item.non_interactive === true" title="静默模式" v-html="SESSION_ICONS.muted"></span>
+              <span class="message-silent" v-if="item.non_interactive === false" title="交互模式" v-html="SESSION_ICONS.speaker"></span>
               <button
                 v-if="ttsSupported && item.text"
                 class="message-speak-btn"
                 :class="{ 'speaking': isSpeaking(item) }"
                 @click.stop="toggleSpeak(item)"
                 :title="isSpeaking(item) ? '停止朗读' : '朗读此消息'"
-              >{{ isSpeaking(item) ? '⏹' : '🔈' }}</button>
+              ><span v-html="isSpeaking(item) ? '⏹' : SESSION_ICONS.speaker"></span></button>
             </div>
           </div>
           <!-- 终端嵌入：suppressTerminal 为真时（该 panel 已被编辑器主区域承载）不渲染，
@@ -139,7 +139,7 @@
           />
           <!-- 缓冲区指示器 -->
           <div class="buffer-indicator" v-if="hasBufferedInput && (agentStatus?.execution_status ?? 'running') !== 'waiting_multi'" @click="$emit('show-buffer')">
-            <span class="buffer-icon">📝</span>
+            <span class="buffer-icon" v-html="SESSION_ICONS.buffer"></span>
             <span class="buffer-text">缓冲区有内容</span>
           </div>
 
@@ -179,7 +179,7 @@
               :disabled="isInputDisabled"
               :title="isRecording ? '停止语音输入' : '语音输入'"
             >
-              {{ isRecording ? '⏹' : '🎤' }}
+              <span v-html="isRecording ? '⏹' : SESSION_ICONS.mic"></span>
             </button>
             <button
               class="send-btn"
@@ -198,8 +198,16 @@
 <script setup>
 import { ref, onBeforeUnmount } from 'vue'
 import { exportElementAsImage } from '../utils/exportImage.js'
+// 自绘 16x16 stroke 线性 SVG 图标（currentColor 继承主题色），与全局风格一致
+const SESSION_ICONS = {
+  muted: '<svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6.5v3h2.5L9 13V3L5 6.5z"/><path d="M11 6.5 13.5 9M13.5 6.5 11 9"/></svg>',
+  speaker: '<svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6.5v3h2.5L9 13V3L5 6.5z"/><path d="M11 6.5a3 3 0 0 1 0 3"/></svg>',
+  buffer: '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 1.5h8v13l-1.5-1-1.5 1-1.5-1-1.5 1-1.5-1z"/><path d="M6 5.5h4M6 8h4"/></svg>',
+  mic: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5.5" y="2" width="5" height="8" rx="2.5"/><path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14"/></svg>',
+}
 
 const props = defineProps({
+
   agent: { type: Object, default: null },
   messages: { type: Array, default: () => [] },
   inputText: { type: String, default: '' },

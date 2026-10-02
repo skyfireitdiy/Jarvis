@@ -6,8 +6,8 @@
         <button class="dir-close-btn" @click="$emit('cancel')">×</button>
       </div>
       <div class="path-header">
-        <button class="path-btn" @click="$emit('refresh', currentPath)">🔄 刷新</button>
-        <button class="path-btn" @click="$emit('go-parent')">⬆</button>
+        <button class="path-btn" @click="$emit('refresh', currentPath)"><span v-html="DIR_ICONS.refresh"></span> 刷新</button>
+        <button class="path-btn" @click="$emit('go-parent')"><span v-html="DIR_ICONS.up"></span></button>
       </div>
       <div class="current-path">{{ currentPath }}</div>
       <div class="dir-search">
@@ -17,7 +17,7 @@
           @input="$emit('update:searchText', $event.target.value)"
           type="text"
           class="dir-search-input"
-          placeholder="🔍 搜索目录..."
+          placeholder="搜索目录..."
           @keydown="$emit('search-keydown', $event)"
         />
       </div>
@@ -29,7 +29,7 @@
           :class="{ selected: selectedDir === dir.path }"
           @click="$emit('select', dir.path); $emit('enter', dir.path, false)"
         >
-          <div class="dir-icon">📁</div>
+          <div class="dir-icon" v-html="DIR_ICONS.folder"></div>
           <div class="dir-name">{{ dir.name }}</div>
           <div class="dir-path">{{ dir.path }}</div>
         </div>
@@ -41,7 +41,7 @@
           :class="{ selected: selectedFile === file.path }"
           @click="$emit('select-file', file.path)"
         >
-          <div class="dir-icon">{{ fileIcon }}</div>
+          <div class="dir-icon" v-html="fileIcon"></div>
           <div class="dir-name">{{ file.name }}</div>
           <div class="dir-path">{{ file.path }}</div>
         </div>
@@ -60,6 +60,13 @@
 <script setup>
 import { ref, watch } from 'vue'
 
+// 自绘 16x16 stroke 线性 SVG 图标（currentColor 继承主题色），与全局风格一致
+const DIR_ICONS = {
+  refresh: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.5-3.5M13 2.5V6h-3.5"/></svg>',
+  up: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 12.5v-9M3.5 8 8 3.5 12.5 8"/></svg>',
+  folder: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 4.5v7a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1H8.2L6.7 4.5H2.5a1 1 0 0 0-1 1z"/></svg>',
+  file: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2.5h7l3 3v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-10a1 1 0 0 1 1-1z"/><path d="M10 2.5v3h3M5.5 8h5M5.5 10.5h5"/></svg>',
+}
 const props = defineProps({
   visible: Boolean,
   currentPath: String,
@@ -97,9 +104,10 @@ const props = defineProps({
   // 文件项图标
   fileIcon: {
     type: String,
-    default: '📄'
+    default: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2.5h7l3 3v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-10a1 1 0 0 1 1-1z"/><path d="M10 2.5v3h3M5.5 8h5M5.5 10.5h5"/></svg>'
   }
 })
+
 
 const emit = defineEmits(['update:visible', 'update:searchText', 'cancel', 'confirm', 'refresh', 'go-parent', 'select', 'enter', 'search-keydown', 'select-file'])
 

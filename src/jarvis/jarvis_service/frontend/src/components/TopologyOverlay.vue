@@ -5,7 +5,7 @@
       <div class="topo-panel" role="dialog" aria-label="网络拓扑">
         <div class="topo-header">
           <div class="topo-title">
-            <span class="topo-title-ico">🗺️</span>
+            <span class="topo-title-ico" v-html="TOPO_ICONS.map"></span>
             <span>网络拓扑</span>
             <span class="topo-sub">{{ counts.online }}/{{ counts.nodes }} 节点在线 · {{ counts.agents }} 个 Agent<template v-if="counts.waiting > 0"> · {{ counts.waiting }} 等待输入</template></span>
           </div>
@@ -182,8 +182,15 @@
               <circle :cx="n.x" :cy="n.y" :r="ACCESS_R"
                       :fill="n.fill" :stroke="n.color" stroke-width="1.8" class="topo-server" />
               <!-- 类型图标 -->
-              <text :x="n.x" :y="n.y" text-anchor="middle" dominant-baseline="central"
-                    class="topo-access-ico">{{ n.icon }}</text>
+              <g :transform="`translate(${n.x - 8}, ${n.y - 8})`">
+                <svg v-if="n.icon === 'extension'" viewBox="0 0 16 16" width="16" height="16" fill="none" :stroke="n.color" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M6 3.5A1.5 1.5 0 0 1 9 3.5V4h1.5A1.5 1.5 0 0 1 12 5.5V7h.5a1.5 1.5 0 0 1 0 3H12v1.5A1.5 1.5 0 0 1 10.5 13H9v.5a1.5 1.5 0 0 1-3 0V13H4.5A1.5 1.5 0 0 1 3 11.5V10h-.5a1.5 1.5 0 0 1 0-3H3V5.5A1.5 1.5 0 0 1 4.5 4H6z"/>
+                </svg>
+                <svg v-else-if="n.icon === 'daemon'" viewBox="0 0 16 16" width="16" height="16" fill="none" :stroke="n.color" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="3" width="12" height="8" rx="1.5"/>
+                  <path d="M5.5 13.5h5M8 11v2.5"/>
+                </svg>
+              </g>
               <!-- 标签文字：纵向时上下放置（顶部行在下、底部行在上）、横向时左右放置（左列在右、右列在左），均朝中间 -->
               <text :x="n.labelAbove === null ? (n.anchor === 'start' ? n.x + ACCESS_R + 16 : n.x - ACCESS_R - 16) : n.x"
                     :y="n.labelAbove === null ? n.y : (n.labelAbove ? n.y - ACCESS_R - 16 : n.y + ACCESS_R + 16)"
@@ -288,13 +295,22 @@
             <span class="topo-legend-item topo-legend-shape">
               <svg width="20" height="18" viewBox="0 0 20 18">
                 <circle cx="10" cy="9" r="7" fill="rgba(8,18,30,0.95)" stroke="#34d99b" stroke-width="1.4" />
-                <text x="10" y="12.4" text-anchor="middle" font-size="8">🧩</text>
+                <g transform="translate(4,3)">
+                  <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="#34d99b" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 3.5A1.5 1.5 0 0 1 9 3.5V4h1.5A1.5 1.5 0 0 1 12 5.5V7h.5a1.5 1.5 0 0 1 0 3H12v1.5A1.5 1.5 0 0 1 10.5 13H9v.5a1.5 1.5 0 0 1-3 0V13H4.5A1.5 1.5 0 0 1 3 11.5V10h-.5a1.5 1.5 0 0 1 0-3H3V5.5A1.5 1.5 0 0 1 4.5 4H6z"/>
+                  </svg>
+                </g>
               </svg>浏览器扩展
             </span>
             <span class="topo-legend-item topo-legend-shape">
               <svg width="20" height="18" viewBox="0 0 20 18">
                 <circle cx="10" cy="9" r="7" fill="rgba(8,18,30,0.95)" stroke="#34d99b" stroke-width="1.4" />
-                <text x="10" y="12.4" text-anchor="middle" font-size="8">🖥</text>
+                <g transform="translate(4,3)">
+                  <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="#34d99b" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="3" width="12" height="8" rx="1.5"/>
+                    <path d="M5.5 13.5h5M8 11v2.5"/>
+                  </svg>
+                </g>
               </svg>后台服务
             </span>
           </div>
@@ -365,6 +381,11 @@ const agentLayout = computed(() =>
 const NODE_COLORS = { online: '#34d99b', offline: '#ff5d6c', unknown: '#8a9bb0' }
 const AGENT_COLORS = { running: '#20c8ff', waiting: '#ffb347', idle: '#8a9bb0', stopped: '#ff5d6c' }
 const AGENT_TEXT = { running: '运行中', waiting: '等待输入', idle: '空闲', stopped: '已停止' }
+
+// 自绘 16x16 stroke 线性 SVG 图标（currentColor 继承主题色），用于替换 A 类功能性 emoji
+const TOPO_ICONS = {
+  map: '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3.5 6 2l4 1.5L14 3v9.5l-4 1-4-1.5L2 13z"/><path d="M6 2v9.5M10 3.5V13"/></svg>',
+}
 
 function nodeColor(state) {
   return NODE_COLORS[state] || NODE_COLORS.unknown
@@ -533,7 +554,7 @@ const localNodes = computed(() => {
       fill: 'rgba(8,18,30,0.95)',
       short: accessShortName(name),
       sub: browserLabel || '浏览器扩展',
-      icon: '🧩',
+      icon: 'extension',
       labelAbove: p.labelAbove,
       anchor: p.anchor,
       title: `浏览器扩展 · ${name}${browserLabel ? ` · ${browserLabel}` : ''}`,
@@ -558,7 +579,7 @@ const localNodes = computed(() => {
       fill: 'rgba(8,18,30,0.95)',
       short: accessShortName(name),
       sub: detail || '后台服务',
-      icon: '🖥',
+      icon: 'daemon',
       labelAbove: p.labelAbove,
       anchor: p.anchor,
       title: `后台服务 · ${name}${detail ? ` · ${detail}` : ''}`,
@@ -846,11 +867,6 @@ defineExpose({ close })
 .topo-node.is-local > .topo-node-label {
   font-size: 11px;
   font-weight: 600;
-}
-/* 接入端胶囊节点内的类型图标（🧩 浏览器扩展 / 🖥 后台服务） */
-.topo-access-ico {
-  font-size: 13px;
-  pointer-events: none;
 }
 .topo-links-local .topo-link {
   stroke-linecap: round;

@@ -175,8 +175,15 @@
           <circle :cx="n.x" :cy="n.y" :r="LOCAL_NODE_RH"
                   :fill="n.fill" :stroke="n.color" stroke-width="1.3" class="lobby-node-body" />
           <!-- 类型图标 -->
-          <text :x="n.x" :y="n.y" text-anchor="middle" dominant-baseline="central"
-                class="lobby-access-ico">{{ n.icon }}</text>
+          <g :transform="`translate(${n.x - 8}, ${n.y - 8})`">
+            <svg v-if="n.icon === 'extension'" viewBox="0 0 16 16" width="16" height="16" fill="none" :stroke="n.color" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 3.5A1.5 1.5 0 0 1 9 3.5V4h1.5A1.5 1.5 0 0 1 12 5.5V7h.5a1.5 1.5 0 0 1 0 3H12v1.5A1.5 1.5 0 0 1 10.5 13H9v.5a1.5 1.5 0 0 1-3 0V13H4.5A1.5 1.5 0 0 1 3 11.5V10h-.5a1.5 1.5 0 0 1 0-3H3V5.5A1.5 1.5 0 0 1 4.5 4H6z"/>
+            </svg>
+            <svg v-else-if="n.icon === 'daemon'" viewBox="0 0 16 16" width="16" height="16" fill="none" :stroke="n.color" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="3" width="12" height="8" rx="1.5"/>
+              <path d="M5.5 13.5h5M8 11v2.5"/>
+            </svg>
+          </g>
           <!-- 标签文字：纵向时上下放置（顶部行在下、底部行在上）、横向时左右放置（左列在右、右列在左），均朝中间 -->
           <text :x="n.labelAbove === null ? (n.anchor === 'start' ? n.x + LOCAL_NODE_RH + 16 : n.x - LOCAL_NODE_RH - 16) : n.x"
                 :y="n.labelAbove === null ? n.y : (n.labelAbove ? n.y - LOCAL_NODE_RH - 16 : n.y + LOCAL_NODE_RH + 16)"
@@ -196,7 +203,7 @@
         :title="roaming ? '点击停止宠物游走' : '点击开启宠物游走'"
         @click.stop="roaming = !roaming"
       >
-        <span class="pet-lobby-roam-icon">{{ roaming ? '🔄' : '⏸' }}</span>
+        <span class="pet-lobby-roam-icon" v-html="roaming ? PET_ICONS.roam : '⏸'"></span>
         <span class="pet-lobby-roam-label">{{ roaming ? '游走中' : '已静止' }}</span>
       </button>
 
@@ -207,7 +214,7 @@
         :title="petsHidden ? '点击显示 Agent 精灵' : '点击隐藏 Agent 精灵'"
         @click.stop="toggleAllPets()"
       >
-        <span class="pet-lobby-display-icon">{{ petsHidden ? '👁' : '🙈' }}</span>
+        <span class="pet-lobby-display-icon" v-html="petsHidden ? PET_ICONS.eye : PET_ICONS.eyeOff"></span>
         <span class="pet-lobby-display-label">{{ petsHidden ? '显示Agent精灵' : '隐藏Agent精灵' }}</span>
       </button>
 
@@ -217,7 +224,7 @@
         :title="allOutputsHidden ? '显示所有 Agent 的输出' : '隐藏所有 Agent 的输出'"
         @click.stop="toggleAllOutputs()"
       >
-        <span class="pet-lobby-display-icon">{{ allOutputsHidden ? '💬' : '🚫' }}</span>
+        <span class="pet-lobby-display-icon" v-html="allOutputsHidden ? PET_ICONS.chat : PET_ICONS.ban"></span>
         <span class="pet-lobby-display-label">{{ allOutputsHidden ? '显示全部输出' : '隐藏全部输出' }}</span>
       </button>
 
@@ -230,7 +237,7 @@
         title="安装浏览器插件"
         @click.stop="openInstallExtensionDialog()"
       >
-        <span class="pet-lobby-display-icon">🧩</span>
+        <span class="pet-lobby-display-icon" v-html="PET_ICONS.puzzle"></span>
         <span class="pet-lobby-display-label">安装浏览器插件</span>
         <span v-if="extensionVersion.outdated" class="pet-lobby-update-dot" title="插件有新版本"></span>
       </button>
@@ -243,7 +250,7 @@
         title="安装本地后台服务"
         @click.stop="openDaemonDialog()"
       >
-        <span class="pet-lobby-display-icon">🖥</span>
+        <span class="pet-lobby-display-icon" v-html="PET_ICONS.monitor"></span>
         <span class="pet-lobby-display-label">本地后台服务</span>
       </button>
     </div>
@@ -320,7 +327,7 @@
             :class="{ exported: pet.exported }"
             :title="pet.exported ? '已导出' : '导出为图片'"
             @click.stop="exportPetOutput(pet)"
-          >{{ pet.exported ? '✓' : '🖼' }}</button>
+          ><span v-html="pet.exported ? '✓' : PET_ICONS.image"></span></button>
         </div>
 
         <!-- 确认控件：需要确认时直接显示（无需点击） -->
@@ -392,7 +399,7 @@
           :disabled="act.enabled === false"
           @click="onContextAction(act)"
         >
-          <span class="lobby-context-icon">{{ act.icon }}</span>
+          <span class="lobby-context-icon" v-html="act.icon"></span>
           <span class="lobby-context-label">{{ act.label }}</span>
         </button>
       </div>
@@ -740,6 +747,24 @@ const STACK_GAP = 4 // 堆叠容器与宠物本体的间距（与 CSS 的 calc(1
 // 节点机箱半高：master 略大（与 nodeItems 中的 rw/rh 保持一致）
 const MASTER_RH = 33
 const NODE_RH = 26
+
+// 自绘 16x16 stroke 线性 SVG 图标（currentColor 继承主题色），用于替换 A 类功能性 emoji
+const PET_ICONS = {
+  roam: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 8.5a5.5 5.5 0 1 1-1.6-3.9"/><path d="M13.5 2.5v3h-3"/></svg>',
+  eye: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 8s2.5-4 6.5-4 6.5 4 6.5 4-2.5 4-6.5 4S1.5 8 1.5 8Z"/><circle cx="8" cy="8" r="1.8"/></svg>',
+  eyeOff: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l10 10"/><path d="M6.2 5.3A6.5 6.5 0 0 1 8 5c4 0 6.5 3 6.5 3a8.7 8.7 0 0 1-1.5 1.8M9.9 10.8A5.4 5.4 0 0 1 8 11c-4 0-6.5-3-6.5-3a8.7 8.7 0 0 1 2.6-2.5"/></svg>',
+  chat: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 3h11v7h-7L3.5 13v-3h-1z"/></svg>',
+  ban: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M4 4l8 8"/></svg>',
+  puzzle: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5A1.5 1.5 0 0 1 9 3.5V4h1.5A1.5 1.5 0 0 1 12 5.5V7h.5a1.5 1.5 0 0 1 0 3H12v1.5A1.5 1.5 0 0 1 10.5 13H9v.5a1.5 1.5 0 0 1-3 0V13H4.5A1.5 1.5 0 0 1 3 11.5V10h-.5a1.5 1.5 0 0 1 0-3H3V5.5A1.5 1.5 0 0 1 4.5 4H6z"/></svg>',
+  monitor: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="12" height="8" rx="1.5"/><path d="M5.5 13.5h5M8 11v2.5"/></svg>',
+  image: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="3" width="11" height="10" rx="1.5"/><circle cx="5.5" cy="6" r="1"/><path d="M3.5 12.5l3.5-3.5 2.5 2.5 2-2 1 1"/></svg>',
+  terminal: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M5 6.5 7 8l-2 1.5M9 10h2.5"/></svg>',
+  refresh: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9"/><path d="M13.5 2.5v3h-3"/></svg>',
+  restart: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.5A5.5 5.5 0 1 0 13.5 8"/><path d="M13.5 2.5v3h-3"/><path d="M8 8.5l2-2"/></svg>',
+  edit: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 2.5a1.8 1.8 0 0 1 2.5 2.5L6 13l-3.5 1L3.5 10.5z"/></svg>',
+  folder: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h3l1.5 2H12.5A1.5 1.5 0 0 1 14 6.5v5A1.5 1.5 0 0 1 12.5 13h-9A1.5 1.5 0 0 1 2 11.5z"/></svg>',
+  folderOpen: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h3l1.5 2H12.5A1.5 1.5 0 0 1 14 6.5v.5H3.5L2 12z"/><path d="M2.5 12.5 4 8.5h9.5l-1 4z"/></svg>',
+}
 
 const stageRef = ref(null)
 const stageSize = ref({ w: 0, h: 0 })
@@ -1162,7 +1187,7 @@ const accessNodes = computed(() => {
       fill: 'rgba(8,18,30,0.7)',
       short: accessShortName(name),
       sub: browserLabel || '浏览器扩展',
-      icon: '🧩',
+      icon: 'extension',
       labelAbove: p.labelAbove,
       anchor: p.anchor,
       title: `浏览器扩展 · ${name}${browserLabel ? ` · ${browserLabel}` : ''}`,
@@ -1187,7 +1212,7 @@ const accessNodes = computed(() => {
       fill: 'rgba(8,18,30,0.7)',
       short: accessShortName(name),
       sub: detail || '后台服务',
-      icon: '🖥',
+      icon: 'daemon',
       labelAbove: p.labelAbove,
       anchor: p.anchor,
       title: `后台服务 · ${name}${detail ? ` · ${detail}` : ''}`,
@@ -1598,10 +1623,10 @@ const contextMenu = ref({ visible: false, x: 0, y: 0, kind: 'pet', agentId: null
 // 节点菜单内置动作：在节点上创建 Agent / 更新代码 / 重启服务（后续可在此追加更多节点功能）
 const NODE_MENU_ACTIONS = [
   { id: 'node-create-agent', icon: '➕', label: '创建 Agent' },
-  { id: 'node-open-terminal', icon: '⌨️', label: '打开终端' },
-  { id: 'node-update-code', icon: '🔄', label: '更新代码' },
-  { id: 'node-restart-service', icon: '♻️', label: '重启服务' },
-  { id: 'node-rename', icon: '✏️', label: '重命名' },
+  { id: 'node-open-terminal', icon: PET_ICONS.terminal, label: '打开终端' },
+  { id: 'node-update-code', icon: PET_ICONS.refresh, label: '更新代码' },
+  { id: 'node-restart-service', icon: PET_ICONS.restart, label: '重启服务' },
+  { id: 'node-rename', icon: PET_ICONS.edit, label: '重命名' },
 ]
 const nodeMenuActions = computed(() => {
   const extra = props.nodeActions || []
@@ -1610,8 +1635,8 @@ const nodeMenuActions = computed(() => {
 
 // 宠物菜单内置动作：添加到分组 / 从分组移出（后续可在此追加更多宠物功能）
 const PET_MENU_ACTIONS = [
-  { id: 'pet-add-to-group', icon: '📁', label: '添加到分组' },
-  { id: 'pet-remove-from-group', icon: '📂', label: '从分组移出' },
+  { id: 'pet-add-to-group', icon: PET_ICONS.folder, label: '添加到分组' },
+  { id: 'pet-remove-from-group', icon: PET_ICONS.folderOpen, label: '从分组移出' },
 ]
 const petMenuActions = computed(() => [...(props.contextActions || []), ...PET_MENU_ACTIONS])
 
@@ -2808,10 +2833,6 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden, openInst
 }
 .lobby-node.is-local .lobby-node-count {
   fill: rgba(150, 190, 210, 0.5);
-}
-/* 接入端胶囊节点内的类型图标（🧩 浏览器扩展 / 🖥 后台服务） */
-.lobby-access-ico {
-  font-size: 11px;
 }
 /* 本机执行面曲线连线 */
 .lobby-links-local .lobby-link {

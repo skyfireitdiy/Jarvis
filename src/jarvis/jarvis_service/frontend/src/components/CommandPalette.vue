@@ -36,6 +36,7 @@
                 <span class="cmd-item-label">
                   <span class="cmd-item-title">{{ entry.action.label }}<span v-if="entry.action.en" class="cmd-item-en">{{ entry.action.en }}</span></span>
                   <span v-if="entry.action.shortcut && entry.action.condition" class="cmd-item-meta">{{ entry.action.condition }}</span>
+                  <span v-else-if="Array.isArray(entry.action.meta)" class="cmd-item-meta"><template v-for="(m, i) in entry.action.meta" :key="i"><span v-if="m.icon" class="cmd-meta-icon" v-html="m.icon"></span>{{ m.text }}<span v-if="i < entry.action.meta.length - 1" class="cmd-meta-sep">　</span></template></span>
                   <span v-else-if="entry.action.meta" class="cmd-item-meta">{{ entry.action.meta }}</span>
                 </span>
                 <span v-if="entry.action.shortcut" class="cmd-item-shortcut">{{ entry.action.shortcut }}</span>
@@ -143,6 +144,16 @@ const emptyText = computed(() => {
 // Agent 图标：仅按类型区分（code_agent / 普通 agent），与大厅/树节点约定一致，
 // 均为 16x16 stroke 线性 SVG（currentColor 继承颜色）。
 // 运行状态用颜色区分（见 agentEntries 的 statusClass 与 .cmd-item-ico 的颜色样式）。
+// Agent 元信息图标（命令面板 meta 标签）：16x16 stroke 线性 SVG（currentColor 继承颜色）
+const COMMAND_META_ICONS = {
+  monitor: '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2.5" width="12" height="8.5" rx="1.5"/><path d="M6 13.5h4M8 11v2.5"/></svg>',
+  proxy: '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="4" cy="4" r="1.8"/><circle cx="12" cy="4" r="1.8"/><circle cx="8" cy="12" r="1.8"/><path d="M5.5 5 7 10.5M10.5 5 9 10.5M5.5 4h5"/></svg>',
+  brain: '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.5a2 2 0 0 0-2 2v.5a2 2 0 0 0-2 2 2 2 0 0 0-1 1.7 2 2 0 0 0 1 1.7 2 2 0 0 0 2 2v.6a2 2 0 0 0 4 0v-.6a2 2 0 0 0 2-2 2 2 0 0 0 1-1.7 2 2 0 0 0-1-1.7 2 2 0 0 0-2-2V4.5a2 2 0 0 0-2-2z"/><path d="M8 2.5v11"/></svg>',
+  bolt: '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 1.5 3 9h4l-1 5.5 6-7.5H8z"/></svg>',
+  leaf: '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13C3 6 7 2.5 13 2.5c.5 5-2 9.5-8 10.5z"/><path d="M3 13c2-3 5-5.5 8-7"/></svg>',
+  folder: '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 4.5v7a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1H8.2L6.7 4.5H2.5a1 1 0 0 0-1 1z"/></svg>',
+  file: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2.5h7l3 3v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-10a1 1 0 0 1 1-1z"/><path d="M10 2.5v3h3"/></svg>',
+}
 const AGENT_ICON_SVG = {
   code: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 4.5 2.5 8l3 3.5M10.5 4.5l3 3.5-3 3.5"/><path d="M9.5 3.5l-3 9"/></svg>',
   agent: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="10" height="7" rx="2"/><circle cx="5.5" cy="8.5" r="0.7" fill="currentColor" stroke="none"/><circle cx="10.5" cy="8.5" r="0.7" fill="currentColor" stroke="none"/><path d="M6 3.5 8 5l2-1.5"/><path d="M5 12v1.5M11 12v1.5"/><path d="M3 10H1.5M14.5 10H13"/></svg>'
@@ -176,12 +187,12 @@ const agentEntries = computed(() => {
     .map(agent => {
       const nodeLabel = typeof ctx.getAgentNodeLabel === 'function' ? ctx.getAgentNodeLabel(agent) : ''
       const metaParts = []
-      if (nodeLabel) metaParts.push(`🖥 ${nodeLabel}`)
-      if (agent?.proxy_node) metaParts.push(`🔀 代理 ${agent.proxy_node}`)
-      if (agent?.llm_group) metaParts.push(`🧠 ${agent.llm_group}`)
-      if (agent?.quick_mode) metaParts.push('⚡ 极速')
-      if (agent?.worktree) metaParts.push('🌿 worktree')
-      if (agent?.working_dir) metaParts.push(`📁 ${agent.working_dir}`)
+      if (nodeLabel) metaParts.push({ icon: COMMAND_META_ICONS.monitor, text: nodeLabel })
+      if (agent?.proxy_node) metaParts.push({ icon: COMMAND_META_ICONS.proxy, text: `代理 ${agent.proxy_node}` })
+      if (agent?.llm_group) metaParts.push({ icon: COMMAND_META_ICONS.brain, text: agent.llm_group })
+      if (agent?.quick_mode) metaParts.push({ icon: COMMAND_META_ICONS.bolt, text: '极速' })
+      if (agent?.worktree) metaParts.push({ icon: COMMAND_META_ICONS.leaf, text: 'worktree' })
+      if (agent?.working_dir) metaParts.push({ icon: COMMAND_META_ICONS.folder, text: agent.working_dir })
       return {
         id: `agent-switch:${agent.agent_id}`,
         label: agent?.name || agent?.agent_id,
@@ -191,7 +202,7 @@ const agentEntries = computed(() => {
         // 运行状态：用于图标颜色区分（运行中暗绿 / 非运行暗红），与排序的 isRunning 一致
         statusClass: isRunning(agent) ? 'running' : 'stopped',
         keywords: [nodeLabel],
-        meta: metaParts.join('   '),
+        meta: metaParts.length ? metaParts : undefined,
         // 所有 Agent 都可选：可见的切过去（激活），不可见的在当前区域创建 Panel 并打开。
         // 因此不置灰——即使选中「当前 Agent 自身」也有意义（把焦点切回它的会话）。
         disabled: false,
@@ -213,7 +224,7 @@ const fileEntries = computed(() => {
       id: `file-open:${filePath}`,
       label: name,
       group: '文件',
-      icon: '📄',
+      icon: COMMAND_META_ICONS.file,
       keywords: [filePath],
       meta: filePath,
       isFileEntry: true,

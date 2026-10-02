@@ -2,7 +2,7 @@
   <div class="modal-overlay" v-if="visible && hasBufferedInput" @click.self="$emit('close')">
     <div class="modal buffer-modal">
       <div class="buffer-panel-header">
-        <span class="buffer-panel-title">📝 输入缓存</span>
+        <span class="buffer-panel-title"><span v-html="BUFFER_ICONS.buffer"></span> 输入缓存</span>
         <div class="buffer-panel-actions">
           <button
             class="buffer-panel-btn"
@@ -16,7 +16,7 @@
             @click="$emit('clear')"
             title="清空缓存"
           >
-            🗑
+            <span v-html="BUFFER_ICONS.trash"></span>
           </button>
           <button
             class="buffer-panel-btn close-btn"
@@ -50,6 +50,13 @@
 </template>
 
 <script setup>
+
+// 自绘 16x16 stroke 线性 SVG 图标（currentColor 继承主题色），与全局风格一致
+const BUFFER_ICONS = {
+  buffer: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 1.5h8v13l-1.5-1-1.5 1-1.5-1-1.5 1-1.5-1z"/><path d="M6 5.5h4M6 8h4"/></svg>',
+  trash: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4h11M6.5 4V2.5h3V4M4 4l.5 9.5h7L12 4M6.5 7v4M9.5 7v4"/></svg>',
+}
+
 defineProps({
   visible: Boolean,
   hasBufferedInput: Boolean,
