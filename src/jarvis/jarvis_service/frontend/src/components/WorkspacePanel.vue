@@ -36,7 +36,11 @@
           @mousedown.prevent
           @click="$emit('setSidebarView', 'files')"
           title="目录树"
-        >📁</button>
+        >
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M1.5 4.5A1.5 1.5 0 0 1 3 3h2.4l1.6 1.6H13A1.5 1.5 0 0 1 14.5 6v5.5A1.5 1.5 0 0 1 13 13H3a1.5 1.5 0 0 1-1.5-1.5v-7Z"/>
+          </svg>
+        </button>
         <button
           class="workspace-activity-button"
           :class="{ active: showSidebar && sidebarView === 'search' }"
@@ -44,7 +48,12 @@
           @mousedown.prevent
           @click="$emit('setSidebarView', 'search')"
           title="全局搜索"
-        >🔎</button>
+        >
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+            <circle cx="7" cy="7" r="4.5"/>
+            <path d="M10.5 10.5 14 14"/>
+          </svg>
+        </button>
         <button
           class="workspace-activity-button"
           :class="{ active: showSidebar && sidebarView === 'git' }"
@@ -53,8 +62,12 @@
           @click="$emit('setSidebarView', 'git')"
           title="Git (Ctrl+Alt+Shift+V)"
         >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
-            <path d="M15.698 7.287 8.712.302a1.03 1.03 0 0 0-1.457 0l-1.45 1.45 1.84 1.84a1.223 1.223 0 0 1 1.55 1.56l1.773 1.774a1.224 1.224 0 0 1 1.267 2.025 1.226 1.226 0 0 1-2.002-1.334L8.58 5.963v4.353a1.228 1.228 0 1 1-1.008-.036V5.887a1.228 1.228 0 0 1-.666-1.608L5.093 2.466l-4.45 4.45a1.03 1.03 0 0 0 0 1.457l6.986 6.986a1.03 1.03 0 0 0 1.457 0l6.612-6.612a1.03 1.03 0 0 0 0-1.46z"/>
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="5" cy="4" r="1.5"/>
+            <circle cx="5" cy="12" r="1.5"/>
+            <circle cx="11" cy="8" r="1.5"/>
+            <path d="M5 5.5v5"/>
+            <path d="M6.5 12H9.5a1.5 1.5 0 0 0 1.5-1.5V9"/>
           </svg>
         </button>
         <button
@@ -64,7 +77,11 @@
           @mousedown.prevent
           @click="$emit('setMainView', 'chat')"
           title="聊天室"
-        >💬</button>
+        >
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v6a1.5 1.5 0 0 1-1.5 1.5H6.5L3.5 14v-3H3.5A1.5 1.5 0 0 1 2 9.5v-6Z"/>
+          </svg>
+        </button>
         <button
           class="workspace-activity-button"
           :class="{ active: mainView === 'terminal' }"
@@ -72,21 +89,28 @@
           @mousedown.prevent
           @click="$emit('setMainView', 'terminal')"
           title="终端"
-        >⌨️</button>
+        >
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12.5v-9Z"/>
+            <path d="M5 6l2 2-2 2"/>
+            <path d="M8.5 10H11"/>
+          </svg>
+        </button>
         <button
           class="workspace-activity-button"
           tabindex="-1"
           @mousedown.prevent
           @click="$emit('openSettings')"
           title="设置 (Ctrl+Alt+,)"
-        >⚙</button>
-        <button
-          class="workspace-activity-button"
-          tabindex="-1"
-          @mousedown.prevent
-          @click="$emit('openDocs')"
-          title="使用文档 (Ctrl+Alt+Shift+H)"
-        >❓</button>
+        >
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="8" cy="8" r="1.5"/>
+            <circle cx="8" cy="8" r="4.2"/>
+            <g stroke-width="2.4">
+              <path d="M8 3.8v-2M10.97 5.03l1.41-1.41M12.2 8h2M10.97 10.97l1.41 1.41M8 12.2v2M5.03 10.97l-1.41 1.41M3.8 8h-2M5.03 5.03l-1.41-1.41"/>
+            </g>
+          </svg>
+        </button>
         <button
           v-if="isAdmin"
           class="workspace-activity-button"
@@ -94,7 +118,25 @@
           @mousedown.prevent
           @click="$emit('openAdmin')"
           title="管理 (Ctrl+Alt+Shift+A)"
-        >🛡️</button>
+        >
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M8 1.5 13 3.5v4c0 3-2 5.5-5 7-3-1.5-5-4-5-7v-4L8 1.5Z"/>
+            <path d="M5.5 8l1.7 1.7L10.5 6"/>
+          </svg>
+        </button>
+        <button
+          class="workspace-activity-button"
+          tabindex="-1"
+          @mousedown.prevent
+          @click="$emit('openDocs')"
+          title="使用文档 (Ctrl+Alt+Shift+H)"
+        >
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="8" cy="8" r="6"/>
+            <path d="M6.3 6.4a1.7 1.7 0 1 1 2.8 1.3c-.8.6-1.1 1-1.1 1.8"/>
+            <circle cx="8" cy="11.6" r="0.4" fill="currentColor" stroke="none"/>
+          </svg>
+        </button>
       </div>
       <slot name="sidebar"></slot>
       <div class="workspace-panel-content workspace-panel-content-main">
