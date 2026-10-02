@@ -24,16 +24,18 @@
         <div class="form-group" v-else><button class="ghost-btn" @click="showCreateUser = true">+ 创建用户</button></div>
         <div class="form-group">
           <div v-if="loading" style="text-align:center;padding:16px;color:var(--text-secondary,#888)">加载中...</div>
-          <table v-else class="admin-table">
-            <thead><tr><th>用户名</th><th>显示名</th><th>管理员</th><th>操作</th></tr></thead>
-            <tbody>
-              <tr v-for="user in users" :key="user.user_id">
-                <td>{{ user.username }}</td><td>{{ user.display_name || '-' }}</td><td>{{ user.is_admin ? '是' : '否' }}</td>
-                <td><div class="btn-group"><button class="btn-sm" @click="openEditUser(user)">编辑</button><button class="btn-sm" @click="openGroupAssign(user)">分配组</button><button class="btn-sm" @click="openResetPassword(user)">重置密码</button><button class="btn-sm danger" @click="deleteUser(user)" :disabled="user.user_id === currentUserId">删除</button></div></td>
-              </tr>
-              <tr v-if="users.length === 0"><td colspan="4" style="text-align:center;color:var(--text-secondary,#888)">暂无用户</td></tr>
-            </tbody>
-          </table>
+          <div v-else class="table-scroll">
+            <table class="admin-table">
+              <thead><tr><th>用户名</th><th>显示名</th><th>管理员</th><th>操作</th></tr></thead>
+              <tbody>
+                <tr v-for="user in users" :key="user.user_id">
+                  <td>{{ user.username }}</td><td>{{ user.display_name || '-' }}</td><td>{{ user.is_admin ? '是' : '否' }}</td>
+                  <td><div class="btn-group"><button class="btn-sm" @click="openEditUser(user)">编辑</button><button class="btn-sm" @click="openGroupAssign(user)">分配组</button><button class="btn-sm" @click="openResetPassword(user)">重置密码</button><button class="btn-sm danger" @click="deleteUser(user)" :disabled="user.user_id === currentUserId">删除</button></div></td>
+                </tr>
+                <tr v-if="users.length === 0"><td colspan="4" style="text-align:center;color:var(--text-secondary,#888)">暂无用户</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
         <!-- 用户组分配 -->
         <div class="expand-section" v-if="showGroupAssign && selectedUser">
@@ -83,16 +85,18 @@
         <div class="form-group" v-else><button class="ghost-btn" @click="showCreateGroup = true">+ 创建权限组</button></div>
         <div class="form-group">
           <div v-if="loading" style="text-align:center;padding:16px;color:var(--text-secondary,#888)">加载中...</div>
-          <table v-else class="admin-table">
-            <thead><tr><th>组名</th><th>显示名</th><th>描述</th><th>操作</th></tr></thead>
-            <tbody>
-              <tr v-for="group in groups" :key="group.group_id">
-                <td>{{ group.name }}</td><td>{{ group.display_name || '-' }}</td><td>{{ group.description || '-' }}</td>
-                <td><div class="btn-group"><button class="btn-sm" @click="openEditGroup(group)">编辑</button><button class="btn-sm danger" @click="deleteGroup(group)">删除</button></div></td>
-              </tr>
-              <tr v-if="groups.length === 0"><td colspan="4" style="text-align:center;color:var(--text-secondary,#888)">暂无权限组</td></tr>
-            </tbody>
-          </table>
+          <div v-else class="table-scroll">
+            <table class="admin-table">
+              <thead><tr><th>组名</th><th>显示名</th><th>描述</th><th>操作</th></tr></thead>
+              <tbody>
+                <tr v-for="group in groups" :key="group.group_id">
+                  <td>{{ group.name }}</td><td>{{ group.display_name || '-' }}</td><td>{{ group.description || '-' }}</td>
+                  <td><div class="btn-group"><button class="btn-sm" @click="openEditGroup(group)">编辑</button><button class="btn-sm danger" @click="deleteGroup(group)">删除</button></div></td>
+                </tr>
+                <tr v-if="groups.length === 0"><td colspan="4" style="text-align:center;color:var(--text-secondary,#888)">暂无权限组</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
         <!-- 编辑组 -->
         <div class="expand-section" v-if="showEditGroup && selectedGroup">
@@ -103,24 +107,26 @@
           <div class="permission-matrix">
             <div style="margin-bottom:8px;font-weight:600;font-size:13px">权限设置</div>
             <div v-if="loadingGroupPerms" style="color:var(--text-secondary,#888);font-size:13px">加载权限中...</div>
-            <table v-else class="perm-table">
-              <thead><tr><th>资源</th><th>动作</th><th>权限</th></tr></thead>
-              <tbody>
-                <template v-for="(actions, resource) in permissionSchema" :key="resource">
-                  <tr v-for="(action, idx) in actions" :key="resource + ':' + action">
-                    <td v-if="idx === 0" :rowspan="actions.length" class="perm-resource-cell">{{ resourceLabels[resource] || resource }}</td>
-                    <td class="perm-action-cell">{{ action }}</td>
-                    <td class="perm-value-cell">
-                      <select class="perm-select" v-model="editPermissions[resource + ':' + action]">
-                        <option value="">无</option>
-                        <option value="allow">✓ 允许</option>
-                        <option value="deny">✗ 拒绝</option>
-                      </select>
-                    </td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
+            <div v-else class="table-scroll">
+              <table class="perm-table">
+                <thead><tr><th>资源</th><th>动作</th><th>权限</th></tr></thead>
+                <tbody>
+                  <template v-for="(actions, resource) in permissionSchema" :key="resource">
+                    <tr v-for="(action, idx) in actions" :key="resource + ':' + action">
+                      <td v-if="idx === 0" :rowspan="actions.length" class="perm-resource-cell">{{ resourceLabels[resource] || resource }}</td>
+                      <td class="perm-action-cell">{{ action }}</td>
+                      <td class="perm-value-cell">
+                        <select class="perm-select" v-model="editPermissions[resource + ':' + action]">
+                          <option value="">无</option>
+                          <option value="allow">✓ 允许</option>
+                          <option value="deny">✗ 拒绝</option>
+                        </select>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
           </div>
           <!-- 可访问节点 -->
           <div class="permission-matrix" style="margin-top:12px">
@@ -910,6 +916,12 @@ const maskedNodeSecret = computed(() => {
 .btn-sm.danger { color: var(--color-error, #ff3c48); border-color: rgba(255,60,72,0.3); }
 .btn-sm.danger:hover { background: rgba(255,60,72,0.1); }
 
+/* 表格滚动容器（窄屏横向滚动，避免表格溢出） */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* 表格 */
 .admin-table {
   width: 100%; border-collapse: collapse; font-size: 13px;
@@ -1276,5 +1288,94 @@ const maskedNodeSecret = computed(() => {
 .config-backup-actions .ghost-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* ==================== 移动端适配 (< 768px) ==================== */
+@media (max-width: 768px) {
+  /* 模态框全屏展示，充分利用窄屏空间 */
+  .admin-modal {
+    width: 100%;
+    max-width: none;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .modal-header {
+    padding: 12px 16px;
+  }
+
+  .modal-header h2 {
+    font-size: 16px;
+  }
+
+  /* Tab 导航：允许横向滚动，避免挤压换行 */
+  .admin-tabs {
+    padding: 0 8px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-tab {
+    padding: 10px 14px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .tab-content {
+    padding: 14px 12px;
+  }
+
+  /* 表单行：纵向排列，标签在上输入在下 */
+  .form-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .form-row > label {
+    min-width: 0;
+  }
+
+  /* 按钮组：允许换行，避免按钮溢出 */
+  .btn-group {
+    flex-wrap: wrap;
+  }
+
+  /* 操作按钮增大触摸区域 */
+  .btn-sm,
+  .ghost-btn {
+    min-height: 36px;
+  }
+
+  /* 表格单元格压缩内边距 */
+  .admin-table th,
+  .admin-table td {
+    padding: 8px 10px;
+  }
+
+  /* 重启服务区域：按钮占满整行 */
+  .restart-service-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .restart-service-row .ghost-btn {
+    width: 100%;
+  }
+
+  .secret-actions {
+    flex-wrap: wrap;
+  }
+
+  .secret-actions .ghost-btn {
+    flex: 1;
+    text-align: center;
+  }
+
+  .config-backup-actions {
+    flex-wrap: wrap;
+  }
 }
 </style>
