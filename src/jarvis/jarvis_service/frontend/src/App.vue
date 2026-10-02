@@ -19348,6 +19348,16 @@ body::-webkit-scrollbar {
   overflow: hidden;
 }
 
+/* PWA 全屏/独立模式：内容延伸到屏幕最顶部，去掉状态栏/挖孔安全边距（实现真正全屏）。
+   注意：仅在 PWA 安装模式下生效；浏览器标签页模式仍保留安全边距，避免被浏览器顶栏遮挡。 */
+@media (display-mode: fullscreen), (display-mode: standalone) {
+  .app {
+    padding-top: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
 /* 未登录时隐藏后台界面，仅保留登录弹窗与背景 */
 .app.not-connected :deep(.agent-sidebar),
 .app.not-connected > .main-content-wrapper {
