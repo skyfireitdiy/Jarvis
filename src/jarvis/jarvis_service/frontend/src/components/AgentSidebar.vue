@@ -47,7 +47,20 @@
                 <input type="checkbox" :checked="isSelected(agent.agent_id)" @change="$emit('toggleSelectAgent', agent.agent_id)">
               </div>
               <div class="agent-info">
-                <span class="agent-type-icon" :title="agent.agent_type">{{ agent.agent_type === 'code_agent' ? '💻' : '🤖' }}</span>
+                <span class="agent-type-icon" :title="agent.agent_type">
+                  <svg v-if="agent.agent_type === 'code_agent'" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M5.5 4.5 2.5 8l3 3.5M10.5 4.5l3 3.5-3 3.5"/>
+                    <path d="M9.5 3.5l-3 9"/>
+                  </svg>
+                  <svg v-else viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="3" y="5" width="10" height="7" rx="2"/>
+                    <circle cx="5.5" cy="8.5" r="0.7" fill="currentColor" stroke="none"/>
+                    <circle cx="10.5" cy="8.5" r="0.7" fill="currentColor" stroke="none"/>
+                    <path d="M6 3.5 8 5l2-1.5"/>
+                    <path d="M5 12v1.5M11 12v1.5"/>
+                    <path d="M3 10H1.5M14.5 10H13"/>
+                  </svg>
+                </span>
                 <span class="agent-name">{{ agent.name }}</span>
                 <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
               </div>
@@ -76,7 +89,20 @@
               <input type="checkbox" :checked="isSelected(agent.agent_id)" @change="$emit('toggleSelectAgent', agent.agent_id)">
             </div>
             <div class="agent-info">
-              <span class="agent-type-icon" :title="agent.agent_type">{{ agent.agent_type === 'code_agent' ? '💻' : '🤖' }}</span>
+              <span class="agent-type-icon" :title="agent.agent_type">
+                <svg v-if="agent.agent_type === 'code_agent'" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M5.5 4.5 2.5 8l3 3.5M10.5 4.5l3 3.5-3 3.5"/>
+                  <path d="M9.5 3.5l-3 9"/>
+                </svg>
+                <svg v-else viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="3" y="5" width="10" height="7" rx="2"/>
+                  <circle cx="5.5" cy="8.5" r="0.7" fill="currentColor" stroke="none"/>
+                  <circle cx="10.5" cy="8.5" r="0.7" fill="currentColor" stroke="none"/>
+                  <path d="M6 3.5 8 5l2-1.5"/>
+                  <path d="M5 12v1.5M11 12v1.5"/>
+                  <path d="M3 10H1.5M14.5 10H13"/>
+                </svg>
+              </span>
               <span class="agent-name">{{ agent.name }}</span>
               <span class="agent-status-dot" :class="getStatusClass(agent)" :title="getStatusText(agent)"></span>
             </div>

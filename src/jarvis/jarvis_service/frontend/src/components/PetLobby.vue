@@ -273,7 +273,20 @@
         </div>
         <div class="lobby-pet-shadow"></div>
       </div>
-      <div class="lobby-pet-name"><span class="lobby-pet-type">{{ pet.agentType === 'code_agent' ? '💻' : '🤖' }}</span>{{ pet.name }}</div>
+      <div class="lobby-pet-name"><span class="lobby-pet-type">
+        <svg v-if="pet.agentType === 'code_agent'" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M5.5 4.5 2.5 8l3 3.5M10.5 4.5l3 3.5-3 3.5"/>
+          <path d="M9.5 3.5l-3 9"/>
+        </svg>
+        <svg v-else viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="5" width="10" height="7" rx="2"/>
+          <circle cx="5.5" cy="8.5" r="0.7" fill="currentColor" stroke="none"/>
+          <circle cx="10.5" cy="8.5" r="0.7" fill="currentColor" stroke="none"/>
+          <path d="M6 3.5 8 5l2-1.5"/>
+          <path d="M5 12v1.5M11 12v1.5"/>
+          <path d="M3 10H1.5M14.5 10H13"/>
+        </svg>
+      </span>{{ pet.name }}</div>
       <div v-if="petWorkingDir(pet)" class="lobby-pet-dir" :title="petWorkingDir(pet)">{{ petWorkingDir(pet) }}</div>
       <div class="lobby-pet-status" :class="pet.statusClass"></div>
 
@@ -3363,7 +3376,7 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden, openInst
   text-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
   pointer-events: none;
 }
-/* 类型图标：CodeAgent 💻 / 普通 Agent 🤖，与侧边栏列表保持一致 */
+/* 类型图标：CodeAgent / 普通 Agent，与侧边栏列表保持一致（SVG stroke 线性） */
 .lobby-pet-type {
   margin-right: 3px;
   font-size: 10px;

@@ -229,7 +229,20 @@
             <ul v-if="hoverInfo.agents.length" class="topo-card-list">
               <li v-for="a in hoverInfo.agents" :key="a.id">
                 <span class="topo-dot" :style="{ background: agentColor(a.state) }"></span>
-                <span class="topo-card-type">{{ a.type === 'code_agent' ? '💻' : '🤖' }}</span>
+                <span class="topo-card-type">
+                  <svg v-if="a.type === 'code_agent'" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M5.5 4.5 2.5 8l3 3.5M10.5 4.5l3 3.5-3 3.5"/>
+                    <path d="M9.5 3.5l-3 9"/>
+                  </svg>
+                  <svg v-else viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="3" y="5" width="10" height="7" rx="2"/>
+                    <circle cx="5.5" cy="8.5" r="0.7" fill="currentColor" stroke="none"/>
+                    <circle cx="10.5" cy="8.5" r="0.7" fill="currentColor" stroke="none"/>
+                    <path d="M6 3.5 8 5l2-1.5"/>
+                    <path d="M5 12v1.5M11 12v1.5"/>
+                    <path d="M3 10H1.5M14.5 10H13"/>
+                  </svg>
+                </span>
                 <span class="topo-card-name">{{ a.name }}</span>
                 <span class="topo-card-state" :style="{ color: agentColor(a.state) }">{{ AGENT_TEXT[a.state] || a.state }}</span>
               </li>

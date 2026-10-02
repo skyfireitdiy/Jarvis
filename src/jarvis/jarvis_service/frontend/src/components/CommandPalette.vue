@@ -32,7 +32,7 @@
                 @click="run(entry.action)"
                 @mousemove="onItemHover(entry.flatIndex)"
               >
-                <span class="cmd-item-ico">{{ entry.action.icon }}</span>
+                <span class="cmd-item-ico" v-html="entry.action.icon"></span>
                 <span class="cmd-item-label">
                   <span class="cmd-item-title">{{ entry.action.label }}<span v-if="entry.action.en" class="cmd-item-en">{{ entry.action.en }}</span></span>
                   <span v-if="entry.action.shortcut && entry.action.condition" class="cmd-item-meta">{{ entry.action.condition }}</span>
@@ -140,11 +140,15 @@ const emptyText = computed(() => {
   return '无匹配命令'
 })
 
-// Agent 图标：仅按类型区分（code_agent 💻 / 普通 agent 🤖），与大厅/树节点约定一致
-// （App.vue: agent_type === 'agent' ? '🤖' : code_agent ? '💻'）。
+// Agent 图标：仅按类型区分（code_agent / 普通 agent），与大厅/树节点约定一致，
+// 均为 16x16 stroke 线性 SVG（currentColor 继承颜色）。
 // 运行状态用颜色区分（见 agentEntries 的 statusClass 与 .cmd-item-ico 的颜色样式）。
+const AGENT_ICON_SVG = {
+  code: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 4.5 2.5 8l3 3.5M10.5 4.5l3 3.5-3 3.5"/><path d="M9.5 3.5l-3 9"/></svg>',
+  agent: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="10" height="7" rx="2"/><circle cx="5.5" cy="8.5" r="0.7" fill="currentColor" stroke="none"/><circle cx="10.5" cy="8.5" r="0.7" fill="currentColor" stroke="none"/><path d="M6 3.5 8 5l2-1.5"/><path d="M5 12v1.5M11 12v1.5"/><path d="M3 10H1.5M14.5 10H13"/></svg>'
+}
 function agentTypeIcon(agent) {
-  return agent?.agent_type === 'code_agent' ? '💻' : '🤖'
+  return agent?.agent_type === 'code_agent' ? AGENT_ICON_SVG.code : AGENT_ICON_SVG.agent
 }
 
 // 将 Agent 列表转换为动作对象，复用命令面板的渲染与键盘导航

@@ -150,7 +150,20 @@
                       class="tree-node-icon expand-arrow"
                       :class="{ expanded: expandedAgents.has(agent.agent_id) }"
                     >▶</span>
-                    <span class="tree-node-icon agent-icon">{{ agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'code_agent' ? '💻' : '🤖' }}</span>
+                    <span class="tree-node-icon agent-icon">
+                      <svg v-if="agent.agent_type === 'code_agent'" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M5.5 4.5 2.5 8l3 3.5M10.5 4.5l3 3.5-3 3.5"/>
+                        <path d="M9.5 3.5l-3 9"/>
+                      </svg>
+                      <svg v-else viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="3" y="5" width="10" height="7" rx="2"/>
+                        <circle cx="5.5" cy="8.5" r="0.7" fill="currentColor" stroke="none"/>
+                        <circle cx="10.5" cy="8.5" r="0.7" fill="currentColor" stroke="none"/>
+                        <path d="M6 3.5 8 5l2-1.5"/>
+                        <path d="M5 12v1.5M11 12v1.5"/>
+                        <path d="M3 10H1.5M14.5 10H13"/>
+                      </svg>
+                    </span>
                     <span class="tree-node-text agent-name">{{ agent.name || agent.agent_id }}</span>
                     <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusClass(agent) === 'stopped' ? '⏹' : getStatusClass(agent) === 'running' ? '▶' : '⏸' }}</span>
                     <span class="agent-node-id">{{ getNodeDisplayName(agent.node_id) }}</span>
@@ -203,7 +216,8 @@
                           <span
                             class="tree-node-icon"
                             :class="visibleNode.node.type === 'directory' ? 'folder-icon' : 'file-icon'"
-                          >{{ visibleNode.node.type === 'directory' ? '📁' : '📄' }}</span>
+                            v-html="getFileTypeIcon(visibleNode.node)"
+                          ></span>
                           <span
                             class="tree-node-text"
                             :class="visibleNode.node.type === 'directory' ? 'directory' : 'file'"
@@ -277,7 +291,8 @@
                           <span
                             class="tree-node-icon"
                             :class="visibleNode.node.type === 'directory' ? 'folder-icon' : 'file-icon'"
-                          >{{ visibleNode.node.type === 'directory' ? '📁' : '📄' }}</span>
+                            v-html="getFileTypeIcon(visibleNode.node)"
+                          ></span>
                           <span
                             class="tree-node-text"
                             :class="visibleNode.node.type === 'directory' ? 'directory' : 'file'"
@@ -312,7 +327,20 @@
                             class="tree-node-icon expand-arrow"
                             :class="{ expanded: expandedAgents.has(agent.agent_id) }"
                           >▶</span>
-                          <span class="tree-node-icon agent-icon">{{ agent.agent_type === 'agent' ? '🤖' : agent.agent_type === 'code_agent' ? '💻' : '🤖' }}</span>
+                          <span class="tree-node-icon agent-icon">
+                            <svg v-if="agent.agent_type === 'code_agent'" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                              <path d="M5.5 4.5 2.5 8l3 3.5M10.5 4.5l3 3.5-3 3.5"/>
+                              <path d="M9.5 3.5l-3 9"/>
+                            </svg>
+                            <svg v-else viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                              <rect x="3" y="5" width="10" height="7" rx="2"/>
+                              <circle cx="5.5" cy="8.5" r="0.7" fill="currentColor" stroke="none"/>
+                              <circle cx="10.5" cy="8.5" r="0.7" fill="currentColor" stroke="none"/>
+                              <path d="M6 3.5 8 5l2-1.5"/>
+                              <path d="M5 12v1.5M11 12v1.5"/>
+                              <path d="M3 10H1.5M14.5 10H13"/>
+                            </svg>
+                          </span>
                           <span class="tree-node-text agent-name">{{ agent.name || agent.agent_id }}</span>
                           <span class="agent-status" :class="getStatusClass(agent)">{{ getStatusClass(agent) === 'stopped' ? '⏹' : getStatusClass(agent) === 'running' ? '▶' : '⏸' }}</span>
                           <span class="agent-node-id">{{ getNodeDisplayName(agent.node_id) }}</span>
@@ -365,7 +393,8 @@
                                 <span
                                   class="tree-node-icon"
                                   :class="visibleNode.node.type === 'directory' ? 'folder-icon' : 'file-icon'"
-                                >{{ visibleNode.node.type === 'directory' ? '📁' : '📄' }}</span>
+                                  v-html="getFileTypeIcon(visibleNode.node)"
+                                ></span>
                                 <span
                                   class="tree-node-text"
                                   :class="visibleNode.node.type === 'directory' ? 'directory' : 'file'"
@@ -5752,6 +5781,89 @@ async function runTabContextAction(act) {
   for (const path of targets) {
     await closeWorkspaceTab(path, paneId, true)
   }
+}
+
+// ===== 文件树节点图标：按文件类型区分（自绘 16x16 stroke 线性 SVG，与 agent 图标风格一致）=====
+// 目录/文件图标用 currentColor 继承 .folder-icon/.file-icon 的颜色。
+const FILE_TREE_FOLDER_SVG = '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 4.5v7.5a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1H8.2L6.7 4.5h-4.2a1 1 0 0 0-1 1z"/></svg>'
+// 细粒度扩展名 → 图标文件映射（图标源：material-icon-theme，位于 public/file-icons/）
+const FILE_TYPE_ICON_MAP = {
+  // 编程语言
+  py: 'python', pyw: 'python',
+  cpp: 'cpp', cc: 'cpp', cxx: 'cpp', hpp: 'cpp', hxx: 'cpp',
+  c: 'c', h: 'c',
+  cs: 'csharp',
+  js: 'javascript', jsx: 'javascript', mjs: 'javascript', cjs: 'javascript',
+  ts: 'typescript', tsx: 'typescript',
+  json: 'json',
+  java: 'java',
+  kt: 'kotlin', kts: 'kotlin',
+  go: 'go',
+  rs: 'rust',
+  rb: 'ruby',
+  php: 'php',
+  swift: 'swift',
+  vue: 'vue',
+  svelte: 'svelte',
+  ps1: 'powershell', psd1: 'powershell', psm1: 'powershell',
+  sh: 'shellcheck', bash: 'shellcheck', zsh: 'shellcheck', fish: 'shellcheck',
+  // 标记 / 样式
+  html: 'html', htm: 'html',
+  css: 'css',
+  scss: 'sass', sass: 'sass', less: 'sass',
+  xml: 'xml',
+  md: 'markdown', markdown: 'markdown',
+  toml: 'toml',
+  yml: 'yaml', yaml: 'yaml',
+  // 配置
+  env: 'settings', ini: 'settings', cfg: 'settings', conf: 'settings', properties: 'settings',
+  // 数据
+  db: 'database', sqlite: 'database', sqlite3: 'database', sql: 'database',
+  csv: 'table', tsv: 'table', xls: 'table', xlsx: 'table',
+  // 图片
+  png: 'image', jpg: 'image', jpeg: 'image', gif: 'image', webp: 'image', bmp: 'image', ico: 'image', svg: 'image', avif: 'image',
+  // 音视频
+  mp3: 'audio', wav: 'audio', ogg: 'audio', flac: 'audio', m4a: 'audio', aac: 'audio',
+  mp4: 'video', avi: 'video', mkv: 'video', mov: 'video', webm: 'video', flv: 'video',
+  // 文档 / office
+  pdf: 'pdf',
+  doc: 'word', docx: 'word',
+  ppt: 'powerpoint', pptx: 'powerpoint',
+  txt: 'document', rtf: 'document',
+  log: 'log',
+  // 压缩包
+  zip: 'zip', tar: 'zip', gz: 'zip', tgz: 'zip', rar: 'zip', '7z': 'zip', bz2: 'zip', xz: 'zip',
+  // 二进制 / 可执行
+  exe: 'exe', msi: 'exe', dll: 'exe', bin: 'exe', so: 'exe',
+  // 字体
+  ttf: 'font', otf: 'font', woff: 'font', woff2: 'font', eot: 'font',
+  // 安全
+  pem: 'lock', key: 'lock', crt: 'lock', p12: 'lock'
+}
+// 无扩展名但需专属图标的文件名（精确匹配，含点文件）
+const FILE_TYPE_ICON_BY_NAME = {
+  dockerfile: 'docker',
+  makefile: 'settings',
+  '.gitignore': 'git',
+  '.gitattributes': 'git',
+  license: 'document',
+  readme: 'document'
+}
+function getFileTypeIcon(node) {
+  if (node.type === 'directory') return FILE_TREE_FOLDER_SVG
+  const name = node.name || ''
+  const lowerName = name.toLowerCase()
+  const dotIdx = lowerName.lastIndexOf('.')
+  const ext = dotIdx >= 0 ? lowerName.slice(dotIdx + 1) : ''
+  // 先按完整文件名匹配（Dockerfile/Makefile/.gitignore/.env 等）
+  let icon = FILE_TYPE_ICON_BY_NAME[lowerName] || ''
+  // 再按扩展名匹配（.env → env → settings）
+  if (!icon && ext) icon = FILE_TYPE_ICON_MAP[ext] || ''
+  if (!icon) {
+    // 有扩展名但未匹配到专属图标 → 通用文件图标
+    icon = 'document'
+  }
+  return `<img src="/file-icons/${icon}.svg" alt="" class="file-type-icon">`
 }
 
 async function handleFileTreeNodeClick(agentId, node) {
@@ -21187,10 +21299,17 @@ body::-webkit-scrollbar {
   cursor: pointer;
   transition: background 0.2s ease;
   user-select: none;
+  background: var(--color-bg-hover);
 }
 
-.tree-node-content:hover {
-  background: var(--color-bg-hover);
+.tree-node-icon.file-icon {
+  color: #8ba3b8;
+}
+
+.tree-node-icon .file-type-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
 }
 
 /* 目录树键盘操作：光标选中节点高亮 */
