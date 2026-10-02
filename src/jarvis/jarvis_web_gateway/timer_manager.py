@@ -19,6 +19,8 @@ from typing import List
 from typing import Optional
 
 from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_web_gateway.cron import CronParseError
+from jarvis.jarvis_web_gateway.cron import parse_cron
 
 
 logger = logging.getLogger(__name__)
@@ -35,13 +37,14 @@ class TimerTask:
     callback: TimerCallback
     run_at: float
     interval_seconds: Optional[float] = None
+    cron_expr: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
     cancelled: bool = False
 
     @property
     def is_recurring(self) -> bool:
-        """是否为循环任务。"""
-        return self.interval_seconds is not None
+        """是否为循环任务（固定间隔或 cron 表达式）。"""
+        return self.interval_seconds is not None or self.cron_expr is not None
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为可序列化的任务信息。"""
@@ -49,6 +52,7 @@ class TimerTask:
             "task_id": self.task_id,
             "run_at": datetime.fromtimestamp(self.run_at).isoformat(),
             "interval_seconds": self.interval_seconds,
+            "cron_expr": self.cron_expr,
             "is_recurring": self.is_recurring,
             "cancelled": self.cancelled,
             "metadata": dict(self.metadata or {}),
@@ -134,6 +138,28 @@ class TimerManager:
             metadata=metadata,
         )
 
+    def schedule_cron(
+        self,
+        cron_expr: str,
+        callback: TimerCallback,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """注册 cron 表达式循环任务。
+
+        首次触发时间为 cron 表达式匹配的下一个时间点；触发后自动推进到下一匹配点。
+        """
+        try:
+            schedule = parse_cron(cron_expr)
+        except CronParseError:
+            raise ValueError(f"invalid cron expression: {cron_expr!r}")
+        run_at = schedule.next_match(time.time())
+        return self._schedule_task(
+            run_at=run_at,
+            callback=callback,
+            cron_expr=cron_expr,
+            metadata=metadata,
+        )
+
     def cancel(self, task_id: str) -> bool:
         """取消指定任务。"""
         with self._condition:
@@ -191,6 +217,7 @@ class TimerManager:
         task_id = task_data["task_id"]
         run_at_raw = task_data["run_at"]
         interval_seconds = task_data.get("interval_seconds")
+        cron_expr = task_data.get("cron_expr")
         metadata = task_data.get("metadata") or {}
 
         callback = self._task_factory(metadata)
@@ -200,6 +227,7 @@ class TimerManager:
             run_at=run_at_ts,
             callback=callback,
             interval_seconds=interval_seconds,
+            cron_expr=cron_expr,
             metadata=metadata,
             task_id=task_id,
             persist=False,
@@ -210,6 +238,7 @@ class TimerManager:
         run_at: float,
         callback: TimerCallback,
         interval_seconds: Optional[float] = None,
+        cron_expr: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
         task_id: Optional[str] = None,
         persist: bool = True,
@@ -224,6 +253,7 @@ class TimerManager:
                 callback=callback,
                 run_at=run_at,
                 interval_seconds=interval_seconds,
+                cron_expr=cron_expr,
                 metadata=metadata,
             )
             self._tasks[task_id] = timer_task
@@ -297,8 +327,13 @@ class TimerManager:
                 self._persist_tasks_locked()
                 return
 
-            assert timer_task.interval_seconds is not None
-            timer_task.run_at = time.time() + timer_task.interval_seconds
+            if timer_task.cron_expr is not None:
+                # cron 任务：推进到下一个匹配时间点
+                schedule = parse_cron(timer_task.cron_expr)
+                timer_task.run_at = schedule.next_match(time.time())
+            else:
+                assert timer_task.interval_seconds is not None
+                timer_task.run_at = time.time() + timer_task.interval_seconds
             heapq.heappush(
                 self._queue,
                 ScheduledTask(

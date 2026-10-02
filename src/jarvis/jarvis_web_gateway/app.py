@@ -110,6 +110,8 @@ from jarvis.jarvis_web_gateway.node_runtime import AgentRouteInfo, NodeRuntime
 from jarvis.jarvis_web_gateway.terminal_input_registry import TerminalInputRegistry
 from jarvis.jarvis_web_gateway.terminal_session_manager import TerminalSessionManager
 from jarvis.jarvis_web_gateway.timer_manager import TimerManager
+from jarvis.jarvis_web_gateway.cron import CronParseError
+from jarvis.jarvis_web_gateway.cron import parse_cron
 from jarvis.jarvis_service.cli import get_single_instance_lock_path
 from jarvis.jarvis_utils.globals import set_interrupt, get_script_pid
 import jarvis.jarvis_utils.globals as jglobals
@@ -7477,12 +7479,14 @@ def create_app(
         run_at = schedule.get("run_at")
         delay_seconds = schedule.get("delay_seconds")
         interval_seconds = schedule.get("interval_seconds")
+        cron = schedule.get("cron")
         provided_fields = [
-            value is not None for value in [run_at, delay_seconds, interval_seconds]
+            value is not None
+            for value in [run_at, delay_seconds, interval_seconds, cron]
         ]
         if sum(provided_fields) != 1:
             raise ValueError(
-                "Exactly one of schedule.run_at, schedule.delay_seconds, schedule.interval_seconds is required"
+                "Exactly one of schedule.run_at, schedule.delay_seconds, schedule.interval_seconds or schedule.cron is required"
             )
 
         if run_at is not None:
@@ -7499,6 +7503,15 @@ def create_app(
             if delay_seconds < 0:
                 raise ValueError("schedule.delay_seconds must be >= 0")
             return {"schedule_type": "delay", "delay_seconds": float(delay_seconds)}
+
+        if cron is not None:
+            if not isinstance(cron, str) or not cron.strip():
+                raise ValueError("schedule.cron must be a non-empty string")
+            try:
+                parse_cron(cron)
+            except CronParseError as e:
+                raise ValueError(f"invalid schedule.cron: {e}")
+            return {"schedule_type": "cron", "cron": cron}
 
         if not isinstance(interval_seconds, (int, float)):
             raise ValueError("schedule.interval_seconds must be a number")
@@ -7695,6 +7708,14 @@ def create_app(
             timer_metadata["schedule"]["delay_seconds"] = delay_seconds
             timer_id = timer_manager.schedule_after(
                 delay_seconds=delay_seconds,
+                callback=callback,
+                metadata=timer_metadata,
+            )
+        elif schedule_info["schedule_type"] == "cron":
+            cron_expr = schedule_info["cron"]
+            timer_metadata["schedule"]["cron"] = cron_expr
+            timer_id = timer_manager.schedule_cron(
+                cron_expr=cron_expr,
                 callback=callback,
                 metadata=timer_metadata,
             )

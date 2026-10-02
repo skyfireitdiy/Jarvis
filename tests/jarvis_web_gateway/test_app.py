@@ -327,3 +327,89 @@ def test_file_search_matches_directory_path():
     assert match_score("mod.rs") == _fuzzy_match_score(query, "mod.rs") or (
         match_score("mod.rs") is None
     )
+
+
+def test_create_timer_with_cron_schedule():
+    """schedule.cron 应能创建 cron 循环定时任务。"""
+    _cleanup_timer_persistence()
+    client = create_test_client()
+    headers = get_auth_headers()
+
+    resp = client.post(
+        "/api/timers",
+        headers=headers,
+        json={
+            "schedule": {"cron": "0 9 * * 1"},
+            "action": {
+                "type": "run_shell_command",
+                "params": {"command": "echo hi", "working_dir": "/tmp"},
+            },
+        },
+    )
+    body = resp.json()
+    assert body["success"] is True, body
+    timer_info = body["data"]
+    assert timer_info["is_recurring"] is True
+    assert timer_info["cron_expr"] == "0 9 * * 1"
+    schedule_meta = timer_info["metadata"]["schedule"]
+    assert schedule_meta["type"] == "cron"
+    assert schedule_meta["cron"] == "0 9 * * 1"
+    # 首次触发为下一个周一 9:00
+    next_run = datetime.fromisoformat(timer_info["run_at"])
+    assert next_run.hour == 9 and next_run.minute == 0
+    assert next_run.weekday() == 0  # Monday
+
+    # 清理
+    timer_id = timer_info["task_id"]
+    resp_del = client.delete(f"/api/timers/{timer_id}", headers=headers)
+    assert resp_del.json()["success"] is True
+    _cleanup_timer_persistence()
+
+
+def test_create_timer_with_invalid_cron_rejected():
+    """非法 cron 表达式应返回 INVALID_ARGUMENT。"""
+    _cleanup_timer_persistence()
+    client = create_test_client()
+    headers = get_auth_headers()
+
+    resp = client.post(
+        "/api/timers",
+        headers=headers,
+        json={
+            "schedule": {"cron": "not a valid cron"},
+            "action": {
+                "type": "run_shell_command",
+                "params": {"command": "echo hi", "working_dir": "/tmp"},
+            },
+        },
+    )
+    body = resp.json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "INVALID_ARGUMENT"
+    assert "cron" in body["error"]["message"]
+    _cleanup_timer_persistence()
+
+
+def test_create_timer_schedule_requires_exactly_one_field():
+    """schedule 必须四选一（run_at/delay_seconds/interval_seconds/cron），多选应报错。"""
+    _cleanup_timer_persistence()
+    client = create_test_client()
+    headers = get_auth_headers()
+
+    # 同时给了 cron 和 delay_seconds -> 报错
+    resp = client.post(
+        "/api/timers",
+        headers=headers,
+        json={
+            "schedule": {"cron": "0 9 * * 1", "delay_seconds": 10},
+            "action": {
+                "type": "run_shell_command",
+                "params": {"command": "echo hi", "working_dir": "/tmp"},
+            },
+        },
+    )
+    body = resp.json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "INVALID_ARGUMENT"
+    assert "Exactly one" in body["error"]["message"]
+    _cleanup_timer_persistence()

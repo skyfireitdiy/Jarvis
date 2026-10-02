@@ -196,7 +196,7 @@ class GatewayManagerTool:
             },
             "schedule": {
                 "type": "object",
-                "description": "定时任务调度配置（create_timer 操作必填），三选一：run_at（ISO 时间字符串）、delay_seconds（延迟秒数≥0）、interval_seconds（间隔秒数>0）",
+                "description": '定时任务调度配置（create_timer 操作必填），四选一：run_at（ISO 时间字符串）、delay_seconds（延迟秒数≥0）、interval_seconds（间隔秒数>0）、cron（5 段 cron 表达式，如 "0 9 * * 1" 每周一 9 点）',
             },
             "timer_action_type": {
                 "type": "string",

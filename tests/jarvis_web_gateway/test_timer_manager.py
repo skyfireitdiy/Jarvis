@@ -99,3 +99,66 @@ def test_cancel_prevents_task_execution() -> None:
         assert executed.is_set() is False
     finally:
         manager.shutdown()
+
+
+def test_schedule_cron_computes_first_run_at() -> None:
+    manager = TimerManager()
+    try:
+        task_id = manager.schedule_cron("0 9 * * *", lambda: None)
+        info = manager.get_task(task_id)
+        assert info is not None
+        assert info["cron_expr"] == "0 9 * * *"
+        assert info["is_recurring"] is True
+        # 首次触发为下一个 9:00
+        assert info["run_at"].endswith("09:00:00")
+    finally:
+        manager.shutdown()
+
+
+def test_schedule_cron_invalid_expression_raises() -> None:
+    manager = TimerManager()
+    try:
+        try:
+            manager.schedule_cron("not a cron", lambda: None)
+        except ValueError as error:
+            assert "invalid cron expression" in str(error)
+        else:
+            raise AssertionError("schedule_cron should raise on invalid cron")
+    finally:
+        manager.shutdown()
+
+
+def test_schedule_cron_persists_cron_expr() -> None:
+    manager = TimerManager()
+    try:
+        task_id = manager.schedule_cron("0 9 * * *", lambda: None)
+        info = manager.get_task(task_id)
+        assert info is not None
+        assert info["cron_expr"] == "0 9 * * *"
+        assert info["interval_seconds"] is None
+    finally:
+        manager.shutdown()
+
+
+def test_restore_cron_task() -> None:
+    def factory(metadata):
+        return lambda: None
+
+    manager = TimerManager(task_factory=factory)
+    try:
+        task_id = manager.restore_task(
+            {
+                "task_id": "cron-task-1",
+                "run_at": "2026-10-03T09:00:00",
+                "cron_expr": "0 9 * * *",
+                "interval_seconds": None,
+                "metadata": {"action": {"type": "run_shell_command", "params": {}}},
+            }
+        )
+        info = manager.get_task(task_id)
+        assert info is not None
+        assert info["cron_expr"] == "0 9 * * *"
+        assert info["is_recurring"] is True
+        assert info["run_at"].endswith("09:00:00")
+    finally:
+        manager.shutdown()
