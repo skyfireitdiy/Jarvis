@@ -167,7 +167,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, watch, onUnmounted } from 'vue'
 
 const props = defineProps({
   visible: Boolean,
@@ -240,6 +240,29 @@ function toggleAclInteract(userId, event) {
   }
   emit('update:accessAclInteract', current)
 }
+
+// 纯键盘支持：在输入框（非多行 textarea）内按 Enter 提交创建，Esc 关闭（父级全局 Esc 兜底）
+function handleKeydown(event) {
+  if (!props.visible) return
+  if (event.key === 'Enter') {
+    const tag = event.target?.tagName?.toLowerCase()
+    // textarea 内 Enter 用于换行，不拦截；按钮聚焦时浏览器原生处理
+    if (tag === 'textarea' || tag === 'button' || tag === 'select') return
+    if (props.noNodeAccess || !props.workDir.trim()) return
+    event.preventDefault()
+    emit('create')
+  }
+}
+
+watch(
+  () => props.visible,
+  (val) => {
+    if (val) document.addEventListener('keydown', handleKeydown)
+    else document.removeEventListener('keydown', handleKeydown)
+  }
+)
+
+onUnmounted(() => document.removeEventListener('keydown', handleKeydown))
 </script>
 
 <style scoped>

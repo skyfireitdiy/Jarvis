@@ -1333,6 +1333,42 @@
       @close="showCommandPalette = false"
     />
 
+    <!-- 空格 Leader 序列提示浮窗：按空格进入后逐级显示下一级操作 -->
+    <div v-if="spaceSeq.active" class="space-seq-popover" @mousedown.prevent>
+      <div class="space-seq-title">
+        <span class="space-seq-key">Space</span>
+        <template v-for="(p, i) in spaceSeq.path" :key="i">
+          <span class="space-seq-arrow">›</span>
+          <span class="space-seq-key">{{ p }}</span>
+        </template>
+        <span class="space-seq-hint">选择下一级操作，ESC 取消</span>
+      </div>
+      <div class="space-seq-grid">
+        <div
+          v-for="group in spaceSeqOptions"
+          :key="group.key"
+          class="space-seq-group"
+          :class="{ active: group.active }"
+        >
+          <div class="space-seq-group-head">
+            <span class="space-seq-item-key">{{ group.key }}</span>
+            <span class="space-seq-item-label">{{ group.label }}</span>
+          </div>
+          <div class="space-seq-children">
+            <div
+              v-for="cmd in group.children"
+              :key="cmd.key"
+              class="space-seq-item"
+              :class="{ active: cmd.active }"
+            >
+              <span class="space-seq-item-key">{{ cmd.key }}</span>
+              <span class="space-seq-item-label">{{ cmd.label }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Panel 右键菜单：与宠物右键一致，列出「当前 Agent」操作 -->
     <div
       v-if="panelContextMenu.visible"
@@ -1663,7 +1699,7 @@ import CommandPalette from './components/CommandPalette.vue'
 import TopologyOverlay from './components/TopologyOverlay.vue'
 import PetLobby from './components/PetLobby.vue'
 import OnboardingTour from './components/OnboardingTour.vue'
-import { ACTIONS as actionDefs } from './actions/registry.js'
+import { ACTIONS as actionDefs, SPACE_COMMANDS } from './actions/registry.js'
 import { resolveCurrentAgentId } from './utils/currentAgentResolver.js'
 
 const PLANTUML_SERVER_URL = 'https://www.plantuml.com/plantuml/svg/'
@@ -9100,6 +9136,11 @@ function openAgentListPalette() {
   openCommandPalette('a>')
 }
 
+// 打开命令面板并预输入 f>，直接展示文件搜索
+function openCommandPaletteFileSearch() {
+  openCommandPalette('f>')
+}
+
 // 切换宠物显示/隐藏（命令面板触发，代理到 PetWidget 内部逻辑）
 function togglePetVisibility() {
   petWidgetRef.value?.togglePet?.()
@@ -9668,6 +9709,7 @@ const commandPaletteCtx = computed(() => ({
   openDocs: openDocs,
   togglePetVisibility,
   openAgentList: openAgentListPalette,
+  openCommandPaletteFileSearch: openCommandPaletteFileSearch,
   // 重新打开新手引导（首次登录后自动展示过一次，可随时重看）
   startOnboarding: (tourId) => startOnboarding(tourId || 'welcome'),
   // 重置新手引导标记：下次进入对应场景会重新触发
@@ -17956,14 +17998,130 @@ function isMonacoEditorFocused() {
   return !!el.closest('.monaco-editor')
 }
 
+// 判断焦点是否在终端（xterm）内部。xterm 通过隐藏的 <textarea class="xterm-helper-textarea">
+// 接收键盘输入，其 tagName 已是 textarea（isEditableElement 可覆盖）；这里再按 .xterm 容器
+// 显式兜底，避免依赖 xterm 内部 DOM 结构变化，确保终端聚焦时空格序列不生效。
+function isTerminalFocused() {
+  const el = document.activeElement
+  if (!el || typeof el.closest !== 'function') return false
+  return !!el.closest('.xterm')
+}
+
 // 编辑器是否已「脱离」全局快捷键控制：在 Monaco 编辑器里按 ESC 后置 true，
 // 使 Ctrl+A 不再被编辑器全选吃掉，而是触发命令面板（列出 Agent）。
 // 重新点击/聚焦编辑器时自动恢复为 false（见 bindWorkspaceViewEvents 的 onDidFocusEditorText）。
 const editorShortcutLocked = ref(false)
 
+// ===== 空格 Leader 按键序列 =====
+// 整体重设计：用「空格 + 领域键 + 动作键」的两级按键序列替代大量 Ctrl+Alt(+Shift)+字母 组合键。
+// 语义键一律用无修饰键的单字母，绝对不被系统/浏览器拦截（用户环境 Ctrl+Alt+Shift 被系统软件拦截）。
+// 流程：按空格进入序列 → 弹浮窗显示领域 → 按领域键(如 a) → 弹浮窗显示该领域动作 → 按动作键执行。
+// ESC 中断；浮窗一直显示直到用户按键或 ESC 中断（不设超时自动退出）；
+// 焦点在输入框/编辑器/终端时空格保留为正常输入。
+// 序列状态：active 是否激活；path 为已输入的键序列（[]=待选领域，['a']=已选领域等待动作）
+const spaceSeq = ref({ active: false, path: [] })
+
+// 空格序列激活期间锁定焦点：防止焦点转移到可编辑元素（含多行输入框/编辑器/终端），
+// 否则后续序列按键会被输入框捕获而不是推进序列。
+function handleSpaceSeqFocusIn(e) {
+  if (!spaceSeq.value.active) return
+  const target = e.target
+  if (isEditableElement(target) || isMonacoEditorFocused() || isTerminalFocused()) {
+    // 阻止焦点落入可编辑元素：blur 回 body，让按键继续走全局 keydown 推进序列
+    if (target && typeof target.blur === 'function') target.blur()
+  }
+}
+
+function enterSpaceSeq() {
+  spaceSeq.value = { active: true, path: [] }
+  // 进入序列时若焦点在可编辑元素，立即移开，避免后续按键被输入框捕获
+  const el = document.activeElement
+  if (el && (isEditableElement(el) || isMonacoEditorFocused() || isTerminalFocused())) {
+    el.blur()
+  }
+}
+function exitSpaceSeq() {
+  spaceSeq.value = { active: false, path: [] }
+}
+// 当前空格序列对应的命令分组（供浮窗渲染）：每一级都按「领域前缀」分组展示。一级（未选领域）
+// 显示完整序列（如 ad=显示变更）；选定领域后（如 Space a）组内命令只显示动作键（如 d 显示变更），
+// 不再重复领域前缀。只保留当前前缀对应的分组，让用户看到「当前前缀」下的全部可选项。
+const spaceSeqOptions = computed(() => {
+  const path = spaceSeq.value.path || []
+  const prefix = path.join('')
+  const showPrefix = path.length === 0
+  return Object.entries(SPACE_COMMANDS)
+    .filter(([gKey]) => path.length === 0 || gKey === prefix)
+    .map(([gKey, g]) => ({
+      key: gKey,
+      label: g.label,
+      active: path[0] === gKey,
+      children: Object.entries(g.children || {}).map(([ck, leaf]) => ({
+        key: showPrefix ? gKey + ck : ck,
+        label: leaf.label,
+        active: path.length === 2 && prefix === gKey + ck,
+      })),
+    }))
+})
+
 // 全局键盘事件处理
 function handleGlobalKeydown(event) {
   const isModifierPressed = event.ctrlKey || event.metaKey
+
+  // ===== 空格 Leader 按键序列（优先于其他所有分支）=====
+  if (spaceSeq.value.active) {
+    // ESC 中断序列
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      exitSpaceSeq()
+      return
+    }
+    // 空格再次按下：重置到第一级（重新选择领域）
+    if (event.code === 'Space') {
+      event.preventDefault()
+      spaceSeq.value = { active: true, path: [] }
+      return
+    }
+    // 无修饰键字母：推进序列
+    if (!event.ctrlKey && !event.altKey && !event.metaKey && /^[a-z]$/i.test(event.key)) {
+      const key = event.key.toLowerCase()
+      const path = spaceSeq.value.path
+      if (path.length === 0) {
+        // 第一级：选择领域
+        if (SPACE_COMMANDS[key]) {
+          event.preventDefault()
+          spaceSeq.value = { active: true, path: [key] }
+        } else {
+          exitSpaceSeq()
+        }
+      } else {
+        // 第二级：选择动作
+        const group = SPACE_COMMANDS[path[0]]
+        const leaf = group?.children?.[key]
+        if (leaf) {
+          const action = actionDefs.find(a => a.id === leaf.actionId)
+          exitSpaceSeq()
+          event.preventDefault()
+          if (action && typeof action.run === 'function') {
+            onCommandRun(action)
+          }
+        } else {
+          exitSpaceSeq()
+        }
+      }
+      return
+    }
+    // 其他键（含修饰键组合）：退出序列并继续正常流程
+    exitSpaceSeq()
+  }
+
+  // 进入空格序列：空格键（无修饰键、焦点不在输入框/编辑器/终端）
+  if (event.code === 'Space' && !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
+    if (isEditableElement(event.target) || isMonacoEditorFocused() || isTerminalFocused()) return
+    event.preventDefault()
+    enterSpaceSeq()
+    return
+  }
 
   // Ctrl/Cmd + P：编辑器聚焦时让位给 Monaco（其内置命令面板 editor.action.quickCommand 由
   // 我们额外绑定的 Ctrl+P addAction 触发）；否则打开 Jarvis 命令面板（登录界面不响应）
@@ -18954,6 +19112,9 @@ onMounted(() => {
   // 添加全局键盘事件监听（在捕获阶段处理 Ctrl+T 等快捷键）
   document.addEventListener('keydown', handleGlobalKeydown, { capture: true })
 
+  // 空格序列激活期间锁定焦点，防止焦点落入输入框/编辑器/终端
+  document.addEventListener('focusin', handleSpaceSeqFocusIn)
+
   // 点击菜单外任意处关闭 Panel 右键菜单（菜单自身已 stop 冒泡）
   document.addEventListener('pointerdown', closePanelContextMenu)
   
@@ -19076,6 +19237,9 @@ onUnmounted(() => {
 
   // 移除全局键盘事件监听
   document.removeEventListener('keydown', handleGlobalKeydown, { capture: true })
+
+  // 移除空格序列焦点锁定监听
+  document.removeEventListener('focusin', handleSpaceSeqFocusIn)
 
   // 移除 Panel 右键菜单的全局关闭监听
   document.removeEventListener('pointerdown', closePanelContextMenu)
@@ -23261,6 +23425,133 @@ body::-webkit-scrollbar {
 }
 
 /* Panel 右键菜单：与宠物右键菜单同款外观（两列排布） */
+/* 空格 Leader 序列提示浮窗 */
+.space-seq-popover {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10000;
+  min-width: 360px;
+  max-width: 620px;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(12, 22, 34, 0.97);
+  border: 1px solid rgba(32, 200, 255, 0.4);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.space-seq-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: #e8f6ff;
+}
+.space-seq-key {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 5px;
+  background: rgba(32, 200, 255, 0.18);
+  border: 1px solid rgba(32, 200, 255, 0.45);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 12px;
+  color: #9fe4ff;
+  line-height: 1.6;
+}
+.space-seq-arrow {
+  color: #5a8aa8;
+  font-size: 14px;
+  padding: 0 2px;
+}
+.space-seq-hint {
+  margin-left: auto;
+  font-size: 11px;
+  color: #6f9bb8;
+}
+.space-seq-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.space-seq-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid transparent;
+}
+.space-seq-group.active {
+  background: rgba(32, 200, 255, 0.12);
+  border-color: rgba(32, 200, 255, 0.45);
+}
+.space-seq-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px 4px;
+  border-bottom: 1px solid rgba(32, 200, 255, 0.15);
+  margin-bottom: 2px;
+}
+.space-seq-group-head .space-seq-item-key {
+  min-width: 22px;
+  padding: 1px 5px;
+  font-size: 12px;
+}
+.space-seq-group-head .space-seq-item-label {
+  font-size: 12px;
+  font-weight: 600;
+}
+.space-seq-children {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.space-seq-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid transparent;
+}
+.space-seq-item.active {
+  background: rgba(32, 200, 255, 0.18);
+  border-color: rgba(32, 200, 255, 0.55);
+}
+.space-seq-item:hover {
+  background: rgba(32, 200, 255, 0.1);
+  border-color: rgba(32, 200, 255, 0.3);
+}
+.space-seq-item-key {
+  flex-shrink: 0;
+  min-width: 26px;
+  text-align: center;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(32, 200, 255, 0.2);
+  border: 1px solid rgba(32, 200, 255, 0.4);
+  font-weight: 700;
+  font-size: 12px;
+  color: #9fe4ff;
+}
+.space-seq-item-label {
+  font-size: 11px;
+  color: #d8ecf8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .panel-context-menu {
   position: fixed;
   z-index: 9999;

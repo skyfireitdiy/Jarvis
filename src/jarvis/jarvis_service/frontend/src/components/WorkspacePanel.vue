@@ -25,7 +25,7 @@
           tabindex="-1"
           @mousedown.prevent
           @click="$emit('setSidebarView', 'agents')"
-          title="Agent 列表 (Ctrl+Alt+Shift+Z)"
+          title="Agent 列表 (Space v a)"
         >
           <img class="workspace-activity-icon" src="/icons/jarvis-pet.svg" alt="Agent" />
         </button>
@@ -60,7 +60,7 @@
           tabindex="-1"
           @mousedown.prevent
           @click="$emit('setSidebarView', 'git')"
-          title="Git (Ctrl+Alt+Shift+V)"
+          title="Git (Space v g)"
         >
           <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="5" cy="4" r="1.5"/>
@@ -101,7 +101,7 @@
           tabindex="-1"
           @mousedown.prevent
           @click="$emit('openSettings')"
-          title="设置 (Ctrl+Alt+,)"
+          title="设置 (Space v s)"
         >
           <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="8" cy="8" r="1.5"/>
@@ -117,7 +117,7 @@
           tabindex="-1"
           @mousedown.prevent
           @click="$emit('openAdmin')"
-          title="管理 (Ctrl+Alt+Shift+A)"
+          title="管理 (Space m a)"
         >
           <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M8 1.5 13 3.5v4c0 3-2 5.5-5 7-3-1.5-5-4-5-7v-4L8 1.5Z"/>
@@ -129,7 +129,7 @@
           tabindex="-1"
           @mousedown.prevent
           @click="$emit('openDocs')"
-          title="使用文档 (Ctrl+Alt+Shift+H)"
+          title="使用文档 (Space m h)"
         >
           <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="8" cy="8" r="6"/>

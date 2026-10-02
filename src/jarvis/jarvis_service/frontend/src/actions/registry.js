@@ -20,7 +20,7 @@ export const ACTIONS = [
   {
     id: "current-view-diff",
     label: "查看变更",
-    shortcut: "Ctrl+Alt+D",
+    shortcut: "Space a d",
     condition: "需选中当前 Agent",
     en: "View Diff",
     group: "当前 Agent",
@@ -32,7 +32,7 @@ export const ACTIONS = [
   {
     id: "current-view-rules",
     label: "查看规则",
-    shortcut: "Ctrl+Alt+R",
+    shortcut: "Space a r",
     condition: "需选中当前 Agent",
     en: "View Rules",
     group: "当前 Agent",
@@ -44,7 +44,7 @@ export const ACTIONS = [
   {
     id: "current-view-tools",
     label: "查看工具",
-    shortcut: "Ctrl+Alt+T",
+    shortcut: "Space a t",
     condition: "需选中当前 Agent",
     en: "View Tools",
     group: "当前 Agent",
@@ -56,7 +56,6 @@ export const ACTIONS = [
   {
     id: "current-create-terminal",
     label: "创建终端",
-    shortcut: "Ctrl+Alt+`",
     condition: "需选中当前 Agent",
     en: "Create Terminal",
     group: "当前 Agent",
@@ -69,11 +68,11 @@ export const ACTIONS = [
   {
     // 全局动作：打开/隐藏编辑器面板，不依赖当前 Agent（与 App.vue 的 Ctrl+E 分支行为一致）
     id: "open-editor",
-    label: "打开编辑器",
+    label: "打开工作区",
     // 实际由 App.vue 的 Ctrl+E 分支执行；此处仅作展示，不参与 ctrl+alt 统一分发
-    shortcut: "Ctrl+E",
+    shortcut: "Space v e",
     condition: "已登录",
-    en: "Open Editor",
+    en: "Open Workspace",
     group: "界面",
     icon: "📝",
     keywords: ["编辑器", "editor", "打开", "open"],
@@ -84,7 +83,7 @@ export const ACTIONS = [
     id: "open-editor-global-search",
     label: "搜索文件内容",
     // 实际由 App.vue 的 Ctrl+Shift+F 分支执行；此处仅作展示，不参与 ctrl+alt 统一分发
-    shortcut: "Ctrl+Shift+F",
+    shortcut: "Space v b / Ctrl+Shift+F",
     condition: "需编辑器面板已打开",
     en: "Search File Contents",
     group: "界面",
@@ -107,7 +106,7 @@ export const ACTIONS = [
     id: "open-editor-file-search",
     label: "搜索文件名",
     // 实际由 App.vue 的 Ctrl+Shift+P 分支执行；此处仅作展示，不参与 ctrl+alt 统一分发
-    shortcut: "Ctrl+Shift+P",
+    shortcut: "Space v n / Ctrl+Shift+P",
     condition: "需编辑器面板已打开",
     en: "Search File Names",
     group: "界面",
@@ -129,7 +128,7 @@ export const ACTIONS = [
     id: "open-editor-file-tree",
     label: "目录树",
     // 实际由 App.vue 的 Ctrl+Shift+E 分支执行；此处仅作展示，不参与 ctrl+alt 统一分发
-    shortcut: "Ctrl+Shift+E",
+    shortcut: "Space v r / Ctrl+Shift+E",
     condition: "需编辑器面板已打开",
     en: "File Tree",
     group: "界面",
@@ -142,7 +141,7 @@ export const ACTIONS = [
     id: "open-command-palette",
     label: "打开命令面板",
     // 实际由 App.vue 的 Ctrl+P 分支执行；此处仅作展示，不参与 ctrl+alt 统一分发
-    shortcut: "Ctrl+P",
+    shortcut: "Space v p / Ctrl+P",
     condition: "已登录",
     en: "Open Command Palette",
     group: "界面",
@@ -155,7 +154,7 @@ export const ACTIONS = [
     id: "save-active-editor-tab",
     label: "保存当前文件",
     // 实际由 App.vue 的 Ctrl+S 分支执行；此处仅作展示，不参与 ctrl+alt 统一分发
-    shortcut: "Ctrl+S",
+    shortcut: "Space v w / Ctrl+S",
     condition: "需编辑器面板已打开且有活动标签",
     en: "Save Active File",
     group: "界面",
@@ -168,7 +167,7 @@ export const ACTIONS = [
     id: "split-workspace-pane-row",
     label: "左右分割编辑器",
     // 实际由 App.vue 的 Ctrl+\ 分支执行；此处仅作展示，不参与 ctrl+alt 统一分发
-    shortcut: "Ctrl+\\",
+    shortcut: "Space p s / Ctrl+\\",
     condition: "需编辑器面板处于文件视图且非移动端",
     en: "Split Editor Right",
     group: "界面",
@@ -182,7 +181,7 @@ export const ACTIONS = [
     id: "split-workspace-pane-column",
     label: "上下分割编辑器",
     // 实际由 App.vue 的 Ctrl+Shift+\ 分支执行；此处仅作展示，不参与 ctrl+alt 统一分发
-    shortcut: "Ctrl+Shift+\\",
+    shortcut: "Space p h / Ctrl+-",
     condition: "需编辑器面板处于文件视图且非移动端",
     en: "Split Editor Down",
     group: "界面",
@@ -197,7 +196,7 @@ export const ACTIONS = [
     id: "close-focused-panel",
     label: "关闭当前焦点面板",
     // 实际由 App.vue 的 Ctrl+W 分支执行；此处仅作展示，不参与 ctrl+alt 统一分发
-    shortcut: "Ctrl+W",
+    shortcut: "Space p x / Ctrl+W",
     condition: "需存在当前焦点面板",
     en: "Close Focused Panel",
     group: "界面",
@@ -236,7 +235,7 @@ export const ACTIONS = [
   {
     id: "current-toggle-auto-scroll",
     label: "切换自动滚动",
-    shortcut: "Ctrl+Alt+S",
+    shortcut: "Space a s",
     condition: "需选中当前 Agent",
     en: "Toggle Auto Scroll",
     group: "当前 Agent",
@@ -248,7 +247,7 @@ export const ACTIONS = [
   {
     id: "current-toggle-auto-read",
     label: "切换自动朗读",
-    shortcut: "Ctrl+Alt+V",
+    shortcut: "Space a v",
     condition: "需选中当前 Agent",
     en: "Toggle Auto Read",
     group: "当前 Agent",
@@ -260,7 +259,7 @@ export const ACTIONS = [
   {
     id: "current-exit-non-interactive",
     label: "退出非交互模式",
-    shortcut: "Ctrl+Alt+X",
+    shortcut: "Space a x",
     condition: "需选中当前 Agent",
     en: "Exit Non-Interactive Mode",
     group: "当前 Agent",
@@ -273,7 +272,7 @@ export const ACTIONS = [
   {
     id: "current-manual-interrupt",
     label: "人工介入",
-    shortcut: "Ctrl+Alt+I",
+    shortcut: "Space a i",
     condition: "需选中当前 Agent",
     en: "Manual Interrupt",
     group: "当前 Agent",
@@ -285,7 +284,7 @@ export const ACTIONS = [
   {
     id: "current-rename",
     label: "重命名",
-    shortcut: "F2",
+    shortcut: "Space a n",
     // F2 优先重命名当前 Agent；无当前 Agent 时才让位给 node-rename（见 App.vue 的 F2 分支）
     shortcutScope: "global",
     condition: "需选中当前 Agent；与节点重命名共用 F2 时以 Agent 优先",
@@ -299,7 +298,7 @@ export const ACTIONS = [
   {
     id: "current-copy",
     label: "复制",
-    shortcut: "Ctrl+Alt+C",
+    shortcut: "Space a c",
     condition: "需选中当前 Agent",
     en: "Copy",
     group: "当前 Agent",
@@ -311,7 +310,7 @@ export const ACTIONS = [
   {
     id: "current-edit-access",
     label: "权限管理",
-    shortcut: "Ctrl+Alt+P",
+    shortcut: "Space a e",
     condition: "需选中当前 Agent 且为属主",
     en: "Access Control",
     group: "当前 Agent",
@@ -323,7 +322,7 @@ export const ACTIONS = [
   {
     id: "current-regenerate",
     label: "无损重生",
-    shortcut: "Ctrl+Alt+G",
+    shortcut: "Space a g",
     condition: "需选中当前 Agent 且为属主",
     en: "Regenerate",
     group: "当前 Agent",
@@ -335,7 +334,6 @@ export const ACTIONS = [
   {
     id: "current-delete",
     label: "删除",
-    shortcut: "Ctrl+Alt+Shift+D",
     condition: "需选中当前 Agent",
     en: "Delete",
     group: "当前 Agent",
@@ -347,7 +345,7 @@ export const ACTIONS = [
   {
     id: "current-toggle-output",
     label: "隐藏输出",
-    shortcut: "Ctrl+Alt+O",
+    shortcut: "Space a o",
     condition: "需选中当前 Agent",
     en: "Toggle Output",
     group: "当前 Agent",
@@ -379,7 +377,7 @@ export const ACTIONS = [
   {
     id: "interrupt-current",
     label: "中断当前 Agent",
-    shortcut: "Ctrl+Alt+K",
+    shortcut: "Space a k",
     condition: "需选中当前 Agent",
     en: "Interrupt Current Agent",
     group: "执行",
@@ -391,7 +389,6 @@ export const ACTIONS = [
   {
     id: "goto-waiting",
     label: "奔赴等待输入的 Agent",
-    shortcut: "Ctrl+Alt+J",
     condition: "需存在等待输入的 Agent",
     en: "Go to Waiting Agent",
     group: "执行",
@@ -406,7 +403,7 @@ export const ACTIONS = [
   {
     id: "sync-status",
     label: "同步 Agent 状态",
-    shortcut: "Ctrl+Alt+Y",
+    shortcut: "Space a y",
     condition: "无特殊条件（全局可用）",
     en: "Sync Agent Status",
     group: "执行",
@@ -417,7 +414,7 @@ export const ACTIONS = [
   {
     id: "create-agent",
     label: "新建 Agent",
-    shortcut: "Ctrl+N",
+    shortcut: "Space n a / Ctrl+N",
     condition: "已登录且不在输入框内",
     en: "New Agent",
     group: "Agent",
@@ -428,7 +425,7 @@ export const ACTIONS = [
   {
     id: "quick-create-agent",
     label: "一句话创建 Agent",
-    shortcut: "Ctrl+Alt+N",
+    shortcut: "Space n q",
     condition: "已登录",
     en: "Quick Create Agent",
     group: "Agent",
@@ -448,7 +445,6 @@ export const ACTIONS = [
   {
     id: "refresh-agents",
     label: "刷新 Agent 列表",
-    shortcut: "Ctrl+Alt+L",
     condition: "已登录",
     en: "Refresh Agent List",
     group: "Agent",
@@ -459,7 +455,6 @@ export const ACTIONS = [
   {
     id: "restart-gateway",
     label: "重启网关",
-    shortcut: "Ctrl+Alt+Shift+R",
     condition: "需 admin:config 权限",
     en: "Restart Gateway",
     group: "网关",
@@ -471,7 +466,6 @@ export const ACTIONS = [
   {
     id: "restart-all-nodes",
     label: "重启所有节点",
-    shortcut: "Ctrl+Alt+Shift+N",
     condition: "需 admin:config 权限",
     en: "Restart All Nodes",
     group: "网关",
@@ -483,7 +477,7 @@ export const ACTIONS = [
   {
     id: "manage-groups",
     label: "管理分组",
-    shortcut: "Ctrl+Alt+M",
+    shortcut: "Space m g",
     condition: "已登录",
     en: "Manage Groups",
     group: "界面",
@@ -494,7 +488,7 @@ export const ACTIONS = [
   {
     id: "toggle-terminal",
     label: "切换终端面板",
-    shortcut: "Ctrl+`",
+    shortcut: "Space v t / Ctrl+`",
     condition: "不在输入框内",
     en: "Toggle Terminal Panel",
     group: "界面",
@@ -505,7 +499,7 @@ export const ACTIONS = [
   {
     id: "toggle-chat",
     label: "切换聊天面板",
-    shortcut: "Ctrl+Alt+H",
+    shortcut: "Space v c",
     condition: "已登录",
     en: "Toggle Chat Panel",
     group: "界面",
@@ -516,7 +510,7 @@ export const ACTIONS = [
   {
     id: "open-topology",
     label: "查看网络拓扑",
-    shortcut: "Ctrl+Alt+U",
+    shortcut: "Space v u",
     condition: "已登录",
     en: "View Network Topology",
     group: "界面",
@@ -527,7 +521,7 @@ export const ACTIONS = [
   {
     id: "open-settings",
     label: "打开设置",
-    shortcut: "Ctrl+Alt+,",
+    shortcut: "Space v s",
     condition: "已登录",
     en: "Open Settings",
     group: "界面",
@@ -538,7 +532,6 @@ export const ACTIONS = [
   {
     id: "toggle-pet",
     label: "隐藏/显示宠物",
-    shortcut: "Ctrl+Alt+B",
     condition: "已登录",
     en: "Toggle Pet",
     group: "界面",
@@ -549,7 +542,7 @@ export const ACTIONS = [
   {
     id: "open-agent-list",
     label: "Agent 列表",
-    shortcut: "Ctrl+L",
+    shortcut: "Space v l / Ctrl+A",
     condition: "已登录",
     en: "Agent List",
     group: "界面",
@@ -561,7 +554,7 @@ export const ACTIONS = [
     // 侧边活动栏「Agent 列表」视图：打开工作区并切换到 agents 侧边栏视图
     id: "open-workspace-agent-list",
     label: "工作区 Agent 列表",
-    shortcut: "Ctrl+Alt+Shift+Z",
+    shortcut: "Space v a",
     condition: "已登录",
     en: "Workspace Agent List",
     group: "界面",
@@ -578,10 +571,23 @@ export const ACTIONS = [
     run: (ctx) => ctx.openWorkspaceAgentList && ctx.openWorkspaceAgentList(),
   },
   {
+    // 命令面板文件搜索：打开命令面板并预输入 f>，直接进入文件搜索（对应 Ctrl+F）
+    id: "open-command-palette-file-search",
+    label: "文件搜索",
+    shortcut: "Space v f / Ctrl+F",
+    condition: "已登录",
+    en: "File Search",
+    group: "界面",
+    icon: "🔎",
+    keywords: ["文件", "搜索", "file", "search", "find", "命令面板"],
+    run: (ctx) =>
+      ctx.openCommandPaletteFileSearch && ctx.openCommandPaletteFileSearch(),
+  },
+  {
     // 侧边活动栏「Git」视图：打开工作区并切换到 Git 侧边栏视图
     id: "open-workspace-git",
     label: "Git 视图",
-    shortcut: "Ctrl+Alt+Shift+V",
+    shortcut: "Space v g",
     condition: "已登录",
     en: "Git View",
     group: "界面",
@@ -592,7 +598,6 @@ export const ACTIONS = [
   {
     id: "open-onboarding",
     label: "查看 Jarvis 介绍",
-    shortcut: "Ctrl+Alt+Shift+/",
     condition: "已登录",
     en: "About Jarvis",
     group: "界面",
@@ -615,7 +620,7 @@ export const ACTIONS = [
   {
     id: "open-docs",
     label: "打开使用文档",
-    shortcut: "Ctrl+Alt+Shift+H",
+    shortcut: "Space m h",
     condition: "已登录",
     en: "Open Documentation",
     group: "界面",
@@ -637,7 +642,6 @@ export const ACTIONS = [
   {
     id: "open-sidebar-onboarding",
     label: "查看侧边栏引导",
-    shortcut: "Ctrl+Alt+Shift+S",
     condition: "已登录",
     en: "Sidebar Guide",
     group: "界面",
@@ -658,7 +662,6 @@ export const ACTIONS = [
   {
     id: "reset-onboarding",
     label: "重置新手引导",
-    shortcut: "Ctrl+Alt+Shift+O",
     condition: "已登录",
     en: "Reset Onboarding",
     group: "界面",
@@ -680,7 +683,6 @@ export const ACTIONS = [
   {
     id: "install-browser-extension",
     label: "安装浏览器插件",
-    shortcut: "Ctrl+Alt+Shift+E",
     condition: "已登录",
     en: "Install Browser Extension",
     group: "界面",
@@ -700,7 +702,6 @@ export const ACTIONS = [
   {
     id: "install-daemon",
     label: "安装本地后台服务",
-    shortcut: "Ctrl+Alt+Shift+B",
     condition: "已登录",
     en: "Install Local Daemon",
     group: "界面",
@@ -723,7 +724,6 @@ export const ACTIONS = [
   {
     id: "logout",
     label: "退出登录",
-    shortcut: "Ctrl+Alt+Shift+Q",
     condition: "已登录",
     en: "Log Out",
     group: "账号",
@@ -744,7 +744,6 @@ export const ACTIONS = [
   {
     id: "admin-update-code-to-main",
     label: "更新代码到 main 分支",
-    shortcut: "Ctrl+Alt+Shift+U",
     condition: "需 admin:config 权限",
     en: "Update Code to main",
     group: "管理",
@@ -756,7 +755,6 @@ export const ACTIONS = [
   {
     id: "admin-restart-node-service",
     label: "重启节点服务",
-    shortcut: "Ctrl+Alt+Shift+T",
     condition: "需 admin:config 权限",
     en: "Restart Node Service",
     group: "管理",
@@ -768,7 +766,6 @@ export const ACTIONS = [
   {
     id: "admin-sync-config",
     label: "同步配置到其他节点",
-    shortcut: "Ctrl+Alt+Shift+Y",
     condition: "需 admin:config 权限",
     en: "Sync Config to Nodes",
     group: "管理",
@@ -780,7 +777,6 @@ export const ACTIONS = [
   {
     id: "admin-node-secret",
     label: "查看节点连接私钥",
-    shortcut: "Ctrl+Alt+Shift+K",
     condition: "需 admin:config 权限",
     en: "View Node Secret",
     group: "管理",
@@ -792,7 +788,6 @@ export const ACTIONS = [
   {
     id: "admin-edit-config",
     label: "编辑配置文件",
-    shortcut: "Ctrl+Alt+Shift+F",
     condition: "需 admin:config 权限",
     en: "Edit Config File",
     group: "管理",
@@ -804,7 +799,7 @@ export const ACTIONS = [
   {
     id: "admin-open-panel",
     label: "打开管理面板",
-    shortcut: "Ctrl+Alt+Shift+A",
+    shortcut: "Space m a",
     condition: "需 admin 权限（config/users/permissions 任一）",
     en: "Open Admin Panel",
     group: "管理",
@@ -821,7 +816,6 @@ export const ACTIONS = [
   {
     id: "node-create-agent",
     label: "在选中节点创建 Agent",
-    shortcut: "Ctrl+Alt+Shift+C",
     condition: "大厅中已选中节点",
     en: "Create Agent on Node",
     group: "节点",
@@ -834,7 +828,6 @@ export const ACTIONS = [
   {
     id: "node-open-terminal",
     label: "打开选中节点终端",
-    shortcut: "Ctrl+Alt+Shift+L",
     condition: "大厅中已选中节点",
     en: "Open Node Terminal",
     group: "节点",
@@ -847,7 +840,6 @@ export const ACTIONS = [
   {
     id: "node-update-code",
     label: "更新选中节点代码",
-    shortcut: "Ctrl+Alt+Shift+G",
     condition: "大厅中已选中节点",
     en: "Update Node Code",
     group: "节点",
@@ -859,7 +851,6 @@ export const ACTIONS = [
   {
     id: "node-restart-service",
     label: "重启选中节点服务",
-    shortcut: "Ctrl+Alt+Shift+P",
     condition: "大厅中已选中节点",
     en: "Restart Node Service",
     group: "节点",
@@ -1148,5 +1139,85 @@ if (import.meta.env?.DEV) {
     );
   }
 }
+
+// ===== 空格 Leader 按键序列命令树 =====
+// 整体重设计：用「空格 + 领域键 + 动作键」的两级按键序列替代大量 Ctrl+Alt(+Shift)+字母 组合键。
+// 语义键一律用无修饰键的单字母，绝对不被系统/浏览器拦截（用户环境 Ctrl+Alt+Shift 被系统软件拦截）。
+// 结构：{ [领域键]: { label, children: { [动作键]: { label, actionId } } } }
+// 叶子节点通过 actionId 引用上方 ACTIONS 中的动作；App.vue 命中叶子后执行 onCommandRun(对应 action)。
+export const SPACE_COMMANDS = {
+  p: {
+    label: "面板 Panel",
+    children: {
+      x: { label: "关闭当前面板", actionId: "close-focused-panel" },
+      s: { label: "左右分割", actionId: "split-workspace-pane-row" },
+      h: { label: "上下分割", actionId: "split-workspace-pane-column" },
+    },
+  },
+  a: {
+    label: "Agent",
+    children: {
+      d: { label: "查看变更", actionId: "current-view-diff" },
+      r: { label: "查看规则", actionId: "current-view-rules" },
+      t: { label: "查看工具", actionId: "current-view-tools" },
+      i: { label: "人工介入", actionId: "current-manual-interrupt" },
+      k: { label: "中断", actionId: "interrupt-current" },
+      o: { label: "隐藏/显示输出", actionId: "current-toggle-output" },
+      v: { label: "自动朗读", actionId: "current-toggle-auto-read" },
+      s: { label: "自动滚动", actionId: "current-toggle-auto-scroll" },
+      c: { label: "复制", actionId: "current-copy" },
+      e: { label: "权限管理", actionId: "current-edit-access" },
+      g: { label: "无损重生", actionId: "current-regenerate" },
+      x: { label: "退出非交互", actionId: "current-exit-non-interactive" },
+      n: { label: "重命名", actionId: "current-rename" },
+      y: { label: "同步状态", actionId: "sync-status" },
+    },
+  },
+  v: {
+    label: "视图 View",
+    children: {
+      a: { label: "Agent 列表", actionId: "open-workspace-agent-list" },
+      g: { label: "Git 视图", actionId: "open-workspace-git" },
+      e: { label: "工作区", actionId: "open-editor" },
+      t: { label: "终端", actionId: "toggle-terminal" },
+      c: { label: "聊天", actionId: "toggle-chat" },
+      s: { label: "设置", actionId: "open-settings" },
+      u: { label: "网络拓扑", actionId: "open-topology" },
+      p: { label: "命令面板", actionId: "open-command-palette" },
+      l: { label: "Agent 列表(命令面板)", actionId: "open-agent-list" },
+      f: { label: "文件搜索", actionId: "open-command-palette-file-search" },
+      r: { label: "目录树", actionId: "open-editor-file-tree" },
+      b: { label: "内容搜索", actionId: "open-editor-global-search" },
+      n: { label: "文件名搜索", actionId: "open-editor-file-search" },
+      w: { label: "保存当前文件", actionId: "save-active-editor-tab" },
+    },
+  },
+  n: {
+    label: "新建 New",
+    children: {
+      a: { label: "新建 Agent", actionId: "create-agent" },
+      q: { label: "一句话创建", actionId: "quick-create-agent" },
+    },
+  },
+  m: {
+    label: "管理 Manage",
+    children: {
+      g: { label: "管理分组", actionId: "manage-groups" },
+      a: { label: "管理面板", actionId: "admin-open-panel" },
+      h: { label: "使用文档", actionId: "open-docs" },
+    },
+  },
+};
+
+// 由 SPACE_COMMANDS 派生的「空格序列 → actionId」扁平映射（用于 App.vue 快速匹配与命令面板展示）
+export const SPACE_COMMAND_ACTIONS = (() => {
+  const map = {};
+  for (const [gKey, group] of Object.entries(SPACE_COMMANDS)) {
+    for (const [aKey, leaf] of Object.entries(group.children || {})) {
+      map[`${gKey}${aKey}`] = leaf.actionId;
+    }
+  }
+  return map;
+})();
 
 export default ACTIONS;
