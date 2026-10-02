@@ -11252,7 +11252,18 @@ async function fetchAgentStatus(agent) {
     
     const result = await response.json()
     // execution_status 是任务级别状态（running/waiting_multi/waiting_single）
-    const executionStatus = result.execution_status || 'running'
+    let executionStatus = result.execution_status || 'running'
+
+    // 【竞态防护】input_request 经 WebSocket 实时到达，比 /status HTTP 轮询更权威。
+    // 若本地已有未完成的输入请求，说明后端此刻正在等待该请求对应的输入；而本次 /status
+    // 响应可能是在命令处理途中（running）读取的过期状态——典型场景：首次执行
+    // <SwitchModelGroup> 时后端先 publish input_request(single) 再 _update_status(waiting_single)，
+    // 轮询 HTTP 响应晚于 input_request 到达，读到过期的 running。此时以输入请求的 mode 为准，
+    // 避免把已切换的单行输入覆盖回多行、并把 agentStatuses 误写为 running。
+    const pendingInputRequest = inputRequests.value.get(agent.agent_id)
+    if (pendingInputRequest && executionStatus === 'running') {
+      executionStatus = pendingInputRequest.mode === 'single' ? 'waiting_single' : 'waiting_multi'
+    }
     
     // 更新状态映射（存储对象格式）
     // 本地确认条仍在时（如 completeFromPanel 已在本地进入确认态），后端 execution_status
