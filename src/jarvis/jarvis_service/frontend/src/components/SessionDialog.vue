@@ -42,7 +42,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 const props = defineProps({
   visible: Boolean,
   sessions: {
@@ -68,6 +68,19 @@ const filteredSessions = computed(() => {
     return haystack.includes(q)
   })
 })
+
+// 打开弹窗时自动聚焦：有会话则聚焦搜索框，无会话则聚焦「跳过」按钮
+watch(
+  () => props.visible,
+  (val) => {
+    if (!val) return
+    nextTick(() => {
+      const search = document.querySelector('.session-search-input')
+      if (search) search.focus()
+      else document.querySelector('.session-modal .ghost-btn')?.focus()
+    })
+  }
+)
 </script>
 
 <style scoped>

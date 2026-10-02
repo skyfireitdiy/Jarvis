@@ -60,7 +60,7 @@
         <div class="form-column create-agent-column create-agent-column-right">
           <div class="form-group">
             <label>Agent 名称（可选）</label>
-            <input :value="agentName" @input="$emit('update:agentName', $event.target.value)" type="text" class="form-control" placeholder="例如：开发环境Agent" />
+            <input ref="nameInput" :value="agentName" @input="$emit('update:agentName', $event.target.value)" type="text" class="form-control" placeholder="例如：开发环境Agent" />
           </div>
           <div class="form-group">
             <label>模型组</label>
@@ -167,7 +167,7 @@
 </template>
 
 <script setup>
-import { computed, watch, onUnmounted } from 'vue'
+import { computed, nextTick, watch, onUnmounted } from 'vue'
 
 const props = defineProps({
   visible: Boolean,
@@ -213,6 +213,9 @@ const emit = defineEmits([
   'selectDir'
 ])
 
+// Agent 名称输入框引用：打开弹窗时自动聚焦
+const nameInput = ref(null)
+
 // 按当前节点过滤最近使用的工作目录
 const filteredRecentWorkDirs = computed(() => {
   if (!props.currentNodeId) return []
@@ -257,8 +260,13 @@ function handleKeydown(event) {
 watch(
   () => props.visible,
   (val) => {
-    if (val) document.addEventListener('keydown', handleKeydown)
-    else document.removeEventListener('keydown', handleKeydown)
+    if (val) {
+      document.addEventListener('keydown', handleKeydown)
+      // 打开弹窗时自动聚焦 Agent 名称输入框，方便纯键盘直接输入
+      nextTick(() => nameInput.value?.focus())
+    } else {
+      document.removeEventListener('keydown', handleKeydown)
+    }
   }
 )
 

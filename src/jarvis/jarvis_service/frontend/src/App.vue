@@ -18064,9 +18064,70 @@ const spaceSeqOptions = computed(() => {
     }))
 })
 
+// 弹窗焦点陷阱：返回当前可见的弹窗容器（多个弹窗同时打开时取最顶层）
+function getActiveOverlay() {
+  const overlays = document.querySelectorAll('.modal-overlay, .palette-overlay')
+  for (let i = overlays.length - 1; i >= 0; i--) {
+    const el = overlays[i]
+    // 仅取真正渲染且可见的（v-if 控制的弹窗关闭后不在 DOM 中；再排除 display:none）
+    if (el.offsetParent !== null || el.getClientRects().length > 0) return el
+  }
+  return null
+}
+
+// 弹窗焦点恢复：记录弹窗打开前的焦点元素，弹窗关闭后恢复
+let overlayReturnFocusEl = null
+let overlayObserver = null
+
+// 收集弹窗内可聚焦元素（Tab 循环目标）
+function getFocusableElements(container) {
+  const selector = [
+    'button:not([disabled])',
+    'input:not([disabled]):not([type="hidden"])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    'a[href]',
+    '[tabindex]:not([tabindex="-1"])'
+  ].join(', ')
+  return Array.from(container.querySelectorAll(selector)).filter(
+    (el) => el.offsetParent !== null || el.getClientRects().length > 0
+  )
+}
+
 // 全局键盘事件处理
 function handleGlobalKeydown(event) {
   const isModifierPressed = event.ctrlKey || event.metaKey
+
+  // ===== 弹窗焦点陷阱：Tab/Shift+Tab 在弹窗内循环，不跳出到背后页面 =====
+  if (event.key === 'Tab') {
+    const overlay = getActiveOverlay()
+    if (overlay) {
+      // 记录弹窗打开前的焦点（供关闭后恢复）；若焦点已在弹窗内则不重复记录
+      if (!overlayReturnFocusEl && !overlay.contains(document.activeElement)) {
+        overlayReturnFocusEl = document.activeElement
+      }
+      const focusables = getFocusableElements(overlay)
+      if (focusables.length) {
+        const first = focusables[0]
+        const last = focusables[focusables.length - 1]
+        const active = document.activeElement
+        if (event.shiftKey) {
+          // Shift+Tab：从第一个（或弹窗外的焦点）回绕到最后一个
+          if (active === first || !overlay.contains(active)) {
+            event.preventDefault()
+            last.focus()
+          }
+        } else {
+          // Tab：从最后一个（或弹窗外的焦点）回绕到第一个
+          if (active === last || !overlay.contains(active)) {
+            event.preventDefault()
+            first.focus()
+          }
+        }
+      }
+      return
+    }
+  }
 
   // ===== 空格 Leader 按键序列（优先于其他所有分支）=====
   if (spaceSeq.value.active) {
@@ -19192,6 +19253,27 @@ onMounted(() => {
     })
     diagramObserver.observe(outputList.value, { childList: true, subtree: true })
   }
+
+  // 弹窗焦点恢复：弹窗出现时记录打开前焦点，弹窗从 DOM 移除（任意关闭方式）时恢复焦点
+  overlayObserver = new MutationObserver(() => {
+    const overlay = document.querySelector('.modal-overlay, .palette-overlay')
+    if (overlay) {
+      // 弹窗出现：记录打开前焦点（若焦点不在弹窗内）
+      const active = document.activeElement
+      if (!overlayReturnFocusEl && active && !overlay.contains(active)) {
+        overlayReturnFocusEl = active
+      }
+    } else if (overlayReturnFocusEl) {
+      // 弹窗消失：恢复焦点到打开前元素
+      const target = overlayReturnFocusEl
+      overlayReturnFocusEl = null
+      // 目标元素仍存在且可聚焦时才恢复，避免焦点落到已销毁元素
+      if (target && document.body.contains(target) && typeof target.focus === 'function') {
+        target.focus()
+      }
+    }
+  })
+  overlayObserver.observe(document.body, { childList: true, subtree: true })
 })
 
 onUnmounted(() => {
@@ -19262,6 +19344,13 @@ onUnmounted(() => {
     diagramObserver.disconnect()
     diagramObserver = null
   }
+
+  // 断开弹窗焦点恢复 MutationObserver
+  if (overlayObserver) {
+    overlayObserver.disconnect()
+    overlayObserver = null
+  }
+  overlayReturnFocusEl = null
 })
 
 // 播放单次提示音

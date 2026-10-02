@@ -41,7 +41,7 @@
         </div>
         <div class="form-group">
           <label>用户名</label>
-          <input :value="username" @input="$emit('update:username', $event.target.value)" type="text" placeholder="首次使用请填 admin" />
+          <input ref="usernameInput" :value="username" @input="$emit('update:username', $event.target.value)" type="text" placeholder="首次使用请填 admin" />
         </div>
         <div class="form-group">
           <label>密码</label>
@@ -131,7 +131,7 @@ jarvis-service start child</code></pre>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { nextTick, ref, watch } from 'vue'
 
 defineProps({
   visible: Boolean,
@@ -145,6 +145,15 @@ defineProps({
 defineEmits(['update:visible', 'update:gatewayUrl', 'update:password', 'update:username', 'connect'])
 
 const showQuickStart = ref(false)
+
+// 用户名输入框引用：打开登录界面时自动聚焦，方便直接输入
+const usernameInput = ref(null)
+watch(
+  () => props.visible,
+  (val) => {
+    if (val) nextTick(() => usernameInput.value?.focus())
+  }
+)
 </script>
 
 <style scoped>
