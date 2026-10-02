@@ -73,7 +73,7 @@
           <aside v-if="showWorkspaceSidebar" class="workspace-sidebar" :style="{ width: workspaceSidebarWidth + 'px' }">
             <div class="workspace-sidebar-resize-handle" @mousedown="startWorkspaceSidebarResize($event)"></div>
             <div class="workspace-sidebar-header">
-              <span class="workspace-sidebar-title">{{ workspaceSidebarView === 'search' ? '全局搜索' : (workspaceSidebarView === 'git' ? 'Git' : (workspaceSidebarView === 'agents' ? 'Agent 列表' : (workspaceSidebarView === 'manage' ? '定时任务与 Daemon 能力' : '目录树'))) }}</span>
+              <span class="workspace-sidebar-title">{{ workspaceSidebarView === 'search' ? '全局搜索' : (workspaceSidebarView === 'git' ? 'Git' : (workspaceSidebarView === 'agents' ? 'Agent 列表' : (workspaceSidebarView === 'manage' ? '能力清单' : (workspaceSidebarView === 'timers' ? '定时任务' : '目录树')))) }}</span>
               <button class="icon-btn-small workspace-sidebar-close-mobile" tabindex="-1" @mousedown.prevent @click="closeWorkspaceSidebar" title="关闭侧边栏">✕</button>
               <button class="icon-btn-small workspace-sidebar-close-desktop" tabindex="-1" @mousedown.prevent @click="closeWorkspaceSidebar" title="关闭侧边栏">✕</button>
             </div>
@@ -520,8 +520,18 @@
             </div>
             <div v-else-if="workspaceSidebarView === 'manage'" class="workspace-sidebar-content">
               <ManageSidebar
-                :timers="manageTimers"
+                view="manage"
                 :daemonSessions="topologyDaemonSessions"
+                :extensionSessions="topologyExtensionSessions"
+                :installedScripts="manageInstalledScripts"
+                :gatewayScripts="manageGatewayScripts"
+                @refresh="refreshManageCapabilities"
+              />
+            </div>
+            <div v-else-if="workspaceSidebarView === 'timers'" class="workspace-sidebar-content">
+              <ManageSidebar
+                view="timers"
+                :timers="manageTimers"
               />
             </div>
             <div v-else class="workspace-sidebar-content">
@@ -2468,6 +2478,53 @@ async function fetchBrowserExtensionSessions() {
   }
 }
 
+// 查询每个在线浏览器扩展会话已安装的自定义脚本（能力清单用）。
+// GET /api/browser-ext/scripts/installed 返回 {success, sessions:[{session_id, name, scripts}]}
+async function fetchInstalledScripts() {
+  try {
+    const { host, port } = getGatewayAddress()
+    const url = `${getHttpProtocol()}://${host}:${port}/api/browser-ext/scripts/installed`
+    const response = await fetchWithAuth(url)
+    if (!response.ok) return []
+    const result = await response.json()
+    if (!result || !result.success) return []
+    return Array.isArray(result.sessions) ? result.sessions : []
+  } catch (e) {
+    return []
+  }
+}
+
+// 查询网关数据目录下保存的脚本（能力清单用）。
+// GET /api/browser-ext/scripts/list 返回 {success, scripts:[{name, size, updated_at}]}
+async function fetchGatewayScripts() {
+  try {
+    const { host, port } = getGatewayAddress()
+    const url = `${getHttpProtocol()}://${host}:${port}/api/browser-ext/scripts/list`
+    const response = await fetchWithAuth(url)
+    if (!response.ok) return []
+    const result = await response.json()
+    if (!result || !result.success) return []
+    return Array.isArray(result.scripts) ? result.scripts : []
+  } catch (e) {
+    return []
+  }
+}
+
+// 刷新能力清单数据（浏览器扩展会话 + daemon 会话 + 已安装脚本 + 网关脚本）。
+// 能力清单缓存：仅在首次打开或手动点刷新按钮时调用，避免频繁请求。
+async function refreshManageCapabilities() {
+  const [extSessions, daemonSessions, installedScripts, gatewayScripts] = await Promise.all([
+    fetchBrowserExtensionSessions(),
+    fetchDaemonSessions(),
+    fetchInstalledScripts(),
+    fetchGatewayScripts(),
+  ])
+  topologyExtensionSessions.value = Array.isArray(extSessions) ? extSessions : []
+  topologyDaemonSessions.value = Array.isArray(daemonSessions) ? daemonSessions : []
+  manageInstalledScripts.value = Array.isArray(installedScripts) ? installedScripts : []
+  manageGatewayScripts.value = Array.isArray(gatewayScripts) ? gatewayScripts : []
+}
+
 // —— 网络拓扑大图中的「接入端」会话列表 ——
 // 浏览器扩展 / 后台服务（daemon）均取网关会话列表：可能有多台设备/多个浏览器接入，
 // 每个会话在拓扑图中渲染为一个节点并显示其 name（用户配置的终端名）。
@@ -2476,6 +2533,9 @@ const topologyExtensionSessions = ref([])
 const topologyDaemonSessions = ref([])
 // 管理侧边栏展示的定时任务列表（只读，由 Agent 直接控制）
 const manageTimers = ref([])
+// 能力清单：浏览器扩展已安装脚本 + 网关脚本库（缓存，避免频繁请求，仅手动刷新）
+const manageInstalledScripts = ref([])
+const manageGatewayScripts = ref([])
 let topologyAccessTimer = null
 async function refreshTopologyAccessSessions() {
   const [extSessions, daemonSessions] = await Promise.all([
@@ -4875,7 +4935,18 @@ function setWorkspaceSidebarView(view) {
     return
   }
   if (view === 'manage') {
-    // 切到管理视图时拉取定时任务列表（只读展示）
+    // 切到能力清单视图：数据缓存，避免频繁请求；仅首次打开（数据为空）时加载，
+    // 之后靠侧边栏内「刷新」按钮手动刷新。
+    if (!topologyDaemonSessions.value.length && !topologyExtensionSessions.value.length) {
+      refreshManageCapabilities()
+    }
+    nextTick(() => {
+      layoutMonacoEditor()
+    })
+    return
+  }
+  if (view === 'timers') {
+    // 切到定时任务视图：任务会变化，拉取最新列表（只读展示）
     refreshManageTimers()
     nextTick(() => {
       layoutMonacoEditor()
@@ -8984,10 +9055,10 @@ watch([showWorkspacePanel, currentAgentId, workspaceSidebarView], ([isWorkspaceP
   })
 })
 
-// 管理侧边栏（定时任务 + Daemon 能力）：视图激活时定时刷新定时任务列表（只读展示）
+// 定时任务侧边栏：视图激活时定时刷新定时任务列表（只读展示，任务会变化）
 let manageTimersTimer = null
 watch([showWorkspaceSidebar, workspaceSidebarView], ([sidebarVisible, sidebarView]) => {
-  const active = sidebarVisible && sidebarView === 'manage'
+  const active = sidebarVisible && sidebarView === 'timers'
   if (manageTimersTimer) {
     clearInterval(manageTimersTimer)
     manageTimersTimer = null

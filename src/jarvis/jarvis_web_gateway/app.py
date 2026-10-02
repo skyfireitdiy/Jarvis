@@ -2705,6 +2705,53 @@ def create_app(
             return {"success": False, "error": f"failed to list scripts: {exc}"}
         return {"success": True, "scripts": scripts}
 
+    @app.get("/api/browser-ext/scripts/installed", dependencies=[Depends(verify_token)])
+    async def api_browser_ext_scripts_installed(request: Request) -> Dict[str, Any]:
+        """列出每个在线浏览器扩展会话已安装的自定义脚本（类油猴脚本）元数据。
+
+        对每个在线会话实时调用 ``script.list``，返回
+        ``[{session_id, name, scripts:[{id,name,description,match,version,enabled,
+        installed_at,updated_at,source_size}]}]``。
+        非管理员只能看到属于自己（token 对应 user_id）的会话。
+        单个会话查询失败不阻断整体，失败会话的 scripts 置为空并附 error。
+        """
+        user_info = request.state.user_info or {}
+        current_user_id = user_info.get("user_id")
+        is_admin = bool(user_info.get("is_admin"))
+        if is_admin or current_user_id in (None, "system"):
+            user_id = None
+        else:
+            user_id = current_user_id
+        sessions = browser_extension_manager.list_sessions(user_id=user_id)
+        result = []
+        for s in sessions:
+            session_id = s.get("session_id")
+            if not session_id:
+                continue
+            entry: Dict[str, Any] = {
+                "session_id": session_id,
+                "name": s.get("name") or "",
+                "scripts": [],
+            }
+            try:
+                resp = await browser_extension_manager.send_command(
+                    session_id,
+                    "script.list",
+                    {},
+                    timeout=5.0,
+                    user_id=current_user_id,
+                    is_admin=is_admin,
+                )
+                # 扩展侧 script.list 返回 {success, scripts:[...]} 或 {scripts:[...]}
+                scripts = (resp or {}).get("scripts")
+                if not isinstance(scripts, list):
+                    scripts = []
+                entry["scripts"] = scripts
+            except Exception as exc:
+                entry["error"] = str(exc)
+            result.append(entry)
+        return {"success": True, "sessions": result}
+
     @app.get("/api/browser-ext/download", dependencies=[Depends(verify_token)])
     async def api_browser_ext_download() -> Response:
         """动态打包浏览器扩展源码并作为 zip 附件下载。

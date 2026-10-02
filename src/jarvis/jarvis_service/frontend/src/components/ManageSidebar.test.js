@@ -46,27 +46,48 @@ function session(overrides = {}) {
   };
 }
 
+// 构造浏览器扩展会话
+function extensionSession(overrides = {}) {
+  return {
+    session_id: "ext-xyz",
+    name: "Chrome 扩展",
+    extension_version: "v1.2.3",
+    browser_info: { name: "Chrome", version: "120", os: "Windows" },
+    tabs: [{ tab_id: 1, title: "示例页", url: "https://example.com" }],
+    ...overrides,
+  };
+}
+
 function mountSidebar(props = {}) {
   return mount(ManageSidebar, {
     props: {
+      view: "manage",
       timers: [],
       daemonSessions: [],
+      extensionSessions: [],
+      installedScripts: [],
+      gatewayScripts: [],
       ...props,
     },
   });
 }
 
-describe("ManageSidebar 定时任务展示", () => {
-  test("默认显示定时任务页签，空态提示", () => {
-    const wrapper = mountSidebar();
-    expect(wrapper.find(".manage-sidebar").exists()).toBe(true);
+describe("ManageSidebar 定时任务展示（view=timers）", () => {
+  test("定时任务视图，空态提示", () => {
+    const wrapper = mountSidebar({ view: "timers" });
+    expect(wrapper.find(".manage-sidebar-title").text()).toBe("定时任务");
     expect(wrapper.find(".manage-sidebar-empty").text()).toContain(
       "暂无定时任务",
     );
   });
 
+  test("定时任务视图不显示刷新按钮", () => {
+    const wrapper = mountSidebar({ view: "timers" });
+    expect(wrapper.find(".manage-sidebar-refresh").exists()).toBe(false);
+  });
+
   test("渲染定时任务列表（动作类型/状态/调度）", () => {
-    const wrapper = mountSidebar({ timers: [timer()] });
+    const wrapper = mountSidebar({ view: "timers", timers: [timer()] });
     expect(wrapper.find(".manage-timer-item").exists()).toBe(true);
     expect(wrapper.find(".manage-timer-type").text()).toBe("调用能力");
     expect(wrapper.find(".manage-timer-status").text()).toBe("运行中");
@@ -74,45 +95,73 @@ describe("ManageSidebar 定时任务展示", () => {
   });
 
   test("已取消任务显示取消状态", () => {
-    const wrapper = mountSidebar({ timers: [timer({ cancelled: true })] });
+    const wrapper = mountSidebar({
+      view: "timers",
+      timers: [timer({ cancelled: true })],
+    });
     expect(wrapper.find(".manage-timer-status").text()).toBe("已取消");
     expect(wrapper.find(".manage-timer-status").classes()).toContain(
       "cancelled",
     );
   });
 
+  test("cron 调度显示 cron 表达式", () => {
+    const wrapper = mountSidebar({
+      view: "timers",
+      timers: [
+        timer({
+          metadata: {
+            action: { type: "capability_call" },
+            schedule: { type: "cron", cron: "0 9 * * 1" },
+          },
+        }),
+      ],
+    });
+    expect(wrapper.find(".manage-timer-schedule").text()).toContain(
+      "cron: 0 9 * * 1",
+    );
+  });
+
   test("动作类型未知时显示原始类型", () => {
     const wrapper = mountSidebar({
+      view: "timers",
       timers: [timer({ metadata: { action: { type: "custom_action" } } })],
     });
     expect(wrapper.find(".manage-timer-type").text()).toBe("custom_action");
   });
 });
 
-describe("ManageSidebar daemon 能力展示", () => {
-  test("无会话时提示暂无在线 daemon", async () => {
+describe("ManageSidebar 能力清单展示（view=manage）", () => {
+  test("能力清单视图标题与刷新按钮", () => {
     const wrapper = mountSidebar();
-    const tabs = wrapper.findAll(".manage-sidebar-tab");
-    await tabs[1].trigger("click"); // 切到 daemon 能力页签
+    expect(wrapper.find(".manage-sidebar-title").text()).toBe("能力清单");
+    expect(wrapper.find(".manage-sidebar-refresh").exists()).toBe(true);
+  });
+
+  test("无任何能力时提示暂无可用能力", () => {
+    const wrapper = mountSidebar();
     expect(wrapper.find(".manage-sidebar-empty").text()).toContain(
-      "暂无在线 daemon",
+      "暂无可用能力",
     );
   });
 
-  test("切换页签到 daemon 能力，展示会话与能力", async () => {
+  test("点击刷新按钮触发 refresh 事件", async () => {
     const wrapper = mountSidebar({ daemonSessions: [session()] });
-    const tabs = wrapper.findAll(".manage-sidebar-tab");
-    await tabs[1].trigger("click");
+    await wrapper.find(".manage-sidebar-refresh").trigger("click");
+    expect(wrapper.emitted("refresh")).toBeTruthy();
+  });
+
+  test("展示 daemon 会话与能力", async () => {
+    const wrapper = mountSidebar({ daemonSessions: [session()] });
+    expect(wrapper.find(".manage-section-title").text()).toBe("Daemon 能力");
     expect(wrapper.find(".manage-session-name").text()).toBe("my-pc");
     // 展开会话后能力列表可见
     await wrapper.find(".manage-session-head").trigger("click");
     expect(wrapper.find(".manage-capability-name").text()).toBe("system.info");
   });
 
-  test("展开会话后可查看能力详情（描述与参数）", async () => {
+  test("展开 daemon 会话后可查看能力详情（描述与参数）", async () => {
     const wrapper = mountSidebar({ daemonSessions: [session()] });
-    const tabs = wrapper.findAll(".manage-sidebar-tab");
-    await tabs[1].trigger("click");
     // 展开会话
     await wrapper.find(".manage-session-head").trigger("click");
     // 展开能力后可见描述与参数
@@ -121,5 +170,54 @@ describe("ManageSidebar daemon 能力展示", () => {
       "查询系统信息",
     );
     expect(wrapper.find(".manage-capability-params-json").exists()).toBe(true);
+  });
+
+  test("展示浏览器扩展会话及其标签页", async () => {
+    const wrapper = mountSidebar({ extensionSessions: [extensionSession()] });
+    expect(wrapper.find(".manage-section-title").text()).toBe("浏览器扩展");
+    expect(wrapper.find(".manage-session-name").text()).toBe("Chrome 扩展");
+    // 展开扩展会话后可见浏览器信息与标签页
+    await wrapper.find(".manage-session-head").trigger("click");
+    expect(wrapper.find(".manage-capability-desc").text()).toContain("Chrome");
+    expect(wrapper.find(".manage-tab-title").text()).toBe("示例页");
+  });
+
+  test("浏览器扩展会话展开后显示已安装脚本", async () => {
+    const wrapper = mountSidebar({
+      extensionSessions: [extensionSession()],
+      installedScripts: [
+        {
+          session_id: "ext-xyz",
+          name: "Chrome 扩展",
+          scripts: [
+            {
+              id: "s-1",
+              name: "mysite",
+              description: "某站点文档操作",
+              version: "1.0.0",
+              enabled: true,
+              match: ["https://example.com/*"],
+            },
+          ],
+        },
+      ],
+    });
+    await wrapper.find(".manage-session-head").trigger("click");
+    expect(wrapper.find(".manage-script-name").text()).toBe("mysite");
+    expect(wrapper.find(".manage-script-desc").text()).toContain(
+      "某站点文档操作",
+    );
+    expect(wrapper.find(".manage-script-status").text()).toBe("已启用");
+  });
+
+  test("展示网关脚本库", () => {
+    const wrapper = mountSidebar({
+      gatewayScripts: [
+        { name: "backup", size: 2048, updated_at: "2026-10-02T00:00:00" },
+      ],
+    });
+    expect(wrapper.find(".manage-section-title").text()).toBe("网关脚本库");
+    expect(wrapper.find(".manage-script-name").text()).toBe("backup");
+    expect(wrapper.find(".manage-script-status").text()).toBe("2.0 KB");
   });
 });
