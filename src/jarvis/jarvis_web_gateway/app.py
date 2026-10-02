@@ -2006,6 +2006,7 @@ def create_app(
         """Lifespan context manager for startup and shutdown events."""
         # Startup
         agent_manager.set_event_loop(asyncio.get_running_loop())
+        daemon_capability_manager.set_event_loop(asyncio.get_running_loop())
         await agent_manager.start_monitoring_for_running_agents()
         # 同步新Token到所有running状态的Agent
         gateway_token = os.environ.get("JARVIS_AUTH_TOKEN", "")
@@ -7602,6 +7603,51 @@ def create_app(
 
         return _run_shell_command_callback, metadata
 
+    def _build_capability_call_callback(action_params: Dict[str, Any]):
+        session_id = action_params.get("session_id")
+        capability = action_params.get("capability")
+        params = action_params.get("params")
+        timeout = action_params.get("timeout", 30.0)
+        user_id = action_params.get("user_id")
+        is_admin = bool(action_params.get("is_admin", False))
+
+        if not isinstance(session_id, str) or not session_id.strip():
+            raise ValueError("action.params.session_id is required")
+        if not isinstance(capability, str) or not capability.strip():
+            raise ValueError("action.params.capability is required")
+        if params is None:
+            params = {}
+        if not isinstance(params, dict):
+            raise ValueError("action.params.params must be an object")
+        try:
+            timeout = float(timeout)
+        except (TypeError, ValueError):
+            raise ValueError("action.params.timeout must be a number")
+
+        metadata = {
+            "type": "capability_call",
+            "params": {
+                "session_id": session_id,
+                "capability": capability,
+                "params": params,
+                "timeout": timeout,
+                "user_id": user_id,
+                "is_admin": is_admin,
+            },
+        }
+
+        def _capability_call_callback() -> None:
+            daemon_capability_manager.call_capability_threadsafe(
+                session_id,
+                capability,
+                params=params,
+                timeout=timeout,
+                user_id=user_id,
+                is_admin=is_admin,
+            )
+
+        return _capability_call_callback, metadata
+
     def _build_timer_action(request: Dict[str, Any]):
         action = request.get("action")
         if not isinstance(action, dict):
@@ -7618,7 +7664,11 @@ def create_app(
             return _build_create_agent_callback(action_params)
         if action_type == "run_shell_command":
             return _build_shell_command_callback(action_params)
-        raise ValueError("action.type must be one of create_agent or run_shell_command")
+        if action_type == "capability_call":
+            return _build_capability_call_callback(action_params)
+        raise ValueError(
+            "action.type must be one of create_agent, run_shell_command or capability_call"
+        )
 
     timer_manager.load_persisted_tasks()
 

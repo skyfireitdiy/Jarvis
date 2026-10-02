@@ -283,6 +283,8 @@ class DaemonCapabilityManager:
     """
 
     def __init__(self) -> None:
+        # 主事件循环（由网关在 lifespan 启动时绑定，供跨线程调用使用）
+        self._event_loop: Optional[asyncio.AbstractEventLoop] = None
         # session_id -> 会话信息
         self._sessions: Dict[str, Dict[str, Any]] = {}
         # request_id -> Future，用于按 id 匹配能力调用响应
@@ -801,6 +803,43 @@ class DaemonCapabilityManager:
             }
         finally:
             self._pending_calls.pop(call_id, None)
+
+    def set_event_loop(self, event_loop: asyncio.AbstractEventLoop) -> None:
+        """绑定用于跨线程调用能力的主事件循环（网关 lifespan 启动时调用）。"""
+        self._event_loop = event_loop
+
+    def call_capability_threadsafe(
+        self,
+        session_id: str,
+        name: str,
+        params: Optional[Dict[str, Any]] = None,
+        timeout: float = DEFAULT_CALL_TIMEOUT,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
+    ) -> Dict[str, Any]:
+        """在线程环境（如定时任务回调）中安全地调用守护进程能力。
+
+        通过 ``run_coroutine_threadsafe`` 把异步的 ``call_capability`` 投递到
+        主事件循环执行，并同步等待结果。适用于在无事件循环的线程（例如
+        TimerManager 的 worker 线程）中调用能力。
+
+        Raises:
+            RuntimeError: 主事件循环未绑定，或能力调用本身失败/超时。
+        """
+        if self._event_loop is None:
+            raise RuntimeError("DaemonCapabilityManager event loop is not set")
+        future = asyncio.run_coroutine_threadsafe(
+            self.call_capability(
+                session_id,
+                name,
+                params=params,
+                timeout=timeout,
+                user_id=user_id,
+                is_admin=is_admin,
+            ),
+            self._event_loop,
+        )
+        return future.result()
 
     # ------------------------------------------------------------------
     # 查询

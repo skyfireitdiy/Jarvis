@@ -123,7 +123,142 @@ def test_create_app_attaches_timer_manager_to_app_state():
         _cleanup_timer_persistence()
 
 
-def test_create_timer_with_create_agent_action(tmp_path):
+def test_create_timer_with_capability_call_action(tmp_path):
+    """capability_call 动作应能被 _build_timer_action 正确构建并调度。"""
+    _cleanup_timer_persistence()
+    client = create_test_client()
+    headers = get_auth_headers()
+
+    # 创建 capability_call 定时任务（delay 足够长避免测试期间触发）
+    resp = client.post(
+        "/api/timers",
+        headers=headers,
+        json={
+            "schedule": {"delay_seconds": 3600},
+            "action": {
+                "type": "capability_call",
+                "params": {
+                    "session_id": "session-1",
+                    "capability": "fs.read",
+                    "params": {"path": "/tmp"},
+                    "timeout": 15,
+                    "user_id": "user-1",
+                    "is_admin": True,
+                },
+            },
+        },
+    )
+    body = resp.json()
+    assert body["success"] is True, body
+    timer_info = body["data"]
+    action_meta = timer_info["metadata"]["action"]
+    assert action_meta["type"] == "capability_call"
+    assert action_meta["params"]["capability"] == "fs.read"
+    assert action_meta["params"]["session_id"] == "session-1"
+    assert action_meta["params"]["timeout"] == 15.0
+    assert action_meta["params"]["is_admin"] is True
+    assert action_meta["params"]["params"] == {"path": "/tmp"}
+
+    # 清理
+    timer_id = timer_info["task_id"]
+    resp_del = client.delete(f"/api/timers/{timer_id}", headers=headers)
+    assert resp_del.json()["success"] is True
+    _cleanup_timer_persistence()
+
+
+def test_create_timer_with_capability_call_rejects_invalid_params():
+    """capability_call 动作缺少必填字段或字段类型错误时应返回 INVALID_ARGUMENT。"""
+    _cleanup_timer_persistence()
+    client = create_test_client()
+    headers = get_auth_headers()
+
+    # 缺 session_id
+    resp = client.post(
+        "/api/timers",
+        headers=headers,
+        json={
+            "schedule": {"delay_seconds": 3600},
+            "action": {
+                "type": "capability_call",
+                "params": {"capability": "fs.read"},
+            },
+        },
+    )
+    body = resp.json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "INVALID_ARGUMENT"
+    assert "session_id" in body["error"]["message"]
+
+    # 缺 capability
+    resp = client.post(
+        "/api/timers",
+        headers=headers,
+        json={
+            "schedule": {"delay_seconds": 3600},
+            "action": {
+                "type": "capability_call",
+                "params": {"session_id": "session-1"},
+            },
+        },
+    )
+    body = resp.json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "INVALID_ARGUMENT"
+    assert "capability" in body["error"]["message"]
+
+    # params 非对象
+    resp = client.post(
+        "/api/timers",
+        headers=headers,
+        json={
+            "schedule": {"delay_seconds": 3600},
+            "action": {
+                "type": "capability_call",
+                "params": {
+                    "session_id": "session-1",
+                    "capability": "fs.read",
+                    "params": "not-an-object",
+                },
+            },
+        },
+    )
+    body = resp.json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "INVALID_ARGUMENT"
+
+    # timeout 非数字
+    resp = client.post(
+        "/api/timers",
+        headers=headers,
+        json={
+            "schedule": {"delay_seconds": 3600},
+            "action": {
+                "type": "capability_call",
+                "params": {
+                    "session_id": "session-1",
+                    "capability": "fs.read",
+                    "timeout": "not-a-number",
+                },
+            },
+        },
+    )
+    body = resp.json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "INVALID_ARGUMENT"
+
+    # 未知 action.type
+    resp = client.post(
+        "/api/timers",
+        headers=headers,
+        json={
+            "schedule": {"delay_seconds": 3600},
+            "action": {"type": "bogus_type", "params": {}},
+        },
+    )
+    body = resp.json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "INVALID_ARGUMENT"
+
     _cleanup_timer_persistence()
 
 

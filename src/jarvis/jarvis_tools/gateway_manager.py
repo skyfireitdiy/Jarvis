@@ -200,12 +200,12 @@ class GatewayManagerTool:
             },
             "timer_action_type": {
                 "type": "string",
-                "enum": ["create_agent", "run_shell_command"],
-                "description": "定时任务动作类型（create_timer 操作必填）：create_agent 或 run_shell_command",
+                "enum": ["create_agent", "run_shell_command", "capability_call"],
+                "description": "定时任务动作类型（create_timer 操作必填）：create_agent / run_shell_command / capability_call",
             },
             "timer_action_params": {
                 "type": "object",
-                "description": "定时任务动作参数（create_timer 操作必填）。create_agent 类型需：agent_type(必填)、working_dir(必填)、name、llm_group、tool_group、config_file、task、additional_args、worktree、proxy_node；run_shell_command 类型需：command(必填)、working_dir(必填)、interpreter",
+                "description": "定时任务动作参数（create_timer 操作必填）。create_agent 类型需：agent_type(必填)、working_dir(必填)、name、llm_group、tool_group、config_file、task、additional_args、worktree、proxy_node；run_shell_command 类型需：command(必填)、working_dir(必填)、interpreter；capability_call 类型需：session_id(必填)、capability(必填)、params(对象)、timeout(秒)、user_id、is_admin",
             },
             # 群组操作的参数
             "group_id": {
@@ -1834,7 +1834,7 @@ class GatewayManagerTool:
         参数:
             node_id: 目标节点 ID（可选，默认为 master）
             schedule: 调度配置，三选一
-            timer_action_type: 动作类型（create_agent / run_shell_command）
+            timer_action_type: 动作类型（create_agent / run_shell_command / capability_call）
             timer_action_params: 动作参数
 
         返回:
