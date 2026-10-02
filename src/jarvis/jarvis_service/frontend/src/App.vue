@@ -19321,6 +19321,22 @@ body::-webkit-scrollbar {
   z-index: 3100;
 }
 
+/* PWA 全屏/独立模式：内容延伸到屏幕最顶部，去掉状态栏/挖孔安全边距（实现真正全屏）。
+   注意：仅在 PWA 安装模式下生效；浏览器标签页模式仍保留安全边距，避免被浏览器顶栏遮挡。
+   此块必须放在全局 <style>（非 scoped）中，否则 html/body/#app 会被加上 data-v 属性而无法命中。 */
+@media (display-mode: fullscreen), (display-mode: standalone) {
+  /* 移动端 PWA 全屏时 --app-height 取 visualViewport.height（不含系统状态栏），
+     导致 .app 高度不足、顶部状态栏/挖孔区域露出 body 深色背景形成黑边。
+     这里让 html/body/#app/.app 高度补上 safe-area-inset-top，使页面覆盖到屏幕最顶部。 */
+  html, body, #app, .app {
+    height: calc(var(--app-height, 100vh) + env(safe-area-inset-top, 0px));
+  }
+  .app {
+    padding-top: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
 
 </style>
 
@@ -19346,16 +19362,6 @@ body::-webkit-scrollbar {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
-}
-
-/* PWA 全屏/独立模式：内容延伸到屏幕最顶部，去掉状态栏/挖孔安全边距（实现真正全屏）。
-   注意：仅在 PWA 安装模式下生效；浏览器标签页模式仍保留安全边距，避免被浏览器顶栏遮挡。 */
-@media (display-mode: fullscreen), (display-mode: standalone) {
-  .app {
-    padding-top: 0;
-    padding-left: 0;
-    padding-right: 0;
-  }
 }
 
 /* 未登录时隐藏后台界面，仅保留登录弹窗与背景 */
