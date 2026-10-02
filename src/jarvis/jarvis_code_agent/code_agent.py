@@ -268,7 +268,7 @@ class CodeAgent(Agent):
             "daemon",  # 本机守护进程工具（调用用户机器上 jarvis-daemon 注册的能力）
             "sub_code_agent",  # 子代码Agent工具，用于创建子Agent执行独立任务
             "eval_js",  # 前端 JS 执行工具（Web 网关模式下向前端浏览器下发 JS）
-            "editor_open_file",  # 编辑器工具（通知前端打开文件/跳转行/选中代码）
+            "jarvis_frontend",  # Jarvis前端工具（通知前端打开文件/跳转行/选中代码）
         ]
         # 如果启用了任务列表管理器，添加相应工具
         if enable_task_list_manager:
