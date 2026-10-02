@@ -73,7 +73,7 @@
           <aside v-if="showWorkspaceSidebar" class="workspace-sidebar" :style="{ width: workspaceSidebarWidth + 'px' }">
             <div class="workspace-sidebar-resize-handle" @mousedown="startWorkspaceSidebarResize($event)"></div>
             <div class="workspace-sidebar-header">
-              <span class="workspace-sidebar-title">{{ workspaceSidebarView === 'search' ? '全局搜索' : (workspaceSidebarView === 'git' ? 'Git' : (workspaceSidebarView === 'agents' ? 'Agent 列表' : '目录树')) }}</span>
+              <span class="workspace-sidebar-title">{{ workspaceSidebarView === 'search' ? '全局搜索' : (workspaceSidebarView === 'git' ? 'Git' : (workspaceSidebarView === 'agents' ? 'Agent 列表' : (workspaceSidebarView === 'manage' ? '定时任务与 Daemon 能力' : '目录树'))) }}</span>
               <button class="icon-btn-small workspace-sidebar-close-mobile" tabindex="-1" @mousedown.prevent @click="closeWorkspaceSidebar" title="关闭侧边栏">✕</button>
               <button class="icon-btn-small workspace-sidebar-close-desktop" tabindex="-1" @mousedown.prevent @click="closeWorkspaceSidebar" title="关闭侧边栏">✕</button>
             </div>
@@ -517,6 +517,12 @@
                   </div>
                 </template>
               </div>
+            </div>
+            <div v-else-if="workspaceSidebarView === 'manage'" class="workspace-sidebar-content">
+              <ManageSidebar
+                :timers="manageTimers"
+                :daemonSessions="topologyDaemonSessions"
+              />
             </div>
             <div v-else class="workspace-sidebar-content">
               <div class="workspace-git-panel">
@@ -1699,6 +1705,7 @@ import CommandPalette from './components/CommandPalette.vue'
 import TopologyOverlay from './components/TopologyOverlay.vue'
 import PetLobby from './components/PetLobby.vue'
 import OnboardingTour from './components/OnboardingTour.vue'
+import ManageSidebar from './components/ManageSidebar.vue'
 import { ACTIONS as actionDefs, SPACE_COMMANDS } from './actions/registry.js'
 import { resolveCurrentAgentId } from './utils/currentAgentResolver.js'
 
@@ -2421,7 +2428,27 @@ async function fetchDaemonSessions() {
   }
 }
 
-// 查询浏览器扩展在线会话：返回会话数组（含 name / extension_version），
+// 查询定时任务列表（只读展示，任务由 Agent 直接控制）。
+// GET /api/timers 返回 {success, data:[{task_id, run_at, interval_seconds,
+//   is_recurring, cancelled, metadata:{action:{type,params}, schedule}}]}
+async function fetchTimers() {
+  try {
+    const { host, port } = getGatewayAddress()
+    const url = `${getHttpProtocol()}://${host}:${port}/api/timers`
+    const response = await fetchWithAuth(url)
+    if (!response.ok) return []
+    const result = await response.json()
+    if (!result || !result.success) return []
+    return Array.isArray(result.data) ? result.data : []
+  } catch (e) {
+    return []
+  }
+}
+
+// 刷新管理侧边栏的定时任务列表
+async function refreshManageTimers() {
+  manageTimers.value = await fetchTimers()
+}
 // 供拓扑图为每个接入的扩展渲染一个节点并显示名称。
 // 注意：/api/browser-ext/version 的 sessions 只含 session_id/extension_version，
 // 不含 name，故这里单独调 /api/browser-ext/sessions。
@@ -2447,6 +2474,8 @@ async function fetchBrowserExtensionSessions() {
 // 非管理员只能看到自己的会话（网关侧限制），管理员可见全部。
 const topologyExtensionSessions = ref([])
 const topologyDaemonSessions = ref([])
+// 管理侧边栏展示的定时任务列表（只读，由 Agent 直接控制）
+const manageTimers = ref([])
 let topologyAccessTimer = null
 async function refreshTopologyAccessSessions() {
   const [extSessions, daemonSessions] = await Promise.all([
@@ -4842,6 +4871,14 @@ function setWorkspaceSidebarView(view) {
       if (!gitLog.value.length && !gitLogLoading.value) {
         refreshGitView()
       }
+    })
+    return
+  }
+  if (view === 'manage') {
+    // 切到管理视图时拉取定时任务列表（只读展示）
+    refreshManageTimers()
+    nextTick(() => {
+      layoutMonacoEditor()
     })
     return
   }
@@ -8945,6 +8982,20 @@ watch([showWorkspacePanel, currentAgentId, workspaceSidebarView], ([isWorkspaceP
   nextTick(() => {
     ensureWorkspaceSidebarFileTree()
   })
+})
+
+// 管理侧边栏（定时任务 + Daemon 能力）：视图激活时定时刷新定时任务列表（只读展示）
+let manageTimersTimer = null
+watch([showWorkspaceSidebar, workspaceSidebarView], ([sidebarVisible, sidebarView]) => {
+  const active = sidebarVisible && sidebarView === 'manage'
+  if (manageTimersTimer) {
+    clearInterval(manageTimersTimer)
+    manageTimersTimer = null
+  }
+  if (active) {
+    refreshManageTimers()
+    manageTimersTimer = setInterval(refreshManageTimers, 5000)
+  }
 })
 
 // Agent 分组管理

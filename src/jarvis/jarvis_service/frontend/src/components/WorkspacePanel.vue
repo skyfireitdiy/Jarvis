@@ -72,6 +72,19 @@
         </button>
         <button
           class="workspace-activity-button"
+          :class="{ active: showSidebar && sidebarView === 'manage' }"
+          tabindex="-1"
+          @mousedown.prevent
+          @click="$emit('setSidebarView', 'manage')"
+          title="定时任务与 Daemon 能力"
+        >
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="8" cy="8" r="5.5"/>
+            <path d="M8 4.5V8l2.5 1.5"/>
+          </svg>
+        </button>
+        <button
+          class="workspace-activity-button"
           :class="{ active: mainView === 'chat' }"
           tabindex="-1"
           @mousedown.prevent
