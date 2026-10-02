@@ -9510,6 +9510,14 @@ const commandPaletteCtx = computed(() => ({
   openAdminNodeSecret: () => openAdminSystemAction('node-secret'),
   openAdminConfigFile: () => openAdminSystemAction('config-file'),
   openWorkspaceAgentList,
+  // 打开工作区并切换到 Git 侧边栏视图（侧边活动栏「Git」按钮 / Ctrl+Alt+Shift+V）
+  openWorkspaceGit: () => {
+    if (!showWorkspacePanel.value) {
+      showWorkspacePanel.value = true
+      if (windowWidth.value <= 768) pushOverlayState()
+    }
+    setWorkspaceSidebarView('git')
+  },
   toggleTerminalPanel,
   toggleChatPanel,
   // 打开编辑器侧边栏的「管理分组」弹窗（重命名 / 删除）
@@ -17953,6 +17961,18 @@ function handleGlobalKeydown(event) {
     return
   }
 
+  // Ctrl/Cmd + L 打开命令面板并直接展示 Agent 列表（预输入 a>）
+  // 与 registry 的 open-agent-list（Ctrl+L）保持一致；浏览器默认聚焦地址栏需拦截
+  if (isModifierPressed && !event.altKey && !event.shiftKey && event.code === 'KeyL') {
+    if (showConnectModal.value) return
+    // 输入框内保留默认行为（避免打断输入）
+    if (isEditableElement(event.target)) return
+    event.preventDefault()
+    commandPaletteFocusKey = getFocusedZoneKey()
+    commandPaletteInitialQuery.value = 'a>'
+    showCommandPalette.value = true
+    return
+  }
   // Ctrl/Cmd + N 打开创建 Agent 弹窗（拦截浏览器新建窗口）
   if (isModifierPressed && !event.altKey && !event.shiftKey && event.code === 'KeyN') {
     // 登录界面不响应

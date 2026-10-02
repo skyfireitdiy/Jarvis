@@ -558,6 +558,38 @@ export const ACTIONS = [
     run: (ctx) => ctx.openAgentList && ctx.openAgentList(),
   },
   {
+    // 侧边活动栏「Agent 列表」视图：打开工作区并切换到 agents 侧边栏视图
+    id: "open-workspace-agent-list",
+    label: "工作区 Agent 列表",
+    shortcut: "Ctrl+Alt+Shift+Z",
+    condition: "已登录",
+    en: "Workspace Agent List",
+    group: "界面",
+    icon: "📋",
+    keywords: [
+      "agent",
+      "列表",
+      "工作区",
+      "侧边栏",
+      "workspace",
+      "list",
+      "sidebar",
+    ],
+    run: (ctx) => ctx.openWorkspaceAgentList && ctx.openWorkspaceAgentList(),
+  },
+  {
+    // 侧边活动栏「Git」视图：打开工作区并切换到 Git 侧边栏视图
+    id: "open-workspace-git",
+    label: "Git 视图",
+    shortcut: "Ctrl+Alt+Shift+V",
+    condition: "已登录",
+    en: "Git View",
+    group: "界面",
+    icon: "🔀",
+    keywords: ["git", "提交", "分支", "版本", "commit", "branch", "version"],
+    run: (ctx) => ctx.openWorkspaceGit && ctx.openWorkspaceGit(),
+  },
+  {
     id: "open-onboarding",
     label: "查看 Jarvis 介绍",
     shortcut: "Ctrl+Alt+Shift+/",
