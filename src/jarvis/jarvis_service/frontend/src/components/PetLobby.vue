@@ -203,7 +203,7 @@
         :title="roaming ? '点击停止宠物游走' : '点击开启宠物游走'"
         @click.stop="roaming = !roaming"
       >
-        <span class="pet-lobby-roam-icon" v-html="roaming ? PET_ICONS.roam : '⏸'"></span>
+        <span class="pet-lobby-roam-icon" v-html="roaming ? PET_ICONS.roam : PET_ICONS.stand"></span>
         <span class="pet-lobby-roam-label">{{ roaming ? '游走中' : '已静止' }}</span>
       </button>
 
@@ -750,7 +750,9 @@ const NODE_RH = 26
 
 // 自绘 16x16 stroke 线性 SVG 图标（currentColor 继承主题色），用于替换 A 类功能性 emoji
 const PET_ICONS = {
-  roam: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 8.5a5.5 5.5 0 1 1-1.6-3.9"/><path d="M13.5 2.5v3h-3"/></svg>',
+  roam: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="2.8" r="1.5"/><path d="M8 4.3 6.6 9.2"/><path d="M8 5.2 9.8 6.8"/><path d="M6.6 9.2 4.6 12.8"/><path d="M6.6 9.2 9 10.2"/></svg>',
+  stand: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="2.8" r="1.5"/><path d="M8 4.3V9"/><path d="M8 5.5 6 7"/><path d="M8 5.5 10 7"/><path d="M8 9 6 12.5"/><path d="M8 9 10 12.5"/></svg>',
+  pause: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="2.6" height="10" rx="1"/><rect x="9.4" y="3" width="2.6" height="10" rx="1"/></svg>',
   eye: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 8s2.5-4 6.5-4 6.5 4 6.5 4-2.5 4-6.5 4S1.5 8 1.5 8Z"/><circle cx="8" cy="8" r="1.8"/></svg>',
   eyeOff: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l10 10"/><path d="M6.2 5.3A6.5 6.5 0 0 1 8 5c4 0 6.5 3 6.5 3a8.7 8.7 0 0 1-1.5 1.8M9.9 10.8A5.4 5.4 0 0 1 8 11c-4 0-6.5-3-6.5-3a8.7 8.7 0 0 1 2.6-2.5"/></svg>',
   chat: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 3h11v7h-7L3.5 13v-3h-1z"/></svg>',
