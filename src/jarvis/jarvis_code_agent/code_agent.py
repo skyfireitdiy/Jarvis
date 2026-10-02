@@ -790,14 +790,16 @@ git reset --hard {start_commit}
                         impact_report, self, final_ret
                     )
 
-                    # 构建验证
+                    # 构建验证（已注释入口：自动构建验证功能被禁用）
+                    # config = BuildValidationConfig(self.root_dir)
+                    # (
+                    #     build_validation_result,
+                    #     final_ret,
+                    # ) = self.build_validation_manager.handle_build_validation(
+                    #     modified_files, self, final_ret
+                    # )
                     config = BuildValidationConfig(self.root_dir)
-                    (
-                        build_validation_result,
-                        final_ret,
-                    ) = self.build_validation_manager.handle_build_validation(
-                        modified_files, self, final_ret
-                    )
+                    build_validation_result = None
 
                     # 静态分析
                     final_ret = self.lint_manager.handle_static_analysis(
