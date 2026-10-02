@@ -17987,9 +17987,11 @@ function handleGlobalKeydown(event) {
   // 否则会把编辑器/输入框的全选行为吃掉。
   // 例外：编辑器已按 ESC「脱离」快捷键控制（editorShortcutLocked）时不再让位，
   // 让 Ctrl+A 触发命令面板，而不是在编辑器里全选。
+  // 普通输入框（textarea/input/contentEditable）无条件让位：即使 editorShortcutLocked
+  // 为 true（曾按 ESC 脱离编辑器），进入输入框后 Ctrl+A 仍应恢复为原生全选。
   if (isModifierPressed && !event.altKey && event.code === 'KeyA') {
     if (showConnectModal.value) return
-    if (!editorShortcutLocked.value && (isMonacoEditorFocused() || isEditableElement(event.target))) return
+    if (isEditableElement(event.target) || (!editorShortcutLocked.value && isMonacoEditorFocused())) return
     event.preventDefault()
     commandPaletteFocusKey = getFocusedZoneKey()
     commandPaletteInitialQuery.value = 'a>'
@@ -18001,9 +18003,11 @@ function handleGlobalKeydown(event) {
   // 注意：Ctrl+F 是「查找」的通用快捷键，焦点在 Monaco 编辑器或输入框时须让位，
   // 否则会把编辑器/输入框的原生查找行为吃掉。
   // 例外：编辑器已按 ESC「脱离」快捷键控制（editorShortcutLocked）时不再让位。
+  // 普通输入框（textarea/input/contentEditable）无条件让位：即使 editorShortcutLocked
+  // 为 true（曾按 ESC 脱离编辑器），进入输入框后 Ctrl+F 仍应恢复为原生查找。
   if (isModifierPressed && !event.altKey && event.code === 'KeyF') {
     if (showConnectModal.value) return
-    if (!editorShortcutLocked.value && (isMonacoEditorFocused() || isEditableElement(event.target))) return
+    if (isEditableElement(event.target) || (!editorShortcutLocked.value && isMonacoEditorFocused())) return
     event.preventDefault()
     commandPaletteFocusKey = getFocusedZoneKey()
     commandPaletteInitialQuery.value = 'f>'
