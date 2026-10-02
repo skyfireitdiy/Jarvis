@@ -11268,9 +11268,20 @@ async function fetchAgentStatus(agent) {
     // <SwitchModelGroup> 时后端先 publish input_request(single) 再 _update_status(waiting_single)，
     // 轮询 HTTP 响应晚于 input_request 到达，读到过期的 running。此时以输入请求的 mode 为准，
     // 避免把已切换的单行输入覆盖回多行、并把 agentStatuses 误写为 running。
+    //
+    // 注意：不能只依赖 inputRequests——当用户发送命令时后端仍在 running，命令会先进入
+    // inputBuffers；随后 input_request 到达时走「缓冲区分支」（handleMessage 中提前 return），
+    // 不会写入 inputRequests（且 sendInputResult 还会把它删掉）。因此这里同时以
+    // agentStatuses 里已记录的等待态（input_request/confirm 处理时写入）作为依据，
+    // 只要本地已是等待输入/确认态，而轮询读到过期的 running，就以本地等待态为准，
+    // 保证单行输入框不会被在途轮询覆盖回多行。
     const pendingInputRequest = inputRequests.value.get(agent.agent_id)
     if (pendingInputRequest && executionStatus === 'running') {
       executionStatus = pendingInputRequest.mode === 'single' ? 'waiting_single' : 'waiting_multi'
+    }
+    const localWaitingStatus = agentStatuses.value.get(agent.agent_id)?.execution_status
+    if (executionStatus === 'running' && ['waiting_single', 'waiting_multi', 'waiting_confirm'].includes(localWaitingStatus)) {
+      executionStatus = localWaitingStatus
     }
     
     // 更新状态映射（存储对象格式）
