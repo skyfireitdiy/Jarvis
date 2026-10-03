@@ -114,6 +114,128 @@ func registerWindowsInput(reg *Registry) {
 		},
 		Handler: handleWindowsInputKeys,
 	})
+
+	_ = reg.Register(Capability{
+		Name: "windows.input.double-click",
+		Description: "在指定屏幕坐标双击鼠标。" +
+			"先 SetCursorPos 移动光标，再连续发送两次按下/抬起。" +
+			"与 windows.input.click 的 count=2 等价，但作为独立能力语义更清晰。" +
+			"坐标以主屏左上角为原点（像素）。无需任何外部命令或第三方依赖。",
+		Platform: PlatformWindows,
+		Parameters: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"x": map[string]any{
+					"type":        "integer",
+					"description": "屏幕横坐标（像素），允许为 0。",
+				},
+				"y": map[string]any{
+					"type":        "integer",
+					"description": "屏幕纵坐标（像素），允许为 0。",
+				},
+				"button": map[string]any{
+					"type":        "string",
+					"description": "鼠标按键，默认 left；支持 left/right/middle。",
+				},
+				"delay_ms": map[string]any{
+					"type":        "integer",
+					"description": "两次点击之间的延迟毫秒数，默认 0；不能为负。",
+				},
+			},
+			"required": []string{"x", "y"},
+		},
+		Handler: handleWindowsInputDoubleClick,
+	})
+
+	_ = reg.Register(Capability{
+		Name: "windows.input.right-click",
+		Description: "在指定屏幕坐标右键点击。" +
+			"先 SetCursorPos 移动光标，再用 mouse_event 发送右键按下/抬起。" +
+			"坐标以主屏左上角为原点（像素）。无需任何外部命令或第三方依赖。",
+		Platform: PlatformWindows,
+		Parameters: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"x": map[string]any{
+					"type":        "integer",
+					"description": "屏幕横坐标（像素），允许为 0。",
+				},
+				"y": map[string]any{
+					"type":        "integer",
+					"description": "屏幕纵坐标（像素），允许为 0。",
+				},
+				"button": map[string]any{
+					"type":        "string",
+					"description": "鼠标按键，默认 right；支持 left/right/middle。",
+				},
+			},
+			"required": []string{"x", "y"},
+		},
+		Handler: handleWindowsInputRightClick,
+	})
+
+	_ = reg.Register(Capability{
+		Name: "windows.input.hover",
+		Description: "把鼠标光标移动到指定屏幕坐标（悬停，不点击）。" +
+			"通过 SetCursorPos 移动光标，可用于触发控件的悬停效果或为后续操作定位。" +
+			"坐标以主屏左上角为原点（像素）。无需任何外部命令或第三方依赖。",
+		Platform: PlatformWindows,
+		Parameters: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"x": map[string]any{
+					"type":        "integer",
+					"description": "屏幕横坐标（像素），允许为 0。",
+				},
+				"y": map[string]any{
+					"type":        "integer",
+					"description": "屏幕纵坐标（像素），允许为 0。",
+				},
+			},
+			"required": []string{"x", "y"},
+		},
+		Handler: handleWindowsInputHover,
+	})
+
+	_ = reg.Register(Capability{
+		Name: "windows.input.drag",
+		Description: "从起点拖拽鼠标到终点（按下、移动、抬起）。" +
+			"先 SetCursorPos 到起点并按下按钮，再沿直线插值逐步移动到终点，最后抬起。" +
+			"可用于拖拽文件、调整窗口大小、绘制等场景。坐标以主屏左上角为原点（像素）。" +
+			"无需任何外部命令或第三方依赖。",
+		Platform: PlatformWindows,
+		Parameters: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"from_x": map[string]any{
+					"type":        "integer",
+					"description": "拖拽起点横坐标（像素），允许为 0。",
+				},
+				"from_y": map[string]any{
+					"type":        "integer",
+					"description": "拖拽起点纵坐标（像素），允许为 0。",
+				},
+				"to_x": map[string]any{
+					"type":        "integer",
+					"description": "拖拽终点横坐标（像素），允许为 0。",
+				},
+				"to_y": map[string]any{
+					"type":        "integer",
+					"description": "拖拽终点纵坐标（像素），允许为 0。",
+				},
+				"button": map[string]any{
+					"type":        "string",
+					"description": "鼠标按键，默认 left；支持 left/right/middle。",
+				},
+				"steps": map[string]any{
+					"type":        "integer",
+					"description": "移动插值步数，默认 20；越大拖拽轨迹越平滑。",
+				},
+			},
+			"required": []string{"from_x", "from_y", "to_x", "to_y"},
+		},
+		Handler: handleWindowsInputDrag,
+	})
 }
 
 // handleWindowsInputClick 是 windows.input.click 的实现。
@@ -354,5 +476,191 @@ func handleWindowsInputKeys(params map[string]any) (any, error) {
 	return map[string]any{
 		"keys": keys,
 		"tool": windowsInputTool,
+	}, nil
+}
+
+// handleWindowsInputDoubleClick 是 windows.input.double-click 的实现。
+func handleWindowsInputDoubleClick(params map[string]any) (any, error) {
+	x, err := requiredInt(params, "x")
+	if err != nil {
+		return nil, err
+	}
+	y, err := requiredInt(params, "y")
+	if err != nil {
+		return nil, err
+	}
+
+	button, err := optionalString(params, "button")
+	if err != nil {
+		return nil, err
+	}
+	if button == "" {
+		button = "left"
+	}
+	downFlag, ok := mouseButtonFlags(button, true)
+	if !ok {
+		return nil, fmt.Errorf("参数 button 不支持 %q，允许值: left、right、middle", button)
+	}
+	upFlag, _ := mouseButtonFlags(button, false)
+
+	delayMS, err := optionalInt(params, "delay_ms", 0)
+	if err != nil {
+		return nil, err
+	}
+	if delayMS < 0 {
+		return nil, fmt.Errorf("参数 delay_ms 不能为负数，实际 %d", delayMS)
+	}
+
+	// 移动光标：SetCursorPos 返回 0 表示失败。
+	if r, _, err := procSetCursorPos.Call(uintptr(x), uintptr(y)); r == 0 {
+		return nil, fmt.Errorf("移动光标到 (%d, %d) 失败: %v", x, y, err)
+	}
+
+	// 连续两次点击实现双击。
+	for i := 0; i < 2; i++ {
+		procMouseEvent.Call(uintptr(downFlag), 0, 0, 0, 0)
+		procMouseEvent.Call(uintptr(upFlag), 0, 0, 0, 0)
+		if i == 0 && delayMS > 0 {
+			time.Sleep(time.Duration(delayMS) * time.Millisecond)
+		}
+	}
+
+	return map[string]any{
+		"x":      x,
+		"y":      y,
+		"button": button,
+		"tool":   windowsInputTool,
+	}, nil
+}
+
+// handleWindowsInputRightClick 是 windows.input.right-click 的实现。
+func handleWindowsInputRightClick(params map[string]any) (any, error) {
+	x, err := requiredInt(params, "x")
+	if err != nil {
+		return nil, err
+	}
+	y, err := requiredInt(params, "y")
+	if err != nil {
+		return nil, err
+	}
+
+	button, err := optionalString(params, "button")
+	if err != nil {
+		return nil, err
+	}
+	if button == "" {
+		button = "right"
+	}
+	downFlag, ok := mouseButtonFlags(button, true)
+	if !ok {
+		return nil, fmt.Errorf("参数 button 不支持 %q，允许值: left、right、middle", button)
+	}
+	upFlag, _ := mouseButtonFlags(button, false)
+
+	// 移动光标：SetCursorPos 返回 0 表示失败。
+	if r, _, err := procSetCursorPos.Call(uintptr(x), uintptr(y)); r == 0 {
+		return nil, fmt.Errorf("移动光标到 (%d, %d) 失败: %v", x, y, err)
+	}
+
+	procMouseEvent.Call(uintptr(downFlag), 0, 0, 0, 0)
+	procMouseEvent.Call(uintptr(upFlag), 0, 0, 0, 0)
+
+	return map[string]any{
+		"x":      x,
+		"y":      y,
+		"button": button,
+		"tool":   windowsInputTool,
+	}, nil
+}
+
+// handleWindowsInputHover 是 windows.input.hover 的实现。
+func handleWindowsInputHover(params map[string]any) (any, error) {
+	x, err := requiredInt(params, "x")
+	if err != nil {
+		return nil, err
+	}
+	y, err := requiredInt(params, "y")
+	if err != nil {
+		return nil, err
+	}
+
+	// 移动光标：SetCursorPos 返回 0 表示失败。
+	if r, _, err := procSetCursorPos.Call(uintptr(x), uintptr(y)); r == 0 {
+		return nil, fmt.Errorf("移动光标到 (%d, %d) 失败: %v", x, y, err)
+	}
+
+	return map[string]any{
+		"x":    x,
+		"y":    y,
+		"tool": windowsInputTool,
+	}, nil
+}
+
+// handleWindowsInputDrag 是 windows.input.drag 的实现。
+func handleWindowsInputDrag(params map[string]any) (any, error) {
+	fromX, err := requiredInt(params, "from_x")
+	if err != nil {
+		return nil, err
+	}
+	fromY, err := requiredInt(params, "from_y")
+	if err != nil {
+		return nil, err
+	}
+	toX, err := requiredInt(params, "to_x")
+	if err != nil {
+		return nil, err
+	}
+	toY, err := requiredInt(params, "to_y")
+	if err != nil {
+		return nil, err
+	}
+
+	button, err := optionalString(params, "button")
+	if err != nil {
+		return nil, err
+	}
+	if button == "" {
+		button = "left"
+	}
+	downFlag, ok := mouseButtonFlags(button, true)
+	if !ok {
+		return nil, fmt.Errorf("参数 button 不支持 %q，允许值: left、right、middle", button)
+	}
+	upFlag, _ := mouseButtonFlags(button, false)
+
+	steps, err := optionalInt(params, "steps", 20)
+	if err != nil {
+		return nil, err
+	}
+	if steps <= 0 {
+		return nil, fmt.Errorf("参数 steps 必须为正整数，实际 %d", steps)
+	}
+
+	// 移动到起点并按下。
+	if r, _, err := procSetCursorPos.Call(uintptr(fromX), uintptr(fromY)); r == 0 {
+		return nil, fmt.Errorf("移动光标到起点 (%d, %d) 失败: %v", fromX, fromY, err)
+	}
+	procMouseEvent.Call(uintptr(downFlag), 0, 0, 0, 0)
+
+	// 沿直线插值逐步移动到终点。
+	for i := 1; i <= steps; i++ {
+		px := fromX + (toX-fromX)*i/steps
+		py := fromY + (toY-fromY)*i/steps
+		procSetCursorPos.Call(uintptr(px), uintptr(py))
+		// 每步之间留极短延迟，保证目标程序能感知到移动轨迹。
+		time.Sleep(time.Duration(10) * time.Millisecond)
+	}
+
+	// 在终点抬起。
+	procMouseEvent.Call(uintptr(upFlag), 0, 0, 0, 0)
+
+	return map[string]any{
+		"from_x": fromX,
+		"from_y": fromY,
+		"to_x":   toX,
+		"to_y":   toY,
+		"button": button,
+		"steps":  steps,
+		"tool":   windowsInputTool,
 	}, nil
 }

@@ -351,7 +351,7 @@ internal/capability/
 
 本轮实现框架 **并注册 Linux 平台能力**：
 
-- Linux 平台已注册 21 个能力（`registerPlatformCapabilities` 在 `registry_linux.go` 中按 `//go:build linux` 装配），见下表；Windows 平台能力随后已补齐（`registry_windows.go` 按 `//go:build windows` 装配，覆盖系统 / 进程 / 应用 / GUI / 输入 / 剪贴板 / 脚本 / 文件系统 / 跨机直传 / 服务 / 浏览器扩展 / OCR 等），Darwin 暂未注册（走 `registry_other.go` 兜底）；
+- Linux 平台已注册 21 个能力（`registerPlatformCapabilities` 在 `registry_linux.go` 中按 `//go:build linux` 装配），见下表；Windows 平台能力随后已补齐（`registry_windows.go` 按 `//go:build windows` 装配，覆盖系统 / 进程 / 应用 / GUI / 输入 / 剪贴板 / 脚本 / 文件系统 / 跨机直传 / 服务 / 系统配置（主题 / 电源计划 / 代理 / 屏幕超时 / 远程桌面 / 开机启动）/ UI 自动化（控件树 / 菜单）/ 浏览器扩展 / OCR 等），Darwin 暂未注册（走 `registry_other.go` 兜底）；
 - 网关侧（Python）已实现：新增独立端点 `/api/daemon/ws` 与会话管理 `daemon_capability_manager`，并提供 `/api/daemon/sessions`、`/api/daemon/capability/list`、`/api/daemon/capability/call` 三个 HTTP API；跨节点调用经 `node_protocol` 的 `daemon_capability_*` 消息由 `NodeConnectionManager` 转发；
 - 多守护进程连接同一网关时，网关侧以 `hello` 中的 `client_id` 区分会话（`session_id` 由网关分配），能力调用结果按 `id` 回投到对应会话。
 

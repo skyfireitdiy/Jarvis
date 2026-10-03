@@ -27,6 +27,23 @@ import (
 	"strings"
 )
 
+// splitWindowsArgs 把启动参数字符串拆分为参数列表。
+//
+// 用途：windows.app.start 需要把用户提供的 args 字符串传给 os/exec 启动进程。
+// 这里用 strings.Fields 按空白拆分，**不经过 shell**，因此不会发生命令注入
+// （与直接拼进命令行让 cmd.exe 解析不同）。args 为空时返回 nil。
+//
+// 注意：本函数不做引号解析（如 "a b" 不会合并为一个参数）。若需要支持带空格
+// 的单个参数，应使用更完整的解析器；对启动应用而言，按空白拆分已能满足
+// 绝大多数场景，且避免了引号解析带来的注入面。
+func splitWindowsArgs(args string) []string {
+	trimmed := strings.TrimSpace(args)
+	if trimmed == "" {
+		return nil
+	}
+	return strings.Fields(trimmed)
+}
+
 // parseWindowsAppCSV 解析 `Get-ItemProperty ... | Select ... |
 // ConvertTo-Csv -NoTypeInformation` 的输出，返回应用条目列表。
 //

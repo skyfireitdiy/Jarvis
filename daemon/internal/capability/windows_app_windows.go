@@ -4,6 +4,8 @@ package capability
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
 	"sort"
 	"strings"
 	"time"
@@ -52,6 +54,34 @@ func registerWindowsApp(reg *Registry) {
 			},
 		},
 		Handler: handleWindowsAppList,
+	})
+
+	_ = reg.Register(Capability{
+		Name: "windows.app.start",
+		Description: "启动一个可执行程序。" +
+			"通过 os/exec 直接启动进程（不经过 shell，避免命令注入），" +
+			"子进程在无窗口的隐藏控制台中运行（不闪黑框）。" +
+			"可选等待进程退出并返回退出码。无需任何第三方依赖。",
+		Platform: PlatformWindows,
+		Parameters: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"path": map[string]any{
+					"type":        "string",
+					"description": "要启动的可执行文件路径，如 C:\\Windows\\notepad.exe。",
+				},
+				"args": map[string]any{
+					"type":        "string",
+					"description": "可选命令行参数，按空白拆分传给进程；不经过 shell。",
+				},
+				"wait": map[string]any{
+					"type":        "boolean",
+					"description": "是否等待进程退出后再返回；默认 false（立即返回 pid）。",
+				},
+			},
+			"required": []string{"path"},
+		},
+		Handler: handleWindowsAppStart,
 	})
 }
 
@@ -209,4 +239,64 @@ func toPowerShellRegistryPath(key string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("无法识别的注册表根键: %s", key)
+}
+
+// windowsAppStartTool 是 windows.app.start 返回结果中 tool 字段的值。
+const windowsAppStartTool = "os/exec"
+
+// handleWindowsAppStart 是 windows.app.start 的实现。
+func handleWindowsAppStart(params map[string]any) (any, error) {
+	path, err := requiredString(params, "path")
+	if err != nil {
+		return nil, err
+	}
+
+	// 校验可执行文件存在；不存在时给出明确错误，避免 exec 启动后报晦涩错误。
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("可执行文件不存在: %s", path)
+		}
+		return nil, fmt.Errorf("无法访问可执行文件 %s: %v", path, err)
+	}
+
+	args, err := optionalString(params, "args")
+	if err != nil {
+		return nil, err
+	}
+	argList := splitWindowsArgs(args)
+
+	wait, err := optionalBool(params, "wait", false)
+	if err != nil {
+		return nil, err
+	}
+
+	// 用 os/exec 直接启动，不经过 shell（不调用 cmd.exe /c），避免命令注入。
+	cmd := exec.Command(path, argList...)
+	// 子进程在无窗口的隐藏控制台中运行，避免守护进程启动 GUI 程序时闪黑框。
+	cmd.SysProcAttr = hideWindow()
+
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("启动 %s 失败: %v", path, err)
+	}
+
+	result := map[string]any{
+		"pid":  cmd.Process.Pid,
+		"tool": windowsAppStartTool,
+	}
+
+	// 可选等待进程退出并返回退出码。
+	if wait {
+		err := cmd.Wait()
+		exitCode := 0
+		if err != nil {
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				exitCode = exitErr.ExitCode()
+			} else {
+				return nil, fmt.Errorf("等待进程退出失败: %v", err)
+			}
+		}
+		result["exit_code"] = exitCode
+	}
+
+	return result, nil
 }

@@ -153,3 +153,32 @@ func TestParseWindowsAppCSVTrimsWhitespace(t *testing.T) {
 		t.Errorf("version 未去除空白：得到 %q", got)
 	}
 }
+
+// TestSplitWindowsArgs 验证启动参数字符串拆分逻辑。
+func TestSplitWindowsArgs(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want []string
+	}{
+		{"空串", "", nil},
+		{"纯空白", "   ", nil},
+		{"单个参数", "notepad", []string{"notepad"}},
+		{"多个参数", "file1.txt file2.txt", []string{"file1.txt", "file2.txt"}},
+		{"多空白折叠", "  a   b  c ", []string{"a", "b", "c"}},
+		{"带引号不合并", `"a b" c`, []string{`"a`, `b"`, "c"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := splitWindowsArgs(tt.in)
+			if len(got) != len(tt.want) {
+				t.Fatalf("期望 %d 个参数 %v，得到 %d 个 %v", len(tt.want), tt.want, len(got), got)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("参数[%d] 错误：期望 %q，得到 %q", i, tt.want[i], got[i])
+				}
+			}
+		})
+	}
+}

@@ -14,6 +14,8 @@ package capability
 //   - windows_script_windows.go：脚本执行
 //   - windows_fs_windows.go：文件系统读写与目录列举
 //   - windows_service_windows.go：系统服务查询与启停
+//   - windows_config_windows.go：系统配置（主题/电源计划/代理/屏幕超时/远程桌面/开机启动）
+//   - windows_ui_windows.go：UI 自动化（控件树枚举/菜单操作）
 //   - windows_browser_ext_windows.go：浏览器扩展下载与更新
 //   - windows_common_windows.go：参数解析与外部命令辅助函数
 func registerPlatformCapabilities(reg *Registry) {
@@ -28,6 +30,8 @@ func registerPlatformCapabilities(reg *Registry) {
 	// 跨机文件直传（push/pull）：逻辑跨平台共享，仅 Platform 字段不同
 	registerTransferRemote(reg, PlatformWindows)
 	registerWindowsService(reg)
+	registerWindowsConfig(reg)
+	registerWindowsUI(reg)
 	registerWindowsBrowserExt(reg)
 	// OCR 文字识别：逻辑跨平台共享（图片经网关识别），仅 Platform 字段不同
 	registerOcr(reg, PlatformWindows)

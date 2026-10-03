@@ -81,24 +81,30 @@ daemon(action="list_capabilities", session_id="<sid>")
 
 ### 2. 按任务选能力
 
-| 目标                              | 能力                                    | 关键参数                                                                              |
-| --------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------- |
-| 列出窗口（拿 window_id/pid/标题） | `windows.window.list`                   | `filter`（**匹配标题，不匹配进程名**）                                                |
-| 聚焦窗口                          | `windows.window.focus`                  | `window_id`（**HWND 十六进制串**）或 `title`                                          |
-| 关闭窗口                          | `windows.window.close`                  | `window_id`                                                                           |
-| 点击                              | `windows.input.click`                   | `x`/`y`（**屏幕绝对坐标**）、`button`、`count`                                        |
-| 按键组合                          | `windows.input.keys`                    | `keys`（如 `ctrl+f`、`Return`、`ctrl+alt+Right`）                                     |
-| 输入文本                          | `windows.input.type`                    | `text`、`delay_ms`                                                                    |
-| 剪贴板读写                        | `windows.clipboard.get` / `.set`        | `text`                                                                                |
-| 跑 PowerShell/cmd                 | `windows.script.exec`                   | `script`、`interpreter`、`timeout_ms`                                                 |
-| 列进程                            | `windows.process.list`                  | `filter`（匹配进程名或 PID）                                                          |
-| 结束进程                          | `windows.process.kill`                  | `pid`、`force`                                                                        |
-| 列已安装应用                      | `windows.app.list`                      | `filter`（名称或发布者）                                                              |
-| 文件读写列                        | `windows.fs.read` / `.write` / `.list`  | `path` 等                                                                             |
-| 跨机传文件（daemon↔节点）         | `fs.transfer.push` / `fs.transfer.pull` | `gateway`、`node_id`、`local_path`、`remote_path`（详见 `daemon_file_transfer` 规则） |
-| 服务管理                          | `windows.service.*`                     | `unit`（需管理员权限才能启停）                                                        |
-| 截图                              | `windows.screenshot`                    | `path`（**只截主屏，返回体不含图像**）                                                |
-| 系统信息                          | `windows.system.info`                   | 无                                                                                    |
+| 目标                              | 能力                                                     | 关键参数                                                                              |
+| --------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| 列出窗口（拿 window_id/pid/标题） | `windows.window.list`                                    | `filter`（**匹配标题，不匹配进程名**）                                                |
+| 聚焦窗口                          | `windows.window.focus`                                   | `window_id`（**HWND 十六进制串**）或 `title`                                          |
+| 关闭窗口                          | `windows.window.close`                                   | `window_id`                                                                           |
+| 点击                              | `windows.input.click`                                    | `x`/`y`（**屏幕绝对坐标**）、`button`、`count`                                        |
+| 双击 / 右键 / 悬停                | `windows.input.double-click` / `.right-click` / `.hover` | `x`/`y`、`button`（双击/右键）、`delay_ms`                                            |
+| 拖拽                              | `windows.input.drag`                                     | `from_x`/`from_y`/`to_x`/`to_y`、`button`、`steps`（默认 20）                         |
+| 按键组合                          | `windows.input.keys`                                     | `keys`（如 `ctrl+f`、`Return`、`ctrl+alt+Right`）                                     |
+| 输入文本                          | `windows.input.type`                                     | `text`、`delay_ms`                                                                    |
+| 剪贴板读写                        | `windows.clipboard.get` / `.set`                         | `text`                                                                                |
+| 跑 PowerShell/cmd                 | `windows.script.exec`                                    | `script`、`interpreter`、`timeout_ms`                                                 |
+| 列进程                            | `windows.process.list`                                   | `filter`（匹配进程名或 PID）                                                          |
+| 结束进程                          | `windows.process.kill`                                   | `pid`、`force`                                                                        |
+| 列已安装应用                      | `windows.app.list`                                       | `filter`（名称或发布者）                                                              |
+| 启动应用                          | `windows.app.start`                                      | `path`（可执行文件绝对路径）、`args`、`wait`                                          |
+| 文件读写列                        | `windows.fs.read` / `.write` / `.list`                   | `path` 等                                                                             |
+| 跨机传文件（daemon↔节点）         | `fs.transfer.push` / `fs.transfer.pull`                  | `gateway`、`node_id`、`local_path`、`remote_path`（详见 `daemon_file_transfer` 规则） |
+| 服务管理                          | `windows.service.*`                                      | `unit`（需管理员权限才能启停）                                                        |
+| 截图                              | `windows.screenshot`                                     | `path`（**只截主屏，返回体不含图像**）                                                |
+| 系统信息                          | `windows.system.info`                                    | 无                                                                                    |
+| 枚举控件树                        | `windows.ui.tree`                                        | `window_id`/`title`、`max_depth`（默认 10）、`max_controls`（默认 200）               |
+| 操作菜单项                        | `windows.ui.menu`                                        | `window_id`/`title`、`path`（如 `File->Open`）                                        |
+| 系统配置                          | `windows.config.*`                                       | 主题 / 电源计划 / 代理 / 屏幕超时 / 远程桌面 / 开机启动（见下文）                     |
 
 ### 3. 文件读写与跨机传输
 
@@ -122,19 +128,18 @@ daemon(action="list_capabilities", session_id="<sid>")
 
 按以下顺序降级尝试，不要一上来就盲点坐标。
 
-#### ① UIAutomation 枚举控件树（首选）
+#### ① 用 `windows.ui.tree` 枚举控件树（首选）
 
-用 `windows.script.exec` 跑 PowerShell + `UIAutomationClient`：
+直接调 `windows.ui.tree` 能力（内部用 .NET UIAutomation，无需手写 PowerShell）：
 
-```powershell
-Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes
-$root=[System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]0xXXXX)
-$all=$root.FindAll([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.Condition]::TrueCondition)
-foreach($e in $all){ $c=$e.Current; $r=$c.BoundingRectangle
-  Write-Output "$($c.ControlType.ProgrammaticName) name='$($c.Name)' aid='$($c.AutomationId)' rect=$([int]$r.X),$([int]$r.Y),$([int]$r.Width),$([int]$r.Height)" }
+```text
+daemon(action="call", session_id="<sid>", name="windows.ui.tree",
+       params={"window_id": "0x003A0BB0", "max_depth": 10, "max_controls": 200})
 ```
 
-拿到控件的 `Name`/`AutomationId`/`BoundingRectangle` 后，用 `input.click` 点其中心。
+返回每个控件的 `type`/`name`/`automation_id`/`rect`（含 `depth`），按 `depth` 可还原层级。拿到控件的 `Name`/`AutomationId`/`BoundingRectangle` 后，用 `input.click` 点其中心。
+
+> 若需手写 UIA 脚本（如自定义过滤），可参考：`Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes` + `FromHandle([IntPtr]0xXXXX)` + `FindAll`（见下文 ② 的说明思路）。
 
 #### ② CEF/Electron 应用：UIA 无效，改用 Windows OCR
 
@@ -154,7 +159,22 @@ foreach($e in $all){ $c=$e.Current; $r=$c.BoundingRectangle
 
 前两者都不可行时，用「点击 → 输入 → Ctrl+A/Ctrl+C → 读剪贴板」验证是否点中了输入框；用窗口标题/进程状态变化判断操作是否生效。**每次只变一个变量**，避免多点连击。
 
-### 5. 验证操作结果
+### 5. 系统配置与菜单操作
+
+`windows.config.*` 用于改系统设置，`windows.ui.menu` 用于操作应用菜单栏：
+
+- **`windows.config.theme`**：切换深色/浅色主题（改注册表 `Personalize\AppsUseLightTheme`）。
+- **`windows.config.power-plan`**：切换电源计划（`powercfg /setactive`），`plan_id` 传计划 GUID。
+- **`windows.config.proxy`**：设置/清除系统代理（`proxy` 传 `http://host:port`，`enabled` 控制开关）。
+- **`windows.config.screen-timeout`**：屏幕超时（分钟），`on_ac` 指定交流/电池。
+- **`windows.config.remote-desktop`**：启用/禁用远程桌面（改注册表 `fDenyTSConnections`，需管理员）。
+- **`windows.config.startup`**：开机启动项（`name`+`path` 增删，注册表 `Run` 键）。
+
+`windows.ui.menu` 按 `path` 逐级展开菜单（`File->Open` 表示先点 `File` 再点 `Open`，内部用 `ExpandCollapsePattern`/`InvokePattern`）。菜单项路径以 `->` 分隔，段名须与实际菜单文本一致；若某项不可见（如子菜单未展开）会返回错误，此时先展开父菜单再试。
+
+> 这些能力多需管理员权限（`remote-desktop`/`startup` 等），失败时先确认 daemon 是否以管理员运行。
+
+### 6. 验证操作结果
 
 常用判据：
 
@@ -164,7 +184,7 @@ foreach($e in $all){ $c=$e.Current; $r=$c.BoundingRectangle
 - **进程**：`windows.process.list` 确认启动/退出。
 - **OCR**：重新截图 OCR，看界面文字是否如预期。
 
-### 6. 清理临时产物
+### 7. 清理临时产物
 
 **必须**：任务结束删除本次在用户机器上产生的所有临时文件（截图、脚本、临时数据）。
 
