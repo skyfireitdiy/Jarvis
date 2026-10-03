@@ -173,6 +173,36 @@ function normalizeGateway(gateway) {
   return g.replace(/\/+$/, "");
 }
 
+/** 从 User-Agent 解析浏览器名称、版本与操作系统（供前端展示，缺失时回退为空）。 */
+function parseBrowserInfo() {
+  const ua = navigator.userAgent || "";
+  const result = { user_agent: ua, platform: navigator.platform || "" };
+  // 浏览器名与版本：注意顺序，Edge/Opera 的 UA 里也含 Chrome 标记，须优先匹配。
+  const patterns = [
+    { name: "Edge", re: /Edg\/([\d.]+)/ },
+    { name: "Opera", re: /OPR\/([\d.]+)/ },
+    { name: "Firefox", re: /Firefox\/([\d.]+)/ },
+    { name: "Chrome", re: /Chrome\/([\d.]+)/ },
+    { name: "Safari", re: /Version\/([\d.]+).*Safari\// },
+    { name: "IE", re: /(?:MSIE\s|Trident\/.*rv:)([\d.]+)/ },
+  ];
+  for (const p of patterns) {
+    const m = ua.match(p.re);
+    if (m) {
+      result.name = p.name;
+      result.version = m[1];
+      break;
+    }
+  }
+  // 操作系统（注意顺序：iOS 的 UA 里也含 Mac OS X，须优先匹配）
+  if (/Windows NT/.test(ua)) result.os = "Windows";
+  else if (/Android/.test(ua)) result.os = "Android";
+  else if (/iPhone|iPad|iPod/.test(ua)) result.os = "iOS";
+  else if (/Mac OS X/.test(ua)) result.os = "macOS";
+  else if (/Linux/.test(ua)) result.os = "Linux";
+  return result;
+}
+
 /** 收集 hello 帧所需的浏览器信息。 */
 async function buildHello() {
   const tabs = await chrome.tabs.query({});
@@ -180,10 +210,7 @@ async function buildHello() {
     type: "hello",
     client_id: await getClientId(),
     extension_version: EXTENSION_VERSION,
-    browser_info: {
-      user_agent: navigator.userAgent,
-      platform: navigator.platform,
-    },
+    browser_info: parseBrowserInfo(),
     tabs: tabs.map((t) => ({
       tab_id: t.id,
       url: t.url,
