@@ -148,7 +148,7 @@ describe("ManageSidebar 定时任务展示（view=timers）", () => {
 describe("ManageSidebar 能力清单展示（view=manage）", () => {
   test("能力清单视图标题与刷新按钮", () => {
     const wrapper = mountSidebar();
-    expect(wrapper.find(".manage-sidebar-title").text()).toBe("能力清单");
+    expect(wrapper.find(".manage-sidebar-title").text()).toBe("增强能力清单");
     expect(wrapper.find(".manage-sidebar-refresh").exists()).toBe(true);
   });
 

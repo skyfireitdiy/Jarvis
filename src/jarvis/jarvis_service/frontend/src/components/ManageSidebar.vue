@@ -1,12 +1,12 @@
 <template>
   <aside class="manage-sidebar">
     <div class="manage-sidebar-header">
-      <h3 class="manage-sidebar-title">{{ view === 'timers' ? '定时任务' : '能力清单' }}</h3>
+      <h3 class="manage-sidebar-title">{{ view === 'timers' ? '定时任务' : '增强能力清单' }}</h3>
       <button
         v-if="view !== 'timers'"
         class="manage-sidebar-refresh"
         tabindex="-1"
-        title="刷新能力清单"
+        title="刷新增强能力清单"
         @click="$emit('refresh')"
       >⟳</button>
     </div>
