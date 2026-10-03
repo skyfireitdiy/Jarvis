@@ -42,7 +42,7 @@ Jarvis 是一个 AI 驱动的编码助手，采用多 Agent 架构，帮助你�
 
 - [配置参考](jarvis_config.md)
 - [离线安装](offline_installation.md)
-- [Web 服务启动](WEB_STARTUP.md)
+- [Web 服务启动](用户手册/04_web_界面与网关/启动_Web_Gateway_服务.md)
 
 ### ❓ 帮助与社区
 

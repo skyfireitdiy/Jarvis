@@ -351,7 +351,7 @@ internal/capability/
 
 本轮实现框架 **并注册 Linux 平台能力**：
 
-- Linux 平台已注册 21 个能力（`registerPlatformCapabilities` 在 `registry_linux.go` 中按 `//go:build linux` 装配），见下表；Windows / Darwin 暂未注册（为空实现）；
+- Linux 平台已注册 21 个能力（`registerPlatformCapabilities` 在 `registry_linux.go` 中按 `//go:build linux` 装配），见下表；Windows 平台能力随后已补齐（`registry_windows.go` 按 `//go:build windows` 装配，覆盖系统 / 进程 / 应用 / GUI / 输入 / 剪贴板 / 脚本 / 文件系统 / 跨机直传 / 服务 / 浏览器扩展 / OCR 等），Darwin 暂未注册（走 `registry_other.go` 兜底）；
 - 网关侧（Python）已实现：新增独立端点 `/api/daemon/ws` 与会话管理 `daemon_capability_manager`，并提供 `/api/daemon/sessions`、`/api/daemon/capability/list`、`/api/daemon/capability/call` 三个 HTTP API；跨节点调用经 `node_protocol` 的 `daemon_capability_*` 消息由 `NodeConnectionManager` 转发；
 - 多守护进程连接同一网关时，网关侧以 `hello` 中的 `client_id` 区分会话（`session_id` 由网关分配），能力调用结果按 `id` 回投到对应会话。
 
@@ -436,13 +436,13 @@ await fetch("http://127.0.0.1:17800/api/auth", {
 
 ## 12. 已确认的决策
 
-| 项             | 决定                                                                     |
-| -------------- | ------------------------------------------------------------------------ |
-| 本地端口鉴权   | 不做鉴权（仅绑 127.0.0.1）                                               |
-| 端口 / 配置    | 默认 `127.0.0.1:17800`，配置走 `~/.jarvis/daemon/config.yaml`            |
-| 代码位置       | `daemon/`，与浏览器扩展同目录                                            |
-| 本轮范围       | 只打通链路与通信                                                         |
-| 扩展目录路径   | 后续再定（本轮不涉及扩展更新）                                           |
-| 能力命名       | 「域.动作」形式（如 `fs.read`），`action` 即能力名                       |
-| 能力平台分发   | 用构建标签（`registry_*.go`），不在无标签文件里写平台 switch             |
-| 能力注册表范围 | 框架 + Linux 平台 21 个能力已实现；Windows / Darwin 未注册；网关侧已实现 |
+| 项             | 决定                                                                                   |
+| -------------- | -------------------------------------------------------------------------------------- |
+| 本地端口鉴权   | 不做鉴权（仅绑 127.0.0.1）                                                             |
+| 端口 / 配置    | 默认 `127.0.0.1:17800`，配置走 `~/.jarvis/daemon/config.yaml`                          |
+| 代码位置       | `daemon/`，与浏览器扩展同目录                                                          |
+| 本轮范围       | 只打通链路与通信                                                                       |
+| 扩展目录路径   | 后续再定（本轮不涉及扩展更新）                                                         |
+| 能力命名       | 「域.动作」形式（如 `fs.read`），`action` 即能力名                                     |
+| 能力平台分发   | 用构建标签（`registry_*.go`），不在无标签文件里写平台 switch                           |
+| 能力注册表范围 | 框架 + Linux 平台 21 个能力已实现；Windows 平台能力已补齐；Darwin 未注册；网关侧已实现 |

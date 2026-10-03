@@ -175,6 +175,11 @@ nav:
           - 管理历史记录与重新连接: 用户手册/04_web_界面与网关/管理历史记录与重新连接.md
           - 管理输入缓冲区和历史输入: 用户手册/04_web_界面与网关/管理输入缓冲区和历史输入.md
           - 调整侧边栏和浮动窗口布局: 用户手册/04_web_界面与网关/调整侧边栏和浮动窗口布局.md
+          - 在 Web 界面中编辑配置文件: 用户手册/04_web_界面与网关/在_Web_界面中编辑配置文件.md
+          - 使用快捷键快速操作: 用户手册/04_web_界面与网关/使用快捷键快速操作.md
+          - 使用管理侧边栏: 用户手册/04_web_界面与网关/使用管理侧边栏.md
+          - 管理定时任务与调度: 用户手册/04_web_界面与网关/管理定时任务与调度.md
+          - 查看版本与关于信息: 用户手册/04_web_界面与网关/查看版本与关于信息.md
       - 工具与效率:
           - 工具与效率功能索引: 用户手册/05_工具与效率/00_功能索引与映射说明.md
           - 为 Git 提交信息添加前缀: 用户手册/05_工具与效率/为_Git_提交信息添加前缀.md
@@ -241,6 +246,7 @@ nav:
           - 上下文压缩策略: technical/implementation/context_compression_strategies.md
           - 上下文压缩流程: technical/implementation/context_compression_flow.md
           - Agent 对比分析: technical/implementation/agent_comparison_analysis.md
+          - LSP 语言扩展: technical/implementation/lsp_language_extension.md
   - 对比与分析:
       - Jarvis vs Codex CLI: compare/jarvis_vs_codex_cli.md
       - Jarvis vs Claude Code: compare/jarvis_vs_claude_code_agent.md
@@ -251,7 +257,7 @@ nav:
   - 部署与运维:
       - 配置参考: jarvis_config.md
       - 离线安装: offline_installation.md
-      - Web 服务启动: WEB_STARTUP.md
+      - Web 服务启动: 用户手册/04_web_界面与网关/启动_Web_Gateway_服务.md
   - 帮助与社区:
       - 参与贡献: jarvis_book/7.参与贡献.md
       - 常见问题: jarvis_book/8.常见问题.md
