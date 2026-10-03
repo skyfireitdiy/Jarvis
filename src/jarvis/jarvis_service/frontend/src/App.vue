@@ -9870,6 +9870,7 @@ const commandPaletteCtx = computed(() => ({
   refreshAgentList: fetchAgentList,
   restartGateway,
   restartAllNodes,
+  confirmRestartAllNodes,
   // 管理类动作（需 admin 权限，registry 中通过 hasPermission 判定）
   hasPermission,
   confirmUpdateCodeToMain,

@@ -56,6 +56,7 @@ export const ACTIONS = [
   {
     id: "current-create-terminal",
     label: "创建终端",
+    shortcut: "Space n t",
     condition: "需选中当前 Agent",
     en: "Create Terminal",
     group: "当前 Agent",
@@ -334,6 +335,7 @@ export const ACTIONS = [
   {
     id: "current-delete",
     label: "删除",
+    shortcut: "Space a z",
     condition: "需选中当前 Agent",
     en: "Delete",
     group: "当前 Agent",
@@ -366,6 +368,7 @@ export const ACTIONS = [
   {
     id: "editor-send-selection-to-agent",
     label: "让 Agent 分析选中代码",
+    shortcut: "Space v d",
     condition: "需在编辑器中选中代码",
     en: "Send Selection to Agent",
     group: "当前 Agent",
@@ -389,6 +392,7 @@ export const ACTIONS = [
   {
     id: "goto-waiting",
     label: "奔赴等待输入的 Agent",
+    shortcut: "Space a w",
     condition: "需存在等待输入的 Agent",
     en: "Go to Waiting Agent",
     group: "执行",
@@ -445,6 +449,7 @@ export const ACTIONS = [
   {
     id: "refresh-agents",
     label: "刷新 Agent 列表",
+    shortcut: "Space a f",
     condition: "已登录",
     en: "Refresh Agent List",
     group: "Agent",
@@ -455,6 +460,7 @@ export const ACTIONS = [
   {
     id: "restart-gateway",
     label: "重启网关",
+    shortcut: "Space m q",
     condition: "需 admin:config 权限",
     en: "Restart Gateway",
     group: "网关",
@@ -466,13 +472,14 @@ export const ACTIONS = [
   {
     id: "restart-all-nodes",
     label: "重启所有节点",
+    shortcut: "Space m r",
     condition: "需 admin:config 权限",
     en: "Restart All Nodes",
     group: "网关",
     icon: "🔁",
     keywords: ["重启", "节点", "全部", "restart", "nodes", "all"],
     enabled: (ctx) => !!ctx?.hasPermission && ctx.hasPermission("admin:config"),
-    run: (ctx) => ctx.restartAllNodes && ctx.restartAllNodes(),
+    run: (ctx) => ctx.confirmRestartAllNodes && ctx.confirmRestartAllNodes(),
   },
   {
     id: "manage-groups",
@@ -532,6 +539,7 @@ export const ACTIONS = [
   {
     id: "toggle-pet",
     label: "隐藏/显示宠物",
+    shortcut: "Space v o",
     condition: "已登录",
     en: "Toggle Pet",
     group: "界面",
@@ -1171,6 +1179,9 @@ export const SPACE_COMMANDS = {
       x: { label: "退出非交互", actionId: "current-exit-non-interactive" },
       n: { label: "重命名", actionId: "current-rename" },
       y: { label: "同步状态", actionId: "sync-status" },
+      f: { label: "刷新 Agent 列表", actionId: "refresh-agents" },
+      w: { label: "奔赴等待输入", actionId: "goto-waiting" },
+      z: { label: "删除当前 Agent", actionId: "current-delete" },
     },
   },
   v: {
@@ -1190,6 +1201,11 @@ export const SPACE_COMMANDS = {
       b: { label: "内容搜索", actionId: "open-editor-global-search" },
       n: { label: "文件名搜索", actionId: "open-editor-file-search" },
       w: { label: "保存当前文件", actionId: "save-active-editor-tab" },
+      d: {
+        label: "让 Agent 分析选中代码",
+        actionId: "editor-send-selection-to-agent",
+      },
+      o: { label: "隐藏/显示宠物", actionId: "toggle-pet" },
     },
   },
   n: {
@@ -1197,6 +1213,7 @@ export const SPACE_COMMANDS = {
     children: {
       a: { label: "新建 Agent", actionId: "create-agent" },
       q: { label: "一句话创建", actionId: "quick-create-agent" },
+      t: { label: "创建终端", actionId: "current-create-terminal" },
     },
   },
   m: {
@@ -1205,6 +1222,8 @@ export const SPACE_COMMANDS = {
       g: { label: "管理分组", actionId: "manage-groups" },
       a: { label: "管理面板", actionId: "admin-open-panel" },
       h: { label: "使用文档", actionId: "open-docs" },
+      r: { label: "重启所有节点", actionId: "restart-all-nodes" },
+      q: { label: "重启网关", actionId: "restart-gateway" },
     },
   },
 };
