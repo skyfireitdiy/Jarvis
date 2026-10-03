@@ -4935,9 +4935,17 @@ function setWorkspaceSidebarView(view) {
     return
   }
   if (view === 'manage') {
-    // 切到能力清单视图：数据缓存，避免频繁请求；仅首次打开（数据为空）时加载，
+    // 切到能力清单视图：数据缓存，避免频繁请求；仅首次打开（四个数据源均为空）时加载，
     // 之后靠侧边栏内「刷新」按钮手动刷新。
-    if (!topologyDaemonSessions.value.length && !topologyExtensionSessions.value.length) {
+    // 注意：不能用 topologyDaemonSessions/topologyExtensionSessions 是否为空来判断——
+    // 这两个 ref 与网络拓扑图共享，可能已被拓扑图轮询填充，导致 installedScripts/
+    // gatewayScripts 永远不加载（网关脚本库区块不显示）。
+    if (
+      !topologyDaemonSessions.value.length &&
+      !topologyExtensionSessions.value.length &&
+      !manageInstalledScripts.value.length &&
+      !manageGatewayScripts.value.length
+    ) {
       refreshManageCapabilities()
     }
     nextTick(() => {
