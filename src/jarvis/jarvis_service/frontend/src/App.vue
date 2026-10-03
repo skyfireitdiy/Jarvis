@@ -68,6 +68,7 @@
         @openSettings="showSettingsModal = true; pushOverlayState()"
         @openDocs="openDocs()"
         @openAdmin="showAdminPanel = true; pushOverlayState()"
+        @openAbout="openAbout()"
       >
         <template #sidebar>
           <aside v-if="showWorkspaceSidebar" class="workspace-sidebar" :style="{ width: workspaceSidebarWidth + 'px' }">
@@ -1167,6 +1168,17 @@
       @disconnectAll="disconnectAll"
     />
 
+    <!-- 关于弹窗 -->
+    <AboutModal
+      :visible="showAboutModal"
+      :frontendVersion="APP_VERSION"
+      :backendVersion="aboutBackendVersion"
+      :nodes="aboutNodes"
+      :daemonSessions="aboutDaemonSessions"
+      :browserExtSessions="aboutBrowserExtSessions"
+      @update:visible="showAboutModal = $event"
+    />
+
     <!-- 管理面板 -->
     <AdminPanel
       :visible="showAdminPanel"
@@ -1711,6 +1723,7 @@ import { parseUnifiedDiff, extractDiffContext } from './gitDiffParser.js'
 import RenameAgentModal from './components/RenameAgentModal.vue'
 import InputPromptModal from './components/InputPromptModal.vue'
 import AdminPanel from './components/AdminPanel.vue'
+import AboutModal from './components/AboutModal.vue'
 import CommandPalette from './components/CommandPalette.vue'
 import TopologyOverlay from './components/TopologyOverlay.vue'
 import PetLobby from './components/PetLobby.vue'
@@ -1723,6 +1736,8 @@ const PLANTUML_SERVER_URL = 'https://www.plantuml.com/plantuml/svg/'
 const PLANTUML_BLOCK_LANGUAGE = 'plantuml'
 const MERMAID_BLOCK_LANGUAGE = 'mermaid'
 const DOT_BLOCK_LANGUAGES = ['dot', 'graphviz']
+// 前端版本号：由 vite.config.js 的 define 在构建时注入（与主版本保持一致）
+const APP_VERSION = __APP_VERSION__
 
 // Mermaid 渲染计数器，用于生成唯一 ID
 let mermaidRenderCounter = 0
@@ -2478,6 +2493,28 @@ async function fetchBrowserExtensionSessions() {
   }
 }
 
+// 打开「关于」弹窗并刷新版本信息（后端版本 / 节点 / daemon / 浏览器扩展）
+async function openAbout() {
+  showAboutModal.value = true
+  pushOverlayState()
+  const { host, port } = getGatewayAddress()
+  // 后端版本与各节点版本
+  try {
+    const resp = await fetchWithAuth(buildNodeHttpUrl(host, port, 'master', 'node/status'))
+    if (resp.ok) {
+      const result = await resp.json()
+      const data = result?.data
+      aboutBackendVersion.value = data?.version || ''
+      aboutNodes.value = Array.isArray(data?.nodes) ? data.nodes : []
+    }
+  } catch (e) {
+    // 忽略，保持已有值
+  }
+  // daemon 与浏览器扩展版本
+  aboutDaemonSessions.value = await fetchDaemonSessions()
+  aboutBrowserExtSessions.value = await fetchBrowserExtensionSessions()
+}
+
 // 查询每个在线浏览器扩展会话已安装的自定义脚本（能力清单用）。
 // GET /api/browser-ext/scripts/installed 返回 {success, sessions:[{session_id, name, scripts}]}
 async function fetchInstalledScripts() {
@@ -2561,6 +2598,12 @@ function stopTopologyAccessPolling() {
 const showConnectModal = ref(true)  // 首次打开显示欢迎界面
 const showSettingsModal = ref(false) // 设置弹窗
 const showAdminPanel = ref(false) // 管理面板
+const showAboutModal = ref(false) // 关于弹窗
+// 「关于」面板数据：后端版本 / 节点 / daemon / 浏览器扩展
+const aboutBackendVersion = ref('')
+const aboutNodes = ref([])
+const aboutDaemonSessions = ref([])
+const aboutBrowserExtSessions = ref([])
 const adminPanelRef = ref(null) // 管理面板组件引用（用于命令面板定位到系统配置）
 const petWidgetRef = ref(null)        // 主宠物挂件组件引用（用于调用宠物显隐）
 const showTerminalPanel = ref(false)  // 终端面板
@@ -18633,6 +18676,11 @@ function handleGlobalKeydown(event) {
     // 管理面板打开时优先关闭它
     if (showAdminPanel.value) {
       showAdminPanel.value = false
+      return
+    }
+    // 关于弹窗打开时优先关闭它
+    if (showAboutModal.value) {
+      showAboutModal.value = false
       return
     }
     // 弹出面板（diff/rules/tools/缓存/重命名/权限管理）：Esc 关闭

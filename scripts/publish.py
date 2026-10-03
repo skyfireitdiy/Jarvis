@@ -57,6 +57,11 @@ def update_version(version_type: str) -> str:
             r'"version"\s*:\s*"([^"]+)"',
             f'"version": "{new_version}"',
         ),
+        # 前端版本与主版本保持一致（前端通过网关分发）
+        "src/jarvis/jarvis_service/frontend/package.json": (
+            r'"version"\s*:\s*"([^"]+)"',
+            f'"version": "{new_version}"',
+        ),
     }
     for file_path, (pattern, replacement) in files_to_update.items():
         path = Path(file_path)
