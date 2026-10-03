@@ -2574,7 +2574,8 @@ def create_app(
         try:
             from jarvis.jarvis_platform.content_types import CONTENT_CONFIG
 
-            max_size = int(CONTENT_CONFIG.get("max_image_size", 20 * 1024 * 1024))
+            raw_max = CONTENT_CONFIG.get("max_image_size", 20 * 1024 * 1024)
+            max_size = raw_max if isinstance(raw_max, int) else 20 * 1024 * 1024
         except Exception:
             max_size = 20 * 1024 * 1024
 

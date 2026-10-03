@@ -110,29 +110,29 @@ class SafeEncoder(json.JSONEncoder):
     - 其他不可序列化对象：尝试转换为字符串
     """
 
-    def default(self, obj: Any) -> Any:
+    def default(self, o: Any) -> Any:
         """处理不可序列化的对象
 
         参数:
-            obj: 要序列化的对象
+            o: 要序列化的对象
 
         返回:
             可序列化的对象
         """
         # 处理函数对象
-        if callable(obj):
+        if callable(o):
             # 尝试获取函数名
-            if hasattr(obj, "__name__"):
-                return f"<function:{obj.__name__}>"
+            if hasattr(o, "__name__"):
+                return f"<function:{o.__name__}>"
             # 尝试获取类名（对于可调用对象）
-            elif hasattr(obj, "__class__"):
-                return f"<callable:{obj.__class__.__name__}>"
+            elif hasattr(o, "__class__"):
+                return f"<callable:{o.__class__.__name__}>"
             else:
                 return "<function>"
 
         # 对于其他不可序列化的对象，尝试转换为字符串
         try:
-            return str(obj)
+            return str(o)
         except Exception:
             return "<unserializable_object>"
 

@@ -185,7 +185,7 @@ DEFAULT_LANGUAGES: Dict[str, LanguageConfig] = {
 def _as_str_list(value: Any) -> List[str]:
     """把配置值规整为字符串列表；类型不符时返回空列表。"""
     if isinstance(value, list) and all(isinstance(i, str) for i in value):
-        return list(value)
+        return [i for i in value if isinstance(i, str)]
     return []
 
 

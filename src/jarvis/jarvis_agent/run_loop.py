@@ -88,10 +88,6 @@ class AgentRunLoop:
         match = re.match(mode_pattern, response, re.MULTILINE)
 
         if match:
-            mode = match.group(1)
-            # 更新agent的当前阶段
-            if hasattr(self.agent, "state_manager"):
-                self.agent.state_manager.set_mode(mode)
             # 从响应中删除阶段标识及周围的连续空行
             response = re.sub(mode_pattern, "", response, count=1)
 
@@ -261,7 +257,7 @@ class AgentRunLoop:
         if ag._native_active():
             ag._pending_native_tool_calls = None
             ag._native_continue = False
-            ag.session.prompt = ensure_str(addon_info)
+            ag.session.prompt = ensure_str(addon_info or "")
             ag.run_input_handlers_next_turn = False
             return
 

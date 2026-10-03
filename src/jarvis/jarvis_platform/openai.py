@@ -739,6 +739,9 @@ class OpenAIModel(BasePlatform):
                 # 已确认支持原生工具的模型：流式异常需向上抛出，交由外层决定，
                 # 避免渲染管线吞掉异常后误判为"成功但空输出"而静默降级。
                 _raise_on_error = getattr(self, "_native_confirmed", False)
+                # 首 token 时间：suppressed 渲染路径不返回该值，先给默认 0.0，
+                # 保证类型系统与后续 _print_response_stats 均有定义。
+                _ft = 0.0
                 if not self.suppress_output:
                     if get_pretty_output():
                         content, _reasoning, _ft = self._chat_with_pretty_output(

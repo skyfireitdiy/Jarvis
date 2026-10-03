@@ -131,12 +131,23 @@ def test_claude_confirmed_raises_instead_of_fallback(monkeypatch):
 
 
 def test_claude_unconfirmed_does_not_raise(monkeypatch):
-    """未确认支持的模型：失败不向上抛出（保持既有容错行为）。"""
+    """未确认支持的模型：失败不向上抛出（保持既有容错行为），降级到文本协议。"""
     m = _make_claude_model()
     m._native_confirmed = False
+    fallback_called = []
+    monkeypatch.setattr(
+        ClaudeModel,
+        "_claude_fallback_text",
+        lambda self, message, append_user: (
+            fallback_called.append(True) or ("fallback", None)
+        ),
+    )
     m.client.messages.stream.side_effect = lambda **kwargs: _BoomStream()
 
-    m.chat_native_once("hi", TOOLS)
+    content, calls = m.chat_native_once("hi", TOOLS)
+    assert content == "fallback"
+    assert calls is None
+    assert fallback_called == [True]
 
 
 def test_raise_on_error_propagates_from_render_pipeline():

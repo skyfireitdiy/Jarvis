@@ -420,6 +420,7 @@ class ClaudeModel(BasePlatform):
                     str,
                     List[MessageParam],
                     int,
+                    float,
                     List[List[Dict[str, str]]],
                     List[Dict[str, str]],
                     Dict[str, str],
@@ -544,20 +545,29 @@ class ClaudeModel(BasePlatform):
                 # 累积器：content 逐块 yield 供流式渲染；final_message 在流结束后存入闭包供外部解析 tool_calls
                 content_parts: List[str] = []
                 final_message = None
+                # 流式异常（如 tools unsupported）被渲染层吞掉后返回空 content，
+                # 若不记录，外层会误判为"输出为空/重复"而做无谓的指数退避重试。
+                gen_error: Optional[Exception] = None
 
                 def _gen() -> Generator[Tuple[str, str], None, None]:
-                    nonlocal final_message
-                    with self.client.messages.stream(**stream_kwargs) as stream:  # type: ignore
-                        for text in stream.text_stream:
-                            content_parts.append(text)
-                            yield ("content", text)
-                        final_message = stream.get_final_message()
+                    nonlocal final_message, gen_error
+                    try:
+                        with self.client.messages.stream(**stream_kwargs) as stream:  # type: ignore
+                            for text in stream.text_stream:
+                                content_parts.append(text)
+                                yield ("content", text)
+                            final_message = stream.get_final_message()
+                    except Exception as _e:
+                        gen_error = _e
 
                 start_time = time.time()
                 gen = _gen()
                 # 已确认支持原生工具的模型：流式异常需向上抛出，交由外层决定，
                 # 避免渲染管线吞掉异常后误判为"成功但空输出"而静默降级。
                 _raise_on_error = getattr(self, "_native_confirmed", False)
+                # 首 token 时间：suppressed 渲染路径不返回该值，先给默认 0.0，
+                # 保证类型系统与后续 _print_response_stats 均有定义。
+                _ft = 0.0
                 if not self.suppress_output:
                     if get_pretty_output():
                         content, _reasoning, _ft = self._chat_with_pretty_output(
@@ -594,6 +604,12 @@ class ClaudeModel(BasePlatform):
                                 "arguments": getattr(block, "input", None) or {},
                             }
                         )
+
+                # 流式异常（如 tools unsupported）被渲染层吞掉后返回空 content，
+                # 若不在此向上抛出，外层会误判为"输出为空/重复"而做无谓的指数退避重试。
+                # 交由外层 except 按可重试性决定重试或降级。
+                if gen_error is not None:
+                    raise gen_error
 
                 # 渲染管线检测到输出陷入重复时返回空 content；若同时无 tool_calls，
                 # 判定为重复导致空输出，回滚本轮并重试（与文本协议路径一致）。

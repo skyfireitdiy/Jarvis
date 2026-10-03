@@ -159,6 +159,14 @@ def test_restore_cron_task() -> None:
         assert info is not None
         assert info["cron_expr"] == "0 9 * * *"
         assert info["is_recurring"] is True
-        assert info["run_at"].endswith("09:00:00")
+        # 恢复时 run_at 取「传入值」与「当前时间」的较大值，避免安排到过去；
+        # 传入的 09:00 可能已过期，故用 max 计算期望值，保证断言与时间无关。
+        expected_ts = max(
+            datetime.fromisoformat("2026-10-03T09:00:00").timestamp(),
+            time.time(),
+        )
+        assert (
+            abs(datetime.fromisoformat(info["run_at"]).timestamp() - expected_ts) < 1.0
+        )
     finally:
         manager.shutdown()

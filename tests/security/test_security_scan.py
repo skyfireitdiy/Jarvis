@@ -9,8 +9,9 @@ class TestSecurityScan:
     """安全扫描测试"""
 
     @pytest.mark.security
+    @pytest.mark.slow
     def test_bandit_scan_src(self):
-        """使用bandit扫描src目录"""
+        """使用bandit扫描src目录（全量安全扫描，耗时较长，可用 -m "not slow" 排除）"""
         result = subprocess.run(
             ["bandit", "-r", "src/jarvis", "-f", "json"], capture_output=True, text=True
         )
