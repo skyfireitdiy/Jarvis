@@ -9312,14 +9312,28 @@ function getCurrentAgentOrNull() {
 // 切换当前 Agent 面板的自动滚动
 function toggleCurrentAutoScroll() {
   const panel = getCurrentPanel()
-  if (!panel || !panel.agentId) return
-  togglePanelAutoScroll(panel, !getPanelAutoScroll(panel))
+  if (!panel || !panel.agentId) {
+    showToast('没有可操作的 Agent 面板', 'error')
+    return
+  }
+  const next = !getPanelAutoScroll(panel)
+  togglePanelAutoScroll(panel, next)
+  showToast(next ? '自动滚动已开启' : '自动滚动已关闭', 'success')
 }
 // 切换当前 Agent 面板的自动朗读
 function toggleCurrentAutoRead() {
   const panel = getCurrentPanel()
-  if (!panel || !panel.agentId) return
-  togglePanelAutoRead(panel, !getPanelAutoRead(panel))
+  if (!panel || !panel.agentId) {
+    showToast('没有可操作的 Agent 面板', 'error')
+    return
+  }
+  const next = !getPanelAutoRead(panel)
+  if (next && !autoReadSupported) {
+    showToast('当前浏览器不支持自动朗读', 'error')
+    return
+  }
+  togglePanelAutoRead(panel, next)
+  showToast(next ? '自动朗读已开启' : '自动朗读已关闭', 'success')
 }
 // 退出当前 Agent 的非交互模式
 function exitCurrentNonInteractive() {
