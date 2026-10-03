@@ -69,6 +69,7 @@
         @openDocs="openDocs()"
         @openAdmin="showAdminPanel = true; pushOverlayState()"
         @openAbout="openAbout()"
+        @openTopology="openTopologyOverlay()"
       >
         <template #sidebar>
           <aside v-if="showWorkspaceSidebar" class="workspace-sidebar" :style="{ width: workspaceSidebarWidth + 'px' }">

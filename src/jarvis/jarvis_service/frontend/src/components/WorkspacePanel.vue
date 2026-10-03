@@ -72,34 +72,6 @@
         </button>
         <button
           class="workspace-activity-button"
-          :class="{ active: showSidebar && sidebarView === 'manage' }"
-          tabindex="-1"
-          @mousedown.prevent
-          @click="$emit('setSidebarView', 'manage')"
-          title="增强能力清单"
-        >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1"/>
-            <rect x="9" y="2.5" width="4.5" height="4.5" rx="1"/>
-            <rect x="2.5" y="9" width="4.5" height="4.5" rx="1"/>
-            <rect x="9" y="9" width="4.5" height="4.5" rx="1"/>
-          </svg>
-        </button>
-        <button
-          class="workspace-activity-button"
-          :class="{ active: showSidebar && sidebarView === 'timers' }"
-          tabindex="-1"
-          @mousedown.prevent
-          @click="$emit('setSidebarView', 'timers')"
-          title="定时任务"
-        >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="8" cy="8" r="5.5"/>
-            <path d="M8 4.5V8l2.5 1.5"/>
-          </svg>
-        </button>
-        <button
-          class="workspace-activity-button"
           :class="{ active: mainView === 'chat' }"
           tabindex="-1"
           @mousedown.prevent
@@ -150,6 +122,50 @@
           <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M8 1.5 13 3.5v4c0 3-2 5.5-5 7-3-1.5-5-4-5-7v-4L8 1.5Z"/>
             <path d="M5.5 8l1.7 1.7L10.5 6"/>
+          </svg>
+        </button>
+        <button
+          class="workspace-activity-button"
+          :class="{ active: showSidebar && sidebarView === 'manage' }"
+          tabindex="-1"
+          @mousedown.prevent
+          @click="$emit('setSidebarView', 'manage')"
+          title="增强能力清单"
+        >
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1"/>
+            <rect x="9" y="2.5" width="4.5" height="4.5" rx="1"/>
+            <rect x="2.5" y="9" width="4.5" height="4.5" rx="1"/>
+            <rect x="9" y="9" width="4.5" height="4.5" rx="1"/>
+          </svg>
+        </button>
+        <button
+          class="workspace-activity-button"
+          :class="{ active: showSidebar && sidebarView === 'timers' }"
+          tabindex="-1"
+          @mousedown.prevent
+          @click="$emit('setSidebarView', 'timers')"
+          title="定时任务"
+        >
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="8" cy="8" r="5.5"/>
+            <path d="M8 4.5V8l2.5 1.5"/>
+          </svg>
+        </button>
+        <button
+          class="workspace-activity-button"
+          tabindex="-1"
+          @mousedown.prevent
+          @click="$emit('openTopology')"
+          title="网络拓扑"
+        >
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="4" cy="4" r="1.5"/>
+            <circle cx="12" cy="4" r="1.5"/>
+            <circle cx="8" cy="12" r="1.5"/>
+            <path d="M5.5 4H10.5"/>
+            <path d="M5 5.5 6.8 10.5"/>
+            <path d="M11 5.5 9.2 10.5"/>
           </svg>
         </button>
         <button
@@ -294,7 +310,9 @@ const emit = defineEmits([
   'closeSidebar',
   'openSettings',
   'openDocs',
-  'openAdmin'
+  'openAdmin',
+  'openAbout',
+  'openTopology'
 ])
 
 const editorContainerRef = ref(null)
