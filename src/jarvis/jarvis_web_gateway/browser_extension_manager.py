@@ -145,6 +145,11 @@ class BrowserExtensionManager:
             # 终端名称：由用户在 Jarvis 网页设置页配置，扩展缓存后随 hello 上报，
             # 用于让网关/Agent 以用户可读的名称识别终端（为空时回退 hostname）。
             terminal_name = str(first.get("name") or "").strip()
+            # 扩展上报的能力清单（[{name, description, parameters, platform}]），
+            # 由扩展侧动态维护并随 hello 上报，网关透传供前端能力清单展示。
+            capabilities = first.get("capabilities")
+            if not isinstance(capabilities, list):
+                capabilities = []
             self._sessions[session_id] = {
                 "websocket": websocket,
                 "user_id": session_user_id,
@@ -155,6 +160,7 @@ class BrowserExtensionManager:
                 "last_seen": now,
                 "extension_version": first.get("extension_version"),
                 "browser_info": first.get("browser_info") or {},
+                "capabilities": capabilities,
             }
             logger.info(
                 "[BROWSER-EXT] session connected: session_id=%s client_id=%s user_id=%s tabs=%d",
@@ -380,6 +386,7 @@ class BrowserExtensionManager:
                     "extension_version": session.get("extension_version"),
                     "browser_info": session.get("browser_info") or {},
                     "tabs": session.get("tabs_meta") or [],
+                    "capabilities": session.get("capabilities") or [],
                 }
             )
         return result
@@ -398,6 +405,7 @@ class BrowserExtensionManager:
             "extension_version": session.get("extension_version"),
             "browser_info": session.get("browser_info") or {},
             "tabs": session.get("tabs_meta") or [],
+            "capabilities": session.get("capabilities") or [],
         }
 
     # ------------------------------------------------------------------

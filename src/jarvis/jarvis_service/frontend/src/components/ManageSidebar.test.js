@@ -54,6 +54,20 @@ function extensionSession(overrides = {}) {
     extension_version: "v1.2.3",
     browser_info: { name: "Chrome", version: "120", os: "Windows" },
     tabs: [{ tab_id: 1, title: "示例页", url: "https://example.com" }],
+    capabilities: [
+      {
+        name: "script.execute",
+        description: "在页面执行任意 JS 脚本（主世界）",
+        parameters: { code: "string" },
+        platform: "browser",
+      },
+      {
+        name: "tab.create",
+        description: "新建标签页",
+        parameters: { url: "string" },
+        platform: "browser",
+      },
+    ],
     ...overrides,
   };
 }
@@ -172,14 +186,26 @@ describe("ManageSidebar 能力清单展示（view=manage）", () => {
     expect(wrapper.find(".manage-capability-params-json").exists()).toBe(true);
   });
 
-  test("展示浏览器扩展会话及其标签页", async () => {
+  test("展示浏览器扩展会话及其能力清单", async () => {
     const wrapper = mountSidebar({ extensionSessions: [extensionSession()] });
     expect(wrapper.find(".manage-section-title").text()).toBe("浏览器扩展");
     expect(wrapper.find(".manage-session-name").text()).toBe("Chrome 扩展");
-    // 展开扩展会话后可见浏览器信息与标签页
+    // 展开扩展会话后可见浏览器信息与能力清单
     await wrapper.find(".manage-session-head").trigger("click");
     expect(wrapper.find(".manage-capability-desc").text()).toContain("Chrome");
-    expect(wrapper.find(".manage-tab-title").text()).toBe("示例页");
+    expect(wrapper.find(".manage-capability-name").text()).toBe(
+      "script.execute",
+    );
+  });
+
+  test("展开浏览器扩展能力后可查看详情（描述与参数）", async () => {
+    const wrapper = mountSidebar({ extensionSessions: [extensionSession()] });
+    await wrapper.find(".manage-session-head").trigger("click");
+    await wrapper.find(".manage-capability-head").trigger("click");
+    expect(
+      wrapper.find(".manage-capability-body .manage-capability-desc").text(),
+    ).toContain("在页面执行任意 JS 脚本");
+    expect(wrapper.find(".manage-capability-params-json").exists()).toBe(true);
   });
 
   test("浏览器扩展会话展开后显示已安装脚本", async () => {

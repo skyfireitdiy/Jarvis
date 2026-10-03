@@ -209,6 +209,15 @@ export class CommandRouter {
   }
 
   /**
+   * 返回本扩展支持的能力清单（供 hello 上报给网关，网关透传给前端能力清单展示）。
+   * 每个能力与 routes 中的 action 一一对应；平台固定为 "browser"。
+   * @returns {Array<{name:string, description:string, parameters:object, platform:string}>}
+   */
+  getCapabilities() {
+    return CAPABILITIES;
+  }
+
+  /**
    * 执行一条指令，返回结果信封。
    * @param {object} msg 指令消息
    * @returns {Promise<object>} 结果信封
@@ -258,3 +267,215 @@ export function cmdError(code, message) {
   err.code = code;
   return err;
 }
+
+/**
+ * 本扩展对外暴露的能力清单（动态上报给网关）。
+ * 每一项与 CommandRouter.routes 中的 action 对应，name 即 action 名；
+ * 网关/前端据此展示「该插件具有哪些能力」，与 daemon 能力清单格式对齐。
+ */
+const CAPABILITIES = [
+  {
+    name: "tab.list",
+    description: "列出浏览器当前打开的标签页",
+    parameters: {},
+    platform: "browser",
+  },
+  {
+    name: "tab.create",
+    description: "新建标签页（可指定 URL 与是否新窗口）",
+    parameters: { url: "string", new_window: "boolean" },
+    platform: "browser",
+  },
+  {
+    name: "tab.close",
+    description: "关闭指定标签页",
+    parameters: { tab_id: "number" },
+    platform: "browser",
+  },
+  {
+    name: "tab.activate",
+    description: "切换到指定标签页",
+    parameters: { tab_id: "number" },
+    platform: "browser",
+  },
+  {
+    name: "page.navigate",
+    description: "导航到指定 URL",
+    parameters: { url: "string", tab_id: "number" },
+    platform: "browser",
+  },
+  {
+    name: "page.reload",
+    description: "重新加载当前页面",
+    parameters: { tab_id: "number" },
+    platform: "browser",
+  },
+  {
+    name: "page.get_info",
+    description: "读取页面基础信息（URL/标题/就绪状态等）",
+    parameters: {},
+    platform: "browser",
+  },
+  {
+    name: "dom.query",
+    description: "查询页面元素信息",
+    parameters: { selector: "string", all: "boolean" },
+    platform: "browser",
+  },
+  {
+    name: "dom.get_text",
+    description: "读取元素文本",
+    parameters: { selector: "string" },
+    platform: "browser",
+  },
+  {
+    name: "dom.click",
+    description: "点击页面元素",
+    parameters: { selector: "string" },
+    platform: "browser",
+  },
+  {
+    name: "dom.type",
+    description: "向输入框输入文本",
+    parameters: { selector: "string", text: "string" },
+    platform: "browser",
+  },
+  {
+    name: "dom.press_key",
+    description: "按下键盘按键",
+    parameters: { key: "string" },
+    platform: "browser",
+  },
+  {
+    name: "script.execute",
+    description: "在页面执行任意 JS 脚本（主世界）",
+    parameters: { code: "string" },
+    platform: "browser",
+  },
+  {
+    name: "script.run",
+    description: "运行扩展内已安装的自定义页面脚本",
+    parameters: { id: "string", action: "string", args: "object" },
+    platform: "browser",
+  },
+  {
+    name: "script.install",
+    description: "安装自定义页面脚本（类油猴）",
+    parameters: { name: "string", source: "string" },
+    platform: "browser",
+  },
+  {
+    name: "script.list",
+    description: "列出已安装的自定义页面脚本",
+    parameters: {},
+    platform: "browser",
+  },
+  {
+    name: "capture.screenshot",
+    description: "对页面截图",
+    parameters: { full_page: "boolean" },
+    platform: "browser",
+  },
+  {
+    name: "debugger.evaluate",
+    description: "通过 CDP 求值任意表达式（不受页面 CSP 限制）",
+    parameters: { expression: "string" },
+    platform: "browser",
+  },
+  {
+    name: "console.get_logs",
+    description: "读取页面控制台日志",
+    parameters: { limit: "number" },
+    platform: "browser",
+  },
+  {
+    name: "network.get_requests",
+    description: "采集页面网络请求",
+    parameters: { duration_ms: "number", filter: "string" },
+    platform: "browser",
+  },
+  {
+    name: "search.query",
+    description: "用默认搜索引擎检索",
+    parameters: { query: "string" },
+    platform: "browser",
+  },
+  {
+    name: "clipboard.write",
+    description: "把文本或图片写入系统剪贴板",
+    parameters: { text: "string" },
+    platform: "browser",
+  },
+  {
+    name: "bookmark.list",
+    description: "列出书签",
+    parameters: {},
+    platform: "browser",
+  },
+  {
+    name: "history.search",
+    description: "查询浏览历史",
+    parameters: { query: "string" },
+    platform: "browser",
+  },
+  {
+    name: "download.list",
+    description: "列出下载记录",
+    parameters: {},
+    platform: "browser",
+  },
+  {
+    name: "download.start",
+    description: "发起下载任务",
+    parameters: { url: "string" },
+    platform: "browser",
+  },
+  {
+    name: "notification.create",
+    description: "弹出系统通知",
+    parameters: { title: "string", message: "string" },
+    platform: "browser",
+  },
+  {
+    name: "alarm.create",
+    description: "创建定时器",
+    parameters: { name: "string", delay_minutes: "number" },
+    platform: "browser",
+  },
+  {
+    name: "session.recent",
+    description: "列出最近关闭的标签页/窗口",
+    parameters: {},
+    platform: "browser",
+  },
+  {
+    name: "cookie.get",
+    description: "读取站点 Cookie（高敏感，涉及登录凭证）",
+    parameters: { url: "string", name: "string" },
+    platform: "browser",
+  },
+  {
+    name: "cookie.set",
+    description: "写入/修改 Cookie（高敏感）",
+    parameters: { url: "string", name: "string", value: "string" },
+    platform: "browser",
+  },
+  {
+    name: "extmgr.list",
+    description: "列出已安装扩展（高敏感）",
+    parameters: {},
+    platform: "browser",
+  },
+  {
+    name: "proxy.get_settings",
+    description: "读取浏览器代理配置（高敏感）",
+    parameters: {},
+    platform: "browser",
+  },
+  {
+    name: "browsingdata.remove",
+    description: "清除浏览数据（高敏感，不可逆）",
+    parameters: { data_types: "array" },
+    platform: "browser",
+  },
+];

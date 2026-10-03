@@ -264,8 +264,12 @@ class CodeAgent(Agent):
             "add_images",  # 添加图片到对话上下文工具
             "ocr",  # OCR 文字识别工具（把图片转成文字，供不支持多模态的模型看图）
             "gateway_manager",  # Gateway 管理工具（Agent 通信、节点管理、模型组查询等）
-            "browser_ext",  # 浏览器扩展工具（操作用户本地真实浏览器标签页）
-            "daemon",  # 本机守护进程工具（调用用户机器上 jarvis-daemon 注册的能力）
+            "browser_ext_sessions",  # 浏览器扩展工具-列出在线会话
+            "browser_ext_capabilities",  # 浏览器扩展工具-列出会话能力清单
+            "browser_ext_call",  # 浏览器扩展工具-按能力名调用
+            "daemon_sessions",  # 本机守护进程工具-列出在线会话
+            "daemon_capabilities",  # 本机守护进程工具-列出会话能力清单
+            "daemon_call",  # 本机守护进程工具-按能力名调用
             "sub_code_agent",  # 子代码Agent工具，用于创建子Agent执行独立任务
             "eval_js",  # 前端 JS 执行工具（Web 网关模式下向前端浏览器下发 JS）
             "jarvis_frontend",  # Jarvis前端工具（通知前端打开文件/跳转行/选中代码）

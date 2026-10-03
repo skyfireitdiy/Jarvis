@@ -113,14 +113,31 @@
                 <div v-if="session.browser_info && Object.keys(session.browser_info).length" class="manage-capability-desc">
                   {{ formatBrowserInfo(session.browser_info) }}
                 </div>
-                <div v-if="session.tabs && session.tabs.length" class="manage-tabs">
-                  <div class="manage-capability-params-title">打开的标签页（{{ session.tabs.length }}）</div>
-                  <div v-for="tab in session.tabs" :key="tab.tab_id || tab.id" class="manage-tab-item" :title="tab.url || ''">
-                    <span class="manage-tab-title">{{ tab.title || tab.url || '未知' }}</span>
-                    <span class="manage-tab-url">{{ tab.url || '' }}</span>
+                <!-- 扩展能力清单（与 daemon 能力格式一致，由扩展动态上报） -->
+                <div v-if="!session.capabilities || session.capabilities.length === 0" class="manage-session-empty">
+                  该扩展未上报能力
+                </div>
+                <div
+                  v-for="cap in session.capabilities || []"
+                  :key="cap.name"
+                  class="manage-capability"
+                >
+                  <button
+                    class="manage-capability-head"
+                    @click="toggleCapability('ext-' + session.session_id, cap.name)"
+                  >
+                    <span class="manage-capability-arrow">{{ isCapabilityExpanded('ext-' + session.session_id, cap.name) ? '▼' : '▶' }}</span>
+                    <span class="manage-capability-name">{{ cap.name }}</span>
+                    <span v-if="cap.platform" class="manage-capability-badge">{{ cap.platform }}</span>
+                  </button>
+                  <div v-if="isCapabilityExpanded('ext-' + session.session_id, cap.name)" class="manage-capability-body">
+                    <p v-if="cap.description" class="manage-capability-desc">{{ cap.description }}</p>
+                    <div v-if="cap.parameters && Object.keys(cap.parameters).length" class="manage-capability-params">
+                      <div class="manage-capability-params-title">参数</div>
+                      <pre class="manage-capability-params-json">{{ formatParams(cap.parameters) }}</pre>
+                    </div>
                   </div>
                 </div>
-                <div v-else class="manage-session-empty">无打开的标签页</div>
                 <!-- 该扩展已安装的自定义脚本 -->
                 <div v-if="getInstalledScripts(session.session_id).length" class="manage-scripts">
                   <div class="manage-capability-params-title">自定义脚本（{{ getInstalledScripts(session.session_id).length }}）</div>

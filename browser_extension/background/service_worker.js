@@ -191,6 +191,8 @@ async function buildHello() {
       active: t.active,
       window_id: t.windowId,
     })),
+    // 本扩展支持的能力清单（动态上报，网关透传给前端能力清单展示）
+    capabilities: router.getCapabilities(),
   };
   // 终端名称：由 Jarvis 网页设置页配置，扩展缓存后随 hello 上报，
   // 使网关能区分不同终端。为空则不带该字段（网关侧回退 hostname）。
