@@ -167,7 +167,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, watch, onUnmounted } from 'vue'
+import { computed, nextTick, ref, watch, onUnmounted } from 'vue'
 
 const props = defineProps({
   visible: Boolean,
