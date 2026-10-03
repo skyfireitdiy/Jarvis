@@ -735,12 +735,17 @@ defineExpose({ close })
   flex: none;
   width: 26px;
   height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--tile-radius-xs, 6px);
   background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
   font-size: 12px;
+  line-height: 1;
+  padding: 0;
 }
 .topo-close:hover {
   background: var(--color-bg-hover);
