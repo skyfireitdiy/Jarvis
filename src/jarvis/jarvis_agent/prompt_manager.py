@@ -37,7 +37,14 @@ class PromptManager:
         原生 function calling 激活时不再注入文本工具清单/JSON 帮助（工具由 API tools 提供）。
         """
         if self.agent._native_active():
-            action_prompt = ""
+            # 原生 function calling：工具清单由 API tools 提供，不再注入文本工具清单/JSON 帮助，
+            # 但保留"按需加载规则/技能"的指引，让模型在任务中途也能主动用 auto_select_rule / load_rule。
+            action_prompt = """
+<rules>
+# ❗ 重要规则（严格遵守，违反易出错）
+- **技能/规则不足时**：如果当前工具无法胜任或缺少相关知识，用 `auto_select_rule` 加载相关规则与技能——它会根据任务自动挑选最合适的规则（最多 5 个）；也可用 `load_rule` 按路径加载指定规则文件。
+</rules>
+"""
         else:
             action_prompt = self.agent.get_tool_usage_prompt()
 

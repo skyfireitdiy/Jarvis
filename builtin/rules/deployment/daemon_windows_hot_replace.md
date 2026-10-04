@@ -222,6 +222,7 @@ Invoke-WebRequest -UseBasicParsing -Method POST -Uri http://127.0.0.1:17800/api/
 9. **非管理员会话**：`windows.process.kill` / 服务操作可能因权限失败；daemon 若以管理员运行，kill 它通常也需管理员权限。
 10. **WSL 调 `taskkill` 常「拒绝访问」**：WSL 进程无 Windows 管理员权限，`taskkill /F /IM jarvis-daemon.exe` 会失败（但 `tasklist` 能列进程）。改用 daemon 能力 `windows.process.kill` 自杀（见「杀进程的可靠手法」）。
 11. **WSL 访问不到 Windows 的 `127.0.0.1`**：WSL2 与 Windows 网络命名空间隔离，在 WSL 里 `curl http://127.0.0.1:17800` 不通。探测 Windows 侧本机服务（daemon 本地 API）必须用 Windows 的 PowerShell/curl，或直接读 Windows 侧日志文件。
+12. **绝不能用 daemon 派生的进程去执行「会杀 daemon 的 redeploy 脚本」**（真机踩坑）：若用 `windows.script.exec` 里的 `Start-Process powershell` 去跑 redeploy.ps1（`schtasks /End` + `taskkill /F /IM jarvis-daemon.exe` + `Copy-Item` + `schtasks /Run`），redeploy 第一步就杀掉 daemon 父进程，而该 powershell 是 daemon 派生的子进程——Windows 会连带终止整个 Job 进程树，导致派生的 powershell 被一起杀掉，**后面的 `Copy-Item` 替换和 `schtasks /Run` 重启都不会执行**。结果：daemon 被停但没重启、exe 没替换，且 daemon 离线后无法再用 daemon 能力恢复（浏览器扩展也无系统命令能力），只能等用户回电脑旁手动 `schtasks /Run /TN Jarvis-Daemon`。**正确做法**：不要用 daemon 派生进程跑 redeploy；要么走本规则的 `self-update-apply` helper 机制（父进程 `os.Exit(0)` 自杀、helper 负责替换+重启），要么用 `schtasks /Create` 创建一个独立的一次性计划任务（由计划任务服务执行，脱离 daemon 进程树）去跑 redeploy。
 
 ### 未验证 / 风险项（如实标注）
 
