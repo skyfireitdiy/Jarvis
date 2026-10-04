@@ -1,127 +1,78 @@
 # 当前进化阶段
 
-**阶段名称**：阶段1 - 架构自主优化
-**开始时间**：2026-01-30
-**预计完成**：2026-05-15（约3个月）
-**当前进度**：66%
+**阶段名称**：阶段 A - 自我进化闭环（效率优先）
+**开始时间**：2026-10-04
+**预计完成**：待定（约 4-6 周）
+**当前进度**：0%
 
-**阶段目标**：具备主动发现和优化架构缺陷的能力
-
-## 当前任务
-
-- [x] 任务1：架构健康度分析工具开发 ✅ 已完成
-  - ✅ 代码复杂度分析（圈复杂度、认知复杂度）- 12个测试，90%覆盖率
-  - ✅ 依赖关系分析（循环依赖、耦合度）- 9个测试，94%覆盖率
-  - ✅ 代码重复度分析 - 14个测试，91%覆盖率
-  - ✅ 架构健康度报告生成 - 25个测试，96%覆盖率
-  - **总计：67个测试，92%平均覆盖率**
-- [x] 任务2：自动重构能力开发 ✅ 已完成（100%）
-  - ✅ 代码自动重构（提取函数、提取类、内联函数、移动方法）- 92个测试，全部通过
-    - ✅ 提取函数 - 20个测试
-    - ✅ 提取类 (Extract Class) - 24个测试
-    - ✅ 内联函数 - 24个测试
-    - ✅ 移动方法 - 24个测试
-  - ✅ 接口自动提取 (Extract Interface) - 20个测试，95%覆盖率
-    - ✅ 支持ABC和Protocol两种接口类型
-    - ✅ 自动识别公共方法并生成接口
-    - ✅ 保留类型注解和文档字符串
-    - ✅ 处理async方法
-  - ✅ 模块自动拆分 (Split Module) - 17个测试，93%覆盖率
-    - ✅ 分析模块依赖关系
-    - ✅ 生成拆分计划
-    - ✅ 执行模块拆分操作
-  - ✅ 依赖注入改造 - 20个测试，100%覆盖率
-    - ✅ 检测硬编码依赖
-    - ✅ 支持构造函数注入
-    - ✅ 生成依赖注入容器
-    - ✅ 与FixHistory集成，支持回滚
-- [ ] 任务3：架构演进机制设计
-  - 模块热插拔机制
-  - 版本化API机制
-  - 灰度发布机制
-  - A/B测试机制
-  - 创建 evolution/ 主目录及子目录
-  - 设置正确的目录权限
-- [x] 任务2：创建当前阶段状态文档
-  - 编写 current_phase.md 文件
-- [x] 任务3：创建进化计划文档
-  - 编写 evolution_plan.md 文件
-- [x] 任务4：创建进化历史记录文件
-  - 初始化 evolution_history.json
-- [x] 任务5：评估现有测试基础设施
-  - 检查 pytest 配置
-  - 评估测试覆盖率
-- [x] 任务6：设计自我验证机制方案
-  - 自动化测试框架设计
-  - 回归测试系统设计
-  - 监控告警系统设计
-- [x] 任务7：设计自我修复机制方案
-  - 代码自动修复设计
-  - 依赖自动更新设计
-  - 配置自动优化设计
-
-## 遇到的问题
-
-暂无问题
-
-## 进度说明
-
-- 阶段0已完成，基础设施就绪
-- 阶段1任务1已完成：jarvis_arch_analyzer模块（67个测试，92%平均覆盖率）
-- 阶段1任务2已完成（100%）：
-  - 基础重构完成（92个测试）
-  - 接口提取完成（20个测试，95%覆盖率）
-  - 模块拆分完成（17个测试，93%覆盖率）
-  - 依赖注入改造完成（20个测试，100%覆盖率）
-  - **总计：149个测试全部通过，平均覆盖率≥93%**
-- 接下来需要完成：架构演进机制设计（任务3）
-
-- 情绪识别：自动识别用户情绪状态
-- 歧义检测：检测用户输入中的歧义
-- 对话管理：跟踪多轮对话上下文
-- 主动交互：分析上下文提供主动建议
-
-- src/jarvis/jarvis_arch_analyzer/ (5个文件)
-- tests/jarvis_arch_analyzer/ (4个文件)
-- src/jarvis/jarvis_auto_fix/refactoring/ (7个文件：extract_function.py, extract_class.py, inline_function.py, move_method.py, extract_interface.py, split_module.py, dependency_injection.py)
-- tests/jarvis_auto_fix/ (6个测试文件)
-
-### Agent工具集成
-
-| 工具                 | 来源  | 功能                                       | 状态 |
-| -------------------- | ----- | ------------------------------------------ | ---- |
-| arch_analyzer_tool   | 阶段1 | 架构分析、复杂度分析、依赖分析、重复度分析 | ✅   |
-| knowledge_graph_tool | 阶段2 | 知识图谱管理（节点、关系、查询）           | ✅   |
-| smart_advisor_tool   | 阶段3 | 智能问答、代码审查、架构决策、最佳实践     | ✅   |
-
-### AgentRunLoop中已集成的组件
-
-| 组件                      | 来源        | 状态 |
-| ------------------------- | ----------- | ---- |
-| DialogueManager           | 阶段4.4     | ✅   |
-| EmotionRecognizer         | 阶段4.3     | ✅   |
-| NeedPredictor             | 阶段4.3     | ✅   |
-| PersonalityAdapter        | 阶段4.3     | ✅   |
-| ProactiveAssistant        | 阶段4.4     | ✅   |
-| AmbiguityResolver         | 阶段4.4     | ✅   |
-| ProactiveServiceManager   | 阶段5.3     | ✅   |
-| ContinuousLearningManager | 阶段5.4     | ✅   |
-| AutonomousManager         | 阶段4.1+4.2 | ✅   |
-
-### AutonomousManager整合的组件
-
-- GoalManager（目标管理）
-- PlanningEngine（计划制定）
-- TaskDecomposer（任务分解）
-- AutonomousExecutor（自主执行）
-- CreativityEngine（创意生成）
-- SolutionDesigner（方案设计）
-- CodeInnovator（代码创新）
-
-## 下一步
-
-阶段5已全部完成！所有组件已集成到AgentRunLoop。可进行实际使用验证。
+**阶段目标**：让 Jarvis 形成「需求澄清 → 主动建议 → 跨会话学习」的闭环，越用越聪明、越用越高效。
 
 ---
 
-**最后更新**：2026-02-01
+## 现状说明（2026-10-04 核实）
+
+> ⚠️ **重要**：本文件此前（2026-02-01 版）记录了大量「已完成」的组件与模块，经 2026-10-04 源码核查，**绝大多数并不存在**（如 jarvis_arch_analyzer、jarvis_auto_fix、knowledge_graph_tool、smart_advisor_tool、DialogueManager、EmotionRecognizer、AutonomousManager 等）。本文件已重写，如实反映真实状态。
+
+### ✅ 实际已实现的核心能力（真实存在）
+
+| 模块/能力                                                       | 说明                                                                                                         |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| jarvis_agent                                                    | Agent 运行循环（run_loop）、会话管理、任务分析、上下文压缩、模型切换                                         |
+| jarvis_code_agent                                               | 代码审查（CodeReviewer）、构建验证（BuildValidator）、lint 自动修复、影响分析（ImpactAnalyzer）、diff 可视化 |
+| jarvis_code_agent.code_analyzer                                 | 依赖分析、符号表数据库（SymbolTableDB）、图遍历（GraphTraverser）、上下文推荐                                |
+| jarvis_memory_organizer                                         | 记忆整理、智能语义检索（smart_retrieval）                                                                    |
+| jarvis_methodology                                              | 方法论（可复用解法库）管理                                                                                   |
+| jarvis_rules_index                                              | 规则索引与加载                                                                                               |
+| jarvis_tools                                                    | 30 个内置工具（代码编辑、执行、搜索、浏览器、daemon 等）                                                     |
+| jarvis_platform                                                 | 多平台接入（OpenAI/Claude/JEV 等）                                                                           |
+| jarvis_sec                                                      | 安全扫描（C/Rust 等）                                                                                        |
+| jarvis_lsp / jarvis_mcp / jarvis_git_utils / jarvis_smart_shell | 语言服务器 / MCP / Git / 智能 Shell                                                                          |
+| 子代理 / 元代理                                                 | sub_agent、sub_code_agent、meta_agent（可生成新工具）                                                        |
+| 技能发现                                                        | skill_discovery（搜索/安装技能）                                                                             |
+
+---
+
+## 当前任务（阶段 A）
+
+- [ ] A1. 需求澄清与意图理解（P0）
+  - 动手前识别「需求是否明确」，含糊时主动澄清
+  - 识别任务类型，选择对应执行策略
+- [ ] A2. 主动服务 / 主动建议（P0）
+  - 任务完成后主动给出「下一步建议」
+  - 发现重复劳动时主动提醒沉淀为方法论/工具
+- [ ] A3. 跨会话持续学习（P0）
+  - 任务开始前自动检索相关历史经验
+  - 任务结束后自动判断并沉淀值得保留的经验
+- [x] A4. 进化状态修正（P0 前置）✅ 已完成（2026-10-04）
+  - 修正 current_phase.md 中与事实不符的「已完成」标记
+  - 重写 evolution_plan.md 为效率优先的 A/B/C 阶段
+
+---
+
+## 遇到的问题
+
+- 旧版进化状态文档（current_phase.md / evolution_plan.md）存在大量与源码不符的「已完成」记录，已核实并修正。
+- 旧计划中的「架构分析、自动修复、知识图谱、智能顾问」多数已被现有 code_analyzer / code_agent_lint / code_reviewer 覆盖，无需重复建设（详见 evolution_plan.md 复核表）。
+
+---
+
+## 进度说明
+
+- 阶段 A 已启动，A4（状态修正）已完成。
+- 接下来优先推进：A1（需求澄清/意图理解）。
+
+---
+
+## 下一步
+
+1. 推进 A1：需求澄清与意图理解。
+2. 完成后依次推进 A2、A3。
+3. 阶段 A 稳定后，按需启动阶段 B（复杂度/重复度分析、测试生成、文档生成）。
+
+---
+
+**最后更新**：2026-10-04
+**规则版本**：2.0
+**执行状态**：永久持续运行
+**监督者**：skyfire
+**执行者**：Jarvis
