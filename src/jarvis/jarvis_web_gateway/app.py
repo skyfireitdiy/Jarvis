@@ -8916,7 +8916,9 @@ def create_app(
             skip = max(0, skip)
 
             # 多取一条用于判断是否还有更多
-            fmt = "%H%x1f%P%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%D"
+            # %b 为提交正文（不含首行 subject），供前端展示/复制完整 commit 信息。
+            # 用 %x1e（记录分隔符）分隔每条提交，避免多行 body 中的换行破坏记录结构。
+            fmt = "%H%x1f%P%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%D%x1f%b%x1e"
             result = _run_git(
                 [
                     "log",
@@ -8931,7 +8933,8 @@ def create_app(
                 return result
 
             raw = result["data"]["stdout"]
-            records = [line for line in raw.split("\n") if line.strip()]
+            # 每条记录以 %x1e 结尾，git 会在记录间补一个换行，故 strip 掉记录首尾空白
+            records = [rec.strip() for rec in raw.split("\x1e") if rec.strip()]
             has_more = len(records) > limit
             records = records[:limit]
 
@@ -8948,7 +8951,7 @@ def create_app(
             commits = []
             for record in records:
                 parts = record.split("\x1f")
-                while len(parts) < 7:
+                while len(parts) < 8:
                     parts.append("")
                 refs_raw = parts[6].strip()
                 refs = [r.strip() for r in refs_raw.split(",") if r.strip()]
@@ -8961,6 +8964,7 @@ def create_app(
                         "date": parts[4],
                         "subject": parts[5],
                         "refs": refs,
+                        "body": parts[7].strip(),
                     }
                 )
 

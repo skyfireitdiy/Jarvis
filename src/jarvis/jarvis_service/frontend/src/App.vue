@@ -580,6 +580,7 @@
                       class="workspace-git-commit"
                       :class="{ selected: gitSelectedCommit === commit.hash }"
                       @click="toggleGitCommitDetail(commit)"
+                      @contextmenu.prevent.stop="openGitCommitContextMenu(commit, $event)"
                     >
                       <div class="workspace-git-graph">
                         <svg viewBox="0 0 20 40" width="20" height="40" aria-hidden="true">
@@ -588,7 +589,7 @@
                         </svg>
                       </div>
                       <div class="workspace-git-commit-body">
-                        <div class="workspace-git-commit-subject" :title="commit.subject">{{ commit.subject }}</div>
+                        <div class="workspace-git-commit-subject" :title="formatGitCommitTooltip(commit)">{{ commit.subject }}</div>
                         <div class="workspace-git-commit-meta">
                           <span class="workspace-git-refs" v-if="commit.refs && commit.refs.length">
                             <span v-for="ref in commit.refs" :key="ref" class="git-ref" :class="gitRefClass(ref)">{{ ref }}</span>
@@ -596,6 +597,12 @@
                           <span class="workspace-git-author">{{ commit.author }}</span>
                           <span class="workspace-git-hash">{{ shortGitHash(commit.hash) }}</span>
                           <span class="workspace-git-time">{{ formatGitRelativeTime(commit.date) }}</span>
+                          <button
+                            v-if="windowWidth < 768"
+                            class="workspace-git-detail-btn"
+                            title="查看完整 commit 信息"
+                            @click.stop="showGitCommitInfoModal(commit)"
+                          >详情</button>
                         </div>
                         <div v-if="gitSelectedCommit === commit.hash" class="workspace-git-commit-detail" @click.stop>
                           <div v-if="gitCommitDetailLoading" class="workspace-git-detail-empty">加载文件列表...</div>
@@ -1441,6 +1448,40 @@
         <span class="file-tree-context-icon" v-html="act.icon"></span>
         <span class="file-tree-context-label">{{ act.label }}</span>
       </button>
+    </div>
+
+    <!-- Git 提交右键菜单 -->
+    <div
+      v-if="gitCommitContextMenu.visible"
+      class="file-tree-context-menu"
+      :style="{ left: gitCommitContextMenu.x + 'px', top: gitCommitContextMenu.y + 'px' }"
+      @pointerdown.stop
+      @click.stop
+      @contextmenu.prevent.stop
+    >
+      <button
+        class="file-tree-context-item"
+        @click="copyGitCommit(gitCommitContextMenu.commit)"
+      >
+        <span class="file-tree-context-icon" v-html="UI_ICONS.copy"></span>
+        <span class="file-tree-context-label">复制 commit</span>
+      </button>
+    </div>
+
+    <!-- Git 提交完整信息弹窗（移动端无 hover，用「详情」按钮查看） -->
+    <div v-if="gitCommitInfoModal" class="diff-modal-overlay" @click.self="gitCommitInfoModal = null">
+      <div class="diff-modal git-commit-info-modal">
+        <div class="diff-modal-header">
+          <h3>Commit 信息</h3>
+          <div class="diff-modal-header-actions">
+            <button class="icon-btn" @click="copyGitCommit(gitCommitInfoModal)" title="复制 commit">复制</button>
+            <button class="icon-btn" @click="gitCommitInfoModal = null" title="关闭">✕</button>
+          </div>
+        </div>
+        <div class="diff-modal-content">
+          <pre class="git-commit-info-pre">{{ formatGitCommitInfo(gitCommitInfoModal) }}</pre>
+        </div>
+      </div>
     </div>
 
     <!-- 目录树「上传」用的隐藏文件选择框 -->
@@ -6808,6 +6849,73 @@ function openFileTreeContextMenu(agent, node, event) {
   nextTick(() => {
     document.addEventListener('pointerdown', closeFileTreeContextMenu, { once: true })
   })
+}
+
+// ===== Git 提交右键菜单 =====
+const gitCommitContextMenu = ref({ visible: false, x: 0, y: 0, commit: null })
+
+function closeGitCommitContextMenu() {
+  if (gitCommitContextMenu.value.visible) {
+    gitCommitContextMenu.value = { ...gitCommitContextMenu.value, visible: false }
+  }
+}
+
+// 在 Git 提交项上右键：就地弹出菜单（视口坐标 + 边界收敛）
+function openGitCommitContextMenu(commit, event) {
+  if (!commit || !event) return
+  const MENU_W = 220
+  const MENU_H = 120
+  let x = event.clientX
+  let y = event.clientY
+  if (x + MENU_W > window.innerWidth) x = Math.max(window.innerWidth - MENU_W, 0)
+  if (y + MENU_H > window.innerHeight) y = Math.max(window.innerHeight - MENU_H, 0)
+  gitCommitContextMenu.value = { visible: true, x, y, commit }
+  // 点击菜单外部时关闭（一次性监听）
+  nextTick(() => {
+    document.addEventListener('pointerdown', closeGitCommitContextMenu, { once: true })
+  })
+}
+
+// 复制完整 commit 信息到剪贴板
+async function copyGitCommit(commit) {
+  if (!commit) return
+  closeGitCommitContextMenu()
+  try {
+    await copyTextToClipboard(formatGitCommitInfo(commit))
+    showToast('已复制 commit 信息')
+  } catch (e) {
+    showToast('复制失败', 'error')
+  }
+}
+
+// 组装完整 commit 信息（hash + subject + body + author + email + date + refs）
+function formatGitCommitInfo(commit) {
+  const lines = []
+  lines.push(`commit ${commit.hash}`)
+  if (commit.refs && commit.refs.length) lines.push(`refs: ${commit.refs.join(', ')}`)
+  lines.push(`Author: ${commit.author} <${commit.email}>`)
+  lines.push(`Date:   ${commit.date}`)
+  lines.push('')
+  lines.push(commit.subject)
+  if (commit.body) {
+    lines.push('')
+    lines.push(commit.body)
+  }
+  return lines.join('\n')
+}
+
+// 悬停/长按提示：完整 commit 信息（单行 subject 之外补全 body 与元信息）
+function formatGitCommitTooltip(commit) {
+  if (!commit) return ''
+  return formatGitCommitInfo(commit)
+}
+
+// 移动端「详情」弹窗：当前展示的 commit（null 表示关闭）
+const gitCommitInfoModal = ref(null)
+
+function showGitCommitInfoModal(commit) {
+  if (!commit) return
+  gitCommitInfoModal.value = commit
 }
 
 // 目录树右键菜单项
@@ -21098,6 +21206,22 @@ body::-webkit-scrollbar {
   color: #c0a060;
 }
 
+.workspace-git-detail-btn {
+  margin-left: auto;
+  padding: 1px 8px;
+  border: 1px solid var(--border-color, #2a2a2a);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary, #888);
+  font-size: 11px;
+  line-height: 16px;
+  cursor: pointer;
+}
+.workspace-git-detail-btn:hover {
+  color: var(--text-primary, #e0e0e0);
+  border-color: var(--accent-color, #4a90d9);
+}
+
 .workspace-git-commit-detail {
   margin-top: 6px;
   padding: 4px 0 2px;
@@ -24640,6 +24764,29 @@ body::-webkit-scrollbar {
   font-size: 13px;
   font-weight: 400;
   color: #8ba3b8;
+}
+
+.diff-modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.git-commit-info-modal {
+  max-width: 560px;
+}
+
+.git-commit-info-pre {
+  margin: 0;
+  padding: 16px 20px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--mono-font, monospace);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-primary, #e0e0e0);
+  background: var(--color-bg-secondary);
 }
 
 /* 左侧文件列表 + 右侧 diff 对比 */
