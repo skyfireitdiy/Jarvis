@@ -1,6 +1,6 @@
 <template>
   <div class="modal-overlay" v-if="visible">
-    <div class="modal create-agent-modal">
+    <div class="modal create-agent-modal" ref="modalEl">
       <h2>创建 Agent</h2>
       <div class="form-grid create-agent-layout">
         <div class="form-column create-agent-column create-agent-column-left">
@@ -218,6 +218,9 @@ const emit = defineEmits([
 // Agent 名称输入框引用：打开弹窗时自动聚焦
 const nameInput = ref(null)
 
+// 弹窗容器引用：仅响应来自弹窗内部的回车，避免误触（如目录选择对话框打开时按回车直接创建）
+const modalEl = ref(null)
+
 // 按当前节点过滤最近使用的工作目录
 const filteredRecentWorkDirs = computed(() => {
   if (!props.currentNodeId) return []
@@ -252,6 +255,9 @@ function handleKeydown(event) {
   // 目录选择对话框打开时，Enter 应交给目录对话框处理（选择/进入目录），不能触发创建
   if (props.dirDialogOpen) return
   if (event.key === 'Enter') {
+    // 仅响应来自本弹窗内部的回车；焦点在弹窗之外（如目录选择对话框）时不提交，
+    // 避免「选择目录后按回车确认」被误判为「创建 Agent」
+    if (modalEl.value && !modalEl.value.contains(event.target)) return
     const tag = event.target?.tagName?.toLowerCase()
     // textarea 内 Enter 用于换行，不拦截；按钮聚焦时浏览器原生处理
     if (tag === 'textarea' || tag === 'button' || tag === 'select') return
