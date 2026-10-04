@@ -451,6 +451,22 @@ func newRuntimeRegistry(store *auth.Store) *capability.Registry {
 	return registry
 }
 
+// storeFromEnv 从环境变量构造一个带凭据的 auth.Store，供 run-script 等独立进程
+// 注入网关凭据（使 ocr.recognize / browser.ext 等能力可用）。
+//
+// 读取 JARVIS_GATEWAY 与 JARVIS_AUTH_TOKEN；两者都非空时才返回非 nil store，
+// 否则返回 nil（表示无凭据，能力层会返回明确错误而非 panic）。
+func storeFromEnv() *auth.Store {
+	gateway := os.Getenv("JARVIS_GATEWAY")
+	token := os.Getenv("JARVIS_AUTH_TOKEN")
+	if gateway == "" || token == "" {
+		return nil
+	}
+	store := auth.NewStore()
+	store.SetWithName(gateway, token, "run-script")
+	return store
+}
+
 // cmdRunScript 执行一个 JS 脚本（run-script 子命令）。
 //
 // 用法：jarvis-daemon run-script <file.js> [--arg key=value ...]
@@ -492,7 +508,10 @@ func cmdRunScript(args []string) error {
 	}
 
 	// 装配能力注册表（复用 run 流程的装配逻辑）。
-	registry := newRuntimeRegistry(nil)
+	// run-script 是独立进程，默认无凭据存储（store=nil），ocr/browser.ext 等
+	// 依赖网关凭据的能力会返回明确错误。若调用方设置了 JARVIS_GATEWAY +
+	// JARVIS_AUTH_TOKEN 环境变量，则据此注入凭据，使这些能力在脚本内可用。
+	registry := newRuntimeRegistry(storeFromEnv())
 
 	// 创建运行时并注入 jarvis 能力对象。
 	r := jsruntime.New()

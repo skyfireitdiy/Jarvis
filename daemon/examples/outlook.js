@@ -214,6 +214,7 @@ try {
 // 主流程
 // ---------------------------------------------------------------------------
 const action = jarvis.args.action || "list";
+let result;
 
 if (action === "list") {
   const filter = jarvis.args.filter || "";
@@ -229,10 +230,8 @@ if (action === "list") {
         m.subject,
     );
   }
-  return { action: "list", count: mails.length, mails: mails };
-}
-
-if (action === "read") {
+  result = { action: "list", count: mails.length, mails: mails };
+} else if (action === "read") {
   const id = jarvis.args.id;
   if (!id) throw new Error("read 需要 --arg id=<entryid>");
   const mail = readMail(id);
@@ -241,10 +240,8 @@ if (action === "read") {
   print("时间:", mail.time);
   print("----------------------------------------");
   print(mail.body);
-  return { action: "read", mail: mail };
-}
-
-if (action === "search") {
+  result = { action: "read", mail: mail };
+} else if (action === "search") {
   const query = jarvis.args.query || "";
   if (!query) throw new Error("search 需要 --arg query=<关键词>");
   const mails = searchMails(query);
@@ -252,18 +249,22 @@ if (action === "search") {
   for (const m of mails) {
     print(m.time + "  " + m.sender + "  " + m.subject);
   }
-  return { action: "search", query: query, count: mails.length, mails: mails };
-}
-
-if (action === "send") {
+  result = {
+    action: "search",
+    query: query,
+    count: mails.length,
+    mails: mails,
+  };
+} else if (action === "send") {
   const to = jarvis.args.to;
   if (!to) throw new Error("send 需要 --arg to=<收件人>");
   const subject = jarvis.args.subject || "";
   const body = jarvis.args.body || "";
   const cc = jarvis.args.cc || "";
-  const result = sendMail(to, cc, subject, body);
+  result = sendMail(to, cc, subject, body);
   print("已发送:", result.subject);
-  return result;
+} else {
+  throw new Error("未知 action: " + action + "（支持 list/read/search/send）");
 }
 
-throw new Error("未知 action: " + action + "（支持 list/read/search/send）");
+result;
