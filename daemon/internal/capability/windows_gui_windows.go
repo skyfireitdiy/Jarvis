@@ -38,6 +38,9 @@ var (
 	procShowWindow               = user32.NewProc("ShowWindow")
 	procSetForegroundWindow      = user32.NewProc("SetForegroundWindow")
 	procPostMessageW             = user32.NewProc("PostMessageW")
+	procGetWindowRect            = user32.NewProc("GetWindowRect")
+	procMoveWindow               = user32.NewProc("MoveWindow")
+	procGetForegroundWindow      = user32.NewProc("GetForegroundWindow")
 )
 
 // Win32 常量。
@@ -267,6 +270,106 @@ func registerWindowsGUI(reg *Registry) {
 		},
 		Handler: handleWindowsWindowClose,
 	})
+
+	_ = reg.Register(Capability{
+		Name: "windows.window.get-pos",
+		Description: "获取窗口的位置与大小。" +
+			"通过 GetWindowRect 读取窗口的屏幕坐标（左上角 x/y 与宽高）。" +
+			"通过 window_id 或 title 定位窗口。无需任何外部命令或第三方依赖。",
+		Platform: PlatformWindows,
+		Parameters: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"window_id": map[string]any{
+					"type":        "string",
+					"description": "窗口 ID，如 0x00010A2C 或十进制；与 title 至少提供一个。",
+				},
+				"title": map[string]any{
+					"type":        "string",
+					"description": "窗口标题（子串匹配，大小写不敏感），当未提供 window_id 时使用。",
+				},
+			},
+		},
+		Handler: handleWindowsWindowGetPos,
+	})
+
+	_ = reg.Register(Capability{
+		Name: "windows.window.move",
+		Description: "移动窗口到指定屏幕坐标。" +
+			"通过 MoveWindow 把窗口左上角移到指定 x/y，可选 width/height 一并调整大小。" +
+			"通过 window_id 或 title 定位窗口。无需任何外部命令或第三方依赖。",
+		Platform: PlatformWindows,
+		Parameters: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"window_id": map[string]any{
+					"type":        "string",
+					"description": "窗口 ID，如 0x00010A2C 或十进制；与 title 至少提供一个。",
+				},
+				"title": map[string]any{
+					"type":        "string",
+					"description": "窗口标题（子串匹配，大小写不敏感），当未提供 window_id 时使用。",
+				},
+				"x": map[string]any{
+					"type":        "integer",
+					"description": "目标左上角横坐标（像素），允许为 0。",
+				},
+				"y": map[string]any{
+					"type":        "integer",
+					"description": "目标左上角纵坐标（像素），允许为 0。",
+				},
+				"width": map[string]any{
+					"type":        "integer",
+					"description": "可选。目标宽度（像素）；缺省时保持原宽度。",
+				},
+				"height": map[string]any{
+					"type":        "integer",
+					"description": "可选。目标高度（像素）；缺省时保持原高度。",
+				},
+			},
+			"required": []string{"x", "y"},
+		},
+		Handler: handleWindowsWindowMove,
+	})
+
+	_ = reg.Register(Capability{
+		Name: "windows.window.resize",
+		Description: "调整窗口大小。" +
+			"通过 MoveWindow 把窗口调整为指定 width/height，可选 x/y 一并移动位置。" +
+			"通过 window_id 或 title 定位窗口。无需任何外部命令或第三方依赖。",
+		Platform: PlatformWindows,
+		Parameters: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"window_id": map[string]any{
+					"type":        "string",
+					"description": "窗口 ID，如 0x00010A2C 或十进制；与 title 至少提供一个。",
+				},
+				"title": map[string]any{
+					"type":        "string",
+					"description": "窗口标题（子串匹配，大小写不敏感），当未提供 window_id 时使用。",
+				},
+				"width": map[string]any{
+					"type":        "integer",
+					"description": "目标宽度（像素），必须为正整数。",
+				},
+				"height": map[string]any{
+					"type":        "integer",
+					"description": "目标高度（像素），必须为正整数。",
+				},
+				"x": map[string]any{
+					"type":        "integer",
+					"description": "可选。目标左上角横坐标（像素）；缺省时保持原位置。",
+				},
+				"y": map[string]any{
+					"type":        "integer",
+					"description": "可选。目标左上角纵坐标（像素）；缺省时保持原位置。",
+				},
+			},
+			"required": []string{"width", "height"},
+		},
+		Handler: handleWindowsWindowResize,
+	})
 }
 
 // handleWindowsWindowList 是 windows.window.list 的实现。
@@ -426,4 +529,212 @@ func parseWindowID(s string) (uintptr, error) {
 		return 0, err
 	}
 	return uintptr(v), nil
+}
+
+// windowsRect 对应 Win32 的 RECT 结构（GetWindowRect 输出）。
+type windowsRect struct {
+	Left   int32
+	Top    int32
+	Right  int32
+	Bottom int32
+}
+
+// resolveWindowHandle 根据 window_id 或 title 解析出窗口句柄。
+//
+// 复用 focus/close 的定位逻辑：window_id 优先（直接 FromHandle 校验存在），
+// 否则按 title 子串查找。返回解析出的 HWND 与窗口标题。
+func resolveWindowHandle(windowID, title string) (uintptr, string, error) {
+	if windowID == "" && title == "" {
+		return 0, "", fmt.Errorf("参数 window_id 与 title 至少需要提供一个")
+	}
+
+	var hwnd uintptr
+	var resolvedTitle string
+	var err error
+
+	if windowID != "" {
+		hwnd, err = parseWindowID(windowID)
+		if err != nil {
+			return 0, "", err
+		}
+		if r, _, _ := procIsWindow.Call(hwnd); r == 0 {
+			return 0, "", fmt.Errorf("窗口 %s 不存在或已关闭", windowID)
+		}
+		resolvedTitle = getWindowText(hwnd)
+	} else {
+		info, ok := findWindowByTitle(title)
+		if !ok {
+			return 0, "", fmt.Errorf("未找到标题匹配 %q 的窗口", title)
+		}
+		hwnd, err = parseWindowID(info.WindowID)
+		if err != nil {
+			return 0, "", err
+		}
+		resolvedTitle = info.Title
+	}
+
+	return hwnd, resolvedTitle, nil
+}
+
+// handleWindowsWindowGetPos 是 windows.window.get-pos 的实现。
+func handleWindowsWindowGetPos(params map[string]any) (any, error) {
+	windowID, err := optionalString(params, "window_id")
+	if err != nil {
+		return nil, err
+	}
+	title, err := optionalString(params, "title")
+	if err != nil {
+		return nil, err
+	}
+
+	hwnd, resolvedTitle, err := resolveWindowHandle(windowID, title)
+	if err != nil {
+		return nil, err
+	}
+
+	var rect windowsRect
+	if r, _, _ := procGetWindowRect.Call(hwnd, uintptr(unsafe.Pointer(&rect))); r == 0 {
+		return nil, fmt.Errorf("获取窗口 %s 的位置失败", formatWindowID(hwnd))
+	}
+
+	return map[string]any{
+		"window_id": formatWindowID(hwnd),
+		"title":     resolvedTitle,
+		"x":         int(rect.Left),
+		"y":         int(rect.Top),
+		"width":     int(rect.Right - rect.Left),
+		"height":    int(rect.Bottom - rect.Top),
+		"tool":      windowsGUITool,
+	}, nil
+}
+
+// handleWindowsWindowMove 是 windows.window.move 的实现。
+func handleWindowsWindowMove(params map[string]any) (any, error) {
+	windowID, err := optionalString(params, "window_id")
+	if err != nil {
+		return nil, err
+	}
+	title, err := optionalString(params, "title")
+	if err != nil {
+		return nil, err
+	}
+	x, err := requiredInt(params, "x")
+	if err != nil {
+		return nil, err
+	}
+	y, err := requiredInt(params, "y")
+	if err != nil {
+		return nil, err
+	}
+	width, err := optionalInt(params, "width", 0)
+	if err != nil {
+		return nil, err
+	}
+	height, err := optionalInt(params, "height", 0)
+	if err != nil {
+		return nil, err
+	}
+
+	hwnd, resolvedTitle, err := resolveWindowHandle(windowID, title)
+	if err != nil {
+		return nil, err
+	}
+
+	// 未提供宽高时保持原大小（读当前 rect）。
+	if width <= 0 || height <= 0 {
+		var rect windowsRect
+		if r, _, _ := procGetWindowRect.Call(hwnd, uintptr(unsafe.Pointer(&rect))); r == 0 {
+			return nil, fmt.Errorf("获取窗口 %s 的位置失败", formatWindowID(hwnd))
+		}
+		if width <= 0 {
+			width = int(rect.Right - rect.Left)
+		}
+		if height <= 0 {
+			height = int(rect.Bottom - rect.Top)
+		}
+	}
+
+	// MoveWindow(hWnd, x, y, nWidth, nHeight, bRepaint)。
+	if r, _, _ := procMoveWindow.Call(hwnd, uintptr(x), uintptr(y), uintptr(width), uintptr(height), 1); r == 0 {
+		return nil, fmt.Errorf("移动窗口 %s 失败", formatWindowID(hwnd))
+	}
+
+	return map[string]any{
+		"window_id": formatWindowID(hwnd),
+		"title":     resolvedTitle,
+		"x":         x,
+		"y":         y,
+		"width":     width,
+		"height":    height,
+		"moved":     true,
+		"tool":      windowsGUITool,
+	}, nil
+}
+
+// handleWindowsWindowResize 是 windows.window.resize 的实现。
+func handleWindowsWindowResize(params map[string]any) (any, error) {
+	windowID, err := optionalString(params, "window_id")
+	if err != nil {
+		return nil, err
+	}
+	title, err := optionalString(params, "title")
+	if err != nil {
+		return nil, err
+	}
+	width, err := requiredInt(params, "width")
+	if err != nil {
+		return nil, err
+	}
+	height, err := requiredInt(params, "height")
+	if err != nil {
+		return nil, err
+	}
+	if width <= 0 || height <= 0 {
+		return nil, fmt.Errorf("参数 width 与 height 必须为正整数，实际 %d x %d", width, height)
+	}
+	x, err := optionalInt(params, "x", 0)
+	if err != nil {
+		return nil, err
+	}
+	y, err := optionalInt(params, "y", 0)
+	if err != nil {
+		return nil, err
+	}
+	hasPos := false
+	if _, ok := params["x"]; ok {
+		hasPos = true
+	}
+	if _, ok := params["y"]; ok {
+		hasPos = true
+	}
+
+	hwnd, resolvedTitle, err := resolveWindowHandle(windowID, title)
+	if err != nil {
+		return nil, err
+	}
+
+	// 未提供 x/y 时保持原位置（读当前 rect）。
+	if !hasPos {
+		var rect windowsRect
+		if r, _, _ := procGetWindowRect.Call(hwnd, uintptr(unsafe.Pointer(&rect))); r == 0 {
+			return nil, fmt.Errorf("获取窗口 %s 的位置失败", formatWindowID(hwnd))
+		}
+		x = int(rect.Left)
+		y = int(rect.Top)
+	}
+
+	if r, _, _ := procMoveWindow.Call(hwnd, uintptr(x), uintptr(y), uintptr(width), uintptr(height), 1); r == 0 {
+		return nil, fmt.Errorf("调整窗口 %s 大小失败", formatWindowID(hwnd))
+	}
+
+	return map[string]any{
+		"window_id": formatWindowID(hwnd),
+		"title":     resolvedTitle,
+		"x":         x,
+		"y":         y,
+		"width":     width,
+		"height":    height,
+		"resized":   true,
+		"tool":      windowsGUITool,
+	}, nil
 }

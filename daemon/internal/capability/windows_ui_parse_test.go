@@ -170,3 +170,93 @@ func TestBuildWindowsUIMenuScript(t *testing.T) {
 		t.Error("window_id 与 title 都缺应返回错误")
 	}
 }
+
+func TestBuildWindowsControlFindPrefix(t *testing.T) {
+	// window_id + name 定位。
+	prefix, err := buildWindowsControlFindPrefix("0x00010A2C", "", "保存", "")
+	if err != nil {
+		t.Fatalf("意外错误: %v", err)
+	}
+	for _, want := range []string{
+		"UIAutomationClient",
+		"FromHandle([IntPtr]0x00010A2C)",
+		"NameProperty",
+		"FindFirst([System.Windows.Automation.TreeScope]::Descendants",
+		encodePowerShellText("保存"),
+	} {
+		if !strings.Contains(prefix, want) {
+			t.Errorf("find 前缀缺少 %q: %s", want, prefix)
+		}
+	}
+
+	// automation_id 定位：应使用 AutomationIdProperty。
+	prefix, err = buildWindowsControlFindPrefix("0x1", "", "", "btnSave")
+	if err != nil {
+		t.Fatalf("automation_id 定位意外错误: %v", err)
+	}
+	if !strings.Contains(prefix, "AutomationIdProperty") {
+		t.Errorf("automation_id 定位应使用 AutomationIdProperty: %s", prefix)
+	}
+	if !strings.Contains(prefix, encodePowerShellText("btnSave")) {
+		t.Errorf("automation_id 未转义: %s", prefix)
+	}
+
+	// title + 注入尝试的 name 必须转义。
+	title := "App'; Remove-Item -Recurse C:\\ -Force; '"
+	name := "保存'; Remove-Item -Recurse C:\\ -Force; '"
+	prefix, err = buildWindowsControlFindPrefix("", title, name, "")
+	if err != nil {
+		t.Fatalf("title 定位意外错误: %v", err)
+	}
+	assertNoRawInput(t, prefix, title)
+	assertNoRawInput(t, prefix, name)
+
+	// 缺参数报错。
+	if _, err := buildWindowsControlFindPrefix("", "", "x", ""); err == nil {
+		t.Error("window_id 与 title 都缺应返回错误")
+	}
+	if _, err := buildWindowsControlFindPrefix("0x1", "", "", ""); err == nil {
+		t.Error("name 与 automation_id 都缺应返回错误")
+	}
+}
+
+func TestBuildWindowsControlClickScript(t *testing.T) {
+	script, err := buildWindowsControlClickScript("0x00010A2C", "", "保存", "")
+	if err != nil {
+		t.Fatalf("意外错误: %v", err)
+	}
+	for _, want := range []string{
+		"InvokePattern",
+		"$p.Invoke()",
+		"SelectionItemPattern",
+		"$s.Select()",
+	} {
+		if !strings.Contains(script, want) {
+			t.Errorf("click 脚本缺少 %q: %s", want, script)
+		}
+	}
+}
+
+func TestBuildWindowsControlSetTextScript(t *testing.T) {
+	script, err := buildWindowsControlSetTextScript("0x00010A2C", "", "", "txtName", "张三")
+	if err != nil {
+		t.Fatalf("意外错误: %v", err)
+	}
+	for _, want := range []string{
+		"ValuePattern",
+		"$v.SetValue(",
+		encodePowerShellText("张三"),
+	} {
+		if !strings.Contains(script, want) {
+			t.Errorf("set-text 脚本缺少 %q: %s", want, script)
+		}
+	}
+
+	// text 含注入尝试必须转义。
+	evil := "'; Remove-Item -Recurse C:\\ -Force; '"
+	script, err = buildWindowsControlSetTextScript("0x1", "", "", "txt", evil)
+	if err != nil {
+		t.Fatalf("意外错误: %v", err)
+	}
+	assertNoRawInput(t, script, evil)
+}

@@ -192,3 +192,85 @@ func buildWindowsUIMenuScript(windowID, title, path string) (string, error) {
 
 	return windowsUIAddTypePreamble + "; " + steps.String(), nil
 }
+
+// buildWindowsControlFindPrefix 构造「定位窗口 + 定位控件」的 PowerShell 前缀语句。
+//
+// 返回的脚本片段执行后，变量 $el 指向目标控件；若定位失败会输出 ERROR: 并 exit。
+// 供 windows.control.click / windows.control.set-text 复用。
+//
+// windowID 与 title 至少提供一个用于定位窗口（同 tree/menu）；name 与 automation_id
+// 至少提供一个用于在窗口内定位控件（按 Name 或 AutomationId 属性，Descendants 范围）。
+// 所有用户输入（title/name/automation_id）均经 encodePowerShellText 转义。
+func buildWindowsControlFindPrefix(windowID, title, name, automationID string) (string, error) {
+	if windowID == "" && title == "" {
+		return "", fmt.Errorf("参数 window_id 与 title 至少需要提供一个")
+	}
+	if name == "" && automationID == "" {
+		return "", fmt.Errorf("参数 name 与 automation_id 至少需要提供一个")
+	}
+
+	var rootExpr string
+	if windowID != "" {
+		rootExpr = "[System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]" + windowID + ")"
+	} else {
+		quotedTitle := encodePowerShellText(title)
+		rootExpr = "$w = Get-Process | Where-Object { $_.MainWindowTitle -like ('*' + " + quotedTitle + " + '*') } | Select-Object -First 1; " +
+			"if ($w -eq $null) { Write-Output 'ERROR:no-window'; exit }; " +
+			"[System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$w.MainWindowHandle)"
+	}
+
+	var find string
+	if name != "" {
+		quotedName := encodePowerShellText(name)
+		find = "$cond = New-Object System.Windows.Automation.PropertyCondition(" +
+			"[System.Windows.Automation.AutomationElement]::NameProperty, " + quotedName + "); " +
+			"$el = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $cond); " +
+			"if ($el -eq $null) { Write-Output ('ERROR:not-found-name: " + quotedName + "'); exit }"
+	} else {
+		quotedID := encodePowerShellText(automationID)
+		find = "$cond = New-Object System.Windows.Automation.PropertyCondition(" +
+			"[System.Windows.Automation.AutomationElement]::AutomationIdProperty, " + quotedID + "); " +
+			"$el = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $cond); " +
+			"if ($el -eq $null) { Write-Output ('ERROR:not-found-id: " + quotedID + "'); exit }"
+	}
+
+	return windowsUIAddTypePreamble + "; " +
+		"$root = " + rootExpr + "; " +
+		"if ($root -eq $null) { Write-Output 'ERROR:no-window'; exit }; " +
+		find, nil
+}
+
+// buildWindowsControlClickScript 构造 windows.control.click 的 PowerShell 脚本。
+//
+// 定位控件后触发点击：优先 InvokePattern.Invoke()（按钮/链接等），
+// 否则 SelectionItemPattern.Select()（列表项/选项卡等）。
+// 成功输出 "OK:invoked" / "OK:selected"，失败输出 "ERROR:..."。
+func buildWindowsControlClickScript(windowID, title, name, automationID string) (string, error) {
+	prefix, err := buildWindowsControlFindPrefix(windowID, title, name, automationID)
+	if err != nil {
+		return "", err
+	}
+	action := "try { $p = $el.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern); " +
+		"$p.Invoke(); Write-Output 'OK:invoked' } catch { " +
+		"try { $s = $el.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern); " +
+		"$s.Select(); Write-Output 'OK:selected' } catch { " +
+		"Write-Output 'ERROR:no-pattern' } }"
+	return prefix + "; " + action, nil
+}
+
+// buildWindowsControlSetTextScript 构造 windows.control.set-text 的 PowerShell 脚本。
+//
+// 定位控件后用 ValuePattern.SetValue() 设置文本（文本框/编辑框等）。
+// text 经 encodePowerShellText 转义为单引号字面量。
+// 成功输出 "OK:value-set"，失败输出 "ERROR:..."。
+func buildWindowsControlSetTextScript(windowID, title, name, automationID, text string) (string, error) {
+	prefix, err := buildWindowsControlFindPrefix(windowID, title, name, automationID)
+	if err != nil {
+		return "", err
+	}
+	quotedText := encodePowerShellText(text)
+	action := "try { $v = $el.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern); " +
+		"$v.SetValue(" + quotedText + "); Write-Output 'OK:value-set' } catch { " +
+		"Write-Output ('ERROR:no-value-pattern: ' + $_.Exception.Message) }"
+	return prefix + "; " + action, nil
+}

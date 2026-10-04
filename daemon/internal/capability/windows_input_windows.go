@@ -236,6 +236,34 @@ func registerWindowsInput(reg *Registry) {
 		},
 		Handler: handleWindowsInputDrag,
 	})
+
+	_ = reg.Register(Capability{
+		Name: "windows.input.wheel",
+		Description: "滚动鼠标滚轮。" +
+			"通过 mouse_event 的 MOUSEEVENTF_WHEEL 发送滚轮滚动，" +
+			"delta 为正表示向上滚、为负表示向下滚（±120 为一格）。" +
+			"可选 x/y 先把光标移到指定位置再滚动。坐标以主屏左上角为原点（像素）。" +
+			"无需任何外部命令或第三方依赖。",
+		Platform: PlatformWindows,
+		Parameters: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"x": map[string]any{
+					"type":        "integer",
+					"description": "可选。滚动前把光标移动到的横坐标（像素）；缺省时在当前光标位置滚动。",
+				},
+				"y": map[string]any{
+					"type":        "integer",
+					"description": "可选。滚动前把光标移动到的纵坐标（像素）；缺省时在当前光标位置滚动。",
+				},
+				"delta": map[string]any{
+					"type":        "integer",
+					"description": "滚动量，正=向上、负=向下；±120 为一格。默认 120。",
+				},
+			},
+		},
+		Handler: handleWindowsInputWheel,
+	})
 }
 
 // handleWindowsInputClick 是 windows.input.click 的实现。
@@ -662,5 +690,53 @@ func handleWindowsInputDrag(params map[string]any) (any, error) {
 		"button": button,
 		"steps":  steps,
 		"tool":   windowsInputTool,
+	}, nil
+}
+
+// handleWindowsInputWheel 是 windows.input.wheel 的实现。
+func handleWindowsInputWheel(params map[string]any) (any, error) {
+	// x/y 可选：提供时先移动光标到该位置再滚动。
+	x, err := optionalInt(params, "x", 0)
+	if err != nil {
+		return nil, err
+	}
+	y, err := optionalInt(params, "y", 0)
+	if err != nil {
+		return nil, err
+	}
+	hasPos := false
+	if _, ok := params["x"]; ok {
+		hasPos = true
+	}
+	if _, ok := params["y"]; ok {
+		hasPos = true
+	}
+
+	delta, err := optionalInt(params, "delta", 120)
+	if err != nil {
+		return nil, err
+	}
+	if delta == 0 {
+		return nil, fmt.Errorf("参数 delta 不能为 0")
+	}
+
+	// 若提供了坐标，先移动光标（SetCursorPos 返回 0 表示失败）。
+	if hasPos {
+		if r, _, err := procSetCursorPos.Call(uintptr(x), uintptr(y)); r == 0 {
+			return nil, fmt.Errorf("移动光标到 (%d, %d) 失败: %v", x, y, err)
+		}
+	}
+
+	// MOUSEEVENTF_WHEEL(0x0800)：dwData 是 signed short，正=向上、负=向下。
+	// delta 可能超出 ±32767（一次滚很多格），按 16 位有符号截断即可，
+	// 因为 mouse_event 只接受一个 short 的滚动量。
+	const mouseEventfWheel = 0x0800
+	procMouseEvent.Call(uintptr(mouseEventfWheel), 0, 0, uintptr(int16(delta)), 0)
+
+	return map[string]any{
+		"x":     x,
+		"y":     y,
+		"delta": delta,
+		"tool":  windowsInputTool,
 	}, nil
 }

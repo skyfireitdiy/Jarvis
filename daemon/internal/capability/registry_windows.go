@@ -32,6 +32,7 @@ func registerPlatformCapabilities(reg *Registry) {
 	registerWindowsService(reg)
 	registerWindowsConfig(reg)
 	registerWindowsUI(reg)
+	registerWindowsWait(reg)
 	registerWindowsBrowserExt(reg)
 	// OCR 文字识别：逻辑跨平台共享（图片经网关识别），仅 Platform 字段不同
 	registerOcr(reg, PlatformWindows)
