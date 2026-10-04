@@ -55,6 +55,17 @@ class Tool:
             Dict[str, Any]: 工具执行结果
         """
         try:
+            # func 可能是两种签名风格：
+            #   1) 位置参数风格 func(arguments) —— 传统 Tool 用法
+            #   2) 关键字参数风格 func(**kwargs) —— 独立类工具的 execute 方法
+            #       （如 browser_ext_sessions / daemon_sessions 的 execute(self, **kwargs)）
+            # 优先以关键字参数调用，TypeError 时回退位置参数调用。
+            if isinstance(arguments, dict):
+                try:
+                    # func 可能是 **kwargs 风格，类型标注按位置参数，属误报
+                    return self.func(**arguments)  # ty: ignore[missing-argument]
+                except TypeError:
+                    return self.func(arguments)
             return self.func(arguments)
         except Exception as e:
             return {
