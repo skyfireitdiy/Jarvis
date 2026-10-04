@@ -12146,7 +12146,10 @@ function handleDirSearchKeydown(event) {
     } else if (selectedDirIndex.value === -1) {
       selectedDirIndex.value = maxIndex
     } else {
+      // 从第 0 项继续上移：回到「未选中」状态，必须同步清空 selectedDir，
+      // 否则 Enter 会因 selectedDir 残留旧值而误判为「确认当前选择」而非「进入目录」
       selectedDirIndex.value = -1
+      selectedDir.value = null
     }
     // 选中的目录同时设置为 selectedDir
     if (selectedDirIndex.value >= 0 && selectedDirIndex.value <= maxIndex) {
