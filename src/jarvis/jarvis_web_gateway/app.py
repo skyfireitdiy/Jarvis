@@ -9118,6 +9118,109 @@ def create_app(
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
+    async def _handle_git_patch_request(payload: Dict[str, Any]) -> Dict[str, Any]:
+        """为选中的一个或多个提交生成补丁（只读）。
+
+        单个提交返回 format-patch 生成的 .patch 文本；
+        多个提交把每个提交的 patch 打包成 .tar.gz（内存中），以 base64 返回。
+        """
+        import base64
+        import io
+        import re
+        import tarfile
+
+        try:
+            resolved = _resolve_git_repo_path(payload)
+            if not resolved.get("success"):
+                return resolved
+            repo_path = resolved["data"]["path"]
+
+            raw_commits = payload.get("commits")
+            if not isinstance(raw_commits, list) or not raw_commits:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_COMMITS",
+                        "message": "commits must be a non-empty list",
+                    },
+                }
+            commits = [str(c).strip() for c in raw_commits if str(c).strip()]
+            if not commits:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_COMMITS",
+                        "message": "commits must be a non-empty list",
+                    },
+                }
+
+            # 逐个提交生成 patch 文本（format-patch -1 <hash> --stdout）
+            patches = []  # [(filename, content)]
+            for index, commit_hash in enumerate(commits):
+                result = _run_git(
+                    ["format-patch", "-1", commit_hash, "--stdout"],
+                    repo_path,
+                )
+                if not result.get("success"):
+                    return result
+                patch_text = result["data"]["stdout"]
+                if not patch_text.strip():
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "COMMIT_NOT_FOUND",
+                            "message": f"Commit not found or has no patch: {commit_hash}",
+                        },
+                    }
+                # 从 patch 的 From 行提取 subject 作为文件名（去掉 [PATCH] 前缀与编号）
+                subject = ""
+                for line in patch_text.splitlines():
+                    if line.startswith("Subject:"):
+                        subject = line[len("Subject:") :].strip()
+                        break
+                # 规范化文件名：去 [PATCH n/m] 前缀、非法字符，取前 60 字符
+                clean = re.sub(r"^\[PATCH[^\]]*\]\s*", "", subject)
+                clean = re.sub(r"[^\w\u4e00-\u9fff.-]+", "-", clean).strip("-")
+                clean = clean[:60].strip("-") or "commit"
+                filename = f"{index + 1:04d}-{clean}.patch"
+                patches.append((filename, patch_text))
+
+            if len(patches) == 1:
+                filename, content = patches[0]
+                return {
+                    "success": True,
+                    "data": {
+                        "format": "patch",
+                        "filename": filename,
+                        "content": content,
+                    },
+                }
+
+            # 多个提交：打包成 tar.gz（内存），以 base64 返回
+            buffer = io.BytesIO()
+            with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
+                for filename, content in patches:
+                    data = content.encode("utf-8")
+                    info = tarfile.TarInfo(name=filename)
+                    info.size = len(data)
+                    info.mtime = 0
+                    tar.addfile(info, io.BytesIO(data))
+            encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+            return {
+                "success": True,
+                "data": {
+                    "format": "tar.gz",
+                    "filename": "commits-patches.tar.gz",
+                    "content_base64": encoded,
+                },
+            }
+        except Exception as e:  # noqa: BLE001
+            logger.exception("[GIT] git patch failed: %r", e)
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
     async def _handle_git_file_content_request(
         payload: Dict[str, Any],
     ) -> Dict[str, Any]:
@@ -9513,6 +9616,8 @@ def create_app(
             result = await _handle_git_branches_request(payload)
         elif normalized_method == "POST" and normalized_path == "/git/file-content":
             result = await _handle_git_file_content_request(payload)
+        elif normalized_method == "POST" and normalized_path == "/git/patch":
+            result = await _handle_git_patch_request(payload)
         elif normalized_method == "POST" and normalized_path == "/upload":
             # 权限校验：file:upload
             # 节点访问校验：仅在 master 上执行。
@@ -10121,6 +10226,18 @@ def create_app(
         if forwarded is not None:
             return forwarded
         return await _handle_git_file_content_request(payload)
+
+    @app.post("/api/git/patch", dependencies=[Depends(verify_token)])
+    async def git_patch(request: Dict[str, Any]) -> Dict[str, Any]:
+        """为选中的一个或多个提交生成补丁（只读）。"""
+        payload = dict(request or {})
+        node_id = str(payload.get("node_id") or "")
+        forwarded = await _forward_git_request_to_node(
+            node_id, "/api/git/patch", payload
+        )
+        if forwarded is not None:
+            return forwarded
+        return await _handle_git_patch_request(payload)
 
     # HTTP API：创建终端会话
     @app.post("/api/terminals", dependencies=[Depends(verify_token)])

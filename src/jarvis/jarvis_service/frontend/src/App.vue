@@ -567,7 +567,17 @@
                     <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.492 2.492 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25Zm-6 0a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Zm8.25-.75a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5ZM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z"/></svg>
                     <span class="workspace-git-branch-name">{{ gitCurrentBranch || '无分支' }}</span>
                   </span>
-                  <button class="icon-btn-small" @click="refreshGitView" :disabled="gitLogLoading" title="刷新">⟳</button>
+                  <div class="workspace-git-toolbar-actions">
+                    <template v-if="gitRangeSelectMode">
+                      <span class="workspace-git-range-count" :title="'已选 ' + gitSelectedCommits.size + ' 个提交'">已选 {{ gitSelectedCommits.size }}</span>
+                      <button class="icon-btn-small" @click="downloadGitPatch" :disabled="!gitSelectedCommits.size || gitPatchLoading" title="下载补丁（1 个为 .patch，多个为 .tar.gz）">⬇</button>
+                      <button class="icon-btn-small" @click="exitGitRangeSelect" title="退出范围选择">✕</button>
+                    </template>
+                    <template v-else>
+                      <button class="icon-btn-small" @click="enterGitRangeSelect" title="选择范围生成下载补丁">⬇</button>
+                      <button class="icon-btn-small" @click="refreshGitView" :disabled="gitLogLoading" title="刷新">⟳</button>
+                    </template>
+                  </div>
                 </div>
                 <div class="workspace-git-summary">
                   <span v-if="gitLogLoading && !gitLog.length">加载中...</span>
@@ -578,8 +588,8 @@
                   <template v-for="(commit, index) in gitLog" :key="commit.hash">
                     <div
                       class="workspace-git-commit"
-                      :class="{ selected: gitSelectedCommit === commit.hash }"
-                      @click="toggleGitCommitDetail(commit)"
+                      :class="{ selected: gitSelectedCommit === commit.hash, 'range-selected': gitRangeSelectMode && gitSelectedCommits.has(commit.hash) }"
+                      @click="gitRangeSelectMode ? toggleGitRangeSelect(commit) : toggleGitCommitDetail(commit)"
                       @contextmenu.prevent.stop="openGitCommitContextMenu(commit, $event)"
                     >
                       <div class="workspace-git-graph">
@@ -6217,6 +6227,9 @@ const gitBranches = ref([])            // 分支列表
 const gitTags = ref([])                // tag 列表
 const gitCurrentBranch = ref('')       // 当前分支
 const gitSelectedCommit = ref(null)    // 展开详情的提交 hash
+const gitRangeSelectMode = ref(false)  // 是否处于范围选择模式
+const gitSelectedCommits = ref(new Set()) // 范围选择模式下选中的提交 hash 集合
+const gitPatchLoading = ref(false)     // 下载补丁进行中
 const gitCommitFiles = ref([])         // 该提交的文件变更列表
 const gitCommitDetailLoading = ref(false)
 const gitSelectedFile = ref(null)      // 当前查看 diff 的文件路径
@@ -6363,6 +6376,75 @@ async function toggleGitCommitDetail(commit) {
     gitDiffError.value = error.message || '获取提交详情失败'
   } finally {
     gitCommitDetailLoading.value = false
+  }
+}
+
+// 进入范围选择模式：清空已选，退出详情展开
+function enterGitRangeSelect() {
+  gitRangeSelectMode.value = true
+  gitSelectedCommits.value = new Set()
+  gitSelectedCommit.value = null
+  gitCommitFiles.value = []
+  gitSelectedFile.value = null
+  gitDiffText.value = ''
+}
+
+// 退出范围选择模式
+function exitGitRangeSelect() {
+  gitRangeSelectMode.value = false
+  gitSelectedCommits.value = new Set()
+}
+
+// 范围选择模式下切换某提交的选中状态
+function toggleGitRangeSelect(commit) {
+  const set = gitSelectedCommits.value
+  if (set.has(commit.hash)) {
+    set.delete(commit.hash)
+  } else {
+    set.add(commit.hash)
+  }
+  // 触发响应式更新
+  gitSelectedCommits.value = new Set(set)
+}
+
+// 下载补丁：1 个 commit 为 .patch，多个为 .tar.gz
+async function downloadGitPatch() {
+  const workingDir = getGitWorkingDir()
+  if (!workingDir) return
+  const commits = Array.from(gitSelectedCommits.value)
+  if (!commits.length) {
+    showToast('请先选择至少一个提交', 'error')
+    return
+  }
+  gitPatchLoading.value = true
+  try {
+    const data = await callGitApi('git/patch', { path: workingDir, commits })
+    if (!data || !data.format || !data.filename) {
+      throw new Error('补丁数据无效')
+    }
+    let blob
+    if (data.format === 'tar.gz') {
+      // base64 → 二进制
+      const binary = atob(data.content_base64)
+      const bytes = new Uint8Array(binary.length)
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+      blob = new Blob([bytes], { type: 'application/gzip' })
+    } else {
+      blob = new Blob([data.content], { type: 'text/plain;charset=utf-8' })
+    }
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = data.filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    showToast(`已下载 ${data.filename}`, 'success')
+  } catch (error) {
+    showToast(error.message || '下载补丁失败', 'error')
+  } finally {
+    gitPatchLoading.value = false
   }
 }
 
@@ -21102,6 +21184,19 @@ body::-webkit-scrollbar {
   font-weight: 500;
 }
 
+.workspace-git-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.workspace-git-range-count {
+  font-size: 11px;
+  color: var(--text-secondary, #b0b0b0);
+  white-space: nowrap;
+  margin-right: 2px;
+}
+
 .workspace-git-summary {
   padding: 4px 8px;
   color: var(--text-secondary, #888);
@@ -21135,6 +21230,11 @@ body::-webkit-scrollbar {
 .workspace-git-commit.selected {
   background: rgba(255, 133, 32, 0.10);
   border-left-color: #ff8520;
+}
+
+.workspace-git-commit.range-selected {
+  background: rgba(66, 133, 244, 0.15);
+  border-left-color: #4285f4;
 }
 
 .workspace-git-graph {
