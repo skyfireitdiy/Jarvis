@@ -3781,13 +3781,14 @@ function clearGitCustomDir() {
   saveGitCustomDir()
   if (workspaceSidebarView.value === 'git') refreshGitView()
 }
-// Git 面板选择 Agent：清除自定义 Git 目录（回到按该 Agent 根目录管理）
+// Git 面板选择 Agent：清除自定义 Git 目录（回到按该 Agent 根目录管理），并刷新 Git 视图
 function onGitAgentChange(agentId) {
   gitAgentId.value = agentId
   if (gitCustomDir.value) {
     gitCustomDir.value = null
     saveGitCustomDir()
   }
+  if (workspaceSidebarView.value === 'git') refreshGitView()
 }
 // 切换目标节点：重新按新节点浏览目录
 async function onOpenDirNodeChange(nodeId) {
@@ -5025,11 +5026,11 @@ function setWorkspaceSidebarView(view) {
     return
   }
   if (view === 'git') {
-    // 切到 Git 视图时自动拉取提交历史与分支（仅首次或数据为空时）
+    // 切到 Git 视图时自动刷新提交历史与分支（每次切换都拉取最新，避免停留在旧数据）
     nextTick(() => {
       layoutMonacoEditor()
       layoutGitDiffEditor()
-      if (!gitLog.value.length && !gitLogLoading.value) {
+      if (!gitLogLoading.value) {
         refreshGitView()
       }
     })
