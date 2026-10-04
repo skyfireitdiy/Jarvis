@@ -1,0 +1,44 @@
+{
+  "timestamp": "2026-10-04T08:56:04.584443",
+  "mode": "use-real",
+  "model_used": "none",
+  "metrics": {
+    "total": 3,
+    "tp": 0,
+    "fp": 0,
+    "tn": 3,
+    "fn": 0,
+    "accuracy": 1.0,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1": 0.0,
+    "false_positive_rate": 0.0,
+    "false_negative_rate": 0.0
+  },
+  "predictions": [
+    {
+      "id": "RC-001",
+      "input": "给 utils.py 里的 parse_config 函数添加一个 timeout 参数，默认值为 30",
+      "category": "clear",
+      "label_vague": false,
+      "pred_vague": false,
+      "reason": "[heuristic] "
+    },
+    {
+      "id": "RC-002",
+      "input": "帮我修一下 login 接口的 bug，报错是空指针，日志在 logs/app.log",
+      "category": "clear",
+      "label_vague": false,
+      "pred_vague": false,
+      "reason": "[heuristic] "
+    },
+    {
+      "id": "RC-003",
+      "input": "把 README.md 里的安装步骤改成用 pip install 的方式",
+      "category": "clear",
+      "label_vague": false,
+      "pred_vague": false,
+      "reason": "[heuristic] "
+    }
+  ]
+}

@@ -1,0 +1,340 @@
+{
+  "timestamp": "2026-10-04T08:53:40.228977",
+  "mode": "use-real",
+  "model_used": "none",
+  "metrics": {
+    "total": 40,
+    "tp": 8,
+    "fp": 0,
+    "tn": 10,
+    "fn": 22,
+    "accuracy": 0.45,
+    "precision": 1.0,
+    "recall": 0.2667,
+    "f1": 0.4211,
+    "false_positive_rate": 0.0,
+    "false_negative_rate": 0.7333
+  },
+  "predictions": [
+    {
+      "id": "RC-001",
+      "input": "给 utils.py 里的 parse_config 函数添加一个 timeout 参数，默认值为 30",
+      "category": "clear",
+      "label_vague": false,
+      "pred_vague": false,
+      "reason": "[heuristic] "
+    },
+    {
+      "id": "RC-002",
+      "input": "帮我修一下 login 接口的 bug，报错是空指针，日志在 logs/app.log",
+      "category": "clear",
+      "label_vague": false,
+      "pred_vague": false,
+      "reason": "[heuristic] "
+    },
+    {
+      "id": "RC-003",
+      "input": "把 README.md 里的安装步骤改成用 pip install 的方式",
+      "category": "clear",
+      "label_vague": false,
+      "pred_vague": false,
+      "reason": "[heuristic] "
+    },
+    {
+      "id": "RC-004",
+      "input": "重构 src/models/user.py 的 User 类，把数据库操作抽到独立的 repository 层",
+      "category": "clear",
+      "label_vague": false,
+      "pred_vague": false,
+      "reason": "[heuristic] "
+    },
+    {
+      "id": "RC-005",
+      "input": "给 tests/ 目录补上 test_utils.py 的单元测试，覆盖正常和异常两种情况",
+      "category": "clear",
+      "label_vague": false,
+      "pred_vague": false,
+      "reason": "[heuristic] "
+    },
+    {
+      "id": "RC-006",
+      "input": "Refactor the Database class in db.py to use connection pooling",
+      "category": "clear",
+      "label_vague": false,
+      "pred_vague": false,
+      "reason": "[heuristic] "
+    },
+    {
+      "id": "RC-007",
+      "input": "帮我优化一下这个函数",
+      "category": "vague_goal",
+      "label_vague": true,
+      "pred_vague": false,
+      "reason": "[none] "
+    },
+    {
+      "id": "RC-008",
+      "input": "这个模块性能太差了，你想想办法",
+      "category": "vague_goal",
+      "label_vague": true,
+      "pred_vague": false,
+      "reason": "[none] "
+    },
+    {
+      "id": "RC-009",
+      "input": "把代码写得更好一点",
+      "category": "vague_goal",
+      "label_vague": true,
+      "pred_vague": false,
+      "reason": "[none] "
+    },
+    {
+      "id": "RC-010",
+      "input": "帮我提升一下这个接口的响应速度",
+      "category": "vague_goal",
+      "label_vague": true,
+      "pred_vague": false,
+      "reason": "[none] "
+    },
+    {
+      "id": "RC-011",
+      "input": "这个查询太慢了，帮我优化优化",
+      "category": "vague_goal",
+      "label_vague": true,
+      "pred_vague": false,
+      "reason": "[none] "
+    },
+    {
+      "id": "RC-012",
+      "input": "Improve the error handling in this project",
+      "category": "vague_goal",
+      "label_vague": true,
+      "pred_vague": false,
+      "reason": "[none] "
+    },
+    {
+      "id": "RC-013",
+      "input": "改一下那个函数",
+      "category": "missing_object",
+      "label_vague": true,
+      "pred_vague": true,
+      "reason": "[heuristic] 你的需求不够明确，能否补充更多细节？"
+    },
+    {
+      "id": "RC-014",
+      "input": "把这个文件里的内容改一下",
+      "category": "missing_object",
+      "label_vague": true,
+      "pred_vague": false,
+      "reason": "[none] "
+    },
+    {
+      "id": "RC-015",
+      "input": "帮我删掉那个变量",
+      "category": "missing_object",
+      "label_vague": true,
+      "pred_vague": false,
+      "reason": "[none] "
+    },
+    {
+      "id": "RC-016",
+      "input": "把那个类的方法抽出来",
+      "category": "missing_object",
+      "label_vague": true,
+      "pred_vague": false,
+      "reason": "[none] "
+    },
+    {
+      "id": "RC-017",
+      "input": "Fix the bug in that function",
+      "category": "missing_object",
+      "label_vague": true,
+      "pred_vague": false,
+      "reason": "[heuristic] "
+    },
+    {
+      "id": "RC-018",
+      "input": "看看这个报错是怎么回事",
+      "category": "missing_object",
+      "label_vague": true,
+      "pred_vague": false,
+      "reason": "[none] "
+    },
+    {
+      "id": "RC-019",
+      "input": "写个脚本",
+      "category": "missing_criteria",
+      "label_vague": true,
+      "pred_vague": true,
+      "reason": "[heuristic] 你的需求不够明确，能否补充更多细节？"
+    },
+    {
+      "id": "RC-020",
+      "input": "帮我写个自动化测试",
+      "category": "missing_criteria",
+      "label_vague": true,
+      "pred_vague": false,
+      "reason": "[heuristic] "
+    },
+    {
+      "id": "RC-021",
+      "input": "帮我生成一份接口文档",
+      "category": "missing_criteria",
+      "label_vague": true,
+      "pred_vague": false,
+      "reason": "[heuristic] "
+    },
+    {
+      "id": "RC-022",
+      "input": "把这个项目部署一下",
+      "category": "missing_criteria",
+      "label_vague": true,
+      "pred_vague": false,
+      "reason": "[none] "
+    },
+    {
+      "id": "RC-023",
+      "input": "帮我写个爬虫",
+      "category": "missing_criteria",
+      "label_vague": true,
+      "pred_vague": true,
+      "reason": "[heuristic] 你的需求不够明确，能否补充更多细节？"
+    },
+    {
+      "id": "RC-024",
+      "input": "Write a script to process the data",
+      "category": "missing_criteria",
+      "label_vague": true,
+      "pred_vague": false,
+      "reason": "[heuristic] "
+    },
+    {
+      "id": "RC-025",
+      "input": "看看这个",
+      "category": "ambiguous_word",
+      "label_vague": true,
+      "pred_vague": true,
+      "reason": "[heuristic] 你的需求不够明确，能否补充更多细节？"
+    },
+    {
+      "id": "RC-026",
+      "input": "那个东西有点问题，你处理一下",
+      "category": "ambiguous_word",
+      "label_vague": true,
+      "pred_vague": false,
+      "reason": "[none] "
+    },
+    {
+      "id": "RC-027",
+      "input": "帮我把它改好看一点",
+      "category": "ambiguous_word",
+      "label_vague": true,
+      "pred_vague": false,
+      "reason": "[none] "
+    },
+    {
+      "id": "RC-028",
+      "input": "这个方案你觉得怎么样",
+      "category": "ambiguous_word",
+      "label_vague": true,
+      "pred_vague": false,
+      "reason": "[none] "
+    },
+    {
+      "id": "RC-029",
+      "input": "Check this out",
+      "category": "ambiguous_word",
+      "label_vague": true,
+      "pred_vague": false,
+      "reason": "[none] "
+    },
+    {
+      "id": "RC-030",
+      "input": "这个接口怎么调用来着",
+      "category": "ambiguous_word",
+      "label_vague": true,
+      "pred_vague": false,
+      "reason": "[none] "
+    },
+    {
+      "id": "RC-031",
+      "input": "嗯，那个……你懂的",
+      "category": "unclear_intent",
+      "label_vague": true,
+      "pred_vague": true,
+      "reason": "[heuristic] 你的需求不够明确，能否补充更多细节？"
+    },
+    {
+      "id": "RC-032",
+      "input": "帮我看看，就是那个，之前说的那个",
+      "category": "unclear_intent",
+      "label_vague": true,
+      "pred_vague": false,
+      "reason": "[none] "
+    },
+    {
+      "id": "RC-033",
+      "input": "能不能……算了，没什么",
+      "category": "unclear_intent",
+      "label_vague": true,
+      "pred_vague": true,
+      "reason": "[heuristic] 你的需求不够明确，能否补充更多细节？"
+    },
+    {
+      "id": "RC-034",
+      "input": "哦对，还有个事，不过先不管了",
+      "category": "unclear_intent",
+      "label_vague": true,
+      "pred_vague": true,
+      "reason": "[heuristic] 你的需求不够明确，能否补充更多细节？"
+    },
+    {
+      "id": "RC-035",
+      "input": "Hmm, I was thinking about... never mind",
+      "category": "unclear_intent",
+      "label_vague": true,
+      "pred_vague": false,
+      "reason": "[heuristic] "
+    },
+    {
+      "id": "RC-036",
+      "input": "你随便帮我弄一下吧",
+      "category": "unclear_intent",
+      "label_vague": true,
+      "pred_vague": true,
+      "reason": "[heuristic] 你的需求不够明确，能否补充更多细节？"
+    },
+    {
+      "id": "RC-037",
+      "input": "把 config.py 里的 MAX_RETRIES 从 3 改成 5，然后跑一下测试确认没影响",
+      "category": "clear",
+      "label_vague": false,
+      "pred_vague": false,
+      "reason": "[heuristic] "
+    },
+    {
+      "id": "RC-038",
+      "input": "给 api/user.py 的 create_user 加参数校验，非法输入返回 400",
+      "category": "clear",
+      "label_vague": false,
+      "pred_vague": false,
+      "reason": "[heuristic] "
+    },
+    {
+      "id": "RC-039",
+      "input": "帮我看看这个函数为什么这么慢，把分析结果和优化建议写到 docs/perf.md",
+      "category": "clear",
+      "label_vague": false,
+      "pred_vague": false,
+      "reason": "[none] "
+    },
+    {
+      "id": "RC-040",
+      "input": "把 src/ 下所有文件里的 TODO 注释列出来，按文件分组输出",
+      "category": "clear",
+      "label_vague": false,
+      "pred_vague": false,
+      "reason": "[heuristic] "
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "timestamp": "2026-10-04T08:56:45.628578",
+  "mode": "use-mock",
+  "model_used": "cheap",
+  "metrics": {
+    "total": 5,
+    "tp": 0,
+    "fp": 0,
+    "tn": 5,
+    "fn": 0,
+    "accuracy": 1.0,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1": 0.0,
+    "false_positive_rate": 0.0,
+    "false_negative_rate": 0.0
+  },
+  "predictions": [
+    {
+      "id": "RC-001",
+      "input": "给 utils.py 里的 parse_config 函数添加一个 timeout 参数，默认值为 30",
+      "category": "clear",
+      "label_vague": false,
+      "pred_vague": false,
+      "reason": "对象、动作、参数名及默认值均明确，可直接执行"
+    },
+    {
+      "id": "RC-002",
+      "input": "帮我修一下 login 接口的 bug，报错是空指针，日志在 logs/app.log",
+      "category": "clear",
+      "label_vague": false,
+      "pred_vague": false,
+      "reason": "已提供对象(login接口)、动作(修复bug)、问题现象(空指针)、日志位置(logs/app.log)，关键信息齐全，可直接执行排查。"
+    },
+    {
+      "id": "RC-003",
+      "input": "把 README.md 里的安装步骤改成用 pip install 的方式",
+      "category": "clear",
+      "label_vague": false,
+      "pred_vague": false,
+      "reason": "对象（README.md里的安装步骤）、动作（改成pip install方式）、目标明确，可直接执行"
+    },
+    {
+      "id": "RC-004",
+      "input": "重构 src/models/user.py 的 User 类，把数据库操作抽到独立的 repository 层",
+      "category": "clear",
+      "label_vague": false,
+      "pred_vague": false,
+      "reason": "明确指定了重构对象（src/models/user.py 的 User 类）、动作（重构、抽离数据库操作）和目标（独立的 repository 层），关键信息齐全，可直接执行。"
+    },
+    {
+      "id": "RC-005",
+      "input": "给 tests/ 目录补上 test_utils.py 的单元测试，覆盖正常和异常两种情况",
+      "category": "clear",
+      "label_vague": false,
+      "pred_vague": false,
+      "reason": "对象（tests/目录、test_utils.py）、动作（补单元测试）、目标与验收标准（覆盖正常和异常两种情况）均明确，可直接执行"
+    }
+  ]
+}
