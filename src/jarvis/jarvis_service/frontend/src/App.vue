@@ -1480,11 +1480,7 @@
       <div class="diff-modal git-commit-info-modal">
         <div class="diff-modal-header">
           <h3>Commit 信息</h3>
-          <div class="diff-modal-header-actions">
-            <button class="icon-btn" @click="copyGitCommitId(gitCommitInfoModal)" title="复制 commit ID">复制 ID</button>
-            <button class="icon-btn" @click="copyGitCommit(gitCommitInfoModal)" title="复制完整 commit 信息">复制</button>
-            <button class="icon-btn" @click="gitCommitInfoModal = null" title="关闭">✕</button>
-          </div>
+          <button class="icon-btn" @click="gitCommitInfoModal = null" title="关闭">✕</button>
         </div>
         <div class="diff-modal-content">
           <pre class="git-commit-info-pre">{{ formatGitCommitInfo(gitCommitInfoModal) }}</pre>
