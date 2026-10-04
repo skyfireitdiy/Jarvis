@@ -574,7 +574,8 @@
                       <button class="icon-btn-small" @click="exitGitRangeSelect" title="退出范围选择">✕</button>
                     </template>
                     <template v-else>
-                      <button class="icon-btn-small" @click="enterGitRangeSelect" title="选择范围生成下载补丁">⬇</button>
+                      <button class="icon-btn-small" @click="viewGitTargetDiff" title="查看变更（当前 Git 目标 Agent 的 diff）">⇄</button>
+                      <button class="icon-btn-small" @click="enterGitRangeSelect" title="选择范围生成下载补丁">☑</button>
                       <button class="icon-btn-small" @click="refreshGitView" :disabled="gitLogLoading" title="刷新">⟳</button>
                     </template>
                   </div>
@@ -6446,6 +6447,16 @@ async function downloadGitPatch() {
   } finally {
     gitPatchLoading.value = false
   }
+}
+
+// 在 Git 侧边栏查看当前 Git 目标 Agent 的变更（打开 diff 浮动窗口）
+function viewGitTargetDiff() {
+  const agent = getGitTargetAgent()
+  if (!agent) {
+    showToast('请先选择 Git 目标 Agent', 'error')
+    return
+  }
+  viewDiff(agent)
 }
 
 // 查看某文件在某提交中的 diff
