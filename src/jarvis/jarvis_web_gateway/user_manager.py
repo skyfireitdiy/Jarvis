@@ -56,16 +56,21 @@ class UserManager:
             if user.get("is_admin"):
                 return
         admin_password = os.environ.get("JARVIS_ADMIN_PASSWORD")
+        must_change_password = False
         if not admin_password:
-            admin_password = uuid.uuid4().hex[:16]
+            # 未显式设置初始密码时，admin 初始为无密码状态：首次可无密码登录，
+            # 登录后强制设置密码，避免随机密码既无法告知用户又造成凭据泄露。
+            must_change_password = True
             logger.warning(
-                f"No JARVIS_ADMIN_PASSWORD set, generated random admin password: {admin_password}"
+                "No JARVIS_ADMIN_PASSWORD set; admin starts with no password. "
+                "Log in with empty password and set one on first login."
             )
         self.create_user(
             username="admin",
-            password=admin_password,
+            password=admin_password or "",
             display_name="Administrator",
             is_admin=True,
+            must_change_password=must_change_password,
         )
 
     def _hash_password(self, password: str) -> str:
@@ -84,11 +89,16 @@ class UserManager:
     def create_user(
         self,
         username: str,
-        password: str,
+        password: str = "",
         display_name: Optional[str] = None,
         is_admin: bool = False,
+        must_change_password: bool = False,
     ) -> dict:
-        """创建用户，验证用户名唯一性，bcrypt哈希密码"""
+        """创建用户，验证用户名唯一性，bcrypt哈希密码。
+
+        ``password`` 为空表示创建无密码用户（password_hash 置空），此类用户
+        允许空密码登录，并应通过 ``must_change_password=True`` 要求首次设置密码。
+        """
         if not USERNAME_PATTERN.match(username):
             raise ValueError(
                 "Username must be 3-32 chars, only letters, digits, underscore"
@@ -101,7 +111,7 @@ class UserManager:
         user = {
             "user_id": user_id,
             "username": username,
-            "password_hash": self._hash_password(password),
+            "password_hash": self._hash_password(password) if password else "",
             "display_name": display_name or username,
             "is_admin": is_admin,
             "status": "active",
@@ -110,6 +120,7 @@ class UserManager:
             "last_login_at": None,
             "locked_reason": None,
             "login_fail_count": 0,
+            "must_change_password": must_change_password,
         }
         self._users[user_id] = user
         self._save_data()
@@ -117,7 +128,11 @@ class UserManager:
         return self._sanitize_user(user)
 
     def authenticate(self, username: str, password: str) -> Optional[dict]:
-        """验证用户名密码，处理登录失败计数和锁定"""
+        """验证用户名密码，处理登录失败计数和锁定。
+
+        无密码用户（password_hash 为空，如初始 admin）允许以空密码登录，
+        登录后应通过 must_change_password 标记强制设置密码。
+        """
         user = None
         for u in self._users.values():
             if u.get("username") == username:
@@ -127,7 +142,14 @@ class UserManager:
             return None
         if user.get("status") == "locked":
             return None
-        if not self._verify_password(password, user.get("password_hash", "")):
+        password_hash = user.get("password_hash", "") or ""
+        if not password_hash:
+            # 无密码用户：仅允许空密码登录
+            if password:
+                user["login_fail_count"] = user.get("login_fail_count", 0) + 1
+                self._save_data()
+                return None
+        elif not self._verify_password(password, password_hash):
             user["login_fail_count"] = user.get("login_fail_count", 0) + 1
             self._save_data()
             return None
@@ -180,13 +202,20 @@ class UserManager:
     def change_password(
         self, user_id: str, old_password: str, new_password: str
     ) -> bool:
-        """用户自助改密，需验证旧密码"""
+        """用户自助改密，需验证旧密码。
+
+        当用户被标记为 ``must_change_password``（初始无密码 admin 或随机密码）
+        时，跳过旧密码验证——用户可能并不知道旧密码，改密成功后清除该标记。
+        """
         user = self._users.get(user_id)
         if user is None:
             return False
-        if not self._verify_password(old_password, user.get("password_hash", "")):
+        if not user.get("must_change_password") and not self._verify_password(
+            old_password, user.get("password_hash", "")
+        ):
             return False
         user["password_hash"] = self._hash_password(new_password)
+        user["must_change_password"] = False
         user["updated_at"] = datetime.now(timezone.utc).isoformat()
         self._save_data()
         return True

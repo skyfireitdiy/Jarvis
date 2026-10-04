@@ -28,6 +28,8 @@ BUILTIN_GROUPS = {
             "agent:create": "allow",
             "agent:delete": "allow",
             "terminal:*": "allow",
+            "file:read": "allow",
+            "file:write": "allow",
             "file:upload": "allow",
             "timer:*": "allow",
             "admin:config": "allow",
@@ -42,6 +44,8 @@ BUILTIN_GROUPS = {
             "agent:create": "allow",
             "agent:delete": "allow",
             "terminal:*": "allow",
+            "file:read": "allow",
+            "file:write": "allow",
             "file:upload": "allow",
         },
         "accessible_nodes": [],
@@ -50,7 +54,9 @@ BUILTIN_GROUPS = {
         "display_name": "Viewer",
         "description": "Read-only access",
         "is_builtin": True,
-        "permissions": {},
+        "permissions": {
+            "file:read": "allow",
+        },
         "accessible_nodes": [],
     },
 }

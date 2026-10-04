@@ -10,6 +10,7 @@ import asyncio
 from collections import deque
 from contextlib import asynccontextmanager
 import io
+import ipaddress
 import json
 from queue import Empty
 from queue import Queue
@@ -18,6 +19,7 @@ import os
 import pathlib
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import threading
@@ -389,6 +391,57 @@ GLOBAL_SEARCH_MAX_LINE_LENGTH = 2000
 GLOBAL_SEARCH_MAX_GLOB_LENGTH = 500
 FILE_SEARCH_DEFAULT_MAX_RESULTS = 200
 FILE_SEARCH_MAX_RESULTS_LIMIT = 1000
+
+
+def _is_safe_proxy_url(target_url: str) -> Tuple[bool, str]:
+    """校验 http_proxy 代理目标 URL 是否安全（防止 SSRF）。
+
+    禁止代理到内网/环回/链路本地/保留地址，仅允许外部公网地址。
+    返回 (是否安全, 错误信息)。
+    """
+    from urllib.parse import urlparse
+
+    def _check_ip(ip_str: str) -> Tuple[bool, str]:
+        try:
+            ip = ipaddress.ip_address(ip_str)
+        except ValueError:
+            return False, f"无法解析 IP: {ip_str}"
+        if ip.is_loopback:
+            return False, f"禁止代理到环回地址: {ip_str}"
+        if ip.is_link_local:
+            return False, f"禁止代理到链路本地地址: {ip_str}"
+        if ip.is_private:
+            return False, f"禁止代理到内网地址: {ip_str}"
+        if ip.is_reserved or ip.is_multicast:
+            return False, f"禁止代理到保留/组播地址: {ip_str}"
+        return True, ""
+
+    try:
+        parsed = urlparse(target_url)
+        host = parsed.hostname
+        if not host:
+            return False, "URL 缺少主机名"
+        # 环回 / 本机
+        if host.lower() in ("localhost", "localhost.localdomain"):
+            return False, f"禁止代理到本机地址: {host}"
+        # 直接是 IP
+        try:
+            ipaddress.ip_address(host)
+        except ValueError:
+            # 非 IP，尝试解析 DNS 并逐一校验解析结果
+            try:
+                infos = socket.getaddrinfo(host, None)
+            except socket.gaierror:
+                return False, f"无法解析主机: {host}"
+            resolved = {str(info[4][0]) for info in infos}
+            for addr in resolved:
+                ok, msg = _check_ip(addr)
+                if not ok:
+                    return False, f"目标解析到内网地址 {addr}: {msg}"
+            return True, ""
+        return _check_ip(host)
+    except Exception as e:  # noqa: BLE001
+        return False, f"URL 校验失败: {str(e)}"
 
 
 def _fuzzy_match_score(query: str, target: str) -> Optional[int]:
@@ -2124,6 +2177,35 @@ def create_app(
         """
         from fastapi import HTTPException
 
+        def _enforce_password_change(user_info: Dict[str, Any]) -> None:
+            """强制改密拦截：无密码（must_change_password）用户除白名单外禁止一切操作。
+
+            白名单：/api/auth/me、/api/auth/logout、/api/users/{user_id}/change-password。
+            system 用户（网关内部）不受此限制。
+            """
+            user_id = user_info.get("user_id", "")
+            if not user_id or user_id == "system":
+                return
+            full_user = user_manager.get_user(user_id)
+            if full_user and full_user.get("must_change_password"):
+                path = request.url.path
+                allowed = (
+                    path == "/api/auth/me"
+                    or path == "/api/auth/logout"
+                    or (
+                        path.startswith("/api/users/")
+                        and path.endswith("/change-password")
+                    )
+                )
+                if not allowed:
+                    raise HTTPException(
+                        status_code=403,
+                        detail={
+                            "code": "FORCE_PASSWORD_CHANGE",
+                            "message": "You must set a password before using Jarvis",
+                        },
+                    )
+
         # 尝试从 X-Jarvis-Token 头提取 Token（优先）
         jarvis_token = request.headers.get("X-Jarvis-Token")
         if jarvis_token:
@@ -2136,6 +2218,7 @@ def create_app(
                         "message": "Invalid or expired X-Jarvis-Token",
                     },
                 )
+            _enforce_password_change(user_info)
             request.state.user_info = user_info
             return user_info
 
@@ -2169,6 +2252,7 @@ def create_app(
                 status_code=401,
                 detail={"code": "INVALID_TOKEN", "message": "Invalid or expired token"},
             )
+        _enforce_password_change(user_info)
         request.state.user_info = user_info
         return user_info
 
@@ -2176,8 +2260,33 @@ def create_app(
         """验证 Agent HTTP 代理访问权限。
 
         必须携带有效 Bearer Token（或已登录会话），与 WS 代理端点保持一致。
+        非 owner 且非 admin 用户需在目标 agent 的 access_acl.read 中才有权访问。
         """
-        verify_token(request)
+        from fastapi import HTTPException
+
+        user_info = verify_token(request)
+        user_id = user_info.get("user_id", "")
+        if user_id and user_id != "system":
+            is_admin = user_info.get("is_admin", False)
+            if not is_admin:
+                agent_id = str(request.path_params.get("agent_id") or "").strip()
+                if agent_id:
+                    agent_info = agent_manager.get_agent(agent_id)
+                    if (
+                        agent_info
+                        and agent_info.owner_id
+                        and agent_info.owner_id != user_id
+                    ):
+                        access_acl = agent_info.access_acl or {}
+                        has_read = user_id in (access_acl.get("read") or [])
+                        if not has_read:
+                            raise HTTPException(
+                                status_code=403,
+                                detail={
+                                    "code": "PERMISSION_DENIED",
+                                    "message": "No read access to this agent",
+                                },
+                            )
 
     # HTTP API：登录接口
     @app.post("/api/auth/login")
@@ -2188,12 +2297,12 @@ def create_app(
             username = str(body.get("username", "")).strip()
             password = str(body.get("password", "")).strip()
 
-            if not username or not password:
+            if not username:
                 return {
                     "success": False,
                     "error": {
                         "code": "MISSING_CREDENTIALS",
-                        "message": "username and password are required",
+                        "message": "username is required",
                     },
                 }
 
@@ -2216,6 +2325,9 @@ def create_app(
                             "username": user["username"],
                             "display_name": user.get("display_name", ""),
                             "is_admin": user.get("is_admin", False),
+                            "must_change_password": user.get(
+                                "must_change_password", False
+                            ),
                         },
                     },
                 }
@@ -3171,7 +3283,18 @@ def create_app(
             )
         old_password = str(body.get("old_password", "")).strip()
         new_password = str(body.get("new_password", "")).strip()
-        if not old_password or not new_password:
+        if not new_password:
+            return {
+                "success": False,
+                "error": {
+                    "code": "INVALID_INPUT",
+                    "message": "new_password is required",
+                },
+            }
+        # 首次登录强制改密（初始随机密码）时，用户可能不知道旧密码，无需提供
+        user = user_manager.get_user(user_id)
+        must_change = bool(user and user.get("must_change_password"))
+        if not must_change and not old_password:
             return {
                 "success": False,
                 "error": {
@@ -4406,6 +4529,22 @@ def create_app(
                     if not full_url.startswith(("http://", "https://")):
                         return Response(
                             content='{"error": "URL must start with http:// or https://"}',
+                            status_code=400,
+                            media_type="application/json",
+                        )
+
+                    # SSRF 防护：禁止代理到内网/环回/链路本地地址
+                    safe, safe_msg = _is_safe_proxy_url(full_url)
+                    if not safe:
+                        logger.error(
+                            f"[HTTP PROXY] 目标 URL 不安全：{full_url} ({safe_msg})"
+                        )
+                        return Response(
+                            content=json.dumps(
+                                {
+                                    "error": f"Proxying to this URL is not allowed: {safe_msg}"
+                                }
+                            ),
                             status_code=400,
                             media_type="application/json",
                         )
@@ -9521,6 +9660,25 @@ def create_app(
                 "error": {"code": "INTERNAL_ERROR", "message": repr(e)},
             }
 
+    def _check_file_permission(
+        user_info: Optional[Dict[str, Any]], permission: str
+    ) -> Optional[Dict[str, Any]]:
+        """校验文件/数据操作权限（参照 /upload 的校验模式）。
+
+        返回 None 表示通过；否则返回 403 错误响应 dict。
+        system 用户直接放行；admin 用户由 permission_manager.check_permission 内部处理。
+        """
+        user_id = user_info.get("user_id", "") if user_info else ""
+        if user_id and user_id != "system":
+            if not permission_manager.check_permission(user_id, permission):
+                return {
+                    "success": False,
+                    "status_code": 403,
+                    "headers": {"content-type": "application/json"},
+                    "body": json.dumps({"error": f"Permission denied: {permission}"}),
+                }
+        return None
+
     async def _dispatch_node_http_request(
         method: str,
         path: str,
@@ -9587,6 +9745,38 @@ def create_app(
                     "headers": {"content-type": "application/json"},
                     "body": json.dumps({"error": "invalid JSON body"}),
                 }
+
+        # --- 文件/数据操作权限校验（master 统一把关，参照 /upload 模式） ---
+        # 子节点本地无 auth 数据，无法独立判定；跨节点请求的权限已由 master 在
+        # 转发前统一把关，故子节点信任 master 的判定，不再重复校验。
+        _file_perm_map = {
+            "/file-content": "file:read",
+            "/file-stat": "file:read",
+            "/file-write": "file:write",
+            "/file-upload": "file:upload",
+            "/file-create": "file:write",
+            "/file-delete": "file:write",
+            "/file-rename": "file:write",
+            "/directories": "file:read",
+            "/parse-orchestration": "file:read",
+            "/git/log": "file:read",
+            "/git/commit-detail": "file:read",
+            "/git/diff": "file:read",
+            "/git/branches": "file:read",
+            "/git/file-content": "file:read",
+            "/git/patch": "file:read",
+        }
+        _required_perm = _file_perm_map.get(normalized_path)
+        if normalized_path.startswith("/data/"):
+            _required_perm = (
+                "file:write" if normalized_method in ("POST", "DELETE") else "file:read"
+            )
+        if node_config.is_master and _required_perm:
+            _perm_resp = _check_file_permission(
+                _mock_req.state.user_info, _required_perm
+            )
+            if _perm_resp:
+                return _perm_resp
 
         if normalized_method == "GET" and normalized_path == "/directories":
             result = await _handle_directories_request(payload)
@@ -9825,6 +10015,19 @@ def create_app(
                         {"error": "URL must start with http:// or https://"}
                     ),
                 }
+            safe, safe_msg = _is_safe_proxy_url(target_url)
+            if not safe:
+                logger.error(
+                    f"[REMOTE HTTP PROXY] 目标 URL 不安全：{target_url} ({safe_msg})"
+                )
+                return {
+                    "success": False,
+                    "status_code": 400,
+                    "headers": {"content-type": "application/json"},
+                    "body": json.dumps(
+                        {"error": f"Proxying to this URL is not allowed: {safe_msg}"}
+                    ),
+                }
             if query:
                 target_url = f"{target_url}?{query}"
             logger.info(f"[REMOTE HTTP PROXY] 发起请求：{target_url}")
@@ -9896,56 +10099,104 @@ def create_app(
         }
 
     @app.post("/api/file-content", dependencies=[Depends(verify_token)])
-    async def get_file_content(request: Dict[str, Any]) -> Dict[str, Any]:
+    async def get_file_content(
+        request: Request, body: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """读取指定绝对路径文件的内容。"""
-        return await _handle_file_content_request(request)
+        from fastapi import HTTPException
+
+        if _check_file_permission(request.state.user_info, "file:read"):
+            raise HTTPException(status_code=403, detail="Permission denied: file:read")
+        return await _handle_file_content_request(body)
 
     @app.post("/api/file-stat", dependencies=[Depends(verify_token)])
-    async def get_file_stat(request: Dict[str, Any]) -> Dict[str, Any]:
+    async def get_file_stat(request: Request, body: Dict[str, Any]) -> Dict[str, Any]:
         """读取指定绝对路径文件的元信息。"""
-        return await _handle_file_stat_request(request)
+        from fastapi import HTTPException
+
+        if _check_file_permission(request.state.user_info, "file:read"):
+            raise HTTPException(status_code=403, detail="Permission denied: file:read")
+        return await _handle_file_stat_request(body)
 
     @app.post("/api/file-write", dependencies=[Depends(verify_token)])
-    async def write_file_content(request: Dict[str, Any]) -> Dict[str, Any]:
+    async def write_file_content(
+        request: Request, body: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """写入指定绝对路径文本文件的内容。"""
-        return await _handle_file_write_request(request)
+        from fastapi import HTTPException
+
+        if _check_file_permission(request.state.user_info, "file:write"):
+            raise HTTPException(status_code=403, detail="Permission denied: file:write")
+        return await _handle_file_write_request(body)
 
     @app.post("/api/file-upload", dependencies=[Depends(verify_token)])
-    async def upload_file_raw(request: Dict[str, Any]) -> Dict[str, Any]:
+    async def upload_file_raw(request: Request, body: Dict[str, Any]) -> Dict[str, Any]:
         """把 base64 编码的文件内容按原文件名写入指定绝对路径。"""
-        return await _handle_file_upload_raw_request(request)
+        from fastapi import HTTPException
+
+        if _check_file_permission(request.state.user_info, "file:upload"):
+            raise HTTPException(
+                status_code=403, detail="Permission denied: file:upload"
+            )
+        return await _handle_file_upload_raw_request(body)
 
     @app.post("/api/file-create", dependencies=[Depends(verify_token)])
-    async def create_file_or_directory(request: Dict[str, Any]) -> Dict[str, Any]:
+    async def create_file_or_directory(
+        request: Request, body: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """创建指定绝对路径的文件或目录（不覆盖已存在路径）。"""
-        return await _handle_file_create_request(request)
+        from fastapi import HTTPException
+
+        if _check_file_permission(request.state.user_info, "file:write"):
+            raise HTTPException(status_code=403, detail="Permission denied: file:write")
+        return await _handle_file_create_request(body)
 
     @app.post("/api/file-delete", dependencies=[Depends(verify_token)])
-    async def delete_file_or_directory(request: Dict[str, Any]) -> Dict[str, Any]:
+    async def delete_file_or_directory(
+        request: Request, body: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """删除指定绝对路径的文件或目录（目录需 recursive 才可递归删除）。"""
-        return await _handle_file_delete_request(request)
+        from fastapi import HTTPException
+
+        if _check_file_permission(request.state.user_info, "file:write"):
+            raise HTTPException(status_code=403, detail="Permission denied: file:write")
+        return await _handle_file_delete_request(body)
 
     @app.post("/api/file-rename", dependencies=[Depends(verify_token)])
-    async def rename_file_or_directory(request: Dict[str, Any]) -> Dict[str, Any]:
+    async def rename_file_or_directory(
+        request: Request, body: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """重命名/移动指定绝对路径的文件或目录（不覆盖已存在路径）。"""
-        return await _handle_file_rename_request(request)
+        from fastapi import HTTPException
+
+        if _check_file_permission(request.state.user_info, "file:write"):
+            raise HTTPException(status_code=403, detail="Permission denied: file:write")
+        return await _handle_file_rename_request(body)
 
     @app.post("/api/data/{key}", dependencies=[Depends(verify_token)])
-    async def save_data_api(key: str, request: Dict[str, Any]) -> Dict[str, Any]:
+    async def save_data_api(
+        key: str, request: Request, body: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """保存数据到存储。"""
+        from fastapi import HTTPException
         from jarvis.jarvis_web_gateway.data_storage import save_data
 
-        success, error = save_data(key, request)
+        if _check_file_permission(request.state.user_info, "file:write"):
+            raise HTTPException(status_code=403, detail="Permission denied: file:write")
+        success, error = save_data(key, body)
         if success:
             return {"success": True, "message": "Data saved successfully"}
         else:
             return {"success": False, "error": error}
 
     @app.get("/api/data/{key}", dependencies=[Depends(verify_token)])
-    async def load_data_api(key: str) -> Dict[str, Any]:
+    async def load_data_api(key: str, request: Request) -> Dict[str, Any]:
         """从存储中读取数据。"""
+        from fastapi import HTTPException
         from jarvis.jarvis_web_gateway.data_storage import load_data
 
+        if _check_file_permission(request.state.user_info, "file:read"):
+            raise HTTPException(status_code=403, detail="Permission denied: file:read")
         success, data, error = load_data(key)
         if success:
             return {"success": True, "data": data}
@@ -9953,10 +10204,13 @@ def create_app(
             return {"success": False, "error": error}
 
     @app.delete("/api/data/{key}", dependencies=[Depends(verify_token)])
-    async def delete_data_api(key: str) -> Dict[str, Any]:
+    async def delete_data_api(key: str, request: Request) -> Dict[str, Any]:
         """从存储中删除数据。"""
+        from fastapi import HTTPException
         from jarvis.jarvis_web_gateway.data_storage import delete_data
 
+        if _check_file_permission(request.state.user_info, "file:write"):
+            raise HTTPException(status_code=403, detail="Permission denied: file:write")
         success, error = delete_data(key)
         if success:
             return {"success": True, "message": "Data deleted successfully"}
@@ -9964,8 +10218,14 @@ def create_app(
             return {"success": False, "error": error}
 
     @app.get("/api/directories", dependencies=[Depends(verify_token)])
-    async def list_directories(path: str = "", node_id: str = "") -> Dict[str, Any]:
+    async def list_directories(
+        request: Request, path: str = "", node_id: str = ""
+    ) -> Dict[str, Any]:
         """获取指定路径下的目录列表。"""
+        from fastapi import HTTPException
+
+        if _check_file_permission(request.state.user_info, "file:read"):
+            raise HTTPException(status_code=403, detail="Permission denied: file:read")
         try:
             resolved_node_id = str(node_id or "").strip()
             target_node_id = resolved_node_id or node_runtime.local_node_id
@@ -10045,14 +10305,20 @@ def create_app(
             }
 
     @app.post("/api/parse-orchestration", dependencies=[Depends(verify_token)])
-    async def parse_orchestration(request: Dict[str, Any]) -> Dict[str, Any]:
+    async def parse_orchestration(
+        request: Request, body: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """读取并解析指定路径的编排 YAML 文件，返回其中的 agents 列表。
 
         支持跨节点：node_id 非本地时转发到目标节点执行。
         """
+        from fastapi import HTTPException
+
+        if _check_file_permission(request.state.user_info, "file:read"):
+            raise HTTPException(status_code=403, detail="Permission denied: file:read")
         try:
-            path = str(request.get("path") or "").strip()
-            resolved_node_id = str(request.get("node_id") or "").strip()
+            path = str(body.get("path") or "").strip()
+            resolved_node_id = str(body.get("node_id") or "").strip()
             target_node_id = resolved_node_id or node_runtime.local_node_id
 
             if target_node_id not in (node_runtime.local_node_id, "master"):
@@ -10170,9 +10436,13 @@ def create_app(
         }
 
     @app.post("/api/git/log", dependencies=[Depends(verify_token)])
-    async def git_log(request: Dict[str, Any]) -> Dict[str, Any]:
+    async def git_log(request: Request, body: Dict[str, Any]) -> Dict[str, Any]:
         """获取提交历史列表（只读）。"""
-        payload = dict(request or {})
+        from fastapi import HTTPException
+
+        if _check_file_permission(request.state.user_info, "file:read"):
+            raise HTTPException(status_code=403, detail="Permission denied: file:read")
+        payload = dict(body or {})
         node_id = str(payload.get("node_id") or "")
         forwarded = await _forward_git_request_to_node(node_id, "/api/git/log", payload)
         if forwarded is not None:
@@ -10180,9 +10450,15 @@ def create_app(
         return await _handle_git_log_request(payload)
 
     @app.post("/api/git/commit-detail", dependencies=[Depends(verify_token)])
-    async def git_commit_detail(request: Dict[str, Any]) -> Dict[str, Any]:
+    async def git_commit_detail(
+        request: Request, body: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """获取某次提交的元信息与文件变更列表（只读）。"""
-        payload = dict(request or {})
+        from fastapi import HTTPException
+
+        if _check_file_permission(request.state.user_info, "file:read"):
+            raise HTTPException(status_code=403, detail="Permission denied: file:read")
+        payload = dict(body or {})
         node_id = str(payload.get("node_id") or "")
         forwarded = await _forward_git_request_to_node(
             node_id, "/api/git/commit-detail", payload
@@ -10192,9 +10468,13 @@ def create_app(
         return await _handle_git_commit_detail_request(payload)
 
     @app.post("/api/git/diff", dependencies=[Depends(verify_token)])
-    async def git_diff(request: Dict[str, Any]) -> Dict[str, Any]:
+    async def git_diff(request: Request, body: Dict[str, Any]) -> Dict[str, Any]:
         """获取某文件在某次提交中的 diff 文本（只读）。"""
-        payload = dict(request or {})
+        from fastapi import HTTPException
+
+        if _check_file_permission(request.state.user_info, "file:read"):
+            raise HTTPException(status_code=403, detail="Permission denied: file:read")
+        payload = dict(body or {})
         node_id = str(payload.get("node_id") or "")
         forwarded = await _forward_git_request_to_node(
             node_id, "/api/git/diff", payload
@@ -10204,9 +10484,13 @@ def create_app(
         return await _handle_git_diff_request(payload)
 
     @app.post("/api/git/branches", dependencies=[Depends(verify_token)])
-    async def git_branches(request: Dict[str, Any]) -> Dict[str, Any]:
+    async def git_branches(request: Request, body: Dict[str, Any]) -> Dict[str, Any]:
         """获取分支与 tag 列表（只读）。"""
-        payload = dict(request or {})
+        from fastapi import HTTPException
+
+        if _check_file_permission(request.state.user_info, "file:read"):
+            raise HTTPException(status_code=403, detail="Permission denied: file:read")
+        payload = dict(body or {})
         node_id = str(payload.get("node_id") or "")
         forwarded = await _forward_git_request_to_node(
             node_id, "/api/git/branches", payload
@@ -10216,9 +10500,15 @@ def create_app(
         return await _handle_git_branches_request(payload)
 
     @app.post("/api/git/file-content", dependencies=[Depends(verify_token)])
-    async def git_file_content(request: Dict[str, Any]) -> Dict[str, Any]:
+    async def git_file_content(
+        request: Request, body: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """获取某文件在指定提交/revision 中的完整内容（只读）。"""
-        payload = dict(request or {})
+        from fastapi import HTTPException
+
+        if _check_file_permission(request.state.user_info, "file:read"):
+            raise HTTPException(status_code=403, detail="Permission denied: file:read")
+        payload = dict(body or {})
         node_id = str(payload.get("node_id") or "")
         forwarded = await _forward_git_request_to_node(
             node_id, "/api/git/file-content", payload
@@ -10228,9 +10518,13 @@ def create_app(
         return await _handle_git_file_content_request(payload)
 
     @app.post("/api/git/patch", dependencies=[Depends(verify_token)])
-    async def git_patch(request: Dict[str, Any]) -> Dict[str, Any]:
+    async def git_patch(request: Request, body: Dict[str, Any]) -> Dict[str, Any]:
         """为选中的一个或多个提交生成补丁（只读）。"""
-        payload = dict(request or {})
+        from fastapi import HTTPException
+
+        if _check_file_permission(request.state.user_info, "file:read"):
+            raise HTTPException(status_code=403, detail="Permission denied: file:read")
+        payload = dict(body or {})
         node_id = str(payload.get("node_id") or "")
         forwarded = await _forward_git_request_to_node(
             node_id, "/api/git/patch", payload
