@@ -1464,7 +1464,14 @@
         @click="copyGitCommit(gitCommitContextMenu.commit)"
       >
         <span class="file-tree-context-icon" v-html="UI_ICONS.copy"></span>
-        <span class="file-tree-context-label">复制 commit</span>
+        <span class="file-tree-context-label">复制 commit 信息</span>
+      </button>
+      <button
+        class="file-tree-context-item"
+        @click="copyGitCommitId(gitCommitContextMenu.commit)"
+      >
+        <span class="file-tree-context-icon" v-html="UI_ICONS.copy"></span>
+        <span class="file-tree-context-label">复制 commit ID</span>
       </button>
     </div>
 
@@ -1474,7 +1481,8 @@
         <div class="diff-modal-header">
           <h3>Commit 信息</h3>
           <div class="diff-modal-header-actions">
-            <button class="icon-btn" @click="copyGitCommit(gitCommitInfoModal)" title="复制 commit">复制</button>
+            <button class="icon-btn" @click="copyGitCommitId(gitCommitInfoModal)" title="复制 commit ID">复制 ID</button>
+            <button class="icon-btn" @click="copyGitCommit(gitCommitInfoModal)" title="复制完整 commit 信息">复制</button>
             <button class="icon-btn" @click="gitCommitInfoModal = null" title="关闭">✕</button>
           </div>
         </div>
@@ -6883,6 +6891,18 @@ async function copyGitCommit(commit) {
   try {
     await copyTextToClipboard(formatGitCommitInfo(commit))
     showToast('已复制 commit 信息')
+  } catch (e) {
+    showToast('复制失败', 'error')
+  }
+}
+
+// 复制 commit ID（完整 hash）到剪贴板
+async function copyGitCommitId(commit) {
+  if (!commit) return
+  closeGitCommitContextMenu()
+  try {
+    await copyTextToClipboard(commit.hash)
+    showToast('已复制 commit ID')
   } catch (e) {
     showToast('复制失败', 'error')
   }
