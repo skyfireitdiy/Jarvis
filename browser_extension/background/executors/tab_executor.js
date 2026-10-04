@@ -176,6 +176,17 @@ export class TabExecutor {
    * 在剩余窗口里优先选最后聚焦的那个；若所有窗口都含 Jarvis 前端页面，则返回 null。
    */
   async _pickTargetWindowId() {
+    // 整体加超时兜底：任何一步（windows.getAll / executeScript / getLastFocused）
+    // 挂起都不应阻塞创建标签页，超时后返回 null 由调用方新开窗口。
+    try {
+      return await this._withTimeout(this._pickTargetWindowIdInner(), 3000);
+    } catch (e) {
+      // 探测超时/失败时返回 null，由调用方新开窗口，避免阻塞创建标签页
+      return null;
+    }
+  }
+
+  async _pickTargetWindowIdInner() {
     const windows = await chrome.windows.getAll({ populate: true });
     if (!windows.length) return null;
     // 并行探测各窗口是否含 Jarvis 前端页面（串行会随标签页数量线性变慢）
@@ -212,15 +223,32 @@ export class TabExecutor {
     if (!tab || tab.id == null) return false;
     if (!/^https?:/i.test(tab.url || "")) return false;
     try {
-      const results = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: hasJarvisAuthBridgeFn,
-        world: "MAIN",
-      });
+      // 注入可能因目标页渲染进程繁忙/冻结而挂起，加超时避免阻塞整个分窗探测
+      const results = await this._withTimeout(
+        chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: hasJarvisAuthBridgeFn,
+          world: "MAIN",
+        }),
+        2000,
+      );
       return Boolean(results && results[0] && results[0].result);
     } catch (e) {
-      // 受限页面（chrome://、扩展页等）无法注入，视为非 Jarvis 页面
+      // 受限页面（chrome://、扩展页等）无法注入，或注入超时，视为非 Jarvis 页面
       return false;
+    }
+  }
+
+  /** 给 Promise 加超时，超时后 reject，避免底层调用永久挂起。 */
+  async _withTimeout(promise, ms) {
+    let timer;
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error("timeout")), ms);
+    });
+    try {
+      return await Promise.race([promise, timeout]);
+    } finally {
+      clearTimeout(timer);
     }
   }
 
