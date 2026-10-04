@@ -7,6 +7,48 @@ import (
 
 // 本文件实现 Windows 等待原语（windows.window.wait / windows.process.wait）的纯逻辑部分：
 // 参数解析、状态判断与通用轮询循环。无构建标签，可在 Linux 上单测。
+//
+// 注意：本文件保持「零平台依赖」——不引用 optionalString/optionalInt（它们定义在
+// 带 //go:build windows 的 windows_common_windows.go 与 //go:build linux 的
+// linux_script_linux.go 中，darwin 平台两者皆无，引用会导致跨平台编译失败）。
+// 故此处内联等价的 waitOptionalString / waitOptionalInt，语义与平台版本保持一致。
+
+// waitOptionalString 读取可选字符串参数；缺失或为 nil 时返回空串。
+// 与 windows_common_windows.go 的 optionalString 语义一致（零平台依赖内联版）。
+func waitOptionalString(params map[string]any, key string) (string, error) {
+	v, ok := params[key]
+	if !ok || v == nil {
+		return "", nil
+	}
+	s, ok := v.(string)
+	if !ok {
+		return "", fmt.Errorf("参数 %s 必须是字符串，实际 %T", key, v)
+	}
+	return s, nil
+}
+
+// waitOptionalInt 读取可选整数参数；缺失或为 nil 时返回默认值。
+// 兼容 JSON 解码后的 float64（网关传来的数字可能是 float64）。
+// 与 windows_common_windows.go 的 optionalInt 语义一致（零平台依赖内联版）。
+func waitOptionalInt(params map[string]any, key string, def int) (int, error) {
+	v, ok := params[key]
+	if !ok || v == nil {
+		return def, nil
+	}
+	switch n := v.(type) {
+	case int:
+		return n, nil
+	case int64:
+		return int(n), nil
+	case float64:
+		if n != float64(int(n)) {
+			return 0, fmt.Errorf("参数 %s 必须是整数，实际 %v", key, n)
+		}
+		return int(n), nil
+	default:
+		return 0, fmt.Errorf("参数 %s 必须是整数，实际 %T", key, v)
+	}
+}
 
 // windowsWaitDefaultTimeout 是等待未指定 timeout_ms 时的默认超时。
 const windowsWaitDefaultTimeout = 10 * time.Second
@@ -23,11 +65,11 @@ var windowsWaitValidStates = map[string]bool{
 
 // parseWindowWaitParams 解析 windows.window.wait 的公共参数。
 func parseWindowWaitParams(params map[string]any) (windowID, title, state string, timeout, interval time.Duration, err error) {
-	windowID, err = optionalString(params, "window_id")
+	windowID, err = waitOptionalString(params, "window_id")
 	if err != nil {
 		return
 	}
-	title, err = optionalString(params, "title")
+	title, err = waitOptionalString(params, "title")
 	if err != nil {
 		return
 	}
@@ -35,7 +77,7 @@ func parseWindowWaitParams(params map[string]any) (windowID, title, state string
 		err = fmt.Errorf("参数 window_id 与 title 至少需要提供一个")
 		return
 	}
-	state, err = optionalString(params, "state")
+	state, err = waitOptionalString(params, "state")
 	if err != nil {
 		return
 	}
@@ -52,7 +94,7 @@ func parseWindowWaitParams(params map[string]any) (windowID, title, state string
 
 // parseProcessWaitParams 解析 windows.process.wait 的公共参数。
 func parseProcessWaitParams(params map[string]any) (pid int, timeout, interval time.Duration, err error) {
-	pid, err = optionalInt(params, "pid", 0)
+	pid, err = waitOptionalInt(params, "pid", 0)
 	if err != nil {
 		return
 	}
@@ -66,7 +108,7 @@ func parseProcessWaitParams(params map[string]any) (pid int, timeout, interval t
 
 // parseWaitTiming 解析 timeout_ms 与 interval_ms 并转成 time.Duration。
 func parseWaitTiming(params map[string]any) (timeout, interval time.Duration, err error) {
-	timeoutMs, err := optionalInt(params, "timeout_ms", int(windowsWaitDefaultTimeout/time.Millisecond))
+	timeoutMs, err := waitOptionalInt(params, "timeout_ms", int(windowsWaitDefaultTimeout/time.Millisecond))
 	if err != nil {
 		return
 	}
@@ -74,7 +116,7 @@ func parseWaitTiming(params map[string]any) (timeout, interval time.Duration, er
 		err = fmt.Errorf("参数 timeout_ms 必须为正整数，实际 %d", timeoutMs)
 		return
 	}
-	intervalMs, err := optionalInt(params, "interval_ms", int(windowsWaitDefaultInterval/time.Millisecond))
+	intervalMs, err := waitOptionalInt(params, "interval_ms", int(windowsWaitDefaultInterval/time.Millisecond))
 	if err != nil {
 		return
 	}
