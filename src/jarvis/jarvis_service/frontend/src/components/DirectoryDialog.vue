@@ -18,7 +18,7 @@
           type="text"
           class="dir-search-input"
           placeholder="搜索目录..."
-          @keydown="$emit('search-keydown', $event)"
+          @keydown="onSearchKeydown"
         />
       </div>
       <div class="dir-list" ref="dirListRef" v-if="filteredDirs.length > 0 || (fileSelectable && fileList.length > 0)">
@@ -110,6 +110,13 @@ const props = defineProps({
 
 
 const emit = defineEmits(['update:visible', 'update:searchText', 'cancel', 'confirm', 'refresh', 'go-parent', 'select', 'enter', 'search-keydown', 'select-file'])
+
+// 目录搜索框键盘事件：阻止冒泡到 document，避免触发创建 Agent 弹窗的全局 Enter 监听
+// （确认目录关闭对话框的同一事件若冒泡，会因 dirDialogOpen 已变为 false 而误触发创建）
+function onSearchKeydown(event) {
+  event.stopPropagation()
+  emit('search-keydown', event)
+}
 
 const searchInput = ref(null)
 const dirListRef = ref(null)

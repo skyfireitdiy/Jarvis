@@ -995,6 +995,7 @@
       :userOptions="availableUserOptions.filter(u => !u.is_admin && u.user_id !== auth.userInfo?.user_id)"
       :recentWorkDirs="recentWorkDirs"
       :currentNodeId="newAgentNodeId"
+      :dirDialogOpen="showDirDialog"
       @cancel="showCreateAgentModal = false"
       @create="createAgent"
       @selectDir="openDirDialog"

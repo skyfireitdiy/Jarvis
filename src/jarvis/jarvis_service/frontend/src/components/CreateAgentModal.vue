@@ -191,7 +191,9 @@ const props = defineProps({
   accessAclInteract: { type: Array, default: () => [] },
   userOptions: { type: Array, default: () => [] },
   recentWorkDirs: { type: Array, default: () => [] },
-  currentNodeId: { type: String, default: '' }
+  currentNodeId: { type: String, default: '' },
+  // 目录选择对话框是否已打开：打开时 Enter 应交给目录对话框处理，不能触发创建
+  dirDialogOpen: { type: Boolean, default: false }
 })
 
 const emit = defineEmits([
@@ -247,6 +249,8 @@ function toggleAclInteract(userId, event) {
 // 纯键盘支持：在输入框（非多行 textarea）内按 Enter 提交创建，Esc 关闭（父级全局 Esc 兜底）
 function handleKeydown(event) {
   if (!props.visible) return
+  // 目录选择对话框打开时，Enter 应交给目录对话框处理（选择/进入目录），不能触发创建
+  if (props.dirDialogOpen) return
   if (event.key === 'Enter') {
     const tag = event.target?.tagName?.toLowerCase()
     // textarea 内 Enter 用于换行，不拦截；按钮聚焦时浏览器原生处理
