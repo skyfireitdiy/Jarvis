@@ -45,6 +45,11 @@ const NOTIFIED_VERSION_KEY = "notified_extension_version";
 // 供 hello 上报给网关（网关据此区分不同终端）。页面未打开时用缓存值。
 const TERMINAL_NAME_KEY = "terminal_name";
 
+// chrome.storage.local 中持久化「各网关登录 Token」的键，形如 { [gatewayKey]: token }。
+// 与 daemon 侧 credentials.json 同理：把 Token 落盘，扩展/浏览器重启后自动恢复登录态，
+// 无需重新打开 Jarvis 页面探测。鉴权失败/断开/移除网关时会同步清除对应条目。
+const TOKENS_KEY = "gateway_tokens";
+
 // chrome.storage.local 中保存「网关黑白名单」的键，形如 {mode, patterns}。
 //
 // 为什么需要：autoDiscoverGateways 会把「浏览器里已登录的网关」自动纳入列表并
@@ -160,6 +165,38 @@ async function loadGateways() {
 /** 保存网关列表。 */
 async function saveGateways(list) {
   await chrome.storage.local.set({ gateways: list });
+}
+
+/**
+ * 从 chrome.storage.local 载入持久化的各网关 Token 到内存 tokens Map。
+ * 扩展/浏览器重启后调用，使 connect 无需重新探测页面即可拿到 Token，自动恢复登录态。
+ * 存储缺失或损坏时静默跳过，保持内存为空（由后续页面探测兜底）。
+ */
+async function loadTokensFromStorage() {
+  try {
+    const cfg = await chrome.storage.local.get([TOKENS_KEY]);
+    const saved = cfg[TOKENS_KEY];
+    if (!saved || typeof saved !== "object") return;
+    for (const [key, token] of Object.entries(saved)) {
+      if (key && token) tokens.set(key, token);
+    }
+  } catch (e) {
+    console.warn("[Jarvis] load tokens from storage failed", e);
+  }
+}
+
+/**
+ * 把内存 tokens Map 持久化到 chrome.storage.local（异步 fire-and-forget）。
+ * 写失败仅告警，不影响内存语义（最坏情况是重启后需重新探测页面）。
+ */
+function persistTokens() {
+  const obj = {};
+  for (const [key, token] of tokens.entries()) {
+    if (key && token) obj[key] = token;
+  }
+  chrome.storage.local.set({ [TOKENS_KEY]: obj }).catch((e) => {
+    console.warn("[Jarvis] persist tokens failed", e);
+  });
 }
 
 /** 规范化网关地址：去掉尾部斜杠。 */
@@ -431,6 +468,7 @@ async function handleAuthError(gateway, code, reason) {
     reason,
   );
   tokens.delete(tokenKey);
+  persistTokens();
   // 丢弃持有失效 Token 的旧连接，避免后续 connect 复用到它
   const stale = clients.get(g);
   if (stale) {
@@ -521,6 +559,7 @@ async function connect(gateway, force = false) {
     console.log("[Jarvis] connect: probe done, has_token=", Boolean(token));
     if (token) {
       tokens.set(tokenKey, token);
+      persistTokens();
     }
   }
   if (!token) {
@@ -578,6 +617,7 @@ function disconnect(gateway, skipProbe = false) {
   const tokenKey = gatewayKey(g);
   // 清空 Token 缓存，避免复用失效 Token
   tokens.delete(tokenKey);
+  persistTokens();
   // 主动断开视为用户意图，重置鉴权失败计数
   authErrorAttempts.delete(tokenKey);
   setState(g, "disconnected");
@@ -604,6 +644,7 @@ async function refreshTokenFromPages(gateway) {
   }
   if (token) {
     tokens.set(gatewayKey(g), token);
+    persistTokens();
     console.log("[Jarvis] token refreshed from page for", g);
   } else {
     console.log("[Jarvis] no token available from page for", g);
@@ -789,6 +830,7 @@ async function autoDiscoverGateways() {
   for (const { gateway, token } of discovered) {
     const key = gatewayKey(gateway);
     tokens.set(key, token);
+    persistTokens();
     if (!configured.has(key)) {
       list.push(gateway);
       configured.add(key);
@@ -906,6 +948,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     clients.delete(g);
     sessions.delete(g);
     tokens.delete(gatewayKey(g));
+    persistTokens();
     states.delete(g);
     loadGateways()
       .then((list) =>
@@ -1016,6 +1059,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
  * 自动发现失败（如无任何 Jarvis 页面）不影响后续已配置网关的连接。
  */
 async function connectAll() {
+  // 先恢复持久化的登录 Token，使已配置网关无需重新探测页面即可直接连接。
+  await loadTokensFromStorage();
   try {
     await autoDiscoverGateways();
   } catch (e) {

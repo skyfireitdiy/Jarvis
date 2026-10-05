@@ -19354,7 +19354,11 @@ function sendHeartbeat() {
 // 并通过 getGateway() 获取当前配置的网关地址（网关与前端可能不同域名），
 // 以便扩展把 Token 关联到正确的网关。
 window.__jarvisAuthBridge = {
-  getToken: () => auth.value.token || null,
+  // 优先返回内存中的 Token；内存为空时回退 localStorage（免登录场景下
+  // jarvis_auth_token 已持久化），让浏览器扩展在持久化 Token 失效时能靠页面兜底恢复。
+  // 注意：本页面只服务当前配置的单个网关（见 getGateway），localStorage 中的
+  // Token 即属于该网关，扩展会按 getGateway() 声明的网关做匹配，天然支持多网关。
+  getToken: () => auth.value.token || localStorage.getItem('jarvis_auth_token') || null,
   // 终端名称：供扩展随 hello 上报给网关，使网关能区分不同终端。
   getName: () => terminalName.value || null,
   getGateway: () => {

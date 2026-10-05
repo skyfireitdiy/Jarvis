@@ -8,8 +8,12 @@
 package auth
 
 import (
+	"encoding/json"
 	"errors"
+	"log"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 )
@@ -81,13 +85,90 @@ type Store struct {
 	creds map[string]Credentials
 	// valid 标记各网关的 Token 是否仍然有效（收到 4401/4403 后置为 false）。
 	valid map[string]bool
+	// path 是持久化文件路径；为空表示不落盘（纯内存，进程退出即失效）。
+	// 非空时，每次写操作都会把全部凭据同步写入该文件，供重启后恢复。
+	path string
 }
 
-// NewStore 创建空的凭据存储。
+// NewStore 创建空的凭据存储（纯内存，不落盘）。
 func NewStore() *Store {
 	return &Store{
 		creds: make(map[string]Credentials),
 		valid: make(map[string]bool),
+	}
+}
+
+// NewPersistentStore 创建带持久化的凭据存储：每次写操作都会把全部凭据
+// 同步写入 path（0600），供进程重启后恢复登录态。
+//
+// 落盘失败只记日志、不影响内存语义（最坏情况是重启后需重新推送凭据）。
+func NewPersistentStore(path string) *Store {
+	s := NewStore()
+	s.path = path
+	return s
+}
+
+// LoadStore 从持久化文件加载凭据并返回带持久化的 Store。
+//
+// 文件不存在或解析失败时返回空 Store（不报错，调用方静默跳过），
+// 保证 daemon 首次启动或凭据文件损坏时也能正常启动。
+func LoadStore(path string) *Store {
+	s := NewPersistentStore(path)
+	if path == "" {
+		return s
+	}
+	blob, err := os.ReadFile(path)
+	if err != nil {
+		return s
+	}
+	var creds []Credentials
+	if err := json.Unmarshal(blob, &creds); err != nil {
+		log.Printf("[auth] 解析凭据文件失败（%s）: %v", path, err)
+		return s
+	}
+	for _, c := range creds {
+		if c.Gateway == "" || c.Token == "" {
+			continue
+		}
+		key := GatewayKey(c.Gateway)
+		if key == "" {
+			continue
+		}
+		s.creds[key] = c
+		s.valid[key] = true
+	}
+	return s
+}
+
+// persist 把当前全部凭据同步写入持久化文件（原子写：临时文件 + rename）。
+// path 为空时为空操作。写失败只记日志，不影响内存语义。
+// 注意：必须在持有 s.mu 写锁时调用（直接读 s.creds，避免死锁）。
+func (s *Store) persist() {
+	if s.path == "" {
+		return
+	}
+	creds := make([]Credentials, 0, len(s.creds))
+	for _, c := range s.creds {
+		creds = append(creds, c)
+	}
+	blob, err := json.Marshal(creds)
+	if err != nil {
+		log.Printf("[auth] 序列化凭据失败: %v", err)
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(s.path), 0o700); err != nil {
+		log.Printf("[auth] 创建凭据目录失败: %v", err)
+		return
+	}
+	tmp := s.path + ".tmp"
+	if err := os.WriteFile(tmp, blob, 0o600); err != nil {
+		log.Printf("[auth] 写入凭据临时文件失败: %v", err)
+		return
+	}
+	_ = os.Chmod(tmp, 0o600)
+	if err := os.Rename(tmp, s.path); err != nil {
+		_ = os.Remove(tmp)
+		log.Printf("[auth] 保存凭据文件失败: %v", err)
 	}
 }
 
@@ -99,9 +180,10 @@ func (s *Store) Set(gateway, token string) {
 		return
 	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.creds[key] = Credentials{Gateway: gateway, Token: token}
 	s.valid[key] = true
+	s.persist()
+	s.mu.Unlock()
 }
 
 // SetWithName 写入指定网关的凭据（含终端名称），并重置该网关的 tokenValid 为 true。
@@ -112,13 +194,14 @@ func (s *Store) SetWithName(gateway, token, name string) {
 		return
 	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	prev := s.creds[key]
 	if name == "" {
 		name = prev.Name
 	}
 	s.creds[key] = Credentials{Gateway: gateway, Token: token, Name: name}
 	s.valid[key] = true
+	s.persist()
+	s.mu.Unlock()
 }
 
 // Get 返回指定网关凭据的副本；未认证时返回 ErrNoCredentials。
@@ -143,17 +226,19 @@ func (s *Store) Clear(gateway string) {
 		return
 	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	delete(s.creds, key)
 	delete(s.valid, key)
+	s.persist()
+	s.mu.Unlock()
 }
 
 // ClearAll 清空全部网关的凭据。
 func (s *Store) ClearAll() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.creds = make(map[string]Credentials)
 	s.valid = make(map[string]bool)
+	s.persist()
+	s.mu.Unlock()
 }
 
 // List 返回全部凭据的副本切片（不暴露内部 map）。

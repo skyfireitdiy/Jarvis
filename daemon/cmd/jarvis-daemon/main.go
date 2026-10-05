@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -670,7 +671,13 @@ func runDaemon(args []string) {
 		log.Fatalf("配置非法: %v", err)
 	}
 
-	store := auth.NewStore()
+	// 凭据持久化文件与 config.yaml 同目录；启动时加载，供重启后自动恢复登录态。
+	// 文件不存在或损坏时 LoadStore 静默返回空 Store，不影响正常启动。
+	credentialsPath := ""
+	if cfgPath != "" {
+		credentialsPath = filepath.Join(filepath.Dir(cfgPath), "credentials.json")
+	}
+	store := auth.LoadStore(credentialsPath)
 
 	// 暴露给自动更新流程，用于更新前临时落盘凭据（见 saveCurrentCredentialsForUpdate）。
 	currentStore = store
@@ -749,6 +756,15 @@ func runDaemon(args []string) {
 	// 若上一次是「自动更新 → 重启」恢复了凭据，则主动发起连接（否则等网页推送）。
 	if restored {
 		manager.ConnectWithName(restoredCreds.Gateway, restoredCreds.Token, restoredCreds.Name)
+	}
+
+	// 从持久化文件恢复的凭据：对所有已认证网关主动发起连接，重启后自动恢复登录态。
+	// ConnectWithName 幂等：与上面的自更新中转恢复指向同一网关时不会重复建连，
+	// 且该网关的 token 已被 SetWithName 覆盖为中转值，遍历时使用的也是正确 token。
+	for _, c := range store.List() {
+		if c.Gateway != "" && c.Token != "" {
+			manager.ConnectWithName(c.Gateway, c.Token, c.Name)
+		}
 	}
 
 	api := localapi.New(store, manager, version)

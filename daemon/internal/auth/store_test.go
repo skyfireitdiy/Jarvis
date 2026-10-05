@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 )
@@ -269,4 +271,82 @@ func TestStoreConcurrentAccess(t *testing.T) {
 		}(i)
 	}
 	wg.Wait()
+}
+
+func TestPersistentStoreRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "credentials.json")
+
+	s := NewPersistentStore(path)
+	s.Set("https://gw1.example.com", "token-1")
+	s.SetWithName("https://gw2.example.com", "token-2", "gw2")
+	s.Set("http://127.0.0.1:8000", "token-3")
+
+	// 重新加载，验证凭据被持久化恢复
+	loaded := LoadStore(path)
+	if !loaded.Has("https://gw1.example.com") {
+		t.Error("gw1 凭据未从磁盘恢复")
+	}
+	if c, err := loaded.Get("https://gw1.example.com"); err != nil || c.Token != "token-1" {
+		t.Errorf("gw1 token 恢复错误: %+v err=%v", c, err)
+	}
+	if c, err := loaded.Get("https://gw2.example.com"); err != nil || c.Token != "token-2" {
+		t.Errorf("gw2 token 恢复错误: %+v err=%v", c, err)
+	}
+	if c, _ := loaded.Get("https://gw2.example.com"); c.Name != "gw2" {
+		t.Errorf("gw2 name 恢复错误: %q", c.Name)
+	}
+	if c, err := loaded.Get("http://127.0.0.1:8000"); err != nil || c.Token != "token-3" {
+		t.Errorf("127.0.0.1 token 恢复错误: %+v err=%v", c, err)
+	}
+}
+
+func TestPersistentStoreClearSyncsDisk(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "credentials.json")
+
+	s := NewPersistentStore(path)
+	s.Set("https://gw1.example.com", "token-1")
+	s.Set("https://gw2.example.com", "token-2")
+
+	// Clear 单个网关后磁盘同步
+	s.Clear("https://gw1.example.com")
+	loaded := LoadStore(path)
+	if loaded.Has("https://gw1.example.com") {
+		t.Error("Clear 后磁盘仍保留 gw1")
+	}
+	if !loaded.Has("https://gw2.example.com") {
+		t.Error("Clear 误删了 gw2")
+	}
+
+	// ClearAll 后磁盘为空
+	s.ClearAll()
+	loaded2 := LoadStore(path)
+	if len(loaded2.List()) != 0 {
+		t.Errorf("ClearAll 后磁盘仍残留 %d 条凭据", len(loaded2.List()))
+	}
+}
+
+func TestLoadStoreMissingFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "does-not-exist.json")
+	s := LoadStore(path)
+	if len(s.List()) != 0 {
+		t.Errorf("不存在文件应返回空 Store，实际 %d 条", len(s.List()))
+	}
+	// 且不应报错（daemon 首次启动时文件不存在属正常情况）
+	if _, err := os.Stat(path); err == nil {
+		t.Error("LoadStore 不应为不存在的文件创建持久化文件")
+	}
+}
+
+func TestLoadStoreInvalidJSON(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "credentials.json")
+	if err := os.WriteFile(path, []byte("{not-valid-json"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	s := LoadStore(path)
+	if len(s.List()) != 0 {
+		t.Errorf("损坏文件应返回空 Store，实际 %d 条", len(s.List()))
+	}
 }
