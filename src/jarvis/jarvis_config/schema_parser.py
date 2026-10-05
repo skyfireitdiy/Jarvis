@@ -10,8 +10,6 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union, cast
 
-from jarvis.jarvis_utils.output import PrettyOutput
-
 
 class ValidationError(Exception):
     """Schema 验证错误"""

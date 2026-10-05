@@ -1169,7 +1169,7 @@ class SessionManager:
         Returns:
             bool: 是否成功保存
         """
-        import json
+
         import os
 
         try:
@@ -1312,7 +1312,6 @@ class SessionManager:
         Args:
             timestamp: 会话时间戳，用于生成文件名
         """
-        import json
         import os
 
         if not self.agent:

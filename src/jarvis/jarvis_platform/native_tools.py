@@ -207,7 +207,6 @@ def ensure_tool_pairing(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 def to_openai_message(msg: Dict[str, Any]) -> Dict[str, Any]:
     """单条规范消息 -> OpenAI ChatCompletion 消息。"""
-    role = msg.get("role")
     if is_tool_call_msg(msg):
         content = msg.get("content") or ""
         tool_calls = []

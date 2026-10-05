@@ -4275,7 +4275,7 @@ def _ast_divide_by_zero_check(
         return None
 
     # Ensure each line ends with \n for correct AST line numbers
-    normalized = [(l if l.endswith("\n") else l + "\n") for l in lines]
+    normalized = [(line if line.endswith("\n") else line + "\n") for line in lines]
     code = "".join(normalized)
     if not code.endswith("\n"):
         code += "\n"
@@ -4856,7 +4856,7 @@ def _ast_null_deref_check(
 
     # Ensure each line ends with \n for correct AST line numbers
     # (callers may pass splitlines() which strips \n)
-    normalized = [(l if l.endswith("\n") else l + "\n") for l in lines]
+    normalized = [(line if line.endswith("\n") else line + "\n") for line in lines]
     code = "".join(normalized)
     if not code.endswith("\n"):
         code += "\n"

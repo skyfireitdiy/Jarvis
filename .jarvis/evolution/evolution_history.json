@@ -113,5 +113,55 @@
         "实施监控告警系统"
       ]
     }
+  },
+  {
+    "timestamp": "2026-10-05T17:23:36Z",
+    "phase": "自由进化会话（2026-10-05）",
+    "task": "实现 Agent 状态变更 WebSocket 广播",
+    "action": "实现 _on_agent_status_change（原 TODO 空实现），用 _router.publish 广播 status_update 消息，携带 agent_id/status/execution_status",
+    "result": {
+      "status": "completed",
+      "detail": "状态映射：running→running，stopped/error→stopped，deleted→仅广播 status。前端通过 payload.agent_id 定位目标 Agent 并更新其执行状态。",
+      "files_modified": [
+        "src/jarvis/jarvis_web_gateway/app.py",
+        "tests/jarvis_web_gateway/test_agent_status_broadcast.py"
+      ],
+      "verification": "新增 5 个测试用例全过；web_gateway 全套 145 测试通过",
+      "commits": ["3396dcb"]
+    }
+  },
+  {
+    "timestamp": "2026-10-05T17:23:36Z",
+    "phase": "自由进化会话（2026-10-05）",
+    "task": "修复 ruff 代码质量问题",
+    "action": "修复 src/jarvis 下 15 个 ruff 错误（未用 import、E741、E402、F811、F841）",
+    "result": {
+      "status": "completed",
+      "detail": "删除未用 import（ct/json×2/PrettyOutput/Panel/Status/console/tarfile/get_normal_model_name）；F811 console 重复定义；F841 model_display_name/role 未用；E741 l→line；E402 Enum/threading 移到顶部。",
+      "files_modified": [
+        "src/jarvis/jarvis_agent/__init__.py",
+        "src/jarvis/jarvis_agent/jarvis.py",
+        "src/jarvis/jarvis_agent/session_manager.py",
+        "src/jarvis/jarvis_config/schema_parser.py",
+        "src/jarvis/jarvis_git_utils/git_commiter.py",
+        "src/jarvis/jarvis_platform/native_tools.py",
+        "src/jarvis/jarvis_sec/checkers/c_checker.py",
+        "src/jarvis/jarvis_web_gateway/app.py"
+      ],
+      "verification": "ruff check src/jarvis/ 0 错误；全套 1404 测试通过",
+      "commits": ["85db0cc", "6ba8d44", "4393e67"]
+    }
+  },
+  {
+    "timestamp": "2026-10-05T17:23:36Z",
+    "phase": "自由进化会话（2026-10-05）",
+    "task": "验证 daemon self-update ARM 修复完整性",
+    "action": "完整复核已提交的 ARMv7 支持修复",
+    "result": {
+      "status": "completed",
+      "detail": "DAEMON_SUPPORTED_ARCH 含 arm；arch 别名 armv7l/armv7/armhf→arm；release-daemon.yml 矩阵含 linux/arm；test_build_update_linux_arm 与 arch 别名测试存在。",
+      "verification": "全部 28 个 daemon 测试通过，修复完整无回归",
+      "commits": ["f757bbf4"]
+    }
   }
 ]

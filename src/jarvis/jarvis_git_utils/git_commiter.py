@@ -10,15 +10,11 @@ from typing import Optional
 import typer
 import yaml  # type: ignore[import-untyped]
 from rich.console import Console
-from rich.panel import Panel
-from rich.status import Status
-
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import get_git_commit_prompt
 from jarvis.jarvis_utils.git_utils import confirm_add_new_files
 from jarvis.jarvis_utils.git_utils import find_git_root_and_cd
 from jarvis.jarvis_utils.git_utils import has_uncommitted_changes
-from jarvis.jarvis_utils.globals import console
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ct
 from jarvis.jarvis_utils.tag import ot
@@ -283,16 +279,11 @@ class GitCommitTool:
             diff = decode_output(diff_bytes)
 
             try:
-                # Get platform and model based on llm_group (thinking mode removed)
-                from jarvis.jarvis_utils.config import get_normal_model_name
-
+                # Get platform based on llm_group (thinking mode removed)
                 platform = PlatformRegistry().get_normal_platform()
                 platform.set_suppress_output(False)
 
                 # 生成提交信息
-                model_display_name = get_normal_model_name() or (
-                    platform.name() if platform else "AI"
-                )
 
                 # 准备提示信息
                 custom_prompt = get_git_commit_prompt()

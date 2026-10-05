@@ -87,7 +87,6 @@ from jarvis.jarvis_platform.content_types import ContentBlock
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.output import PrettyOutput
-from jarvis.jarvis_utils.tag import ct
 from jarvis.jarvis_utils.tag import ot
 
 __all__ = [

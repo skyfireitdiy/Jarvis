@@ -7,6 +7,8 @@ import os
 import shutil
 import subprocess
 import sys
+from enum import Enum
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -54,11 +56,8 @@ from jarvis.jarvis_jck.cli import (
 
 logger = logging.getLogger(__name__)
 
+
 # ========== Agent 状态管理 ==========
-from enum import Enum
-import threading
-
-
 class AgentStatus(Enum):
     """Agent 状态枚举。
 

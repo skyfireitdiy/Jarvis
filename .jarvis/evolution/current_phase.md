@@ -56,9 +56,27 @@
 
 ---
 
+## 自由进化会话（2026-10-05）
+
+> Administrator 授权的一次自由进化会话（不设限、允许任意手段），目标「充分进化当前系统，以实现高效、智能的 AI 智能体」，并留下进化路线与日志。完整日志见 `free_evolution_20261005.md`。
+
+### ✅ 本次会话完成的进化项
+
+1. **Agent 状态变更 WebSocket 广播**（commit 3396dcb）：实现 `_on_agent_status_change`（原 TODO 空实现），Agent 生命周期状态（stopped/deleted/error）实时广播到前端。
+2. **修复 15 个 ruff 代码质量问题**（commit 85db0cc / 6ba8d44 / 4393e67）：`ruff check src/jarvis/` 现为 0 错误。
+3. **验证 daemon self-update ARM 修复完整性**（commit f757bbf4）：完整复核，linux/arm 构建与测试全通过。
+
+### 验证结果
+
+- 全套测试：**1404 passed, 0 failed**
+- ruff：**0 错误**
+
+---
+
 ## 进度说明
 
 - 阶段 A 已启动，A4（状态修正）已完成。
+- 自由进化会话（2026-10-05）已完成：WebSocket 广播、ruff 清理、daemon ARM 验证。
 - 接下来优先推进：A1（需求澄清/意图理解）。
 
 ---
@@ -71,7 +89,7 @@
 
 ---
 
-**最后更新**：2026-10-04
+**最后更新**：2026-10-05
 **规则版本**：2.0
 **执行状态**：永久持续运行
 **监督者**：skyfire

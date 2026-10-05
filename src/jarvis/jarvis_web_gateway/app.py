@@ -517,14 +517,37 @@ def _update_status(status: str) -> None:
 def _on_agent_status_change(agent_id: str, status: str, data: Any) -> None:
     """Agent 状态变更回调，发送 WebSocket 通知。
 
+    由 AgentManager 在 Agent 生命周期状态变化时调用（如 stopped/deleted/error），
+    通过全局 _router 广播 status_update 消息给所有连接的前端，使前端能实时
+    同步 Agent 的执行状态（如将已停止的 Agent 标记为 stopped）。
+
     Args:
         agent_id: Agent ID
-        status: 新状态 ("running", "stopped", "error")
-        data: 额外数据
+        status: 新状态 ("running", "stopped", "deleted", "error")
+        data: 额外数据（Agent 信息字典）
     """
-    # TODO: 实现 WebSocket 广播，向所有连接的前端发送状态变更通知
-    # 这里需要修改 WebSocketConnectionManager 来支持广播
-    pass
+    if not _router:
+        return
+    try:
+        # 将 Agent 生命周期状态映射为前端可识别的 execution_status：
+        # running → running；stopped/error → stopped（前端据此标记 Agent 已退出）；
+        # deleted 表示 Agent 已被删除，前端无需更新 execution_status，
+        # 但仍广播事件（含原始 status）供前端刷新 Agent 列表。
+        execution_status: Optional[str] = None
+        if status == "running":
+            execution_status = "running"
+        elif status in ("stopped", "error"):
+            execution_status = "stopped"
+
+        payload: Dict[str, Any] = {"agent_id": agent_id, "status": status}
+        if execution_status:
+            payload["execution_status"] = execution_status
+        # session_id=None 触发路由器广播到所有 session
+        _router.publish({"type": "status_update", "payload": payload}, session_id=None)
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_web_gateway.app", function="_on_agent_status_change"
+        )
 
 
 class WebGateway(BaseGateway):
@@ -8371,7 +8394,6 @@ def create_app(
         """
         import base64
         import hashlib
-        import tarfile
 
         try:
             raw_path = str(payload.get("path", "")).strip()
