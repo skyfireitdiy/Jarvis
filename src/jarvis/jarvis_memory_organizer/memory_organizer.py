@@ -21,7 +21,12 @@ from typing import Set
 import typer
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import get_data_dir, set_llm_group
+from jarvis.jarvis_utils.config import (
+    get_data_dir,
+    set_llm_group,
+    get_max_input_token_count,
+)
+from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.utils import init_env
 
 
@@ -79,51 +84,74 @@ class MemoryOrganizer:
         查找具有重叠标签的记忆组
 
         返回：{重叠数量: [记忆索引集合列表]}
+
+        性能优化：原实现为 O(n²) 两两比较 + O(n³) 组扩展，在记忆数量大时
+        （如数千条）会非常慢。优化后：
+        1. 用标签索引只生成"共享 >= min_overlap 个标签"的候选记忆对，
+           避免全量 O(n²) 两两比较（候选对通常远小于全量对）；
+        2. 组扩展时只从候选邻居中寻找可加入的记忆，避免遍历全部记忆。
+        语义保持不变：组内任意两条记忆的重叠标签数均 >= min_overlap。
         """
+        # 预计算每条记忆的标签集合
+        tags_of = [set(memory.get("tags", [])) for memory in memories]
+
         # 构建标签到记忆索引的映射
         tag_to_memories = defaultdict(set)
-        for i, memory in enumerate(memories):
-            for tag in memory.get("tags", []):
+        for i, tags in enumerate(tags_of):
+            for tag in tags:
                 tag_to_memories[tag].add(i)
 
-        # 查找具有共同标签的记忆对
+        # 生成候选边：共享 >= min_overlap 个标签的记忆对（i < j）
+        candidate_edges = set()
+        visited_pairs = set()
+        for memset in tag_to_memories.values():
+            lst = sorted(memset)
+            for a in range(len(lst)):
+                for b in range(a + 1, len(lst)):
+                    i, j = lst[a], lst[b]
+                    key = (i, j) if i < j else (j, i)
+                    if key in visited_pairs:
+                        continue
+                    visited_pairs.add(key)
+                    if len(tags_of[i] & tags_of[j]) >= min_overlap:
+                        candidate_edges.add(key)
+
+        # 候选邻居表：与某记忆共享 >= min_overlap 个标签的其它记忆
+        candidate_adj = defaultdict(set)
+        for i, j in candidate_edges:
+            candidate_adj[i].add(j)
+            candidate_adj[j].add(i)
+
+        # 查找具有共同标签的记忆组（团语义：组内两两重叠 >= min_overlap）
         overlap_groups = defaultdict(list)
         processed_groups = set()
 
-        # 对每对记忆计算标签重叠数
-        for i in range(len(memories)):
-            for j in range(i + 1, len(memories)):
-                tags_i = set(memories[i].get("tags", []))
-                tags_j = set(memories[j].get("tags", []))
-                overlap_count = len(tags_i & tags_j)
+        for i, j in sorted(candidate_edges):
+            group = {i, j}
 
-                if overlap_count >= min_overlap:
-                    # 查找包含这两个记忆的最大组
-                    group = {i, j}
+            # 扩展组，包含所有与组内记忆有足够重叠的记忆
+            changed = True
+            while changed:
+                changed = False
+                # 只从候选邻居中寻找可加入的记忆（候选邻居远少于全部记忆）
+                candidates = set()
+                for m in group:
+                    candidates |= candidate_adj[m]
+                for k in candidates:
+                    if k not in group:
+                        # 检查与组内所有记忆的最小重叠数
+                        min_overlap_with_group = min(
+                            len(tags_of[k] & tags_of[m]) for m in group
+                        )
+                        if min_overlap_with_group >= min_overlap:
+                            group.add(k)
+                            changed = True
 
-                    # 扩展组，包含所有与组内记忆有足够重叠的记忆
-                    changed = True
-                    while changed:
-                        changed = False
-                        for k in range(len(memories)):
-                            if k not in group:
-                                # 检查与组内所有记忆的最小重叠数
-                                min_overlap_with_group = min(
-                                    len(
-                                        set(memories[k].get("tags", []))
-                                        & set(memories[m].get("tags", []))
-                                    )
-                                    for m in group
-                                )
-                                if min_overlap_with_group >= min_overlap:
-                                    group.add(k)
-                                    changed = True
-
-                    # 将组转换为有序元组以便去重
-                    group_tuple = tuple(sorted(group))
-                    if group_tuple not in processed_groups:
-                        processed_groups.add(group_tuple)
-                        overlap_groups[min_overlap].append(set(group_tuple))
+            # 将组转换为有序元组以便去重
+            group_tuple = tuple(sorted(group))
+            if group_tuple not in processed_groups:
+                processed_groups.add(group_tuple)
+                overlap_groups[min_overlap].append(set(group_tuple))
 
         return overlap_groups
 
@@ -229,6 +257,137 @@ class MemoryOrganizer:
             # 返回 None 表示合并失败，跳过这组记忆
             return None
 
+    def _merge_memories_batch_with_llm(
+        self, groups: List[List[Dict[str, Any]]]
+    ) -> List[Optional[Dict[str, Any]]]:
+        """使用大模型批量合并多个记忆组。
+
+        将多个独立的小组打包进一次 LLM 调用，模型对每个组分别输出一个
+        <merged_memory> 块，从而大幅减少小组合并时的调用次数（省去每次
+        调用的固定开销）。返回与输入 groups 一一对应的合并结果列表，
+        某组失败时对应位置为 None。
+        """
+        # 准备每个组的输入内容
+        group_inputs = []
+        for idx, memories in enumerate(groups, start=1):
+            sorted_memories = sorted(
+                memories, key=lambda m: m.get("created_at", ""), reverse=True
+            )
+            parts = []
+            all_tags = set()
+            for mem in sorted_memories:
+                parts.append(
+                    f"记忆ID: {mem.get('id', '未知')}\n"
+                    f"创建时间: {mem.get('created_at', '未知')}\n"
+                    f"标签: {', '.join(mem.get('tags', []))}\n"
+                    f"内容:\n{mem.get('content', '')}"
+                )
+                all_tags.update(mem.get("tags", []))
+            group_inputs.append(
+                {
+                    "idx": idx,
+                    "contents": (("=" * 50) + "\n").join(parts),
+                    "tags": ", ".join(sorted(all_tags)),
+                    "count": len(memories),
+                }
+            )
+
+        # 构造批量 prompt
+        prompt_lines = [
+            f"请将以下 {len(groups)} 组相关记忆分别合并，每组独立合并成一个综合性的记忆。",
+            "",
+        ]
+        for gi in group_inputs:
+            prompt_lines.append(f"【组 {gi['idx']}】（共 {gi['count']} 条记忆）")
+            prompt_lines.append("原始记忆（按时间从新到旧排序）：")
+            prompt_lines.append("=" * 50)
+            prompt_lines.append(gi["contents"])
+            prompt_lines.append("=" * 50)
+            prompt_lines.append(f"原始标签集合：{gi['tags']}")
+            prompt_lines.append("")
+        prompt_lines.extend(
+            [
+                "请对每一组分别完成以下任务：",
+                "1. 分析该组记忆的共同主题和关键信息",
+                "2. 将它们合并成一个连贯、完整的记忆",
+                "3. 生成新的标签列表（保留重要标签，去除冗余，可以添加新的概括性标签）",
+                "4. 确保合并后的记忆保留了所有重要信息",
+                "5. **重要**：越近期的记忆权重越高，优先保留最新记忆中的信息",
+                "",
+                "请将每组的结果放在对应的 <merged_memory> 标签内，使用JSON格式，并用组编号区分：",
+                "",
+                "<merged_memory>",
+                "{",
+                '  "group": 1,',
+                '  "content": "组1合并后的记忆内容，可以是多行文本",',
+                '  "tags": ["标签1", "标签2", "标签3"]',
+                "}",
+                "</merged_memory>",
+                "",
+                "<merged_memory>",
+                "{",
+                '  "group": 2,',
+                '  "content": "组2合并后的记忆内容",',
+                '  "tags": ["标签1", "标签2"]',
+                "}",
+                "</merged_memory>",
+                "",
+                "注意：",
+                "- 每组内容要全面但简洁",
+                "- 标签要准确反映内容主题",
+                "- 保持专业和客观的语气",
+                "- 最近的记忆信息优先级更高",
+                "- 必须为每一组都输出一个 <merged_memory> 块，且 group 字段与组编号对应",
+                "- 只输出 <merged_memory> 标签内的内容，不要有其他说明",
+                "- JSON格式必须有效，字符串中的换行符使用 \\n 表示",
+            ]
+        )
+        prompt = "\n".join(prompt_lines)
+
+        results: List[Optional[Dict[str, Any]]] = [None] * len(groups)
+        try:
+            if self.platform is None:
+                raise ValueError("Platform is not initialized")
+
+            # 调用大模型 - 收集完整响应
+            response_parts = []
+            for chunk_type, chunk_content in self.platform.chat(prompt):
+                if chunk_type == "content":
+                    response_parts.append(chunk_content)
+            response = "".join(response_parts)
+
+            # 解析响应：提取所有 <merged_memory> 块
+            import re
+
+            from jarvis.jarvis_utils.jsonnet_compat import loads as json5_loads
+
+            blocks = re.findall(
+                r"<merged_memory>(.*?)</merged_memory>",
+                response,
+                re.DOTALL | re.IGNORECASE,
+            )
+            for block in blocks:
+                try:
+                    result = json5_loads(block.strip())
+                    group_idx = result.get("group")
+                    if group_idx is None:
+                        continue
+                    # 组编号是 1-based，转成 0-based 索引
+                    pos = int(group_idx) - 1
+                    if 0 <= pos < len(groups):
+                        results[pos] = {
+                            "content": result.get("content", ""),
+                            "tags": result.get("tags", []),
+                            "type": groups[pos][0].get("type", "unknown"),
+                            "merged_from": [m.get("id", "") for m in groups[pos]],
+                        }
+                except (ValueError, Exception):
+                    continue
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 调用大模型批量合并记忆失败: {str(e)}")
+
+        return results
+
     def organize_memories(
         self,
         memory_type: str,
@@ -282,46 +441,128 @@ class MemoryOrganizer:
                     f"ℹ️ 发现 {len(groups)} 个具有 2 个重叠标签的记忆组"
                 )
 
+                # 批量合并参数：小组（<= 4 条）打包成批调用，大组单独调用
+                # 每批小组数上限（防止单批输出过长）
+                BATCH_MAX_GROUPS = 5
+                BATCH_MAX_GROUP_SIZE = 4
+
+                # 基于 token 预算动态分批：预留 20% 给输出，避免输入超模型上限
+                try:
+                    max_input_tokens = get_max_input_token_count()
+                except Exception:
+                    max_input_tokens = 0
+                batch_token_budget = (
+                    int(max_input_tokens * 0.8) if max_input_tokens > 0 else 0
+                )
+
+                # 预处理所有组：按原顺序贪心去重（跳过含已删除记忆的组），并转换索引
+                pending_groups = []  # (original_indices, group_memories)
+                pre_deleted = set()
                 for group in groups:
-                    # 将活跃索引转换回原始索引
                     original_indices = set()
                     for active_idx in group:
                         original_idx = active_memories[active_idx][0]
                         original_indices.add(original_idx)
-
+                    # 贪心去重：若组内任一记忆已删除，跳过
+                    if pre_deleted & original_indices:
+                        continue
                     group_memories = [memories[i] for i in original_indices]
+                    pending_groups.append((original_indices, group_memories))
+                    pre_deleted.update(original_indices)
 
-                    # 显示将要合并的记忆（先拼接后统一打印，避免循环逐条输出）
+                # 拆分：小组合并进批，大组单独
+                small_groups = [
+                    pg for pg in pending_groups if len(pg[1]) <= BATCH_MAX_GROUP_SIZE
+                ]
+                large_groups = [
+                    pg for pg in pending_groups if len(pg[1]) > BATCH_MAX_GROUP_SIZE
+                ]
+
+                # 批量合并小组：按 token 预算动态分批（同时受每批组数上限约束）
+                batches = []
+                current_batch = []
+                current_tokens = 0
+                for pg in small_groups:
+                    # 估算该组的输入 token
+                    group_text = "\n".join(
+                        f"记忆ID: {m.get('id', '')}\n标签: {','.join(m.get('tags', []))}\n内容:{m.get('content', '')}"
+                        for m in pg[1]
+                    )
+                    group_tokens = get_context_token_count(group_text)
+                    # 达到组数上限或 token 预算时开新批
+                    if current_batch and (
+                        len(current_batch) >= BATCH_MAX_GROUPS
+                        or (
+                            batch_token_budget > 0
+                            and current_tokens + group_tokens > batch_token_budget
+                        )
+                    ):
+                        batches.append(current_batch)
+                        current_batch = []
+                        current_tokens = 0
+                    current_batch.append(pg)
+                    current_tokens += group_tokens
+                if current_batch:
+                    batches.append(current_batch)
+
+                for batch in batches:
+                    batch_memories = [pg[1] for pg in batch]
+
+                    # 显示将要合并的记忆
+                    for original_indices, group_memories in batch:
+                        lines = ["", f"准备合并 {len(group_memories)} 个记忆:"]
+                        for mem in group_memories:
+                            lines.append(
+                                f"  - ID: {mem.get('id', '未知')}, "
+                                f"标签: {', '.join(mem.get('tags', []))[:50]}..."
+                            )
+                        PrettyOutput.auto_print(f"ℹ️ {'\n'.join(lines)}")
+
+                    if not dry_run:
+                        merged_results = self._merge_memories_batch_with_llm(
+                            batch_memories
+                        )
+                        for (original_indices, group_memories), merged_memory in zip(
+                            batch, merged_results
+                        ):
+                            if merged_memory is None:
+                                PrettyOutput.auto_print("  ⚠️ 跳过这组记忆的合并")
+                                continue
+                            self._save_merged_memory(
+                                merged_memory,
+                                memory_type,
+                                [memories[i] for i in original_indices],
+                            )
+                            stats["processed_groups"] += 1
+                            stats["merged_memories"] += len(original_indices)
+                            stats["created_memories"] += 1
+                            deleted_indices.update(original_indices)
+                    else:
+                        PrettyOutput.auto_print("  ℹ️ [模拟运行] 跳过实际合并")
+
+                # 大组单独合并
+                for original_indices, group_memories in large_groups:
                     lines = ["", f"准备合并 {len(group_memories)} 个记忆:"]
                     for mem in group_memories:
                         lines.append(
                             f"  - ID: {mem.get('id', '未知')}, "
                             f"标签: {', '.join(mem.get('tags', []))[:50]}..."
                         )
-                    joined_lines = "\n".join(lines)
-                    PrettyOutput.auto_print(f"ℹ️ {joined_lines}")
+                    PrettyOutput.auto_print(f"ℹ️ {'\n'.join(lines)}")
 
                     if not dry_run:
-                        # 合并记忆
                         merged_memory = self._merge_memories_with_llm(group_memories)
-
-                        # 如果合并失败，跳过这组
                         if merged_memory is None:
                             PrettyOutput.auto_print("  ⚠️ 跳过这组记忆的合并")
                             continue
-
-                        # 保存新记忆
                         self._save_merged_memory(
                             merged_memory,
                             memory_type,
                             [memories[i] for i in original_indices],
                         )
-
                         stats["processed_groups"] += 1
                         stats["merged_memories"] += len(original_indices)
                         stats["created_memories"] += 1
-
-                        # 标记这些记忆已被删除
                         deleted_indices.update(original_indices)
                     else:
                         PrettyOutput.auto_print("  ℹ️ [模拟运行] 跳过实际合并")
