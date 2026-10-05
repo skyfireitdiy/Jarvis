@@ -271,6 +271,7 @@ class CodeAgent(Agent):
             "sub_code_agent",  # 子代码Agent工具，用于创建子Agent执行独立任务
             "eval_js",  # 前端 JS 执行工具（Web 网关模式下向前端浏览器下发 JS）
             "jarvis_frontend",  # Jarvis前端工具（通知前端打开文件/跳转行/选中代码）
+            "timer",  # 定时器工具（支持 after/at/loop 定时执行，含 cancel/list/clear 管理）
         ]
         # 如果启用了任务列表管理器，添加相应工具
         if enable_task_list_manager:
