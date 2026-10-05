@@ -2956,6 +2956,13 @@ function activateWorkspacePane(paneId, { moveFocus = false } = {}) {
   if (!findWorkspacePaneById(workspacePaneTree.value, paneId)) return
   if (activePaneId.value === paneId) return
   activePaneId.value = paneId
+  // 激活会话 pane 时同步当前 Agent，使侧边栏 Agent 高亮跟随切换（与 activatePanel 一致）
+  const pane = findWorkspacePaneById(workspacePaneTree.value, paneId)
+  if (pane && pane.view === 'session' && pane.sessionPanelId) {
+    const panel = panels.value.find(p => p.id === pane.sessionPanelId)
+    const agent = panel?.agentId ? agentList.value.find(a => a.agent_id === panel.agentId) : null
+    if (agent) switchAgent(agent)
+  }
   // 激活 pane 会切换 Monaco 容器（只有激活 pane 渲染真实容器），需重建视图
   nextTick(() => {
     remountMonacoEditor()
@@ -9209,6 +9216,18 @@ const globalSearchAgentId = ref(null)
 const gitAgentId = ref(null)
 const effectiveGlobalSearchAgentId = computed(() => globalSearchAgentId.value || currentAgentId.value)
 const effectiveGitAgentId = computed(() => gitAgentId.value || currentAgentId.value)
+
+// Git 视图作用的目标 Agent 变化时，若当前停留在 Git 视图，则按新 Agent 的工作目录重新拉取。
+// 监听 effectiveGitAgentId（而非仅 activeWorkspaceSessionId）：点击 session 面板切换 Agent
+// 会更新 currentAgentId（进而改变 effectiveGitAgentId），但不会改变 activeWorkspaceSessionId，
+// 否则 Git 面板的 commit 列表不会跟随新 Agent 刷新。
+watch(effectiveGitAgentId, () => {
+  if (!showWorkspacePanel.value || workspaceSidebarView.value !== 'git') return
+  nextTick(() => {
+    refreshGitView()
+  })
+})
+
 const stoppedAgents = computed(() => {
   return agentList.value.filter(agent => isStoppedAgent(agent))
 })
