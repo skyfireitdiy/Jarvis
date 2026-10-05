@@ -69,6 +69,55 @@
 
 ---
 
+## 第二轮进化（2026-10-05 晚）—— 完成阶段 A 闭环（A1/A2/A3）
+
+> 在第一轮基础上，本轮聚焦 evolution_plan.md 阶段 A 的三个 P0 项，形成「需求澄清 → 主动建议 → 跨会话学习」闭环。
+
+### 安全回退点
+
+- 本轮初始 commit：`e37ebdabf20d6863ee00d5a32dfc4f2d06c29307`
+
+### 4. ✅ A3 跨会话主动检索增强（task-1）
+
+**问题**：`prepare_memory_tags_prompt()` 只列出记忆标签，让模型自行决定是否检索，跨会话学习依赖模型自觉、不可靠。
+**方案**：`memory_manager.py` 新增 `prepare_memory_context_prompt(user_input)`，用 `SmartRetriever.semantic_search` 检索 `project_long_term`/`global_long_term` 记忆（limit=5，单条截断 500 字符，异常返回空串）；在 `_first_run()` 中 `prepare_memory_tags_prompt()` 之后调用，将检索结果注入会话 prompt。
+**文件**：`src/jarvis/jarvis_agent/memory_manager.py`、`src/jarvis/jarvis_agent/__init__.py`
+**测试**：新增 `tests/jarvis_agent/test_memory_context_prompt.py`（7 个用例），jarvis_agent 全套 233 passed。
+
+### 5. ✅ A1 需求澄清增强（task-2）
+
+**问题**：提示词虽写"需求不明确时先询问"，但缺少系统性的需求模糊度检测机制。
+**方案**：新增 `requirement_clarifier.py`：
+
+- `detect_ambiguous_requirement(user_input)`：启发式规则（中英文模糊表述模式、文本过短<15字符、缺少具体对象、模糊代词）
+- `build_clarification_prompt()`
+  Agent 新增 `_clarify_ambiguous_requirement`，在 `run()` 中 `_classify_and_switch_model` 之后调用（仅 `first` 且非 `quick_mode`）；非交互模式直接返回原始输入避免卡住；检测到模糊时用 `_multiline_input` 询问，用户输入"继续"则不改，否则追加 `[补充信息]`。
+  **文件**：`src/jarvis/jarvis_agent/requirement_clarifier.py`（新增）、`src/jarvis/jarvis_agent/__init__.py`
+  **测试**：新增 `tests/jarvis_agent/test_requirement_clarifier.py`（17 个用例），jarvis_agent 全套 250 passed。
+  **手动验证**：6 个明确需求全部判明确；20 个中文模糊 + 7 个英文模糊需求全部判模糊。
+
+### 6. ✅ A2 主动建议机制（task-3）
+
+**问题**：任务完成后缺少主动给出"下一步建议"的机制。
+**方案**：Agent 新增 `_generate_proactive_suggestions`，分析 `__executed_tools__` 列表与记忆标签，针对性生成建议：
+
+- 修改代码（edit_file/write_file）→ 建议跑测试验证
+- 执行脚本（execute_script）→ 建议检查输出
+- 仅分析未修改（read_code/lsp）→ 提示可进入实现
+- 多步骤任务 → 建议沉淀为方法论
+- 有记忆标签 → 建议检索相关记忆
+  在 `_complete_task` 结尾调用，异常时 `save_exception` 并 pass，不影响主流程。
+  **文件**：`src/jarvis/jarvis_agent/__init__.py`
+  **测试**：新增 `tests/jarvis_agent/test_proactive_suggestions.py`（8 个用例），jarvis_agent 全套 258 passed。
+
+### 第二轮验证汇总
+
+- `python3 -m pytest tests/jarvis_agent/`：**258 passed, 0 failed**（含新增 32 用例）
+- `ruff check src/jarvis/`：**0 错误**
+- 所有修改文件通过 `ast.parse` 语法检查
+
+---
+
 ## 验证汇总
 
 - `python3 -m pytest tests/`：**1404 passed, 0 failed**（全套回归通过）
@@ -77,12 +126,15 @@
 
 ## 进化路线建议（下一步）
 
-1. **前端 Agent 状态 UI 增强**：当前广播已就绪，前端 `status_update` 分支已能识别 `agent_id` 定位。可进一步在侧边栏 Agent 列表实时展示 running/stopped 状态徽标（当前仅依赖轮询/会话内消息）。
-2. **A1 需求澄清闭环**（evolution_plan.md 阶段 A P0）：任务描述含糊时主动澄清，降低返工。
-3. **A3 跨会话持续学习**：任务开始前自动检索相关历史经验注入上下文。
+> 阶段 A 闭环（A1/A2/A3）已达成。以下为后续高价值方向：
+
+1. **阶段 A 实战打磨**：在多轮真实任务中观察需求澄清、主动建议、跨会话检索的实际效果，按需调优阈值与提示文案，避免误报/漏报。
+2. **A3 沉淀侧自动化**：当前"任务结束后自动沉淀经验"依赖主动建议的提示，可进一步实现自动判断并沉淀值得保留的经验（而非仅提示）。
+3. **前端 Agent 状态 UI 增强**：侧边栏 Agent 列表实时展示 running/stopped 状态徽标（基于已就绪的 `status_update` 广播）。
+4. **阶段 B 轻量启动**：复杂度/重复度分析、测试生成、文档生成（evolution_plan.md 阶段 B）。
 
 ## 最后更新
 
-- 时间：2026-10-05
+- 时间：2026-10-05（晚，第二轮：完成阶段 A 闭环）
 - 执行者：Jarvis
 - 监督者：skyfire

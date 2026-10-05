@@ -57,6 +57,68 @@ class MemoryManager:
             return "memory" in tool_names
         return False
 
+    def prepare_memory_context_prompt(self, user_input: str) -> str:
+        """主动检索与当前任务相关的历史记忆并注入上下文
+
+        与 prepare_memory_tags_prompt 不同，此方法直接执行语义检索，
+        将最相关的记忆内容注入到会话上下文中，而非仅列出标签让模型自行检索。
+
+        参数:
+            user_input: 当前任务的用户输入文本
+
+        返回:
+            str: 格式化后的相关记忆提示，无相关记忆时返回空字符串
+        """
+        if not user_input or not user_input.strip():
+            return ""
+
+        # 仅在存在记忆目录且有记忆文件时执行检索，避免无谓开销
+        try:
+            from pathlib import Path
+
+            from jarvis.jarvis_utils.config import get_data_dir
+
+            # 检查项目记忆目录和全局记忆目录是否存在
+            project_dir = Path(".jarvis/memory")
+            global_dir = Path(get_data_dir()) / "memory"
+            if not project_dir.exists() and not global_dir.exists():
+                return ""
+        except Exception:
+            return ""
+
+        try:
+            from jarvis.jarvis_memory_organizer.smart_retrieval import SmartRetriever
+
+            retriever = SmartRetriever()
+            memories = retriever.semantic_search(
+                query=user_input,
+                memory_types=["project_long_term", "global_long_term"],
+                limit=5,
+            )
+            if not memories:
+                return ""
+
+            # 格式化检索结果
+            prompt = "\n\n📚 基于当前任务自动检索到以下相关历史记忆（供参考）："
+            for i, memory in enumerate(memories):
+                content = (memory.content or "").strip()
+                if not content:
+                    continue
+                # 限制单条记忆长度，避免撑爆上下文
+                if len(content) > 500:
+                    content = content[:500] + "..."
+                tags_str = "/".join(memory.tags) if memory.tags else "无标签"
+                prompt += f"\n\n[{i + 1}] ({memory.type} | {tags_str})\n{content}"
+
+            return prompt
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_agent.memory_manager",
+                function="prepare_memory_context_prompt",
+            )
+            return ""
+
     def _format_memory_tags(self, memory_tags: dict[str, Any]) -> str:
         """格式化记忆标签"""
         prompt = "\n\n系统中存在以下记忆标签，你可以使用 memory 工具（action=retrieve）检索相关记忆："

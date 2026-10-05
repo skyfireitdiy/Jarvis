@@ -956,7 +956,154 @@ class Agent:
         """按任务性质把推荐采样温度应用到当前模型（委托至 ModelSwitcher）"""
         return self._model_switcher.apply_task_temperature(temperature)
 
+    def _clarify_ambiguous_requirement(
+        self, user_input: Union[str, List[ContentBlock]]
+    ) -> Union[str, List[ContentBlock]]:
+        """检测用户需求是否模糊，在交互模式下主动澄清
+
+        使用启发式规则检测需求是否含糊不清。若检测到模糊且处于交互模式，
+        主动向用户询问补充信息。
+
+        参数:
+            user_input: 用户输入的需求描述
+
+        返回:
+            澄清后的用户输入（交互模式下），或原始输入（非交互模式/无需澄清）
+        """
+        # 非交互模式下跳过澄清，避免卡住
+        if getattr(self, "non_interactive", False):
+            return user_input
+
+        # 提取文本部分用于检测
+        if isinstance(user_input, list):
+            text_parts = []
+            for block in user_input:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    text_parts.append(block.get("text", ""))
+            text = "\n".join(text_parts) if text_parts else ""
+        else:
+            text = user_input
+
+        if not text or not text.strip():
+            return user_input
+
+        # 检测需求是否模糊
+        try:
+            from jarvis.jarvis_agent.requirement_clarifier import (
+                build_clarification_prompt,
+                detect_ambiguous_requirement,
+            )
+
+            is_ambiguous, reasons = detect_ambiguous_requirement(text)
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_agent.__init__",
+                function="_clarify_ambiguous_requirement",
+            )
+            return user_input
+
+        if not is_ambiguous:
+            return user_input
+
+        # 交互模式下主动向用户澄清
+        try:
+            from jarvis.jarvis_utils.output import PrettyOutput
+
+            PrettyOutput.auto_print(
+                f"⚠ 检测到需求可能含糊（{'; '.join(reasons)}），主动向您确认："
+            )
+            clarification = self._multiline_input(
+                build_clarification_prompt(), print_on_empty=True
+            )
+            if clarification and clarification.strip():
+                clarification = clarification.strip()
+                if clarification != "继续":
+                    # 将澄清内容追加到用户输入
+                    if isinstance(user_input, str):
+                        return f"{user_input}\n\n[补充信息] {clarification}"
+                    else:
+                        return user_input + cast(
+                            List[ContentBlock],
+                            [{"type": "text", "text": f"\n[补充信息] {clarification}"}],
+                        )
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_agent.__init__",
+                function="_clarify_ambiguous_requirement",
+            )
+            pass
+
+        return user_input
+
+    def _generate_proactive_suggestions(self) -> str:
+        """基于本次任务执行情况，主动生成下一步建议。
+
+        通过分析本次会话已执行的工具序列，推断任务所处阶段，
+        给出有针对性的后续行动建议（如验证、沉淀、检索等），
+        帮助智能体更高效地推进工作。
+
+        返回:
+            建议文本（可能为空字符串，表示无建议）
+        """
+        try:
+            executed = self.get_user_data("__executed_tools__")
+            executed = executed if isinstance(executed, list) else []
+            if not executed:
+                return ""
+
+            executed_set = set(executed)
+            suggestions: List[str] = []
+
+            # 1. 修改了代码 → 建议运行测试/构建验证
+            if executed_set & {"edit_file", "edit_file_by_line", "write_file"}:
+                suggestions.append(
+                    "🔧 本次修改了代码文件，建议运行相关测试（pytest）或构建验证改动是否生效、有无回归。"
+                )
+
+            # 2. 执行了脚本 → 建议检查输出
+            if executed_set & {"execute_script", "daemon_call"}:
+                suggestions.append(
+                    "🖥 本次执行了脚本/命令，建议确认输出是否符合预期，必要时清理临时产物。"
+                )
+
+            # 3. 读取了代码但未修改 → 提示可进入实现阶段
+            if executed_set & {"read_code", "lsp", "symbol_dependency"} and not (
+                executed_set & {"edit_file", "edit_file_by_line", "write_file"}
+            ):
+                suggestions.append(
+                    "📖 本次主要进行了代码分析，若已明确目标，可着手实施最小改动并验证。"
+                )
+
+            # 4. 多步骤任务 → 建议沉淀为方法论
+            if len(executed) >= 3:
+                suggestions.append(
+                    "🧠 本次任务涉及多步骤操作，若有可复用的经验或踩坑记录，建议通过 memory 工具沉淀为长期记忆，便于后续复用。"
+                )
+
+            # 5. 有记忆标签 → 建议检索相关记忆
+            memory_tags = self.get_memory_tags()
+            if memory_tags:
+                tags_str = ", ".join(f"`{tag}`" for tag in memory_tags[:3])
+                suggestions.append(
+                    f"💡 本次产生了记忆标签（{tags_str} 等），可结合 memory 工具检索相关历史经验，避免重复踩坑。"
+                )
+
+            if not suggestions:
+                return ""
+
+            return "📌 **主动建议**：\n" + "\n".join(f"- {s}" for s in suggestions)
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_agent.__init__",
+                function="_generate_proactive_suggestions",
+            )
+            return ""
+
     def _setup_system_prompt(self) -> None:
+        """设置系统提示词"""
         """设置系统提示词"""
         prompt_text = self.prompt_manager.build_system_prompt(self)
         self.model.set_system_prompt(prompt_text)
@@ -1817,6 +1964,19 @@ class Agent:
             memory_hint = f"\n\n💡 **记忆标签提示**: 本次任务产生了以下记忆标签: {tags_str}\n你可以使用 `memory` 工具（action=retrieve）通过这些标签检索相关记忆，获取更多详细信息。"
             result = result + memory_hint
 
+        # 主动建议：基于任务执行情况给出下一步建议
+        try:
+            suggestions = self._generate_proactive_suggestions()
+            if suggestions:
+                result = result + "\n\n" + suggestions
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_agent.__init__",
+                function="_complete_task",
+            )
+            pass
+
         return result
 
     def make_default_addon_prompt(self, need_complete: bool) -> str:
@@ -1977,6 +2137,10 @@ class Agent:
                     self._classify_and_switch_model(
                         user_input, classify_user_request, get_system_prompt
                     )
+
+                # 需求模糊度检测与澄清（仅首次运行且非极速模式）
+                if self.first and not self.quick_mode:
+                    user_input = self._clarify_ambiguous_requirement(user_input)
 
             non_interactive_note = ""
             if getattr(self, "non_interactive", False):
@@ -2247,6 +2411,14 @@ class Agent:
         # 准备记忆标签提示
         memory_tags_prompt = self.memory_manager.prepare_memory_tags_prompt()
 
+        # 主动检索与当前任务相关的历史记忆
+        if self.session.prompt:
+            memory_context_prompt = self.memory_manager.prepare_memory_context_prompt(
+                ensure_str(self.session.prompt)
+            )
+        else:
+            memory_context_prompt = ""
+
         # 极速模式下跳过自动规则选择
         if not self.quick_mode:
             # 自动选择并加载规则（如果用户未指定规则且启用了自动规则选择）
@@ -2256,6 +2428,10 @@ class Agent:
         # 添加记忆标签提示
         if memory_tags_prompt:
             self.session.prompt = f"{self.session.prompt}{memory_tags_prompt}"
+
+        # 添加主动检索到的相关记忆
+        if memory_context_prompt:
+            self.session.prompt = f"{self.session.prompt}{memory_context_prompt}"
 
         # 标记首次运行初始化已执行（供首轮无工具调用检测使用）
         self._first_run_occurred = True

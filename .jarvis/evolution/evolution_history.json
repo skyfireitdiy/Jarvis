@@ -163,5 +163,41 @@
       "verification": "全部 28 个 daemon 测试通过，修复完整无回归",
       "commits": ["f757bbf4"]
     }
+  },
+  {
+    "timestamp": "2026-10-05T20:02:00Z",
+    "phase": "自由进化会话（2026-10-05 第二轮）",
+    "task": "A3-跨会话主动检索增强",
+    "action": "在任务开始前自动检索相关历史记忆并注入上下文",
+    "result": {
+      "status": "completed",
+      "detail": "memory_manager.py 新增 prepare_memory_context_prompt(user_input)，用 SmartRetriever.semantic_search 检索 project_long_term/global_long_term 记忆（limit=5，单条截断 500 字符），在 _first_run 中调用并将结果注入会话 prompt，使跨会话学习不再依赖模型自觉。",
+      "verification": "新增 tests/jarvis_agent/test_memory_context_prompt.py 7 个用例通过；jarvis_agent 全套 233 passed；ruff 0 错误",
+      "commits": ["e37ebdab..0b3d129"]
+    }
+  },
+  {
+    "timestamp": "2026-10-05T20:02:00Z",
+    "phase": "自由进化会话（2026-10-05 第二轮）",
+    "task": "A1-需求澄清增强",
+    "action": "检测用户需求是否模糊并在交互模式下主动澄清",
+    "result": {
+      "status": "completed",
+      "detail": "新增 requirement_clarifier.py：detect_ambiguous_requirement（启发式：模糊表述中英文模式、文本过短<15字符、缺少具体对象、模糊代词）与 build_clarification_prompt。Agent 新增 _clarify_ambiguous_requirement，在 run() 中（first 且非 quick_mode）调用；非交互模式跳过避免卡住；用户输入'继续'则不改，否则追加[补充信息]。",
+      "verification": "新增 tests/jarvis_agent/test_requirement_clarifier.py 17 个用例通过；jarvis_agent 全套 250 passed；ruff 0 错误",
+      "commits": ["e37ebdab..0b3d129"]
+    }
+  },
+  {
+    "timestamp": "2026-10-05T20:02:00Z",
+    "phase": "自由进化会话（2026-10-05 第二轮）",
+    "task": "A2-主动建议机制",
+    "action": "任务完成后基于执行情况主动给出下一步建议",
+    "result": {
+      "status": "completed",
+      "detail": "Agent 新增 _generate_proactive_suggestions：分析 __executed_tools__ 列表与记忆标签，针对性建议（修改代码→跑测试、执行脚本→检查输出、仅分析→可进入实现、多步骤→沉淀方法论、有记忆标签→检索记忆）。在 _complete_task 结尾调用，异常时 save_exception 并 pass，不影响主流程。",
+      "verification": "新增 tests/jarvis_agent/test_proactive_suggestions.py 8 个用例通过；jarvis_agent 全套 258 passed；ruff 0 错误",
+      "commits": ["e37ebdab..0b3d129"]
+    }
   }
 ]
