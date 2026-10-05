@@ -160,7 +160,11 @@
 
 ---
 
-### 2.6 Agent SDK（优化）
+### 2.6 Agent SDK（优化）—— ❌ 已删除，不实施
+
+> **状态更新（2026-10-05）**：该方案曾实现为 `src/jarvis/jarvis_agent/sdk.py`，但经审查发现 `run_agents_parallel` 并行编排 API 在真实 `CodeAgent` 下存在严重并发问题：① `set_current_agent` 写进程级全局栈，并行时 `get_current_agent()` 会返回错误的 Agent；② `os.getcwd()`/`os.chdir` 是进程级全局，并行时各线程工作目录互相串扰，可能让任务在错误的仓库执行。因此该 SDK 模块及其测试、文档引用已全部删除，**不再实施**。Jarvis 的编程入口仍为 `CodeAgent`/`Agent` 类（`from jarvis.jarvis_code_agent.code_agent import CodeAgent`）。
+
+**原方案（已废弃）**：
 
 **现状核实**：Jarvis 有 Python SDK（`from jarvis.jarvis_code_agent.code_agent import CodeAgent`），可调用 Agent 执行任务，但定位是"调用 Agent"而非"构建自定义 Agent 的完整 SDK 生态"。
 

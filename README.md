@@ -390,51 +390,9 @@ agent = Agent(system_prompt="你是一个专业的文档维护助手。", name="
 agent.run('分析 README.md，补充用户群体信息')
 ```
 
-### SDK 进阶用法（编排 / 结构化输出 / 回调）
+---
 
-`jarvis.jarvis_agent.sdk` 提供高层编排 API，复用现有 Agent 机制，纯增量无副作用。
-
-```python
-from jarvis.jarvis_code_agent.code_agent import CodeAgent
-from jarvis.jarvis_agent.sdk import (
-    run_agents_parallel,
-    pipeline,
-    run_structured,
-    on_event,
-    EVENT_TASK_COMPLETED,
-)
-
-# 1. 并行编排：多个独立 Agent 同时运行
-results = run_agents_parallel([
-    (CodeAgent(non_interactive=True), "分析 src/ 目录结构"),
-    (CodeAgent(non_interactive=True), "统计测试用例数量"),
-])
-# results 与输入顺序对应，失败位置为 None
-
-# 2. 串行管道：前一个 Agent 输出作为后一个输入
-results = pipeline([
-    (CodeAgent(non_interactive=True), "生成项目变更摘要"),
-    (CodeAgent(non_interactive=True), lambda prev: f"把以下摘要翻译成英文：\n{prev}"),
-])
-
-# 3. 结构化输出：让 Agent 按 JSON schema 返回可解析结果
-data = run_structured(
-    CodeAgent(non_interactive=True),
-    "分析当前仓库的技术栈",
-    schema={"type": "object", "properties": {"languages": {"type": "array"}}},
-)
-# data 是解析后的 Python dict/list
-
-# 4. 生命周期回调：订阅 Agent 事件（复用 event_bus）
-agent = CodeAgent(non_interactive=True)
-def on_done(agent=None, **kwargs):
-    print(f"Agent {agent.name} 完成任务")
-on_event(agent, EVENT_TASK_COMPLETED, on_done)
-```
-
-> 说明：`run_agents_parallel` 用线程池并行运行独立 Agent；`pipeline` 串行传递输出；
-> `run_structured` 要求 Agent 只输出 JSON 并解析（容忍 Markdown 代码块包裹）；
-> `on_event` 封装 `event_bus.subscribe`，事件名见 `jarvis.jarvis_agent.events`。
+## ⚙ 配置说明
 
 ---
 
