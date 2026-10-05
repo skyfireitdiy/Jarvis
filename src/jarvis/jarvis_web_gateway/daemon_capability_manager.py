@@ -84,8 +84,9 @@ DAEMON_RELEASE_BASE_URL = os.environ.get(
 DAEMON_LATEST_VERSION = str(JARVIS_VERSION or "").strip()
 
 # 支持的平台/架构（与 .github/workflows/release-daemon.yml 的构建矩阵一致，无 macOS）。
+# 注意：arm = ARMv7 32 位（如 hinas 的 ARMv7 盒子），release 矩阵会构建 linux/arm。
 DAEMON_SUPPORTED_OS = ("linux", "windows")
-DAEMON_SUPPORTED_ARCH = ("amd64", "arm64")
+DAEMON_SUPPORTED_ARCH = ("amd64", "arm64", "arm")
 
 
 def _load_daemon_assets() -> Dict[str, Dict[str, Any]]:
@@ -179,6 +180,10 @@ def _resolve_daemon_platform(source: Any) -> Tuple[str, str]:
         "x86_64": "amd64",
         "x64": "amd64",
         "aarch64": "arm64",
+        # ARMv7 32 位（如树莓派 2/3 32 位系统、ARM 盒子）可能上报 armv7l/armv7，归一化为 arm。
+        "armv7l": "arm",
+        "armv7": "arm",
+        "armhf": "arm",
     }
     arch = arch_alias.get(arch, arch)
     return os_name, arch

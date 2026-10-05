@@ -85,6 +85,10 @@ def test_resolve_platform_normalizes_arch_aliases():
         dcm._resolve_daemon_platform({"build_info": {"arch": "aarch64"}})[1] == "arm64"
     )
     assert dcm._resolve_daemon_platform({"build_info": {"arch": "x64"}})[1] == "amd64"
+    # ARMv7 32 位（如 hinas 的 ARM 盒子）可能上报 armv7l/armv7 → 归一化为 arm。
+    assert dcm._resolve_daemon_platform({"build_info": {"arch": "armv7l"}})[1] == "arm"
+    assert dcm._resolve_daemon_platform({"build_info": {"arch": "armv7"}})[1] == "arm"
+    assert dcm._resolve_daemon_platform({"build_info": {"arch": "arm"}})[1] == "arm"
 
 
 # ----------------------------------------------------------------------
@@ -172,6 +176,20 @@ def test_build_update_windows_url(monkeypatch):
     assert info["available"] is True
     assert info["asset"] == "jarvis-daemon_windows_arm64.zip"
     assert info["url"].endswith("/v2.0.0/jarvis-daemon_windows_arm64.zip")
+
+
+def test_build_update_linux_arm(monkeypatch):
+    """linux/arm（ARMv7 32 位，如 hinas）→ 匹配 linux_arm 产物并下发。"""
+    monkeypatch.setattr(dcm, "DAEMON_LATEST_VERSION", "v6.0.10")
+    monkeypatch.setattr(
+        dcm, "DAEMON_RELEASE_BASE_URL", "https://github.com/o/r/releases/download"
+    )
+    monkeypatch.setattr(dcm, "DAEMON_ASSETS", {})
+    info = dcm._build_daemon_update("v6.0.9", "linux", "arm")
+    assert info is not None
+    assert info["available"] is True
+    assert info["asset"] == "jarvis-daemon_linux_arm.tar.gz"
+    assert info["url"].endswith("/v6.0.10/jarvis-daemon_linux_arm.tar.gz")
 
 
 def test_build_update_unsupported_platform(monkeypatch):
