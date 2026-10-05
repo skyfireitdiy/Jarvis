@@ -272,6 +272,60 @@ def get_git_commit_prompt() -> str:
     return cast(str, GLOBAL_CONFIG_DATA.get("git_commit_prompt", ""))
 
 
+def get_after_change_tools_config() -> Dict[str, List[str]]:
+    """获取文件变更后处理工具命令配置（从 config.yaml 读取）
+
+    配置项 after_change_tools 的键为文件扩展名/文件名，值为命令模板列表。
+    支持格式: ["template1", "template2"] 或 [("tool1", "template1"), ("tool2", "template2")]。
+    键会统一转为小写。
+
+    返回:
+        Dict[str, List[str]]: 文件扩展名/文件名 -> 命令模板列表，未配置时返回空字典
+    """
+    raw = GLOBAL_CONFIG_DATA.get("after_change_tools", {})
+    if not isinstance(raw, dict):
+        return {}
+    result: Dict[str, List[str]] = {}
+    for k, v in raw.items():
+        if not isinstance(v, list) or not v:
+            continue
+        k_lower = str(k).lower()
+        if isinstance(v[0], str):
+            # 新格式：直接是命令模板列表
+            result[k_lower] = v
+        elif isinstance(v[0], (list, tuple)) and len(v[0]) == 2:
+            # 旧格式：需要提取模板
+            result[k_lower] = [template for _, template in v]
+    return result
+
+
+def get_lint_tools_config() -> Dict[str, List[str]]:
+    """获取 lint 工具命令配置（从 config.yaml 读取）
+
+    配置项 lint_tools 的键为文件扩展名/文件名，值为命令模板列表。
+    支持格式: ["template1", "template2"] 或 [("tool1", "template1"), ("tool2", "template2")]。
+    键会统一转为小写。
+
+    返回:
+        Dict[str, List[str]]: 文件扩展名/文件名 -> 命令模板列表，未配置时返回空字典
+    """
+    raw = GLOBAL_CONFIG_DATA.get("lint_tools", {})
+    if not isinstance(raw, dict):
+        return {}
+    result: Dict[str, List[str]] = {}
+    for k, v in raw.items():
+        if not isinstance(v, list) or not v:
+            continue
+        k_lower = str(k).lower()
+        if isinstance(v[0], str):
+            # 新格式：直接是命令模板列表
+            result[k_lower] = v
+        elif isinstance(v[0], (list, tuple)) and len(v[0]) == 2:
+            # 旧格式：需要提取模板
+            result[k_lower] = [template for _, template in v]
+    return result
+
+
 def get_jarvis_github_url() -> str:
     """
     获取Jarvis的GitHub仓库地址

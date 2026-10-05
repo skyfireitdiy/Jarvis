@@ -158,13 +158,62 @@ class RulesManager:
         self._load_project_rule_file()
 
     def _load_project_rule_file(self) -> None:
-        """自动加载项目 .jarvis/rules/rule.md 文件（项目综述）
+        """自动加载项目级综述规则（项目综述）
 
-        如果项目根目录下存在 .jarvis/rules/rule.md 文件，将其内容作为
-        特殊规则自动加载到规则系统中。
+        依次加载：
+        1. `.jarvis/rules/rule.md`（项目综述，优先级最高）
+        2. 仓库根 `AGENTS.md`（无则 `CLAUDE.md`，社区通用约定，作为补充来源）
+
+        两者共存时不冲突，合并注入。
         """
         # 使用 load_rule 方法加载，与其他规则一致
         self.load_rule("project:rule")
+        # 兼容社区约定：读取仓库根 AGENTS.md / CLAUDE.md，作为项目综述补充
+        self.load_rule("project:agents")
+
+    def _read_project_agents_file(self) -> Optional[str]:
+        """读取仓库根 AGENTS.md（无则 CLAUDE.md）作为项目综述补充。
+
+        优先级：AGENTS.md > CLAUDE.md。内容按模型最大输入 token 的 80% 预算
+        做截断，避免超大文件一次注入打爆上下文窗口。
+
+        返回：
+            处理后的内容字符串，若文件不存在或为空则返回 None。
+        """
+        for filename in ("AGENTS.md", "CLAUDE.md"):
+            file_path = os.path.join(self.root_dir, filename)
+            if not os.path.isfile(file_path):
+                continue
+            try:
+                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                    content = f.read().strip()
+                if not content:
+                    return None
+                # token 预算截断：预算 = 模型最大输入 token 的 80%
+                try:
+                    from jarvis.jarvis_utils.config import get_max_input_token_count
+                    from jarvis.jarvis_utils.embedding import get_context_token_count
+
+                    budget = int(get_max_input_token_count() * 0.8)
+                    if get_context_token_count(content) > budget:
+                        # 按预算截断到最近换行，保留首部要点
+                        head = content[: budget * 4]
+                        newline = head.rfind("\n")
+                        if newline > budget * 2:
+                            head = content[:newline]
+                        content = (
+                            head
+                            + f"\n\n[注：{filename} 内容较长，已按 token 预算截断；"
+                            "完整内容请用 `read_code` 工具读取原文]"
+                        )
+                except Exception:
+                    # 截断失败时忽略，保留完整内容
+                    pass
+                return content
+            except Exception:
+                # 读取失败时忽略，不影响主流程
+                return None
+        return None
 
     def _add_path_comment(self, rule_name: str, rule_content: str) -> str:
         """在规则内容前添加路径注释
@@ -703,6 +752,12 @@ class RulesManager:
 
                 # 处理 project 前缀
                 if prefix == "project":
+                    # 特殊规则：project:agents 读取仓库根 AGENTS.md/CLAUDE.md
+                    if actual_name == "agents":
+                        agents_content = self._read_project_agents_file()
+                        if agents_content:
+                            return self._add_path_comment(rule_name, agents_content)
+                        return None
                     project_rules_dir = os.path.join(self.root_dir, ".jarvis", "rules")
                     if os.path.exists(project_rules_dir) and os.path.isdir(
                         project_rules_dir
@@ -1037,6 +1092,13 @@ class RulesManager:
 
                 # 处理 project 前缀
                 elif prefix == "project":
+                    # 特殊规则：project:agents 对应仓库根 AGENTS.md/CLAUDE.md
+                    if actual_name == "agents":
+                        for filename in ("AGENTS.md", "CLAUDE.md"):
+                            p = os.path.join(self.root_dir, filename)
+                            if os.path.isfile(p):
+                                return p
+                        return "--"
                     return os.path.join(self.root_dir, ".jarvis", "rules", actual_name)
 
                 # 处理 global 前缀

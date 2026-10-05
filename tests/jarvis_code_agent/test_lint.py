@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """lint.py 单元测试"""
 
-from unittest.mock import patch, mock_open
+from unittest.mock import patch
 
+from jarvis.jarvis_utils.collections import CaseInsensitiveDict
+from jarvis.jarvis_utils.config import get_lint_tools_config
 from jarvis.jarvis_code_agent.lint import (
-    load_lint_tools_config,
     get_lint_commands_for_files,
     LINT_COMMAND_TEMPLATES_BY_FILE,
 )
@@ -33,21 +34,18 @@ class TestLintTools:
         dockerfile_templates = LINT_COMMAND_TEMPLATES_BY_FILE["dockerfile"]
         assert any("hadolint" in t for t in dockerfile_templates)
 
-    @patch("os.path.exists")
-    @patch("builtins.open", new_callable=mock_open)
-    @patch("yaml.safe_load")
-    def test_load_lint_tools_config_with_file(
-        self, mock_yaml_load, mock_file, mock_exists
-    ):
-        """测试从yaml文件加载配置"""
-        mock_exists.return_value = True
-        mock_yaml_load.return_value = {
-            ".custom": ["custom-linter {file_path}"],
-            ".PY": ["additional-python-linter {file_path}"],  # 测试大写转小写
-            ".new": ["new-linter1 {file_path}", "new-linter2 {file_path}"],
-        }
+    @patch("jarvis.jarvis_utils.config.GLOBAL_CONFIG_DATA")
+    def test_get_lint_tools_config_with_config(self, mock_config):
+        """测试从GLOBAL_CONFIG_DATA加载配置"""
+        mock_config.get.side_effect = lambda key, default=None: {
+            "lint_tools": {
+                ".custom": ["custom-linter {file_path}"],
+                ".PY": ["additional-python-linter {file_path}"],  # 测试大写转小写
+                ".new": ["new-linter1 {file_path}", "new-linter2 {file_path}"],
+            }
+        }.get(key, default)
 
-        result = load_lint_tools_config()
+        result = get_lint_tools_config()
 
         # 验证结果
         assert result[".custom"] == ["custom-linter {file_path}"]
@@ -55,27 +53,17 @@ class TestLintTools:
         assert result[".new"] == ["new-linter1 {file_path}", "new-linter2 {file_path}"]
         assert ".PY" not in result  # 大写版本不应存在
 
-    @patch("os.path.exists")
-    def test_load_lint_tools_config_no_file(self, mock_exists):
-        """测试配置文件不存在的情况"""
-        mock_exists.return_value = False
-
-        result = load_lint_tools_config()
-
+    @patch("jarvis.jarvis_utils.config.GLOBAL_CONFIG_DATA", CaseInsensitiveDict())
+    def test_get_lint_tools_config_no_config(self):
+        """测试未配置的情况"""
+        result = get_lint_tools_config()
         assert result == {}
 
-    @patch("os.path.exists")
-    @patch("builtins.open", new_callable=mock_open)
-    @patch("yaml.safe_load")
-    def test_load_lint_tools_config_empty_file(
-        self, mock_yaml_load, mock_file, mock_exists
-    ):
-        """测试空配置文件的情况"""
-        mock_exists.return_value = True
-        mock_yaml_load.return_value = None
-
-        result = load_lint_tools_config()
-
+    @patch("jarvis.jarvis_utils.config.GLOBAL_CONFIG_DATA")
+    def test_get_lint_tools_config_empty_config(self, mock_config):
+        """测试配置为空的情况"""
+        mock_config.get.return_value = None
+        result = get_lint_tools_config()
         assert result == {}
 
     def test_get_lint_commands_by_extension(self):
@@ -139,35 +127,27 @@ class TestLintTools:
         assert len(cmds) >= 1
         assert any("git-lint" in cmd for _, cmd in cmds)
 
-    @patch("jarvis.jarvis_code_agent.lint.get_data_dir")
-    @patch("os.path.exists")
-    @patch("builtins.open", new_callable=mock_open)
-    @patch("yaml.safe_load")
-    def test_config_merge(
-        self, mock_yaml_load, mock_file, mock_exists, mock_get_data_dir
-    ):
-        """测试配置合并功能"""
-        # 设置mock返回值
-        mock_get_data_dir.return_value = "/mock/data/dir"
-        mock_exists.return_value = True
-        mock_yaml_load.return_value = {
-            ".py": ["additional-linter {file_path}"],  # 应该更新现有配置
-            ".custom": ["custom-linter {file_path}"],  # 应该添加新配置
+    @patch("jarvis.jarvis_code_agent.lint.get_lint_tools_config")
+    def test_config_merge(self, mock_get_config):
+        """测试配置合并功能（从 config.yaml 读取）"""
+        # 模拟 config.yaml 中配置的 lint_tools
+        mock_get_config.return_value = {
+            ".py": ["additional-linter {file_path}"],  # 覆盖现有配置
+            ".custom": ["custom-linter {file_path}"],  # 新增配置
         }
 
-        # 测试load_lint_tools_config的返回值
-        config = load_lint_tools_config()
+        # .py 文件：.py 被覆盖，只生成 additional-linter
+        cmds = get_lint_commands_for_files(["test.py"], None)
+        cmd_strs = [cmd for _, cmd in cmds]
+        assert any("additional-linter" in cmd for cmd in cmd_strs)
+        assert not any("ruff check" in cmd for cmd in cmd_strs)  # 被覆盖
 
-        # 验证配置加载正确
-        assert config[".py"] == ["additional-linter {file_path}"]
-        assert config[".custom"] == ["custom-linter {file_path}"]
+        # .custom 文件：新增配置生效
+        cmds = get_lint_commands_for_files(["app.custom"], None)
+        cmd_strs = [cmd for _, cmd in cmds]
+        assert any("custom-linter" in cmd for cmd in cmd_strs)
 
-        # 创建一个新的配置字典来模拟合并后的效果
-        test_config = LINT_COMMAND_TEMPLATES_BY_FILE.copy()
-        test_config.update(config)
-
-        # 验证合并后的效果
-        assert test_config[".py"] == ["additional-linter {file_path}"]  # 被覆盖
-        assert test_config[".custom"] == ["custom-linter {file_path}"]  # 新增
-        assert ".js" in test_config  # 保持不变
-        assert any("eslint" in t for t in test_config[".js"])
+        # .js 文件：未配置，保持内置默认
+        cmds = get_lint_commands_for_files(["app.js"], None)
+        cmd_strs = [cmd for _, cmd in cmds]
+        assert any("eslint" in cmd for cmd in cmd_strs)

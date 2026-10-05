@@ -14,9 +14,7 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 
-import yaml  # type: ignore[import-untyped]
-
-from jarvis.jarvis_utils.config import get_data_dir, read_text_file
+from jarvis.jarvis_utils.config import get_lint_tools_config
 
 # Lint工具对应的自动修复命令映射（lint工具名 -> 自动修复命令模板）
 # 用于在发现lint告警时，提示用户可用的自动修复工具
@@ -190,65 +188,6 @@ LINT_COMMAND_TEMPLATES_BY_FILE: Dict[str, List[str]] = {
 }
 
 
-def load_lint_tools_config() -> Dict[str, List[str]]:
-    """从yaml文件加载全局lint工具配置
-
-    Returns:
-        Dict[str, List[str]]: 文件扩展名/文件名 -> 命令模板列表
-    """
-    config_path = os.path.join(get_data_dir(), "lint_tools.yaml")
-    if not os.path.exists(config_path):
-        return {}
-
-    content = read_text_file(config_path)
-    config = yaml.safe_load(content) or {}
-    result = {}
-    for k, v in config.items():
-        k_lower = k.lower()
-        # 支持格式: ["template1", "template2"] 或 [("tool1", "template1"), ("tool2", "template2")]
-        if isinstance(v, list) and v:
-            if isinstance(v[0], str):
-                # 新格式：直接是命令模板列表
-                result[k_lower] = v
-            elif isinstance(v[0], (list, tuple)) and len(v[0]) == 2:
-                # 旧格式：需要提取模板
-                result[k_lower] = [template for _, template in v]
-    return result
-
-
-def load_project_lint_tools_config(project_root: str) -> Dict[str, List[str]]:
-    """从项目根目录加载lint工具配置
-
-    Args:
-        project_root: 项目根目录
-
-    Returns:
-        Dict[str, List[str]]: 文件扩展名/文件名 -> 命令模板列表
-    """
-    project_config_path = os.path.join(project_root, ".jarvis", "lint_tools.yaml")
-    if not os.path.exists(project_config_path):
-        return {}
-
-    content = read_text_file(project_config_path)
-    config = yaml.safe_load(content) or {}
-    result = {}
-    for k, v in config.items():
-        k_lower = k.lower()
-        # 支持格式: ["template1", "template2"] 或 [("tool1", "template1"), ("tool2", "template2")]
-        if isinstance(v, list) and v:
-            if isinstance(v[0], str):
-                # 新格式：直接是命令模板列表
-                result[k_lower] = v
-            elif isinstance(v[0], (list, tuple)) and len(v[0]) == 2:
-                # 旧格式：需要提取模板
-                result[k_lower] = [template for _, template in v]
-    return result
-
-
-# 合并默认配置和全局yaml配置（项目级配置在运行时动态加载）
-LINT_COMMAND_TEMPLATES_BY_FILE.update(load_lint_tools_config())
-
-
 def _format_lint_command(
     template: str,
     file_path: str,
@@ -315,12 +254,9 @@ def get_lint_commands_for_files(
     Returns:
         [(file_path, command), ...] 格式的命令列表
     """
-    # 加载项目级配置（如果提供项目根目录）
-    # 项目级配置会覆盖全局配置
+    # 合并内置默认命令与 config.yaml 配置（config.yaml 已含全局+项目合并，项目覆盖全局）
     config = LINT_COMMAND_TEMPLATES_BY_FILE.copy()
-    if project_root:
-        project_config = load_project_lint_tools_config(project_root)
-        config.update(project_config)  # 项目配置覆盖全局配置
+    config.update(get_lint_tools_config())
 
     commands = []
     # 记录不需要文件路径的工具模板（如 cargo clippy），避免重复执行

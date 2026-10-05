@@ -484,6 +484,28 @@
         "required": ["template"]
       },
       "default": {}
+    },
+    "after_change_tools": {
+      "type": "object",
+      "description": "文件变更后处理工具命令配置（如格式化）。键为文件扩展名或文件名（如 .py、Makefile），值为命令模板列表。模板支持 {file_path}、{file_name} 占位符",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "default": {}
+    },
+    "lint_tools": {
+      "type": "object",
+      "description": "静态检查（lint）工具命令配置。键为文件扩展名或文件名（如 .py、Makefile），值为命令模板列表。模板支持 {file_path}、{file_name}、{config} 占位符",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "default": {}
     }
   },
   "additionalProperties": true
