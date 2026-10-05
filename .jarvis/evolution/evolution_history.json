@@ -182,10 +182,11 @@
     "task": "A1-需求澄清增强",
     "action": "检测用户需求是否模糊并在交互模式下主动澄清",
     "result": {
-      "status": "completed",
-      "detail": "新增 requirement_clarifier.py：detect_ambiguous_requirement（启发式：模糊表述中英文模式、文本过短<15字符、缺少具体对象、模糊代词）与 build_clarification_prompt。Agent 新增 _clarify_ambiguous_requirement，在 run() 中（first 且非 quick_mode）调用；非交互模式跳过避免卡住；用户输入'继续'则不改，否则追加[补充信息]。",
+      "status": "reverted",
+      "detail": "新增 requirement_clarifier.py：detect_ambiguous_requirement（启发式：模糊表述中英文模式、文本过短<15字符、缺少具体对象、模糊代词）与 build_clarification_prompt。Agent 新增 _clarify_ambiguous_requirement，在 run() 中（first 且非 quick_mode）调用；非交互模式跳过避免卡住；用户输入'继续'则不改，否则追加[补充信息]。 【已回退】经 Administrator 评审，此功能与大模型原生澄清能力重复（模型本就会在需求不清时主动询问），且固定规则存在误报（如'明天西安天气'被判模糊），制造'蠢'的体验。已删除 requirement_clarifier.py 及调用。",
       "verification": "新增 tests/jarvis_agent/test_requirement_clarifier.py 17 个用例通过；jarvis_agent 全套 250 passed；ruff 0 错误",
-      "commits": ["e37ebdab..0b3d129"]
+      "commits": ["e37ebdab..0b3d129"],
+      "revert_reason": "与大模型原生澄清能力重复，且固定规则误报损害体验"
     }
   },
   {
@@ -194,10 +195,35 @@
     "task": "A2-主动建议机制",
     "action": "任务完成后基于执行情况主动给出下一步建议",
     "result": {
-      "status": "completed",
-      "detail": "Agent 新增 _generate_proactive_suggestions：分析 __executed_tools__ 列表与记忆标签，针对性建议（修改代码→跑测试、执行脚本→检查输出、仅分析→可进入实现、多步骤→沉淀方法论、有记忆标签→检索记忆）。在 _complete_task 结尾调用，异常时 save_exception 并 pass，不影响主流程。",
+      "status": "reverted",
+      "detail": "Agent 新增 _generate_proactive_suggestions：分析 __executed_tools__ 列表与记忆标签，针对性建议（修改代码→跑测试、执行脚本→检查输出、仅分析→可进入实现、多步骤→沉淀方法论、有记忆标签→检索记忆）。在 _complete_task 结尾调用，异常时 save_exception 并 pass，不影响主流程。 【已回退】经 Administrator 评审，主动建议为'提醒类'功能，价值有限且可能轻微冗余，决定移除。已删除 _generate_proactive_suggestions 方法及调用。",
       "verification": "新增 tests/jarvis_agent/test_proactive_suggestions.py 8 个用例通过；jarvis_agent 全套 258 passed；ruff 0 错误",
-      "commits": ["e37ebdab..0b3d129"]
+      "commits": ["e37ebdab..0b3d129"],
+      "revert_reason": "提醒类功能价值有限，可能轻微冗余"
+    }
+  },
+  {
+    "timestamp": "2026-10-05T20:22:40Z",
+    "phase": "自由进化会话（2026-10-05 第二轮）",
+    "task": "回退 A1-需求澄清增强",
+    "action": "删除 requirement_clarifier.py 及 Agent._clarify_ambiguous_requirement 调用",
+    "result": {
+      "status": "completed",
+      "detail": "经 Administrator 评审，A1 与大模型原生澄清能力重复（模型本就会在需求不清时主动询问），且固定规则在'明天西安天气'等语义完整需求上误报，制造'蠢'体验。已删除 src/jarvis/jarvis_agent/requirement_clarifier.py、tests/jarvis_agent/test_requirement_clarifier.py，并移除 __init__.py 中的方法定义与调用。",
+      "verification": "jarvis_agent 全套 241 passed（258-17）；ruff 0 错误；无 requirement_clarifier 引用残留",
+      "commits": ["4899ca6"]
+    }
+  },
+  {
+    "timestamp": "2026-10-05T23:28:40Z",
+    "phase": "自由进化会话（2026-10-05 第二轮）",
+    "task": "回退 A2-主动建议机制",
+    "action": "删除 Agent._generate_proactive_suggestions 方法及 _complete_task 中的调用",
+    "result": {
+      "status": "completed",
+      "detail": "经 Administrator 评审，A2 为'提醒类'功能（建议跑测试/沉淀方法论等），价值有限且可能轻微冗余，决定移除。已删除 __init__.py 中 _generate_proactive_suggestions 方法定义与 _complete_task 中的调用，并删除测试文件 test_proactive_suggestions.py。",
+      "verification": "jarvis_agent 全套 233 passed（241-8）；ruff 0 错误；无 _generate_proactive_suggestions 引用残留",
+      "commits": ["0862ca6"]
     }
   }
 ]
