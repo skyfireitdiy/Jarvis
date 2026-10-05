@@ -1354,6 +1354,103 @@ def get_build_validation_timeout() -> int:
     return int(GLOBAL_CONFIG_DATA.get("build_validation_timeout", 30))
 
 
+def get_build_validation_config() -> Dict[str, Any]:
+    """
+    获取构建验证的静态用户配置。
+
+    静态配置（disable_build_validation / disable_reason / custom_build_command）
+    合并进 config.yaml 的 build_validation 配置项，通过 GLOBAL_CONFIG_DATA 读取
+    （全局 + 项目级自动合并，项目级覆盖全局）。
+
+    返回：
+        Dict[str, Any]: 构建验证静态配置字典，未配置时返回空字典
+    """
+    config = GLOBAL_CONFIG_DATA.get("build_validation", {})
+    if not isinstance(config, dict):
+        return {}
+    return config
+
+
+def update_build_validation_config(project_root: str, updates: Dict[str, Any]) -> bool:
+    """将构建验证静态配置写回项目级 config.yaml，并同步到 GLOBAL_CONFIG_DATA。
+
+    静态配置写操作（disable_build_validation / enable_build_validation /
+    set_custom_build_command）需要持久化到项目级 config.yaml。写入时保留
+    schema 注释头（# yaml-language-server: ...），并带 .yaml.bak 备份。
+
+    Args:
+        project_root: 项目根目录
+        updates: 要更新的 build_validation 配置项（键值对）
+
+    Returns:
+        bool: 是否写入成功
+    """
+    import shutil
+    from pathlib import Path
+
+    import yaml  # type: ignore[import-untyped]
+
+    from jarvis.jarvis_utils.output import PrettyOutput
+
+    config_dir = os.path.join(project_root, ".jarvis")
+    config_path = os.path.join(config_dir, "config.yaml")
+
+    try:
+        os.makedirs(config_dir, exist_ok=True)
+
+        # 读取现有 config.yaml，保留开头的注释行（含 schema 注释头）
+        header_comments = ""
+        existing: Dict[str, Any] = {}
+        if os.path.exists(config_path):
+            with open(config_path, "r", encoding="utf-8") as f:
+                raw = f.read()
+            lines = raw.split("\n")
+            comment_lines = []
+            for line in lines:
+                stripped = line.strip()
+                if stripped.startswith("#") or stripped == "":
+                    comment_lines.append(line)
+                else:
+                    break
+            if comment_lines:
+                header_comments = "\n".join(comment_lines) + "\n"
+            try:
+                parsed = yaml.safe_load(raw)
+                if isinstance(parsed, dict):
+                    existing = parsed
+            except Exception:
+                existing = {}
+
+        # 合并 build_validation 配置
+        build_validation = existing.get("build_validation")
+        if not isinstance(build_validation, dict):
+            build_validation = {}
+        build_validation.update(updates)
+        existing["build_validation"] = build_validation
+
+        # 备份
+        if os.path.exists(config_path):
+            backup_path = Path(config_path).with_suffix(".yaml.bak")
+            shutil.copy(config_path, str(backup_path))
+
+        # 写回（保留开头的注释行）
+        content = ""
+        if header_comments:
+            content += header_comments
+        content += yaml.safe_dump(
+            existing, allow_unicode=True, default_flow_style=False, sort_keys=False
+        )
+        with open(config_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
+        # 同步到 GLOBAL_CONFIG_DATA，使后续读取立即生效
+        set_config("build_validation", build_validation)
+        return True
+    except Exception as e:
+        PrettyOutput.auto_print(f"❌ 保存构建验证配置到 config.yaml 失败: {e}")
+        return False
+
+
 def get_mcp_config() -> List[Dict[str, Any]]:
     """
     获取MCP配置列表。

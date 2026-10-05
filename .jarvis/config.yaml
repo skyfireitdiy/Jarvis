@@ -1,2 +1,5 @@
 # yaml-language-server: $schema=../src/jarvis/jarvis_data/config_schema.json
 # enable_tmux: true
+build_validation:
+  disable_build_validation: true
+  disable_reason: 用户选择禁用（项目可能需要在特殊环境中构建）

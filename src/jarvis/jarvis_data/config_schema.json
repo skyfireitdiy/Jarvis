@@ -275,6 +275,25 @@
       "description": "构建验证的超时时间（秒）。当构建验证执行时间超过此值时，将终止验证并报告超时。",
       "default": 30
     },
+    "build_validation": {
+      "type": "object",
+      "description": "构建验证的静态用户配置（与运行时状态分离，运行时状态保存在独立的 build_validation_state.yaml 中）",
+      "properties": {
+        "disable_build_validation": {
+          "type": "boolean",
+          "description": "是否禁用构建验证"
+        },
+        "disable_reason": {
+          "type": "string",
+          "description": "禁用构建验证的原因"
+        },
+        "custom_build_command": {
+          "type": "string",
+          "description": "自定义构建命令，替代默认的构建验证命令"
+        }
+      },
+      "additionalProperties": false
+    },
     "enable_autonomous": {
       "type": "boolean",
       "description": "是否启用智能增强功能（情绪识别、歧义检测、对话管理、主动交互）",

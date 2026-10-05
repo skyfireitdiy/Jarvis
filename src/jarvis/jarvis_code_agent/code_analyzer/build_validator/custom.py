@@ -53,7 +53,7 @@ class CustomBuildValidator(BuildValidatorBase):
         # 检查是否配置了自定义命令
         if not self.custom_command:
             duration = time.time() - start_time
-            error_msg = "未配置自定义构建命令，请在 .jarvis/build_validation_config.yaml 中设置 custom_build_command"
+            error_msg = "未配置自定义构建命令，请在 .jarvis/config.yaml 中设置 build_validation.custom_build_command"
             PrettyOutput.auto_print(f"❌ {error_msg}")
             return BuildResult(
                 success=False,
