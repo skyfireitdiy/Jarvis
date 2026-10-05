@@ -484,7 +484,18 @@ class Agent:
 
     def get_tool_usage_prompt(self) -> str:
         """获取工具使用提示"""
-        return build_action_prompt(self.output_handler)
+        # 提取任务上下文文本，供工具量大时按相关性粗筛工具
+        task_context: Optional[str] = None
+        if isinstance(self.original_user_input, str):
+            task_context = self.original_user_input
+        elif isinstance(self.original_user_input, list):
+            texts = [
+                block.get("text", "")
+                for block in self.original_user_input
+                if isinstance(block, dict) and block.get("text")
+            ]
+            task_context = " ".join(texts) if texts else None
+        return build_action_prompt(self.output_handler, task_context)
 
     def __new__(cls, *args: Any, **kwargs: Any) -> "Agent":
         if kwargs.get("agent_type") == "code_agent":

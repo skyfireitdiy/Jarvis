@@ -16,12 +16,17 @@ def get_tool_registry(
     return None
 
 
-def build_action_prompt(output_handlers: List[OutputHandlerProtocol]) -> str:
+def build_action_prompt(
+    output_handlers: List[OutputHandlerProtocol],
+    task_context: Optional[str] = None,
+) -> str:
     """
     Builds the action prompt string from a list of output handlers.
 
     Args:
         output_handlers: A list of output handler instances.
+        task_context: Optional task context text, passed to ToolRegistry.prompt()
+            for tool pre-selection when the tool count is large.
 
     Returns:
         A formatted string containing the action prompt.
@@ -44,7 +49,10 @@ def build_action_prompt(output_handlers: List[OutputHandlerProtocol]) -> str:
     for handler in output_handlers:
         action_prompt += f"\n<tool>\n## {handler.name()}\n"
         # Get the handler's prompt and ensure correct formatting
-        handler_prompt = handler.prompt().strip()
+        if isinstance(handler, ToolRegistry):
+            handler_prompt = handler.prompt(task_context).strip()
+        else:
+            handler_prompt = handler.prompt().strip()
         # Adjust indentation to maintain hierarchy
         handler_prompt = "\n".join(
             "   " + line if line.strip() else line

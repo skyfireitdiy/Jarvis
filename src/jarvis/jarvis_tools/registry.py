@@ -100,6 +100,107 @@ tool_call_help = """
 """
 
 
+# 工具预筛 Top-N：工具量超阈值时，按任务上下文粗筛出最相关的工具注入 prompt
+_TOOL_PRESELECT_TOP_N = 50
+
+# 工具预筛启用阈值：工具数量超过该值时启用预筛，否则全量注入（避免影响小工具量场景）
+_TOOL_PRESELECT_THRESHOLD = 50
+
+# 工具预筛停用词（单字/无意义词，jieba 分词后过滤）
+_TOOL_PRESELECT_STOP_WORDS = {
+    "的",
+    "了",
+    "和",
+    "与",
+    "及",
+    "或",
+    "在",
+    "是",
+    "有",
+    "我",
+    "你",
+    "他",
+    "她",
+    "它",
+    "这",
+    "那",
+    "一个",
+    "如何",
+    "怎么",
+    "怎样",
+    "什么",
+    "为什么",
+    "请",
+    "帮",
+    "需要",
+    "进行",
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "to",
+    "of",
+    "and",
+    "or",
+    "for",
+    "with",
+    "please",
+    "use",
+    "using",
+}
+
+
+def _preselect_tools(
+    task_context: str,
+    tools: List[Dict[str, Any]],
+    top_n: int = _TOOL_PRESELECT_TOP_N,
+) -> List[Dict[str, Any]]:
+    """基于任务上下文关键词对工具做粗筛，只保留最相关的 Top-N 候选。
+
+    用 jieba 分词提取任务上下文关键词，与每个工具的"名称 + 描述"做子串匹配打分，
+    按分数降序取 top_n 条。这是为降低"工具量大时注入 prompt 的工具清单量"而做的
+    粗筛，最终是否调用仍由模型从预筛后的工具里判定。
+
+    注意：工具是 Agent 的执行能力，漏选会导致无法调用，故必须保守：
+    - 无关键词 / 无任何匹配 / 异常时回退返回全量，避免漏掉关键工具；
+    - 预筛只影响 prompt 注入，不影响 execute_tool 执行（execute_tool 走 _all_tools）。
+
+    返回：
+        预筛后的工具列表。若无法预筛（无关键词 / 无任何匹配 / 异常），回退返回全量。
+    """
+    try:
+        import jieba
+
+        # 提取任务上下文关键词（过滤停用词与单字）
+        keywords = [
+            w.strip()
+            for w in jieba.cut(task_context)
+            if len(w.strip()) > 1
+            and w.strip().lower() not in _TOOL_PRESELECT_STOP_WORDS
+        ]
+        if not keywords:
+            return tools
+
+        # 对每个工具做关键词匹配打分（名称 + 描述）
+        scored: List[Tuple[int, Dict[str, Any]]] = []
+        for tool in tools:
+            haystack = (f"{tool.get('name', '')} {tool.get('description', '')}").lower()
+            score = sum(1 for kw in keywords if kw.lower() in haystack)
+            scored.append((score, tool))
+
+        # 按分数降序排序，再只保留有匹配的候选
+        scored.sort(key=lambda x: x[0], reverse=True)
+        matched = [tool for score, tool in scored if score > 0]
+        if not matched:
+            return tools  # 无任何匹配，回退全量
+
+        # 取 Top-N（matched 已按分数降序排列）
+        return matched[:top_n]
+    except Exception:
+        return tools  # 异常时回退全量，保证不改变现有行为
+
+
 class OutputHandlerProtocol(Protocol):
     def name(self) -> str: ...
 
@@ -237,11 +338,29 @@ class ToolRegistry(OutputHandlerProtocol):
 
         return False
 
-    def prompt(self) -> str:
-        """加载工具"""
+    def prompt(self, task_context: Optional[str] = None) -> str:
+        """加载工具
+
+        参数:
+            task_context: 可选的任务上下文文本，用于工具量大时按相关性粗筛工具。
+                仅当工具数量超过 _TOOL_PRESELECT_THRESHOLD 且提供了 task_context 时
+                才启用预筛；否则全量注入，不影响现有行为。
+        """
         tools = self.get_all_tools()
         if tools:
             from jarvis.jarvis_platform.native_tools import _compact_tool_schema
+
+            # 工具量大时按任务上下文粗筛，降低注入量（保守：超阈值且有上下文才启用）
+            if task_context and len(tools) > _TOOL_PRESELECT_THRESHOLD:
+                tools = _preselect_tools(task_context, tools)
+                # 确保必选工具始终被包含（预筛可能漏掉它们）
+                prescreened_names = {t.get("name") for t in tools}
+                for tool_name in self._required_tools:
+                    if (
+                        tool_name not in prescreened_names
+                        and tool_name in self._all_tools
+                    ):
+                        tools.append(self._all_tools[tool_name].to_dict())
 
             tools_prompt = "## 可用工具\n"
             for tool in tools:
