@@ -1,4 +1,5 @@
 import json
+import importlib
 import os
 import re
 import sys
@@ -838,9 +839,18 @@ class ToolRegistry(OutputHandlerProtocol):
             sys.path.insert(0, parent_dir)
 
             try:
-                # 使用标准导入机制导入模块
-                module_name = p_file_path.stem
-                module = __import__(module_name)
+                # 计算导入用模块名：jarvis_tools 包内的工具用完整包路径导入，
+                # 避免以顶层模块名导入产生与 jarvis.jarvis_tools.<name> 不同的模块对象
+                # （模块级单例/缓存会因此分裂，如 timer 的 get_timer_manager）。
+                stem = p_file_path.stem
+                try:
+                    if p_file_path.parent.resolve() == Path(__file__).parent.resolve():
+                        import_module_name = f"jarvis.jarvis_tools.{stem}"
+                    else:
+                        import_module_name = stem
+                except Exception:
+                    import_module_name = stem
+                module = importlib.import_module(import_module_name)
 
                 # 在模块中查找工具类
                 tool_found = False
@@ -853,7 +863,7 @@ class ToolRegistry(OutputHandlerProtocol):
                         and hasattr(item, "description")
                         and hasattr(item, "parameters")
                         and hasattr(item, "execute")
-                        and item.name == module_name
+                        and item.name == stem
                     ):
                         if hasattr(item, "check"):
                             if not item.check():
