@@ -49,6 +49,95 @@ def _limit_rule_body(rule_name: str, body: str) -> str:
     )
 
 
+# 预筛候选上限：避免规则上千时把全量规则名+描述塞给 LLM，只保留最相关的 Top-N
+_RULE_PRESELECT_TOP_N = 50
+
+# 预筛停用词（单字/无意义词，jieba 分词后过滤）
+_RULE_PRESELECT_STOP_WORDS = {
+    "的",
+    "了",
+    "和",
+    "与",
+    "及",
+    "或",
+    "在",
+    "是",
+    "有",
+    "我",
+    "你",
+    "他",
+    "她",
+    "它",
+    "这",
+    "那",
+    "一个",
+    "如何",
+    "怎么",
+    "怎样",
+    "什么",
+    "为什么",
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "to",
+    "of",
+    "and",
+    "or",
+    "for",
+    "with",
+}
+
+
+def _preselect_rules(
+    task_description: str,
+    rule_names: List[str],
+    desc_by_name: Dict[str, str],
+    top_n: int = _RULE_PRESELECT_TOP_N,
+) -> List[str]:
+    """基于任务描述关键词对规则做粗筛，只保留最相关的 Top-N 候选。
+
+    用 jieba 分词提取任务描述关键词，与每个规则的"名称 + 描述"做子串匹配打分，
+    按分数降序取 top_n 条。这是为降低"选择阶段塞给 LLM 的候选量"而做的粗筛，
+    最终相关性仍由 LLM 从预筛后的候选里判定。
+
+    返回：
+        预筛后的规则名列表。若无法预筛（无关键词 / 无任何匹配 / 异常），
+        回退返回全量，避免漏选正确规则。
+    """
+    try:
+        import jieba
+
+        # 提取任务描述关键词（过滤停用词与单字）
+        keywords = [
+            w.strip()
+            for w in jieba.cut(task_description)
+            if len(w.strip()) > 1
+            and w.strip().lower() not in _RULE_PRESELECT_STOP_WORDS
+        ]
+        if not keywords:
+            return rule_names
+
+        # 对每个规则做关键词匹配打分（名称 + 描述）
+        scored: List[Tuple[int, str]] = []
+        for rule_name in rule_names:
+            haystack = (rule_name + " " + desc_by_name.get(rule_name, "")).lower()
+            score = sum(1 for kw in keywords if kw.lower() in haystack)
+            scored.append((score, rule_name))
+
+        # 按分数降序排序，再只保留有匹配的候选
+        scored.sort(key=lambda x: x[0], reverse=True)
+        matched = [rule_name for score, rule_name in scored if score > 0]
+        if not matched:
+            return rule_names  # 无任何匹配，回退全量
+
+        # 取 Top-N（matched 已按分数降序排列）
+        return matched[:top_n]
+    except Exception:
+        return rule_names  # 异常时回退全量，保证不改变现有行为
+
+
 class RulesManager:
     """规则管理器，负责加载和管理各种规则"""
 
@@ -1159,7 +1248,16 @@ class RulesManager:
                 desc_by_name[rule_name] = description
 
             # 直接对全量候选做一次 normal 选择（不再经 cheap 窄化，避免弱模型筛丢正确规则）
-            top_rules = all_rules_list
+            # 先做关键词粗筛，只保留最相关的 Top-N 候选，降低塞给 LLM 的候选量；
+            # 预筛无匹配/无关键词/异常时回退全量，保证不改变现有行为。
+            prescreened = _preselect_rules(
+                task_description, all_rules_list, desc_by_name
+            )
+            if len(prescreened) < len(all_rules_list):
+                PrettyOutput.auto_print(
+                    f"🔍 规则预筛: {len(all_rules_list)} → {len(prescreened)} 个候选"
+                )
+            top_rules = prescreened
 
             # 构造编号列表（全量候选）
             numbered_rules = ""

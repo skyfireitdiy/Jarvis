@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from jarvis.jarvis_utils.methodology import (
     _get_methodology_directory,
+    _preselect_methodologies,
     _select_methodologies_with_eval_model,
     _select_methodologies_with_normal_model,
     load_methodology,
@@ -266,3 +267,53 @@ class TestLoadMethodologyEvalFirst:
         finally:
             for p in patches:
                 p.stop()
+
+
+class TestPreselectMethodologies:
+    """测试 _preselect_methodologies 预筛函数"""
+
+    def _make_methodologies(self):
+        return [
+            ("部署开源项目", "部署相关方法论"),
+            ("生成提交信息", "提交信息方法论"),
+            ("调试AI生成代码", "调试方法论"),
+            ("遗留代码重构", "重构方法论"),
+        ]
+
+    def test_match_relevant_titles(self):
+        """关键词应命中相关标题，过滤无关标题"""
+        result = _preselect_methodologies(
+            "如何部署开源项目", self._make_methodologies()
+        )
+        titles = [t for t, _ in result]
+        assert "部署开源项目" in titles
+        assert "生成提交信息" not in titles  # 无关标题被过滤
+
+    def test_no_match_returns_all(self):
+        """无任何匹配时回退全量，避免漏选"""
+        result = _preselect_methodologies(
+            "完全无关的随机词汇xyz", self._make_methodologies()
+        )
+        assert len(result) == len(self._make_methodologies())
+
+    def test_no_keywords_returns_all(self):
+        """用户输入无有效关键词时回退全量"""
+        result = _preselect_methodologies("的 了 是", self._make_methodologies())
+        assert len(result) == len(self._make_methodologies())
+
+    def test_top_n_truncation(self):
+        """超过 top_n 时截断到 top_n"""
+        methodologies = [(f"主题{i}", f"内容{i}") for i in range(100)]
+        # 用户输入包含所有标题共有的词，全部命中
+        result = _preselect_methodologies("主题", methodologies, top_n=10)
+        assert len(result) == 10
+
+    def test_exception_returns_all(self):
+        """异常时回退全量，保证不改变现有行为"""
+        with patch(
+            "jarvis.jarvis_utils.methodology._PRESELECT_STOP_WORDS",
+            new=None,  # 触发异常
+        ):
+            # 直接调用会因 stop_words 为 None 抛异常，应回退全量
+            result = _preselect_methodologies("部署", self._make_methodologies())
+            assert len(result) == len(self._make_methodologies())

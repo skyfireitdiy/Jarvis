@@ -1037,7 +1037,7 @@ class task_list_manager:
                 "action": {
                     "type": "string",
                     "enum": action_enum,
-                    "description": "要执行的操作：add_tasks（添加任务）、get_task_detail（获取任务详情）、get_task_list_summary（获取任务列表摘要）、execute_task（执行任务）、update_task（更新任务）、clear_tasks（清除所有任务）",
+                    "description": "要执行的操作，取值见 enum 字段（如 add_tasks 添加任务、execute_task 执行任务、update_task 更新任务）",
                 },
                 "main_goal": {
                     "type": "string",
@@ -1045,7 +1045,7 @@ class task_list_manager:
                 },
                 "background": {
                     "type": "string",
-                    "description": "所有子任务的公共背景信息，将自动添加到每个子任务的描述中。**必须包含以下信息**：1) **全局约束条件**：所有子任务必须遵循的技术约束、环境限制、性能要求等；2) **必须要求**：所有子任务必须完成的要求、必须遵循的规范、必须实现的功能等；3) **禁止事项**：所有子任务执行中禁止的操作、禁止使用的技术、禁止修改的内容等；4) **验证标准**：所有子任务的统一验证方式、验收标准、测试要求等。可用于提供全局上下文、统一规范等公共信息。",
+                    "description": "所有子任务的公共背景信息，自动加入每个子任务描述。应包含：1)全局约束条件；2)必须要求；3)禁止事项；4)验证标准。用于提供统一上下文与规范。",
                 },
                 "tasks_info": {
                     "type": "array",
@@ -1056,11 +1056,11 @@ class task_list_manager:
                             "task_name": {"type": "string", "description": "任务名称"},
                             "task_desc": {
                                 "type": "string",
-                                "description": "任务描述。**必须包含以下信息**：1) **约束条件**：明确任务执行的技术约束、环境限制、性能要求等；2) **必须要求**：明确任务必须完成的具体要求、必须遵循的规范、必须实现的功能等；3) **禁止事项**：明确任务执行中禁止的操作、禁止使用的技术、禁止修改的内容等；4) **验证标准**：明确任务完成的验证方式、验收标准、测试要求等。任务描述应该清晰、具体、可执行。",
+                                "description": "任务描述，应清晰具体可执行。需包含：1)约束条件；2)必须要求；3)禁止事项；4)验证标准。",
                             },
                             "expected_output": {
                                 "type": "string",
-                                "description": "预期输出。**必须使用分条列出的结构化格式**，例如：1) xxx；2) yyy；3) zzz，或使用 markdown 列表 - xxx、- yyy、- zzz。后续验证 Agent 会对每一条预期输出条目分别进行验证。",
+                                "description": "预期输出，须用分条结构化格式（如 1)xxx；2)yyy 或 markdown 列表），后续验证 Agent 会对每条分别验证。",
                             },
                             "agent_type": {
                                 "type": "string",
@@ -1099,7 +1099,7 @@ class task_list_manager:
                         },
                         "task_desc": {
                             "type": "string",
-                            "description": "更新后的任务描述（可选）。**必须包含以下信息**：1) **约束条件**：明确任务执行的技术约束、环境限制、性能要求等；2) **必须要求**：明确任务必须完成的具体要求、必须遵循的规范、必须实现的功能等；3) **禁止事项**：明确任务执行中禁止的操作、禁止使用的技术、禁止修改的内容等；4) **验证标准**：明确任务完成的验证方式、验收标准、测试要求等。任务描述应该清晰、具体、可执行。",
+                            "description": "更新后的任务描述（可选）。需包含：1)约束条件；2)必须要求；3)禁止事项；4)验证标准。",
                         },
                         "expected_output": {
                             "type": "string",
@@ -1127,27 +1127,7 @@ class task_list_manager:
                         },
                         "verification_method": {
                             "type": "string",
-                            "description": """验证方法说明（当 status 更新为 completed 时必填）。描述如何验证任务是否真正完成。
-
-**必须包含以下信息：**
-1. **需要检查的文件或代码位置**：明确指出验证需要检查的具体文件路径、函数名、类名或代码行号范围；
-2. **验证的具体步骤和方法**：说明应该执行什么命令、调用什么工具、或检查什么内容来验证任务完成；
-3. **预期的验证结果**：明确描述验证通过时应该看到的结果，以及验证失败时可能出现的情况；
-4. **判断标准**：给出明确的通过/失败判断条件。
-
-**示例：**
-```
-验证文件：src/utils/helper.py
-验证步骤：
-1. 使用 read_code 工具读取 src/utils/helper.py 的第 50-80 行
-2. 检查 parse_config() 函数是否添加了 timeout 参数（默认值为30）
-3. 执行命令 'python -c "from src.utils.helper import parse_config; print(parse_config.__doc__)"' 确认函数可正常导入
-判断标准：
-- 通过：parse_config 函数签名包含 timeout: int = 30 参数，且函数可正常导入无报错
-- 失败：参数缺失、默认值错误、或导入时抛出异常
-```
-
-此信息将传递给验证Agent作为验证指导，请确保描述足够详尽与具体。""",
+                            "description": "验证方法说明（当 status 更新为 completed 时必填），将传给验证 Agent 作为指导。需包含：1)需检查的文件/代码位置（路径、函数名、行号）；2)验证的具体步骤（命令/工具/检查内容）；3)预期验证结果（通过/失败各应看到什么）；4)判断标准（明确通过/失败条件）。描述应详尽具体。",
                         },
                     },
                 },

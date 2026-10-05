@@ -4,6 +4,7 @@
 import json
 
 from jarvis.jarvis_platform.native_tools import (
+    _compact_tool_schema,
     _sanitize_surrogates,
     build_anthropic_tools,
     build_openai_tools,
@@ -270,6 +271,7 @@ class TestSchema:
         atools = build_anthropic_tools(reg)
         assert "want" not in atools[0]["input_schema"]["properties"]
 
+
 class TestSurrogateSanitization:
     """孤立 UTF-16 代理字符清理：防止 UTF-8 编码抛 UnicodeEncodeError。
 
@@ -350,7 +352,9 @@ class TestSurrogateSanitization:
         history = [
             {"role": "system", "content": "系统提示"},
             {"role": "user", "content": "测试 😀 正常文本"},
-            make_tool_call_msg(None, [make_tool_call("c1", "read_code", {"p": "中文"})]),
+            make_tool_call_msg(
+                None, [make_tool_call("c1", "read_code", {"p": "中文"})]
+            ),
             make_tool_result_msg("c1", "read_code", "结果 😀"),
         ]
         o_msgs = to_openai_messages(history)
@@ -379,3 +383,127 @@ class TestSurrogateSanitization:
 
         atools = build_anthropic_tools(reg)
         assert "after" in atools[0]["input_schema"]["properties"]
+
+
+class TestCompactToolSchema:
+    """测试 _compact_tool_schema 精简函数"""
+
+    def test_keeps_required_type_enum(self):
+        """保留工具调用关键约束：type/required/enum"""
+        schema = {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["add", "cancel", "list"],
+                    "description": "操作类型",
+                }
+            },
+            "required": ["action"],
+        }
+        out = _compact_tool_schema(schema)
+        assert out["type"] == "object"
+        assert out["required"] == ["action"]
+        assert out["properties"]["action"]["enum"] == ["add", "cancel", "list"]
+
+    def test_omits_default(self):
+        """省略不影响调用正确性的 default 字段"""
+        schema = {
+            "type": "object",
+            "properties": {
+                "detail": {
+                    "type": "string",
+                    "enum": ["low", "high", "auto"],
+                    "default": "auto",
+                    "description": "精度",
+                }
+            },
+        }
+        out = _compact_tool_schema(schema)
+        assert "default" not in out["properties"]["detail"]
+
+    def test_truncates_long_description(self):
+        """超长 description 被截断"""
+        schema = {
+            "type": "object",
+            "properties": {"path": {"type": "string", "description": "x" * 500}},
+        }
+        out = _compact_tool_schema(schema, desc_limit=100)
+        desc = out["properties"]["path"]["description"]
+        assert len(desc) <= 104  # 100 + "..."
+        assert desc.endswith("...")
+
+    def test_keeps_short_description(self):
+        """短 description 不被截断"""
+        schema = {
+            "type": "object",
+            "properties": {"path": {"type": "string", "description": "文件路径"}},
+        }
+        out = _compact_tool_schema(schema)
+        assert out["properties"]["path"]["description"] == "文件路径"
+
+    def test_recursive_nested_object(self):
+        """嵌套 object/array 递归精简"""
+        schema = {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "path": {
+                                "type": "string",
+                                "description": "x" * 500,
+                                "default": "",
+                            }
+                        },
+                        "required": ["path"],
+                    },
+                }
+            },
+        }
+        out = _compact_tool_schema(schema, desc_limit=50)
+        inner = out["properties"]["items"]["items"]
+        assert inner["required"] == ["path"]
+        assert "default" not in inner["properties"]["path"]
+        assert inner["properties"]["path"]["description"].endswith("...")
+
+    def test_non_dict_returns_as_is(self):
+        """非 dict 输入原样返回"""
+        assert _compact_tool_schema(None) is None
+        assert _compact_tool_schema("str") == "str"
+
+    def test_build_tools_applies_compact(self):
+        """build_openai_tools/build_anthropic_tools 应用精简"""
+        reg = _FakeRegistry(
+            [
+                _FakeTool(
+                    "demo",
+                    "演示工具",
+                    {
+                        "type": "object",
+                        "properties": {
+                            "mode": {
+                                "type": "string",
+                                "enum": ["a", "b"],
+                                "default": "a",
+                                "description": "x" * 500,
+                            }
+                        },
+                        "required": ["mode"],
+                    },
+                )
+            ]
+        )
+        otools = build_openai_tools(reg)
+        oparams = otools[0]["function"]["parameters"]
+        assert oparams["required"] == ["mode"]
+        assert "default" not in oparams["properties"]["mode"]
+        assert oparams["properties"]["mode"]["enum"] == ["a", "b"]
+        assert oparams["properties"]["mode"]["description"].endswith("...")
+
+        atools = build_anthropic_tools(reg)
+        aparams = atools[0]["input_schema"]
+        assert aparams["required"] == ["mode"]
+        assert "default" not in aparams["properties"]["mode"]

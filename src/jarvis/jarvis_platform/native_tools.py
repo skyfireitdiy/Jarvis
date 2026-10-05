@@ -37,9 +37,7 @@ def _sanitize_surrogates(text: str) -> str:
     # 快速路径：绝大多数文本不含代理字符，避免逐字符扫描开销
     if not any(0xD800 <= ord(ch) <= 0xDFFF for ch in text):
         return text
-    return "".join(
-        "\ufffd" if 0xD800 <= ord(ch) <= 0xDFFF else ch for ch in text
-    )
+    return "".join("\ufffd" if 0xD800 <= ord(ch) <= 0xDFFF else ch for ch in text)
 
 
 def _sanitize_value(value: Any) -> Any:
@@ -247,8 +245,7 @@ def to_openai_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     # 出口统一清理孤立代理字符，避免 httpx 以 UTF-8 编码请求体时抛
     # UnicodeEncodeError（详见 _sanitize_surrogates 说明）。
     return [
-        to_openai_message(sanitize_message(m))
-        for m in ensure_tool_pairing(messages)
+        to_openai_message(sanitize_message(m)) for m in ensure_tool_pairing(messages)
     ]
 
 
@@ -369,12 +366,55 @@ def ensure_object_schema(schema: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+# 工具参数 description 截断上限：超长描述会显著膨胀 tools 输入量，
+# 截断后保留关键语义，模型仍能据此构造正确参数。
+_TOOL_DESC_LIMIT = 200
+
+
+def _compact_tool_schema(schema: Any, desc_limit: int = _TOOL_DESC_LIMIT) -> Any:
+    """精简工具 parameters schema，降低注入 tools 的输入量。
+
+    保留工具调用所需的关键约束（type/required/enum/properties/items），
+    省略不影响调用正确性的冗余字段（default 等），并截断超长 description。
+    递归处理嵌套 object/array。这是为降低"每次调用塞给模型的工具 schema
+    输入量"而做的精简，不改变工具可调用性。
+
+    返回：
+        精简后的 schema dict。非 dict 输入原样返回。
+    """
+    if not isinstance(schema, dict):
+        return schema
+    out: Dict[str, Any] = {}
+    if "type" in schema:
+        out["type"] = schema["type"]
+    if "description" in schema:
+        desc = schema["description"]
+        out["description"] = (
+            desc if len(desc) <= desc_limit else desc[:desc_limit] + "..."
+        )
+    # required / enum 是工具调用正确性的关键约束，必须保留
+    if "required" in schema:
+        out["required"] = schema["required"]
+    if "enum" in schema:
+        out["enum"] = schema["enum"]
+    if "properties" in schema and isinstance(schema["properties"], dict):
+        out["properties"] = {
+            k: _compact_tool_schema(v, desc_limit)
+            for k, v in schema["properties"].items()
+        }
+    if "items" in schema:
+        out["items"] = _compact_tool_schema(schema["items"], desc_limit)
+    # 其余字段（default/additionalProperties 等）省略，不影响调用正确性
+    return out
+
+
 def build_openai_tools(registry: Any) -> List[Dict[str, Any]]:
     """从 ToolRegistry 构建 OpenAI tools 数组。"""
     tools = []
     for tool in registry.tools.values():
         parameters = getattr(tool, "parameters", None) or {}
         parameters = with_timer_params(ensure_object_schema(parameters))
+        parameters = _compact_tool_schema(parameters)
         tools.append(
             {
                 "type": "function",
@@ -394,6 +434,7 @@ def build_anthropic_tools(registry: Any) -> List[Dict[str, Any]]:
     for tool in registry.tools.values():
         parameters = getattr(tool, "parameters", None) or {}
         parameters = with_timer_params(ensure_object_schema(parameters))
+        parameters = _compact_tool_schema(parameters)
         tools.append(
             {
                 "name": tool.name,

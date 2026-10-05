@@ -241,6 +241,8 @@ class ToolRegistry(OutputHandlerProtocol):
         """加载工具"""
         tools = self.get_all_tools()
         if tools:
+            from jarvis.jarvis_platform.native_tools import _compact_tool_schema
+
             tools_prompt = "## 可用工具\n"
             for tool in tools:
                 try:
@@ -249,9 +251,18 @@ class ToolRegistry(OutputHandlerProtocol):
                     tools_prompt += "  - 参数:\n"
                     tools_prompt += "```json\n"
 
+                    # 精简参数 schema（截断超长描述、省略冗余字段），降低输入量
+                    parameters = tool["parameters"]
+                    if isinstance(parameters, str):
+                        try:
+                            parameters = json.loads(parameters)
+                        except Exception:
+                            parameters = {}
+                    parameters = _compact_tool_schema(parameters)
+
                     # 生成格式化的JSON参数
                     json_params = json.dumps(
-                        tool["parameters"],
+                        parameters,
                         ensure_ascii=False,
                         indent=2,
                         sort_keys=False,

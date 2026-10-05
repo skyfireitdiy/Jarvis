@@ -516,6 +516,42 @@ class MemoryTool:
                 limit=search_limit,
             )
 
+            # 基于 token 预算筛选返回的记忆，防止单条超长记忆撑爆上下文
+            # （与普通检索 _execute_retrieve 的 token 限制逻辑保持一致）
+            memory_token_limit = None
+            agent = args.get("agent")
+            if agent and hasattr(agent, "model"):
+                try:
+                    remaining_tokens = agent.model.get_remaining_token_count()
+                    memory_token_limit = calculate_token_limit(remaining_tokens)
+                    if memory_token_limit <= 0:
+                        memory_token_limit = None
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_tools.memory",
+                        function="_execute_smart_search",
+                    )
+                    pass
+
+            # 回退方案：使用输入窗口的2/3
+            if memory_token_limit is None:
+                max_input_tokens = get_max_input_token_count()
+                memory_token_limit = int(max_input_tokens * 2 / 3)
+
+            filtered_memories = []
+            total_tokens = 0
+            for memory in memories:
+                memory_content = memory.content or ""
+                memory_tokens = get_context_token_count(memory_content)
+                if total_tokens + memory_tokens > memory_token_limit:
+                    break
+                if len(filtered_memories) >= 50:
+                    break
+                filtered_memories.append(memory)
+                total_tokens += memory_tokens
+            memories = filtered_memories
+
             # 格式化为Markdown输出
             markdown_output = "# 智能语义检索结果\n\n"
             markdown_output += f"**查询**: {query}\n\n"

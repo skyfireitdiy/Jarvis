@@ -196,6 +196,93 @@ def _load_all_methodologies() -> List[Tuple[str, str]]:
     return all_methodologies
 
 
+# 预筛候选上限：避免上千方法论时把全量标题塞给 LLM，只保留最相关的 Top-N
+_PRESELECT_TOP_N = 50
+
+# 预筛停用词（单字/无意义词，jieba 分词后过滤）
+_PRESELECT_STOP_WORDS = {
+    "的",
+    "了",
+    "和",
+    "与",
+    "及",
+    "或",
+    "在",
+    "是",
+    "有",
+    "我",
+    "你",
+    "他",
+    "她",
+    "它",
+    "这",
+    "那",
+    "一个",
+    "如何",
+    "怎么",
+    "怎样",
+    "什么",
+    "为什么",
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "to",
+    "of",
+    "and",
+    "or",
+    "for",
+    "with",
+}
+
+
+def _preselect_methodologies(
+    user_input: str,
+    methodologies: List[Tuple[str, str]],
+    top_n: int = _PRESELECT_TOP_N,
+) -> List[Tuple[str, str]]:
+    """基于用户输入关键词对方法论做粗筛，只保留最相关的 Top-N 候选。
+
+    用 jieba 分词提取用户输入关键词，与每个方法论标题做子串/关键词匹配打分，
+    按分数降序取 top_n 条。这是为降低"选择阶段塞给 LLM 的候选量"而做的粗筛，
+    最终相关性仍由 LLM 从预筛后的候选里判定。
+
+    返回：
+        预筛后的方法论列表。若无法预筛（无关键词 / 无任何匹配 / 异常），
+        回退返回全量，避免漏选正确方法论。
+    """
+    try:
+        import jieba
+
+        # 提取用户输入关键词（过滤停用词与单字）
+        keywords = [
+            w.strip()
+            for w in jieba.cut(user_input)
+            if len(w.strip()) > 1 and w.strip().lower() not in _PRESELECT_STOP_WORDS
+        ]
+        if not keywords:
+            return methodologies
+
+        # 对每个方法论标题做关键词匹配打分
+        scored: List[Tuple[int, Tuple[str, str]]] = []
+        for item in methodologies:
+            title = item[0].lower()
+            score = sum(1 for kw in keywords if kw.lower() in title)
+            scored.append((score, item))
+
+        # 按分数降序排序，再只保留有匹配的候选
+        scored.sort(key=lambda x: x[0], reverse=True)
+        matched = [item for score, item in scored if score > 0]
+        if not matched:
+            return methodologies  # 无任何匹配，回退全量
+
+        # 取 Top-N（matched 已按分数降序排列）
+        return matched[:top_n]
+    except Exception:
+        return methodologies  # 异常时回退全量，保证不改变现有行为
+
+
 def _select_methodologies_with_eval_model(
     user_input: str,
     prompt: str,
@@ -381,6 +468,16 @@ def load_methodology(
 
         # 步骤1：获取所有方法论的标题
         methodology_titles = [title for title, _ in methodologies]
+
+        # 步骤1.5：预筛候选，降低选择阶段塞给 LLM 的候选量（上千方法论时避免全量标题膨胀）。
+        # 预筛只做粗筛，最终相关性仍由 LLM 判定；预筛为空时回退全量，避免漏选。
+        prescreened = _preselect_methodologies(user_input, methodologies)
+        if len(prescreened) < len(methodologies):
+            methodologies = prescreened
+            methodology_titles = [title for title, _ in methodologies]
+            PrettyOutput.auto_print(
+                f"ℹ️ 方法论预筛：从 {len(prescreened)} 个候选中粗筛（原始全量候选已缩减）"
+            )
 
         # 步骤2：选择相关性高的方法论。
         # 优先用结构化评估模型（如 Jev）做候选选择：它只接受 JSON 协议，
