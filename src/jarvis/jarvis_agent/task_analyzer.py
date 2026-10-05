@@ -22,19 +22,15 @@ _NATIVE_TASK_ANALYSIS_PROMPT = """对刚结束的任务做一次复盘。需要�
    - project_long_term：项目相关（架构决策、关键约定、重要实现）
    - global_long_term：通用经验、用户偏好、方法技巧
    没有值得存的就不存。
-2. **现有能力评估**：先判断当前已有工具/方法论是否已能覆盖本任务解法——
+2. **现有能力评估**：先判断当前已有工具/规则是否已能覆盖本任务解法——
    - 若能覆盖：直接说明用哪个即可，不需要新建。
    - 若不能、且该任务确实值得沉淀：
-     a) 若是一个**可复用、成体系的解法/流程**：用 methodology 新增或更新
-        （operation add/update；scope：项目相关用 project、通用用 global；
-        content 按 rule 文档结构组织：规则简介、必须遵守的原则、必须执行的操作、
-        实践指导/自检，便于后续复用与检索）。
-     b) 若缺的是一个**自动化工具**：用 meta_agent 生成
+     a) 若缺的是一个**自动化工具**：用 meta_agent 生成
         （function_description 写清目标功能与预期行为；工具须含参数定义与错误处理）。
 3. **规则建议（可选）**：仅当现有规则确有明显缺口时才简述建议；没有就不提。
 4. 最后用一句话总结本次复盘结论。
 
-规则：以事实为准、不编造；宁缺毋滥；methodology/meta_agent 仅在真正值得时用，不为了生成而生成。"""
+规则：以事实为准、不编造；宁缺毋滥；meta_agent 仅在真正值得时用，不为了生成而生成。"""
 
 
 class TaskAnalyzer:
@@ -49,7 +45,6 @@ class TaskAnalyzer:
         """
         self.agent: Any = agent
         self._analysis_done: bool = False
-        self._methodology_extraction_done: bool = False
         # 收集任务执行过程中的信息，用于方法论提取
         self._execution_steps: List[str] = []
         self._tool_calls: List[str] = []
@@ -123,7 +118,7 @@ class TaskAnalyzer:
         """处理分析循环"""
         while True:
             # 原生 function calling 激活时，走 Agent._invoke_model 的原生通道：
-            # 工具（memory/methodology/meta_agent 等）由内部原生循环执行并触发 AFTER_TOOL_CALL，
+            # 工具（memory/meta_agent 等）由内部原生循环执行并触发 AFTER_TOOL_CALL，
             # 不再用文本 JSON 解析。
             if (
                 self.agent._native_active()

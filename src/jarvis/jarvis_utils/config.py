@@ -930,16 +930,6 @@ def get_pretty_output() -> bool:
     return True
 
 
-def is_use_methodology() -> bool:
-    """
-    获取是否启用方法论。
-
-    返回：
-        bool: 如果启用方法论则返回True，默认为True
-    """
-    return True
-
-
 def is_use_analysis() -> bool:
     """
     获取是否启用任务分析。
@@ -960,20 +950,6 @@ def get_tool_load_dirs() -> List[str]:
     return [
         os.path.expanduser(os.path.expandvars(str(p)))
         for p in GLOBAL_CONFIG_DATA.get("tool_load_dirs", [])
-        if p
-    ]
-
-
-def get_methodology_dirs() -> List[str]:
-    """
-    获取方法论加载目录。
-
-    返回:
-        List[str]: 方法论加载目录列表
-    """
-    return [
-        os.path.expanduser(os.path.expandvars(str(p)))
-        for p in GLOBAL_CONFIG_DATA.get("methodology_dirs", [])
         if p
     ]
 
@@ -1074,16 +1050,6 @@ def get_summary_cb_dirs() -> List[str]:
         for p in GLOBAL_CONFIG_DATA.get("summary_cb_dirs", [])
         if p
     ]
-
-
-def get_central_methodology_repo() -> str:
-    """
-    获取中心方法论Git仓库地址。
-
-    返回:
-        str: 中心方法论Git仓库地址，如果未配置则返回空字符串
-    """
-    return cast(str, GLOBAL_CONFIG_DATA.get("central_methodology_repo", ""))
 
 
 def get_central_tool_repo() -> str:
@@ -1206,19 +1172,6 @@ def is_enable_impact_analysis() -> bool:
         bool: 如果启用影响范围分析则返回True，默认为True
     """
     return True
-
-
-def is_enable_auto_methodology_extraction() -> bool:
-    """
-    获取是否启用方法论自动提取。
-
-    当启用时，任务完成后会自动从任务执行过程中提取方法论并保存。
-    默认关闭，可通过配置文件设置 auto_methodology_extraction: true 启用。
-
-    返回：
-        bool: 如果启用方法论自动提取则返回True，默认为False
-    """
-    return bool(GLOBAL_CONFIG_DATA.get("auto_methodology_extraction", False))
 
 
 def is_enable_request_classification() -> bool:

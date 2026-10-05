@@ -123,7 +123,6 @@ class SmartRetriever:
         "安全": ["security", "安全"],
         "性能": ["performance", "性能"],
         "错误": ["error", "bug", "fix", "错误"],
-        "方法论": ["methodology", "方法论"],
         "记忆": ["memory", "记忆"],
         "规则": ["rule", "规则"],
     }

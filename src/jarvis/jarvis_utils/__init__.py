@@ -9,7 +9,6 @@ Jarvis工具模块
 - embedding: 文本嵌入工具
 - git_utils: Git仓库操作
 - input: 用户输入处理
-- methodology: 方法论管理
 - output: 输出格式化
 - utils: 通用工具
 """

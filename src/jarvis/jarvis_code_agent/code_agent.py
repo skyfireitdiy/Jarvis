@@ -45,7 +45,6 @@ from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.config import is_enable_quick_mode
 from jarvis.jarvis_utils.config import is_enable_request_classification
 from jarvis.jarvis_utils.config import is_use_analysis
-from jarvis.jarvis_utils.config import is_use_methodology
 from jarvis.jarvis_utils.config import set_config
 from jarvis.jarvis_utils.git_utils import detect_large_code_deletion
 from jarvis.jarvis_utils.git_utils import advance_start_commit
@@ -258,7 +257,6 @@ class CodeAgent(Agent):
             "search_web",  # 网络搜索工具
             "read_webpage",  # 网页内容读取工具
             "memory",  # 记忆管理工具（支持save/retrieve/clear操作）
-            "methodology",  # 方法论工具
             "symbol_dependency",  # 符号依赖查询工具
             "lsp",  # LSP 语义查询工具（定义/引用/实现/诊断/修复建议）
             "add_images",  # 添加图片到对话上下文工具
@@ -349,7 +347,7 @@ class CodeAgent(Agent):
 
         # 从配置文件读取默认值，允许通过 kwargs 覆盖
         # 如果 kwargs 中未指定，则从配置文件读取默认值
-        use_methodology = kwargs.pop("use_methodology", is_use_methodology())
+        use_methodology = kwargs.pop("use_methodology", True)
         use_analysis = kwargs.pop("use_analysis", is_use_analysis())
         # 保存原始的 use_analysis 配置值，用于在 run 方法结束前手动调用分析
         self._use_analysis_config = use_analysis

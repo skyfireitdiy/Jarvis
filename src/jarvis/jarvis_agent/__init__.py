@@ -35,7 +35,6 @@ from jarvis.jarvis_agent.events import TASK_COMPLETED
 from jarvis.jarvis_agent.events import TASK_STARTED
 from jarvis.jarvis_agent.events import TOOL_FILTERED
 from jarvis.jarvis_agent.file_context_handler import file_context_handler
-from jarvis.jarvis_agent.file_methodology_manager import FileMethodologyManager
 from jarvis.jarvis_agent.memory_manager import MemoryManager
 from jarvis.jarvis_agent.rules_manager import RulesManager
 
@@ -78,7 +77,6 @@ from jarvis.jarvis_utils.config import is_enable_memory_organizer
 from jarvis.jarvis_utils.config import is_execute_tool_confirm
 from jarvis.jarvis_utils.config import is_force_save_memory
 from jarvis.jarvis_utils.config import is_use_analysis
-from jarvis.jarvis_utils.config import is_use_methodology
 from jarvis.jarvis_utils.globals import clear_current_agent
 from jarvis.jarvis_utils.globals import get_interrupt
 from jarvis.jarvis_utils.globals import get_short_term_memories
@@ -88,7 +86,6 @@ from jarvis.jarvis_utils.globals import set_current_agent
 from jarvis.jarvis_platform.content_types import ContentBlock
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.input import user_confirm
-from jarvis.jarvis_utils.methodology import _load_all_methodologies
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ct
 from jarvis.jarvis_utils.tag import ot
@@ -150,9 +147,6 @@ def show_agent_startup_stats(
         model_name: 使用的模型名称
     """
     try:
-        methodologies = _load_all_methodologies()
-        methodology_count = len(methodologies)
-
         # 获取工具数量
         # 创建一个临时的工具注册表类来获取所有工具（不应用过滤）
         class TempToolRegistry(ToolRegistry):
@@ -196,7 +190,6 @@ def show_agent_startup_stats(
         )
 
         stats_parts = [
-            f"📚  本地方法论: [bold cyan]{methodology_count}[/bold cyan]",
             f"🛠️  工具: [bold green]{available_tool_count}/{total_tool_count}[/bold green] (可用/全部)",
             f"🧠  全局记忆: [bold yellow]{global_memory_count}[/bold yellow]",
         ]
@@ -352,7 +345,6 @@ class Agent:
     event_bus: EventBus
     memory_manager: MemoryManager
     task_analyzer: TaskAnalyzer
-    file_methodology_manager: FileMethodologyManager
     prompt_manager: PromptManager
     model: BasePlatform
     session: SessionManager
@@ -799,10 +791,10 @@ class Agent:
             force_save_memory: 是否强制保存记忆
             summary_prompt: 总结提示词
         """
-        # 解析 use_methodology 配置
+        # 解析 use_methodology 配置（方法论系统已移除，保留参数作为兼容占位）
         try:
             resolved_use_methodology = bool(
-                use_methodology if use_methodology is not None else is_use_methodology()
+                use_methodology if use_methodology is not None else True
             )
         except Exception:
             resolved_use_methodology = (
@@ -877,9 +869,6 @@ class Agent:
         # 初始化各个功能管理器
         self.memory_manager = MemoryManager(self)  # 记忆管理器：管理长期和短期记忆
         self.task_analyzer = TaskAnalyzer(self)  # 任务分析器：分析任务完成度和满意度
-        self.file_methodology_manager = FileMethodologyManager(
-            self
-        )  # 文件和方法论管理器：处理文件上传和方法论加载
         self.prompt_manager = PromptManager(self)  # 提示词管理器：构建和管理系统提示词
         self._history_compressor = HistoryCompressor(self)  # 历史摘要/压缩处理器
         self._callback_loader = CallbackLoader(self)  # 回调/事件加载处理器
@@ -898,10 +887,6 @@ class Agent:
         # 如果配置了强制保存记忆，确保 memory 工具可用
         if self.force_save_memory:
             self._ensure_save_memory_tool()
-
-        # 如果启用了分析，确保 methodology 工具可用
-        if self.use_analysis:
-            self._ensure_methodology_tool()
 
         # 设置系统提示词（基于配置和工具列表构建）
         self._setup_system_prompt()
@@ -1332,32 +1317,6 @@ class Agent:
             # 如果 memory 不在 use_tools 列表中，则添加
             if "memory" not in self.use_tools:
                 self.use_tools.append("memory")
-                # 更新工具注册表的工具列表
-                self.set_use_tools(self.use_tools)
-        except Exception:
-            # 忽略所有错误，不影响主流程
-            pass
-
-    def _ensure_methodology_tool(self) -> None:
-        """如果启用了分析，确保 methodology 工具在 use_tools 列表中"""
-        try:
-            tool_registry = self.get_tool_registry()
-            if not tool_registry:
-                return
-
-            # 检查 methodology 工具是否已注册（工具默认都会注册）
-            if not tool_registry.get_tool("methodology"):
-                # 如果工具本身不存在，则无法使用，直接返回
-                return
-
-            # 检查 methodology 是否在 use_tools 列表中
-            # 如果 use_tools 为 None，表示使用所有工具，无需添加
-            if self.use_tools is None:
-                return
-
-            # 如果 methodology 不在 use_tools 列表中，则添加
-            if "methodology" not in self.use_tools:
-                self.use_tools.append("methodology")
                 # 更新工具注册表的工具列表
                 self.set_use_tools(self.use_tools)
         except Exception:
@@ -2289,11 +2248,8 @@ class Agent:
         # 准备记忆标签提示
         memory_tags_prompt = self.memory_manager.prepare_memory_tags_prompt()
 
-        # 极速模式下跳过文件上传、方法论加载和自动规则选择
+        # 极速模式下跳过自动规则选择
         if not self.quick_mode:
-            # 处理文件上传和方法论加载
-            self.file_methodology_manager.handle_files_and_methodology()
-
             # 自动选择并加载规则（如果用户未指定规则且启用了自动规则选择）
             if self.session.prompt and self._enable_auto_rule_select:
                 self.auto_select_and_load_rules(ensure_str(self.session.prompt))

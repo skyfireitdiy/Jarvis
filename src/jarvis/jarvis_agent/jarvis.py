@@ -22,7 +22,6 @@ import jarvis.jarvis_utils.utils as jutils
 from jarvis.jarvis_agent.agent_manager import AgentManager
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
 from jarvis.jarvis_agent.config_editor import ConfigEditor
-from jarvis.jarvis_agent.methodology_share_manager import MethodologyShareManager
 from jarvis.jarvis_agent.rule_share_manager import RuleShareManager
 from jarvis.jarvis_agent.tool_share_manager import ToolShareManager
 from jarvis.jarvis_utils.config import get_agent_definition_dirs
@@ -187,7 +186,6 @@ def print_commands_overview() -> None:
 | jarvis-rules-index | jri | 规则索引管理 |
 | jarvis-platform-manager | jpm | 管理和测试不同的大语言模型平台 |
 | jarvis-tool | jt | 工具管理与调用系统 |
-| jarvis-methodology | jm | 方法论知识库管理 |
 | jarvis-smart-shell | jss | 实验性的智能Shell功能 |
 | jarvis-sec | jsec | 安全分析套件，结合启发式扫描和 AI 深度验证 |
 | jarvis-c2rust | jc2r | C→Rust 迁移套件，支持渐进式迁移和智能库替代 |
@@ -203,18 +201,6 @@ def handle_edit_option(edit: bool, config_file: Optional[str]) -> bool:
     """处理配置文件编辑选项，返回是否已处理并需提前结束。"""
     if edit:
         ConfigEditor.edit_config(config_file)
-        return True
-    return False
-
-
-def handle_share_methodology_option(
-    share_methodology: bool, config_file: Optional[str]
-) -> bool:
-    """处理方法论分享选项，返回是否已处理并需提前结束。"""
-    if share_methodology:
-        init_env("", config_file=config_file)  # 初始化配置但不显示欢迎信息
-        methodology_manager = MethodologyShareManager()
-        methodology_manager.run()
         return True
     return False
 
@@ -856,9 +842,6 @@ def run_cli(
         help="从指定会话文件恢复",
     ),
     edit: bool = typer.Option(False, "-e", "--edit", help="编辑配置文件"),
-    share_methodology: bool = typer.Option(
-        False, "--share-methodology", help="分享本地方法论到中心方法论仓库"
-    ),
     share_tool: bool = typer.Option(
         False, "--share-tool", help="分享本地工具到中心工具仓库"
     ),
@@ -871,11 +854,11 @@ def run_cli(
         "--interactive-config",
         help="启动交互式配置向导（基于当前配置补充设置）",
     ),
-    disable_methodology_analysis: bool = typer.Option(
+    disable_analysis: bool = typer.Option(
         False,
         "-D",
-        "--disable-methodology-analysis",
-        help="禁用方法论和任务分析（覆盖配置文件设置）",
+        "--disable-analysis",
+        help="禁用任务分析（覆盖配置文件设置）",
     ),
     print_prompt: bool = typer.Option(
         False,
@@ -1101,8 +1084,7 @@ def run_cli(
             set_config("llm_group", str(llm_group))
         if tool_group:
             set_config("tool_group", str(tool_group))
-        if disable_methodology_analysis:
-            set_config("use_methodology", False)
+        if disable_analysis:
             set_config("use_analysis", False)
         if print_prompt:
             set_config("print_prompt", True)
@@ -1154,10 +1136,6 @@ def run_cli(
 
     # 处理配置文件编辑
     if handle_edit_option(edit, config_file):
-        return
-
-    # 处理方法论分享
-    if handle_share_methodology_option(share_methodology, config_file):
         return
 
     # 处理工具分享
@@ -1585,8 +1563,7 @@ def run_cli(
             set_config("llm_group", str(llm_group))
         if tool_group:
             set_config("tool_group", str(tool_group))
-        if disable_methodology_analysis:
-            set_config("use_methodology", False)
+        if disable_analysis:
             set_config("use_analysis", False)
         if print_prompt:
             set_config("print_prompt", True)
@@ -1599,8 +1576,7 @@ def run_cli(
         agent_manager = AgentManager(
             tool_group=tool_group,
             restore_session=True if restore else restore_session,
-            use_methodology=False if disable_methodology_analysis else None,
-            use_analysis=False if disable_methodology_analysis else None,
+            use_analysis=False if disable_analysis else None,
             non_interactive=non_interactive,
             allow_savesession=True,
             rule_names=rule_names,

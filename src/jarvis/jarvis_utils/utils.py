@@ -187,8 +187,6 @@ COMMAND_MAPPING = {
     "ja": "jarvis-agent",
     # 工具
     "jt": "jarvis-tool",
-    # 方法论
-    "jm": "jarvis-methodology",
     # 记忆整理
     "jmo": "jarvis-memory-organizer",
     # 安全分析
