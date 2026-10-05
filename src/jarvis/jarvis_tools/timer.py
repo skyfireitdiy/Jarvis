@@ -319,6 +319,10 @@ class TimerManager:
         skipped_count = 0
         for task_data in tasks_data:
             task = TimerTask.from_dict(task_data)
+            # 跳过已取消或已完成的任务：它们不应被恢复后继续触发
+            if task.status in ("cancelled", "completed"):
+                skipped_count += 1
+                continue
             if task.next_fire_time:
                 try:
                     next_fire = datetime.fromisoformat(task.next_fire_time)
