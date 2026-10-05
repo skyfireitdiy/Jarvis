@@ -36,6 +36,12 @@ from jarvis.jarvis_utils.utils import extract_json_from_text
 from jarvis.jarvis_utils.utils import is_context_overflow
 
 
+# 模块级内置工具缓存：内置工具类无状态，可安全跨 ToolRegistry 实例复用，
+# 避免每次实例化都重复 import sub_code_agent/code_agent 等重型模块（显著拖慢
+# test_tool_parsing 等频繁创建 ToolRegistry 的场景）。
+_BUILTIN_TOOLS_CACHE: Optional[Dict[str, Tool]] = None
+
+
 tool_call_help = """
 ## 工具调用指南（Markdown）
 
@@ -585,8 +591,15 @@ class ToolRegistry(OutputHandlerProtocol):
             PrettyOutput.auto_print("⚠️ " + "\n⚠️ ".join(error_lines))
 
     def _load_builtin_tools(self) -> None:
-        """从内置工具目录加载工具"""
+        """从内置工具目录加载工具（带模块级缓存，避免重复 import 重型模块）"""
+        global _BUILTIN_TOOLS_CACHE
         tools_dir = Path(__file__).parent
+
+        # 复用模块级缓存：内置工具无状态，跨实例共享安全且大幅减少重复 import
+        if _BUILTIN_TOOLS_CACHE is not None:
+            self.tools.update(_BUILTIN_TOOLS_CACHE)
+            self._builtin_tool_names = set(_BUILTIN_TOOLS_CACHE.keys())
+            return
 
         # 遍历目录中的所有.py文件
         for file_path in tools_dir.glob("*.py"):
@@ -598,6 +611,7 @@ class ToolRegistry(OutputHandlerProtocol):
 
         # 记录当前已加载的工具名称为内置工具
         self._builtin_tool_names = set(self.tools.keys())
+        _BUILTIN_TOOLS_CACHE = dict(self.tools)
 
     def _load_external_tools(self) -> None:
         """从jarvis_data/tools和配置的目录加载外部工具"""

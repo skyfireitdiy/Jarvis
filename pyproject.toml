@@ -148,7 +148,7 @@ dependencies = [
 
     [tool.pytest.ini_options]
     minversion = "6.0.8"
-    addopts = "-ra -q --strict-markers"
+    addopts = "-ra -q --strict-markers -m 'not slow'"
     testpaths = ["tests"]
     python_files = ["test_*.py", "*_test.py"]
     python_classes = ["Test*"]

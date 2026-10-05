@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from datetime import timedelta
-from typing import List
+from typing import List, Optional
 
 
 # 各字段的取值范围（用于校验）
@@ -142,15 +142,66 @@ class CronSchedule:
         # 两者都 *：每天
         return True
 
+    def _day_matches(self, dt: datetime) -> bool:
+        """判断给定日期（忽略分/时）是否满足 cron 的日级条件。
+
+        与 :meth:`matches` 中除 minute/hour 外的判定逻辑保持一致。
+        """
+        if dt.month not in self.months:
+            return False
+        day_match = dt.day in self.days
+        weekday_match = dt.weekday() in self.weekdays
+        if self._day_restricted and self._weekday_restricted:
+            return day_match or weekday_match
+        if self._day_restricted:
+            return day_match
+        if self._weekday_restricted:
+            return weekday_match
+        return True
+
+    def _first_match_in_day(
+        self, day: datetime, from_candidate: datetime
+    ) -> Optional[datetime]:
+        """返回 ``day`` 当天内 ``>= from_candidate`` 的第一个匹配时刻；无则返回 None。
+
+        前提：``day`` 的日级条件已满足（``_day_matches(day)`` 为 True）。
+        """
+        for hour in self.hours:
+            for minute in self.minutes:
+                dt = day.replace(hour=hour, minute=minute)
+                if dt >= from_candidate and self.matches(dt):
+                    return dt
+        return None
+
     def next_match(self, from_ts: float) -> float:
         """返回严格大于 from_ts 的下一个匹配时间戳。"""
         base = datetime.fromtimestamp(from_ts)
         # 从 from_ts 的下一个整分钟开始扫描
         candidate = (base + timedelta(minutes=1)).replace(second=0, microsecond=0)
-        for _ in range(_MAX_SCAN_MINUTES):
-            if self.matches(candidate):
-                return candidate.timestamp()
-            candidate += timedelta(minutes=1)
+
+        # 按天跳跃扫描：同一天内 month/day/weekday 不变，只有 minute/hour 变化。
+        # 对每个"日级条件满足"的天，直接计算该天第一个匹配时刻，避免逐分钟扫描；
+        # 对"日级条件不满足"的天（如 2 月 30 日），整段跳过，避免扫描 5 年。
+        scanned = 0
+        while scanned < _MAX_SCAN_MINUTES:
+            if not self._day_matches(candidate):
+                next_day = (candidate + timedelta(days=1)).replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                )
+                scanned += int((next_day - candidate).total_seconds() // 60)
+                candidate = next_day
+                continue
+            # 日级条件满足：计算当天第一个匹配时刻
+            day_start = candidate.replace(hour=0, minute=0, second=0, microsecond=0)
+            first = self._first_match_in_day(day_start, candidate)
+            if first is not None and first >= candidate:
+                return first.timestamp()
+            # 当天无匹配或匹配时刻已过，跳到下一天
+            next_day = (day_start + timedelta(days=1)).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            scanned += int((next_day - candidate).total_seconds() // 60)
+            candidate = next_day
         raise CronParseError(
             f"no matching time found within scan window for cron: {self.expression!r}"
         )

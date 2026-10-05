@@ -23,6 +23,25 @@ def clear_env_overrides(monkeypatch):
 class TestEnvVarOverride:
     """测试 config.py 的环境变量覆盖机制"""
 
+    @pytest.fixture(autouse=True)
+    def isolate_global_config(self):
+        """隔离 GLOBAL_CONFIG_DATA，避免真实 ~/.jarvis/config.yaml 污染测试结果。
+
+        全量跑测试时 GLOBAL_CONFIG_DATA 可能被真实配置填充（如 normal model 配置为
+        deepseek-flash），导致 test_default_no_override 断言默认值失败。这里在测试前
+        移除影响模型解析的键，使断言只依赖代码默认值，测试结束后恢复原状。
+        """
+        # 影响模型解析的键（_get_resolved_model_config 读取）
+        keys = ["model", "platform", "llm_group", "llm_groups"]
+        snapshot = {}
+        for key in keys:
+            if key in config_mod.GLOBAL_CONFIG_DATA:
+                snapshot[key] = config_mod.GLOBAL_CONFIG_DATA[key]
+                del config_mod.GLOBAL_CONFIG_DATA[key]
+        yield
+        for key, value in snapshot.items():
+            config_mod.GLOBAL_CONFIG_DATA[key] = value
+
     def test_default_no_override(self, clear_env_overrides):
         """不设环境变量时返回默认值"""
         assert config_mod.get_normal_platform_name() == "openai"
