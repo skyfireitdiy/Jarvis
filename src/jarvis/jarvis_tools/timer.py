@@ -307,7 +307,7 @@ class TimerManager:
         with self._lock:
             tasks_data = []
             for task in self._tasks.values():
-                if task.status != "cancelled" and task.time_type != "relative":
+                if task.status != "cancelled":
                     tasks_data.append(task.to_dict())
             return {"tasks": tasks_data}
 
