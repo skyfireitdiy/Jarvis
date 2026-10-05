@@ -737,6 +737,17 @@ def _get_resolved_model_config() -> Dict[str, Any]:
             # 未显式指定组：顶层覆盖组
             resolved_config[key] = GLOBAL_CONFIG_DATA[key]
 
+    # 环境变量覆盖（无交互快速配置，便于 CI）：
+    # 优先级：环境变量 > config.yaml > 默认值。未设置时不影响现有行为。
+    # JARVIS_PLATFORM / JARVIS_MODEL 覆盖平台与模型；base_url 走标准环境变量
+    # （OPENAI_API_BASE / ANTHROPIC_BASE_URL），由平台客户端直接读取。
+    env_platform = os.environ.get("JARVIS_PLATFORM")
+    if env_platform:
+        resolved_config["platform"] = env_platform
+    env_model = os.environ.get("JARVIS_MODEL")
+    if env_model:
+        resolved_config["model"] = env_model
+
     # 不再将 llm_config 应用到环境变量，所有配置通过 llm_config 参数直接传递给 platform
     # _apply_llm_config_to_env(resolved_config)
 

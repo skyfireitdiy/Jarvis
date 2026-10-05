@@ -6,6 +6,8 @@ Quick Config CLI 工具
 
 import yaml  # type: ignore[import-untyped]
 from pathlib import Path
+from typing import Any
+from typing import Dict
 import typer
 from rich.console import Console
 import requests
@@ -19,10 +21,37 @@ console = Console()
 
 
 @app.command()
-def quick_config():
-    """快速配置 LLM 平台信息到 Jarvis 配置文件的 llms 部分"""
+def quick_config(
+    platform: str = typer.Option(None, help="平台类型 (openai/claude)，非交互模式必填"),
+    base_url: str = typer.Option(None, help="API 基础 URL，非交互模式必填"),
+    api_key: str = typer.Option(None, help="API 密钥，非交互模式必填"),
+    model: str = typer.Option(
+        None, help="模型名称，非交互模式必填（normal/smart/cheap 共用）"
+    ),
+    group: str = typer.Option(None, help="模型组名称，非交互模式可选，默认取模型名"),
+    max_tokens: int = typer.Option(200000, help="最大输入 token 数，非交互模式可选"),
+    skip_test: bool = typer.Option(
+        False, "--skip-test", help="跳过 API 连通性测试（CI 场景推荐）"
+    ),
+):
+    """快速配置 LLM 平台信息到 Jarvis 配置文件的 llms 部分
+
+    交互模式：直接运行 jqc 不带参数，按提示输入。
+    非交互模式（便于 CI）：提供 --platform/--base-url/--api-key/--model 后自动写入配置。
+    """
     try:
-        run_quick_config()
+        if platform and api_key and model:
+            run_quick_config_noninteractive(
+                platform=platform,
+                base_url=base_url,
+                api_key=api_key,
+                model=model,
+                group=group,
+                max_tokens=max_tokens,
+                skip_test=skip_test,
+            )
+        else:
+            run_quick_config()
     except SystemExit:
         raise typer.Exit(code=1)
 
@@ -147,6 +176,137 @@ def get_models(platform: str, base_url: str, api_key: str) -> list:
         PrettyOutput.auto_print(f"⚠️  获取模型列表失败: {e}")
 
     return []
+
+
+def run_quick_config_noninteractive(
+    platform: str,
+    base_url: str,
+    api_key: str,
+    model: str,
+    group: str | None = None,
+    max_tokens: int = 200000,
+    skip_test: bool = False,
+) -> None:
+    """非交互式快速配置 LLM 平台（便于 CI 无 TTY 环境）
+
+    将单个模型写入 config.yaml 的 llms 部分，并创建模型组（normal/smart/cheap 共用该模型），
+    同时设为默认模型组。逻辑与交互版"仅一个模型"分支等价，但跳过交互输入。
+
+    Args:
+        platform: 平台类型 (openai/claude)
+        base_url: API 基础 URL
+        api_key: API 密钥
+        model: 模型名称
+        group: 模型组名称，默认取模型名
+        max_tokens: 最大输入 token 数
+        skip_test: 是否跳过 API 连通性测试
+    """
+    init_env("")
+
+    platform = platform.lower().strip()
+    if platform not in ["claude", "openai"]:
+        PrettyOutput.auto_print(
+            f"❌ 不支持的平台类型: {platform}，仅支持 claude 和 openai"
+        )
+        raise typer.Exit(code=1)
+
+    if not base_url:
+        PrettyOutput.auto_print("❌ 非交互模式必须提供 --base-url")
+        raise typer.Exit(code=1)
+
+    group_name = (group or model).strip()
+    if not group_name:
+        PrettyOutput.auto_print("❌ 模型组名称不能为空")
+        raise typer.Exit(code=1)
+
+    # 可选连通性测试
+    if not skip_test:
+        PrettyOutput.auto_print(f"🔍 正在测试模型 {model} 的API连通性...")
+        success, error_msg = test_model_connection(platform, base_url, api_key, model)
+        if not success:
+            PrettyOutput.auto_print(f"❌ API连通性测试失败: {error_msg}")
+            raise typer.Exit(code=1)
+        PrettyOutput.auto_print("✅ API连通性测试通过")
+
+    # 读取/创建配置文件
+    jarvis_dir = Path.home() / ".jarvis"
+    output_file = jarvis_dir / "config.yaml"
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+
+    config = {}
+    if output_file.exists():
+        try:
+            with open(output_file, "r", encoding="utf-8") as f:
+                config = yaml.safe_load(f) or {}
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 读取配置文件失败: {e}")
+
+    if "llms" not in config:
+        config["llms"] = {}
+    if "llm_groups" not in config:
+        config["llm_groups"] = {}
+
+    # 复用已有同名模型的 llms 配置，否则新建
+    existing_config_name = None
+    for config_key, llm_config in config.get("llms", {}).items():
+        if isinstance(llm_config, dict) and llm_config.get("model") == model:
+            existing_config_name = config_key
+            break
+
+    llm_config_entry: Dict[str, Any] = {}
+    if existing_config_name is not None:
+        existing_entry = config["llms"][existing_config_name]
+        if isinstance(existing_entry, dict):
+            llm_config_entry = existing_entry
+        llm_config_entry["platform"] = platform
+        llm_config_entry["model"] = model
+        llm_config_entry["max_input_token_count"] = max_tokens
+        model_config_name = existing_config_name
+    else:
+        hostname_part = _extract_hostname(base_url)
+        model_config_name = (
+            f"{platform}_{hostname_part}_{model.replace('.', '_').replace('-', '_')}"
+        )
+        llm_config_entry = {
+            "platform": platform,
+            "model": model,
+            "max_input_token_count": max_tokens,
+        }
+        config["llms"][model_config_name] = llm_config_entry
+
+    if platform == "openai":
+        llm_config_entry["llm_config"] = {
+            "openai_api_key": api_key,
+            "openai_api_base": base_url,
+            "supports_multimodal": False,
+        }
+    elif platform == "claude":
+        llm_config_entry["llm_config"] = {
+            "anthropic_api_key": api_key,
+            "anthropic_base_url": base_url,
+            "supports_multimodal": False,
+        }
+
+    # 创建/更新模型组（normal/smart/cheap 共用该模型）
+    config["llm_groups"][group_name] = {
+        "normal_llm": model_config_name,
+        "smart_llm": model_config_name,
+        "cheap_llm": model_config_name,
+    }
+    config["llm_group"] = group_name
+
+    # 保存配置
+    try:
+        with open(output_file, "w", encoding="utf-8") as f:
+            yaml.safe_dump(
+                config, f, allow_unicode=True, default_flow_style=False, sort_keys=False
+            )
+        PrettyOutput.auto_print(
+            f"✅ 配置已保存到 {output_file}（模型组: {group_name}, 模型: {model}）"
+        )
+    except Exception as e:
+        PrettyOutput.auto_print(f"❌ 保存配置失败: {e}")
+        raise typer.Exit(code=1)
 
 
 def run_quick_config():

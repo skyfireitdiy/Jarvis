@@ -1,0 +1,115 @@
+---
+# yamllint disable rule:line-length
+# =============================================================================
+# Jarvis Issue 自动分类工作流模板
+# -----------------------------------------------------------------------------
+# 用途：issue 触发时，用 Jarvis CodeAgent 自动分析 issue 内容并分类/打标签。
+#
+# 用法：
+#   1. 把本文件复制到你的仓库 .github/workflows/jarvis-issue-triage.yml
+#   2. 配置环境变量（Jarvis 从标准 LLM 环境变量读取 API Key，见下）：
+#      - OPENAI_API_KEY     （OpenAI 平台）调用 LLM 的 API Key
+#      - ANTHROPIC_API_KEY  （Anthropic 平台）调用 LLM 的 API Key
+#      - OPENAI_API_BASE    （可选）自定义 OpenAI 兼容端点
+#      - JARVIS_MODEL       （可选）指定模型，默认 gpt-5
+#      - JARVIS_PLATFORM    （可选）指定平台，默认 openai
+#   3. 授予工作流 issues: write 权限（用于添加标签/评论）
+#
+#   说明：Jarvis 首次运行会自动生成默认配置（无交互），API Key 通过标准
+#        环境变量（OPENAI_API_KEY / ANTHROPIC_API_KEY）注入，无需预置 config.yaml。
+#        也可用 jqc 非交互模式持久化配置：jqc --platform openai --base-url <url>
+#        --api-key <key> --model <model> --skip-test（写入 ~/.jarvis/config.yaml）。
+# 原理：复用 Jarvis headless 非交互模式（jvs -n --task-file），把 issue 标题
+#       与正文作为任务输入，输出分类结论，再解析 .output 添加标签与评论。
+# =============================================================================
+name: Jarvis Issue Triage
+
+"on":
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  jarvis-issue-triage:
+    name: Jarvis Issue Triage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Install Jarvis
+        run: |
+          pip install --upgrade pip
+          # 从 PyPI 安装 Jarvis（jarvis-ai-assistant），适用于任意用户仓库
+          pip install jarvis-ai-assistant
+
+      - name: Prepare Jarvis task file
+        id: task
+        run: |
+          # 把 issue 标题与正文写入任务文件（避免特殊字符破坏 JSON）
+          cat > /tmp/issue-body.txt <<'EOF'
+          ${{ github.event.issue.body }}
+          EOF
+          cat > /tmp/jarvis-task.json <<'EOF'
+          {
+            "task_desc": "请对以下 GitHub issue 进行自动分类。输出结构化结论：1) 类别（bug/feature/documentation/question/enhancement 之一，可多选）；2) 建议标签（GitHub label 名，逗号分隔）；3) 一句话摘要；4) 建议的下一步处理。",
+            "background": "这是 GitHub Actions 中 Jarvis 自动 issue 分类。请阅读 /tmp/issue-body.txt 中的 issue 正文，结合仓库类型给出分类建议。",
+            "status_file": "/tmp/jarvis-status.json"
+          }
+          EOF
+
+      - name: Run Jarvis triage (headless)
+        id: jarvis
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_BASE: ${{ secrets.OPENAI_API_BASE }}
+          JARVIS_MODEL: ${{ secrets.JARVIS_MODEL }}
+          JARVIS_PLATFORM: ${{ secrets.JARVIS_PLATFORM }}
+          # 跳过首次运行的交互式配置引导（CI 环境无 TTY）
+          JARVIS_SKIP_INTERACTIVE_CONFIG: "1"
+        run: |
+          jvs -n --task-file /tmp/jarvis-task.json || true
+
+      - name: Read Jarvis triage result
+        id: result
+        run: |
+          if [ -f /tmp/jarvis-status.json ]; then
+            echo "status=$(jq -r '.status' /tmp/jarvis-status.json)" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -f /tmp/jarvis-status.output ]; then
+            {
+              echo "output<<EOF"
+              cat /tmp/jarvis-status.output
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Post triage comment
+        if: steps.result.outputs.output != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = [
+              '## 🤖 Jarvis Issue 自动分类',
+              '',
+              '```',
+              process.env.TRIAGE_OUTPUT || '(无输出)',
+              '```'
+            ].join('\n');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+        env:
+          TRIAGE_OUTPUT: ${{ steps.result.outputs.output }}

@@ -67,3 +67,57 @@
 - 连通性测试失败并不强制阻止保存；如果你选择继续保存，后续真正使用该模型时仍可能失败。
 - 如果本地已经有相同模型的配置，系统可能直接复用原配置，而不是重复创建一份新的。
 - 这里写入的是持久配置，并且会改写当前默认模型组，不等于某次会话里临时切换模型组。
+
+## 非交互快速配置（便于 CI / 自动化）
+
+上面的交互式流程适合手动配置；如果你需要在 CI 或脚本里无人工输入地完成配置，可以使用以下两种方式，二选一即可。
+
+### 方式 A：环境变量覆盖（运行期生效，不写配置）
+
+Jarvis 读取配置时支持用环境变量覆盖平台与模型，优先级为 **环境变量 > config.yaml > 默认值**。这种方式不改写 `~/.jarvis/config.yaml`，只在本次运行生效，适合 CI 里临时指定模型。
+
+| 环境变量            | 作用                              | 默认值   |
+| ------------------- | --------------------------------- | -------- |
+| `OPENAI_API_KEY`    | OpenAI 平台 API 密钥              | 无       |
+| `ANTHROPIC_API_KEY` | Claude 平台 API 密钥              | 无       |
+| `OPENAI_API_BASE`   | API 基础 URL                      | 平台默认 |
+| `JARVIS_MODEL`      | 覆盖模型名称                      | `gpt-5`  |
+| `JARVIS_PLATFORM`   | 覆盖平台类型（`openai`/`claude`） | `openai` |
+
+示例：
+
+```bash
+export OPENAI_API_KEY=sk-xxx
+export JARVIS_MODEL=gpt-4o
+export JARVIS_PLATFORM=openai
+jvs -n --task "你的任务"
+```
+
+> 首次运行 `jvs` 会自动生成默认 `~/.jarvis/config.yaml`（无交互），API Key 通过上述标准环境变量注入，无需预置配置文件。
+
+### 方式 B：`jqc` 非交互模式（持久化写入 config.yaml）
+
+`jqc` 支持带参数的非交互模式，直接把配置写入 `~/.jarvis/config.yaml`，适合在 CI 里提前准备持久配置。
+
+```bash
+jqc --platform openai \
+    --base-url https://api.openai.com/v1 \
+    --api-key sk-xxx \
+    --model gpt-4o \
+    --group default \
+    --skip-test
+```
+
+非交互参数说明：
+
+| 参数           | 必填 | 说明                                |
+| -------------- | ---- | ----------------------------------- |
+| `--platform`   | 是   | 平台类型（`openai`/`claude`）       |
+| `--base-url`   | 是   | API 基础 URL                        |
+| `--api-key`    | 是   | API 密钥                            |
+| `--model`      | 是   | 模型名称（normal/smart/cheap 共用） |
+| `--group`      | 否   | 模型组名称，默认取模型名            |
+| `--max-tokens` | 否   | 最大输入 token 数，默认 `200000`    |
+| `--skip-test`  | 否   | 跳过 API 连通性测试（CI 场景推荐）  |
+
+> 交互模式：直接运行 `jqc`（不带参数）按提示输入，逻辑保持不变。
