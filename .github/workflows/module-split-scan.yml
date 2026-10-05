@@ -1,0 +1,48 @@
+---
+# 模块单例分裂扫描（CI 版）
+#
+# 目的：在 GitHub Actions 上检测「模块单例分裂点」——同一物理 .py 文件若被
+# 包路径（jarvis.jarvis_tools.timer）与裸顶层名（timer）两种方式导入，会被
+# Python 当作两个不同的模块对象，导致模块级单例/缓存分裂（典型症状：A 处
+# 创建的任务/状态，B 处看不到、无法操作，如 timer 的 get_timer_manager）。
+#
+# 复用 scripts/scan_module_split.py：
+#   - 默认扫描整个 src 目录（该扫描是整体静态分析，非 diff 粒度）；
+#   - 先跑 --selftest 验证扫描器自身逻辑可用，再跑真实工程扫描；
+#   - 命中即 job 失败，阻断合并/发布。
+#
+# 触发：push/PR 到 main，也支持 workflow_dispatch 手动触发。
+name: Module Split Scan
+
+"on":
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  module-split-scan:
+    name: 模块单例分裂扫描
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: 自检扫描器逻辑
+        run: |
+          set -euo pipefail
+          python3 scripts/scan_module_split.py --selftest
+
+      - name: 扫描真实工程 src
+        run: |
+          set -euo pipefail
+          python3 scripts/scan_module_split.py
