@@ -771,6 +771,8 @@ func runDaemon(args []string) {
 	// 开关由关闭变为打开时，补做一次扩展同步检查：daemon 只在 hello_ack 时检查
 	// 一次开关，而前端推送开关通常晚于 hello_ack，若不补查会一直判定为「已关闭」。
 	api.SetOnBrowserExtEnabled(func() { onBrowserExtSwitchEnabled(manager) })
+	// 周期性兜底：每 10 分钟对已连接网关做一次扩展版本同步检查（见函数注释）。
+	startBrowserExtPeriodicSync(manager)
 	// 网关黑白名单：读取当前内存态；更新时同时改内存态并持久化到 config.yaml。
 	// 接口本身在 localapi 内已强制校验来源回环（仅限本机访问）。
 	api.SetGatewayFilter(
@@ -861,6 +863,12 @@ func buildClientID() string {
 // browserExtSyncMu 串行化扩展同步，避免多个网关同时握手时并发写同一目录。
 var browserExtSyncMu sync.Mutex
 
+// browserExtSyncInterval 是浏览器扩展周期性同步检查的间隔。
+//
+// 作为握手/开关事件之外的安全兜底：网关长时间不重连、开关早已打开时，
+// 若网关侧发布了新扩展版本，本地仅靠事件触发感知不到，此定时器周期兜底。
+const browserExtSyncInterval = 10 * time.Minute
+
 // gatewayExtVersionMu 保护 gatewayExtVersions。
 var gatewayExtVersionMu sync.Mutex
 
@@ -914,6 +922,37 @@ func onBrowserExtSwitchEnabled(manager *wsclient.Manager) {
 		log.Printf("[daemon] 扩展开关已打开，补做一次同步检查（网关 %s，网关版本 %q）", st.Gateway, latest)
 		maybeAutoSyncBrowserExt(st.Gateway, latest)
 	}
+}
+
+// startBrowserExtPeriodicSync 每 browserExtSyncInterval（10 分钟）对已连接网关
+// 做一次浏览器扩展版本同步检查。
+//
+// 为什么需要：扩展同步的既有触发点（网关握手 hello_ack、开关「关闭→打开」跃迁）
+// 都依赖事件。若网关长时间不重连、开关早已打开，而网关侧发布了新扩展版本，本地
+// 仅靠事件触发无法感知，直到下次重连才同步。此定时器作为兜底，周期性把「网关最新
+// 版本」与本地比对。
+//
+// 安全：这里只是周期性地触发检查，实际是否同步仍由 maybeAutoSyncBrowserExt 内部的
+// 开关判断 + 版本比对 + browserExtSyncMu 互斥锁把关，不绕过任何既有约束；任何失败
+// 只记日志，绝不影响连接与既有能力。
+func startBrowserExtPeriodicSync(manager *wsclient.Manager) {
+	go func() {
+		ticker := time.NewTicker(browserExtSyncInterval)
+		defer ticker.Stop()
+		for range ticker.C {
+			for _, st := range manager.Status() {
+				if !st.Connected {
+					continue
+				}
+				latest, ok := gatewayExtVersionOf(st.Gateway)
+				if !ok {
+					// 该网关尚未下发过版本（未收到 hello_ack），等其自身握手时再处理。
+					continue
+				}
+				maybeAutoSyncBrowserExt(st.Gateway, latest)
+			}
+		}
+	}()
 }
 
 // maybeAutoSyncBrowserExt 在网关下发扩展最新版本且与本地不一致时，异步同步扩展包。

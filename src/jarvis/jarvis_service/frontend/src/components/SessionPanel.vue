@@ -138,7 +138,7 @@
             @paste="$emit('paste', $event)"
           />
           <!-- 缓冲区指示器 -->
-          <div class="buffer-indicator" v-if="hasBufferedInput && (agentStatus?.execution_status ?? 'running') !== 'waiting_multi'" @click="$emit('show-buffer')">
+          <div class="buffer-indicator" v-if="hasBufferedInput && (agentStatus?.execution_status ?? 'running') !== 'waiting_multi'" @click="$emit('show-buffer', agent?.agent_id)">
             <span class="buffer-icon" v-html="SESSION_ICONS.buffer"></span>
             <span class="buffer-text">缓冲区有内容</span>
           </div>

@@ -857,7 +857,7 @@
                       @input-change="handlePanelInputChange(getPanePanel(pane), $event)"
                       @keydown="handlePanelKeydown(getPanePanel(pane), $event)"
                       @paste="handlePanelPaste(getPanePanel(pane), $event)"
-                      @show-buffer="showBufferPanel = true"
+                      @show-buffer="openBufferPanel(getPanePanel(pane))"
                       @clear-buffer="clearBufferFromPanel(getPanePanel(pane))"
                       @set-output-list="setPanelOutputList(getPanePanel(pane), $event)"
                       @set-terminal-ref="(executionId, el, agentId) => setPanelTerminalRef(getPanePanel(pane), executionId, el, agentId)"
@@ -3686,6 +3686,7 @@ const showSessionDialog = ref(false)   // Session 选择对话框
 const availableSessions = ref([])         // 可恢复的 session 列表
 const selectedSession = ref(null)         // 选中的 session
 const showBufferPanel = ref(false)        // 缓存管理面板显示状态
+const bufferPanelAgentId = ref(null)      // 缓存管理面板对应的目标 Agent（点击的 Panel 所属 Agent）
 const bufferEditText = ref('')            // 缓存编辑文本
 const showDirDialog = ref(false)           // 目录选择对话框
 let handleResize = null
@@ -7906,15 +7907,22 @@ function showToast(message, type = 'success') {
     toast.value.show = false
   }, 2000)
 }
+
+// 打开缓存管理面板，记录目标 Agent（点击的 Panel 所属 Agent）
+function openBufferPanel(panel) {
+  bufferPanelAgentId.value = panel?.agentId ?? null
+  showBufferPanel.value = true
+}
+
 const hasBufferedInput = computed(() => {
-  const agentId = currentAgentId.value
+  const agentId = bufferPanelAgentId.value
   return agentId ? inputBuffers.value.has(agentId) : false
 })
 
 // 监听缓存面板打开，自动加载缓存内容
 watch(showBufferPanel, (newVal) => {
   if (newVal && hasBufferedInput.value) {
-    const agentId = currentAgentId.value
+    const agentId = bufferPanelAgentId.value
     if (agentId && inputBuffers.value.has(agentId)) {
       bufferEditText.value = inputBuffers.value.get(agentId)
     }
@@ -16473,7 +16481,7 @@ function sendBufferedInput(agentId = null) {
 }
 
 function clearBuffer() {
-  const agentId = currentAgentId.value
+  const agentId = bufferPanelAgentId.value
   if (!agentId) {
     return
   }
@@ -16487,7 +16495,7 @@ function clearBuffer() {
 }
 
 function loadBufferToInput() {
-  const agentId = currentAgentId.value
+  const agentId = bufferPanelAgentId.value
   if (!agentId || !inputBuffers.value.has(agentId)) {
     return
   }
@@ -16502,7 +16510,7 @@ function loadBufferToInput() {
 }
 
 function saveBufferEdit() {
-  const agentId = currentAgentId.value
+  const agentId = bufferPanelAgentId.value
   if (!agentId || !bufferEditText.value.trim()) {
     return
   }
