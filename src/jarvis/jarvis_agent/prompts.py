@@ -42,21 +42,21 @@ def get_task_analysis_prompt(
     # 第一步：记忆保存部分
     if not has_memory_tool:
         # 若无 memory 工具，说明无法保存记忆
-        memory_step = """第一步：记录值得保存的信息
+        memory_step = """第二步：记录值得保存的信息
 1. 识别任务中的关键信息与知识点
 2. 评估是否有值得保存的项目长期记忆或全局长期记忆
 3. 注意：当前环境不支持 memory 工具，无法保存记忆。请直接说明识别到的关键信息即可。"""
     else:
         # 有 memory 工具
-        memory_step = """第一步：记录值得保存的信息
+        memory_step = """第二步：记录值得保存的信息
 1. 识别任务中的关键信息与知识点
 2. 评估是否有值得保存的项目长期记忆或全局长期记忆
 3. 若有价值，用 memory 工具（action=save）保存有价值的信息：
    - project_long_term: 保存与当前项目相关的长期信息（如项目配置、架构决策、开发规范等）
    - global_long_term: 保存通用信息、用户偏好、知识或方法（如技术知识、最佳实践、用户习惯等）"""
 
-    # 第二步：规则体系分析部分
-    rule_analysis_step = """第二步：分析规则体系
+    # 第一步：规则体系分析部分
+    rule_analysis_step = """第一步：分析规则体系
 1. 检查当前项目的全局或项目规则（.jarvis/rules/ 目录，不包括 builtin/rules/ 内置规则）是否有需要完善之处
 2. 重点关注以下方面的规则覆盖：
    - 项目级规范（如代码风格、模块设计约定）
@@ -68,7 +68,7 @@ def get_task_analysis_prompt(
 3. 若发现规则缺失或需要完善：
    - 用 load_rule 工具加载 builtin:rule 查看现有规则体系
    - 评估缺失的规则是否需要新建
-   - 若需要新建规则，在第三步中说明
+   - 若需要新建规则，在后续步骤中说明
 4. 若现有规则已经完善，直接说明即可"""
 
     # 第三步：工具/规则分析部分
@@ -127,9 +127,9 @@ def get_task_analysis_prompt(
 <request>
 当前任务已结束，请按以下步骤分析该任务：
 
-{memory_step}
-
 {rule_analysis_step}
+
+{memory_step}
 
 {solution_step}
 
