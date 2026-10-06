@@ -25,16 +25,32 @@ EVAL_VENV_DIR=/home/skyfire/harbor-venv \
 ```
 
 - `run_eval.sh run` 会自动：
-  1. 从 `~/.jarvis/config.yaml` 的 `ds` 模型组读取 platform/model/api_base/api_key；
+  1. 从 `~/.jarvis/config.yaml` 的模型组读取 platform/model/api_base/api_key（默认 `ds`，可用 `-g <组名>` 指定，如 `-g linuxdo`）；
   2. 透传 `OPENAI_API_KEY`、`OPENAI_API_BASE`、`JARVIS_MODEL`、`JARVIS_PLATFORM`；
   3. 透传 `OPENAI_EXTRA_BODY={"thinking":{"type":"disabled"}}`（禁用 deepseek 推理，关键修复）；
   4. 以 `JARVIS_WHEELHOUSE_DIR` 指向离线 wheelhouse，供容器内 `install()` 离线安装 jca。
 - 其他常用参数：
+  - `-g <模型组>` / `--group=<模型组>`：指定 config.yaml 中的模型组（默认 `ds`）。
   - `--n-tasks N`：跑 N 个任务；`--n-concurrent N`：并发数。
   - `--include-task-name <name>`：只跑指定任务（如 `crack-7z-hash`）。
   - `--agent-timeout-multiplier 2`：把 agent 超时放大 2 倍（默认 900s，复杂任务可能不够）。
+- API key 来源（二选一）：优先读 config.yaml 模型组；未配置时回退到环境变量 `OPENAI_API_KEY`（配合 `JARVIS_MODEL`/`JARVIS_PLATFORM`/`OPENAI_API_BASE`）。
 
 > 终端是 fish 时用 `bash scripts/run_eval.sh ...` 显式调用。
+
+### 查看所有任务名
+
+terminal-bench@2.0 数据集共 **89 个任务**，任务名即缓存目录
+`~/.cache/harbor/tasks/<hash>/<任务名>/task.toml` 中的任务名。查看命令：
+
+```bash
+find ~/.cache/harbor/tasks/ -name task.toml 2>/dev/null | awk -F/ '{print $(NF-1)}' | sort
+```
+
+部分任务示例：`crack-7z-hash`、`gpt2-codegolf`、`password-recovery`、
+`path-tracing`、`qemu-alpine-ssh`、`sqlite-db-truncate` 等。
+
+> 用 `--include-task-name <name>` 可只跑指定任务，任务名需与上表一致。
 
 ### 后台运行（可选）
 

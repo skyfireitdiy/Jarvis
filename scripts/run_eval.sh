@@ -13,8 +13,11 @@
 #   # 只搭建环境（创建 venv + 安装 harbor + 下载数据集）
 #   ./scripts/run_eval.sh setup
 #
-#   # 运行评测（需先 export OPENAI_API_KEY=sk-xxx）
+#   # 运行评测。API key 来源（二选一）：
+#   #   - 优先从 ~/.jarvis/config.yaml 的模型组读取（默认 ds，可用 -g <组名> 指定）
+#   #   - 或 export OPENAI_API_KEY（配合 JARVIS_MODEL/JARVIS_PLATFORM/OPENAI_API_BASE）
 #   OPENAI_API_KEY=sk-xxx ./scripts/run_eval.sh run [--n-concurrent N] [--n-tasks N]
+#   ./scripts/run_eval.sh run -g linuxdo --n-concurrent 2
 #
 #   # 查看 harbor run 帮助
 #   ./scripts/run_eval.sh help
@@ -173,8 +176,16 @@ run_eval() {
 		exit 1
 	}
 	IFS='|' read -r PLATFORM MODEL API_BASE API_KEY <<<"$INFO"
+	# 若 config.yaml 的模型组未提供 API key，回退到环境变量 OPENAI_API_KEY
+	# （模型名/平台/base 相应回退到 JARVIS_MODEL / JARVIS_PLATFORM / OPENAI_API_BASE）
+	if [ -z "$API_KEY" ] && [ -n "${OPENAI_API_KEY:-}" ]; then
+		API_KEY="$OPENAI_API_KEY"
+		[ -z "$PLATFORM" ] && PLATFORM="${JARVIS_PLATFORM:-openai}"
+		[ -z "$MODEL" ] && MODEL="${JARVIS_MODEL:-}"
+		[ -z "$API_BASE" ] && API_BASE="${OPENAI_API_BASE:-}"
+	fi
 	if [ -z "$API_KEY" ]; then
-		echo_err "模型组 $MODEL_GROUP 未配置 API key"
+		echo_err "未配置 API key：请在 ~/.jarvis/config.yaml 的 $MODEL_GROUP 模型组配置，或 export OPENAI_API_KEY"
 		exit 1
 	fi
 	echo_info "使用模型组 $MODEL_GROUP: platform=$PLATFORM model=$MODEL base=$API_BASE"
@@ -219,7 +230,30 @@ case "${1:-}" in
 setup) setup ;;
 run)
 	shift
-	run_eval "$@"
+	# 解析 -g/--group 指定模型组（优先级：-g 参数 > EVAL_MODEL_GROUP 环境变量 > 默认 ds）
+	# 其余参数原样传给 harbor run
+	local_model_group=""
+	remaining=()
+	while [ $# -gt 0 ]; do
+		case "$1" in
+		-g | --group)
+			local_model_group="$2"
+			shift 2
+			;;
+		-g=* | --group=*)
+			local_model_group="${1#*=}"
+			shift
+			;;
+		*)
+			remaining+=("$1")
+			shift
+			;;
+		esac
+	done
+	if [ -n "$local_model_group" ]; then
+		export EVAL_MODEL_GROUP="$local_model_group"
+	fi
+	run_eval "${remaining[@]}"
 	;;
 help)
 	check_prereq
@@ -228,7 +262,7 @@ help)
 *)
 	echo "用法: $0 {setup|run|help}"
 	echo "  setup   搭建评测环境（创建 venv + 安装 harbor + 下载数据集）"
-	echo "  run     运行评测（需先 export OPENAI_API_KEY 等）"
+	echo "  run     运行评测（-g <模型组> 指定模型组，默认 ds；API key 读 config.yaml 或 export OPENAI_API_KEY）"
 	echo "  help    查看 harbor run 参数"
 	exit 1
 	;;
