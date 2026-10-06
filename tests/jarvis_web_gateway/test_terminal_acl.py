@@ -250,3 +250,43 @@ def test_get_all_admin_session_ids_returns_admin_sessions(manager):
     assert "session_admin-b" in sids
     # 非 admin 用户不应包含
     assert "session_normal-u" not in sids
+
+
+def test_get_access_session_ids_falls_back_to_session_id_for_child_node(manager):
+    """子节点终端 owner_id 为空时应回退到 session_id，避免输出无人接收。
+
+    根因：Bug 1 修复后 _publish_output 改为遍历 _get_access_session_ids，
+    但子节点创建终端时未传 owner_id（owner_id 为空），导致 _get_access_session_ids
+    返回空列表，输出全部丢失（表现为"只有标签和空的 xterm"）。
+    """
+    # 模拟子节点终端：owner_id 为空，但 session_id 有值（session_{user_id}）
+    session = TerminalSession(
+        terminal_id="child-term",
+        interpreter="bash",
+        working_dir=".",
+        session_id="session_owner1",
+        owner_id="",
+        access_acl={},
+    )
+    assert session._get_access_session_ids() == ["session_owner1"]
+
+
+def test_publish_output_falls_back_to_session_id_for_child_node(manager):
+    """子节点终端（owner_id 为空）的 _publish_output 应回退到 session_id 推送输出。"""
+    published = []
+
+    class FakeRouter:
+        def publish(self, message, session_id=None, connection_id=None):
+            published.append(session_id)
+
+    session = TerminalSession(
+        terminal_id="child-term",
+        interpreter="bash",
+        working_dir=".",
+        session_id="session_owner1",
+        owner_id="",
+        access_acl={},
+    )
+    session.stream_publisher = FakeRouter()
+    session._publish_output(b"hello child node")
+    assert "session_owner1" in published

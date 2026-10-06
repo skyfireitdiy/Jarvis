@@ -166,6 +166,11 @@ class TerminalSession:
         for sid in self.attached_session_ids:
             if sid and sid not in ids:
                 ids.append(sid)
+        # 兼容子节点终端：创建时未传 owner_id（owner_id 为空），此时回退到
+        # self.session_id，避免 _get_access_session_ids 为空导致输出无人接收
+        # （表现为"只有标签和空的 xterm"）
+        if not ids and self.session_id and self.session_id != "default":
+            ids.append(self.session_id)
         return ids
 
     def _publish_output(self, data: bytes) -> None:
