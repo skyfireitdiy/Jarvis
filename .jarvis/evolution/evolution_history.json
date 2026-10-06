@@ -272,5 +272,17 @@
       "verification": "jarvis_audit 10 passed（新增 2 个用例：文本协议审计无明文泄露、默认关闭不解析）；jarvis_agent 全套 passed（无回归）；ruff 0 错误；git 工作区干净",
       "commits": ["02c9d15", "43e934c"]
     }
+  },
+  {
+    "timestamp": "2026-10-06T00:55:00Z",
+    "phase": "自由进化会话（2026-10-06 第四轮）",
+    "task": "任意代码热补丁工具 hotpatch：热更新/注入任意 Python 代码并立即生效，无需重启进程",
+    "action": "新增 src/jarvis/jarvis_tools/hotpatch.py（HotpatchTool，自动注册）。两种方式：① module_name 热更新已有模块（支持逗号分隔批量多模块，reload 后自动用 gc.get_objects() 把旧类实例 __class__ 重绑到新类，使新方法立即生效）；② code 临时注入任意语句/代码块/函数/全新模块（不落盘、不持久化，命名空间注入 agent/sys/globals，可访问/修改 agent 内外任意对象）。关键实现：reload 前清理 __pycache__ 避免复用过期字节码导致修改不生效；异常全部捕获不崩 Agent",
+    "result": {
+      "status": "completed",
+      "detail": "按 Administrator 拍板实现：①支持多模块批量 reload；②不持久化；③不做撤销/回滚；④支持任意语句/代码块；⑤可访问/修改 agent 之外对象（注入 sys/globals 到命名空间）；⑥已有类实例自动切换新方法（reload 前记录旧类，reload 后 gc.get_objects() 遍历精确匹配 type(obj) is 旧类 的实例，重绑 __class__ 到新类，__slots__/C 类型重绑失败静默跳过）。实现中发现并解决关键坑：importlib.reload 会复用过期 .pyc 字节码缓存导致源码已改但 reload 后仍是旧代码（co_consts 未变），故 reload 前用 shutil.rmtree 清理 __pycache__ 强制重新编译。测试 12 个用例覆盖：reload 生效、批量多模块、实例自动重绑（核心）、rebind 关闭、注入新模块、执行语句访问 agent、访问外部对象、定义函数、异常捕获、不影响其他模块。",
+      "verification": "tests/jarvis_tools/test_hotpatch.py 12 passed；tests/jarvis_tools/ 全套 passed（无回归）；tests/jarvis_agent/ 全套 passed（无回归）；hotpatch 相关 ruff 0 错误；工具经 _load_builtin_tools 自动注册验证通过（get_tool_registry 含 hotpatch）。注：全量 ruff 有 5 个预存 F401 错误在 tests/jarvis_code_agent/ 与 tests/jarvis_web_gateway/（与本改动无关，最后提交 24526cd8 为旧提交）",
+      "commits": ["501f951", "e351606", "aec9267", "643191c"]
+    }
   }
 ]

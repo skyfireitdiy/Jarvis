@@ -78,10 +78,19 @@
 2. **审计系统缺陷修复**：① `_redact` 由精确匹配改为子串匹配（新增 `_is_sensitive_key`），覆盖 `api_key`/`access_token`/`secret_key`/`client_secret` 等复合敏感键；② `_call_tools` 新增 `_extract_tool_arguments` 从文本协议 response 解析 arguments 字典传入 `_audit_log`，使文本协议工具调用的敏感值也能正确脱敏（解析失败静默返回空字典）；③ `evolution_history.json` 末尾补换行。审计测试增至 8 个用例。
 3. **审计系统审查修复**：① `_call_tools` 不再记录原始 response 字符串，改为仅记录 `tool_name` + 已脱敏 `arguments` 字典，杜绝 `data.response` 中敏感明文泄露；② 新增 `_is_audit_enabled` 前置检查（读取 `config.is_enable_audit`），默认关闭时不执行 `_extract_tool_arguments` 解析，保证严格零开销。审计测试增至 10 个用例。
 
+### ✅ 第四轮进化（2026-10-06 凌晨）—— 任意代码热补丁 hotpatch
+
+1. **hotpatch 热补丁工具**：新增 `src/jarvis/jarvis_tools/hotpatch.py`（`HotpatchTool`，经 `_load_builtin_tools` 自动注册）。两种使用方式：
+   - **方式① 生效已修改代码**：`module_name` 热更新已有模块（支持逗号分隔**批量多模块**）；reload 后自动用 `gc.get_objects()` 把旧类实例 `__class__` **重绑到新类**，使已有类实例的新方法立即生效（用户明确要求）。
+   - **方式② 临时注入代码**：`code` 注入任意语句/代码块/函数/全新模块（不落盘、不持久化），命名空间注入 `agent`/`sys`/`globals`，可访问/修改 **agent 内外任意对象**。
+2. **关键坑解决**：`importlib.reload` 会复用**过期 `.pyc` 字节码缓存**，导致源码已改但 reload 后仍是旧代码。实现 `_clear_pycache`（reload 前 `shutil.rmtree` 清理 `__pycache__`）强制重新编译，否则"修改后立即生效"失效。
+3. **方案文档**：`.jarvis/evolution/decisions/hotpatch_design.md` 完整记录两种方式、多模块、实例自动切换、reload 生效边界（正在执行的调用不生效）、命名空间注入设计。
+
 ### 验证结果
 
 - 全套测试：**1404 passed, 0 failed**（第一轮）；`tests/jarvis_agent/` **233 passed**（第二轮回退后，仅 A3 保留 7 用例）；`tests/jarvis_audit/` **10 passed**（第三轮审计系统 + 复合敏感键脱敏 + response 明文修复）
-- ruff：**0 错误**
+- 第四轮：`tests/jarvis_tools/test_hotpatch.py` **12 passed**；`tests/jarvis_tools/` 全套 passed；`tests/jarvis_agent/` 全套 passed（无回归）；hotpatch 相关 ruff 0 错误
+- ruff：**0 错误**（注：全量 ruff 有 5 个预存 F401 错误在 `tests/jarvis_code_agent/` 与 `tests/jarvis_web_gateway/`，与本轮改动无关）
 
 ---
 
@@ -91,6 +100,7 @@
 - 自由进化会话（2026-10-05）已完成：WebSocket 广播、ruff 清理、daemon ARM 验证。
 - 第二阶段自由进化（2026-10-05 晚）完成 A3（跨会话学习）；A1（需求澄清，与大模型原生能力重复）、A2（主动建议，提醒类价值有限）经评审均已回退。
 - 第三轮自由进化（2026-10-05 深夜）实现审计系统：可配置、默认关闭，记录用户输入/工具调用/任务完成到 JSONL 审计日志。
+- 第四轮自由进化（2026-10-06 凌晨）实现任意代码热补丁工具 hotpatch：热更新/注入任意 Python 代码立即生效，支持批量多模块、已有类实例自动切换新方法、访问 agent 内外任意对象。
 - 阶段 A 保留的进化项为「跨会话学习」，需求澄清与主动建议回归大模型自然行为。
 
 ---
@@ -109,7 +119,7 @@
 
 ---
 
-**最后更新**：2026-10-06（第三轮：审计系统 + 复合敏感键脱敏 + response 明文/零开销修复）
+**最后更新**：2026-10-06（第四轮：任意代码热补丁 hotpatch + 已有类实例自动切换 + pyc 缓存坑修复）
 **规则版本**：2.0
 **执行状态**：永久持续运行
 **监督者**：skyfire
