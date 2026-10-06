@@ -226,6 +226,12 @@ class NodeConnectionManager:
                         self._router.publish(
                             output_message, session_id=output_session_id
                         )
+                        # 实时终端共享：ACL 决策统一在 master，子节点只回传原始输出。
+                        # 此处额外广播给所有 admin 用户，使其他设备（管理员）也能
+                        # 实时看到子节点终端的输出。
+                        self._publish_terminal_output_to_admins(
+                            output_message, output_session_id
+                        )
                     continue
                 if message_type == AGENT_CREATE_REQUEST:
                     response = self._handle_agent_create_request(next_message, node_id)
@@ -318,6 +324,28 @@ class NodeConnectionManager:
             self._node_runtime.node_registry.mark_offline(node_id)
             self._connections.pop(node_id, None)
             self._connection_to_node.pop(connection_id, None)
+
+    def _publish_terminal_output_to_admins(
+        self, message: Dict[str, Any], exclude_session_id: Optional[str] = None
+    ) -> None:
+        """把子节点终端的输出广播给所有 admin 用户（ACL 决策统一在 master）。
+
+        子节点只负责把原始输出回传 master，由 master 决定分发给哪些用户。
+        admin 用户经 _access_level 放行（视为 owner）可查看所有终端，因此
+        子节点终端的输出也应实时推送给所有在线的 admin 用户。离线用户无连接，
+        publish 到其 session_id 无副作用。
+        """
+        try:
+            tsm = self._terminal_session_manager
+            if tsm is None or self._router is None:
+                return
+            for admin_sid in tsm.get_all_admin_session_ids():
+                if admin_sid != exclude_session_id:
+                    self._router.publish(message, session_id=admin_sid)
+        except Exception as e:
+            logger.warning(
+                "[NODE TERMINAL] Failed to broadcast output to admins: %s", e
+            )
 
     def get_node_connection(self, node_id: str) -> Optional[WebSocket]:
         return self._connections.get(node_id)
