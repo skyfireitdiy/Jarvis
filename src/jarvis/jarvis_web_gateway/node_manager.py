@@ -2245,6 +2245,42 @@ class ChildNodeClient:
                     request_id=request_id,
                 )
 
+            elif action == "terminal_attach":
+                # 返回终端输出缓冲（base64），供 master 转发给前端恢复时回放
+                terminal_id = str(inner_payload.get("terminal_id") or "").strip()
+                session = tsm.get_session(terminal_id) if terminal_id else None
+                if session is None:
+                    return build_node_message(
+                        NODE_TERMINAL_RESPONSE,
+                        {
+                            "success": False,
+                            "error": {
+                                "code": "NOT_FOUND",
+                                "message": "terminal not found",
+                            },
+                        },
+                        request_id=request_id,
+                    )
+                import base64 as _base64
+
+                output = [
+                    _base64.b64encode(chunk).decode("utf-8")
+                    for chunk in session.get_output_buffer()
+                ]
+                return build_node_message(
+                    NODE_TERMINAL_RESPONSE,
+                    {
+                        "success": True,
+                        "data": {
+                            "terminal_id": terminal_id,
+                            "interpreter": session.interpreter,
+                            "working_dir": session.working_dir,
+                            "output": output,
+                        },
+                    },
+                    request_id=request_id,
+                )
+
             elif action == "terminal_session_resize":
                 terminal_id = str(inner_payload.get("terminal_id") or "").strip()
                 rows = int(inner_payload.get("rows") or 24)

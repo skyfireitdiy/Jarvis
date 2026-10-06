@@ -10883,6 +10883,45 @@ def create_app(
 
             import base64
 
+            # 子节点终端的影子会话：真实输出缓冲在子节点，转发 attach 到子节点拿缓冲
+            local_node_id = _node_runtime.local_node_id if _node_runtime else "master"
+            node_id = session.node_id or "master"
+            if node_id not in ("master", local_node_id) and _node_connection_manager:
+                try:
+                    resp = await _node_connection_manager.send_request_to_node(
+                        node_id,
+                        NODE_TERMINAL_REQUEST,
+                        {
+                            "action": "terminal_attach",
+                            "payload": {"terminal_id": terminal_id},
+                            "session_id": session_id,
+                        },
+                    )
+                    resp_payload = resp.get("payload") or {}
+                    if resp_payload.get("success"):
+                        data = resp_payload.get("data") or {}
+                        return {
+                            "success": True,
+                            "data": {
+                                "terminal_id": terminal_id,
+                                "interpreter": data.get(
+                                    "interpreter", session.interpreter
+                                ),
+                                "working_dir": data.get(
+                                    "working_dir", session.working_dir
+                                ),
+                                "output": data.get("output") or [],
+                            },
+                        }
+                except Exception as e:
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "INTERNAL_ERROR",
+                            "message": f"转发到子节点失败: {e}",
+                        },
+                    }
+
             output = [
                 base64.b64encode(chunk).decode("utf-8")
                 for chunk in session.get_output_buffer()
