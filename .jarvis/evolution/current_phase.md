@@ -86,10 +86,24 @@
 2. **关键坑解决**：`importlib.reload` 会复用**过期 `.pyc` 字节码缓存**，导致源码已改但 reload 后仍是旧代码。实现 `_clear_pycache`（reload 前 `shutil.rmtree` 清理 `__pycache__`）强制重新编译，否则"修改后立即生效"失效。
 3. **方案文档**：`.jarvis/evolution/decisions/hotpatch_design.md` 完整记录两种方式、多模块、实例自动切换、reload 生效边界（正在执行的调用不生效）、命名空间注入设计。
 
+### ✅ 第五轮进化（2026-10-06 凌晨）—— 调研 Agent 评测基准，评估自进化量化标尺
+
+1. **调研业界公认 Agent 评测基准**：确认 Claude Code 与 Codex 都在公开报告的编码 Agent 测试集为 **SWE-bench Verified**（最权威编码能力标尺，OpenAI 联合创建）+ **Terminal-Bench**（真实终端任务）。
+2. **深入调研 Terminal-Bench 2.0 接入方式**：评测框架 **Harbor**（`pip install harbor`），任务在隔离 Docker 容器执行（`task.toml`/`instruction.md`/`Dockerfile`/`solve.sh`/`tests`，验证产出 `reward.txt` 0/1）。命令：`harbor run --dataset terminal-bench@2.0 --agent <oracle|terminus-2|claude-code> --model ... --n-concurrent N`。自定义 Agent 需 subclass `BaseInstalledAgent`/`BaseAgent`（参考 `claude_code.py`）。
+3. **路线决策（未写代码）**：TB 与 Jarvis `execute_script`/终端能力高度契合，可作自进化量化标尺（进化前后对比 reward 通过率）；但接入需写 Harbor 适配层 + Docker 环境，属大工程，且是"评估能力"而非"增强能力"本身，短期 ROI 低于直接增强。**决策：后置为长期量化标尺**，当前聚焦更高 ROI 进化方向。
+
+### ✅ 第六轮进化（2026-10-06 凌晨）—— 实现 Terminal-Bench 2.0 Harbor 适配层（自进化量化标尺）
+
+1. **Harbor 适配层**：新增 `src/jarvis/jarvis_eval/harbor_agent.py`（`JarvisInstalledAgent` 继承 Harbor `BaseInstalledAgent`）+ 轻量 `__init__.py` + `tests/jarvis_eval/test_harbor_agent.py`（11 个单元测试）。方案从第五轮调研的 `BaseAgent`（外部 agent + 命令重定向）改为 **`BaseInstalledAgent`（jca CLI 装进容器）**——Administrator 指出 Jarvis 有命令行工具 jca，Agent loop 跑在任务容器内，与 Harbor 隔离模型天然契合，大幅简化。
+2. **适配层要点**：`install()` 容器内 `pip install jarvis-ai-assistant`；`run()` 用 `@with_prompt_template` 把 instruction base64 写入容器文件后调 `jca -n --task-file`；`_build_passthrough_env` 透传 11 个 API key 环境变量（OPENAI_API_KEY 等）使容器内 jca 能访问模型 API。
+3. **关键技术决策**：顶层 import harbor（Harbor `import_class` 要求类是 `type` 而非工厂函数）；`__init__.py` 保持轻量不 import harbor，Jarvis 主项目 import `jarvis_eval` 包安全；`# type: ignore` 需用通用形式（`[unresolved-import]` 对 ty 不生效）；`BaseInstalledAgent._exec` 自动加 `set -o pipefail`（run 命令不再自己加）；`jca -n --task-file` 非交互模式读任务（不需要 `-w` worktree）。
+4. **方案文档**：`.jarvis/evolution/decisions/terminal_bench_adapter.md` 完整记录选型、实现、验证、运行命令（`harbor run --dataset terminal-bench@2.0 -a jarvis_eval.harbor_agent:JarvisInstalledAgent --ae OPENAI_API_KEY=...`）与边界。
+
 ### 验证结果
 
 - 全套测试：**1404 passed, 0 failed**（第一轮）；`tests/jarvis_agent/` **233 passed**（第二轮回退后，仅 A3 保留 7 用例）；`tests/jarvis_audit/` **10 passed**（第三轮审计系统 + 复合敏感键脱敏 + response 明文修复）
 - 第四轮：`tests/jarvis_tools/test_hotpatch.py` **12 passed**；`tests/jarvis_tools/` 全套 passed；`tests/jarvis_agent/` 全套 passed（无回归）；hotpatch 相关 ruff 0 错误
+- 第六轮：`tests/jarvis_eval/test_harbor_agent.py` **11 passed**（有 harbor）+ **1 skipped**（无 harbor 正确跳过）；Harbor `import_class` 加载验证通过（name()=jarvis，是 `BaseInstalledAgent` 子类）；无 harbor 时 `import jarvis.jarvis_eval` 安全；`tests/jarvis_agent/` 全套 passed（无回归）
 - ruff：**0 错误**（注：全量 ruff 有 5 个预存 F401 错误在 `tests/jarvis_code_agent/` 与 `tests/jarvis_web_gateway/`，与本轮改动无关）
 
 ---
@@ -101,6 +115,8 @@
 - 第二阶段自由进化（2026-10-05 晚）完成 A3（跨会话学习）；A1（需求澄清，与大模型原生能力重复）、A2（主动建议，提醒类价值有限）经评审均已回退。
 - 第三轮自由进化（2026-10-05 深夜）实现审计系统：可配置、默认关闭，记录用户输入/工具调用/任务完成到 JSONL 审计日志。
 - 第四轮自由进化（2026-10-06 凌晨）实现任意代码热补丁工具 hotpatch：热更新/注入任意 Python 代码立即生效，支持批量多模块、已有类实例自动切换新方法、访问 agent 内外任意对象。
+- 第五轮自由进化（2026-10-06 凌晨）调研业界公认 Agent 评测基准（SWE-bench Verified + Terminal-Bench，Claude Code/Codex 都在用），评估 Terminal-Bench 2.0 作为自进化量化标尺的可行性，结论后置（大工程、评估能力而非增强能力，短期 ROI 低）。
+- 第六轮自由进化（2026-10-06 凌晨）实现 Terminal-Bench 2.0 Harbor 适配层（`JarvisInstalledAgent` 继承 `BaseInstalledAgent` + jca CLI），作为自进化量化标尺的接入底座：本机已完成适配层 + 单元测试 + 静态检查，实际评测运行需 Docker/云端机器。
 - 阶段 A 保留的进化项为「跨会话学习」，需求澄清与主动建议回归大模型自然行为。
 
 ---
@@ -110,16 +126,11 @@
 1. 对保留的 A3（跨会话学习）进行实战打磨：在多轮真实任务中观察主动检索历史记忆的实际效果，按需调优检索数量与提示文案。
 2. 可启动阶段 B 的轻量项：任务结束后自动判断并沉淀值得保留的经验（A3 的"沉淀"侧目前依赖记忆标签提示，可进一步自动化）。
 3. 按需推进阶段 B 其他项（复杂度/重复度分析、测试生成、文档生成）。
-
-## 下一步
-
-1. 推进 A1：需求澄清与意图理解。
-2. 完成后依次推进 A2、A3。
-3. 阶段 A 稳定后，按需启动阶段 B（复杂度/重复度分析、测试生成、文档生成）。
+4. **（已实现）Terminal-Bench 2.0 量化标尺**：Harbor 适配层（`jarvis_eval.harbor_agent:JarvisInstalledAgent`）已实现并单元测试，本机无法跑真实评测（无 Docker/磁盘不足）。下一步在 Docker/云端机器上跑通 `harbor run --dataset terminal-bench@2.0 -a jarvis_eval.harbor_agent:JarvisInstalledAgent --ae OPENAI_API_KEY=...`，作为自进化量化标尺（进化前后对比 reward 通过率）。
 
 ---
 
-**最后更新**：2026-10-06（第四轮：任意代码热补丁 hotpatch + 已有类实例自动切换 + pyc 缓存坑修复）
+**最后更新**：2026-10-06（第六轮：实现 Terminal-Bench 2.0 Harbor 适配层，自进化量化标尺接入底座完成）
 **规则版本**：2.0
 **执行状态**：永久持续运行
 **监督者**：skyfire

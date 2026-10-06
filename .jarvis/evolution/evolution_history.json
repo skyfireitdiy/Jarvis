@@ -308,5 +308,27 @@
       "verification": "验证 get_task_analysis_prompt 生成顺序 rule(48)<memory(365)<solution(583) 正确；_NATIVE_TASK_ANALYSIS_PROMPT 顺序 rule<memory<meta_agent 正确；tests/jarvis_agent/test_agent_prompts.py + tests/jarvis_code_agent/test_code_agent_prompts.py 通过；tests/jarvis_agent 全套 233 passed（无回归）；ruff 0 错误",
       "commits": []
     }
+  },
+  {
+    "timestamp": "2026-10-06T02:00:00Z",
+    "phase": "自由进化会话（2026-10-06 第四轮）",
+    "task": "调研业界公认 Agent 评测基准，评估 Terminal-Bench 2.0 作为 Jarvis 自进化量化标尺的可行性",
+    "action": "调研 Claude Code 与 Codex 都在用的测试集（SWE-bench Verified + Terminal-Bench），并深入调研 Terminal-Bench 2.0 接入方式（Harbor 框架、BaseInstalledAgent 自定义 Agent 接口、Docker 沙箱、reward.txt 验证机制）。结论沉淀为路线决策，未实际接入。",
+    "result": {
+      "status": "decided",
+      "detail": "业界公认且 Claude Code/Codex 都公开报告的编码 Agent 基准：SWE-bench Verified（最权威编码能力标尺，OpenAI 联合创建）+ Terminal-Bench（真实终端任务，最贴合 Jarvis execute_script 能力）。TB2.0 接入：评测框架 Harbor（pip install harbor），任务在隔离 Docker 容器执行（task.toml/instruction.md/Dockerfile/solve.sh/tests，验证产出 reward.txt 0/1）。跑法 harbor run --dataset terminal-bench@2.0 --agent <oracle|terminus-2|claude-code> --model ... --n-concurrent N。自定义 Agent 需 subclass BaseInstalledAgent/BaseAgent（参考 claude_code.py）。环境要求 Docker 20GB+/Python3.9+/联网。评估：TB 与 Jarvis 终端能力高度契合，可作自进化量化标尺（进化前后对比 reward 通过率），但接入需写 Harbor 适配层 + Docker 环境，属大工程；且是评估能力而非增强能力本身，短期 ROI 低于直接增强。决策：后置为长期量化标尺，当前聚焦更高 ROI 进化方向。",
+      "verification": "调研基于官方 GitHub(terminal-bench-2) 与 DeepWiki 文档，接入接口与命令均已核实。未写代码、无测试（纯调研决策项）。"
+    }
+  },
+  {
+    "timestamp": "2026-10-06T02:28:00Z",
+    "phase": "自由进化会话（2026-10-06 第六轮）",
+    "task": "实现 Terminal-Bench 2.0 接入的 Harbor 适配层（BaseInstalledAgent + jca CLI），作为自进化量化标尺",
+    "action": "按 Administrator 确认的 B+C 方案落地：新增 src/jarvis/jarvis_eval/harbor_agent.py（JarvisInstalledAgent 继承 BaseInstalledAgent）+ 轻量 __init__.py + tests/jarvis_eval/test_harbor_agent.py（11 个单元测试）。install() 容器内 pip install jarvis-ai-assistant，run() 用 @with_prompt_template 把 instruction base64 写入容器文件后调 jca -n --task-file，_build_passthrough_env 透传 API key 环境变量。",
+    "result": {
+      "status": "implemented",
+      "detail": "适配层继承 BaseInstalledAgent（Agent loop 跑在任务容器内，与 Harbor 隔离模型天然契合，比 BaseAgent 外部重定向方案更简洁）。关键技术决策：顶层 import harbor（Harbor import_class 要求类是 type 而非工厂函数），__init__.py 保持轻量不 import harbor 使 Jarvis 主项目 import 安全；# type: ignore 需用通用形式（[unresolved-import] 对 ty 不生效）；BaseInstalledAgent._exec 自动加 set -o pipefail（run 命令不再自己加）；jca -n --task-file 非交互模式读任务（不需要 -w worktree）。",
+      "verification": "tests/jarvis_eval/test_harbor_agent.py 11 passed（有 harbor）+ 1 skipped（无 harbor 正确跳过）；Harbor import_class 加载验证通过（name()=jarvis，是 BaseInstalledAgent 子类）；无 harbor 时 import jarvis.jarvis_eval 安全；ruff 0 错误、ruff format 通过、ty All checks passed；tests/jarvis_agent/ 全套 passed 无回归。实际评测运行需 Docker/云端机器（本机磁盘 1.8G/内存 3.8G 无法跑 Docker 镜像）。"
+    }
   }
 ]
