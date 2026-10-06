@@ -119,20 +119,32 @@ date +%Y-%m-%d
 
 **预期输出：** 日期字符串（如 `2026-01-12`）
 
-### 操作3：运行pytest测试
+### 操作3：运行全部测试（Python / Go / 前端）
 
 **执行步骤：**
 
-1. 执行pytest命令：
+1. 运行Python测试（pytest）：
 
 ```bash
 pytest -v
 ```
 
+1. 运行Go测试（于daemon目录）：
+
+```bash
+cd daemon && go test ./...
+```
+
+1. 运行前端测试（于frontend目录）：
+
+```bash
+cd src/jarvis/jarvis_service/frontend && npm test
+```
+
 1. 检查测试结果：
-   - 若测试全部通过（exit code为0）：继续执行后续操作
-   - 若有测试失败（exit code非0）：**禁发布**，提示用户
-2. （可选）查看详细测试报告：
+   - 若全部测试通过（exit code为0）：继续执行后续操作
+   - 若有任一测试失败（exit code非0）：**禁发布**，提示用户
+1. （可选）查看详细测试报告：
 
 ```bash
 pytest -v --tb=short
@@ -141,11 +153,13 @@ pytest -v --tb=short
 **注意事项：**
 
 - 必于项目根目录执行pytest命令
+- Go测试必于`daemon/`目录执行（该目录有独立go.mod）
+- 前端测试必于`src/jarvis/jarvis_service/frontend/`目录执行
 - 若有特定测试目录，可指定路径（如 `pytest tests/`）
-- 测试失败时禁跳过此步骤继续发布
+- 任一测试失败时禁跳过此步骤继续发布
   **预期输出：**
-- 测试全部通过：继续流程
-- 测试失败：停止流程并禁发布
+- 全部测试通过：继续流程
+- 任一测试失败：停止流程并禁发布
 
 ### 操作4：获取代码变更
 
