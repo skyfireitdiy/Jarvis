@@ -44,6 +44,8 @@ class TerminalSession:
     proc: Optional[subprocess.Popen] = None
     stream_publisher: Optional[Any] = None
     session_id: str = "default"
+    owner_id: str = ""
+    access_acl: Dict[str, List[str]] = field(default_factory=dict)
     created_at: float = field(default_factory=lambda: __import__("time").time())
     _closed: bool = False
     _output_sequence: int = 0
@@ -203,6 +205,7 @@ class TerminalSessionManager:
         working_dir: str = ".",
         stream_publisher: Optional[Any] = None,
         session_id: str = "default",
+        owner_id: str = "",
     ) -> Tuple[Optional[str], Optional[str]]:
         """创建新的终端会话。
 
@@ -211,6 +214,7 @@ class TerminalSessionManager:
             working_dir: 工作目录
             stream_publisher: 流输出发布器
             session_id: WebSocket会话ID
+            owner_id: 会话所有者用户ID
 
         Returns:
             (terminal_id, error_message)
@@ -246,6 +250,7 @@ class TerminalSessionManager:
                         working_dir,
                         stream_publisher,
                         session_id,
+                        owner_id,
                     )
                 else:
                     return self._create_session_unix(
@@ -254,6 +259,7 @@ class TerminalSessionManager:
                         working_dir,
                         stream_publisher,
                         session_id,
+                        owner_id,
                     )
 
             except Exception as e:
@@ -266,6 +272,7 @@ class TerminalSessionManager:
         working_dir: str,
         stream_publisher: Optional[Any],
         session_id: str,
+        owner_id: str = "",
     ) -> Tuple[Optional[str], Optional[str]]:
         """Unix/Linux: 使用PTY创建终端会话。"""
         master_fd, slave_fd = pty.openpty()
@@ -307,6 +314,7 @@ class TerminalSessionManager:
                 proc=proc,
                 stream_publisher=stream_publisher,
                 session_id=session_id,
+                owner_id=owner_id,
             )
 
             self._sessions[terminal_id] = session
@@ -349,6 +357,7 @@ class TerminalSessionManager:
         working_dir: str,
         stream_publisher: Optional[Any],
         session_id: str,
+        owner_id: str = "",
     ) -> Tuple[Optional[str], Optional[str]]:
         """Windows: 使用subprocess+pipe创建终端会话。"""
         env = os.environ.copy()
@@ -375,6 +384,7 @@ class TerminalSessionManager:
                 proc=proc,
                 stream_publisher=stream_publisher,
                 session_id=session_id,
+                owner_id=owner_id,
                 _output_queue=output_queue,
             )
 
@@ -598,20 +608,21 @@ class TerminalSessionManager:
             return sessions
 
     def list_sessions_for_user(self, session_id: str) -> List[Dict[str, Any]]:
-        """列出指定用户（WebSocket会话ID）的活跃终端会话。
+        """列出指定用户（WebSocket会话ID）可访问的活跃终端会话。
 
-        用于按账号过滤/隔离会话，前端重连后据此恢复属于当前用户的会话。
+        返回该用户拥有的会话 + 被分享给该用户的会话（带 access 级别）。
 
         Args:
             session_id: WebSocket会话ID（即用户标识）
 
         Returns:
-            会话信息列表，含 session_id/created_at 等归属与时间信息
+            会话信息列表，含 session_id/created_at/access 等归属与访问信息
         """
         with self._lock:
             sessions = []
             for terminal_id, session in self._sessions.items():
-                if session.session_id != session_id:
+                access = self._access_level(session, session_id)
+                if access is None:
                     continue
                 sessions.append(
                     {
@@ -621,29 +632,164 @@ class TerminalSessionManager:
                         "is_closed": session.is_closed(),
                         "session_id": session.session_id,
                         "created_at": session.created_at,
+                        "owner_id": session.owner_id,
+                        "access": access,
+                        "access_acl": session.access_acl or {},
                     }
                 )
             return sessions
 
-    def attach_session(self, terminal_id: str, session_id: str) -> bool:
+    def _access_level(self, session: TerminalSession, user_id: str) -> Optional[str]:
+        """计算用户对会话的访问级别。
+
+        兼容 ``session_{user_id}`` 格式的会话ID，自动提取真实 user_id 进行匹配；
+        system 用户与 admin 用户视为 owner 放行。
+
+        Returns:
+            "owner" / "interact" / "read" / None（无访问权限）
+        """
+        # 兼容 session_{user_id} 格式，提取真实 user_id
+        if user_id and user_id.startswith("session_"):
+            user_id = user_id[len("session_") :]
+        if not user_id:
+            return None
+        # system 用户放行
+        if user_id == "system":
+            return "owner"
+        # admin 用户放行
+        if self._is_admin_user(user_id):
+            return "owner"
+        if session.owner_id and user_id == session.owner_id:
+            return "owner"
+        acl = session.access_acl or {}
+        if user_id in acl.get("interact", []):
+            return "interact"
+        if user_id in acl.get("read", []):
+            return "read"
+        return None
+
+    def _is_admin_user(self, user_id: str) -> bool:
+        """判断用户是否为 admin（通过 UserManager 查询）。"""
+        try:
+            from jarvis.jarvis_utils.config import get_data_dir
+            from jarvis.jarvis_web_gateway.user_manager import UserManager
+
+            user_mgr = UserManager(get_data_dir())
+            user = user_mgr.get_user(user_id)
+            return bool(user and user.get("is_admin"))
+        except Exception:
+            return False
+
+    def _get_admin_user_id(self) -> Optional[str]:
+        """获取 admin 用户的 user_id（用于 set_access_acl 过滤）。"""
+        try:
+            from jarvis.jarvis_utils.config import get_data_dir
+            from jarvis.jarvis_web_gateway.user_manager import UserManager
+
+            user_mgr = UserManager(get_data_dir())
+            admin_user = user_mgr.get_user_by_username("admin")
+            return admin_user["user_id"] if admin_user else None
+        except Exception:
+            return None
+
+    def attach_session(self, terminal_id: str, session_id: str) -> Optional[str]:
         """将终端会话接管/关联到指定用户（WebSocket会话ID）。
 
-        校验会话归属：仅当会话属于该用户时才允许接管，防止越权访问他人会话。
+        校验会话归属：仅当会话属于该用户（owner）或被分享给该用户
+        （read/interact）时才允许接管，防止越权访问他人会话。
 
         Args:
             terminal_id: 终端ID
-            session_id: WebSocket会话ID（即用户标识）
+            session_id: WebSocket会话ID（即用户标识，可为 session_{user_id} 格式）
 
         Returns:
-            是否接管成功（会话存在且归属匹配）
+            access 级别字符串（"owner"/"interact"/"read"），无权限或不存在时返回 None
+        """
+        with self._lock:
+            session = self._sessions.get(terminal_id)
+            if session is None:
+                return None
+            return self._access_level(session, session_id)
+
+    def check_access(
+        self, terminal_id: str, user_id: str, need_interact: bool
+    ) -> Optional[str]:
+        """校验用户对会话的访问级别。
+
+        Args:
+            terminal_id: 终端ID
+            user_id: 用户ID
+            need_interact: 是否需要交互级别（兼容参数，返回值为实际访问级别）
+
+        Returns:
+            access 级别字符串（"owner"/"interact"/"read"），无权限或不存在时返回 None
+        """
+        with self._lock:
+            session = self._sessions.get(terminal_id)
+            if session is None:
+                return None
+            return self._access_level(session, user_id)
+
+    def set_access_acl(
+        self, terminal_id: str, owner_id: str, acl: Dict[str, List[str]]
+    ) -> bool:
+        """设置会话的访问控制列表（仅 owner 可操作）。
+
+        自动过滤 owner 自身与 admin 用户（这两个用户对会话有完全控制权限）。
+
+        Args:
+            terminal_id: 终端ID
+            owner_id: 操作者用户ID（须为会话 owner）
+            acl: 访问控制列表 {read: [...], interact: [...]}
+
+        Returns:
+            是否设置成功
         """
         with self._lock:
             session = self._sessions.get(terminal_id)
             if session is None:
                 return False
-            if session.session_id != session_id:
+            if not session.owner_id or session.owner_id != owner_id:
                 return False
+            # 过滤 owner 自身与 admin 用户，去重
+            admin_user_id = self._get_admin_user_id()
+            normalized = {"read": [], "interact": []}
+            for level in ("read", "interact"):
+                users = acl.get(level, []) or []
+                seen = set()
+                for u in users:
+                    if not u or u == session.owner_id or u in seen:
+                        continue
+                    if admin_user_id and u == admin_user_id:
+                        continue
+                    seen.add(u)
+                    normalized[level].append(u)
+            session.access_acl = normalized
             return True
+
+    def get_session_info(self, terminal_id: str) -> Optional[Dict[str, Any]]:
+        """获取会话信息（含 owner 与 ACL）。
+
+        Args:
+            terminal_id: 终端ID
+
+        Returns:
+            会话信息字典或None
+        """
+        with self._lock:
+            session = self._sessions.get(terminal_id)
+            if session is None:
+                return None
+            return {
+                "terminal_id": terminal_id,
+                "interpreter": session.interpreter,
+                "working_dir": session.working_dir,
+                "is_closed": session.is_closed(),
+                "session_id": session.session_id,
+                "created_at": session.created_at,
+                "owner_id": session.owner_id,
+                "access_acl": session.access_acl or {},
+            }
 
     def get_session(self, terminal_id: str) -> Optional[TerminalSession]:
         """获取终端会话。

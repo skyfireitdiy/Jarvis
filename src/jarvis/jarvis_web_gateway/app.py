@@ -1387,6 +1387,7 @@ class WebSocketConnectionManager:
                     working_dir=working_dir,
                     stream_publisher=self._router,
                     session_id=session_id,
+                    owner_id=user_id or "",
                 )
                 if terminal_id:
                     message = {
@@ -1424,6 +1425,18 @@ class WebSocketConnectionManager:
                     return
             terminal_id = payload.get("terminal_id")
             if terminal_id and _terminal_session_manager:
+                # 归属校验：仅 owner 可关闭会话（修复 IDOR）
+                if user_id and user_id != "system":
+                    session = _terminal_session_manager.get_session(terminal_id)
+                    if session is None or session.owner_id != user_id:
+                        error_msg = {
+                            "type": "terminal_error",
+                            "payload": {
+                                "error": "Permission denied: not the owner of this terminal"
+                            },
+                        }
+                        self._router.publish(error_msg, session_id=session_id)
+                        return
                 _terminal_session_manager.close_session(terminal_id)
                 message = {
                     "type": "terminal_closed",
@@ -1452,9 +1465,29 @@ class WebSocketConnectionManager:
             terminal_id = payload.get("terminal_id")
             data = payload.get("data", "")
             if terminal_id and _terminal_session_manager:
+                # 交互校验：仅 owner 或 interact 用户可输入（修复 IDOR）
+                if user_id and user_id != "system":
+                    access = _terminal_session_manager.check_access(
+                        terminal_id, user_id, True
+                    )
+                    if access not in ("owner", "interact"):
+                        error_msg = {
+                            "type": "terminal_error",
+                            "payload": {
+                                "error": "Permission denied: no interact access to this terminal"
+                            },
+                        }
+                        self._router.publish(error_msg, session_id=session_id)
+                        return
                 _terminal_session_manager.write_input(terminal_id, data)
             return
         if message_type == "terminal_session_resize":
+            auth_payload = self._auth_store.get(session_id)
+            user_id = None
+            if auth_payload and isinstance(auth_payload, dict):
+                user_info = auth_payload.get("user_info")
+                if user_info and isinstance(user_info, dict):
+                    user_id = user_info.get("user_id")
             terminal_id = payload.get("terminal_id")
             rows = payload.get("rows")
             cols = payload.get("cols")
@@ -1466,6 +1499,20 @@ class WebSocketConnectionManager:
                     cols_int = int(cols)
                 except (TypeError, ValueError):
                     return
+                # 交互校验：仅 owner 或 interact 用户可调整大小
+                if user_id and user_id != "system":
+                    access = _terminal_session_manager.check_access(
+                        terminal_id, user_id, True
+                    )
+                    if access not in ("owner", "interact"):
+                        error_msg = {
+                            "type": "terminal_error",
+                            "payload": {
+                                "error": "Permission denied: no interact access to this terminal"
+                            },
+                        }
+                        self._router.publish(error_msg, session_id=session_id)
+                        return
                 _terminal_session_manager.resize(terminal_id, rows_int, cols_int)
             return
         if message_type == "file_upload":
@@ -10660,6 +10707,7 @@ def create_app(
                 working_dir=working_dir,
                 stream_publisher=router,
                 session_id=session_id,
+                owner_id=user_id,
             )
 
             if terminal_id is None:
@@ -10723,9 +10771,9 @@ def create_app(
             user_id = (
                 user_info.get("user_id", "anonymous") if user_info else "anonymous"
             )
-            session_id = f"session_{user_id}"
 
-            if not terminal_session_manager.attach_session(terminal_id, session_id):
+            session = terminal_session_manager.get_session(terminal_id)
+            if session is None or session.owner_id != user_id:
                 return {
                     "success": False,
                     "error": {"code": "NOT_FOUND", "message": "终端不存在"},
@@ -10795,6 +10843,58 @@ def create_app(
                     "interpreter": session.interpreter,
                     "working_dir": session.working_dir,
                     "output": output,
+                },
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    # HTTP API：设置终端会话的访问控制列表（分享给其他用户）
+    @app.put(
+        "/api/terminals/{terminal_id}/acl",
+        dependencies=[Depends(verify_token)],
+    )
+    async def set_terminal_acl(
+        terminal_id: str, request_body: Dict[str, Any], request: Request
+    ) -> Dict[str, Any]:
+        """设置终端会话的访问控制列表（仅 owner 可操作）。
+
+        Args:
+            request_body: {
+                "read": ["user_id", ...],      # 只读用户
+                "interact": ["user_id", ...]   # 可交互用户
+            }
+
+        Returns:
+            {"success": True, "data": {"terminal_id": "xxx", "access_acl": {...}}}
+        """
+        try:
+            user_info = getattr(request.state, "user_info", None)
+            user_id = (
+                user_info.get("user_id", "anonymous") if user_info else "anonymous"
+            )
+
+            acl = {
+                "read": list(request_body.get("read") or []),
+                "interact": list(request_body.get("interact") or []),
+            }
+            if not terminal_session_manager.set_access_acl(terminal_id, user_id, acl):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "FORBIDDEN",
+                        "message": "仅会话所有者可设置访问控制",
+                    },
+                }
+
+            info = terminal_session_manager.get_session_info(terminal_id)
+            return {
+                "success": True,
+                "data": {
+                    "terminal_id": terminal_id,
+                    "access_acl": (info or {}).get("access_acl", {}),
                 },
             }
         except Exception as e:

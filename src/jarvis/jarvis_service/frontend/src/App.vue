@@ -820,6 +820,7 @@
                       @close="setActivePaneView('file')"
                       @switch="switchTerminal"
                       @closeTerminal="closeTerminal"
+                      @shareTerminal="openTerminalShareDialog"
                       @setHostRef="setTerminalHostRef"
                       @startResize="startTerminalPanelResize"
                     />
@@ -1060,6 +1061,37 @@
         <div class="modal-actions">
           <button class="btn secondary" @click="showEditAccessModal = false">取消</button>
           <button class="btn primary" @click="saveAgentAccess">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 终端分享弹窗：owner 分享终端给其他用户（只读 read / 可交互 interact） -->
+    <div v-if="showTerminalShareModal" class="modal-overlay" @click.self="showTerminalShareModal = false">
+      <div class="modal-content" style="max-width: 480px;">
+        <h3>分享终端</h3>
+        <div class="form-group">
+          <label>可查看用户 (read)</label>
+          <div class="acl-user-list">
+            <label v-for="user in filteredUserOptionsForTerminalShare" :key="user.user_id" class="checkbox-label">
+              <input type="checkbox" :value="user.user_id" v-model="terminalShareRead" />
+              {{ user.display_name || user.user_id }}
+            </label>
+            <div v-if="filteredUserOptionsForTerminalShare.length === 0" class="form-help">暂无可选用户</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>可交互用户 (interact)</label>
+          <div class="acl-user-list">
+            <label v-for="user in filteredUserOptionsForTerminalShare" :key="user.user_id" class="checkbox-label">
+              <input type="checkbox" :value="user.user_id" v-model="terminalShareInteract" />
+              {{ user.display_name || user.user_id }}
+            </label>
+            <div v-if="filteredUserOptionsForTerminalShare.length === 0" class="form-help">暂无可选用户</div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn secondary" @click="showTerminalShareModal = false">取消</button>
+          <button class="btn primary" @click="saveTerminalShare">保存</button>
         </div>
       </div>
     </div>
@@ -10610,6 +10642,15 @@ const filteredUserOptionsForAcl = computed(() => {
     return true
   })
 })
+// 终端分享用户列表：排除当前用户（owner）和 admin（有完全控制权限，无需 ACL 授权）
+const filteredUserOptionsForTerminalShare = computed(() => {
+  const ownerId = auth.value.userInfo?.user_id || ''
+  return availableUserOptions.value.filter(user => {
+    if (user.user_id === ownerId) return false
+    if (user.is_admin) return false
+    return true
+  })
+})
 const availableNodeOptions = ref([])
 const userAccessibleNodes = ref(null) // null=未加载, []=无权限, ["*"]=所有, ["id1","id2"]=限定节点
 const userPermissions = ref(null) // null=未加载, {allowed:[pattern],denied:[pattern]}=已加载
@@ -13946,6 +13987,11 @@ const showEditAccessModal = ref(false)
 const editingAccessAgent = ref(null)
 const editAccessRead = ref([])
 const editAccessInteract = ref([])
+// 终端分享弹窗状态：owner 可将终端分享给其他用户（只读 read / 可交互 interact）
+const showTerminalShareModal = ref(false)
+const editingShareTerminalId = ref(null)
+const terminalShareRead = ref([])
+const terminalShareInteract = ref([])
 
 // 弹窗关闭后开启自动聚焦静默窗口：
 // 避免关闭瞬间挂起的异步状态同步（fetchAgentStatus）把焦点抢回输入框。
@@ -13994,6 +14040,42 @@ async function saveAgentAccess() {
   } catch (error) {
     console.error('[AGENT] Access update failed:', error)
     alert(`权限更新失败: ${error.message}`)
+  }
+}
+
+// 打开终端分享弹窗：owner 选择可查看（read）/可交互（interact）的用户
+async function openTerminalShareDialog(terminalId) {
+  editingShareTerminalId.value = terminalId
+  terminalShareRead.value = []
+  terminalShareInteract.value = []
+  showTerminalShareModal.value = true
+  // 获取用户列表供选择
+  await fetchUserList()
+}
+
+// 保存终端分享 ACL：PUT /api/terminals/{id}/acl（主网关路径，非 node 代理）
+async function saveTerminalShare() {
+  const terminalId = editingShareTerminalId.value
+  if (!terminalId) return
+  try {
+    const { host, port } = getGatewayAddress()
+    const response = await fetchWithAuth(`${getHttpProtocol()}://${host}:${port}/api/terminals/${encodeURIComponent(terminalId)}/acl`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        read: terminalShareRead.value,
+        interact: terminalShareInteract.value,
+      })
+    })
+    if (!response.ok) {
+      const error = await response.json()
+      alert(`分享失败: ${error.error?.message || error.detail || '未知错误'}`)
+      return
+    }
+    showToast('分享设置已保存', 'success')
+    showTerminalShareModal.value = false
+  } catch (error) {
+    console.error('[TERMINAL] Share update failed:', error)
+    alert(`分享失败: ${error.message}`)
   }
 }
 
@@ -15251,6 +15333,7 @@ function handleMessage(message, agentId = null) {
         node_id: nodeId,
         interpreter: payload?.interpreter || 'bash',
         working_dir: payload?.working_dir || '.',
+        access: 'owner',
         terminal: null,
         hostEl: null,
         fitAddon: null,
@@ -17067,6 +17150,10 @@ function initIndependentTerminal(terminalId, el) {
   
   // 监听用户输入
   session.terminal.onData(data => {
+    // 只读模式：不发送输入（read 用户仅可查看）
+    if (session.access === 'read') {
+      return
+    }
     sendTerminalInput(terminalId, data)
   })
   
@@ -17153,6 +17240,7 @@ async function restoreTerminalSessions() {
         node_id: s.node_id || 'master',
         interpreter: s.interpreter || 'bash',
         working_dir: s.working_dir || '.',
+        access: s.access || 'read',
         terminal: null,
         hostEl: null,
         fitAddon: null,

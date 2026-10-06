@@ -13,11 +13,14 @@
           v-for="session in sessions"
           :key="session.terminal_id"
           class="terminal-tab"
-          :class="{ active: activeId === session.terminal_id }"
+          :class="{ active: activeId === session.terminal_id, 'terminal-tab-readonly': session.access === 'read' }"
           @click="$emit('switch', session.terminal_id)"
         >
           <span class="terminal-tab-title">{{ session.interpreter }}</span>
-          <button class="terminal-tab-close" tabindex="-1" @mousedown.prevent @click.stop="$emit('closeTerminal', session.terminal_id)">✕</button>
+          <span v-if="session.access === 'read'" class="terminal-tab-badge" title="只读">👁</span>
+          <span v-else-if="session.access === 'interact'" class="terminal-tab-badge" title="可交互">⌨</span>
+          <button v-if="session.access === 'owner'" class="terminal-tab-share" tabindex="-1" title="分享终端" @mousedown.prevent @click.stop="$emit('shareTerminal', session.terminal_id)">🔗</button>
+          <button v-if="session.access === 'owner'" class="terminal-tab-close" tabindex="-1" @mousedown.prevent @click.stop="$emit('closeTerminal', session.terminal_id)">✕</button>
         </div>
       </div>
       <div class="terminal-panel-actions">
@@ -88,6 +91,7 @@ const emit = defineEmits([
   'close',
   'switch',
   'closeTerminal',
+  'shareTerminal',
   'setHostRef',
   'startResize'
 ])
@@ -252,6 +256,35 @@ const emit = defineEmits([
 
 .terminal-tab-title {
   font-weight: 500;
+}
+
+.terminal-tab-readonly {
+  opacity: 0.75;
+}
+
+.terminal-tab-badge {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.terminal-tab-share {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.terminal-tab-share:hover {
+  background: var(--color-accent);
+  color: var(--color-text-primary);
 }
 
 .terminal-tab-close {
