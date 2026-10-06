@@ -15328,12 +15328,18 @@ function handleMessage(message, agentId = null) {
       return
     }
     if (terminalId) {
+      // 去重：已存在的会话（如实时共享/恢复场景）只更新 access 级别，避免重复 push
+      const existing = terminalSessions.value.find(t => t.terminal_id === terminalId)
+      if (existing) {
+        if (payload?.access) existing.access = payload.access
+        return
+      }
       terminalSessions.value.push({
         terminal_id: terminalId,
         node_id: nodeId,
         interpreter: payload?.interpreter || 'bash',
         working_dir: payload?.working_dir || '.',
-        access: 'owner',
+        access: payload?.access || 'owner',
         terminal: null,
         hostEl: null,
         fitAddon: null,
@@ -15349,6 +15355,8 @@ function handleMessage(message, agentId = null) {
           initIndependentTerminal(terminalId, hostEl)
         }
       })
+      // 实时共享：接管会话，让后端记录本用户以便接收实时输出
+      attachTerminalSession(terminalId)
     }
   } else if (type === 'terminal_closed') {
     // 独立终端关闭
@@ -17194,6 +17202,33 @@ function decodeTerminalBase64(b64) {
   } catch (error) {
     console.error('[independent-terminal] Failed to decode base64 data:', error)
     return ''
+  }
+}
+
+// 接管终端会话：让后端记录本用户以便接收实时输出，并回放输出缓冲
+async function attachTerminalSession(terminalId) {
+  try {
+    const { host, port } = getGatewayAddress()
+    const baseUrl = `${getHttpProtocol()}://${host}:${port}`
+    const attachResp = await fetchWithAuth(
+      `${baseUrl}/api/terminals/${encodeURIComponent(terminalId)}/attach`,
+      { method: 'POST' }
+    )
+    const attachResult = await attachResp.json()
+    if (!attachResult.success || !Array.isArray(attachResult.data?.output)) return
+    const bufferedOutput = attachResult.data.output.map(decodeTerminalBase64)
+    if (bufferedOutput.length === 0) return
+    // 若 xterm 已初始化则直接写入，否则存入 pending_output 由初始化回放
+    const session = terminalSessions.value.find(t => t.terminal_id === terminalId)
+    if (session && session.terminal) {
+      for (const data of bufferedOutput) {
+        session.terminal.write(data)
+      }
+    } else if (session) {
+      session.pending_output = [...(session.pending_output || []), ...bufferedOutput]
+    }
+  } catch (e) {
+    console.warn('[independent-terminal] Failed to attach session:', terminalId, e)
   }
 }
 

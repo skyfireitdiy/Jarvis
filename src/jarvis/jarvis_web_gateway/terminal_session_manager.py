@@ -705,6 +705,28 @@ class TerminalSessionManager:
         except Exception:
             return False
 
+    def get_all_admin_session_ids(self) -> List[str]:
+        """返回所有 admin 用户的 WebSocket session_id 列表。
+
+        用于终端创建/关闭事件广播：admin 用户经 _access_level 放行（视为
+        owner），能看到所有终端，因此终端事件应实时推送给所有在线的 admin 用户，
+        使其他设备（管理员）能实时看到新终端出现/关闭。
+        """
+        try:
+            from jarvis.jarvis_utils.config import get_data_dir
+            from jarvis.jarvis_web_gateway.user_manager import UserManager
+
+            user_mgr = UserManager(get_data_dir())
+            sids: List[str] = []
+            for u in user_mgr.list_users(limit=100000):
+                if u.get("is_admin"):
+                    uid = u.get("user_id")
+                    if uid:
+                        sids.append(f"session_{uid}")
+            return sids
+        except Exception:
+            return []
+
     def _get_admin_user_id(self) -> Optional[str]:
         """获取 admin 用户的 user_id（用于 set_access_acl 过滤）。"""
         try:

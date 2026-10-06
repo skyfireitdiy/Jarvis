@@ -227,3 +227,26 @@ def test_publish_output_sends_to_admin_after_attach(manager):
     session.stream_publisher = FakeRouter()
     session._publish_output(b"hello admin")
     assert "session_admin2" in published
+
+
+def test_get_all_admin_session_ids_returns_admin_sessions(manager):
+    """get_all_admin_session_ids 应返回所有 admin 用户的 session_id（用于终端事件广播）。"""
+    fake_users = [
+        {"user_id": "admin-a", "is_admin": True},
+        {"user_id": "admin-b", "is_admin": True},
+        {"user_id": "normal-u", "is_admin": False},
+    ]
+
+    class FakeUserManager:
+        def list_users(self, limit=50):
+            return fake_users
+
+    with patch(
+        "jarvis.jarvis_web_gateway.user_manager.UserManager",
+        return_value=FakeUserManager(),
+    ):
+        sids = manager.get_all_admin_session_ids()
+    assert "session_admin-a" in sids
+    assert "session_admin-b" in sids
+    # 非 admin 用户不应包含
+    assert "session_normal-u" not in sids

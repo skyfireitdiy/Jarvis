@@ -1330,6 +1330,8 @@ class WebSocketConnectionManager:
                             "payload": result_data,
                         }
                         self._router.publish(result_msg, session_id=session_id)
+                        # 实时终端共享：广播给所有 admin 用户
+                        self._publish_terminal_event_to_admins(result_msg, session_id)
                     elif message_type == "terminal_close" and resp_payload.get(
                         "success"
                     ):
@@ -1338,6 +1340,8 @@ class WebSocketConnectionManager:
                             "payload": {"terminal_id": payload.get("terminal_id")},
                         }
                         self._router.publish(result_msg, session_id=session_id)
+                        # 实时终端共享：广播给所有 admin 用户
+                        self._publish_terminal_event_to_admins(result_msg, session_id)
                 except Exception as e:
                     save_exception(
                         e, module="jarvis_web_gateway.app", function="__init__"
@@ -1404,6 +1408,9 @@ class WebSocketConnectionManager:
                         },
                     }
                     self._router.publish(message, session_id=session_id)
+                    # 实时终端共享：广播给所有 admin 用户（admin 可查看所有终端），
+                    # 使其他设备（管理员）能实时看到新终端出现
+                    self._publish_terminal_event_to_admins(message, session_id)
             return
         if message_type == "terminal_close":
             # 权限校验：terminal:create（终端操作统一权限）
@@ -1443,6 +1450,8 @@ class WebSocketConnectionManager:
                     "payload": {"terminal_id": terminal_id},
                 }
                 self._router.publish(message, session_id=session_id)
+                # 实时终端共享：广播给所有 admin 用户，使其他设备实时移除已关闭终端
+                self._publish_terminal_event_to_admins(message, session_id)
             return
         if message_type == "terminal_session_input":
             # 权限校验：terminal:create（终端操作统一权限）
@@ -1620,6 +1629,26 @@ class WebSocketConnectionManager:
                 message_type, payload, websocket, session_id, connection_id
             )
             return
+
+    def _publish_terminal_event_to_admins(
+        self, message: Dict[str, Any], exclude_session_id: Optional[str] = None
+    ) -> None:
+        """把终端事件（创建/关闭）广播给所有 admin 用户，实现实时终端共享。
+
+        admin 用户经 _access_level 放行（视为 owner）可查看所有终端，因此
+        终端事件应实时推送给所有在线的 admin 用户，使其他设备（管理员）能
+        实时看到终端出现/关闭。离线用户无连接，publish 到其 session_id 无副作用。
+        """
+        try:
+            if _terminal_session_manager is None:
+                return
+            for admin_sid in _terminal_session_manager.get_all_admin_session_ids():
+                if admin_sid != exclude_session_id:
+                    self._router.publish(message, session_id=admin_sid)
+        except Exception as e:
+            logger.error(
+                f"[WS MESSAGE] Failed to broadcast terminal event to admins: {e}"
+            )
 
     async def _handle_chat_message(
         self,
@@ -10890,6 +10919,28 @@ def create_app(
                 }
 
             info = terminal_session_manager.get_session_info(terminal_id)
+            # 实时终端共享：给所有被分享（read/interact）用户推送 terminal_created，
+            # 使其立即感知到该终端（即使之前未见过）
+            if info:
+                acl_now = info.get("access_acl") or {}
+                node_id = str(
+                    _node_runtime.local_node_id if _node_runtime else "master"
+                )
+                for level in ("read", "interact"):
+                    for uid in acl_now.get(level, []):
+                        if not uid:
+                            continue
+                        evt = {
+                            "type": "terminal_created",
+                            "payload": {
+                                "terminal_id": terminal_id,
+                                "interpreter": info.get("interpreter") or "bash",
+                                "working_dir": info.get("working_dir") or ".",
+                                "node_id": node_id,
+                                "access": level,
+                            },
+                        }
+                        _router.publish(evt, session_id=f"session_{uid}")
             return {
                 "success": True,
                 "data": {
