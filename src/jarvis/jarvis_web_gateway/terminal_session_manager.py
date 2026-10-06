@@ -45,6 +45,7 @@ class TerminalSession:
     stream_publisher: Optional[Any] = None
     session_id: str = "default"
     owner_id: str = ""
+    node_id: str = "master"
     access_acl: Dict[str, List[str]] = field(default_factory=dict)
     # 已接管（attach）本会话的用户 session_id 集合，用于把实时输出推送给
     # 所有有权限的观看者（owner / ACL 用户 / 被放行的 admin 用户）
@@ -663,6 +664,7 @@ class TerminalSessionManager:
                         "session_id": session.session_id,
                         "created_at": session.created_at,
                         "owner_id": session.owner_id,
+                        "node_id": session.node_id,
                         "access": access,
                         "access_acl": session.access_acl or {},
                     }
@@ -824,6 +826,46 @@ class TerminalSessionManager:
             session.access_acl = normalized
             return True
 
+    def register_remote_session(
+        self,
+        terminal_id: str,
+        node_id: str,
+        owner_id: str = "",
+        session_id: str = "default",
+        interpreter: str = "bash",
+        working_dir: str = ".",
+    ) -> None:
+        """登记一个远端（子节点）终端会话的元数据（影子会话）。
+
+        子节点终端实际 session 存在于子节点，master 不持有真实 PTY；
+        这里在 master 登记一个无 PTY 的影子会话，使 list_sessions_for_user
+        能返回子节点终端（用于前端同步恢复），同时保持 ACL 决策在 master。
+
+        Args:
+            terminal_id: 终端ID
+            node_id: 终端所在节点ID
+            owner_id: 创建者用户ID
+            session_id: 创建者的 WebSocket 会话ID
+            interpreter: 解释器
+            working_dir: 工作目录
+        """
+        with self._lock:
+            if terminal_id in self._sessions:
+                return
+            self._sessions[terminal_id] = TerminalSession(
+                terminal_id=terminal_id,
+                interpreter=interpreter,
+                working_dir=working_dir,
+                session_id=session_id,
+                owner_id=owner_id,
+                node_id=node_id,
+            )
+
+    def unregister_session(self, terminal_id: str) -> None:
+        """移除一个会话（用于子节点终端关闭时清理影子会话）。"""
+        with self._lock:
+            self._sessions.pop(terminal_id, None)
+
     def get_session_info(self, terminal_id: str) -> Optional[Dict[str, Any]]:
         """获取会话信息（含 owner 与 ACL）。
 
@@ -845,6 +887,7 @@ class TerminalSessionManager:
                 "session_id": session.session_id,
                 "created_at": session.created_at,
                 "owner_id": session.owner_id,
+                "node_id": session.node_id,
                 "access_acl": session.access_acl or {},
             }
 

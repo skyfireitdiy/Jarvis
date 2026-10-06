@@ -1332,6 +1332,22 @@ class WebSocketConnectionManager:
                         self._router.publish(result_msg, session_id=session_id)
                         # 实时终端共享：广播给所有 admin 用户
                         self._publish_terminal_event_to_admins(result_msg, session_id)
+                        # 在 master 登记子节点终端的影子会话，使 list_sessions_for_user
+                        # 能返回子节点终端（前端同步恢复），ACL 决策保持在 master
+                        if _terminal_session_manager:
+                            terminal_id = result_data.get("terminal_id")
+                            if terminal_id:
+                                owner_id = ""
+                                if session_id and session_id.startswith("session_"):
+                                    owner_id = session_id[len("session_") :]
+                                _terminal_session_manager.register_remote_session(
+                                    terminal_id=terminal_id,
+                                    node_id=terminal_node_id,
+                                    owner_id=owner_id,
+                                    session_id=session_id,
+                                    interpreter=result_data.get("interpreter", "bash"),
+                                    working_dir=result_data.get("working_dir", "."),
+                                )
                     elif message_type == "terminal_close" and resp_payload.get(
                         "success"
                     ):
@@ -1342,6 +1358,11 @@ class WebSocketConnectionManager:
                         self._router.publish(result_msg, session_id=session_id)
                         # 实时终端共享：广播给所有 admin 用户
                         self._publish_terminal_event_to_admins(result_msg, session_id)
+                        # 移除 master 上登记的子节点终端影子会话
+                        if _terminal_session_manager:
+                            _terminal_session_manager.unregister_session(
+                                str(payload.get("terminal_id") or "")
+                            )
                 except Exception as e:
                     save_exception(
                         e, module="jarvis_web_gateway.app", function="__init__"
@@ -10772,10 +10793,11 @@ def create_app(
             session_id = f"session_{user_id}"
 
             sessions = terminal_session_manager.list_sessions_for_user(session_id)
-            # 补充 node_id 以便前端知道终端在哪个节点上
+            # 补充 node_id（影子会话已带 node_id；本地会话若无则补 master 节点）
             local_node_id = _node_runtime.local_node_id if _node_runtime else "master"
             for s in sessions:
-                s["node_id"] = local_node_id
+                if not s.get("node_id"):
+                    s["node_id"] = local_node_id
             return {"success": True, "data": sessions}
         except Exception as e:
             return {

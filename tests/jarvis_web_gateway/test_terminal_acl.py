@@ -290,3 +290,60 @@ def test_publish_output_falls_back_to_session_id_for_child_node(manager):
     session.stream_publisher = FakeRouter()
     session._publish_output(b"hello child node")
     assert "session_owner1" in published
+
+
+def test_register_remote_session_appears_in_list_for_user():
+    """master 登记子节点终端影子会话后，list_sessions_for_user 应返回并带 node_id。"""
+    m = TerminalSessionManager()
+    m.register_remote_session(
+        terminal_id="child-term",
+        node_id="node-2",
+        owner_id="owner1",
+        session_id="session_owner1",
+    )
+    sessions = m.list_sessions_for_user("session_owner1")
+    assert any(s["terminal_id"] == "child-term" for s in sessions)
+    child = next(s for s in sessions if s["terminal_id"] == "child-term")
+    assert child["node_id"] == "node-2"
+    assert child["owner_id"] == "owner1"
+    assert child["access"] == "owner"
+
+
+def test_register_remote_session_visible_to_admin():
+    """admin 用户应能看到 master 登记的子节点终端影子会话（_access_level 放行）。"""
+    m = TerminalSessionManager()
+    m.register_remote_session(
+        terminal_id="child-term",
+        node_id="node-2",
+        owner_id="owner1",
+        session_id="session_owner1",
+    )
+    with patch.object(TerminalSessionManager, "_is_admin_user", return_value=True):
+        sessions = m.list_sessions_for_user("session_admin2")
+    assert any(s["terminal_id"] == "child-term" for s in sessions)
+
+
+def test_unregister_remote_session_removes():
+    """unregister_session 应移除 master 登记的子节点终端影子会话。"""
+    m = TerminalSessionManager()
+    m.register_remote_session(
+        terminal_id="child-term",
+        node_id="node-2",
+        owner_id="owner1",
+        session_id="session_owner1",
+    )
+    m.unregister_session("child-term")
+    sessions = m.list_sessions_for_user("session_owner1")
+    assert not any(s["terminal_id"] == "child-term" for s in sessions)
+
+
+def test_register_remote_session_attach_returns_owner():
+    """影子会话（子节点终端）attach 应返回 owner（供前端恢复时记录）。"""
+    m = TerminalSessionManager()
+    m.register_remote_session(
+        terminal_id="child-term",
+        node_id="node-2",
+        owner_id="owner1",
+        session_id="session_owner1",
+    )
+    assert m.attach_session("child-term", "session_owner1") == "owner"
