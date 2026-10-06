@@ -99,4 +99,17 @@ describe("TerminalPanel 恢复会话渲染", () => {
     expect(readTab.classes()).toContain("terminal-tab-readonly");
     expect(readTab.find(".terminal-tab-badge").exists()).toBe(true);
   });
+
+  test("同步按钮存在，点击触发 syncTerminals 事件（恢复所有有权限终端）", () => {
+    const wrapper = mountPanel({ socket: {} });
+    // 同步按钮在终端面板操作区
+    const syncBtn = wrapper
+      .findAll(".terminal-create-btn")
+      .find((b) => b.text() === "🔄");
+    expect(syncBtn).toBeTruthy();
+    syncBtn.trigger("click");
+    const emitted = wrapper.emitted("syncTerminals");
+    expect(emitted).toBeTruthy();
+    expect(emitted.length).toBe(1);
+  });
 });

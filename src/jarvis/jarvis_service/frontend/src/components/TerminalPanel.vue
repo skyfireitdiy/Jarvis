@@ -36,6 +36,7 @@
             {{ formatNodeLabel(node) }}
           </option>
         </select>
+        <button class="terminal-create-btn" tabindex="-1" @mousedown.prevent @click="$emit('syncTerminals')" :disabled="!socket" title="同步：恢复所有有权限的终端">🔄</button>
         <button class="terminal-create-btn" tabindex="-1" @mousedown.prevent @click="$emit('createTerminal')" :disabled="!socket" title="新建终端">➕</button>
         <button class="terminal-create-btn" tabindex="-1" @mousedown.prevent @click="$emit('close')" title="关闭面板">✕</button>
       </div>
@@ -88,6 +89,7 @@ const emit = defineEmits([
   'startMove',
   'update:selectedNodeId',
   'createTerminal',
+  'syncTerminals',
   'close',
   'switch',
   'closeTerminal',

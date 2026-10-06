@@ -817,6 +817,7 @@
                       @startMove="startTerminalPanelMove"
                       @update:selectedNodeId="selectedTerminalNodeId = $event"
                       @createTerminal="createTerminalForSelectedNode"
+                      @syncTerminals="restoreTerminalSessions"
                       @close="setActivePaneView('file')"
                       @switch="switchTerminal"
                       @closeTerminal="closeTerminal"
@@ -17398,10 +17399,8 @@ function createTerminalForAgent(agent) {
 }
 
 function closeTerminal(terminalId) {
-
-  // 先获取 node_id（清理前）
-  const closingSession = terminalSessions.value.find(t => t.terminal_id === terminalId)
-  const nodeId = closingSession?.node_id || ""
+  // 关闭标签页仅关闭本地 xterm 视图，不退出实际终端进程（类似 tmux detach）。
+  // 后端会话保留，可通过「同步」按钮重新恢复（restoreTerminalSessions）。
   
   // 清理终端实例
   const sessionIndex = terminalSessions.value.findIndex(t => t.terminal_id === terminalId)
@@ -17421,19 +17420,6 @@ function closeTerminal(terminalId) {
   // 如果关闭的是当前激活的终端，切换到另一个
   if (activeTerminalId.value === terminalId) {
     activeTerminalId.value = terminalSessions.value.length > 0 ? terminalSessions.value[0].terminal_id : null
-  }
-  
-  // 发送关闭消息到后端
-  if (socket.value) {
-    const payload = { terminal_id: terminalId }
-    if (nodeId) {
-      payload.node_id = nodeId
-    }
-    const message = {
-      type: 'terminal_close',
-      payload,
-    }
-    socket.value.send(JSON.stringify(message))
   }
   
   // 清理 ref
