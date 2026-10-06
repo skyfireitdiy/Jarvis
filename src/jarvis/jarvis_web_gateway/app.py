@@ -5923,6 +5923,17 @@ def create_app(
 
             resolved_target_node = target_node_id or node_runtime.local_node_id
 
+            # 权限校验：创建 Agent 需要 agent:create 权限（system/admin 由 _check_permission 内部放行）
+            if user_info and user_info.get("user_id") != "system":
+                if _check_permission(user_info, "agent:create"):
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "PERMISSION_DENIED",
+                            "message": "Permission denied: agent:create",
+                        },
+                    }
+
             # 节点访问校验：仅在 master 上执行。
             # 子节点本地没有 auth 数据（权限数据不同步），无法独立判定；
             # 跨节点请求的权限已由 master 在转发前统一把关，
@@ -7944,10 +7955,21 @@ def create_app(
         return timer_info
 
     @app.post("/api/timers", dependencies=[Depends(verify_token)])
-    async def create_timer(request: Dict[str, Any]) -> Dict[str, Any]:
+    async def create_timer(
+        request_body: Dict[str, Any], request: Request
+    ) -> Dict[str, Any]:
         """创建定时器。"""
         try:
-            timer_info = _schedule_timer_task(request)
+            user_info = getattr(request.state, "user_info", None)
+            if _check_permission(user_info, "timer:create"):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "PERMISSION_DENIED",
+                        "message": "Permission denied: timer:create",
+                    },
+                }
+            timer_info = _schedule_timer_task(request_body)
             return {"success": True, "data": timer_info}
         except ValueError as e:
             return {
@@ -7966,9 +7988,18 @@ def create_app(
             }
 
     @app.get("/api/timers", dependencies=[Depends(verify_token)])
-    async def list_timers() -> Dict[str, Any]:
+    async def list_timers(request: Request) -> Dict[str, Any]:
         """查询所有定时器。"""
         try:
+            user_info = getattr(request.state, "user_info", None)
+            if _check_permission(user_info, "timer:read"):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "PERMISSION_DENIED",
+                        "message": "Permission denied: timer:read",
+                    },
+                }
             return {"success": True, "data": timer_manager.list_tasks()}
         except Exception as e:
             return {
@@ -7977,9 +8008,18 @@ def create_app(
             }
 
     @app.get("/api/timers/{timer_id}", dependencies=[Depends(verify_token)])
-    async def get_timer(timer_id: str) -> Dict[str, Any]:
+    async def get_timer(timer_id: str, request: Request) -> Dict[str, Any]:
         """查询单个定时器。"""
         try:
+            user_info = getattr(request.state, "user_info", None)
+            if _check_permission(user_info, "timer:read"):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "PERMISSION_DENIED",
+                        "message": "Permission denied: timer:read",
+                    },
+                }
             timer_info = timer_manager.get_task(timer_id)
             if timer_info is None:
                 return {
@@ -7994,9 +8034,18 @@ def create_app(
             }
 
     @app.delete("/api/timers/{timer_id}", dependencies=[Depends(verify_token)])
-    async def delete_timer(timer_id: str) -> Dict[str, Any]:
+    async def delete_timer(timer_id: str, request: Request) -> Dict[str, Any]:
         """删除指定定时器。"""
         try:
+            user_info = getattr(request.state, "user_info", None)
+            if _check_permission(user_info, "timer:delete"):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "PERMISSION_DENIED",
+                        "message": "Permission denied: timer:delete",
+                    },
+                }
             success = timer_manager.cancel(timer_id)
             if not success:
                 return {
@@ -9681,6 +9730,25 @@ def create_app(
                 "success": False,
                 "error": {"code": "INTERNAL_ERROR", "message": repr(e)},
             }
+
+    def _check_permission(
+        user_info: Optional[Dict[str, Any]], permission: str
+    ) -> Optional[Dict[str, Any]]:
+        """校验通用操作权限（参照 _check_file_permission 的校验模式）。
+
+        返回 None 表示通过；否则返回 403 错误响应 dict。
+        system 用户直接放行；admin 用户由 permission_manager.check_permission 内部处理。
+        """
+        user_id = user_info.get("user_id", "") if user_info else ""
+        if user_id and user_id != "system":
+            if not permission_manager.check_permission(user_id, permission):
+                return {
+                    "success": False,
+                    "status_code": 403,
+                    "headers": {"content-type": "application/json"},
+                    "body": json.dumps({"error": f"Permission denied: {permission}"}),
+                }
+        return None
 
     def _check_file_permission(
         user_info: Optional[Dict[str, Any]], permission: str
