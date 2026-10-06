@@ -284,5 +284,17 @@
       "verification": "tests/jarvis_tools/test_hotpatch.py 12 passed；tests/jarvis_tools/ 全套 passed（无回归）；tests/jarvis_agent/ 全套 passed（无回归）；hotpatch 相关 ruff 0 错误；工具经 _load_builtin_tools 自动注册验证通过（get_tool_registry 含 hotpatch）。注：全量 ruff 有 5 个预存 F401 错误在 tests/jarvis_code_agent/ 与 tests/jarvis_web_gateway/（与本改动无关，最后提交 24526cd8 为旧提交）",
       "commits": ["501f951", "e351606", "aec9267", "643191c"]
     }
+  },
+  {
+    "timestamp": "2026-10-06T01:05:00Z",
+    "phase": "自由进化会话（2026-10-06 第四轮）",
+    "task": "hotpatch 注册到 CodeAgent 工具白名单",
+    "action": "在 src/jarvis/jarvis_code_agent/code_agent.py 的 _build_code_agent_tool_list 白名单中新增 hotpatch 工具（timer 之后）。此前 hotpatch 仅注册在主 Agent 的 ToolRegistry（自动扫描），CodeAgent 用显式白名单 + use_tools 硬过滤，导致 code agent 无法调用 hotpatch。",
+    "result": {
+      "status": "completed",
+      "detail": "确认 CodeAgent 工具清单机制：_build_code_agent_tool_list 用显式白名单（code_agent.py:248-275）构建工具列表，经 use_tools 传给父类 set_use_tools -> ToolRegistry.use_tools() 硬过滤（registry.py:488-492 把 self.tools 替换为仅含白名单工具）。故此前 hotpatch 不在白名单，CodeAgent 无法调用。现已在白名单加入 hotpatch，使 code agent 在自进化场景下也能热补丁自身（修改代码后立即生效，无需重启）。",
+      "verification": "验证 _build_code_agent_tool_list 返回清单含 hotpatch（27 个工具）；ToolRegistry 注册含 hotpatch；tests/jarvis_tools/test_hotpatch.py + tests/jarvis_code_agent/ 全套 passed（无回归）；ruff check code_agent.py 0 错误",
+      "commits": []
+    }
   }
 ]

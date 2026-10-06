@@ -272,6 +272,7 @@ class CodeAgent(Agent):
             "eval_js",  # 前端 JS 执行工具（Web 网关模式下向前端浏览器下发 JS）
             "jarvis_frontend",  # Jarvis前端工具（通知前端打开文件/跳转行/选中代码）
             "timer",  # 定时器工具（支持 after/at/loop 定时执行，含 cancel/list/clear 管理）
+            "hotpatch",  # 任意代码热补丁工具（热更新/注入 Python 模块代码，立即生效不重启）
         ]
         # 如果启用了任务列表管理器，添加相应工具
         if enable_task_list_manager:
