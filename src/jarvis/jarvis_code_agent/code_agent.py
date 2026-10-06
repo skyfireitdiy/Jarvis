@@ -1193,6 +1193,12 @@ def cli(
         "--quick",
         help="极速模式：取消任务分类、规则自动加载、上下文推荐、方法论加载",
     ),
+    quiet: bool = typer.Option(
+        False,
+        "-Q",
+        "--quiet",
+        help="安静模式：抑制控制台输出（仍保留事件/网关输出），用于评测等减少日志噪音场景",
+    ),
     print_prompt: bool = typer.Option(
         False,
         "--print-prompt",
@@ -1609,6 +1615,8 @@ def cli(
                     return
         if print_prompt:
             set_config("print_prompt", True)
+        if quiet:
+            set_config("quiet", True)
     except Exception:
         # 静默忽略同步异常，不影响主流程
         pass

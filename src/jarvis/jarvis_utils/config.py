@@ -1657,6 +1657,19 @@ def is_non_interactive() -> bool:
     return False
 
 
+def is_quiet() -> bool:
+    """
+    获取是否启用安静模式（quiet）。
+
+    启用后抑制 jca 的富文本控制台输出（仍保留网关/事件输出），
+    用于评测等需要减少日志噪音的场景。默认关闭。
+
+    返回：
+        bool: 如果启用安静模式则返回True，默认为False
+    """
+    return GLOBAL_CONFIG_DATA.get("quiet", False) is True
+
+
 def is_skip_predefined_tasks() -> bool:
     """
     是否跳过预定义任务加载。

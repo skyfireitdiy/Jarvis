@@ -602,6 +602,16 @@ def emit_output(event: OutputEvent) -> None:
     context = event.context or {}
     skip_console = context.get("_gateway_skip", False)
 
+    # 安静模式（quiet）下抑制控制台输出，仍保留网关/事件输出
+    if not skip_console:
+        try:
+            from jarvis.jarvis_utils.config import is_quiet
+
+            if is_quiet():
+                skip_console = True
+        except Exception:
+            pass
+
     # 如果没有设置跳过标记，向所有输出后端广播事件
     if not skip_console:
         with _output_lock:

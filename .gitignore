@@ -177,4 +177,6 @@ test
 .swn
 .swm
 .swl
+# Harbor 评测产物
+jobs/
 
