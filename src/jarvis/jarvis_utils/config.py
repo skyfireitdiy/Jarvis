@@ -1279,6 +1279,20 @@ def is_enable_native_tool_calls() -> bool:
     return bool(GLOBAL_CONFIG_DATA.get("enable_native_tool_calls", True))
 
 
+def is_enable_audit() -> bool:
+    """
+    获取是否启用审计系统。
+
+    启用后，Agent 的关键行为事件（用户输入、工具调用、任务完成等）会被记录到
+    ~/.jarvis/audit/ 目录下的 JSONL 审计日志，供安全审查与行为追踪。
+    默认关闭，可通过配置文件设置 enable_audit: true 启用。
+
+    返回：
+        bool: 如果启用审计系统则返回 True，默认为 False
+    """
+    return bool(GLOBAL_CONFIG_DATA.get("enable_audit", False))
+
+
 def _get_native_support_file() -> str:
     """原生工具调用支持记录文件路径。"""
     return os.path.join(get_data_dir(), "native_tool_support.json")

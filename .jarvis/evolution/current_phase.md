@@ -72,9 +72,15 @@
 2. **A2 主动建议机制（已回退）**：曾实现 `Agent._generate_proactive_suggestions`，经 Administrator 评审后回退。原因：提醒类功能价值有限，可能轻微冗余。已删除方法定义、调用及测试。
 3. **A1 需求澄清增强（已回退）**：曾实现 `requirement_clarifier.py` 与 `Agent._clarify_ambiguous_requirement`，经 Administrator 评审后回退。原因：与大模型原生澄清能力重复（模型本就会在需求不清时主动询问），且固定规则在"明天西安天气"等语义完整需求上误报，制造"蠢"的体验。已删除相关代码与测试。
 
+### ✅ 第三轮进化（2026-10-05 深夜）—— 审计系统（可配置、默认关闭）
+
+1. **审计系统**：新增 `src/jarvis/jarvis_audit/` 模块，提供 `AuditLogger`（写入 `~/.jarvis/audit/YYYY-MM-DD.jsonl`，JSONL 格式，敏感字段脱敏，进程安全追加）与 `log_event()` 统一入口。新增 `enable_audit` 配置项（`config.py` 的 `is_enable_audit()`，默认 `false`；`config_schema.json` 同步）。Agent 层接入 4 个审计点：`run()` 记录 `user_input`、`_call_tools` 与 `_execute_pending_native_calls` 记录 `tool_call`、`_complete_task` 记录 `task_completed`。全部惰性导入 + 异常静默，默认关闭零开销。测试 6 个用例。
+2. **审计系统缺陷修复**：① `_redact` 由精确匹配改为子串匹配（新增 `_is_sensitive_key`），覆盖 `api_key`/`access_token`/`secret_key`/`client_secret` 等复合敏感键；② `_call_tools` 新增 `_extract_tool_arguments` 从文本协议 response 解析 arguments 字典传入 `_audit_log`，使文本协议工具调用的敏感值也能正确脱敏（解析失败静默返回空字典）；③ `evolution_history.json` 末尾补换行。审计测试增至 8 个用例。
+3. **审计系统审查修复**：① `_call_tools` 不再记录原始 response 字符串，改为仅记录 `tool_name` + 已脱敏 `arguments` 字典，杜绝 `data.response` 中敏感明文泄露；② 新增 `_is_audit_enabled` 前置检查（读取 `config.is_enable_audit`），默认关闭时不执行 `_extract_tool_arguments` 解析，保证严格零开销。审计测试增至 10 个用例。
+
 ### 验证结果
 
-- 全套测试：**1404 passed, 0 failed**（第一轮）；`tests/jarvis_agent/` **233 passed**（第二轮回退后，仅 A3 保留 7 用例）
+- 全套测试：**1404 passed, 0 failed**（第一轮）；`tests/jarvis_agent/` **233 passed**（第二轮回退后，仅 A3 保留 7 用例）；`tests/jarvis_audit/` **10 passed**（第三轮审计系统 + 复合敏感键脱敏 + response 明文修复）
 - ruff：**0 错误**
 
 ---
@@ -83,7 +89,8 @@
 
 - 阶段 A 已启动，A4（状态修正）已完成。
 - 自由进化会话（2026-10-05）已完成：WebSocket 广播、ruff 清理、daemon ARM 验证。
-- 第二轮自由进化（2026-10-05 晚）完成 A3（跨会话学习）；A1（需求澄清，与大模型原生能力重复）、A2（主动建议，提醒类价值有限）经评审均已回退。
+- 第二阶段自由进化（2026-10-05 晚）完成 A3（跨会话学习）；A1（需求澄清，与大模型原生能力重复）、A2（主动建议，提醒类价值有限）经评审均已回退。
+- 第三轮自由进化（2026-10-05 深夜）实现审计系统：可配置、默认关闭，记录用户输入/工具调用/任务完成到 JSONL 审计日志。
 - 阶段 A 保留的进化项为「跨会话学习」，需求澄清与主动建议回归大模型自然行为。
 
 ---
@@ -102,7 +109,7 @@
 
 ---
 
-**最后更新**：2026-10-05
+**最后更新**：2026-10-06（第三轮：审计系统 + 复合敏感键脱敏 + response 明文/零开销修复）
 **规则版本**：2.0
 **执行状态**：永久持续运行
 **监督者**：skyfire

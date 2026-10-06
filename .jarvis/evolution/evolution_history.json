@@ -225,5 +225,52 @@
       "verification": "jarvis_agent 全套 233 passed（241-8）；ruff 0 错误；无 _generate_proactive_suggestions 引用残留",
       "commits": ["0862ca6"]
     }
+  },
+  {
+    "timestamp": "2026-10-05T23:42:00Z",
+    "phase": "自由进化会话（2026-10-05 第三轮）",
+    "task": "实现审计系统（可配置、默认关闭）",
+    "action": "新增 jarvis_audit 模块 + enable_audit 配置项 + Agent 层接入审计点",
+    "result": {
+      "status": "completed",
+      "detail": "实现一套可配置、默认关闭的审计系统：新增 src/jarvis/jarvis_audit/（AuditLogger 写入 ~/.jarvis/audit/YYYY-MM-DD.jsonl，JSONL 格式，敏感字段脱敏，进程安全追加）；config.py 新增 is_enable_audit()（默认 False）；config_schema.json 新增 enable_audit 配置项；Agent 层接入 4 个审计点（run 记录 user_input、_call_tools 与 _execute_pending_native_calls 记录 tool_call、_complete_task 记录 task_completed），全部惰性导入+异常静默，默认关闭零开销。",
+      "verification": "jarvis_agent 233 passed（无回归）；jarvis_audit 6 passed；ruff 0 错误；ty 通过；git 工作区干净",
+      "commits": [
+        "0924b09",
+        "38679ad",
+        "342b4b4",
+        "072be0c",
+        "6464a53",
+        "2a304b0",
+        "d2d5413",
+        "0c2a125",
+        "6e46e92",
+        "589a8e1"
+      ]
+    }
+  },
+  {
+    "timestamp": "2026-10-05T23:52:00Z",
+    "phase": "自由进化会话（2026-10-05 第三轮）",
+    "task": "审计系统缺陷修复：复合敏感键脱敏 + 文本协议 arguments 脱敏",
+    "action": "修复 3 处缺陷：1) _redact 改为子串匹配覆盖 api_key/access_token/secret_key 等复合敏感键；2) _call_tools 新增 _extract_tool_arguments 解析文本协议 arguments 字典传入 _audit_log 使其经过 _redact 脱敏；3) evolution_history.json 末尾补换行",
+    "result": {
+      "status": "completed",
+      "detail": "修复审计脱敏缺陷：_redact 原先用 str(k).lower() in _SENSITIVE_KEYS 精确匹配，导致 api_key/access_token/secret_key 等复合敏感键漏脱敏，改为子串匹配（新增 _is_sensitive_key）；文本协议 tool_call 原先只记录原始 response 字符串，arguments 中的敏感值不会经过 _redact，新增 _extract_tool_arguments 从 response 中解析 arguments 字典传入 _audit_log，使其正确脱敏（解析失败静默返回空字典，不影响主流程）。",
+      "verification": "jarvis_audit 8 passed（新增 2 个复合敏感键脱敏用例）；jarvis_agent 全套 passed（无回归）；ruff 0 错误；端到端验证 _call_tools 审计路径正确脱敏 api_key 且保留非敏感字段",
+      "commits": ["8cfbf43", "335ff3d"]
+    }
+  },
+  {
+    "timestamp": "2026-10-05T23:59:00Z",
+    "phase": "自由进化会话（2026-10-05 第三轮）",
+    "task": "审计系统审查修复：response 明文泄露 + 默认关闭非零开销",
+    "action": "修复 2 处审查问题：1) _call_tools 不再记录原始 response 字符串，改为仅记录 tool_name + 已脱敏 arguments 字典，杜绝 response 中敏感明文泄露；2) 新增 _is_audit_enabled 前置检查，默认关闭时不执行 _extract_tool_arguments 解析，保证严格零开销",
+    "result": {
+      "status": "completed",
+      "detail": "审查发现 2 个缺陷：① data.response 原始字符串仍泄露敏感明文（如 api_key 值），采用推荐方案二，不再记录原始 response，仅记录脱敏后的 arguments 字典 + tool_name，保留非敏感信息且不泄露；② _extract_tool_arguments 作为参数在 _audit_log 调用前求值，即使审计关闭也扫描整个 response 产生 O(n) 开销，新增 _is_audit_enabled 前置检查（读取 config.is_enable_audit），关闭时跳过解析，保证默认关闭严格零开销。_extract_tool_arguments 返回结构改为 {\"name\", \"arguments\"}。",
+      "verification": "jarvis_audit 10 passed（新增 2 个用例：文本协议审计无明文泄露、默认关闭不解析）；jarvis_agent 全套 passed（无回归）；ruff 0 错误；git 工作区干净",
+      "commits": ["02c9d15", "43e934c"]
+    }
   }
 ]

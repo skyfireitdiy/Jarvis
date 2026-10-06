@@ -1162,6 +1162,10 @@ class Agent:
         for call, out in zip(calls, outputs):
             call_id = call.get("id", "") or ""
             name = call.get("name", "") or "unknown"
+            # 审计：记录原生工具调用（默认关闭时零开销）
+            self._audit_log(
+                "tool_call", tool_name=name, arguments=call.get("arguments") or {}
+            )
             # 每个 tool_call_id 都要回包，否则 OpenAI/Anthropic 报 pairing 400
             if call_id:
                 model.append_native_tool_result(call_id, name, out)
@@ -1662,7 +1666,64 @@ class Agent:
         """
         Delegates the tool execution to the external `execute_tool_call` function.
         """
+        # 审计：记录文本协议工具调用（默认关闭时零开销，仅开启时解析）
+        if self._is_audit_enabled():
+            info = self._extract_tool_arguments(response)
+            self._audit_log(
+                "tool_call", tool_name=info["name"], arguments=info["arguments"]
+            )
         return execute_tool_call(response, self)
+
+    def _is_audit_enabled(self) -> bool:
+        """审计是否开启（默认关闭；关闭时不做任何解析，保持零开销）。"""
+        try:
+            from jarvis.jarvis_utils.config import is_enable_audit
+
+            return bool(is_enable_audit())
+        except Exception:
+            return False
+
+    def _extract_tool_arguments(self, response: str) -> Dict[str, Any]:
+        """从文本协议响应中提取工具调用 arguments 字典，供审计脱敏使用。
+
+        解析失败或未找到时返回空字典，绝不抛出异常。
+        返回 {"name": str, "arguments": dict}。
+        """
+        try:
+            from jarvis.jarvis_utils.utils import extract_json_from_text
+            from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
+
+            for i, ch in enumerate(response):
+                if ch not in ("{", "["):
+                    continue
+                json_str, _ = extract_json_from_text(response, i)
+                if not json_str:
+                    continue
+                try:
+                    tool_call = json_loads(json_str)
+                except Exception:
+                    tool_call = json.loads(json_str)
+                if not isinstance(tool_call, dict):
+                    continue
+                args = tool_call.get("arguments")
+                if isinstance(args, dict):
+                    return {"name": tool_call.get("name", ""), "arguments": args}
+            return {"name": "", "arguments": {}}
+        except Exception:
+            return {"name": "", "arguments": {}}
+
+    def _audit_log(self, event_type: str, **data: Any) -> None:
+        """记录一条审计事件（默认关闭时零开销，异常静默不影响主流程）。
+
+        审计系统由配置项 enable_audit 控制，默认关闭。关闭时 log_event
+        内部直接返回，此处惰性导入避免模块加载开销。
+        """
+        try:
+            from jarvis.jarvis_audit.audit import log_event
+
+            log_event(event_type, **data)
+        except Exception:
+            pass
 
     def _complete_task(self, auto_completed: bool = False) -> str:
         """完成任务并生成总结(如果需要)
@@ -1818,6 +1879,14 @@ class Agent:
             memory_hint = f"\n\n💡 **记忆标签提示**: 本次任务产生了以下记忆标签: {tags_str}\n你可以使用 `memory` 工具（action=retrieve）通过这些标签检索相关记忆，获取更多详细信息。"
             result = result + memory_hint
 
+        # 审计：记录任务完成事件（默认关闭时零开销）
+        self._audit_log(
+            "task_completed",
+            auto_completed=auto_completed,
+            need_summary=self.need_summary,
+            result=result[:500],
+        )
+
         return result
 
     def make_default_addon_prompt(self, need_complete: bool) -> str:
@@ -1959,6 +2028,15 @@ class Agent:
             # 只在第一次运行时设置原始任务目标，确保交互模式下后续输入不会覆盖原始目标
             if not self.original_user_input:
                 self.original_user_input = user_input
+
+            # 审计：记录用户输入事件（默认关闭时零开销）
+            if isinstance(user_input, str):
+                input_text = user_input
+            else:
+                input_text = "\n".join(
+                    b.get("text", "") for b in user_input if b.get("type") == "text"
+                )
+            self._audit_log("user_input", user_input=input_text[:500])
 
             # 如果是CodeAgent实例，则跳过注册，由CodeAgent.run自行管理
             if not isinstance(self, CodeAgent):
