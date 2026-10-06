@@ -45,9 +45,6 @@ _PASSTHROUGH_ENV_VARS: tuple[str, ...] = (
     # Anthropic
     "ANTHROPIC_API_KEY",
     "ANTHROPIC_BASE_URL",
-    # DeepSeek
-    "DEEPSEEK_API_KEY",
-    "DEEPSEEK_BASE_URL",
     # 通用代理
     "API_BASE_URL",
     "HTTP_PROXY",

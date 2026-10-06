@@ -133,7 +133,10 @@ PYTHONPATH=src ~/.jarvis-eval-venv/bin/harbor run \
    在线多镜像源安装（清华 → 阿里云 → 直连 PyPI）。
    wheelhouse 由 `run_eval.sh setup` 用 Python 3.12 自动构建（与容器
    Ubuntu 24.04 的 Python 版本匹配，确保 wheel 平台/ABI 兼容），
-   内含与 PyPI 发布版一致的 `jarvis-ai-assistant==6.0.10` 及其全部依赖。
+   内含 `jarvis-ai-assistant` 及其全部依赖。默认取 **PyPI 最新版**
+   （`JCA_VERSION=latest`），也可用 `JCA_VERSION=<版本>` 指定具体版本；
+   wheelhouse 已构建时默认跳过（marker 记录实际版本），发新版本后
+   需 `JCA_FORCE_REBUILD=1` 强制重建才会用新版。
    若需用本机最新源码评测，需先发布到 PyPI，或调整 `harbor_agent.py` 的
    `install()` 改为从本地 wheel/git 安装。
 

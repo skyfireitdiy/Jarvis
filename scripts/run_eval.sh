@@ -30,6 +30,10 @@ set -euo pipefail
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_DIR="${EVAL_VENV_DIR:-$HOME/.jarvis-eval-venv}"
 HARBOR_VERSION="${HARBOR_VERSION:-harbor}"
+# 评测容器内安装的 jarvis-ai-assistant 版本；latest=PyPI 最新版，可指定如 6.0.10
+JCA_VERSION="${JCA_VERSION:-latest}"
+# 置 1 时强制重建离线 wheelhouse（否则缓存命中即跳过，发新版本后需置 1 更新）
+JCA_FORCE_REBUILD="${JCA_FORCE_REBUILD:-0}"
 
 # 本机代理环境变量会导致 pip/uv 安装失败，安装时直连
 PROXY_UNSET="env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY"
@@ -65,12 +69,13 @@ check_prereq() {
 # 上传容器并用 --no-index --find-links 完全离线安装，彻底绕开该问题。
 build_wheelhouse() {
 	local wh_dir="${JARVIS_WHEELHOUSE_DIR:-$HOME/.cache/harbor/wheelhouse}"
-	local wh_marker="$wh_dir/jarvis_ai_assistant-6.0.10-py3-none-any.whl"
-	if [ -f "$wh_marker" ]; then
-		echo_info "wheelhouse 已存在，跳过构建: $wh_dir"
+	# marker 记录实际构建的版本（不依赖版本号文件名，发新版本后仍能正确判断）
+	local wh_marker="$wh_dir/.built"
+	if [ -f "$wh_marker" ] && [ "$JCA_FORCE_REBUILD" != "1" ]; then
+		echo_info "wheelhouse 已存在，跳过构建: $wh_dir ($(cat "$wh_marker"))"
 		return 0
 	fi
-	echo_info "构建离线 wheelhouse: $wh_dir"
+	echo_info "构建离线 wheelhouse: $wh_dir (JCA_VERSION=$JCA_VERSION)"
 	local wh_venv="$HOME/.cache/harbor/wh-venv"
 	if [ ! -x "$wh_venv/bin/python" ]; then
 		uv venv "$wh_venv" --python 3.12
@@ -78,12 +83,23 @@ build_wheelhouse() {
 	fi
 	mkdir -p "$wh_dir"
 	# 用 Python 3.12 下载依赖，确保 wheel 平台/ABI 与容器（Ubuntu 24.04 + 3.12）兼容
+	# 默认取 PyPI 最新版（JCA_VERSION=latest），也可指定具体版本
+	local jca_spec="jarvis-ai-assistant"
+	[ "$JCA_VERSION" != "latest" ] && jca_spec="jarvis-ai-assistant==$JCA_VERSION"
 	$PROXY_UNSET "$wh_venv/bin/python" -m pip download \
-		--no-cache-dir --dest "$wh_dir" "jarvis-ai-assistant==6.0.10"
+		--no-cache-dir --dest "$wh_dir" "$jca_spec"
 	# jieba 仅提供 sdist，离线构建需 setuptools/wheel
 	$PROXY_UNSET "$wh_venv/bin/python" -m pip download \
 		--no-cache-dir --dest "$wh_dir" setuptools wheel
-	echo_info "wheelhouse 构建完成: $wh_dir"
+	# 从下载的 wheel 文件名解析实际版本写入 marker
+	local built_ver wheel_files=("$wh_dir"/jarvis_ai_assistant-*.whl)
+	if [ -e "${wheel_files[0]}" ]; then
+		built_ver="$(basename "${wheel_files[0]}" .whl | sed -E 's/jarvis_ai_assistant-([0-9][^-]*).*/\1/')"
+	else
+		built_ver="$JCA_VERSION"
+	fi
+	echo "$built_ver" >"$wh_marker"
+	echo_info "wheelhouse 构建完成: $wh_dir (jarvis-ai-assistant $built_ver)"
 }
 
 # ===== 1. 创建 venv 并安装 harbor =====
@@ -177,7 +193,6 @@ run_eval() {
 	# 额外透传用户已设置的其他 API key / 代理变量
 	for var in OPENAI_API_BASE OPENAI_BASE_URL \
 		ANTHROPIC_API_KEY ANTHROPIC_BASE_URL \
-		DEEPSEEK_API_KEY DEEPSEEK_BASE_URL \
 		API_BASE_URL HTTP_PROXY HTTPS_PROXY NO_PROXY; do
 		if [ -n "${!var:-}" ]; then
 			AE_ARGS+=(--ae "$var=${!var}")
