@@ -46,6 +46,9 @@ class TerminalSession:
     session_id: str = "default"
     owner_id: str = ""
     access_acl: Dict[str, List[str]] = field(default_factory=dict)
+    # 已接管（attach）本会话的用户 session_id 集合，用于把实时输出推送给
+    # 所有有权限的观看者（owner / ACL 用户 / 被放行的 admin 用户）
+    attached_session_ids: set = field(default_factory=set)
     created_at: float = field(default_factory=lambda: __import__("time").time())
     _closed: bool = False
     _output_sequence: int = 0
@@ -145,6 +148,26 @@ class TerminalSession:
             )
             pass
 
+    def _get_access_session_ids(self) -> List[str]:
+        """返回有权接收本终端实时输出的 WebSocket 会话ID列表。
+
+        包含 owner 与被分享（read/interact）用户，使实时输出能推送给
+        所有有权限的用户（而不只是 owner），修复被分享用户看不到
+        终端实时内容的问题。
+        """
+        ids: List[str] = []
+        if self.owner_id:
+            ids.append(f"session_{self.owner_id}")
+        acl = self.access_acl or {}
+        for uid in acl.get("interact", []) + acl.get("read", []):
+            if uid and f"session_{uid}" not in ids:
+                ids.append(f"session_{uid}")
+        # 已接管本会话的用户（含被放行的 admin 用户），使其实时输出也能送达
+        for sid in self.attached_session_ids:
+            if sid and sid not in ids:
+                ids.append(sid)
+        return ids
+
     def _publish_output(self, data: bytes) -> None:
         """发布终端输出到WebSocket。"""
         if self.stream_publisher is None:
@@ -175,8 +198,10 @@ class TerminalSession:
             print(
                 f"[TerminalSession {self.terminal_id}] Publishing output: type={message['type']}, exec_id={payload['execution_id']}, data_len={len(data)}"
             )
-            # 直接通过 router 发送消息
-            self.stream_publisher.publish(message, session_id=self.session_id)
+            # 推送给 owner 与被分享（read/interact）用户，使所有有权限的用户
+            # 都能收到实时输出（而不只是 owner 的 session_id）
+            for sid in self._get_access_session_ids():
+                self.stream_publisher.publish(message, session_id=sid)
         except Exception as e:
             print(f"[TerminalSession {self.terminal_id}] Failed to publish output: {e}")
 
@@ -709,7 +734,12 @@ class TerminalSessionManager:
             session = self._sessions.get(terminal_id)
             if session is None:
                 return None
-            return self._access_level(session, session_id)
+            access = self._access_level(session, session_id)
+            if access is not None:
+                # 记录已接管本会话的用户，使 _get_access_session_ids 能把
+                # 实时输出推送给所有有权限的观看者（含被放行的 admin 用户）
+                session.attached_session_ids.add(session_id)
+            return access
 
     def check_access(
         self, terminal_id: str, user_id: str, need_interact: bool

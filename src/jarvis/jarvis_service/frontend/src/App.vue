@@ -17053,10 +17053,9 @@ function setTerminalHostRef(terminalId, el) {
     independentTerminalHosts.value.set(terminalId, el)
     if (session) {
       session.hostEl = el
-      // 如果 terminal 实例已存在（面板切换导致组件重建），重新打开
-      if (session.terminal) {
-        initIndependentTerminal(terminalId, el)
-      }
+      // 无论 terminal 是否已初始化，都确保 xterm 创建（修复重新登录后
+      // hostEl 已渲染但 xterm 未初始化、只见标签不见内容的问题）
+      initIndependentTerminal(terminalId, el)
     }
   } else {
     independentTerminalHosts.value.delete(terminalId)
@@ -17251,8 +17250,11 @@ async function restoreTerminalSessions() {
       if (!activeTerminalId.value) {
         activeTerminalId.value = terminalId
       }
-      // 若 DOM 已渲染则初始化终端（回放缓冲）
+      // 若 DOM 已渲染且 xterm 尚未初始化，则初始化终端（回放缓冲）。
+      // 若 hostEl 已由 setTerminalHostRef 触发初始化，则此处跳过，避免重复创建。
       nextTick(() => {
+        const sessionNow = terminalSessions.value.find(t => t.terminal_id === terminalId)
+        if (!sessionNow || sessionNow.terminal) return
         const hostEl = independentTerminalHosts.value.get(terminalId)
         if (hostEl) {
           initIndependentTerminal(terminalId, hostEl)
