@@ -1792,6 +1792,7 @@ import plantumlEncoder from 'plantuml-encoder'
 import mermaid from 'mermaid'
 import { graphviz } from 'd3-graphviz'
 import historyStorage from './historyStorage.js'
+import { createTerminalCreationTracker } from './terminalCreationTracker.js'
 import ConnectModal from './components/ConnectModal.vue'
 import BufferPanel from './components/BufferPanel.vue'
 import DirectoryDialog from './components/DirectoryDialog.vue'
@@ -7765,7 +7766,8 @@ const terminalSessions = ref([]) // [{ terminal_id, interpreter, working_dir, te
 const activeTerminalId = ref(null) // 当前激活的终端ID
 const independentTerminalHosts = ref(new Map()) // terminal_id -> hostEl
 const isCreatingTerminalSession = ref(false)
-
+// 终端创建"本设备发起"追踪器：区分本设备创建（自动切换）与他端共享（不切换）
+const terminalCreationTracker = createTerminalCreationTracker()
 // 输入控制
 const inputText = ref('')
 const inputMode = ref('multi') // 当前显示Agent的输入模式
@@ -15347,8 +15349,10 @@ function handleMessage(message, agentId = null) {
         resizeObserver: null,  // ResizeObserver 实例
         history: [],  // 保存历史输出，用于面板隐藏后再显示时恢复
       })
-      // 自动切换到新创建的 terminal
-      activeTerminalId.value = terminalId
+      // 仅当本设备发起了终端创建时才自动切换，避免他端共享的终端打断本设备工作流
+      if (terminalCreationTracker.shouldSwitch()) {
+        activeTerminalId.value = terminalId
+      }
       // 初始化终端
       nextTick(() => {
         const hostEl = independentTerminalHosts.value.get(terminalId)
@@ -17302,6 +17306,12 @@ async function restoreTerminalSessions() {
   }
 }
 
+// 标记本设备发起了终端创建；若创建失败（无 terminal_created 回包），超时后自动复位，
+// 避免残留标志导致后续他端共享的终端被误切换
+function markTerminalCreationPending() {
+  terminalCreationTracker.mark()
+}
+
 function createTerminal() {
   if (!socket.value) {
     console.warn('[independent-terminal] No socket connection')
@@ -17322,6 +17332,8 @@ function createTerminal() {
     payload,
   }
   socket.value.send(JSON.stringify(message))
+  // 标记本设备发起了终端创建，terminal_created 回包时自动切换
+  markTerminalCreationPending()
   
   // 自动在工作区中显示终端
   showWorkspaceHostView('terminal')
@@ -17346,6 +17358,8 @@ function createTerminalForSelectedNode() {
     },
   }
   socket.value.send(JSON.stringify(message))
+  // 标记本设备发起了终端创建，terminal_created 回包时自动切换
+  markTerminalCreationPending()
 
   // 自动在工作区中显示终端
   showWorkspaceHostView('terminal')
@@ -17367,6 +17381,8 @@ function createTerminalForNode(nodeId) {
     payload: { node_id: normalizedNodeId },
   }
   socket.value.send(JSON.stringify(message))
+  // 标记本设备发起了终端创建，terminal_created 回包时自动切换
+  markTerminalCreationPending()
   // 自动在工作区中显示终端
   showWorkspaceHostView('terminal')
 }
@@ -17393,6 +17409,8 @@ function createTerminalForAgent(agent) {
     payload,
   }
   socket.value.send(JSON.stringify(message))
+  // 标记本设备发起了终端创建，terminal_created 回包时自动切换
+  markTerminalCreationPending()
   
   // 自动在工作区中显示终端
   showWorkspaceHostView('terminal')
