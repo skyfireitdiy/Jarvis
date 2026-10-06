@@ -10680,14 +10680,25 @@ def create_app(
 
     # HTTP API：列出所有终端会话
     @app.get("/api/terminals", dependencies=[Depends(verify_token)])
-    async def list_terminals() -> Dict[str, Any]:
-        """列出所有活跃的终端会话。
+    async def list_terminals(request: Request) -> Dict[str, Any]:
+        """列出当前用户活跃的终端会话。
 
         Returns:
             {"success": True, "data": [{"terminal_id": "xxx", ...}]}
         """
         try:
-            sessions = terminal_session_manager.list_sessions()
+            # 多用户模式：per-user session隔离
+            user_info = getattr(request.state, "user_info", None)
+            user_id = (
+                user_info.get("user_id", "anonymous") if user_info else "anonymous"
+            )
+            session_id = f"session_{user_id}"
+
+            sessions = terminal_session_manager.list_sessions_for_user(session_id)
+            # 补充 node_id 以便前端知道终端在哪个节点上
+            local_node_id = _node_runtime.local_node_id if _node_runtime else "master"
+            for s in sessions:
+                s["node_id"] = local_node_id
             return {"success": True, "data": sessions}
         except Exception as e:
             return {
@@ -10697,7 +10708,7 @@ def create_app(
 
     # HTTP API：关闭终端会话
     @app.delete("/api/terminals/{terminal_id}", dependencies=[Depends(verify_token)])
-    async def close_terminal(terminal_id: str) -> Dict[str, Any]:
+    async def close_terminal(terminal_id: str, request: Request) -> Dict[str, Any]:
         """关闭指定的终端会话。
 
         Args:
@@ -10707,6 +10718,19 @@ def create_app(
             {"success": True}
         """
         try:
+            # 多用户模式：校验会话归属，防止越权关闭他人会话
+            user_info = getattr(request.state, "user_info", None)
+            user_id = (
+                user_info.get("user_id", "anonymous") if user_info else "anonymous"
+            )
+            session_id = f"session_{user_id}"
+
+            if not terminal_session_manager.attach_session(terminal_id, session_id):
+                return {
+                    "success": False,
+                    "error": {"code": "NOT_FOUND", "message": "终端不存在"},
+                }
+
             success = terminal_session_manager.close_session(terminal_id)
             if not success:
                 return {
@@ -10720,7 +10744,64 @@ def create_app(
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
-    # ==================== 群组管理 API ====================
+    # HTTP API：接管终端会话并获取输出缓冲（用于重连回放）
+    @app.post(
+        "/api/terminals/{terminal_id}/attach",
+        dependencies=[Depends(verify_token)],
+    )
+    async def attach_terminal(terminal_id: str, request: Request) -> Dict[str, Any]:
+        """接管终端会话并返回其输出缓冲，供前端重连后回放。
+
+        校验会话归属（仅本人会话可接管），返回 base64 编码的输出块列表，
+        前端按顺序回放后即可与实时输出衔接。
+
+        Args:
+            terminal_id: 终端ID
+
+        Returns:
+            {"success": True, "data": {"terminal_id": "xxx", "output": [base64...]}}
+        """
+        try:
+            # 多用户模式：per-user session隔离
+            user_info = getattr(request.state, "user_info", None)
+            user_id = (
+                user_info.get("user_id", "anonymous") if user_info else "anonymous"
+            )
+            session_id = f"session_{user_id}"
+
+            if not terminal_session_manager.attach_session(terminal_id, session_id):
+                return {
+                    "success": False,
+                    "error": {"code": "NOT_FOUND", "message": "终端不存在"},
+                }
+
+            session = terminal_session_manager.get_session(terminal_id)
+            if session is None:
+                return {
+                    "success": False,
+                    "error": {"code": "NOT_FOUND", "message": "终端不存在"},
+                }
+
+            import base64
+
+            output = [
+                base64.b64encode(chunk).decode("utf-8")
+                for chunk in session.get_output_buffer()
+            ]
+            return {
+                "success": True,
+                "data": {
+                    "terminal_id": terminal_id,
+                    "interpreter": session.interpreter,
+                    "working_dir": session.working_dir,
+                    "output": output,
+                },
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
 
     # HTTP API：创建群组
     @app.post("/api/groups", dependencies=[Depends(verify_token)])

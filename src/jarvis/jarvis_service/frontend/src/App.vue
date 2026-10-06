@@ -11060,6 +11060,8 @@ async function connect() {
     fetchModelGroups()
     fetchNodeStatus()
     fetchUserAccessibleNodes()
+    // 恢复当前用户的存活终端会话（方案A：断开不杀进程 + 输出缓冲回放）
+    restoreTerminalSessions()
     // 自动注册聊天室（避免丢消息，不依赖用户手动打开聊天面板）
     if (!myClientId.value) {
       myClientId.value = getOrCreateClientId()
@@ -17092,6 +17094,86 @@ function initIndependentTerminal(terminalId, el) {
       }
     }
   }, 300)
+}
+
+// 解码 base64 字符串为 UTF-8 文本（与 appendExecution 中的解码逻辑一致）
+function decodeTerminalBase64(b64) {
+  try {
+    const binaryString = atob(b64)
+    const bytes = new Uint8Array(binaryString.length)
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i)
+    }
+    return new TextDecoder('utf-8').decode(bytes)
+  } catch (error) {
+    console.error('[independent-terminal] Failed to decode base64 data:', error)
+    return ''
+  }
+}
+
+// 登录/重连后恢复当前用户的存活终端会话（方案A：断开不杀进程 + 输出缓冲回放）
+async function restoreTerminalSessions() {
+  if (!socket.value) {
+    console.warn('[independent-terminal] No socket connection, skip restore')
+    return
+  }
+  try {
+    const { host, port } = getGatewayAddress()
+    const baseUrl = `${getHttpProtocol()}://${host}:${port}`
+    const url = `${baseUrl}/api/terminals`
+    const response = await fetchWithAuth(url)
+    if (!response.ok) return
+    const result = await response.json()
+    if (!result.success || !Array.isArray(result.data)) return
+
+    for (const s of result.data) {
+      const terminalId = s.terminal_id
+      if (!terminalId) continue
+      // 跳过已恢复的会话，避免重复
+      if (terminalSessions.value.find(t => t.terminal_id === terminalId)) continue
+
+      // 接管会话并获取输出缓冲（供回放）
+      let bufferedOutput = []
+      try {
+        const attachResp = await fetchWithAuth(
+          `${baseUrl}/api/terminals/${encodeURIComponent(terminalId)}/attach`,
+          { method: 'POST' }
+        )
+        const attachResult = await attachResp.json()
+        if (attachResult.success && Array.isArray(attachResult.data?.output)) {
+          bufferedOutput = attachResult.data.output.map(decodeTerminalBase64)
+        }
+      } catch (e) {
+        console.warn('[independent-terminal] Failed to attach session:', terminalId, e)
+      }
+
+      // 加入会话列表，缓冲输出存入 pending_output，由 initIndependentTerminal 回放
+      terminalSessions.value.push({
+        terminal_id: terminalId,
+        node_id: s.node_id || 'master',
+        interpreter: s.interpreter || 'bash',
+        working_dir: s.working_dir || '.',
+        terminal: null,
+        hostEl: null,
+        fitAddon: null,
+        resizeObserver: null,
+        history: [],
+        pending_output: bufferedOutput,
+      })
+      if (!activeTerminalId.value) {
+        activeTerminalId.value = terminalId
+      }
+      // 若 DOM 已渲染则初始化终端（回放缓冲）
+      nextTick(() => {
+        const hostEl = independentTerminalHosts.value.get(terminalId)
+        if (hostEl) {
+          initIndependentTerminal(terminalId, hostEl)
+        }
+      })
+    }
+  } catch (e) {
+    console.error('[independent-terminal] Failed to restore sessions:', e)
+  }
 }
 
 function createTerminal() {

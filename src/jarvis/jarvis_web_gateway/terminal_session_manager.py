@@ -10,6 +10,7 @@ from __future__ import annotations
 from jarvis.jarvis_utils.exception_utils import save_exception
 import os
 import shutil
+from collections import deque
 import subprocess
 import threading
 import uuid
@@ -43,9 +44,12 @@ class TerminalSession:
     proc: Optional[subprocess.Popen] = None
     stream_publisher: Optional[Any] = None
     session_id: str = "default"
+    created_at: float = field(default_factory=lambda: __import__("time").time())
     _closed: bool = False
     _output_sequence: int = 0
     _sequence_lock: threading.Lock = field(default_factory=threading.Lock)
+    # 输出环形缓冲（断开期间缓存输出，重连后可回放），容量约 1MB
+    _output_buffer: deque = field(default_factory=lambda: deque(maxlen=1024 * 1024))
     # Windows-specific fields
     _output_queue: Optional[Any] = field(default=None)  # queue.Queue on Windows
     _output_thread: Optional[threading.Thread] = field(default=None)
@@ -147,6 +151,9 @@ class TerminalSession:
             )
             return
 
+        # 写入输出环形缓冲，供断开重连后回放
+        self._output_buffer.append(data)
+
         try:
             # base64 编码数据，使其可序列化为 JSON
             import base64
@@ -170,6 +177,15 @@ class TerminalSession:
             self.stream_publisher.publish(message, session_id=self.session_id)
         except Exception as e:
             print(f"[TerminalSession {self.terminal_id}] Failed to publish output: {e}")
+
+    def get_output_buffer(self) -> List[bytes]:
+        """获取输出环形缓冲中的全部数据（按时间顺序）。
+
+        用于断开重连后回放输出。返回的是原始 bytes 列表，调用方需自行
+        base64 编码后按前端期望的格式发送。
+        """
+        with self._sequence_lock:
+            return list(self._output_buffer)
 
 
 class TerminalSessionManager:
@@ -580,6 +596,54 @@ class TerminalSessionManager:
                     }
                 )
             return sessions
+
+    def list_sessions_for_user(self, session_id: str) -> List[Dict[str, Any]]:
+        """列出指定用户（WebSocket会话ID）的活跃终端会话。
+
+        用于按账号过滤/隔离会话，前端重连后据此恢复属于当前用户的会话。
+
+        Args:
+            session_id: WebSocket会话ID（即用户标识）
+
+        Returns:
+            会话信息列表，含 session_id/created_at 等归属与时间信息
+        """
+        with self._lock:
+            sessions = []
+            for terminal_id, session in self._sessions.items():
+                if session.session_id != session_id:
+                    continue
+                sessions.append(
+                    {
+                        "terminal_id": terminal_id,
+                        "interpreter": session.interpreter,
+                        "working_dir": session.working_dir,
+                        "is_closed": session.is_closed(),
+                        "session_id": session.session_id,
+                        "created_at": session.created_at,
+                    }
+                )
+            return sessions
+
+    def attach_session(self, terminal_id: str, session_id: str) -> bool:
+        """将终端会话接管/关联到指定用户（WebSocket会话ID）。
+
+        校验会话归属：仅当会话属于该用户时才允许接管，防止越权访问他人会话。
+
+        Args:
+            terminal_id: 终端ID
+            session_id: WebSocket会话ID（即用户标识）
+
+        Returns:
+            是否接管成功（会话存在且归属匹配）
+        """
+        with self._lock:
+            session = self._sessions.get(terminal_id)
+            if session is None:
+                return False
+            if session.session_id != session_id:
+                return False
+            return True
 
     def get_session(self, terminal_id: str) -> Optional[TerminalSession]:
         """获取终端会话。
