@@ -252,6 +252,48 @@ def _check_version_constraint(version: str, constraint: str) -> bool:
     return True
 
 
+def _resolve_plugin_dep_url(url: str, tag: Optional[str], branch: Optional[str]) -> str:
+    """根据 tag/branch 解析插件依赖的下载 URL。
+
+    当 url 是 GitHub 仓库地址（形如 https://github.com/owner/repo）且提供了
+    tag 或 branch 时，自动构造对应 archive 下载地址：
+        tag:    https://github.com/owner/repo/archive/refs/tags/<tag>.tar.gz
+        branch: https://github.com/owner/repo/archive/refs/heads/<branch>.tar.gz
+    否则（非 GitHub 地址，或已是完整下载地址）原样返回 url。
+
+    参数:
+        url: 依赖插件配置的 url
+        tag: 依赖插件配置的 tag（可选）
+        branch: 依赖插件配置的 branch（可选）
+
+    返回:
+        str: 解析后的下载 URL
+    """
+    if not url:
+        return url
+    if not tag and not branch:
+        return url
+    # 仅当 url 是 GitHub 仓库地址（不含已指定的后缀）时构造 archive URL
+    url = url.rstrip("/")
+    if "github.com/" not in url:
+        return url
+    # 提取 owner/repo（忽略可能的 .git 后缀）
+    parts = url.split("github.com/", 1)
+    if len(parts) != 2:
+        return url
+    repo_path = parts[1].rstrip("/")
+    if repo_path.endswith(".git"):
+        repo_path = repo_path[:-4]
+    repo_path = "/".join(repo_path.split("/")[:2])
+    if not repo_path or "/" not in repo_path:
+        return url
+    if tag:
+        return f"https://github.com/{repo_path}/archive/refs/tags/{tag}.tar.gz"
+    if branch:
+        return f"https://github.com/{repo_path}/archive/refs/heads/{branch}.tar.gz"
+    return url
+
+
 def _check_plugin_dependencies(dependencies: Any, plugins_dir: Any) -> list:
     """检查插件的插件依赖是否已安装且版本兼容。
 
@@ -261,28 +303,56 @@ def _check_plugin_dependencies(dependencies: Any, plugins_dir: Any) -> list:
         plugins_dir: 已安装插件的目录
 
     返回:
-        list: 不满足的依赖列表，每项为 dict（含 type/name/version_constraint/installed/reason）
+        list: 不满足的依赖列表，每项为 dict（含 type/name/version_constraint/installed/reason，
+            可选 url/tag/branch 用于依赖自动安装）
     """
     if not dependencies:
         return []
 
     import yaml
 
-    # 归一化为 dict {name: constraint}
+    # 归一化为 dict {name: {"version":..., "url":..., "tag":..., "branch":...}}
+    # 简写形式 {name: "version"} 或 [{name, version}] 仍支持
     dep_map: dict = {}
     if isinstance(dependencies, dict):
-        dep_map = {str(k): (str(v) if v else "*") for k, v in dependencies.items()}
+        for k, v in dependencies.items():
+            name = str(k)
+            if isinstance(v, dict):
+                # 完整形式：{name: {version, url, tag, branch}}
+                dep_map[name] = {
+                    "version": str(v.get("version")) if v.get("version") else "*",
+                    "url": v.get("url"),
+                    "tag": v.get("tag"),
+                    "branch": v.get("branch"),
+                }
+            else:
+                # 简写形式：{name: "version"}
+                dep_map[name] = {
+                    "version": str(v) if v else "*",
+                    "url": None,
+                    "tag": None,
+                    "branch": None,
+                }
     elif isinstance(dependencies, list):
         for item in dependencies:
             if isinstance(item, dict):
                 name = item.get("name")
                 if name:
-                    dep_map[str(name)] = str(item.get("version") or "*")
+                    dep_map[str(name)] = {
+                        "version": str(item.get("version") or "*"),
+                        "url": item.get("url"),
+                        "tag": item.get("tag"),
+                        "branch": item.get("branch"),
+                    }
     else:
         return []
 
     missing = []
-    for dep_name, constraint in dep_map.items():
+    for dep_name, dep_info in dep_map.items():
+        constraint = dep_info["version"]
+        dep_url = dep_info.get("url")
+        dep_tag = dep_info.get("tag")
+        dep_branch = dep_info.get("branch")
         dep_dir = plugins_dir / dep_name
         installed_version = None
         if dep_dir.exists():
@@ -304,6 +374,9 @@ def _check_plugin_dependencies(dependencies: Any, plugins_dir: Any) -> list:
                     "version_constraint": constraint,
                     "installed": None,
                     "reason": "未安装",
+                    "url": dep_url,
+                    "tag": dep_tag,
+                    "branch": dep_branch,
                 }
             )
         elif installed_version is None:
@@ -317,6 +390,9 @@ def _check_plugin_dependencies(dependencies: Any, plugins_dir: Any) -> list:
                     "version_constraint": constraint,
                     "installed": str(installed_version),
                     "reason": f"版本不兼容（已装 {installed_version}，需 {constraint}）",
+                    "url": dep_url,
+                    "tag": dep_tag,
+                    "branch": dep_branch,
                 }
             )
 
@@ -478,7 +554,10 @@ def _check_dependencies(dependencies: Any, plugins_dir: Any) -> list:
 
 
 def install_plugin(
-    source_path: str, force: bool = False, source_url: Optional[str] = None
+    source_path: str,
+    force: bool = False,
+    source_url: Optional[str] = None,
+    _installing_deps: Optional[set] = None,
 ) -> bool:
     """安装插件到 Jarvis 数据目录
 
@@ -486,6 +565,7 @@ def install_plugin(
         source_path: 插件源路径，可以是目录、压缩文件（tar/tar.gz/zip）或 http(s) URL
         force: 是否强制覆盖已安装的插件（忽略版本比较），默认 False
         source_url: 来源 URL（可选），安装成功后记录到插件目录，供升级使用
+        _installing_deps: 内部参数，记录正在自动安装的依赖插件名集合，用于防止依赖递归死循环
 
     返回:
         bool: 安装成功返回 True，失败返回 False
@@ -627,19 +707,69 @@ def install_plugin(
         # 目标安装目录
         target_dir = plugins_dir / plugin_name
 
-        # 依赖检查：插件声明的依赖必须已安装且版本兼容
+        # 依赖检查：插件声明的依赖必须已安装且版本兼容。
+        # 对带 url 的 plugins 依赖，未安装时自动下载安装；无 url 或安装失败的仍拒绝。
         if plugin_dependencies:
+            # 初始化正在安装的依赖集合（用于防止依赖递归死循环，如 A->B->A）
+            if _installing_deps is None:
+                _installing_deps = set()
+            if plugin_name in _installing_deps:
+                PrettyOutput.auto_print(
+                    f"❌ 检测到循环依赖: 插件 {plugin_name} 正在安装中，终止以避免死循环"
+                )
+                if temp_dir and os.path.exists(temp_dir):
+                    shutil.rmtree(temp_dir)
+                return False
+            _installing_deps.add(plugin_name)
+
             missing_deps = _check_dependencies(plugin_dependencies, plugins_dir)
-            if missing_deps:
+            auto_install_failed = False
+            for dep in missing_deps:
+                # 仅对带 url 的插件依赖尝试自动安装
+                if dep.get("type") == "plugins" and dep.get("url"):
+                    PrettyOutput.auto_print(
+                        f"⬇️  检测到未满足的插件依赖 [{dep['name']}]，正在自动安装..."
+                    )
+                    dep_url = _resolve_plugin_dep_url(
+                        dep.get("url"), dep.get("tag"), dep.get("branch")
+                    )
+                    ok = install_plugin(
+                        dep_url,
+                        source_url=dep_url,
+                        _installing_deps=_installing_deps,
+                    )
+                    if not ok:
+                        PrettyOutput.auto_print(
+                            f"❌ 自动安装插件依赖失败: {dep['name']}"
+                        )
+                        auto_install_failed = True
+                    continue
+                # 无 url 的插件依赖或 python/commands 依赖，无法自动安装，报错
                 type_labels = {
                     "plugins": "插件",
                     "python": "Python 包",
                     "commands": "系统命令",
                 }
+                label = type_labels.get(dep.get("type"), "依赖")
+                PrettyOutput.auto_print(
+                    f"❌ 依赖未满足: [{label}] {dep['name']} "
+                    f"(需 {dep['version_constraint']}): {dep['reason']}"
+                )
+                auto_install_failed = True
+
+            # 重新检查依赖：自动安装后可能仍不满足（如版本不兼容、无 url 依赖）
+            if auto_install_failed or _check_dependencies(
+                plugin_dependencies, plugins_dir
+            ):
                 PrettyOutput.auto_print(
                     f"❌ 依赖检查失败: 插件 {plugin_name} 的以下依赖未满足"
                 )
-                for dep in missing_deps:
+                for dep in _check_dependencies(plugin_dependencies, plugins_dir):
+                    type_labels = {
+                        "plugins": "插件",
+                        "python": "Python 包",
+                        "commands": "系统命令",
+                    }
                     label = type_labels.get(dep.get("type"), "依赖")
                     PrettyOutput.auto_print(
                         f"  - [{label}] {dep['name']} (需 {dep['version_constraint']}): {dep['reason']}"

@@ -520,6 +520,139 @@ tool_load_dirs:
         result = install_plugin(str(plugin_source))
         assert result is False
 
+    def test_install_auto_install_plugin_dep_with_url(self, tmp_path, monkeypatch):
+        """测试依赖插件缺失但带 url 时自动安装"""
+        from jarvis.jarvis_agent import utils
+
+        # 主插件依赖 depA（带 url + tag）
+        plugin_source = tmp_path / "main_plugin"
+        plugin_source.mkdir()
+        config_content = """name: main-plugin
+model: plugin-model
+dependencies:
+  plugins:
+    depA:
+      url: https://github.com/owner/repoA
+      tag: v1.0
+"""
+        with open(plugin_source / "config.yaml", "w", encoding="utf-8") as f:
+            f.write(config_content)
+
+        test_data_dir = tmp_path / ".jarvis"
+        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
+
+        calls = {}
+        orig_install = utils.install_plugin
+
+        def fake_install(src, force=False, source_url=None, _installing_deps=None):
+            calls["src"] = src
+            calls["source_url"] = source_url
+            # 模拟依赖安装成功：创建 depA 目录
+            dep_dir = test_data_dir / "plugins" / "depA"
+            dep_dir.mkdir(parents=True, exist_ok=True)
+            with open(dep_dir / "config.yaml", "w", encoding="utf-8") as f:
+                f.write("name: depA\nversion: 1.0\n")
+            return True
+
+        monkeypatch.setattr(utils, "install_plugin", fake_install)
+
+        result = orig_install(str(plugin_source))
+
+        # 自动安装触发，且 URL 按 tag 解析为 archive 地址
+        assert result is True
+        assert calls["src"] == (
+            "https://github.com/owner/repoA/archive/refs/tags/v1.0.tar.gz"
+        )
+        assert calls["source_url"] == calls["src"]
+        assert (test_data_dir / "plugins" / "main-plugin").exists()
+
+    def test_install_reject_plugin_dep_without_url(self, tmp_path, monkeypatch):
+        """测试依赖插件缺失且无 url 时拒绝安装"""
+        from jarvis.jarvis_agent import utils
+
+        plugin_source = tmp_path / "p2"
+        plugin_source.mkdir()
+        config_content = """name: p2
+model: plugin-model
+dependencies:
+  plugins:
+    depB: ">=1.0"
+"""
+        with open(plugin_source / "config.yaml", "w", encoding="utf-8") as f:
+            f.write(config_content)
+
+        test_data_dir = tmp_path / ".jarvis"
+        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
+
+        result = utils.install_plugin(str(plugin_source))
+        assert result is False
+        assert not (test_data_dir / "plugins" / "p2").exists()
+
+    def test_install_cycle_dependency_guard(self, tmp_path, monkeypatch):
+        """测试循环依赖时终止，避免死循环"""
+        from jarvis.jarvis_agent import utils
+
+        plugin_source = tmp_path / "p3"
+        plugin_source.mkdir()
+        config_content = """name: p3
+model: plugin-model
+dependencies:
+  plugins:
+    depC:
+      url: https://github.com/c/d
+"""
+        with open(plugin_source / "config.yaml", "w", encoding="utf-8") as f:
+            f.write(config_content)
+
+        test_data_dir = tmp_path / ".jarvis"
+        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
+
+        orig_install = utils.install_plugin
+
+        def fake_install(src, force=False, source_url=None, _installing_deps=None):
+            # 模拟 depC 又依赖回 p3，触发循环
+            if _installing_deps is None:
+                _installing_deps = set()
+            _installing_deps.add("depC")
+            return orig_install(str(plugin_source), _installing_deps=_installing_deps)
+
+        monkeypatch.setattr(utils, "install_plugin", fake_install)
+
+        result = orig_install(str(plugin_source))
+        assert result is False
+
+    def test_resolve_plugin_dep_url(self):
+        """测试 _resolve_plugin_dep_url 的 URL 解析"""
+        from jarvis.jarvis_agent.utils import _resolve_plugin_dep_url
+
+        # GitHub 仓库 + tag
+        assert (
+            _resolve_plugin_dep_url("https://github.com/owner/repo", "v1.0", None)
+            == "https://github.com/owner/repo/archive/refs/tags/v1.0.tar.gz"
+        )
+        # GitHub 仓库 + branch
+        assert (
+            _resolve_plugin_dep_url("https://github.com/owner/repo", None, "main")
+            == "https://github.com/owner/repo/archive/refs/heads/main.tar.gz"
+        )
+        # GitHub 仓库 + .git 后缀 + tag
+        assert (
+            _resolve_plugin_dep_url("https://github.com/owner/repo.git", "v2", None)
+            == "https://github.com/owner/repo/archive/refs/tags/v2.tar.gz"
+        )
+        # 无 tag/branch 原样返回
+        assert (
+            _resolve_plugin_dep_url("https://github.com/owner/repo", None, None)
+            == "https://github.com/owner/repo"
+        )
+        # 非 GitHub 地址原样返回
+        assert (
+            _resolve_plugin_dep_url("https://example.com/x.tar.gz", "v1", None)
+            == "https://example.com/x.tar.gz"
+        )
+        # 空 url 原样返回
+        assert _resolve_plugin_dep_url("", "v1", None) == ""
+
 
 class TestAutoDiscoverPlugins:
     """测试自动发现插件功能"""
