@@ -1340,7 +1340,7 @@ def list_plugins_info() -> List[dict]:
                     info["dependencies"] = config.get("dependencies", None)
                     info["frontend"] = config.get("frontend", None)
                     info["builtin"] = is_builtin or bool(config.get("builtin", False))
-                    info["capabilities"] = _build_plugin_capabilities(config)
+                    info["capabilities"] = _build_plugin_capabilities(config, plugin_dir)
                     info["installed"] = True
             except Exception:
                 info["installed"] = False
@@ -1348,12 +1348,121 @@ def list_plugins_info() -> List[dict]:
     return result
 
 
-def _build_plugin_capabilities(config: dict) -> List[dict]:
+def _resolve_plugin_dir(plugin_dir) -> "Path | None":
+    """将插件目录参数归一化为 Path；无效时返回 None。"""
+    from pathlib import Path
+
+    if plugin_dir is None:
+        return None
+    try:
+        return Path(plugin_dir)
+    except Exception:
+        return None
+
+
+def _collect_plugin_files(dirs, plugin_dir, extensions) -> list:
+    """收集扩展点目录下的实际文件（用于展示具体规则/工具）。
+
+    dirs: config.yaml 中的目录列表（可能含 {{plugin_dir}} 占位或相对/绝对路径）
+    plugin_dir: 插件目录，用于解析 {{plugin_dir}} 占位与相对路径
+    extensions: 感兴趣的文件扩展名元组，如 (".md",) 或 (".py",)
+    """
+    import os
+    from pathlib import Path
+
+    base = _resolve_plugin_dir(plugin_dir)
+    if base is None:
+        return []
+    if not isinstance(dirs, list):
+        return []
+    files: list = []
+    seen: set = set()
+    for d in dirs:
+        if not isinstance(d, str):
+            continue
+        p = d.replace("{{plugin_dir}}", str(base))
+        if not os.path.isabs(p):
+            p = str(base / p)
+        p_path = Path(p)
+        if not p_path.exists() or not p_path.is_dir():
+            continue
+        for f in sorted(p_path.iterdir()):
+            if f.is_file() and f.suffix in extensions and str(f) not in seen:
+                seen.add(str(f))
+                files.append(f)
+    return files
+
+
+def _read_rule_meta(rule_file):
+    """解析规则 Markdown 的 YAML front matter，返回 (name, description)。
+
+    规则文件以 `---` 开头，front matter 含 name/description。
+    解析失败或缺少 name 时返回 (None, None)。
+    """
+    try:
+        text = rule_file.read_text(encoding="utf-8")
+    except Exception:
+        return None, None
+    if not text.startswith("---"):
+        return None, None
+    end = text.find("---", 3)
+    if end == -1:
+        return None, None
+    try:
+        import yaml
+
+        meta = yaml.safe_load(text[3:end])
+    except Exception:
+        return None, None
+    if not isinstance(meta, dict):
+        return None, None
+    return meta.get("name"), meta.get("description")
+
+
+def _read_tool_meta(tool_file):
+    """解析工具 Python 模块的 class name/description 属性，返回 (name, description)。
+
+    工具类在模块内定义 name/description 字符串属性；解析失败或缺少 name 时返回 (None, None)。
+    """
+    import ast
+
+    try:
+        tree = ast.parse(tool_file.read_text(encoding="utf-8"))
+    except Exception:
+        return None, None
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef):
+            continue
+        name = None
+        desc = None
+        for stmt in node.body:
+            if not isinstance(stmt, ast.Assign):
+                continue
+            for target in stmt.targets:
+                if not isinstance(target, ast.Name):
+                    continue
+                if target.id == "name" and isinstance(stmt.value, ast.Constant):
+                    name = stmt.value.value
+                elif target.id == "description" and isinstance(stmt.value, ast.Constant):
+                    desc = stmt.value.value
+        if name:
+            return name, desc
+    return None, None
+
+
+def _build_plugin_capabilities(config: dict, plugin_dir=None) -> List[dict]:
     """
     从插件 config.yaml 构建能力清单（供前端展示，让用户了解插件提供了哪些操作）。
 
     自动从既有能力字段推导，并合并插件作者通过顶层 capabilities 字段声明的
     自定义能力（如事件钩子、@内置命令等）。
+
+    规则与工具会进一步读取实际文件，展示具体规则名/工具名及其用途，
+    让用户知道插件到底提供了什么、怎么用。
+
+    参数:
+        config: 插件 config.yaml 解析后的 dict
+        plugin_dir: 插件目录（Path 或 str），用于解析相对路径读取规则/工具文件
 
     返回:
         list[dict]: 每个元素为 {type, name, description}，type 取值：
@@ -1364,22 +1473,44 @@ def _build_plugin_capabilities(config: dict) -> List[dict]:
     def _append(ctype: str, name: str, desc: str) -> None:
         capabilities.append({"type": ctype, "name": name, "description": desc})
 
-    # 规则
+    # 规则：读取规则目录下实际文件，展示具体规则名与触发场景
     rules = config.get("rules_load_dirs")
     if rules:
-        _append(
-            "rules",
-            "规则",
-            f"提供 {len(rules)} 个规则目录，可被 Agent 自动发现并加载",
-        )
-    # 工具
+        rule_files = _collect_plugin_files(rules, plugin_dir, (".md",))
+        if rule_files:
+            for rule_file in rule_files:
+                name, desc = _read_rule_meta(rule_file)
+                if name:
+                    _append(
+                        "rules",
+                        f"规则：{name}",
+                        desc or f"规则文件 {rule_file.name}，可被 Agent 自动发现并加载",
+                    )
+        else:
+            _append(
+                "rules",
+                "规则",
+                f"提供 {len(rules)} 个规则目录，可被 Agent 自动发现并加载",
+            )
+    # 工具：读取工具目录下实际文件，展示具体工具名与用途
     tools = config.get("tool_load_dirs")
     if tools:
-        _append(
-            "tools",
-            "工具",
-            f"提供 {len(tools)} 个工具目录，注册可调用的工具",
-        )
+        tool_files = _collect_plugin_files(tools, plugin_dir, (".py",))
+        if tool_files:
+            for tool_file in tool_files:
+                name, desc = _read_tool_meta(tool_file)
+                if name:
+                    _append(
+                        "tools",
+                        f"工具：{name}",
+                        desc or f"工具模块 {tool_file.name}，注册可调用工具",
+                    )
+        else:
+            _append(
+                "tools",
+                "工具",
+                f"提供 {len(tools)} 个工具目录，注册可调用的工具",
+            )
     # Agent 定义
     agents = config.get("agent_definition_dirs")
     if agents:

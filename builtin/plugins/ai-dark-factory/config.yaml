@@ -58,7 +58,7 @@ replace_map:
 capabilities:
   - name: "编排流水线 dark-factory-pipeline"
     description: "多 Agent 自主写码/测试/评估的黑灯工厂流水线，Specs 进可工作的软件出，人类审 pass/fail 报告。"
-  - name: "4 条开发规则"
-    description: "提供 TDD 铁律、Spec 写作、编排、留白纪律 4 条规则，约束流水线内各 Agent 的行为。"
-  - name: "4 个工具"
-    description: "提供门禁计算、留白生成、流水线生成、Spec 校验 4 个工具，支撑黑灯工厂自动化。"
+  - name: "开发规则集"
+    description: "内置 TDD 铁律、Spec 写作、编排、留白纪律 4 条规则，详见上方「规则」清单，约束流水线内各 Agent 的行为。"
+  - name: "流水线工具集"
+    description: "内置门禁计算、留白生成、流水线生成、Spec 校验 4 个工具，详见上方「工具」清单，支撑黑灯工厂自动化。"
