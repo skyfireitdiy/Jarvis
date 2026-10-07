@@ -2,6 +2,7 @@
 name: ai-dark-factory
 description: AI Agent 黑灯工厂——Specs 进，可工作的软件出。多 Agent 自主写码/测试/评估，人类审 pass/fail 报告。
 version: 0.1.0
+builtin: true
 license: MIT
 rules_load_dirs:
   - "{{plugin_dir}}/rules"
@@ -11,3 +12,10 @@ orchestration:
   - name: dark-factory-pipeline
     description: AI 黑灯工厂编排流水线——Specs 进，可工作的软件出
     file: "{{plugin_dir}}/orchestration/dark_factory_pipeline.yaml"
+capabilities:
+  - name: "编排流水线 dark-factory-pipeline"
+    description: "多 Agent 自主写码/测试/评估的黑灯工厂流水线，Specs 进可工作的软件出，人类审 pass/fail 报告。"
+  - name: "4 条开发规则"
+    description: "提供 TDD 铁律、Spec 写作、编排、留白纪律 4 条规则，约束流水线内各 Agent 的行为。"
+  - name: "4 个工具"
+    description: "提供门禁计算、留白生成、流水线生成、Spec 校验 4 个工具，支撑黑灯工厂自动化。"

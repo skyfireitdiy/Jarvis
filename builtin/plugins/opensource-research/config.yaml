@@ -2,6 +2,10 @@
 name: opensource-research
 description: 系统性研究开源项目——提供开源软件研究的九阶段方法论（背景/问题/技术/架构/优缺点/竞品/演进/跟进/总结），生成深度研究报告。
 version: 0.1.0
+builtin: true
 license: MIT
 rules_load_dirs:
   - "{{plugin_dir}}/rules"
+capabilities:
+  - name: "开源研究九阶段方法论"
+    description: "提供开源软件研究的九阶段方法论（背景/问题/技术/架构/优缺点/竞品/演进/跟进/总结），生成深度研究报告。"

@@ -174,4 +174,50 @@ describe("PluginSidebar", () => {
     expect(upgradeCall[0]).toContain("/api/plugins/demo-plugin/upgrade");
     confirmSpy.mockRestore();
   });
+
+  test("内置插件不显示升级/卸载按钮，并显示内置标记", async () => {
+    const fetchWithAuth = makeFetch({
+      "GET http://127.0.0.1:8000/api/plugins?node_id=master": () => ({
+        success: true,
+        data: {
+          node_id: "master",
+          plugins: [plugin({ name: "builtin-p", builtin: true })],
+        },
+      }),
+    });
+    const wrapper = mount(PluginSidebar, {
+      props: { ...baseProps, fetchWithAuth },
+    });
+    await flushPromises();
+    expect(wrapper.text()).toContain("内置");
+    expect(wrapper.find(".plugin-item-actions").exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("升级");
+    expect(wrapper.text()).not.toContain("卸载");
+  });
+
+  test("展示插件能力清单", async () => {
+    const fetchWithAuth = makeFetch({
+      "GET http://127.0.0.1:8000/api/plugins?node_id=master": () => ({
+        success: true,
+        data: {
+          node_id: "master",
+          plugins: [
+            plugin({
+              capabilities: [
+                { name: "事件钩子 on_task_start", description: "任务开始触发" },
+                { name: "@mycmd", description: "内置命令" },
+              ],
+            }),
+          ],
+        },
+      }),
+    });
+    const wrapper = mount(PluginSidebar, {
+      props: { ...baseProps, fetchWithAuth },
+    });
+    await flushPromises();
+    expect(wrapper.text()).toContain("事件钩子 on_task_start");
+    expect(wrapper.text()).toContain("@mycmd");
+    expect(wrapper.text()).toContain("任务开始触发");
+  });
 });

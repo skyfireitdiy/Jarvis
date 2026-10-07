@@ -1246,6 +1246,8 @@ def list_plugins_info() -> List[dict]:
             "version": None,
             "dependencies": None,
             "frontend": None,
+            "builtin": False,
+            "capabilities": [],
             "installed": False,
         }
         if config_file.exists():
@@ -1258,11 +1260,118 @@ def list_plugins_info() -> List[dict]:
                     info["version"] = config.get("version", None)
                     info["dependencies"] = config.get("dependencies", None)
                     info["frontend"] = config.get("frontend", None)
+                    info["builtin"] = bool(config.get("builtin", False))
+                    info["capabilities"] = _build_plugin_capabilities(config)
                     info["installed"] = True
             except Exception:
                 info["installed"] = False
         result.append(info)
     return result
+
+
+def _build_plugin_capabilities(config: dict) -> List[dict]:
+    """
+    从插件 config.yaml 构建能力清单（供前端展示，让用户了解插件提供了哪些操作）。
+
+    自动从既有能力字段推导，并合并插件作者通过顶层 capabilities 字段声明的
+    自定义能力（如事件钩子、@内置命令等）。
+
+    返回:
+        list[dict]: 每个元素为 {type, name, description}，type 取值：
+            rules / tools / agents / orchestration / frontend / custom
+    """
+    capabilities: List[dict] = []
+
+    def _append(ctype: str, name: str, desc: str) -> None:
+        capabilities.append({"type": ctype, "name": name, "description": desc})
+
+    # 规则
+    rules = config.get("rules_load_dirs")
+    if rules:
+        _append(
+            "rules",
+            "规则",
+            f"提供 {len(rules)} 个规则目录，可被 Agent 自动发现并加载",
+        )
+    # 工具
+    tools = config.get("tool_load_dirs")
+    if tools:
+        _append(
+            "tools",
+            "工具",
+            f"提供 {len(tools)} 个工具目录，注册可调用的工具",
+        )
+    # Agent 定义
+    agents = config.get("agent_definition_dirs")
+    if agents:
+        _append(
+            "agents",
+            "Agent 定义",
+            f"提供 {len(agents)} 个 Agent 定义目录，供内置配置选择器选用",
+        )
+    # 编排文件
+    orchestration = config.get("orchestration")
+    if isinstance(orchestration, list):
+        for entry in orchestration:
+            if isinstance(entry, dict):
+                name = entry.get("name") or entry.get("id")
+                if name:
+                    _append(
+                        "orchestration",
+                        f"编排：{name}",
+                        str(entry.get("description", "") or "编排流水线模板"),
+                    )
+    # 前端扩展
+    frontend = config.get("frontend")
+    if isinstance(frontend, dict):
+        frontend_parts = []
+        for key in ("admin_tabs", "sidebar_views", "tool_panels"):
+            if frontend.get(key):
+                frontend_parts.append(key)
+        if frontend_parts:
+            _append(
+                "frontend",
+                "前端扩展",
+                "提供前端界面扩展：" + "、".join(frontend_parts),
+            )
+    # 插件作者声明的自定义能力（事件钩子、@内置命令等）
+    custom = config.get("capabilities")
+    if isinstance(custom, list):
+        for entry in custom:
+            if isinstance(entry, dict):
+                name = entry.get("name")
+                if name:
+                    _append(
+                        "custom",
+                        str(name),
+                        str(entry.get("description", "") or ""),
+                    )
+
+    return capabilities
+
+
+def _is_builtin_plugin(plugin_dir) -> bool:
+    """
+    判断插件目录是否为内置插件（config.yaml 中 builtin: true）。
+
+    Args:
+        plugin_dir: 插件目录（Path 或 str）
+
+    Returns:
+        bool: 内置插件返回 True，否则返回 False
+    """
+    import yaml
+    from pathlib import Path
+
+    config_file = Path(plugin_dir) / "config.yaml"
+    if not config_file.exists():
+        return False
+    try:
+        with open(config_file, "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+        return isinstance(config, dict) and bool(config.get("builtin", False))
+    except Exception:
+        return False
 
 
 def list_plugin_orchestrations() -> List[dict]:
@@ -1352,6 +1461,11 @@ def uninstall_plugin(plugin_name: str) -> bool:
         PrettyOutput.auto_print(f"⚠️ 插件路径不是目录: {plugin_dir}")
         return False
 
+    # 防御性拒绝卸载内置插件
+    if _is_builtin_plugin(plugin_dir):
+        PrettyOutput.auto_print(f"⛔ 内置插件不可卸载: {plugin_name}")
+        return False
+
     # 可逆效应：卸载前撤销该插件注册的工具/规则（若当前进程有已加载的
     # ToolRegistry / RulesManager 实例，则实际移除；否则仅清理登记，目录
     # 删除后下次启动自然不再加载）。
@@ -1405,6 +1519,11 @@ def upgrade_plugin(plugin_name: str) -> bool:
 
     if not plugin_dir.exists():
         PrettyOutput.auto_print(f"⚠️ 插件不存在: {plugin_name}")
+        return False
+
+    # 防御性拒绝升级内置插件
+    if _is_builtin_plugin(plugin_dir):
+        PrettyOutput.auto_print(f"⛔ 内置插件不可升级: {plugin_name}")
         return False
 
     # 读取来源 URL

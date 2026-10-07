@@ -315,22 +315,35 @@
           <div v-if="loadingPlugins" style="text-align:center;padding:16px;color:var(--text-secondary,#888)">加载中...</div>
           <div v-else class="table-scroll">
             <table class="admin-table">
-              <thead><tr><th>插件名</th><th>版本</th><th>描述</th><th>依赖</th><th>前端扩展</th><th>操作</th></tr></thead>
+              <thead><tr><th>插件名</th><th>版本</th><th>描述</th><th>能力</th><th>依赖</th><th>前端扩展</th><th>操作</th></tr></thead>
               <tbody>
                 <tr v-for="plugin in plugins" :key="plugin.name">
-                  <td>{{ plugin.name }}</td>
+                  <td>
+                    {{ plugin.name }}
+                    <span v-if="plugin.builtin" class="plugin-badge">内置</span>
+                  </td>
                   <td>{{ plugin.version || '-' }}</td>
                   <td>{{ plugin.description || '-' }}</td>
+                  <td>
+                    <div v-if="plugin.capabilities && plugin.capabilities.length" class="plugin-caps">
+                      <div v-for="(cap, idx) in plugin.capabilities" :key="idx" class="plugin-cap">
+                        <span class="plugin-cap-name">{{ cap.name }}</span>
+                        <span v-if="cap.description" class="plugin-cap-desc">{{ cap.description }}</span>
+                      </div>
+                    </div>
+                    <span v-else>-</span>
+                  </td>
                   <td>{{ formatDependencies(plugin.dependencies) }}</td>
                   <td>{{ plugin.frontend ? '是' : '否' }}</td>
                   <td>
-                    <div class="btn-group">
+                    <div v-if="!plugin.builtin" class="btn-group">
                       <button class="btn-sm" @click="upgradePlugin(plugin)" :disabled="pluginBusy[plugin.name]">升级</button>
                       <button class="btn-sm danger" @click="uninstallPlugin(plugin)" :disabled="pluginBusy[plugin.name]">卸载</button>
                     </div>
+                    <span v-else class="plugin-builtin-hint">内置插件</span>
                   </td>
                 </tr>
-                <tr v-if="plugins.length === 0"><td colspan="6" style="text-align:center;color:var(--text-secondary,#888)">该节点暂无已安装插件</td></tr>
+                <tr v-if="plugins.length === 0"><td colspan="7" style="text-align:center;color:var(--text-secondary,#888)">该节点暂无已安装插件</td></tr>
               </tbody>
             </table>
           </div>
@@ -1521,6 +1534,41 @@ async function uninstallPlugin(plugin) {
 }
 .plugin-install-row input:focus {
   border-color: var(--accent, #20c8ff);
+}
+
+.plugin-badge {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(32, 200, 255, 0.12);
+  color: var(--accent, #20c8ff);
+  border: 1px solid rgba(32, 200, 255, 0.3);
+  vertical-align: middle;
+}
+.plugin-caps {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 320px;
+}
+.plugin-cap {
+  font-size: 12px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.plugin-cap-name {
+  color: var(--text-primary, #d6e4f0);
+  font-weight: 600;
+}
+.plugin-cap-desc {
+  margin-left: 4px;
+  color: var(--text-secondary, #8ba3b8);
+}
+.plugin-builtin-hint {
+  font-size: 12px;
+  color: var(--text-secondary, #8ba3b8);
 }
 
 /* ==================== 移动端适配 (< 768px) ==================== */

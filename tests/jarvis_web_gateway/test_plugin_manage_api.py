@@ -196,3 +196,75 @@ def test_permission_denied_for_non_admin(client, isolated_data_dir):
     """非 admin 用户访问插件管理 API 被拒绝。"""
     resp = client.get("/api/plugins", headers=_auth_headers("wrong-token"))
     assert resp.status_code == 401
+
+
+def _make_builtin_plugin(plugin_dir: Path, name: str) -> None:
+    """构造一个内置插件目录（config.yaml 含 builtin: true + capabilities）。"""
+    plugin_dir.mkdir(parents=True, exist_ok=True)
+    (plugin_dir / "config.yaml").write_text(
+        json.dumps(
+            {
+                "name": name,
+                "version": "1.0.0",
+                "description": "builtin plugin",
+                "builtin": True,
+                "rules_load_dirs": ["{{plugin_dir}}/rules"],
+                "capabilities": [
+                    {"name": "事件钩子 on_task_start", "description": "任务开始触发"},
+                    {"name": "@mycmd", "description": "内置命令"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_list_plugins_builtin_flag(client, isolated_data_dir):
+    """list 返回 builtin 标记与 capabilities 能力清单。"""
+    plugins_dir = Path(isolated_data_dir) / "plugins"
+    _make_plugin(plugins_dir / "normal", "normal")
+    _make_builtin_plugin(plugins_dir / "builtin-p", "builtin-p")
+
+    resp = client.get("/api/plugins", headers=_auth_headers())
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is True
+    plugins = {p["name"]: p for p in body["data"]["plugins"]}
+
+    assert plugins["normal"]["builtin"] is False
+    assert plugins["builtin-p"]["builtin"] is True
+    caps = plugins["builtin-p"]["capabilities"]
+    assert any(c["type"] == "rules" for c in caps)
+    assert any(c["type"] == "custom" and c["name"] == "@mycmd" for c in caps)
+
+
+def test_uninstall_builtin_plugin_rejected(client, isolated_data_dir):
+    """卸载内置插件被拒绝，目录保留。"""
+    plugins_dir = Path(isolated_data_dir) / "plugins"
+    _make_builtin_plugin(plugins_dir / "builtin-p", "builtin-p")
+
+    resp = client.post(
+        "/api/plugins/builtin-p/uninstall",
+        json={"node_id": "master"},
+        headers=_auth_headers(),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is False
+    assert (plugins_dir / "builtin-p").exists()
+
+
+def test_upgrade_builtin_plugin_rejected(client, isolated_data_dir):
+    """升级内置插件被拒绝。"""
+    plugins_dir = Path(isolated_data_dir) / "plugins"
+    _make_builtin_plugin(plugins_dir / "builtin-p", "builtin-p")
+
+    resp = client.post(
+        "/api/plugins/builtin-p/upgrade",
+        json={"node_id": "master"},
+        headers=_auth_headers(),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is False
+    assert (plugins_dir / "builtin-p").exists()

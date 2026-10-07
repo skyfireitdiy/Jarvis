@@ -50,16 +50,26 @@
           <div v-for="plugin in plugins" :key="plugin.name" class="plugin-item">
             <div class="plugin-item-head">
               <span class="plugin-item-name" :title="plugin.name">{{ plugin.name }}</span>
-              <span class="plugin-item-version">{{ plugin.version || '-' }}</span>
+              <span class="plugin-item-version">
+                {{ plugin.version || '-' }}
+                <span v-if="plugin.builtin" class="plugin-item-badge">内置</span>
+              </span>
             </div>
             <div v-if="plugin.description" class="plugin-item-desc">{{ plugin.description }}</div>
+            <div v-if="plugin.capabilities && plugin.capabilities.length" class="plugin-item-capabilities">
+              <div class="plugin-item-meta-label">能力</div>
+              <div v-for="(cap, idx) in plugin.capabilities" :key="idx" class="plugin-item-cap">
+                <span class="plugin-item-cap-name">{{ cap.name }}</span>
+                <span v-if="cap.description" class="plugin-item-cap-desc">{{ cap.description }}</span>
+              </div>
+            </div>
             <div v-if="formatDependencies(plugin.dependencies) !== '-'" class="plugin-item-meta">
               <span class="plugin-item-meta-label">依赖</span> {{ formatDependencies(plugin.dependencies) }}
             </div>
             <div class="plugin-item-meta">
               <span class="plugin-item-meta-label">前端扩展</span> {{ plugin.frontend ? '是' : '否' }}
             </div>
-            <div class="plugin-item-actions">
+            <div v-if="!plugin.builtin" class="plugin-item-actions">
               <button class="plugin-btn plugin-btn-sm" :disabled="pluginBusy[plugin.name]" @click="upgradePlugin(plugin)">升级</button>
               <button class="plugin-btn plugin-btn-sm plugin-btn-danger" :disabled="pluginBusy[plugin.name]" @click="uninstallPlugin(plugin)">卸载</button>
             </div>
@@ -375,6 +385,38 @@ defineExpose({ loadPlugins })
   font-size: 12px;
   color: var(--text-secondary, #8ba3b8);
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.plugin-item-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(32, 200, 255, 0.12);
+  color: var(--accent, #20c8ff);
+  border: 1px solid rgba(32, 200, 255, 0.3);
+  flex-shrink: 0;
+}
+.plugin-item-capabilities {
+  margin-top: 6px;
+  padding: 6px 8px;
+  background: var(--bg-secondary, #0b1424);
+  border-radius: 4px;
+}
+.plugin-item-cap {
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.plugin-item-cap-name {
+  color: var(--text-primary, #d6e4f0);
+  font-weight: 600;
+}
+.plugin-item-cap-desc {
+  margin-left: 4px;
+  color: var(--text-secondary, #8ba3b8);
 }
 .plugin-item-desc {
   margin-top: 6px;

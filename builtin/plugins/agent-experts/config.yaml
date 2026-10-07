@@ -2,6 +2,10 @@
 name: agent-experts
 description: 内置专家 Agent 定义集——提供 6 个专家角色，供内置配置选择器选用。
 version: 0.1.0
+builtin: true
 license: MIT
 agent_definition_dirs:
   - "{{plugin_dir}}/agents"
+capabilities:
+  - name: "6 个专家 Agent 角色"
+    description: "提供架构图生成、代码逆向设计、开源部署、重构检查、脚本生成、安全漏洞分析 6 个专家角色，供内置配置选择器选用。"
