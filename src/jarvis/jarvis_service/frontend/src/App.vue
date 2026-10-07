@@ -555,10 +555,10 @@
                   v-if="activeAgents.length"
                   class="workspace-sidebar-agent-select"
                   :value="effectiveGitAgentId || ''"
-                  title="选择 Git 的 Agent"
+                  title="选择 Git 的 Agent；选「跟随当前会话」则随编辑器会话联动"
                   @change="onGitAgentChange($event.target.value)"
                 >
-                  <option value="" disabled>选择 Agent</option>
+                  <option value="">跟随当前会话</option>
                   <option v-for="agent in activeAgents" :key="agent.agent_id" :value="agent.agent_id">
                     {{ agent.name || agent.agent_id }}
                   </option>
@@ -3916,9 +3916,10 @@ function clearGitCustomDir() {
   saveGitCustomDir()
   if (workspaceSidebarView.value === 'git') refreshGitView()
 }
-// Git 面板选择 Agent：清除自定义 Git 目录（回到按该 Agent 根目录管理），并刷新 Git 视图
+// Git 面板选择 Agent：清除自定义 Git 目录（回到按该 Agent 根目录管理），并刷新 Git 视图。
+// 选择「跟随当前会话」（空值）时重置为 null，恢复随编辑器会话联动。
 function onGitAgentChange(agentId) {
-  gitAgentId.value = agentId
+  gitAgentId.value = agentId ? agentId : null
   if (gitCustomDir.value) {
     gitCustomDir.value = null
     saveGitCustomDir()
