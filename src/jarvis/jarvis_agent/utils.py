@@ -1214,10 +1214,12 @@ def list_plugins() -> None:
 
 def list_plugins_info() -> List[dict]:
     """
-    列出所有已安装插件并返回结构化信息（供 HTTP API 使用）。
+    列出所有插件并返回结构化信息（供 HTTP API 使用）。
 
-    扫描 <data_dir>/plugins/ 目录，读取每个插件的 config.yaml，
-    返回包含 name/description/version/dependencies/frontend 等字段的字典列表。
+    同时枚举：
+    - 内置插件：源码内置目录 builtin/plugins/（builtin: true，不复制、不可卸载/升级）
+    - 外部插件：<data_dir>/plugins/ 目录
+    若某插件名同时存在于内置目录与数据目录，以内置为准（跳过数据目录副本）。
 
     返回:
         list[dict]: 每个元素为插件信息字典，字段：
@@ -1226,27 +1228,53 @@ def list_plugins_info() -> List[dict]:
             - version: 版本
             - dependencies: 依赖声明（若存在）
             - frontend: 前端扩展声明（若存在）
-            - installed: 是否安装（目录存在且 config 可读）
+            - builtin: 是否内置插件
+            - capabilities: 能力清单
+            - installed: 是否可用（目录存在且 config 可读）
     """
     import yaml
     from pathlib import Path
     from jarvis.jarvis_utils.config import get_data_dir
 
-    plugins_dir = Path(get_data_dir()) / "plugins"
-    if not plugins_dir.exists():
-        return []
+    # 收集内置插件目录（builtin/plugins/）
+    builtin_dirs: List[Path] = []
+    try:
+        from jarvis.jarvis_utils.template_utils import _get_builtin_dir
 
-    plugin_dirs = [d for d in plugins_dir.iterdir() if d.is_dir()]
+        builtin_dir = _get_builtin_dir()
+        if builtin_dir is not None:
+            builtin_plugins_dir = builtin_dir / "plugins"
+            if builtin_plugins_dir.exists() and builtin_plugins_dir.is_dir():
+                builtin_dirs = [
+                    d
+                    for d in builtin_plugins_dir.iterdir()
+                    if d.is_dir() and (d / "config.yaml").exists()
+                ]
+    except Exception:
+        builtin_dirs = []
+
+    # 收集外部插件目录（data_dir/plugins/），跳过与内置同名的副本
+    plugins_dir = Path(get_data_dir()) / "plugins"
+    external_dirs: List[Path] = []
+    if plugins_dir.exists() and plugins_dir.is_dir():
+        builtin_names = {d.name for d in builtin_dirs}
+        external_dirs = [
+            d
+            for d in plugins_dir.iterdir()
+            if d.is_dir() and d.name not in builtin_names
+        ]
+
     result: List[dict] = []
-    for plugin_dir in sorted(plugin_dirs):
+    for plugin_dir in sorted(builtin_dirs + external_dirs):
         config_file = plugin_dir / "config.yaml"
+        is_builtin = plugin_dir in builtin_dirs
         info: dict = {
             "name": plugin_dir.name,
             "description": "",
             "version": None,
             "dependencies": None,
             "frontend": None,
-            "builtin": False,
+            "builtin": is_builtin,
             "capabilities": [],
             "installed": False,
         }
@@ -1260,7 +1288,7 @@ def list_plugins_info() -> List[dict]:
                     info["version"] = config.get("version", None)
                     info["dependencies"] = config.get("dependencies", None)
                     info["frontend"] = config.get("frontend", None)
-                    info["builtin"] = bool(config.get("builtin", False))
+                    info["builtin"] = is_builtin or bool(config.get("builtin", False))
                     info["capabilities"] = _build_plugin_capabilities(config)
                     info["installed"] = True
             except Exception:
@@ -1352,7 +1380,12 @@ def _build_plugin_capabilities(config: dict) -> List[dict]:
 
 def _is_builtin_plugin(plugin_dir) -> bool:
     """
-    判断插件目录是否为内置插件（config.yaml 中 builtin: true）。
+    判断插件目录是否为内置插件。
+
+    内置插件判定采用双保险：
+    1. 插件 config.yaml 中声明 builtin: true；
+    2. 插件名存在于源码内置目录 builtin/plugins/<name>（兼容已安装的旧副本，
+       即便副本 config.yaml 未含 builtin 标记也能识别为内置插件）。
 
     Args:
         plugin_dir: 插件目录（Path 或 str）
@@ -1363,23 +1396,42 @@ def _is_builtin_plugin(plugin_dir) -> bool:
     import yaml
     from pathlib import Path
 
-    config_file = Path(plugin_dir) / "config.yaml"
-    if not config_file.exists():
-        return False
+    plugin_dir = Path(plugin_dir)
+    plugin_name = plugin_dir.name
+
+    # 方式1：config.yaml 声明 builtin: true
+    config_file = plugin_dir / "config.yaml"
+    if config_file.exists():
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                config = yaml.safe_load(f)
+            if isinstance(config, dict) and config.get("builtin", False):
+                return True
+        except Exception:
+            pass
+
+    # 方式2：插件名存在于源码内置目录 builtin/plugins/<name>
     try:
-        with open(config_file, "r", encoding="utf-8") as f:
-            config = yaml.safe_load(f)
-        return isinstance(config, dict) and bool(config.get("builtin", False))
+        from jarvis.jarvis_utils.template_utils import _get_builtin_dir
+
+        builtin_dir = _get_builtin_dir()
+        if builtin_dir is not None:
+            builtin_plugin_dir = builtin_dir / "plugins" / plugin_name
+            if builtin_plugin_dir.exists() and builtin_plugin_dir.is_dir():
+                return True
     except Exception:
-        return False
+        pass
+
+    return False
 
 
 def list_plugin_orchestrations() -> List[dict]:
     """
-    列出所有已安装插件声明的编排流水线模板（供前端编排功能使用）。
+    列出所有插件声明的编排流水线模板（供前端编排功能使用）。
 
-    扫描 <data_dir>/plugins/ 目录，读取每个插件的 config.yaml，渲染
-    {{plugin_dir}} 模板变量后提取 orchestration 声明，返回模板列表。
+    同时扫描内置插件（builtin/plugins/）与外部插件（<data_dir>/plugins/），
+    读取每个插件的 config.yaml，渲染 {{plugin_dir}} 模板变量后提取
+    orchestration 声明，返回模板列表。
 
     返回:
         list[dict]: 每个元素为编排模板信息字典，字段：
@@ -1393,12 +1445,36 @@ def list_plugin_orchestrations() -> List[dict]:
     from jarvis.jarvis_utils.config import get_data_dir
     from jarvis.jarvis_utils.template_utils import render_plugin_config_template
 
+    # 收集内置插件目录（builtin/plugins/）
+    builtin_dirs: List[Path] = []
+    try:
+        from jarvis.jarvis_utils.template_utils import _get_builtin_dir
+
+        builtin_dir = _get_builtin_dir()
+        if builtin_dir is not None:
+            builtin_plugins_dir = builtin_dir / "plugins"
+            if builtin_plugins_dir.exists() and builtin_plugins_dir.is_dir():
+                builtin_dirs = [
+                    d
+                    for d in builtin_plugins_dir.iterdir()
+                    if d.is_dir() and (d / "config.yaml").exists()
+                ]
+    except Exception:
+        builtin_dirs = []
+
+    # 收集外部插件目录（data_dir/plugins/），跳过与内置同名的副本
     plugins_dir = Path(get_data_dir()) / "plugins"
-    if not plugins_dir.exists():
-        return []
+    external_dirs: List[Path] = []
+    if plugins_dir.exists() and plugins_dir.is_dir():
+        builtin_names = {d.name for d in builtin_dirs}
+        external_dirs = [
+            d
+            for d in plugins_dir.iterdir()
+            if d.is_dir() and d.name not in builtin_names
+        ]
 
     result: List[dict] = []
-    for plugin_dir in sorted(d for d in plugins_dir.iterdir() if d.is_dir()):
+    for plugin_dir in sorted(builtin_dirs + external_dirs):
         config_file = plugin_dir / "config.yaml"
         if not config_file.exists():
             continue

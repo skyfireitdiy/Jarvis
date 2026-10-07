@@ -1486,6 +1486,21 @@ def _load_plugin_configs(
     # 自动发现 plugins 目录下的子目录（可通过环境变量 JARVIS_DISABLE_AUTO_DISCOVER 禁用）
     auto_discovered_dirs = []
     if not os.environ.get("JARVIS_DISABLE_AUTO_DISCOVER"):
+        # 内置插件：直接从源码内置目录 builtin/plugins/ 加载（不复制）
+        try:
+            from jarvis.jarvis_utils.template_utils import _get_builtin_dir
+
+            builtin_dir = _get_builtin_dir()
+            if builtin_dir is not None:
+                builtin_plugins_dir = builtin_dir / "plugins"
+                if builtin_plugins_dir.exists() and builtin_plugins_dir.is_dir():
+                    for item in sorted(builtin_plugins_dir.iterdir()):
+                        if item.is_dir() and (item / "config.yaml").exists():
+                            auto_discovered_dirs.append(str(item))
+        except Exception:
+            pass
+
+        # 外部插件：从数据目录 plugins/ 加载
         data_dir = Path(get_data_dir())
         plugins_dir = data_dir / "plugins"
         if plugins_dir.exists() and plugins_dir.is_dir():

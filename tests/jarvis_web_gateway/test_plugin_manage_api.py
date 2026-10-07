@@ -64,16 +64,18 @@ def _make_plugin(plugin_dir: Path, name: str, version: str = "1.0.0") -> None:
 
 
 def test_list_plugins_empty(client):
-    """空插件目录时 list 返回空列表且 success。"""
+    """无外部插件时 list 只返回内置插件（builtin 均为 True）。"""
     resp = client.get("/api/plugins", headers=_auth_headers())
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
-    assert body["data"]["plugins"] == []
+    plugins = body["data"]["plugins"]
+    assert len(plugins) >= 1
+    assert all(p["builtin"] is True for p in plugins)
 
 
 def test_list_plugins_with_installed(client, isolated_data_dir):
-    """已安装插件时 list 返回结构化信息。"""
+    """已安装插件时 list 返回结构化信息（含内置插件）。"""
     plugins_dir = Path(isolated_data_dir) / "plugins"
     _make_plugin(plugins_dir / "my-plugin", "my-plugin", "2.1.0")
 
@@ -81,12 +83,12 @@ def test_list_plugins_with_installed(client, isolated_data_dir):
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
-    plugins = body["data"]["plugins"]
-    assert len(plugins) == 1
-    assert plugins[0]["name"] == "my-plugin"
-    assert plugins[0]["version"] == "2.1.0"
-    assert plugins[0]["installed"] is True
-    assert plugins[0]["frontend"]["admin_tabs"][0]["id"] == "my-tab"
+    plugins = {p["name"]: p for p in body["data"]["plugins"]}
+    assert plugins["my-plugin"]["name"] == "my-plugin"
+    assert plugins["my-plugin"]["version"] == "2.1.0"
+    assert plugins["my-plugin"]["installed"] is True
+    assert plugins["my-plugin"]["builtin"] is False
+    assert plugins["my-plugin"]["frontend"]["admin_tabs"][0]["id"] == "my-tab"
 
 
 def test_list_plugins_node_id_query(client, isolated_data_dir):
@@ -99,7 +101,8 @@ def test_list_plugins_node_id_query(client, isolated_data_dir):
     body = resp.json()
     assert body["success"] is True
     assert body["data"]["node_id"] == "master"
-    assert len(body["data"]["plugins"]) == 1
+    names = {p["name"] for p in body["data"]["plugins"]}
+    assert "p1" in names
 
 
 def test_install_plugin(client, isolated_data_dir):
