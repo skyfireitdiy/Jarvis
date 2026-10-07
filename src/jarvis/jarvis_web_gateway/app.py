@@ -640,7 +640,7 @@ class WebGateway(BaseGateway):
         import time
 
         wait_interval = 0.5  # 秒
-        waited = 0
+        waited = 0.0
         session_id: Optional[str] = None
 
         while True:
@@ -1040,10 +1040,10 @@ class WebSocketConnectionManager:
                 if ws_conn_id == connection_id:
                     self._gateway._client_connection_map.pop(cid, None)
             async with self._connection_state_lock:
-                connections = self._active_connections.get(session_id)
-                if connections:
-                    connections.pop(connection_id, None)
-                    if not connections:
+                conns = self._active_connections.get(session_id)
+                if conns:
+                    conns.pop(connection_id, None)
+                    if not conns:
                         self._active_connections.pop(session_id, None)
                         self._auth_store.pop(session_id, None)
             print(
@@ -1128,13 +1128,13 @@ class WebSocketConnectionManager:
     async def _handle_message(
         self,
         session_id: str,
-        message: Any,
+        message: Dict[str, Any],
         websocket: WebSocket,
         connection_id: Optional[str] = None,
     ) -> None:
         if not isinstance(message, dict):
-            return
-        message_type = message.get("type")
+            return  # type: ignore[unreachable]
+        message_type: Optional[str] = message.get("type")
         payload = message.get("payload") or {}
 
         if message_type == "sync_request":
@@ -1383,7 +1383,7 @@ class WebSocketConnectionManager:
                 if not self._permission_manager.check_permission(
                     user_id, "terminal:create"
                 ):
-                    error_msg = {
+                    error_msg: Dict[str, Any] = {
                         "type": "terminal_error",
                         "payload": {"error": "Permission denied: terminal:create"},
                     }
@@ -1456,8 +1456,8 @@ class WebSocketConnectionManager:
             if terminal_id and _terminal_session_manager:
                 # 归属校验：仅 owner 可关闭会话（修复 IDOR）
                 if user_id and user_id != "system":
-                    session = _terminal_session_manager.get_session(terminal_id)
-                    if session is None or session.owner_id != user_id:
+                    term_session = _terminal_session_manager.get_session(terminal_id)
+                    if term_session is None or term_session.owner_id != user_id:
                         error_msg = {
                             "type": "terminal_error",
                             "payload": {
@@ -1646,7 +1646,7 @@ class WebSocketConnectionManager:
         # ============================================================
         # 聊天室消息处理
         # ============================================================
-        if message_type.startswith("chat_"):
+        if message_type and message_type.startswith("chat_"):
             await self._handle_chat_message(
                 message_type, payload, websocket, session_id, connection_id
             )
@@ -1920,7 +1920,7 @@ class WebSocketConnectionManager:
                 }
             )
             return
-        msg = {
+        msg: Dict[str, Any] = {
             "type": "chat_message",
             "payload": {
                 "room_id": room_id,
@@ -3585,6 +3585,12 @@ def create_app(
 
     # ==================== 组管理 API ====================
 
+    @app.get("/api/permissions/schema", dependencies=[Depends(verify_token)])
+    async def api_permission_schema(request: Request) -> Dict[str, Any]:
+        """获取可用权限清单（资源 → 动作列表），供权限组配置界面动态渲染。"""
+        schema = permission_manager.get_permission_schema()
+        return {"success": True, "data": {"schema": schema}}
+
     @app.get("/api/permissions/groups", dependencies=[Depends(verify_token)])
     async def api_list_groups(request: Request) -> Dict[str, Any]:
         """列出所有权限组。"""
@@ -3965,7 +3971,7 @@ def create_app(
 
         # 检查read权限：非owner需在access_acl.read中
         user_id = None
-        user_info = {}
+        user_info: Dict[str, Any] = {}
         if auth_payload is not None:
             user_info = auth_payload.get("user_info") or {}
             user_id = user_info.get("user_id")
@@ -4206,7 +4212,7 @@ def create_app(
                     pass
                 return data
 
-            websocket.receive_text = _checked_receive_text  # ty: ignore[invalid-assignment]
+            websocket.receive_text = _checked_receive_text  # type: ignore[method-assign]
 
         try:
             await agent_proxy_manager.proxy_websocket(websocket, agent_id)
@@ -4597,19 +4603,21 @@ def create_app(
                         )
                 else:
                     # 远端 agent HTTP 代理
-                    response = await node_connection_manager.send_request_to_node(
-                        normalized_node_id,
-                        AGENT_HTTP_REQUEST,
-                        {
-                            "agent_id": agent_id,
-                            "method": request.method,
-                            "path": agent_sub_path,
-                            "query": str(request.query_params),
-                            "headers": dict(request.headers),
-                            "body": body,
-                        },
+                    remote_response = (
+                        await node_connection_manager.send_request_to_node(
+                            normalized_node_id,
+                            AGENT_HTTP_REQUEST,
+                            {
+                                "agent_id": agent_id,
+                                "method": request.method,
+                                "path": agent_sub_path,
+                                "query": str(request.query_params),
+                                "headers": dict(request.headers),
+                                "body": body,
+                            },
+                        )
                     )
-                    payload = response.get("payload") or {}
+                    payload = remote_response.get("payload") or {}
                     if not payload.get("success"):
                         error = payload.get("error") or {}
                         return Response(
@@ -4675,16 +4683,16 @@ def create_app(
                     headers.pop("host", None)
 
                     # 读取请求体
-                    body = await request.body()
+                    raw_body = await request.body()
 
                     # 判断是否需要流式响应：检查 Accept 头或请求体中的 stream 参数
                     accept_header = headers.get("accept", "")
                     want_stream = "text/event-stream" in accept_header
 
                     # 如果 Accept 头未指定，检查请求体中的 stream 字段（OpenAI SDK 格式）
-                    if not want_stream and body:
+                    if not want_stream and raw_body:
                         try:
-                            body_json = json.loads(body)
+                            body_json = json.loads(raw_body)
                             # 检查stream字段的各种真值形式
                             stream_value = body_json.get("stream")
                             if (
@@ -4699,9 +4707,9 @@ def create_app(
                         except (json.JSONDecodeError, ValueError):
                             # 如果JSON解析失败，检查原始body中是否包含stream关键字
                             body_str = (
-                                body.decode("utf-8", errors="replace")
-                                if isinstance(body, bytes)
-                                else str(body)
+                                raw_body.decode("utf-8", errors="replace")
+                                if isinstance(raw_body, bytes)
+                                else str(raw_body)
                             )
                             if (
                                 '"stream": true' in body_str
@@ -4713,7 +4721,7 @@ def create_app(
                                 )
 
                     logger.info(
-                        f"[HTTP PROXY] 流式检测：Accept={accept_header}, want_stream={want_stream}, body_length={len(body) if body else 0}"
+                        f"[HTTP PROXY] 流式检测：Accept={accept_header}, want_stream={want_stream}, body_length={len(raw_body) if raw_body else 0}"
                     )
 
                     try:
@@ -4726,7 +4734,7 @@ def create_app(
                                     method=request.method,
                                     url=full_url,
                                     headers=headers,
-                                    content=body,
+                                    content=raw_body,
                                 ) as response:
                                     logger.debug(
                                         f"[NODE HTTP PROXY] Streaming response: {response.status_code}"
@@ -4745,13 +4753,13 @@ def create_app(
                                 },
                             )
                         else:
-                            response = await httpx.AsyncClient(
+                            http_response = await httpx.AsyncClient(
                                 timeout=httpx.Timeout(60.0)
                             ).request(
                                 method=request.method,
                                 url=full_url,
                                 headers=headers,
-                                content=body,
+                                content=raw_body,
                             )
 
                             excluded_headers = {
@@ -4762,15 +4770,15 @@ def create_app(
                             }
                             response_headers = {
                                 k: v
-                                for k, v in response.headers.items()
+                                for k, v in http_response.headers.items()
                                 if k.lower() not in excluded_headers
                             }
 
                             return Response(
-                                content=response.content,
-                                status_code=response.status_code,
+                                content=http_response.content,
+                                status_code=http_response.status_code,
                                 headers=response_headers,
-                                media_type=response.headers.get("content-type"),
+                                media_type=http_response.headers.get("content-type"),
                             )
                     except httpx.TimeoutException:
                         return Response(
@@ -4791,9 +4799,9 @@ def create_app(
                     want_stream = "text/event-stream" in accept_header
 
                     # 如果 Accept 头未指定，检查请求体中的 stream 字段（OpenAI SDK 格式）
-                    if not want_stream and body:
+                    if not want_stream and raw_body:
                         try:
-                            body_json = json.loads(body)
+                            body_json = json.loads(raw_body)
                             # 检查stream字段的各种真值形式
                             stream_value = body_json.get("stream")
                             if (
@@ -4808,9 +4816,9 @@ def create_app(
                         except (json.JSONDecodeError, ValueError):
                             # 如果JSON解析失败，检查原始body中是否包含stream关键字
                             body_str = (
-                                body.decode("utf-8", errors="replace")
-                                if isinstance(body, bytes)
-                                else str(body)
+                                raw_body.decode("utf-8", errors="replace")
+                                if isinstance(raw_body, bytes)
+                                else str(raw_body)
                             )
                             if (
                                 '"stream": true' in body_str
@@ -4822,7 +4830,7 @@ def create_app(
                                 )
 
                     logger.info(
-                        f"[HTTP PROXY] 远端代理流式检测：Accept={accept_header}, want_stream={want_stream}, body_length={len(body) if body else 0}"
+                        f"[HTTP PROXY] 远端代理流式检测：Accept={accept_header}, want_stream={want_stream}, body_length={len(raw_body) if raw_body else 0}"
                     )
 
                     if want_stream:
@@ -4838,7 +4846,7 @@ def create_app(
                                     "path": f"http_proxy/{target_url}",
                                     "query": str(request.query_params),
                                     "headers": dict(request.headers),
-                                    "body": body,
+                                    "body": raw_body,
                                     "streaming": True,
                                 },
                             ):
@@ -4866,7 +4874,7 @@ def create_app(
                                 "path": f"http_proxy/{target_url}",
                                 "query": str(request.query_params),
                                 "headers": dict(request.headers),
-                                "body": body,
+                                "body": raw_body,
                             },
                         )
                     payload = response.get("payload") or {}
@@ -5082,7 +5090,7 @@ def create_app(
         ):
             try:
                 body = (await request.body()).decode("utf-8", errors="replace")
-                response = await node_connection_manager.send_request_to_node(
+                remote_response = await node_connection_manager.send_request_to_node(
                     route.node_id,
                     AGENT_HTTP_REQUEST,
                     {
@@ -5094,7 +5102,7 @@ def create_app(
                         "body": body,
                     },
                 )
-                payload = response.get("payload") or {}
+                payload = remote_response.get("payload") or {}
                 if not payload.get("success"):
                     error = payload.get("error") or {}
                     return Response(

@@ -10252,6 +10252,14 @@ const commandPaletteCtx = computed(() => ({
     }
     setWorkspaceSidebarView('git')
   },
+  // 打开工作区并切换到「插件管理」侧边栏视图（侧边活动栏「插件」按钮 / Space m p）
+  openWorkspacePlugins: () => {
+    if (!showWorkspacePanel.value) {
+      showWorkspacePanel.value = true
+      if (windowWidth.value <= 768) pushOverlayState()
+    }
+    setWorkspaceSidebarView('plugins')
+  },
   toggleTerminalPanel,
   toggleChatPanel,
   // 打开编辑器侧边栏的「管理分组」弹窗（重命名 / 删除）

@@ -440,21 +440,15 @@ const installSource = ref('')
 const installForce = ref(false)
 const pluginBusy = ref({})
 
-// 权限Schema：资源→动作列表
-const permissionSchema = {
-  '*': ['*'],
-  'agent': ['*', 'create', 'delete'],
-  'terminal': ['*'],
-  'timer': ['*', 'read', 'create', 'delete'],
-  'admin': ['*', 'users', 'permissions', 'config'],
-  'node': ['*', 'access'],
-}
+// 权限Schema：资源→动作列表（动态从后端 /api/permissions/schema 加载，避免硬编码）
+const permissionSchema = ref({})
 const resourceLabels = {
   '*': '全部',
   'agent': 'Agent',
   'terminal': '终端',
   'timer': '定时任务',
   'admin': '管理',
+  'file': '文件',
   'node': '节点',
 }
 
@@ -545,6 +539,7 @@ watch(() => props.visible, (val) => {
   if (val) {
     loadUsers()
     loadGroups()
+    loadPermissionSchema()
   } else {
     showCreateUser.value = false
     showCreateGroup.value = false
@@ -573,6 +568,16 @@ async function loadGroups() {
     if (result.success) groups.value = result.data.groups || []
     else props.showToast(result.error?.message || '加载权限组失败', 'error')
   } catch (e) { props.showToast('加载权限组失败: ' + e.message, 'error') }
+}
+
+// 从后端动态加载可用权限清单（资源 → 动作），供权限矩阵渲染，避免前端硬编码
+async function loadPermissionSchema() {
+  try {
+    const resp = await props.fetchWithAuth(buildApiUrl('/api/permissions/schema'))
+    const result = await resp.json()
+    if (result.success) permissionSchema.value = result.data.schema || {}
+    else props.showToast(result.error?.message || '加载权限清单失败', 'error')
+  } catch (e) { props.showToast('加载权限清单失败: ' + e.message, 'error') }
 }
 
 async function createUser() {

@@ -820,6 +820,20 @@ export const ACTIONS = [
         ctx.hasPermission("admin:permissions")),
     run: (ctx) => ctx.openAdminPanel && ctx.openAdminPanel(),
   },
+  {
+    // 打开工作区并切换到「插件管理」侧边栏视图（侧边活动栏「插件」按钮）
+    id: "open-workspace-plugins",
+    label: "插件管理",
+    shortcut: "Space m p",
+    condition: "需 admin:plugins 权限",
+    en: "Plugin Management",
+    group: "管理",
+    icon: "🧩",
+    keywords: ["插件", "plugin", "管理", "plugins", "扩展"],
+    enabled: (ctx) =>
+      !!ctx?.hasPermission && ctx.hasPermission("admin:plugins"),
+    run: (ctx) => ctx.openWorkspacePlugins && ctx.openWorkspacePlugins(),
+  },
   // ===== 节点（作用于大厅中选中的节点）=====
   {
     id: "node-create-agent",
@@ -1224,6 +1238,7 @@ export const SPACE_COMMANDS = {
       h: { label: "使用文档", actionId: "open-docs" },
       r: { label: "重启所有节点", actionId: "restart-all-nodes" },
       q: { label: "重启网关", actionId: "restart-gateway" },
+      p: { label: "插件管理", actionId: "open-workspace-plugins" },
     },
   },
 };

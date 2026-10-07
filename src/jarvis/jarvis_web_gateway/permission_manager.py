@@ -8,9 +8,23 @@ import os
 import json
 import uuid
 import logging
-from typing import Optional
+from typing import Any, Optional, cast
 
 logger = logging.getLogger(__name__)
+
+# 可用权限清单（资源 → 动作列表），供权限组配置界面的权限矩阵动态渲染。
+# 这是权限定义的单一数据源：新增/修改权限时同步维护此处，前端通过
+# GET /api/permissions/schema 获取，避免硬编码。
+# 每个资源可用 "*" 表示该资源下所有动作（如 admin:* 匹配 admin:config 等）。
+PERMISSION_SCHEMA = {
+    "admin": ["*", "config", "permissions", "plugins", "users"],
+    "agent": ["*", "create", "delete", "read"],
+    "file": ["*", "read", "write", "upload"],
+    "terminal": ["*", "create"],
+    "timer": ["*", "read", "create", "delete"],
+    "node": ["*", "access"],
+    "*": ["*"],
+}
 
 BUILTIN_GROUPS = {
     "sys-admin": {
@@ -76,12 +90,14 @@ class PermissionManager:
         self._user_permissions_file = os.path.join(
             self._data_dir, "user_permissions.json"
         )
-        self._groups: dict = {}
-        self._group_permissions: dict = {}
-        self._user_groups: dict = {}
-        self._user_permissions: dict = {}
-        self._permission_cache: dict = {}
-        self._user_manager = None  # 注入UserManager引用，用于is_admin检查
+        self._groups: dict[str, dict] = {}
+        self._group_permissions: dict[str, dict] = {}
+        self._user_groups: dict[str, list] = {}
+        self._user_permissions: dict[str, dict] = {}
+        self._permission_cache: dict[str, bool] = {}
+        self._user_manager: Optional[Any] = (
+            None  # 注入UserManager引用，用于is_admin检查
+        )
         self._load_data()
         self._ensure_builtin_groups()
 
@@ -89,7 +105,7 @@ class PermissionManager:
         if os.path.exists(filepath):
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
-                    return json.load(f)
+                    return cast(dict, json.load(f))
             except (json.JSONDecodeError, IOError) as e:
                 logger.error(f"Failed to load {filepath}: {e}")
         return {}
@@ -194,7 +210,7 @@ class PermissionManager:
         return False
 
     def get_user_permissions(self, user_id: str) -> dict:
-        result = {"allowed": [], "denied": []}
+        result: dict[str, list] = {"allowed": [], "denied": []}
         user_group_ids = self._user_groups.get(user_id, [])
         for group_id in user_group_ids:
             group_perms = self._group_permissions.get(group_id, {})
@@ -384,3 +400,11 @@ class PermissionManager:
             ]
             for k in keys_to_remove:
                 del self._permission_cache[k]
+
+    def get_permission_schema(self) -> dict:
+        """获取可用权限清单（资源 → 动作列表），供权限组配置界面动态渲染。
+
+        Returns:
+            dict: {资源: [动作, ...]}，每个资源含 "*" 表示该资源下所有动作。
+        """
+        return {k: list(v) for k, v in PERMISSION_SCHEMA.items()}
