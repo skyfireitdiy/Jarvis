@@ -19,6 +19,7 @@ from typing import Tuple
 from jarvis.jarvis_agent.builtin_rules import get_builtin_rule
 from jarvis.jarvis_agent.builtin_rules import get_builtin_rule_path
 from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_tools.plugin_registry import PluginRegistry
 from jarvis.jarvis_utils.template_utils import render_rule_template
 from jarvis.jarvis_utils.config import get_central_rules_repo
 from jarvis.jarvis_utils.exception_utils import save_exception
@@ -156,6 +157,8 @@ class RulesManager:
 
         # 自动加载项目 .jarvis/rule.md 文件（项目综述）
         self._load_project_rule_file()
+        # 注册为全局规则撤销器（可逆效应），供 PluginRegistry.revoke_plugin 调用
+        PluginRegistry.instance().set_rules_revoker(self.unregister_rules_by_plugin)
 
     def _load_project_rule_file(self) -> None:
         """自动加载项目级综述规则（项目综述）
@@ -954,7 +957,52 @@ class RulesManager:
         # 重新合并已加载的规则
         self._merge_loaded_rules()
 
+        # 可逆效应登记：若规则来自插件目录，登记到 PluginRegistry，
+        # 供插件卸载时精确撤销。
+        plugin_name = self._infer_source_plugin(self.get_rule_file_path(name))
+        if plugin_name:
+            PluginRegistry.instance().register_rule(plugin_name, name)
+
         return True
+
+    @staticmethod
+    def _infer_source_plugin(file_path: str) -> Optional[str]:
+        """从规则文件路径反推来源插件名（可逆效应来源识别）。
+
+        当路径形如 <...>/plugins/<plugin_name>/rules/xxx.md 时返回插件名，
+        否则返回 None（表示非插件来源的规则）。
+        """
+        try:
+            p = Path(file_path)
+            parts = p.parts
+            for i, part in enumerate(parts):
+                if part == "plugins" and i + 1 < len(parts):
+                    return parts[i + 1]
+        except Exception:
+            pass
+        return None
+
+    def unregister_rules_by_plugin(self, plugin_name: str) -> int:
+        """撤销指定插件注册的全部规则（可逆效应）。
+
+        从 PluginRegistry 读取该插件登记的规则名并逐个卸载，同时清理
+        PluginRegistry 中该插件的登记。
+
+        参数:
+            plugin_name: 插件名
+
+        返回:
+            int: 被撤销的规则数量
+        """
+        registry = PluginRegistry.instance()
+        rule_names = registry.get_plugin_rules(plugin_name)
+        count = 0
+        for name in rule_names:
+            if self.unload_rule(name):
+                count += 1
+        # 仅清理 PluginRegistry 中该插件的规则登记（不影响工具登记）
+        registry.clear_rules(plugin_name)
+        return count
 
     def unload_rule(self, name: str) -> bool:
         """卸载指定名称的规则

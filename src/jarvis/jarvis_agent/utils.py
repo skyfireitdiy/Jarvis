@@ -948,6 +948,23 @@ def uninstall_plugin(plugin_name: str) -> bool:
         PrettyOutput.auto_print(f"⚠️ 插件路径不是目录: {plugin_dir}")
         return False
 
+    # 可逆效应：卸载前撤销该插件注册的工具/规则（若当前进程有已加载的
+    # ToolRegistry / RulesManager 实例，则实际移除；否则仅清理登记，目录
+    # 删除后下次启动自然不再加载）。
+    try:
+        from jarvis.jarvis_tools.plugin_registry import PluginRegistry
+
+        registry = PluginRegistry.instance()
+        if registry.has_plugin(plugin_name):
+            result = registry.revoke_plugin(plugin_name)
+            if result.get("tools") or result.get("rules"):
+                PrettyOutput.auto_print(
+                    f"↩️  已撤销插件 '{plugin_name}' 注册的资源"
+                    f"（工具 {result.get('tools', 0)} 个，规则 {result.get('rules', 0)} 个）"
+                )
+    except Exception as e:
+        PrettyOutput.auto_print(f"⚠️ 撤销插件资源失败（继续卸载）: {str(e)}")
+
     try:
         import shutil
 

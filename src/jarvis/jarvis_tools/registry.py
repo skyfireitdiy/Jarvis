@@ -23,6 +23,7 @@ from jarvis.jarvis_mcp.stdio_mcp_client import StdioMcpClient
 from jarvis.jarvis_mcp.streamable_mcp_client import StreamableMcpClient
 from jarvis.jarvis_platform.openai import PARSE_ERROR_KEY
 from jarvis.jarvis_tools.base import Tool
+from jarvis.jarvis_tools.plugin_registry import PluginRegistry
 from jarvis.jarvis_utils.config import calculate_token_limit
 from jarvis.jarvis_utils.exception_utils import save_exception
 from jarvis.jarvis_utils.config import read_text_file
@@ -470,6 +471,8 @@ class ToolRegistry(OutputHandlerProtocol):
         self.tools: Dict[str, Tool] = {}
         # 记录内置工具名称，用于区分内置工具和用户自定义工具
         self._builtin_tool_names: Set[str] = set()
+        # 记录外部工具来源（工具名 -> 来源插件名），供插件卸载时撤销注册（可逆效应）
+        self._external_tool_sources: Dict[str, str] = {}
         # 定义必选工具列表（这些工具将始终可用）
         self._required_tools: List[str] = ["execute_script"]
         # 加载内置工具和外部工具
@@ -478,6 +481,8 @@ class ToolRegistry(OutputHandlerProtocol):
         self._load_mcp_tools()
         # 应用工具配置组过滤
         self._apply_tool_config_filter()
+        # 注册为全局工具撤销器（可逆效应），供 PluginRegistry.revoke_plugin 调用
+        PluginRegistry.instance().set_tool_revoker(self.unregister_tools_by_plugin)
 
     def use_tools(self, name: List[str]) -> None:
         """使用指定工具
@@ -883,6 +888,17 @@ class ToolRegistry(OutputHandlerProtocol):
                             ),
                             interactive=getattr(tool_instance, "interactive", False),
                         )
+                        # 记录来源插件名（路径含 plugins/<name>/ 时反推），供卸载撤销。
+                        # 同时显式登记到 PluginRegistry（可逆效应的事实来源），
+                        # unregister_tools_by_plugin 据此精确撤销。
+                        source_plugin = self._infer_source_plugin(p_file_path)
+                        if source_plugin:
+                            self._external_tool_sources[tool_instance.name] = (
+                                source_plugin
+                            )
+                            PluginRegistry.instance().register_tool(
+                                source_plugin, tool_instance.name
+                            )
                         tool_found = True
                         break
 
@@ -900,6 +916,68 @@ class ToolRegistry(OutputHandlerProtocol):
                 f"❌ 从 {Path(file_path).name} 加载工具失败: {str(e)}"
             )
             return False
+
+    @staticmethod
+    def _infer_source_plugin(file_path: Path) -> Optional[str]:
+        """从工具文件路径反推来源插件名（可逆效应来源追踪）。
+
+        当文件路径形如 <...>/plugins/<plugin_name>/tools/xxx.py 时返回插件名，
+        否则返回 None（表示非插件来源的工具，如内置工具或用户 tools 目录）。
+        """
+        try:
+            parts = file_path.parts
+            for i, part in enumerate(parts):
+                if part == "plugins" and i + 1 < len(parts):
+                    return parts[i + 1]
+        except Exception:
+            pass
+        return None
+
+    def unregister_tool(self, name: str) -> bool:
+        """撤销指定工具的注册（可逆效应）。
+
+        从 self.tools 和 self._all_tools 中移除指定工具，并清理来源记录。
+        内置工具（在 _builtin_tool_names 中）不会被移除。
+
+        参数:
+            name: 工具名称
+
+        返回:
+            bool: 工具是否被移除
+        """
+        if name in self._builtin_tool_names:
+            return False
+        removed = False
+        if name in self.tools:
+            del self.tools[name]
+            removed = True
+        if hasattr(self, "_all_tools") and name in self._all_tools:
+            del self._all_tools[name]
+            removed = True
+        self._external_tool_sources.pop(name, None)
+        return removed
+
+    def unregister_tools_by_plugin(self, plugin_name: str) -> int:
+        """撤销指定插件注册的全部工具（可逆效应）。
+
+        从 PluginRegistry 读取该插件登记的工具名并逐个撤销，同时清理
+        PluginRegistry 中该插件的登记。
+
+        参数:
+            plugin_name: 插件名
+
+        返回:
+            int: 被撤销的工具数量
+        """
+        registry = PluginRegistry.instance()
+        tool_names = registry.get_plugin_tools(plugin_name)
+        count = 0
+        for name in tool_names:
+            if self.unregister_tool(name):
+                count += 1
+        # 仅清理 PluginRegistry 中该插件的工具登记（不影响规则登记）
+        registry.clear_tools(plugin_name)
+        return count
 
     @staticmethod
     def _has_tool_calls_block(content: str) -> bool:
