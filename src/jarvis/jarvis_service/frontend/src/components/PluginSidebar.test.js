@@ -195,7 +195,7 @@ describe("PluginSidebar", () => {
     expect(wrapper.text()).not.toContain("卸载");
   });
 
-  test("展示插件能力清单", async () => {
+  test("能力不显示在条目中，鼠标悬浮时通过悬浮框展示", async () => {
     const fetchWithAuth = makeFetch({
       "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
         success: true,
@@ -216,8 +216,18 @@ describe("PluginSidebar", () => {
       props: { ...baseProps, fetchWithAuth },
     });
     await flushPromises();
+    // 能力不应占用条目空间（条目中不渲染能力文本）
+    expect(wrapper.find(".plugin-item-capabilities").exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("事件钩子 on_task_start");
+    expect(wrapper.text()).not.toContain("@mycmd");
+    // 悬浮框初始不渲染
+    expect(wrapper.find(".plugin-cap-tooltip").exists()).toBe(false);
+    // 鼠标悬浮到插件条目时展示能力悬浮框
+    await wrapper.find(".plugin-item").trigger("mouseenter");
+    expect(wrapper.find(".plugin-cap-tooltip").exists()).toBe(true);
     expect(wrapper.text()).toContain("事件钩子 on_task_start");
-    expect(wrapper.text()).toContain("@mycmd");
     expect(wrapper.text()).toContain("任务开始触发");
+    expect(wrapper.text()).toContain("@mycmd");
+    expect(wrapper.text()).toContain("内置命令");
   });
 });

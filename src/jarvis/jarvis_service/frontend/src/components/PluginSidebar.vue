@@ -47,7 +47,13 @@
         <div v-if="loadingPlugins" class="plugin-empty">加载中...</div>
         <div v-else-if="plugins.length === 0" class="plugin-empty">该节点暂无已安装插件</div>
         <div v-else class="plugin-list-inner">
-          <div v-for="plugin in plugins" :key="plugin.name" class="plugin-item">
+          <div
+            v-for="plugin in plugins"
+            :key="plugin.name"
+            class="plugin-item"
+            @mouseenter="showCapabilities(plugin, $event)"
+            @mouseleave="hideCapabilities"
+          >
             <div class="plugin-item-head">
               <span class="plugin-item-name" :title="plugin.name">{{ plugin.name }}</span>
               <span class="plugin-item-version">
@@ -56,13 +62,6 @@
               </span>
             </div>
             <div v-if="plugin.description" class="plugin-item-desc">{{ plugin.description }}</div>
-            <div v-if="plugin.capabilities && plugin.capabilities.length" class="plugin-item-capabilities">
-              <div class="plugin-item-meta-label">能力</div>
-              <div v-for="(cap, idx) in plugin.capabilities" :key="idx" class="plugin-item-cap">
-                <span class="plugin-item-cap-name">{{ cap.name }}</span>
-                <span v-if="cap.description" class="plugin-item-cap-desc">{{ cap.description }}</span>
-              </div>
-            </div>
             <div v-if="formatDependencies(plugin.dependencies) !== '-'" class="plugin-item-meta">
               <span class="plugin-item-meta-label">依赖</span> {{ formatDependencies(plugin.dependencies) }}
             </div>
@@ -77,8 +76,32 @@
         </div>
       </div>
     </div>
+
+    <!-- 能力悬浮框：能力不占条目空间，全部放悬浮框展示 -->
+    <transition name="cap-tip">
+      <div
+        v-if="activeCapTip && activeCapTip.capabilities && activeCapTip.capabilities.length"
+        class="plugin-cap-tooltip"
+        :style="capTipStyle"
+        @mouseenter="keepCapTip"
+        @mouseleave="hideCapabilities"
+      >
+        <div class="plugin-cap-tooltip-title">{{ activeCapTip.name }} · 能力</div>
+        <div class="plugin-cap-tooltip-body">
+          <div
+            v-for="(cap, idx) in activeCapTip.capabilities"
+            :key="idx"
+            class="plugin-cap-tooltip-item"
+          >
+            <span class="plugin-cap-tooltip-name">{{ cap.name }}</span>
+            <span v-if="cap.description" class="plugin-cap-tooltip-desc">：{{ cap.description }}</span>
+          </div>
+        </div>
+      </div>
+    </transition>
   </aside>
 </template>
+
 
 <script setup>
 import { ref, onMounted } from 'vue'
@@ -95,10 +118,43 @@ const props = defineProps({
 const pluginNodeId = ref('master')
 const plugins = ref([])
 const loadingPlugins = ref(false)
+
 const installingPlugin = ref(false)
 const installSource = ref('')
 const installForce = ref(false)
 const pluginBusy = ref({})
+
+// 能力悬浮框状态
+const activeCapTip = ref(null)
+const capTipStyle = ref({})
+let capTipTimer = null
+
+function showCapabilities(plugin, event) {
+  if (!plugin.capabilities || !plugin.capabilities.length) return
+  clearTimeout(capTipTimer)
+  const rect = event.currentTarget.getBoundingClientRect()
+  const tipWidth = 320
+  let left = rect.left
+  let top = rect.bottom + 6
+  // 水平：不超出视口右缘
+  if (left + tipWidth > window.innerWidth - 8) left = window.innerWidth - tipWidth - 8
+  if (left < 8) left = 8
+  // 垂直：下方放不下则向上
+  if (top > window.innerHeight - 40) top = Math.max(8, rect.top - 8)
+  capTipStyle.value = { left: left + 'px', top: top + 'px' }
+  activeCapTip.value = plugin
+}
+
+function hideCapabilities() {
+  clearTimeout(capTipTimer)
+  capTipTimer = setTimeout(() => {
+    activeCapTip.value = null
+  }, 150)
+}
+
+function keepCapTip() {
+  clearTimeout(capTipTimer)
+}
 
 function getGatewayAddress() {
   const raw = (props.gatewayUrl || '127.0.0.1:8000').trim()
@@ -397,25 +453,55 @@ defineExpose({ loadPlugins })
   border: 1px solid rgba(32, 200, 255, 0.3);
   flex-shrink: 0;
 }
-.plugin-item-capabilities {
-  margin-top: 6px;
-  padding: 6px 8px;
-  background: var(--bg-secondary, #0b1424);
-  border-radius: 4px;
+/* 能力悬浮框 */
+.plugin-cap-tooltip {
+  position: fixed;
+  z-index: 10000;
+  width: 320px;
+  max-width: calc(100vw - 16px);
+  background: var(--bg-primary, #0a0f1c);
+  border: 1px solid var(--accent, #20c8ff);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  padding: 10px 12px;
+  pointer-events: auto;
+  box-sizing: border-box;
 }
-.plugin-item-cap {
-  margin-top: 3px;
-  font-size: 11px;
+.plugin-cap-tooltip-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent, #20c8ff);
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color, #1a2a3a);
+}
+.plugin-cap-tooltip-body {
+  max-height: 260px;
+  overflow-y: auto;
+}
+.plugin-cap-tooltip-item {
+  margin-top: 6px;
+  font-size: 12px;
   line-height: 1.4;
   word-break: break-word;
 }
-.plugin-item-cap-name {
+.plugin-cap-tooltip-item:first-child {
+  margin-top: 0;
+}
+.plugin-cap-tooltip-name {
   color: var(--text-primary, #d6e4f0);
   font-weight: 600;
 }
-.plugin-item-cap-desc {
-  margin-left: 4px;
+.plugin-cap-tooltip-desc {
   color: var(--text-secondary, #8ba3b8);
+}
+.cap-tip-enter-active,
+.cap-tip-leave-active {
+  transition: opacity 0.15s ease;
+}
+.cap-tip-enter-from,
+.cap-tip-leave-to {
+  opacity: 0;
 }
 .plugin-item-desc {
   margin-top: 6px;
