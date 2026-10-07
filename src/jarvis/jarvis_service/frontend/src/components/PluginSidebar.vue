@@ -56,9 +56,16 @@
           >
             <div class="plugin-item-head">
               <span class="plugin-item-name" :title="plugin.name">{{ plugin.name }}</span>
-              <span class="plugin-item-version">
-                {{ plugin.version || '-' }}
-                <span v-if="plugin.builtin" class="plugin-item-badge">内置</span>
+              <span class="plugin-item-head-right">
+                <button
+                  v-if="plugin.capabilities && plugin.capabilities.length"
+                  class="plugin-btn plugin-btn-sm plugin-cap-btn"
+                  @click.stop="toggleInlineCapabilities(plugin)"
+                >能力</button>
+                <span class="plugin-item-version">
+                  {{ plugin.version || '-' }}
+                  <span v-if="plugin.builtin" class="plugin-item-badge">内置</span>
+                </span>
               </span>
             </div>
             <div v-if="plugin.description" class="plugin-item-desc">{{ plugin.description }}</div>
@@ -67,6 +74,23 @@
             </div>
             <div class="plugin-item-meta">
               <span class="plugin-item-meta-label">前端扩展</span> {{ plugin.frontend ? '是' : '否' }}
+            </div>
+            <!-- 移动端内联能力展开区：点击“能力”入口展开，替代 hover 悬浮框 -->
+            <div
+              v-if="expandedCapPlugin === plugin"
+              class="plugin-cap-inline"
+            >
+              <div class="plugin-cap-tooltip-title">{{ plugin.name }} · 能力</div>
+              <div class="plugin-cap-tooltip-body">
+                <div
+                  v-for="(cap, idx) in plugin.capabilities"
+                  :key="idx"
+                  class="plugin-cap-tooltip-item"
+                >
+                  <span class="plugin-cap-tooltip-name">{{ cap.name }}</span>
+                  <span v-if="cap.description" class="plugin-cap-tooltip-desc">：{{ cap.description }}</span>
+                </div>
+              </div>
             </div>
             <div v-if="!plugin.builtin" class="plugin-item-actions">
               <button class="plugin-btn plugin-btn-sm" :disabled="pluginBusy[plugin.name]" @click="upgradePlugin(plugin)">升级</button>
@@ -127,6 +151,13 @@ const pluginBusy = ref({})
 const activeCapTip = ref(null)
 const capTipStyle = ref({})
 let capTipTimer = null
+// 移动端能力展开状态（点击入口展开，替代桌面端 hover 悬浮框）
+const expandedCapPlugin = ref(null)
+
+function toggleInlineCapabilities(plugin) {
+  if (!plugin.capabilities || !plugin.capabilities.length) return
+  expandedCapPlugin.value = expandedCapPlugin.value === plugin ? null : plugin
+}
 
 function showCapabilities(plugin, event) {
   if (!plugin.capabilities || !plugin.capabilities.length) return
@@ -432,6 +463,29 @@ defineExpose({ loadPlugins })
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.plugin-item-head-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+/* 能力入口按钮：桌面端用 hover 悬浮框，默认隐藏；移动端点击展开内联面板时显示 */
+.plugin-cap-btn {
+  display: none;
+}
+/* 移动端内联能力展开区 */
+.plugin-cap-inline {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: rgba(32, 200, 255, 0.05);
+  border: 1px solid rgba(32, 200, 255, 0.22);
+  border-radius: 6px;
+}
+.plugin-cap-inline .plugin-cap-tooltip-title {
+  margin-bottom: 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(32, 200, 255, 0.12);
+}
 .plugin-item-version {
   font-size: 12px;
   color: var(--text-secondary, #8ba3b8);
@@ -550,5 +604,14 @@ defineExpose({ loadPlugins })
 }
 .plugin-btn-danger:hover:not(:disabled) {
   background: rgba(255, 60, 72, 0.1);
+}
+/* 移动端：无 hover，用“能力”按钮点击展开内联面板，隐藏 fixed 悬浮框 */
+@media (max-width: 768px) {
+  .plugin-cap-btn {
+    display: inline-block;
+  }
+  .plugin-cap-tooltip {
+    display: none !important;
+  }
 }
 </style>
