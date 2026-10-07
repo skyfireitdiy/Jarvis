@@ -38,9 +38,22 @@
        base_url: http://127.0.0.1:8081/sse
    ```
 
-7. 保存配置文件。
-8. 重新启动会话，让 Jarvis 重新读取 MCP 配置。
-9. 启动后检查这些外部工具是否已经出现在当前可用工具中。
+7. 示例三：基于 Streamable HTTP 的远程服务型
+
+   ```yaml
+   mcp:
+     - name: stream-mcp
+       type: streamable
+       enable: true
+       base_url: https://example.com
+       endpoint_path: mcp
+   ```
+
+   > `base_url` 填服务的主机地址，`endpoint_path` 填 MCP 端点路径（默认 `mcp`），二者拼接为实际请求地址。需要额外请求头（如 User-Agent、Bearer 认证）时，用 `headers` 字段指定。
+
+8. 保存配置文件。
+9. 重新启动会话，让 Jarvis 重新读取 MCP 配置。
+10. 启动后检查这些外部工具是否已经出现在当前可用工具中。
 
 ## 你会看到的提示与反馈
 
@@ -49,6 +62,35 @@
 - 如果连接成功且外部端返回了工具列表，这些工具会被注册成当前可用工具。
 - 除了工具调用外，系统还可能额外注册资源列表和资源读取能力。
 - 如果远端返回空工具列表，系统会给出警告，而不是假装接入成功。
+
+## 示例：Parallel Search MCP（免 API key 网页搜索）
+
+如果你需要让 Jarvis 搜索最新网页或读取指定网页内容，又不想配置任何 API key，可以接入 Parallel 官方提供的免费 Search MCP。它提供两个工具：
+
+- `web_search`：实时网页搜索，返回相关结果与摘要。
+- `web_fetch`：从指定 URL 提取干净的 Markdown 内容。
+
+**免费匿名使用，无需 API key**（匿名有较低的速率限制；如需更高速率限制，可在 `headers` 中传 Parallel API key 的 Bearer 认证）。端点：`https://search.parallel.ai/mcp`。
+
+在 `~/.jarvis/config.yaml` 中加入以下配置：
+
+```yaml
+mcp:
+  - name: parallel-search
+    type: streamable
+    enable: true
+    base_url: https://search.parallel.ai
+    endpoint_path: mcp
+    headers:
+      User-Agent: Jarvis
+```
+
+说明：
+
+- `base_url` 填 Parallel 的主机地址，`endpoint_path` 填 `mcp`，这样实际请求的是 `https://search.parallel.ai/mcp`（不要带尾斜杠，Parallel 端点不接受尾斜杠）。
+- `headers.User-Agent` 用于标识请求来源为 Jarvis，可按需调整。
+- 接入成功后，会注册 `parallel-search.tool_call.web_search` 与 `parallel-search.tool_call.web_fetch` 两个工具。
+- 如需更高速率限制，可申请 Parallel API key 并通过 `headers.Authorization` 传入（如 `Authorization: Bearer <你的key>`）。
 
 ## 注意事项
 
