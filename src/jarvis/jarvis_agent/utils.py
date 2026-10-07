@@ -553,6 +553,293 @@ def _check_dependencies(dependencies: Any, plugins_dir: Any) -> list:
     return missing
 
 
+def _scaffold_slug(name: str) -> str:
+    """把插件名规范化为安全的目录/文件名 slug（小写、连字符分隔）。"""
+    import re
+
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", name.strip()).strip("-").lower()
+    return slug or "my-plugin"
+
+
+def _scaffold_class_name(name: str) -> str:
+    """把插件名转成工具类名（CamelCase + Tool 后缀）。"""
+    parts = _scaffold_slug(name).split("-")
+    return "".join(p.capitalize() for p in parts) + "Tool"
+
+
+def _scaffold_tool_module_name(name: str) -> str:
+    """把插件名转成工具模块文件名（文件名 stem 必须等于工具 name）。"""
+    return _scaffold_slug(name) + "_tool"
+
+
+def scaffold_plugin(name: str, output_dir: Optional[str] = None) -> Optional[str]:
+    """生成一个符合 Jarvis 加载约定的插件脚手架目录。
+
+    参数:
+        name: 插件名称（用于生成目录名、config.yaml 的 name、工具/规则/Agent 命名）
+        output_dir: 输出目录（默认当前工作目录）
+
+    返回:
+        str: 生成的插件目录绝对路径；失败返回 None
+
+    生成的骨架包含:
+        config.yaml      插件配置（含全部扩展点示例）
+        README.md        开发者文档
+        rules/           规则目录（YAML front matter 模板）
+        tools/           工具目录（class XxxTool 模板，name==文件名 stem）
+        agents/          Agent 定义目录模板
+        orchestration/   编排流水线模板
+        frontend/        前端扩展（admin_tab.js / sidebar_view.js，用 window.Vue）
+    """
+    import os
+    from pathlib import Path
+
+    slug = _scaffold_slug(name)
+    base_dir = Path(output_dir or os.getcwd()).resolve()
+    plugin_dir = base_dir / slug
+
+    # 目标目录已存在且非空则拒绝，避免误覆盖
+    if plugin_dir.exists() and any(plugin_dir.iterdir()):
+        PrettyOutput.auto_print(f"❌ 目标目录已存在且非空: {plugin_dir}")
+        return None
+
+    tool_class = _scaffold_class_name(name)
+    tool_module = _scaffold_tool_module_name(name)
+
+    # 目录结构
+    for sub in ("rules", "tools", "agents", "orchestration", "frontend"):
+        (plugin_dir / sub).mkdir(parents=True, exist_ok=True)
+
+    # ---------- config.yaml ----------
+    config = f"""---
+name: {slug}
+description: {name}——请补充插件描述。
+version: 0.1.0
+license: MIT
+# 扩展点说明（按需启用，路径用 {{{{plugin_dir}}}} 占位，运行时自动渲染）：
+# - rules_load_dirs: 规则目录，规则文件带 YAML front matter（name/description）
+# - tool_load_dirs: 工具目录，工具类 name 必须等于文件名 stem
+# - agent_definition_dirs: Agent 定义目录（YAML 格式）
+# - orchestration: 编排流水线（配合 OrganizeAgents + --task-file 消费）
+# - frontend: 前端扩展点（admin_tabs/sidebar_views/tool_panels，JS 用 window.Vue）
+rules_load_dirs:
+  - "{{{{plugin_dir}}}}/rules"
+tool_load_dirs:
+  - "{{{{plugin_dir}}}}/tools"
+# agent_definition_dirs:
+#   - "{{{{plugin_dir}}}}/agents"
+# frontend:
+#   admin_tabs:
+#     - id: {slug}-admin
+#       title: "{name} 管理"
+#       entry: admin_tab.js
+#   sidebar_views:
+#     - id: {slug}-view
+#       title: "{name}"
+#       entry: sidebar_view.js
+"""
+    (plugin_dir / "config.yaml").write_text(config, encoding="utf-8")
+
+    # ---------- README.md ----------
+    readme = f"""# {name}
+
+> 由 `jarvis --new-plugin {name}` 生成的插件脚手架。
+
+## 插件结构
+
+```
+{slug}/
+├── config.yaml          # 插件配置（name/version + 扩展点声明）
+├── README.md
+├── rules/               # 规则（YAML front matter: name/description）
+├── tools/               # 工具（class XxxTool, name==文件名 stem）
+├── agents/              # Agent 定义（可选）
+├── orchestration/       # 编排流水线（可选）
+└── frontend/            # 前端扩展（可选，用 window.Vue）
+```
+
+## 开发指南
+
+### 1. 工具（tools/）
+
+工具文件是 Python 模块，类名 `{tool_class}`，**`name` 必须等于文件名 stem（`{tool_module}`）**，
+否则注册表不会加载。实现 `check()`（静态方法，返回 bool 表示是否可用）与
+`execute(args) -> {{"success", "stdout", "stderr"}}`。
+
+### 2. 规则（rules/）
+
+Markdown 文件，开头带 YAML front matter：
+
+```yaml
+---
+name: <规则名>
+description: <何时触发该规则>
+---
+```
+
+### 3. 前端扩展（frontend/，可选）
+
+前端 JS 是纯浏览器 ES module：**用 `window.Vue` 渲染，导出 default 组件，不要 `import 'vue'`**。
+在 config.yaml 的 `frontend` 字段声明 `admin_tabs` / `sidebar_views` / `tool_panels`。
+
+### 4. 编排（orchestration/，可选）
+
+YAML 编排流水线，配合 `OrganizeAgents` 与 `jca -n --task-file` 消费。
+
+## 安装
+
+```bash
+jarvis --install-plugin {slug}
+```
+
+## 卸载
+
+```bash
+jarvis --uninstall-plugin {slug}
+```
+"""
+    (plugin_dir / "README.md").write_text(readme, encoding="utf-8")
+
+    # ---------- rules/<slug>.md ----------
+    rule = f"""---
+name: {slug}_rule
+description: {name} 的规则模板。当需要遵循 {name} 插件的约定时触发。
+---
+# {name} 规则
+
+在此编写规则正文。规则用于指导 Agent 在相关场景下的行为。
+"""
+    (plugin_dir / "rules" / f"{slug}.md").write_text(rule, encoding="utf-8")
+
+    # ---------- tools/<tool_module>.py ----------
+    tool = f'''"""
+{name} 工具模板。
+
+用途:
+- 在此描述工具的用途与行为。
+
+参数:
+- 在此描述参数。
+
+返回:
+- success (bool)
+- stdout (str)
+- stderr (str)
+"""
+import json
+from typing import Any
+from typing import Dict
+
+
+class {tool_class}:
+    # 文件名必须与工具名一致，便于注册表自动加载
+    name = "{tool_module}"
+    description = "{name} 工具：请补充工具描述。"
+
+    parameters = {{
+        "type": "object",
+        "properties": {{
+            "input": {{
+                "type": "string",
+                "description": "输入内容",
+            }},
+        }},
+        "required": ["input"],
+    }}
+
+    @staticmethod
+    def check() -> bool:
+        """工具是否可用（无外部依赖时始终返回 True）。"""
+        return True
+
+    def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            data = args.get("input")
+            if not data or not isinstance(data, str):
+                return {{
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "参数错误：input 必须是非空字符串",
+                }}
+            output = {{
+                "echo": data,
+                "note": "请在此实现实际逻辑",
+            }}
+            return {{
+                "success": True,
+                "stdout": json.dumps(output, ensure_ascii=False, indent=2),
+                "stderr": "",
+            }}
+        except Exception as e:
+            return {{
+                "success": False,
+                "stdout": "",
+                "stderr": f"{tool_module} 执行异常: {{e}}",
+            }}
+'''
+    (plugin_dir / "tools" / f"{tool_module}.py").write_text(tool, encoding="utf-8")
+
+    # ---------- agents/<slug>.yaml ----------
+    agent = f"""# {name} Agent 定义模板（可选，需在 config.yaml 启用 agent_definition_dirs）
+name: {slug}_agent
+description: {name} 的 Agent 角色定义。
+system_prompt: |
+  你是 {name} 插件的专用 Agent。
+"""
+    (plugin_dir / "agents" / f"{slug}.yaml").write_text(agent, encoding="utf-8")
+
+    # ---------- orchestration/<slug>_pipeline.yaml ----------
+    pipeline = f"""# {name} 编排流水线模板（可选，配合 OrganizeAgents + --task-file 消费）
+# 参考 builtin/agent_orchestration/ 下的示例编排文件格式。
+agents:
+  - name: {slug}_worker
+    role: 执行者
+    task: 在此描述任务
+"""
+    (plugin_dir / "orchestration" / f"{slug}_pipeline.yaml").write_text(
+        pipeline, encoding="utf-8"
+    )
+
+    # ---------- frontend/admin_tab.js ----------
+    admin_tab_js = """// 管理页 Tab 组件模板（可选，需在 config.yaml 的 frontend.admin_tabs 声明）
+// 约定：纯浏览器 ES module，用 window.Vue 渲染，导出 default 组件，不要 import 'vue'。
+export default {
+  name: "PluginAdminTab",
+  template: `
+    <div style="padding: 16px;">
+      <h3>插件管理页</h3>
+      <p>在此实现管理功能。</p>
+    </div>
+  `,
+};
+"""
+    (plugin_dir / "frontend" / "admin_tab.js").write_text(
+        admin_tab_js, encoding="utf-8"
+    )
+
+    # ---------- frontend/sidebar_view.js ----------
+    sidebar_view_js = """// 侧边栏视图组件模板（可选，需在 config.yaml 的 frontend.sidebar_views 声明）
+// 约定：纯浏览器 ES module，用 window.Vue 渲染，导出 default 组件，不要 import 'vue'。
+export default {
+  name: "PluginSidebarView",
+  template: `
+    <div style="padding: 16px;">
+      <h3>插件视图</h3>
+      <p>在此实现侧边栏视图内容。</p>
+    </div>
+  `,
+};
+"""
+    (plugin_dir / "frontend" / "sidebar_view.js").write_text(
+        sidebar_view_js, encoding="utf-8"
+    )
+
+    PrettyOutput.auto_print(
+        f"✅ 插件脚手架已生成: {plugin_dir}\n   安装: jarvis --install-plugin {slug}"
+    )
+    return str(plugin_dir)
+
+
 def install_plugin(
     source_path: str,
     force: bool = False,

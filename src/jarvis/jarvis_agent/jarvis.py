@@ -972,6 +972,16 @@ def run_cli(
         "--agent-id",
         help="Agent ID，由 Web Gateway 的 AgentManager 分配的唯一标识符",
     ),
+    new_plugin: Optional[str] = typer.Option(
+        None,
+        "--new-plugin",
+        help="生成插件脚手架：指定插件名称，生成符合 Jarvis 加载约定的完整插件骨架",
+    ),
+    plugin_output_dir: Optional[str] = typer.Option(
+        None,
+        "--plugin-output-dir",
+        help="插件脚手架输出目录（默认当前工作目录，配合 --new-plugin 使用）",
+    ),
     install_plugin: Optional[str] = typer.Option(
         None,
         "--install-plugin",
@@ -1012,6 +1022,17 @@ def run_cli(
     # 处理工具检查参数（原 jck 命令功能）
     if handle_check_mode(check, check_lint, check_build, check_tool_name, check_json):
         return
+
+    # 处理插件脚手架生成参数
+    if new_plugin:
+        from jarvis.jarvis_agent.utils import scaffold_plugin as do_scaffold_plugin
+
+        result = do_scaffold_plugin(new_plugin, output_dir=plugin_output_dir)
+        if result:
+            raise typer.Exit(code=0)
+        else:
+            PrettyOutput.auto_print("❌ 插件脚手架生成失败")
+            raise typer.Exit(code=1)
 
     # 处理插件安装参数
     if install_plugin:
