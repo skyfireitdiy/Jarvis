@@ -1464,6 +1464,30 @@ def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any
     return result
 
 
+# 插件扩展点字段白名单：这些字段会被合并进全局配置供 getter 消费
+# （get_tool_load_dirs/get_rules_load_dirs/get_agent_definition_dirs/
+#  get_plugin_orchestrations/get_roles_dirs/get_builtin_input_handler_dirs 等）。
+# 其余字段视为插件私有配置，隔离到 plugin_configs 单独配置项，避免污染全局配置、
+# 避免多个插件同名私有字段互相覆盖。
+_PLUGIN_EXTENSION_FIELDS = frozenset(
+    {
+        "tool_load_dirs",
+        "rules_load_dirs",
+        "agent_definition_dirs",
+        "orchestration",
+        "roles_dirs",
+        "after_tool_call_cb_dirs",
+        "builtin_input_handler_dirs",
+        "before_tool_call_cb_dirs",
+        "before_model_call_cb_dirs",
+        "summary_cb_dirs",
+    }
+)
+
+# 全局配置中存放插件私有配置的单独配置项键名
+PLUGIN_CONFIGS_KEY = "plugin_configs"
+
+
 def _load_plugin_configs(
     merged_config: Dict[str, Any], config_file_dir: Optional[str] = None
 ) -> Dict[str, Any]:
@@ -1525,6 +1549,8 @@ def _load_plugin_configs(
 
     # 先收集所有插件配置，按顺序合并（后加载的覆盖前面的）
     combined_plugin_config: Dict[str, Any] = {}
+    # 收集各插件私有配置（非扩展点字段），按插件名隔离，避免互相覆盖
+    plugin_configs: Dict[str, Any] = {}
 
     # 遍历每个插件目录，加载配置
     for plugin_dir in all_plugin_dirs:
@@ -1576,10 +1602,25 @@ def _load_plugin_configs(
                     PluginRegistry.instance().set_plugin_code_agent_tools(
                         plugin_path.name, True
                     )
-                # 合并插件配置：后加载的插件覆盖前面的
-                combined_plugin_config = _deep_merge(
-                    combined_plugin_config, plugin_config
-                )
+                # 拆分扩展点字段与私有字段：
+                # - 扩展点字段（白名单）合并进全局配置，供 getter 消费
+                # - 其余字段视为插件私有配置，按插件名隔离到 plugin_configs，
+                #   避免污染全局配置顶层、避免多个插件同名私有字段互相覆盖
+                extension_config: Dict[str, Any] = {}
+                private_config: Dict[str, Any] = {}
+                for key, value in plugin_config.items():
+                    if key in _PLUGIN_EXTENSION_FIELDS:
+                        extension_config[key] = value
+                    else:
+                        private_config[key] = value
+                # 合并扩展点配置：后加载的插件覆盖前面的
+                if extension_config:
+                    combined_plugin_config = _deep_merge(
+                        combined_plugin_config, extension_config
+                    )
+                # 收集插件私有配置（按插件名隔离）
+                if private_config:
+                    plugin_configs[plugin_path.name] = private_config
                 PrettyOutput.auto_print(f"✅ 已加载插件配置: {plugin_path}")
             else:
                 PrettyOutput.auto_print(
@@ -1587,6 +1628,10 @@ def _load_plugin_configs(
                 )
         except Exception as e:
             PrettyOutput.auto_print(f"❌ 加载插件配置失败 {plugin_path}: {e}")
+
+    # 将各插件私有配置聚合到单独配置项，再合并进全局配置
+    if plugin_configs:
+        combined_plugin_config[PLUGIN_CONFIGS_KEY] = plugin_configs
 
     # 最后将项目配置与合并后的插件配置合并（项目配置优先）
     if combined_plugin_config:

@@ -628,6 +628,9 @@ builtin: true
 # - frontend: 前端扩展点（admin_tabs/sidebar_views/tool_panels，JS 用 window.Vue）
 # - plugin/: 插件私有功能（运行在 gateway，供前端代理调用，不暴露给 Agent）
 #   api.py 末尾需定义 PUBLIC_FUNCTIONS 白名单，gateway 只允许调用白名单内函数。
+# 私有配置隔离：除上述扩展点字段外，其余字段（name/version/dependencies/自定义业务字段）
+# 会被隔离到全局配置 plugin_configs.<插件名>，不污染全局配置顶层、多插件同名私有字段互不覆盖；
+# 插件可通过 get_plugin_config("<插件名>") 读取自己的私有配置。
 rules_load_dirs:
   - "{{{{plugin_dir}}}}/rules"
 tool_load_dirs:

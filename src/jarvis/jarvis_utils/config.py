@@ -255,6 +255,37 @@ def get_plugin_dirs() -> List[str]:
     return cast(List[str], value)
 
 
+def get_plugin_config(plugin_name: str) -> Dict[str, Any]:
+    """获取指定插件的私有配置（非扩展点字段）。
+
+    插件 config.yaml 中除扩展点字段（tool_load_dirs/rules_load_dirs 等）外的
+    其余字段会被隔离到 `plugin_configs.<plugin_name>` 单独配置项，供插件自身
+    读取，避免污染全局配置、避免多个插件同名私有字段互相覆盖。
+
+    参数:
+        plugin_name: 插件名（目录名或 config.yaml 的 name 字段）
+
+    返回:
+        Dict[str, Any]: 插件私有配置字典；未找到时返回空字典
+    """
+    plugin_configs = GLOBAL_CONFIG_DATA.get("plugin_configs", {})
+    if isinstance(plugin_configs, dict):
+        config = plugin_configs.get(plugin_name)
+        if isinstance(config, dict):
+            return config
+    return {}
+
+
+def get_all_plugin_configs() -> Dict[str, Any]:
+    """获取所有插件的私有配置。
+
+    返回:
+        Dict[str, Any]: 插件名 -> 插件私有配置 的映射
+    """
+    plugin_configs = GLOBAL_CONFIG_DATA.get("plugin_configs", {})
+    return plugin_configs if isinstance(plugin_configs, dict) else {}
+
+
 """配置管理模块。
 
 该模块提供了获取Jarvis系统各种配置设置的函数。

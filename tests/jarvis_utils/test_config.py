@@ -4,7 +4,13 @@
 import yaml
 import pytest
 
-from jarvis.jarvis_utils.config import get_plugin_dirs, GLOBAL_CONFIG_DATA
+from jarvis.jarvis_utils.config import (
+    get_plugin_dirs,
+    get_plugin_config,
+    get_all_plugin_configs,
+    set_global_config_data,
+    GLOBAL_CONFIG_DATA,
+)
 from jarvis.jarvis_utils.utils import _load_plugin_configs
 
 
@@ -72,13 +78,15 @@ class TestLoadPluginConfigs:
         with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(plugin_config, f)
 
-        # 测试加载（项目配置无 model，应使用插件配置）
+        # 测试加载（model/custom_key 是插件私有字段，应隔离到 plugin_configs）
         base_config = {"plugin_dirs": [str(plugin_dir)]}
         result = _load_plugin_configs(base_config)
 
-        # 验证配置合并：项目配置无 model，使用插件配置
-        assert result["model"] == "plugin-model"  # 插件配置生效
-        assert result["custom_key"] == "custom_value"  # 插件新增配置
+        # 私有字段不再污染全局配置顶层，而是隔离到 plugin_configs.<plugin_name>
+        assert "model" not in result
+        assert "custom_key" not in result
+        assert result["plugin_configs"]["plugin1"]["model"] == "plugin-model"
+        assert result["plugin_configs"]["plugin1"]["custom_key"] == "custom_value"
         assert str(plugin_dir) in result["plugin_dirs"]  # plugin_dirs 保持不变
 
     def test_multiple_plugins_loading(self, tmp_path):
@@ -96,14 +104,18 @@ class TestLoadPluginConfigs:
         with open(plugin_dir2 / "config.yaml", "w", encoding="utf-8") as f:
             yaml.dump(plugin_config2, f)
 
-        # 测试加载（项目配置无 model，应使用最后一个插件的配置）
+        # 测试加载（model/key1/key2 是插件私有字段，应隔离到各自的 plugin_configs）
         base_config = {"plugin_dirs": [str(plugin_dir1), str(plugin_dir2)]}
         result = _load_plugin_configs(base_config)
 
-        # 验证配置合并（后加载的插件覆盖前面的）
-        assert result["model"] == "plugin2-model"  # plugin2 覆盖 plugin1
-        assert result["key1"] == "value1"  # plugin1 的配置
-        assert result["key2"] == "value2"  # plugin2 的配置
+        # 私有字段按插件名隔离，互不覆盖、不污染全局顶层
+        assert "model" not in result
+        assert "key1" not in result
+        assert "key2" not in result
+        assert result["plugin_configs"]["plugin1"]["model"] == "plugin1-model"
+        assert result["plugin_configs"]["plugin2"]["model"] == "plugin2-model"
+        assert result["plugin_configs"]["plugin1"]["key1"] == "value1"
+        assert result["plugin_configs"]["plugin2"]["key2"] == "value2"
 
     def test_nonexistent_plugin_dir(self, tmp_path):
         """测试不存在的插件目录"""
@@ -160,8 +172,11 @@ class TestLoadPluginConfigs:
         base_config = {"plugin_dirs": ["plugin_relative"]}
         result = _load_plugin_configs(base_config, str(tmp_path))
 
-        # 验证相对路径正确解析
-        assert result["custom_key"] == "relative_value"
+        # 验证相对路径正确解析（私有字段隔离到 plugin_configs）
+        assert (
+            result["plugin_configs"]["plugin_relative"]["custom_key"]
+            == "relative_value"
+        )
 
 
 class TestConfigPriority:
@@ -173,7 +188,7 @@ class TestConfigPriority:
         pass
 
     def test_project_config_priority_over_plugin(self, tmp_path):
-        """测试项目配置优先级高于插件配置"""
+        """测试项目配置不会被插件私有字段覆盖"""
         # 创建插件
         plugin_dir = tmp_path / "plugin"
         plugin_dir.mkdir()
@@ -185,12 +200,14 @@ class TestConfigPriority:
         base_config = {"model": "project-model", "plugin_dirs": [str(plugin_dir)]}
         result = _load_plugin_configs(base_config)
 
-        # 项目配置应优先于插件配置
-        assert result["model"] == "project-model"  # 项目配置覆盖插件配置
-        assert result["plugin_only_key"] == "plugin_value"  # 插件独有配置保留
+        # 插件私有字段隔离到 plugin_configs，不会覆盖项目配置
+        assert result["model"] == "project-model"  # 项目配置保留
+        assert "plugin_only_key" not in result  # 插件私有字段不进全局顶层
+        assert result["plugin_configs"]["plugin"]["model"] == "plugin-model"
+        assert result["plugin_configs"]["plugin"]["plugin_only_key"] == "plugin_value"
 
     def test_multiple_plugins_priority(self, tmp_path):
-        """测试多个插件的优先级（后加载的覆盖前面的）"""
+        """测试多个插件的私有字段按插件名隔离（互不覆盖）"""
         # 创建两个插件
         plugin_dir1 = tmp_path / "plugin1"
         plugin_dir1.mkdir()
@@ -206,11 +223,13 @@ class TestConfigPriority:
         base_config = {"plugin_dirs": [str(plugin_dir1), str(plugin_dir2)]}
         result = _load_plugin_configs(base_config)
 
-        # 后加载的插件应覆盖前面的
-        assert result["key"] == "value2"
+        # 同名私有字段按插件名隔离，后加载的不会覆盖前面的
+        assert "key" not in result
+        assert result["plugin_configs"]["plugin1"]["key"] == "value1"
+        assert result["plugin_configs"]["plugin2"]["key"] == "value2"
 
     def test_deep_merge_nested_dict(self, tmp_path):
-        """测试深度合并嵌套字典（项目配置优先）"""
+        """测试嵌套字典私有字段隔离（项目配置不受影响）"""
         # 创建插件
         plugin_dir = tmp_path / "plugin"
         plugin_dir.mkdir()
@@ -228,14 +247,20 @@ class TestConfigPriority:
         }
         result = _load_plugin_configs(base_config)
 
-        # 验证深度合并：项目配置优先，但保留插件独有配置
-        assert result["llm"]["model"] == "project-model"  # 项目配置覆盖插件配置
-        assert result["llm"]["temperature"] == 0.7  # 项目配置保留
-        assert result["llm"]["max_tokens"] == 2000  # 项目配置保留
-        assert result["llm"]["plugin_only_key"] == "plugin_value"  # 插件独有配置保留
+        # 插件私有 llm 字段隔离，项目配置的 llm 不受影响
+        assert result["llm"] == {
+            "model": "project-model",
+            "temperature": 0.7,
+            "max_tokens": 2000,
+        }
+        assert result["plugin_configs"]["plugin"]["llm"]["model"] == "plugin-model"
+        assert (
+            result["plugin_configs"]["plugin"]["llm"]["plugin_only_key"]
+            == "plugin_value"
+        )
 
     def test_deep_merge_multiple_levels(self, tmp_path):
-        """测试多级嵌套字典的深度合并（项目配置优先）"""
+        """测试多级嵌套字典私有字段隔离"""
         # 创建插件
         plugin_dir = tmp_path / "plugin"
         plugin_dir.mkdir()
@@ -260,26 +285,28 @@ class TestConfigPriority:
         }
         result = _load_plugin_configs(base_config)
 
-        # 验证多级深度合并：项目配置优先
-        assert result["level1"]["level1_key"] == "project-value"  # 项目配置保留
+        # 插件私有 level1 隔离，项目配置的 level1 不受影响
+        assert result["level1"]["level1_key"] == "project-value"
+        assert result["level1"]["level2"]["level2_key"] == "project-value"
+        assert result["level1"]["level2"]["level3_key"] == "project-value"
+        assert "plugin_only" not in result["level1"]["level2"]
         assert (
-            result["level1"]["level2"]["level2_key"] == "project-value"
-        )  # 项目配置保留
+            result["plugin_configs"]["plugin"]["level1"]["level2"]["level3_key"]
+            == "plugin-value"
+        )
         assert (
-            result["level1"]["level2"]["level3_key"] == "project-value"
-        )  # 项目配置覆盖插件配置
-        assert (
-            result["level1"]["level2"]["plugin_only"] == "plugin_data"
-        )  # 插件独有配置保留
+            result["plugin_configs"]["plugin"]["level1"]["level2"]["plugin_only"]
+            == "plugin_data"
+        )
 
     def test_deep_merge_list_append(self, tmp_path):
-        """测试列表追加合并"""
+        """测试扩展点列表追加合并 + 私有列表隔离"""
         # 创建插件
         plugin_dir = tmp_path / "plugin"
         plugin_dir.mkdir()
         plugin_config = {
-            "tool_load_dirs": ["/plugin/tools"],
-            "methodology_dirs": ["/plugin/methods"],
+            "tool_load_dirs": ["/plugin/tools"],  # 扩展点：合并进全局
+            "methodology_dirs": ["/plugin/methods"],  # 私有：隔离
         }
         with open(plugin_dir / "config.yaml", "w", encoding="utf-8") as f:
             yaml.dump(plugin_config, f)
@@ -292,12 +319,15 @@ class TestConfigPriority:
         }
         result = _load_plugin_configs(base_config)
 
-        # 验证列表追加：项目列表 + 插件列表
+        # 扩展点 tool_load_dirs 追加合并；私有 methodology_dirs 隔离
         assert result["tool_load_dirs"] == ["/project/tools", "/plugin/tools"]
-        assert result["methodology_dirs"] == ["/project/methods", "/plugin/methods"]
+        assert result["methodology_dirs"] == ["/project/methods"]  # 项目私有保留
+        assert result["plugin_configs"]["plugin"]["methodology_dirs"] == [
+            "/plugin/methods"
+        ]
 
     def test_deep_mixed_types(self, tmp_path):
-        """测试混合类型合并（项目配置优先）"""
+        """测试混合类型：扩展点合并 + 私有字段隔离"""
         # 创建插件
         plugin_dir = tmp_path / "plugin"
         plugin_dir.mkdir()
@@ -305,9 +335,9 @@ class TestConfigPriority:
             "llm": {
                 "model": "plugin-model",
                 "plugin_key": "plugin_val",
-            },  # 字典：深度合并
-            "tool_load_dirs": ["/plugin/tools"],  # 列表：追加
-            "execute_tool_confirm": True,  # 基本类型：项目配置覆盖
+            },  # 私有字典：隔离
+            "tool_load_dirs": ["/plugin/tools"],  # 扩展点：追加合并
+            "execute_tool_confirm": True,  # 私有标量：隔离
         }
         with open(plugin_dir / "config.yaml", "w", encoding="utf-8") as f:
             yaml.dump(plugin_config, f)
@@ -321,15 +351,17 @@ class TestConfigPriority:
         }
         result = _load_plugin_configs(base_config)
 
-        # 验证混合类型合并：项目配置优先
-        assert result["llm"]["model"] == "project-model"  # 项目配置覆盖插件配置
-        assert result["llm"]["temperature"] == 0.7  # 项目配置保留
-        assert result["llm"]["plugin_key"] == "plugin_val"  # 插件独有配置保留
-        assert result["tool_load_dirs"] == [
-            "/project/tools",
-            "/plugin/tools",
-        ]  # 列表：追加
-        assert result["execute_tool_confirm"] is False  # 项目配置覆盖插件配置
+        # 项目配置的 llm/execute_tool_confirm 不受插件影响
+        assert result["llm"]["model"] == "project-model"
+        assert result["llm"]["temperature"] == 0.7
+        assert "plugin_key" not in result["llm"]
+        # 扩展点 tool_load_dirs 追加合并
+        assert result["tool_load_dirs"] == ["/project/tools", "/plugin/tools"]
+        assert result["execute_tool_confirm"] is False
+        # 插件私有字段隔离
+        assert result["plugin_configs"]["plugin"]["llm"]["model"] == "plugin-model"
+        assert result["plugin_configs"]["plugin"]["llm"]["plugin_key"] == "plugin_val"
+        assert result["plugin_configs"]["plugin"]["execute_tool_confirm"] is True
 
     def test_plugin_dirs_not_list(self):
         """测试 plugin_dirs 格式错误（非列表类型）"""
@@ -358,7 +390,7 @@ class TestConfigPriority:
 
         # 应跳过无效项，加载有效项
         assert result["model"] == "test-model"
-        assert result["valid_key"] == "valid_value"  # 有效插件配置已加载
+        assert result["plugin_configs"]["valid_plugin"]["valid_key"] == "valid_value"
 
     def test_plugin_dir_template_variable(self, tmp_path):
         """测试插件配置中的 {{plugin_dir}} 模板变量"""
@@ -380,11 +412,16 @@ data_path: {{plugin_dir}}/data
         base_config = {"plugin_dirs": [str(plugin_dir)]}
         result = _load_plugin_configs(base_config)
 
-        # 验证模板变量已正确渲染
+        # 验证模板变量已正确渲染：扩展点 tool_load_dirs 进全局，私有字段隔离
         expected_path = str(plugin_dir)
-        assert result["model"] == "plugin-model"
         assert result["tool_load_dirs"] == [f"{expected_path}/tools"]
-        assert result["data_path"] == f"{expected_path}/data"
+        assert "model" not in result
+        assert "data_path" not in result
+        assert result["plugin_configs"]["my_plugin"]["model"] == "plugin-model"
+        assert (
+            result["plugin_configs"]["my_plugin"]["data_path"]
+            == f"{expected_path}/data"
+        )
 
     def test_plugin_dir_template_in_nested_dict(self, tmp_path):
         """测试嵌套字典中的 {{plugin_dir}} 模板变量"""
@@ -408,10 +445,18 @@ llm:
         base_config = {"plugin_dirs": [str(plugin_dir)]}
         result = _load_plugin_configs(base_config)
 
-        # 验证嵌套字典中的模板变量已正确渲染
+        # 私有字段隔离到 plugin_configs，模板变量已正确渲染
         expected_path = str(plugin_dir)
-        assert result["llm"]["cache_dir"] == f"{expected_path}/cache"
-        assert result["llm"]["tools"]["path"] == f"{expected_path}/tools"
+        assert "llm" not in result
+        assert "model" not in result
+        assert (
+            result["plugin_configs"]["nested_plugin"]["llm"]["cache_dir"]
+            == f"{expected_path}/cache"
+        )
+        assert (
+            result["plugin_configs"]["nested_plugin"]["llm"]["tools"]["path"]
+            == f"{expected_path}/tools"
+        )
 
     def test_plugin_dir_template_multiple_occurrences(self, tmp_path):
         """测试配置中多次使用 {{plugin_dir}} 模板变量"""
@@ -433,11 +478,21 @@ path3: {{plugin_dir}}/path3
         base_config = {"plugin_dirs": [str(plugin_dir)]}
         result = _load_plugin_configs(base_config)
 
-        # 验证所有模板变量都已正确渲染
+        # 私有字段隔离到 plugin_configs，所有模板变量都已正确渲染
         expected_path = str(plugin_dir)
-        assert result["path1"] == f"{expected_path}/path1"
-        assert result["path2"] == f"{expected_path}/path2"
-        assert result["path3"] == f"{expected_path}/path3"
+        assert "path1" not in result
+        assert (
+            result["plugin_configs"]["multi_plugin"]["path1"]
+            == f"{expected_path}/path1"
+        )
+        assert (
+            result["plugin_configs"]["multi_plugin"]["path2"]
+            == f"{expected_path}/path2"
+        )
+        assert (
+            result["plugin_configs"]["multi_plugin"]["path3"]
+            == f"{expected_path}/path3"
+        )
 
 
 class TestInstallPlugin:
@@ -683,11 +738,14 @@ class TestAutoDiscoverPlugins:
         base_config = {}
         result = _load_plugin_configs(base_config)
 
-        # 验证自动发现的插件已加载
-        # 使用 sorted() 保证字典序遍历，后加载的覆盖前面的，model 应为 plugin2-model
-        assert result["model"] == "plugin2-model"
-        assert result["key1"] == "value1"
-        assert result["key2"] == "value2"
+        # 自动发现的插件已加载，私有字段隔离到各自的 plugin_configs
+        assert "model" not in result
+        assert "key1" not in result
+        assert "key2" not in result
+        assert result["plugin_configs"]["plugin1"]["model"] == "plugin1-model"
+        assert result["plugin_configs"]["plugin2"]["model"] == "plugin2-model"
+        assert result["plugin_configs"]["plugin1"]["key1"] == "value1"
+        assert result["plugin_configs"]["plugin2"]["key2"] == "value2"
 
     def test_auto_discover_with_config_dirs(self, tmp_path, monkeypatch):
         """测试配置指定的插件目录和自动发现的插件目录合并"""
@@ -715,7 +773,120 @@ class TestAutoDiscoverPlugins:
         base_config = {"plugin_dirs": [str(config_plugin)]}
         result = _load_plugin_configs(base_config)
 
-        # 验证两种插件都已加载
-        assert result["model"] == "config-model"  # 配置指定的插件
-        assert result["config_key"] == "config_value"
-        assert result["auto_key"] == "auto_value"  # 自动发现的插件
+        # 两种插件都已加载，私有字段隔离到各自的 plugin_configs
+        assert "model" not in result
+        assert "config_key" not in result
+        assert "auto_key" not in result
+        assert result["plugin_configs"]["config_plugin"]["model"] == "config-model"
+        assert result["plugin_configs"]["config_plugin"]["config_key"] == "config_value"
+        assert result["plugin_configs"]["auto_plugin"]["auto_key"] == "auto_value"
+
+
+class TestPluginConfigIsolation:
+    """测试插件私有配置隔离到单独配置项的行为"""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, disable_auto_discover):
+        """为所有测试禁用自动发现"""
+        pass
+
+    def test_private_configs_isolated_by_plugin_name(self, tmp_path):
+        """测试两个插件声明同名私有字段时互不覆盖"""
+        # 插件 A 和 B 声明同名私有 dict 字段 private_cfg
+        pa = tmp_path / "pluginA"
+        pa.mkdir()
+        with open(pa / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump({"private_cfg": {"mode": "fast", "retries": 3}}, f)
+
+        pb = tmp_path / "pluginB"
+        pb.mkdir()
+        with open(pb / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump({"private_cfg": {"mode": "slow", "level": 5}}, f)
+
+        base_config = {"plugin_dirs": [str(pa), str(pb)]}
+        result = _load_plugin_configs(base_config)
+
+        # 同名私有字段按插件名隔离，后加载的不会覆盖前面的
+        assert "private_cfg" not in result  # 不污染全局顶层
+        assert result["plugin_configs"]["pluginA"]["private_cfg"] == {
+            "mode": "fast",
+            "retries": 3,
+        }
+        assert result["plugin_configs"]["pluginB"]["private_cfg"] == {
+            "mode": "slow",
+            "level": 5,
+        }
+
+    def test_extension_fields_still_merged(self, tmp_path):
+        """测试扩展点字段仍合并进全局配置，供 getter 消费"""
+        pa = tmp_path / "pluginA"
+        pa.mkdir()
+        with open(pa / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump({"tool_load_dirs": ["/A/tools"], "private_key": "pv"}, f)
+
+        pb = tmp_path / "pluginB"
+        pb.mkdir()
+        with open(pb / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump({"rules_load_dirs": ["/B/rules"]}, f)
+
+        base_config = {"plugin_dirs": [str(pa), str(pb)]}
+        result = _load_plugin_configs(base_config)
+
+        # 扩展点字段合并进全局
+        assert result["tool_load_dirs"] == ["/A/tools"]
+        assert result["rules_load_dirs"] == ["/B/rules"]
+        # 私有字段隔离
+        assert result["plugin_configs"]["pluginA"]["private_key"] == "pv"
+
+    def test_get_plugin_config(self, tmp_path):
+        """测试 get_plugin_config / get_all_plugin_configs getter"""
+        pa = tmp_path / "pluginA"
+        pa.mkdir()
+        with open(pa / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump({"name": "pluginA", "custom": {"k": "v"}}, f)
+
+        base_config = {"plugin_dirs": [str(pa)]}
+        result = _load_plugin_configs(base_config)
+        set_global_config_data(result)
+
+        # get_plugin_config 返回指定插件私有配置
+        assert get_plugin_config("pluginA")["custom"] == {"k": "v"}
+        assert get_plugin_config("pluginA")["name"] == "pluginA"
+        # 不存在的插件返回空字典
+        assert get_plugin_config("nonexistent") == {}
+        # get_all_plugin_configs 返回全部
+        assert "pluginA" in get_all_plugin_configs()
+
+    def test_private_configs_not_pollute_global(self, tmp_path):
+        """测试插件私有字段不污染全局配置顶层"""
+        pa = tmp_path / "pluginA"
+        pa.mkdir()
+        with open(pa / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump(
+                {
+                    "name": "pluginA",
+                    "description": "desc",
+                    "version": "1.0",
+                    "builtin": False,
+                    "license": "MIT",
+                    "custom_field": "custom",
+                },
+                f,
+            )
+
+        base_config = {"plugin_dirs": [str(pa)]}
+        result = _load_plugin_configs(base_config)
+
+        # 元数据字段不污染全局顶层
+        for key in (
+            "name",
+            "description",
+            "version",
+            "builtin",
+            "license",
+            "custom_field",
+        ):
+            assert key not in result, f"{key} 不应出现在全局配置顶层"
+        # 全部隔离到 plugin_configs
+        assert result["plugin_configs"]["pluginA"]["name"] == "pluginA"
+        assert result["plugin_configs"]["pluginA"]["custom_field"] == "custom"
