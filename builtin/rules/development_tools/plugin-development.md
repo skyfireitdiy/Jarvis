@@ -142,7 +142,7 @@ class MyPluginTool:
 
 - 每个功能是纯函数，返回 dict：`{"success": bool, "data": ... / "message": ... / "error": ...}`。
 - 模块末尾定义 `PUBLIC_FUNCTIONS: list[str]` 白名单，gateway 只允许调用白名单内函数（防任意函数被调用）。
-- 工具类通过 importlib 按文件路径加载 `plugin/api.py`（因 `plugin/` 不在 sys.path），参考 gh 插件 `tools/_gh_api.py` 的 `load_api()`。
+- 工具类通过 importlib 按文件路径加载 `plugin/api.py`（因 `plugin/` 不在 sys.path），用 `importlib.util.spec_from_file_location` 加载并缓存，供工具类薄封装调用。
 
 ### 3. 规则（rules/）
 

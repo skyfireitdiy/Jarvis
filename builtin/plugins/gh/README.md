@@ -13,7 +13,7 @@ GitHub 助手插件——自动处理当前仓库的 PR 和 Issue，复用 GitHu
 
 ## 默认仓库
 
-`skyfireitdiy/Jarvis`（GitHub 公开仓库）。各工具可通过 `repo` 参数覆盖，格式 `owner/repo`。
+gh 插件默认处理**当前工作目录对应的 GitHub 仓库**（读取 git remote origin 自动解析）。若需操作其他仓库，可执行 `gh repo set-default owner/repo`，或命令加 `--repo owner/repo` 参数显式指定。
 
 ## 认证方式
 
@@ -30,17 +30,19 @@ gh auth login
 gh auth status
 ```
 
-## 工具清单
+## 常用命令
 
-| 工具             | 说明                          | 认证   |
-| ---------------- | ----------------------------- | ------ |
-| `gh_list_prs`    | 列出 PR（可按 state 过滤）    | 匿名   |
-| `gh_get_pr`      | 查看单个 PR 详情              | 匿名   |
-| `gh_merge_pr`    | 合并 PR（需认证）             | gh CLI |
-| `gh_list_issues` | 列出 Issue（可按 state 过滤） | 匿名   |
-| `gh_get_issue`   | 查看单个 Issue 详情           | 匿名   |
-| `gh_comment`     | 对 PR/Issue 评论（需认证）    | gh CLI |
-| `gh_close_issue` | 关闭 Issue（需认证）          | gh CLI |
+Agent 通过 `execute_script` 直接调用 GitHub 官方 `gh` CLI 完成 GitHub 操作，无需额外工具：
+
+| 命令                                 | 说明                          | 认证   |
+| ------------------------------------ | ----------------------------- | ------ |
+| `gh pr list`                         | 列出 PR（可按 state 过滤）    | 匿名   |
+| `gh pr view <number>`                | 查看单个 PR 详情              | 匿名   |
+| `gh pr merge <number>`               | 合并 PR（需认证）             | gh CLI |
+| `gh issue list`                      | 列出 Issue（可按 state 过滤） | 匿名   |
+| `gh issue view <number>`             | 查看单个 Issue 详情           | 匿名   |
+| `gh issue comment` / `gh pr comment` | 对 PR/Issue 评论（需认证）    | gh CLI |
+| `gh issue close <number>`            | 关闭 Issue（需认证）          | gh CLI |
 
 ## 插件结构
 
@@ -49,11 +51,11 @@ gh/
 ├── config.yaml          # 插件配置（name/version + 扩展点声明）
 ├── README.md
 ├── rules/               # gh 插件使用规则
-├── tools/               # 工具（class XxxTool, name==文件名 stem）
+├── plugin/              # 插件私有功能（api.py + gh_common.py，供前端侧边栏调用）
 └── frontend/            # 前端侧边栏视图（编辑器活动栏 → GitHub）
 ```
 
 ## 相关代码
 
-- GitHub REST API：`https://api.github.com`
+- 前端侧边栏：通过 `plugin/api.py` 调用 GitHub REST API（`https://api.github.com`）
 - 认证：复用 GitHub 官方 `gh` CLI 登录态（`gh auth token`）
