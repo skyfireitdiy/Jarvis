@@ -153,11 +153,37 @@ def fix_tool_call_with_llm(content: str, agent: Any, error_msg: str) -> Optional
         return None
 
 
-def install_plugin(source_path: str) -> bool:
+def _compare_versions(v1: str, v2: str) -> Optional[int]:
+    """比较两个语义化版本号。
+
+    参数:
+        v1: 第一个版本号（如 "1.2.0"）
+        v2: 第二个版本号（如 "1.3.0"）
+
+    返回:
+        int: 1 表示 v1 > v2，0 表示相等，-1 表示 v1 < v2
+        None: 任一版本号无法解析时返回 None
+    """
+    try:
+        from packaging.version import Version
+
+        ver1 = Version(v1)
+        ver2 = Version(v2)
+        if ver1 > ver2:
+            return 1
+        if ver1 < ver2:
+            return -1
+        return 0
+    except Exception:
+        return None
+
+
+def install_plugin(source_path: str, force: bool = False) -> bool:
     """安装插件到 Jarvis 数据目录
 
     参数:
         source_path: 插件源路径，可以是目录或压缩文件（tar/tar.gz/zip）
+        force: 是否强制覆盖已安装的插件（忽略版本比较），默认 False
 
     返回:
         bool: 安装成功返回 True，失败返回 False
@@ -166,6 +192,8 @@ def install_plugin(source_path: str) -> bool:
         1. 校验插件是否包含 config.yaml
         2. 复制或解压到 ~/.jarvis/plugins/插件名/ 下
         3. 插件名从 config.yaml 的 name 字段获取，若无则使用目录名/文件名
+        4. 版本控制：高版本插件可覆盖低版本，低版本不能覆盖高版本
+        5. force=True 时忽略版本比较，强制覆盖
     """
     import os
     import shutil
@@ -245,15 +273,16 @@ def install_plugin(source_path: str) -> bool:
                 shutil.rmtree(temp_dir)
             return False
 
-        # 读取 config.yaml 获取插件名
+        # 读取 config.yaml 获取插件名与版本
+        plugin_version = None
         try:
             with open(config_file, "r", encoding="utf-8") as f:
                 config_content = yaml.safe_load(f)
-                plugin_name = (
-                    config_content.get("name", None)
-                    if isinstance(config_content, dict)
-                    else None
-                )
+                if isinstance(config_content, dict):
+                    plugin_name = config_content.get("name", None)
+                    plugin_version = config_content.get("version", None)
+                else:
+                    plugin_name = None
         except Exception:
             plugin_name = None
 
@@ -274,10 +303,50 @@ def install_plugin(source_path: str) -> bool:
         # 目标安装目录
         target_dir = plugins_dir / plugin_name
 
-        # 如果目标目录已存在，先删除
+        # 如果目标目录已存在，进行版本控制：高版本可覆盖低版本，低版本不能覆盖高版本
         if target_dir.exists():
-            PrettyOutput.auto_print(f"⚠️  插件目录已存在，将覆盖: {target_dir}")
-            shutil.rmtree(target_dir)
+            installed_version = None
+            installed_config_file = target_dir / "config.yaml"
+            if installed_config_file.exists():
+                try:
+                    with open(installed_config_file, "r", encoding="utf-8") as f:
+                        installed_config = yaml.safe_load(f)
+                        if isinstance(installed_config, dict):
+                            installed_version = installed_config.get("version", None)
+                except Exception:
+                    installed_version = None
+
+            # 强制覆盖：忽略版本比较
+            if force:
+                PrettyOutput.auto_print(
+                    f"⚠️  强制覆盖插件目录: {target_dir}（忽略版本比较）"
+                )
+                shutil.rmtree(target_dir)
+            # 双方都有版本号时进行比较
+            elif installed_version and plugin_version:
+                cmp = _compare_versions(plugin_version, installed_version)
+                if cmp is not None and cmp < 0:
+                    PrettyOutput.auto_print(
+                        f"❌ 拒绝安装: 新版本 v{plugin_version} 低于已安装版本 "
+                        f"v{installed_version}（插件 {plugin_name}）"
+                    )
+                    # 清理临时目录
+                    if temp_dir and os.path.exists(temp_dir):
+                        shutil.rmtree(temp_dir)
+                    return False
+                if cmp is not None and cmp >= 0:
+                    PrettyOutput.auto_print(
+                        f"⚠️  插件目录已存在，将覆盖: {target_dir} "
+                        f"(v{installed_version} -> v{plugin_version})"
+                    )
+                else:
+                    # 版本无法解析，保守允许覆盖（保持向后兼容）
+                    PrettyOutput.auto_print(f"⚠️  插件目录已存在，将覆盖: {target_dir}")
+                shutil.rmtree(target_dir)
+            else:
+                # 已安装插件无版本号（旧格式）或新插件无版本号，允许覆盖以兼容旧插件
+                PrettyOutput.auto_print(f"⚠️  插件目录已存在，将覆盖: {target_dir}")
+                shutil.rmtree(target_dir)
 
         # 复制插件到目标目录
         shutil.copytree(plugin_source_dir, target_dir)

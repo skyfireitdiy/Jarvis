@@ -977,6 +977,11 @@ def run_cli(
         "--install-plugin",
         help="安装插件：指定插件目录或压缩文件路径（支持 .tar, .tar.gz, .tgz, .zip）",
     ),
+    install_plugin_force: bool = typer.Option(
+        False,
+        "--install-plugin-force",
+        help="强制覆盖已安装的插件（忽略版本比较，高版本可覆盖低版本，低版本也可强制覆盖）",
+    ),
     uninstall_plugin: Optional[str] = typer.Option(
         None,
         "--uninstall-plugin",
@@ -1007,7 +1012,7 @@ def run_cli(
     if install_plugin:
         from jarvis.jarvis_agent.utils import install_plugin as do_install_plugin
 
-        success = do_install_plugin(install_plugin)
+        success = do_install_plugin(install_plugin, force=install_plugin_force)
         if success:
             PrettyOutput.auto_print("✅ 插件安装成功")
             raise typer.Exit(code=0)
