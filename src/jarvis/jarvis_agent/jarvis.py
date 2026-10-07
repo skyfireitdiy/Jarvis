@@ -975,12 +975,17 @@ def run_cli(
     install_plugin: Optional[str] = typer.Option(
         None,
         "--install-plugin",
-        help="安装插件：指定插件目录或压缩文件路径（支持 .tar, .tar.gz, .tgz, .zip）",
+        help="安装插件：指定插件目录、压缩文件路径或 http(s) URL（支持 .tar, .tar.gz, .tgz, .zip）",
     ),
     install_plugin_force: bool = typer.Option(
         False,
         "--install-plugin-force",
         help="强制覆盖已安装的插件（忽略版本比较，高版本可覆盖低版本，低版本也可强制覆盖）",
+    ),
+    upgrade_plugin: Optional[str] = typer.Option(
+        None,
+        "--upgrade-plugin",
+        help="升级插件：重新下载该插件记录来源 URL 的最新版并覆盖安装（仅支持 URL 安装的插件）",
     ),
     uninstall_plugin: Optional[str] = typer.Option(
         None,
@@ -1012,12 +1017,31 @@ def run_cli(
     if install_plugin:
         from jarvis.jarvis_agent.utils import install_plugin as do_install_plugin
 
-        success = do_install_plugin(install_plugin, force=install_plugin_force)
+        # URL 来源时记录来源 URL，供升级机制使用
+        is_url = install_plugin.startswith("http://") or install_plugin.startswith(
+            "https://"
+        )
+        source_url = install_plugin if is_url else None
+        success = do_install_plugin(
+            install_plugin, force=install_plugin_force, source_url=source_url
+        )
         if success:
             PrettyOutput.auto_print("✅ 插件安装成功")
             raise typer.Exit(code=0)
         else:
             PrettyOutput.auto_print("❌ 插件安装失败")
+            raise typer.Exit(code=1)
+
+    # 处理插件升级参数
+    if upgrade_plugin:
+        from jarvis.jarvis_agent.utils import upgrade_plugin as do_upgrade_plugin
+
+        success = do_upgrade_plugin(upgrade_plugin)
+        if success:
+            PrettyOutput.auto_print("✅ 插件升级成功")
+            raise typer.Exit(code=0)
+        else:
+            PrettyOutput.auto_print("❌ 插件升级失败")
             raise typer.Exit(code=1)
 
     # 处理插件卸载参数

@@ -178,12 +178,158 @@ def _compare_versions(v1: str, v2: str) -> Optional[int]:
         return None
 
 
-def install_plugin(source_path: str, force: bool = False) -> bool:
+def _check_version_constraint(version: str, constraint: str) -> bool:
+    """检查版本是否满足版本约束。
+
+    支持的约束格式（可逗号组合多个条件）：
+        "1.2.0"          精确版本
+        ">=1.2.0"        大于等于
+        ">1.2.0"         大于
+        "<=1.2.0"        小于等于
+        "<1.2.0"         小于
+        "==1.2.0"        精确等于
+        "*"              任意版本
+        ">=1.0.0,<2.0.0" 区间（逗号分隔多个条件，需全部满足）
+
+    参数:
+        version: 待检查的版本号
+        constraint: 版本约束表达式
+
+    返回:
+        bool: 满足约束返回 True，否则返回 False
+    """
+    if not version or not constraint:
+        return True
+    constraint = constraint.strip()
+    if not constraint or constraint == "*":
+        return True
+
+    # 拆分逗号分隔的多个条件，需全部满足
+    parts = [p.strip() for p in constraint.split(",") if p.strip()]
+    if not parts:
+        return True
+
+    from packaging.version import Version
+
+    try:
+        ver = Version(version)
+    except Exception:
+        return False
+
+    for part in parts:
+        # 解析操作符
+        if part.startswith(">="):
+            op, target = ">=", part[2:].strip()
+        elif part.startswith("<="):
+            op, target = "<=", part[2:].strip()
+        elif part.startswith("=="):
+            op, target = "==", part[2:].strip()
+        elif part.startswith(">"):
+            op, target = ">", part[1:].strip()
+        elif part.startswith("<"):
+            op, target = "<", part[1:].strip()
+        else:
+            op, target = "==", part
+
+        try:
+            target_ver = Version(target)
+        except Exception:
+            # 约束目标无法解析，视为不满足
+            return False
+
+        cmp = (ver > target_ver) - (ver < target_ver)
+        if op == ">=" and cmp < 0:
+            return False
+        if op == "<=" and cmp > 0:
+            return False
+        if op == "==" and cmp != 0:
+            return False
+        if op == ">" and cmp <= 0:
+            return False
+        if op == "<" and cmp >= 0:
+            return False
+
+    return True
+
+
+def _check_dependencies(dependencies: Any, plugins_dir: Any) -> list:
+    """检查插件的依赖是否已安装且版本兼容。
+
+    参数:
+        dependencies: config.yaml 中的 dependencies 字段，
+            可为 dict（{插件名: 版本约束}）或 list（[{"name":..., "version":...}]）
+        plugins_dir: 已安装插件的目录
+
+    返回:
+        list: 不满足的依赖列表，每项为 dict（含 name/version_constraint/installed/reason）
+    """
+    if not dependencies:
+        return []
+
+    import yaml
+
+    # 归一化为 dict {name: constraint}
+    dep_map: dict = {}
+    if isinstance(dependencies, dict):
+        dep_map = {str(k): (str(v) if v else "*") for k, v in dependencies.items()}
+    elif isinstance(dependencies, list):
+        for item in dependencies:
+            if isinstance(item, dict):
+                name = item.get("name")
+                if name:
+                    dep_map[str(name)] = str(item.get("version") or "*")
+    else:
+        return []
+
+    missing = []
+    for dep_name, constraint in dep_map.items():
+        dep_dir = plugins_dir / dep_name
+        installed_version = None
+        if dep_dir.exists():
+            config_file = dep_dir / "config.yaml"
+            if config_file.exists():
+                try:
+                    with open(config_file, "r", encoding="utf-8") as f:
+                        cfg = yaml.safe_load(f)
+                        if isinstance(cfg, dict):
+                            installed_version = cfg.get("version")
+                except Exception:
+                    installed_version = None
+
+        if not dep_dir.exists():
+            missing.append(
+                {
+                    "name": dep_name,
+                    "version_constraint": constraint,
+                    "installed": None,
+                    "reason": "未安装",
+                }
+            )
+        elif installed_version is None:
+            # 已安装但无版本号，无法校验，视为满足（保守）
+            continue
+        elif not _check_version_constraint(str(installed_version), constraint):
+            missing.append(
+                {
+                    "name": dep_name,
+                    "version_constraint": constraint,
+                    "installed": str(installed_version),
+                    "reason": f"版本不兼容（已装 {installed_version}，需 {constraint}）",
+                }
+            )
+
+    return missing
+
+
+def install_plugin(
+    source_path: str, force: bool = False, source_url: Optional[str] = None
+) -> bool:
     """安装插件到 Jarvis 数据目录
 
     参数:
-        source_path: 插件源路径，可以是目录或压缩文件（tar/tar.gz/zip）
+        source_path: 插件源路径，可以是目录、压缩文件（tar/tar.gz/zip）或 http(s) URL
         force: 是否强制覆盖已安装的插件（忽略版本比较），默认 False
+        source_url: 来源 URL（可选），安装成功后记录到插件目录，供升级使用
 
     返回:
         bool: 安装成功返回 True，失败返回 False
@@ -194,6 +340,7 @@ def install_plugin(source_path: str, force: bool = False) -> bool:
         3. 插件名从 config.yaml 的 name 字段获取，若无则使用目录名/文件名
         4. 版本控制：高版本插件可覆盖低版本，低版本不能覆盖高版本
         5. force=True 时忽略版本比较，强制覆盖
+        6. 支持从 URL 下载安装，并记录来源 URL 供升级
     """
     import os
     import shutil
@@ -205,10 +352,29 @@ def install_plugin(source_path: str, force: bool = False) -> bool:
 
     from jarvis.jarvis_utils.config import get_data_dir
     from jarvis.jarvis_utils.exception_utils import save_exception
+    from jarvis.jarvis_utils.http import get as http_get
     from jarvis.jarvis_utils.output import PrettyOutput
 
     temp_dir = None  # 预初始化，确保 except 分支可访问（ty 推断局限）
+    download_path = None  # URL 下载的临时文件路径
     try:
+        # 支持 http(s) URL：下载到临时文件后按压缩文件处理
+        if source_path.startswith("http://") or source_path.startswith("https://"):
+            PrettyOutput.auto_print(f"⬇️  正在从 URL 下载插件: {source_path}")
+            try:
+                response = http_get(source_path, stream=True)
+                download_path = tempfile.mkstemp(
+                    prefix="jarvis_plugin_dl_", suffix=".tar.gz"
+                )[1]
+                with open(download_path, "wb") as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+                source_path = download_path
+            except Exception as e:
+                PrettyOutput.auto_print(f"❌ 下载插件失败: {str(e)}")
+                return False
+
         source = Path(source_path).resolve()
 
         if not source.exists():
@@ -275,12 +441,14 @@ def install_plugin(source_path: str, force: bool = False) -> bool:
 
         # 读取 config.yaml 获取插件名与版本
         plugin_version = None
+        plugin_dependencies = None
         try:
             with open(config_file, "r", encoding="utf-8") as f:
                 config_content = yaml.safe_load(f)
                 if isinstance(config_content, dict):
                     plugin_name = config_content.get("name", None)
                     plugin_version = config_content.get("version", None)
+                    plugin_dependencies = config_content.get("dependencies", None)
                 else:
                     plugin_name = None
         except Exception:
@@ -302,6 +470,22 @@ def install_plugin(source_path: str, force: bool = False) -> bool:
 
         # 目标安装目录
         target_dir = plugins_dir / plugin_name
+
+        # 依赖检查：插件声明的依赖必须已安装且版本兼容
+        if plugin_dependencies:
+            missing_deps = _check_dependencies(plugin_dependencies, plugins_dir)
+            if missing_deps:
+                PrettyOutput.auto_print(
+                    f"❌ 依赖检查失败: 插件 {plugin_name} 的以下依赖未满足"
+                )
+                for dep in missing_deps:
+                    PrettyOutput.auto_print(
+                        f"  - {dep['name']} (需 {dep['version_constraint']}): {dep['reason']}"
+                    )
+                # 清理临时目录
+                if temp_dir and os.path.exists(temp_dir):
+                    shutil.rmtree(temp_dir)
+                return False
 
         # 如果目标目录已存在，进行版本控制：高版本可覆盖低版本，低版本不能覆盖高版本
         if target_dir.exists():
@@ -351,9 +535,26 @@ def install_plugin(source_path: str, force: bool = False) -> bool:
         # 复制插件到目标目录
         shutil.copytree(plugin_source_dir, target_dir)
 
+        # 记录来源 URL（供升级机制使用）
+        if source_url:
+            try:
+                with open(target_dir / ".source", "w", encoding="utf-8") as f:
+                    f.write(source_url)
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_agent.utils", function="install_plugin"
+                )
+
         # 清理临时目录
         if temp_dir and os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
+
+        # 清理下载的临时文件
+        if download_path and os.path.exists(download_path):
+            try:
+                os.remove(download_path)
+            except Exception:
+                pass
 
         PrettyOutput.auto_print(f"✅ 插件安装成功: {plugin_name} -> {target_dir}")
         return True
@@ -466,6 +667,53 @@ def uninstall_plugin(plugin_name: str) -> bool:
         return False
 
 
+def upgrade_plugin(plugin_name: str) -> bool:
+    """
+    升级插件
+
+    从插件记录的来源 URL 重新下载最新版并覆盖安装。
+    仅支持通过 URL 安装的插件（存在 .source 文件）。
+
+    Args:
+        plugin_name: 插件名称
+
+    Returns:
+        bool: 升级成功返回 True，失败返回 False
+    """
+    from pathlib import Path
+    from jarvis.jarvis_utils.config import get_data_dir
+    from jarvis.jarvis_utils.output import PrettyOutput
+
+    # 安全处理：只保留文件名部分，防止路径遍历攻击
+    plugin_name = Path(plugin_name).name
+
+    plugins_dir = Path(get_data_dir()) / "plugins"
+    plugin_dir = plugins_dir / plugin_name
+
+    if not plugin_dir.exists():
+        PrettyOutput.auto_print(f"⚠️ 插件不存在: {plugin_name}")
+        return False
+
+    # 读取来源 URL
+    source_file = plugin_dir / ".source"
+    if not source_file.exists():
+        PrettyOutput.auto_print(f"⚠️ 插件 {plugin_name} 不是通过 URL 安装的，无法升级")
+        return False
+
+    try:
+        source_url = source_file.read_text(encoding="utf-8").strip()
+    except Exception as e:
+        PrettyOutput.auto_print(f"❌ 读取插件来源失败: {str(e)}")
+        return False
+
+    if not source_url:
+        PrettyOutput.auto_print(f"⚠️ 插件 {plugin_name} 未记录来源 URL，无法升级")
+        return False
+
+    PrettyOutput.auto_print(f"⬆️  正在升级插件 {plugin_name}（来源: {source_url}）")
+    return install_plugin(source_url, force=True, source_url=source_url)
+
+
 __all__ = [
     "join_prompts",
     "is_auto_complete",
@@ -473,4 +721,5 @@ __all__ = [
     "fix_tool_call_with_llm",
     "install_plugin",
     "uninstall_plugin",
+    "upgrade_plugin",
 ]
