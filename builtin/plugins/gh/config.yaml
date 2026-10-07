@@ -15,6 +15,44 @@ frontend:
 dependencies:
   commands:
     - gh
+replace_map:
+  gh/issue:
+    append: false
+    template: |
+      请处理当前仓库的 GitHub Issue（遵循 gh_rule）。
+      ## 你必须遵守的规则
+      - **必须**：先确认目标仓库，再开始任何操作。
+      - **必须**：读操作（列出/查看）可直接执行；写操作（评论/关闭）
+        前先与用户确认。
+      - **必须**：写操作需 gh 已登录（gh auth status 校验）。
+      - **禁止**：对错误的仓库执行操作。
+      ## 你必须执行的操作
+      1. 用 `gh issue list` 列出当前仓库的 Issue。
+      2. 用 `gh issue view <number>` 查看目标 Issue 详情（含 body/labels）。
+      3. 分析 Issue，明确要解决的问题。
+      4. 如需写码实现，遵循 gh_rule 与相关开发规则完成修改。
+      5. 写操作（评论/关闭）前先与用户确认，再执行
+        `gh issue comment <number> --body "..."` 或 `gh issue close <number>`。
+    description: 处理 GitHub Issue
+  gh/pr:
+    append: false
+    template: |
+      请处理当前仓库的 GitHub Pull Request（遵循 gh_rule）。
+      ## 你必须遵守的规则
+      - **必须**：先确认目标仓库，再开始任何操作。
+      - **必须**：读操作（列出/查看）可直接执行；写操作（评论/合并）
+        前先与用户确认。
+      - **必须**：写操作需 gh 已登录（gh auth status 校验）。
+      - **禁止**：未经用户确认自动合并 PR。
+      ## 你必须执行的操作
+      1. 用 `gh pr list` 列出当前仓库的 Pull Request。
+      2. 用 `gh pr view <number>` 查看 PR 详情，用 `gh pr diff <number>`
+        查看改动。
+      3. 分析 PR 的改动与关联 Issue，评估是否可合并或需修改。
+      4. 如需修改，遵循 gh_rule 与相关开发规则补齐实现/测试。
+      5. 合并前先与用户确认，再执行 `gh pr merge <number>`
+        （可指定 --squash / --rebase / --merge）。
+    description: 处理 GitHub Pull Request
 capabilities:
   - name: "PR 管理"
     description: "列出/查看/合并当前仓库的 Pull Request"

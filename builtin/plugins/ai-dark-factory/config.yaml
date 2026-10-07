@@ -12,6 +12,49 @@ orchestration:
   - name: dark-factory-pipeline
     description: AI 黑灯工厂编排流水线——Specs 进，可工作的软件出
     file: "{{plugin_dir}}/orchestration/dark_factory_pipeline.yaml"
+replace_map:
+  dark-factory/issue:
+    append: false
+    template: |
+      请使用 AI 黑灯工厂工作流开发以下需求（来自 GitHub Issue）。
+      ## 你必须遵守的规则
+      - **必须**：先读取并理解 Issue，把需求转成合格的 NLSpec
+        （Goal/Constraints/Interfaces/Non-goals 四要素）。
+      - **必须**：遵守 spec_writing / tdd_iron_rule / orchestration /
+        holdout_discipline 规则。
+      - **必须**：按 规划 → 生成（TDD）→ 验证 → 门禁 四层推进，不跳阶段。
+      - **必须**：门禁处输出结构化审批报告，交人工审批，不自动合并。
+      - **禁止**：没有 Spec 就开始实现。
+      ## 你必须执行的操作
+      1. 用 `gh issue view <number>` 读取目标 Issue，提取需求。
+      2. 用 spec_validator 工具校验/补全 NLSpec 四要素。
+      3. 调用 pipeline_generator 工具生成黑灯工厂编排 YAML
+        （feature=该需求），或直接用 @OrganizeAgents 加载
+        dark-factory-pipeline 模板。
+      4. 按四层流水线推进：planner 规划 → generator 写码（先写测试）→
+        validator 用 holdout 评估 → orchestrator 计算门禁指标。
+      5. 产出审批报告后交人工确认；通过后如需提交，用 gh 提交 PR。
+    description: 用黑灯工厂工作流开发 Issue 需求
+  dark-factory/pr:
+    append: false
+    template: |
+      请使用 AI 黑灯工厂工作流处理以下 GitHub Pull Request。
+      ## 你必须遵守的规则
+      - **必须**：先读取 PR 的 diff 与关联 Issue，理解改动目标。
+      - **必须**：遵守 spec_writing / tdd_iron_rule / orchestration /
+        holdout_discipline 规则。
+      - **必须**：按 规划 → 生成（TDD）→ 验证 → 门禁 四层推进。
+      - **必须**：门禁处输出审批报告（各场景通过率、失败详情、
+        改动 diff 摘要），交人工审批。
+      - **禁止**：未经人工审批自动合并 PR。
+      ## 你必须执行的操作
+      1. 用 `gh pr view <number>` 读取 PR 详情，用 `gh pr diff <number>` 查看改动。
+      2. 用 spec_validator 校验改动对应的 NLSpec 四要素是否完整。
+      3. 调用 pipeline_generator 生成编排 YAML（feature=PR 改动目标），
+        或直接用 @OrganizeAgents 加载 dark-factory-pipeline。
+      4. 按四层流水线推进：规划 → 生成（补齐缺失实现/测试）→ 验证 → 门禁。
+      5. 产出审批报告交人工确认；通过后如需合并，用 `gh pr merge <number>`（先与用户确认）。
+    description: 用黑灯工厂工作流处理 PR
 capabilities:
   - name: "编排流水线 dark-factory-pipeline"
     description: "多 Agent 自主写码/测试/评估的黑灯工厂流水线，Specs 进可工作的软件出，人类审 pass/fail 报告。"
