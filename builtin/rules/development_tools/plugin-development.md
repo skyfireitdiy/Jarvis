@@ -22,12 +22,15 @@ Jarvis 插件是**按目录组织的可扩展单元**，通过 `config.yaml` 声
 <plugin_name>/
 ├── config.yaml          # 必填：插件配置（name/version + 扩展点声明）
 ├── README.md            # 推荐：开发者文档
+├── plugin/              # 可选：插件私有功能（运行在 gateway，不暴露给 Agent）
 ├── rules/               # 可选：规则（Markdown，带 YAML front matter）
-├── tools/               # 可选：工具（Python 模块，class XxxTool）
+├── tools/               # 可选：Agent 工具（Python 模块，class XxxTool）
 ├── agents/              # 可选：Agent 定义（YAML）
 ├── orchestration/       # 可选：编排流水线（YAML）
 └── frontend/            # 可选：前端扩展（纯浏览器 ES module，用 window.Vue）
 ```
+
+> **工具分两类，物理隔离**：`plugin/` 是插件私有功能（运行在 gateway，供前端代理调用，**不暴露给 Agent**）；`tools/` 是 Agent 工具（运行在 agent 进程，供 Agent 调用）。详见下文「工具（tools/）」与「插件私有功能（plugin/）」。
 
 ## config.yaml 字段规范
 
@@ -122,8 +125,26 @@ class MyPluginTool:
 - 类需具备 `name`/`description`/`parameters`/`execute` 属性，且 `item.name == 文件名 stem` 才会被 `register_tool_by_file` 加载。
 - 可选 `protocol_version`（默认 "1.0"）、`interactive`（True 时要求串行执行）。
 - 工具路径含 `plugins/<name>/` 时，`_infer_source_plugin` 自动反推来源插件名并登记到 `PluginRegistry`，卸载时精确撤销。
+- **运行环境**：Agent 工具运行在 **agent 进程**，由 ToolRegistry 加载，供 Agent 调用。工具类应尽量是私有功能的薄封装（见下节）。
 
-### 2. 规则（rules/）
+### 2. 插件私有功能（plugin/，可选）
+
+插件自己使用的功能实现（如 API 封装、token 管理、业务纯函数）放在 `plugin/` 目录（如 `plugin/api.py`）。
+
+**关键约束：**
+
+- `plugin/` **不声明在 `tool_load_dirs`**，因此不会被 ToolRegistry 加载，**Agent 看不到、调不到**。
+- **运行环境**：插件私有功能运行在 **gateway**（master 进程），供前端代理调用。
+- gateway 前端代理通过 `POST /api/plugins/{node_id}/function-call` 调用私有功能（请求体 `{plugin, function, arguments}`），**只允许**调用模块内 `PUBLIC_FUNCTIONS` 白名单里的函数。
+- Agent 工具（tools/）是私有功能的**薄封装**：只做参数解析、调用私有功能、格式化返回 `{"success","stdout","stderr"}`。
+
+**api.py 约定：**
+
+- 每个功能是纯函数，返回 dict：`{"success": bool, "data": ... / "message": ... / "error": ...}`。
+- 模块末尾定义 `PUBLIC_FUNCTIONS: list[str]` 白名单，gateway 只允许调用白名单内函数（防任意函数被调用）。
+- 工具类通过 importlib 按文件路径加载 `plugin/api.py`（因 `plugin/` 不在 sys.path），参考 gh 插件 `tools/_gh_api.py` 的 `load_api()`。
+
+### 3. 规则（rules/）
 
 Markdown 文件，开头带 YAML front matter：
 
@@ -136,7 +157,7 @@ description: 何时触发该规则（清晰列出触发关键词/场景）。
 
 规则会被 Agent 自动发现并加载，用于约束相关场景下的行为。
 
-### 3. Agent 定义（agents/，可选）
+### 4. Agent 定义（agents/，可选）
 
 YAML 格式，需在 config.yaml 启用 `agent_definition_dirs`：
 
@@ -147,11 +168,11 @@ system_prompt: |
   你是 my-plugin 插件的专用 Agent。
 ```
 
-### 4. 编排（orchestration/，可选）
+### 5. 编排（orchestration/，可选）
 
 YAML 编排流水线，配合 `OrganizeAgents` 与 `jca -n --task-file` 消费。参考 `builtin/agent_orchestration/` 下的示例格式。
 
-### 5. 前端扩展（frontend/，可选）
+### 6. 前端扩展（frontend/，可选）
 
 前端 JS 是**纯浏览器 ES module**：用 `window.Vue` 渲染，导出 default 组件，**不要 `import 'vue'`**。在 config.yaml 的 `frontend` 字段声明 `admin_tabs`/`sidebar_views`/`tool_panels`，每项含 `id`/`title`/`entry`（entry 为 JS 文件名，相对插件 frontend 目录）。
 

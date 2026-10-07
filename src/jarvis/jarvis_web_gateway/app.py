@@ -8277,6 +8277,363 @@ def create_app(
             )
             result = response.get("payload") or {}
             return result
+        return result
+
+    # 插件工具注册表（懒加载，进程内缓存）。只加载插件工具（tools/ 目录），
+    # 不加载内置工具（execute_script 等），避免 gateway 进程引入无关副作用，
+    # 也天然保证前端代理只能调用插件工具。
+    _plugin_tool_registry_holder: Dict[str, Any] = {}
+
+    def _ensure_plugin_tool_registry():
+        """懒加载插件工具注册表（只加载插件 tools/ 目录下的工具）。
+
+        用 ToolRegistry.__new__ 绕过 __init__（不加载内置/外部工具），
+        仅遍历 get_tool_load_dirs()（含各插件 tools/ 目录）用 register_tool_by_file
+        加载插件工具。register_tool_by_file 会登记来源插件到 _external_tool_sources，
+        供工具代理端点校验工具归属。
+        """
+        if _plugin_tool_registry_holder:
+            return _plugin_tool_registry_holder["registry"]
+        from jarvis.jarvis_tools.registry import ToolRegistry
+        from jarvis.jarvis_utils.config import get_tool_load_dirs
+
+        reg = ToolRegistry.__new__(ToolRegistry)
+        reg.tools = {}
+        reg._builtin_tool_names = set()
+        reg._external_tool_sources = {}
+        reg._required_tools = ["execute_script"]
+        reg._all_tools = {}
+
+        for tool_dir in get_tool_load_dirs():
+            p_tool_dir = pathlib.Path(tool_dir)
+            if not p_tool_dir.exists() or not p_tool_dir.is_dir():
+                continue
+            for file_path in sorted(p_tool_dir.glob("*.py")):
+                if file_path.name == "__init__.py":
+                    continue
+                reg.register_tool_by_file(str(file_path))
+
+        _plugin_tool_registry_holder["registry"] = reg
+        return reg
+
+    def _list_plugin_tools() -> List[Dict[str, Any]]:
+        """列出所有可被前端代理调用的插件工具（含来源插件名）。"""
+        """列出所有可被前端代理调用的插件工具（含来源插件名）。"""
+        reg = _ensure_plugin_tool_registry()
+        result = []
+        for name in sorted(reg._all_tools.keys()):
+            tool = reg._all_tools[name]
+            result.append(
+                {
+                    "name": name,
+                    "plugin": reg._external_tool_sources.get(name, ""),
+                    "description": getattr(tool, "description", ""),
+                    "parameters": getattr(tool, "parameters", {}),
+                }
+            )
+        return result
+
+    def _call_plugin_tool(
+        plugin: str, tool: str, arguments: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """在本地执行插件工具（校验工具来源必须匹配指定插件）。"""
+        reg = _ensure_plugin_tool_registry()
+        # 只允许调用来源为指定插件的工具，防止越权调用其它插件/内置工具
+        if tool not in reg._external_tool_sources:
+            return {
+                "success": False,
+                "error": {
+                    "code": "TOOL_NOT_FOUND",
+                    "message": f"插件工具不存在或不可代理调用: {tool}",
+                },
+            }
+        if reg._external_tool_sources[tool] != plugin:
+            return {
+                "success": False,
+                "error": {
+                    "code": "TOOL_PLUGIN_MISMATCH",
+                    "message": f"工具 {tool} 不属于插件 {plugin}",
+                },
+            }
+        if tool not in reg._all_tools:
+            return {
+                "success": False,
+                "error": {
+                    "code": "TOOL_NOT_LOADED",
+                    "message": f"插件工具未加载: {tool}",
+                },
+            }
+        try:
+            result = reg.execute_tool(tool, dict(arguments or {}))
+            if isinstance(result, dict):
+                return result
+            return {"success": True, "stdout": str(result), "stderr": ""}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "TOOL_EXEC_FAILED", "message": str(e)},
+            }
+
+    async def _run_plugin_tool(
+        node_id: str, plugin: str, tool: str, arguments: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """在指定节点上执行插件工具（本地/master 直接执行，子节点转发）。"""
+        if node_id in (node_runtime.local_node_id, "master"):
+            return _call_plugin_tool(plugin, tool, arguments)
+        # 子节点转发（复用插件管理请求通道）
+        node_info = node_runtime.node_registry.get(node_id)
+        if node_info is None:
+            return {
+                "success": False,
+                "error": {
+                    "code": "NODE_NOT_FOUND",
+                    "message": f"Node not found: {node_id}",
+                },
+            }
+        if node_info.status != "online":
+            return {
+                "success": False,
+                "error": {
+                    "code": "NODE_OFFLINE",
+                    "message": f"Node is offline: {node_id}",
+                },
+            }
+        response = await node_connection_manager.send_request_to_node(
+            node_id,
+            PLUGIN_MANAGE_REQUEST,
+            {
+                "action": "call_tool",
+                "plugin": plugin,
+                "tool": tool,
+                "arguments": arguments or {},
+            },
+            timeout=60.0,
+        )
+        result = response.get("payload") or {}
+        return result
+
+    @app.get("/api/plugins/{node_id}/tools", dependencies=[Depends(verify_token)])
+    async def list_plugin_tools(node_id: str, request: Request) -> Dict[str, Any]:
+        """列出指定节点上可被前端代理调用的插件工具（登录用户即可）。"""
+        try:
+            if node_id in (node_runtime.local_node_id, "master"):
+                tools = _list_plugin_tools()
+                return {
+                    "success": True,
+                    "data": {"node_id": node_id, "tools": tools},
+                }
+            result = await _run_plugin_manage(node_id, "list_tools", {})
+            if result.get("success"):
+                return {
+                    "success": True,
+                    "data": {
+                        "node_id": node_id,
+                        "tools": result.get("tools", []),
+                    },
+                }
+            return {
+                "success": False,
+                "error": result.get("error")
+                or {
+                    "code": "LIST_TOOLS_FAILED",
+                    "message": "Failed to list plugin tools",
+                },
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    @app.post("/api/plugins/{node_id}/tool-call", dependencies=[Depends(verify_token)])
+    async def call_plugin_tool(
+        node_id: str, request_body: Dict[str, Any], request: Request
+    ) -> Dict[str, Any]:
+        """在指定节点上代理调用插件工具（登录用户即可）。
+
+        请求体: { plugin, tool, arguments }
+        只允许调用来源为指定插件的工具；内置工具不可被代理调用。
+        """
+        try:
+            plugin = str(request_body.get("plugin") or "").strip()
+            tool = str(request_body.get("tool") or "").strip()
+            arguments = request_body.get("arguments") or {}
+            if not plugin or not tool:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_REQUEST",
+                        "message": "plugin and tool are required",
+                    },
+                }
+            result = await _run_plugin_tool(node_id, plugin, tool, arguments)
+            return result
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    def _list_plugin_functions(node_id: str) -> List[Dict[str, Any]]:
+        """列出本地所有插件的私有功能（读取各插件 plugin/api.py 的 PUBLIC_FUNCTIONS）。
+
+        插件私有功能运行在 gateway，供前端代理调用；不经过 ToolRegistry。
+        """
+        from jarvis.jarvis_agent.utils import list_plugins_info
+
+        result: List[Dict[str, Any]] = []
+        try:
+            plugins = list_plugins_info()
+        except Exception:
+            plugins = []
+        for p in plugins:
+            name = str(p.get("name") or "") if isinstance(p, dict) else str(p)
+            if not name:
+                continue
+            api = NodeConnectionManager._load_plugin_api(name)
+            if api is None:
+                continue
+            functions = []
+            for fn in getattr(api, "PUBLIC_FUNCTIONS", []) or []:
+                if callable(getattr(api, fn, None)):
+                    functions.append(fn)
+            if functions:
+                result.append({"plugin": name, "functions": functions})
+        return result
+
+    def _call_plugin_function(
+        plugin: str, function: str, arguments: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """在本地执行插件私有功能（白名单校验，不经过 ToolRegistry）。"""
+        api = NodeConnectionManager._load_plugin_api(plugin)
+        if api is None:
+            return {
+                "success": False,
+                "error": {
+                    "code": "FUNCTION_API_NOT_FOUND",
+                    "message": f"插件 {plugin} 无私有功能层（plugin/api.py）",
+                },
+            }
+        whitelist = getattr(api, "PUBLIC_FUNCTIONS", []) or []
+        if function not in whitelist or not callable(getattr(api, function, None)):
+            return {
+                "success": False,
+                "error": {
+                    "code": "FUNCTION_NOT_ALLOWED",
+                    "message": f"功能 {function} 不在插件 {plugin} 白名单内",
+                },
+            }
+        try:
+            result = getattr(api, function)(**dict(arguments or {}))
+            if isinstance(result, dict):
+                return {"success": True, "result": result}
+            return {"success": True, "result": {"success": True, "data": result}}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "FUNCTION_EXEC_FAILED", "message": str(e)},
+            }
+
+    async def _run_plugin_function(
+        node_id: str, plugin: str, function: str, arguments: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """在指定节点上执行插件私有功能（本地/master 直接执行，子节点转发）。"""
+        if node_id in (node_runtime.local_node_id, "master"):
+            return _call_plugin_function(plugin, function, arguments)
+        node_info = node_runtime.node_registry.get(node_id)
+        if node_info is None:
+            return {
+                "success": False,
+                "error": {
+                    "code": "NODE_NOT_FOUND",
+                    "message": f"Node not found: {node_id}",
+                },
+            }
+        if node_info.status != "online":
+            return {
+                "success": False,
+                "error": {
+                    "code": "NODE_OFFLINE",
+                    "message": f"Node is offline: {node_id}",
+                },
+            }
+        response = await node_connection_manager.send_request_to_node(
+            node_id,
+            PLUGIN_MANAGE_REQUEST,
+            {
+                "action": "call_function",
+                "name": plugin,
+                "function": function,
+                "arguments": arguments or {},
+            },
+            timeout=60.0,
+        )
+        result = response.get("payload") or {}
+        return result
+
+    @app.get("/api/plugins/{node_id}/functions", dependencies=[Depends(verify_token)])
+    async def list_plugin_functions(node_id: str, request: Request) -> Dict[str, Any]:
+        """列出指定节点上可被前端代理调用的插件私有功能（登录用户即可）。"""
+        try:
+            if node_id in (node_runtime.local_node_id, "master"):
+                functions = _list_plugin_functions(node_id)
+                return {
+                    "success": True,
+                    "data": {"node_id": node_id, "plugins": functions},
+                }
+            result = await _run_plugin_manage(node_id, "list_functions", {})
+            if result.get("success"):
+                return {
+                    "success": True,
+                    "data": {
+                        "node_id": node_id,
+                        "plugins": result.get("functions", []),
+                    },
+                }
+            return {
+                "success": False,
+                "error": result.get("error")
+                or {
+                    "code": "LIST_FUNCTIONS_FAILED",
+                    "message": "Failed to list plugin functions",
+                },
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    @app.post(
+        "/api/plugins/{node_id}/function-call", dependencies=[Depends(verify_token)]
+    )
+    async def call_plugin_function(
+        node_id: str, request_body: Dict[str, Any], request: Request
+    ) -> Dict[str, Any]:
+        """在指定节点上代理调用插件私有功能（登录用户即可）。
+
+        请求体: { plugin, function, arguments }
+        只允许调用插件 api.py PUBLIC_FUNCTIONS 白名单内的功能；不经过 ToolRegistry。
+        """
+        try:
+            plugin = str(request_body.get("plugin") or "").strip()
+            function = str(request_body.get("function") or "").strip()
+            arguments = request_body.get("arguments") or {}
+            if not plugin or not function:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_REQUEST",
+                        "message": "plugin and function are required",
+                    },
+                }
+            result = await _run_plugin_function(node_id, plugin, function, arguments)
+            return result
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
 
     @app.get("/api/plugins", dependencies=[Depends(verify_token)])
     async def list_plugins(request: Request, node_id: str = "master") -> Dict[str, Any]:

@@ -177,7 +177,8 @@
           @mousedown.prevent
           @click="$emit('setSidebarView', 'plugin:' + ext.id)"
         >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <span v-if="ext.iconSvg" class="workspace-activity-plugin-icon" v-html="ext.iconSvg"></span>
+          <svg v-else viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M6 2h4l1 2h2.5a1 1 0 0 1 1 1V13a1 1 0 0 1-1 1H2.5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1H5l1-2Z"/>
             <path d="M8 6.5v4M6 8.5h4"/>
           </svg>
@@ -575,6 +576,18 @@ defineExpose({
   height: 20px;
   display: block;
   object-fit: contain;
+}
+
+.workspace-activity-plugin-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+.workspace-activity-plugin-icon svg {
+  width: 16px;
+  height: 16px;
 }
 
 .workspace-panel-content {

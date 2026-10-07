@@ -271,3 +271,95 @@ def test_upgrade_builtin_plugin_rejected(client, isolated_data_dir):
     body = resp.json()
     assert body["success"] is False
     assert (plugins_dir / "builtin-p").exists()
+
+
+def _make_plugin_with_api(plugin_dir: Path, name: str) -> None:
+    """构造一个含 plugin/api.py 私有功能层的插件。"""
+    _make_plugin(plugin_dir, name)
+    api_dir = plugin_dir / "plugin"
+    api_dir.mkdir(parents=True, exist_ok=True)
+    (api_dir / "api.py").write_text(
+        """def hello(name="world"):
+    return {"success": True, "message": f"hello {name}"}
+
+def secret():
+    return {"success": True, "message": "secret"}
+
+PUBLIC_FUNCTIONS = ["hello"]
+""",
+        encoding="utf-8",
+    )
+
+
+def test_list_plugin_functions(client, isolated_data_dir):
+    """列出插件私有功能（PUBLIC_FUNCTIONS 白名单）。"""
+    plugins_dir = Path(isolated_data_dir) / "plugins"
+    _make_plugin_with_api(plugins_dir / "fn-plugin", "fn-plugin")
+
+    resp = client.get("/api/plugins/master/functions", headers=_auth_headers())
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is True
+    plugins = body["data"]["plugins"]
+    fn_plugin = next((p for p in plugins if p["plugin"] == "fn-plugin"), None)
+    assert fn_plugin is not None
+    assert "hello" in fn_plugin["functions"]
+    assert "secret" not in fn_plugin["functions"]
+
+
+def test_call_plugin_function(client, isolated_data_dir):
+    """调用插件私有功能（白名单内）。"""
+    plugins_dir = Path(isolated_data_dir) / "plugins"
+    _make_plugin_with_api(plugins_dir / "fn-plugin", "fn-plugin")
+
+    resp = client.post(
+        "/api/plugins/master/function-call",
+        json={
+            "plugin": "fn-plugin",
+            "function": "hello",
+            "arguments": {"name": "jarvis"},
+        },
+        headers=_auth_headers(),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is True
+    assert body["result"]["success"] is True
+    assert body["result"]["message"] == "hello jarvis"
+
+
+def test_call_plugin_function_not_in_whitelist(client, isolated_data_dir):
+    """调用不在白名单内的函数被拒绝。"""
+    plugins_dir = Path(isolated_data_dir) / "plugins"
+    _make_plugin_with_api(plugins_dir / "fn-plugin", "fn-plugin")
+
+    resp = client.post(
+        "/api/plugins/master/function-call",
+        json={
+            "plugin": "fn-plugin",
+            "function": "secret",
+            "arguments": {},
+        },
+        headers=_auth_headers(),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "FUNCTION_NOT_ALLOWED"
+
+
+def test_call_plugin_function_plugin_not_found(client, isolated_data_dir):
+    """调用不存在插件的功能返回失败。"""
+    resp = client.post(
+        "/api/plugins/master/function-call",
+        json={
+            "plugin": "no-such-plugin",
+            "function": "hello",
+            "arguments": {},
+        },
+        headers=_auth_headers(),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "FUNCTION_API_NOT_FOUND"

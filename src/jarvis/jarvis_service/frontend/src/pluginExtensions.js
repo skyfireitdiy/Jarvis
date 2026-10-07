@@ -57,6 +57,8 @@ export async function fetchPluginExtensions({
             id: ext.id,
             title: ext.title || ext.id,
             entry: ext.entry,
+            icon: ext.icon || null,
+            iconSvg: null,
             url: buildExtensionUrl({
               nodeId,
               plugin: plugin.name,
@@ -68,6 +70,39 @@ export async function fetchPluginExtensions({
         }
       }
     }
+    // 为配置了图标文件路径的扩展加载 SVG 内容（内联 SVG 直接使用）
+    await Promise.all(
+      extensions.map(async (ext) => {
+        if (!ext.icon) return;
+        if (
+          typeof ext.icon === "string" &&
+          ext.icon.trim().startsWith("<svg")
+        ) {
+          ext.iconSvg = ext.icon;
+          return;
+        }
+        try {
+          const iconUrl = buildExtensionUrl({
+            nodeId,
+            plugin: ext.plugin,
+            entry: ext.icon,
+            baseUrl,
+            getHttpProtocol,
+          });
+          const resp = await fetchWithAuth(iconUrl);
+          if (!resp || !resp.ok) return;
+          const result = await resp.json();
+          if (!result || !result.success) return;
+          const svg = result.data && result.data.content;
+          if (typeof svg === "string" && svg.trim()) ext.iconSvg = svg;
+        } catch (e) {
+          console.warn(
+            `[PluginExtensions] Failed to load icon for ${ext.plugin}/${ext.id}:`,
+            e,
+          );
+        }
+      }),
+    );
   } catch (e) {
     console.warn("[PluginExtensions] Failed to fetch plugin extensions:", e);
   }

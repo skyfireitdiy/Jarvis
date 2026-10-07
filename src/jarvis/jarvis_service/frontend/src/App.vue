@@ -547,7 +547,7 @@
               />
             </div>
             <div v-else-if="isPluginSidebarView(workspaceSidebarView) && activePluginSidebarComp" class="workspace-sidebar-content">
-              <component :is="activePluginSidebarComp" />
+              <component :is="activePluginSidebarComp" :workingDir="pluginSidebarWorkingDir" />
             </div>
             <div v-else class="workspace-sidebar-content">
               <div class="workspace-git-panel">
@@ -2405,6 +2405,17 @@ async function fetchWithAuth(url, options = {}) {
   return response
 }
 
+// 暴露统一的带认证请求函数给插件前端扩展（动态加载的独立 ES module）。
+// 插件侧边栏/面板组件无法访问本组件的 auth.value.token，也不应直接接触 token，
+// 故通过 window.__jarvisFetch 提供统一的认证请求入口：插件只需调用
+//   window.__jarvisFetch(url, options)
+// 即可自动携带 jarvis 认证信息，token 不暴露给插件。
+try {
+  window.__jarvisFetch = (url, options) => fetchWithAuth(url, options)
+} catch (e) {
+  /* ignore */
+}
+
 // URL 解析辅助函数：支持 HTTPS 协议和域名
 
 // 获取当前页面的 HTTP 协议（http:// 或 https://）
@@ -2984,13 +2995,20 @@ function resolvePluginExtensionComponent(ext) {
 function isPluginSidebarView(view) {
   return typeof view === 'string' && view.startsWith('plugin:')
 }
+// 缓存插件侧边栏的异步组件实例，避免 computed 每次返回新的 defineAsyncComponent。
+// 若每次返回新实例，Vue 重渲染 <component :is> 时会视为不同组件反复卸载/重载，
+// 导致插件组件"先渲染正常、随后被清空为空"。
+const pluginSidebarCompCache = new Map()
 // 当前激活的插件侧边栏 view 对应的异步组件（用于 <component :is> 渲染）
 const activePluginSidebarComp = computed(() => {
   const view = workspaceSidebarView.value
   if (!isPluginSidebarView(view)) return null
   const ext = pluginSidebarViews.value.find(e => `plugin:${e.id}` === view)
   if (!ext) return null
-  return defineAsyncComponent(() => resolvePluginExtensionComponent(ext))
+  if (!pluginSidebarCompCache.has(ext.id)) {
+    pluginSidebarCompCache.set(ext.id, defineAsyncComponent(() => resolvePluginExtensionComponent(ext)))
+  }
+  return pluginSidebarCompCache.get(ext.id)
 })
 // 编辑器主区域视图：'file' 显示代码编辑器/diff，'chat' 显示聊天室，'terminal' 显示终端。
 // 已统一为 pane 树模型：唯一 leaf 就是主区域，故主区域视图 = 唯一 leaf 的 view（派生）。
@@ -6393,6 +6411,9 @@ function getGitWorkingDir() {
   if (gitCustomDir.value?.path) return String(gitCustomDir.value.path).trim()
   return String(getGitTargetAgent()?.working_dir || '').trim()
 }
+
+// 插件侧边栏（如 gh）跟随 Git 面板目标工作目录，用于解析当前仓库
+const pluginSidebarWorkingDir = computed(() => getGitWorkingDir())
 
 // 调用后端 Git 只读接口
 async function callGitApi(apiPath, payload) {

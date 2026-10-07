@@ -635,6 +635,71 @@ class NodeConnectionManager:
                         },
                         request_id=request_id,
                     )
+                if action == "list_functions":
+                    name = str(payload.get("name") or "")
+                    api = self._load_plugin_api(name)
+                    functions = []
+                    if api is not None:
+                        whitelist = getattr(api, "PUBLIC_FUNCTIONS", []) or []
+                        for fn in whitelist:
+                            if callable(getattr(api, fn, None)):
+                                functions.append(fn)
+                    return build_node_message(
+                        PLUGIN_MANAGE_RESPONSE,
+                        {
+                            "success": True,
+                            "action": action,
+                            "functions": functions,
+                        },
+                        request_id=request_id,
+                    )
+                if action == "call_function":
+                    name = str(payload.get("name") or "")
+                    function = str(payload.get("function") or "")
+                    arguments = payload.get("arguments") or {}
+                    api = self._load_plugin_api(name)
+                    if api is None:
+                        return build_node_message(
+                            PLUGIN_MANAGE_RESPONSE,
+                            {
+                                "success": False,
+                                "action": action,
+                                "error": {
+                                    "code": "FUNCTION_API_NOT_FOUND",
+                                    "message": f"插件 {name} 无私有功能层（plugin/api.py）",
+                                },
+                            },
+                            request_id=request_id,
+                        )
+                    whitelist = getattr(api, "PUBLIC_FUNCTIONS", []) or []
+                    if function not in whitelist or not callable(getattr(api, function, None)):
+                        return build_node_message(
+                            PLUGIN_MANAGE_RESPONSE,
+                            {
+                                "success": False,
+                                "action": action,
+                                "error": {
+                                    "code": "FUNCTION_NOT_ALLOWED",
+                                    "message": f"功能 {function} 不在插件 {name} 白名单内",
+                                },
+                            },
+                            request_id=request_id,
+                        )
+                    try:
+                        result = getattr(api, function)(**dict(arguments or {}))
+                    except TypeError as te:
+                        result = {"success": False, "error": f"参数错误: {te}"}
+                    except Exception as exc:
+                        result = {"success": False, "error": str(exc)}
+                    return build_node_message(
+                        PLUGIN_MANAGE_RESPONSE,
+                        {
+                            "success": True,
+                            "action": action,
+                            "result": result,
+                        },
+                        request_id=request_id,
+                    )
                 return build_node_message(
                     PLUGIN_MANAGE_RESPONSE,
                     {
@@ -672,14 +737,34 @@ class NodeConnectionManager:
         """
         from jarvis.jarvis_utils.config import get_data_dir
 
-        plugin_dir = (
-            pathlib.Path(get_data_dir()) / "plugins" / pathlib.Path(plugin_name).name
-        )
+        plugin_name = pathlib.Path(plugin_name).name
+        # 插件可能位于外部插件目录（data_dir/plugins/）或内置插件目录（builtin/plugins/）
+        candidate_dirs = []
+        candidate_dirs.append(pathlib.Path(get_data_dir()) / "plugins" / plugin_name)
+        try:
+            from jarvis.jarvis_utils.template_utils import _get_builtin_dir
+
+            builtin_dir = _get_builtin_dir()
+            if builtin_dir is not None:
+                candidate_dirs.append(builtin_dir / "plugins" / plugin_name)
+        except Exception:
+            pass
+
         safe_rel = str(rel_path or "").lstrip("/")
-        target = (plugin_dir / safe_rel).resolve()
-        if not str(target).startswith(str(plugin_dir.resolve())):
-            raise ValueError("invalid frontend path")
-        if not target.is_file():
+        target = None
+        for plugin_dir in candidate_dirs:
+            plugin_root = plugin_dir.resolve()
+            # rel_path 可相对插件目录，也可相对插件 frontend 子目录
+            for base in (plugin_root, plugin_root / "frontend"):
+                candidate = (base / safe_rel).resolve()
+                if not str(candidate).startswith(str(plugin_root)):
+                    raise ValueError("invalid frontend path")
+                if candidate.is_file():
+                    target = candidate
+                    break
+            if target is not None:
+                break
+        if target is None:
             raise FileNotFoundError(f"frontend file not found: {rel_path}")
         content = target.read_text(encoding="utf-8")
         if target.suffix in (".js", ".mjs"):
@@ -691,6 +776,43 @@ class NodeConnectionManager:
         else:
             content_type = "text/plain"
         return content, content_type
+
+    @staticmethod
+    def _load_plugin_api(plugin_name: str):
+        """加载插件 plugin/api.py 私有功能模块（master 与子节点共用）。
+
+        返回模块对象；插件不存在或没有 plugin/api.py 时返回 None。
+        api.py 是插件私有功能层（不暴露给 Agent），供 gateway 前端代理调用。
+        """
+        import importlib.util
+        import sys as _sys
+        from jarvis.jarvis_utils.config import get_data_dir
+
+        plugin_name = pathlib.Path(plugin_name).name
+        # 插件可能位于外部插件目录（data_dir/plugins/）或内置插件目录（builtin/plugins/）
+        candidate_dirs = []
+        candidate_dirs.append(pathlib.Path(get_data_dir()) / "plugins" / plugin_name)
+        try:
+            from jarvis.jarvis_utils.template_utils import _get_builtin_dir
+
+            builtin_dir = _get_builtin_dir()
+            if builtin_dir is not None:
+                candidate_dirs.append(builtin_dir / "plugins" / plugin_name)
+        except Exception:
+            pass
+        for plugin_dir in candidate_dirs:
+            api_path = plugin_dir / "plugin" / "api.py"
+            if api_path.is_file():
+                spec = importlib.util.spec_from_file_location(
+                    f"plugin_api_{plugin_name}", api_path
+                )
+                if spec is None or spec.loader is None:
+                    return None
+                module = importlib.util.module_from_spec(spec)
+                _sys.modules[f"plugin_api_{plugin_name}"] = module
+                spec.loader.exec_module(module)
+                return module
+        return None
 
     async def _handle_node_http_proxy_request(
         self,
