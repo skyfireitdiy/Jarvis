@@ -530,6 +530,33 @@
         }
       },
       "default": {}
+    },
+    "dependencies": {
+      "type": "object",
+      "description": "插件依赖声明（插件 config.yaml 中使用）。支持三类：plugins（插件依赖）、python（Python 包依赖）、commands（系统命令依赖）。旧格式为扁平 dict（{插件名: 版本约束}）或 list，视为插件依赖",
+      "properties": {
+        "plugins": {
+          "type": ["object", "array"],
+          "description": "插件依赖：其他已安装的 Jarvis 插件。对象形式为 {插件名: 版本约束}，数组形式为 [{name, version}]",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "python": {
+          "type": ["object", "array"],
+          "description": "Python 包依赖。对象形式为 {包名: 版本约束}，数组形式为 [{name, version}]",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "commands": {
+          "type": ["array", "object"],
+          "description": "系统命令依赖。数组形式为 [\"git\", \"jq\"]，对象形式为 {\"git\": 任意值}",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
     }
   },
   "additionalProperties": true

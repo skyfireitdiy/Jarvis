@@ -252,16 +252,16 @@ def _check_version_constraint(version: str, constraint: str) -> bool:
     return True
 
 
-def _check_dependencies(dependencies: Any, plugins_dir: Any) -> list:
-    """检查插件的依赖是否已安装且版本兼容。
+def _check_plugin_dependencies(dependencies: Any, plugins_dir: Any) -> list:
+    """检查插件的插件依赖是否已安装且版本兼容。
 
     参数:
-        dependencies: config.yaml 中的 dependencies 字段，
-            可为 dict（{插件名: 版本约束}）或 list（[{"name":..., "version":...}]）
+        dependencies: 插件依赖声明，可为 dict（{插件名: 版本约束}）
+            或 list（[{"name":..., "version":...}]）
         plugins_dir: 已安装插件的目录
 
     返回:
-        list: 不满足的依赖列表，每项为 dict（含 name/version_constraint/installed/reason）
+        list: 不满足的依赖列表，每项为 dict（含 type/name/version_constraint/installed/reason）
     """
     if not dependencies:
         return []
@@ -299,6 +299,7 @@ def _check_dependencies(dependencies: Any, plugins_dir: Any) -> list:
         if not dep_dir.exists():
             missing.append(
                 {
+                    "type": "plugins",
                     "name": dep_name,
                     "version_constraint": constraint,
                     "installed": None,
@@ -311,12 +312,167 @@ def _check_dependencies(dependencies: Any, plugins_dir: Any) -> list:
         elif not _check_version_constraint(str(installed_version), constraint):
             missing.append(
                 {
+                    "type": "plugins",
                     "name": dep_name,
                     "version_constraint": constraint,
                     "installed": str(installed_version),
                     "reason": f"版本不兼容（已装 {installed_version}，需 {constraint}）",
                 }
             )
+
+    return missing
+
+
+def _check_python_dependencies(dependencies: Any) -> list:
+    """检查插件的 Python 包依赖是否已安装且版本兼容。
+
+    参数:
+        dependencies: Python 包依赖声明，可为 dict（{包名: 版本约束}）
+            或 list（[{"name":..., "version":...}]）
+
+    返回:
+        list: 不满足的依赖列表，每项为 dict（含 type/name/version_constraint/installed/reason）
+    """
+    if not dependencies:
+        return []
+
+    import importlib.metadata
+    import importlib.util
+
+    # 归一化为 dict {name: constraint}
+    dep_map: dict = {}
+    if isinstance(dependencies, dict):
+        dep_map = {str(k): (str(v) if v else "*") for k, v in dependencies.items()}
+    elif isinstance(dependencies, list):
+        for item in dependencies:
+            if isinstance(item, dict):
+                name = item.get("name")
+                if name:
+                    dep_map[str(name)] = str(item.get("version") or "*")
+    else:
+        return []
+
+    missing = []
+    for pkg_name, constraint in dep_map.items():
+        # 检查包是否可导入（兼容包名与模块名不同，如 Pillow -> PIL）
+        try:
+            spec = importlib.util.find_spec(pkg_name)
+            installed = spec is not None
+        except Exception:
+            installed = False
+
+        installed_version = None
+        if installed:
+            try:
+                installed_version = importlib.metadata.version(pkg_name)
+            except Exception:
+                installed_version = None
+
+        if not installed:
+            missing.append(
+                {
+                    "type": "python",
+                    "name": pkg_name,
+                    "version_constraint": constraint,
+                    "installed": None,
+                    "reason": "未安装",
+                }
+            )
+        elif installed_version is None:
+            # 已安装但无法读取版本号，无法校验，视为满足（保守）
+            continue
+        elif not _check_version_constraint(str(installed_version), constraint):
+            missing.append(
+                {
+                    "type": "python",
+                    "name": pkg_name,
+                    "version_constraint": constraint,
+                    "installed": str(installed_version),
+                    "reason": f"版本不兼容（已装 {installed_version}，需 {constraint}）",
+                }
+            )
+
+    return missing
+
+
+def _check_command_dependencies(dependencies: Any) -> list:
+    """检查插件的系统命令依赖是否存在于 PATH 中。
+
+    参数:
+        dependencies: 命令依赖声明，可为 list（["git", "jq"]）
+            或 dict（{"git": 任意值}）或 list（[{"name": "git"}]）
+
+    返回:
+        list: 不满足的依赖列表，每项为 dict（含 type/name/version_constraint/installed/reason）
+    """
+    if not dependencies:
+        return []
+
+    import shutil
+
+    # 归一化为命令名列表
+    cmd_names = []
+    if isinstance(dependencies, list):
+        for item in dependencies:
+            if isinstance(item, str):
+                cmd_names.append(item)
+            elif isinstance(item, dict) and item.get("name"):
+                cmd_names.append(str(item["name"]))
+    elif isinstance(dependencies, dict):
+        cmd_names = [str(k) for k in dependencies.keys()]
+
+    missing = []
+    for cmd in cmd_names:
+        if shutil.which(cmd) is None:
+            missing.append(
+                {
+                    "type": "commands",
+                    "name": cmd,
+                    "version_constraint": "*",
+                    "installed": None,
+                    "reason": "命令不存在",
+                }
+            )
+
+    return missing
+
+
+def _check_dependencies(dependencies: Any, plugins_dir: Any) -> list:
+    """检查插件的依赖是否已满足。
+
+    支持三类依赖：
+        1. plugins: 插件依赖（其他已安装的 Jarvis 插件）
+        2. python:  Python 包依赖（可用 importlib 导入）
+        3. commands: 系统命令依赖（PATH 中可找到）
+
+    参数:
+        dependencies: config.yaml 中的 dependencies 字段。
+            新格式为 dict，含 plugins/python/commands 子键；
+            旧格式为扁平 dict（{插件名: 版本约束}）或 list，视为插件依赖。
+        plugins_dir: 已安装插件的目录
+
+    返回:
+        list: 不满足的依赖列表，每项为 dict（含 type/name/version_constraint/installed/reason）
+    """
+    if not dependencies:
+        return []
+
+    # 归一化分类：新格式用 plugins/python/commands 子键，旧格式视为插件依赖
+    if isinstance(dependencies, dict) and any(
+        k in dependencies for k in ("plugins", "python", "commands")
+    ):
+        plugin_deps = dependencies.get("plugins")
+        python_deps = dependencies.get("python")
+        command_deps = dependencies.get("commands")
+    else:
+        plugin_deps = dependencies
+        python_deps = None
+        command_deps = None
+
+    missing = []
+    missing.extend(_check_plugin_dependencies(plugin_deps, plugins_dir))
+    missing.extend(_check_python_dependencies(python_deps))
+    missing.extend(_check_command_dependencies(command_deps))
 
     return missing
 
@@ -475,12 +631,18 @@ def install_plugin(
         if plugin_dependencies:
             missing_deps = _check_dependencies(plugin_dependencies, plugins_dir)
             if missing_deps:
+                type_labels = {
+                    "plugins": "插件",
+                    "python": "Python 包",
+                    "commands": "系统命令",
+                }
                 PrettyOutput.auto_print(
                     f"❌ 依赖检查失败: 插件 {plugin_name} 的以下依赖未满足"
                 )
                 for dep in missing_deps:
+                    label = type_labels.get(dep.get("type"), "依赖")
                     PrettyOutput.auto_print(
-                        f"  - {dep['name']} (需 {dep['version_constraint']}): {dep['reason']}"
+                        f"  - [{label}] {dep['name']} (需 {dep['version_constraint']}): {dep['reason']}"
                     )
                 # 清理临时目录
                 if temp_dir and os.path.exists(temp_dir):
