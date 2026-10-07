@@ -8,6 +8,7 @@ from jarvis.jarvis_utils.config import (
     get_plugin_dirs,
     get_plugin_config,
     get_all_plugin_configs,
+    get_replace_map,
     set_global_config_data,
     GLOBAL_CONFIG_DATA,
 )
@@ -890,3 +891,37 @@ class TestPluginConfigIsolation:
         # 全部隔离到 plugin_configs
         assert result["plugin_configs"]["pluginA"]["name"] == "pluginA"
         assert result["plugin_configs"]["pluginA"]["custom_field"] == "custom"
+
+    def test_replace_map_merged_as_extension_field(self, tmp_path):
+        """测试 replace_map 作为扩展点字段合并进全局，且 get_replace_map 能消费"""
+        pa = tmp_path / "pluginA"
+        pa.mkdir()
+        with open(pa / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump(
+                {
+                    "replace_map": {
+                        "MyTag": {
+                            "append": False,
+                            "template": "hello {{current_dir}}",
+                            "description": "自定义标记",
+                        }
+                    },
+                    "private_key": "pv",
+                },
+                f,
+            )
+
+        base_config = {"plugin_dirs": [str(pa)]}
+        result = _load_plugin_configs(base_config)
+
+        # replace_map 作为扩展点字段合并进全局顶层
+        assert "replace_map" in result
+        assert result["replace_map"]["MyTag"]["description"] == "自定义标记"
+        # 私有字段仍隔离
+        assert result["plugin_configs"]["pluginA"]["private_key"] == "pv"
+
+        # get_replace_map 能消费插件声明的 replace_map（清缓存后生效）
+        set_global_config_data(result)
+        get_replace_map.cache_clear()
+        merged = get_replace_map()
+        assert merged["MyTag"]["description"] == "自定义标记"

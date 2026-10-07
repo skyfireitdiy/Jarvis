@@ -1466,7 +1466,8 @@ def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any
 
 # 插件扩展点字段白名单：这些字段会被合并进全局配置供 getter 消费
 # （get_tool_load_dirs/get_rules_load_dirs/get_agent_definition_dirs/
-#  get_plugin_orchestrations/get_roles_dirs/get_builtin_input_handler_dirs 等）。
+#  get_plugin_orchestrations/get_roles_dirs/get_builtin_input_handler_dirs/
+#  get_replace_map 等）。
 # 其余字段视为插件私有配置，隔离到 plugin_configs 单独配置项，避免污染全局配置、
 # 避免多个插件同名私有字段互相覆盖。
 _PLUGIN_EXTENSION_FIELDS = frozenset(
@@ -1481,6 +1482,7 @@ _PLUGIN_EXTENSION_FIELDS = frozenset(
         "before_tool_call_cb_dirs",
         "before_model_call_cb_dirs",
         "summary_cb_dirs",
+        "replace_map",
     }
 )
 
