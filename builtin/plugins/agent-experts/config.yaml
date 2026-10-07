@@ -1,0 +1,7 @@
+---
+name: agent-experts
+description: 内置专家 Agent 定义集——提供 6 个专家角色，供内置配置选择器选用。
+version: 0.1.0
+license: MIT
+agent_definition_dirs:
+  - "{{plugin_dir}}/agents"
