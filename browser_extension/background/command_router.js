@@ -110,7 +110,7 @@ export class CommandRouter {
       "debugger.send_command": (p) => this.debugExecutor.sendCommand(p),
       "network.get_requests": (p) => this.debugExecutor.getRequests(p),
       // 捕获类
-      "capture.screenshot": (p) => this.captureExecutor.screenshot(p),
+      "capture.screenshot": (p) => this.captureExecutor.screenshot(p, ctx),
       // 书签类
       "bookmark.list": (p) => this.bookmarksExecutor.list(p),
       "bookmark.search": (p) => this.bookmarksExecutor.search(p),
@@ -220,9 +220,10 @@ export class CommandRouter {
   /**
    * 执行一条指令，返回结果信封。
    * @param {object} msg 指令消息
+   * @param {object} [ctx] 执行上下文（命令来源网关与登录 Token），供截图上传等能力使用
    * @returns {Promise<object>} 结果信封
    */
-  async handle(msg) {
+  async handle(msg, ctx = {}) {
     const id = msg?.id;
     const action = msg?.action;
     const params = msg?.params || {};

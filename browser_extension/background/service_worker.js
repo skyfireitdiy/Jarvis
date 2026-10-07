@@ -412,7 +412,12 @@ async function handleMessage(gateway, msg) {
       );
       break;
     case "command": {
-      const result = await router.handle(msg);
+      // 把命令来源网关与登录 Token 传给路由：截图类能力需要把结果上传到
+      // 「调用该命令的 Agent 所在网关」（= 命令来源网关），并复用登录态鉴权。
+      const result = await router.handle(msg, {
+        gateway,
+        token: tokens.get(gatewayKey(gateway)),
+      });
       const client = clients.get(gateway);
       const ok = client && client.send(result);
       if (!ok) {

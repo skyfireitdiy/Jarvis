@@ -5,19 +5,26 @@ import { cmdError } from "../command_router.js";
 export class CaptureExecutor {
   /**
    * 截取指定标签页。
-   * - 普通截图：返回当前视口 PNG（base64，不含 data: 前缀）。
-   * - 整页截图：滚动拼接，返回 { image, width, height, full_page }。
+   * - 普通截图：截取当前视口 PNG，上传到命令来源网关，返回可访问的完整 URL。
+   * - 整页截图：滚动拼接，上传后返回 { url, width, height, full_page }。
+   *
+   * 设计背景：截图 base64 若直接回传给 Agent 会撑爆 LLM 上下文，故扩展把截图
+   * 上传到「调用该命令的 Agent 所在网关」（= 命令来源 gateway，见 ctx），网关
+   * 保存后返回 URL 路径，Agent 用 add_images 加载识图。
    */
-  async screenshot({ tab_id, full_page }) {
+  async screenshot({ tab_id, full_page }, ctx = {}) {
     const tab = await this._resolveTab(tab_id);
     try {
       if (full_page) {
-        return await this._captureFullPage(tab);
+        const shot = await this._captureFullPage(tab);
+        const url = await this._uploadToGateway(shot.image, ctx);
+        return { url, width: shot.width, height: shot.height, full_page: true };
       }
       const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
         format: "png",
       });
-      return this._strip(dataUrl);
+      const image = this._strip(dataUrl);
+      return await this._uploadToGateway(image, ctx);
     } catch (e) {
       const msg = e && e.message ? e.message : String(e);
       if (/Cannot access|chrome:\/\//i.test(msg)) {
@@ -25,6 +32,62 @@ export class CaptureExecutor {
       }
       throw cmdError("EXEC_ERROR", msg);
     }
+  }
+  /**
+   * 把截图 base64 上传到命令来源网关的 /upload 端点，返回可访问的完整 URL。
+   *
+   * 复用网关现有的 /upload 端点（_handle_file_upload）：接收 { file_name, file_data }
+   * 并自动生成唯一文件名，保存到网关 uploads 目录，返回相对 URL /uploads/xxx.png。
+   * 扩展再拼上命令来源网关地址，得到对 Agent 一定可达的完整 URL。
+   *
+   * @param {string} imageBase64 PNG 的 base64（不含 data: 前缀）
+   * @param {object} ctx 执行上下文，含 gateway 与 token
+   * @returns {Promise<string>} 完整可访问的图片 URL
+   */
+  async _uploadToGateway(imageBase64, ctx = {}) {
+    const gateway = String(ctx.gateway || "").trim();
+    if (!gateway) {
+      throw cmdError(
+        "NO_GATEWAY",
+        "缺少命令来源网关地址，无法上传截图。请通过网关下发 capture.screenshot。",
+      );
+    }
+    const token = String(ctx.token || "").trim();
+    const url = `${gateway}/api/node/master/upload`;
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const resp = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        file_name: "screenshot.png",
+        file_data: imageBase64,
+      }),
+    });
+    let body = null;
+    try {
+      body = await resp.json();
+    } catch (e) {
+      body = null;
+    }
+    if (!resp.ok || !body || !body.success) {
+      const errMsg =
+        (body && (body.error || body.detail)) ||
+        `HTTP ${resp.status}`;
+      throw cmdError(
+        "UPLOAD_FAILED",
+        `截图上传到网关失败（${gateway}）：${
+          typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg)
+        }`,
+      );
+    }
+    const fileUrl = body.data && body.data.file_url;
+    if (!fileUrl) {
+      throw cmdError("UPLOAD_FAILED", "网关未返回截图 URL");
+    }
+    // /upload 返回相对 URL（/uploads/xxx.png），拼上命令来源网关得到完整 URL。
+    // 网关即 Agent 的 master_url 网关，Agent 通过该地址访问，故 URL 一定可达。
+    return `${gateway}${String(fileUrl).startsWith("/") ? "" : "/"}${fileUrl}`;
   }
 
   /**
