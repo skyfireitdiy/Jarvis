@@ -46,7 +46,9 @@ def list_issues(repo: Optional[str] = None, state: str = "open") -> Dict[str, An
     if state not in ("open", "closed", "all"):
         return {"success": False, "error": f"无效 state: {state}"}
     resp = gh_common.api_request(
-        "GET", f"/repos/{repo}/issues?state={state}&per_page=100"
+        "GET",
+        f"/repos/{repo}/issues?state={state}&per_page=100",
+        token=gh_common.get_token(),
     )
     if not resp["success"]:
         return {"success": False, "error": resp["error"]}
@@ -81,7 +83,9 @@ def list_prs(repo: Optional[str] = None, state: str = "open") -> Dict[str, Any]:
     if state not in ("open", "closed", "all"):
         return {"success": False, "error": f"无效 state: {state}"}
     resp = gh_common.api_request(
-        "GET", f"/repos/{repo}/pulls?state={state}&per_page=100"
+        "GET",
+        f"/repos/{repo}/pulls?state={state}&per_page=100",
+        token=gh_common.get_token(),
     )
     if not resp["success"]:
         return {"success": False, "error": resp["error"]}
@@ -113,7 +117,9 @@ def get_issue(
         return {"success": False, "error": _repo_err}
     if number is None:
         return {"success": False, "error": "请提供 number（issue 编号）"}
-    resp = gh_common.api_request("GET", f"/repos/{repo}/issues/{number}")
+    resp = gh_common.api_request(
+        "GET", f"/repos/{repo}/issues/{number}", token=gh_common.get_token()
+    )
     if not resp["success"]:
         return {"success": False, "error": resp["error"]}
     issue = resp["data"]
@@ -141,7 +147,9 @@ def get_pr(repo: Optional[str] = None, number: Optional[int] = None) -> Dict[str
         return {"success": False, "error": _repo_err}
     if number is None:
         return {"success": False, "error": "请提供 number（PR 编号）"}
-    resp = gh_common.api_request("GET", f"/repos/{repo}/pulls/{number}")
+    resp = gh_common.api_request(
+        "GET", f"/repos/{repo}/pulls/{number}", token=gh_common.get_token()
+    )
     if not resp["success"]:
         return {"success": False, "error": resp["error"]}
     pr = resp["data"]
@@ -174,7 +182,9 @@ def list_comments(
     if number is None:
         return {"success": False, "error": "请提供 number（issue/PR 编号）"}
     resp = gh_common.api_request(
-        "GET", f"/repos/{repo}/issues/{number}/comments?per_page=100"
+        "GET",
+        f"/repos/{repo}/issues/{number}/comments?per_page=100",
+        token=gh_common.get_token(),
     )
     if not resp["success"]:
         return {"success": False, "error": resp["error"]}
