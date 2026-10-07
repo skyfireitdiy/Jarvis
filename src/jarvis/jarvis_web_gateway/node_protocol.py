@@ -50,6 +50,8 @@ CONFIG_SET_REQUEST = "config_set_request"
 CONFIG_SET_RESPONSE = "config_set_response"
 CODE_UPDATE_TO_MAIN_REQUEST = "code_update_to_main_request"
 CODE_UPDATE_TO_MAIN_RESPONSE = "code_update_to_main_response"
+PLUGIN_MANAGE_REQUEST = "plugin_manage_request"
+PLUGIN_MANAGE_RESPONSE = "plugin_manage_response"
 ERROR = "error"
 
 

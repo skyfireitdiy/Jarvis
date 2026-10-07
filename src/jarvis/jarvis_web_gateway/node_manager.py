@@ -67,6 +67,8 @@ from .node_protocol import (
     CONFIG_SET_RESPONSE,
     CODE_UPDATE_TO_MAIN_REQUEST,
     CODE_UPDATE_TO_MAIN_RESPONSE,
+    PLUGIN_MANAGE_REQUEST,
+    PLUGIN_MANAGE_RESPONSE,
     NODE_AUTH,
     NODE_AUTH_RESULT,
     NODE_HEARTBEAT,
@@ -312,6 +314,20 @@ class NodeConnectionManager:
                         request_id,
                     )
                     continue
+                if message_type == PLUGIN_MANAGE_REQUEST:
+                    logger.info(
+                        "[NODE] handling plugin manage request node_id=%s request_id=%s",
+                        node_id,
+                        request_id,
+                    )
+                    response = self._handle_plugin_manage_request(next_message)
+                    await websocket.send_json(response)
+                    logger.info(
+                        "[NODE] sent plugin manage response node_id=%s request_id=%s",
+                        node_id,
+                        request_id,
+                    )
+                    continue
                 logger.warning(
                     "[NODE] unhandled message node_id=%s type=%s request_id=%s",
                     node_id,
@@ -525,6 +541,156 @@ class NodeConnectionManager:
                 },
                 request_id=request_id,
             )
+
+    def _handle_plugin_manage_request(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        """处理插件管理请求（list/install/uninstall/upgrade/serve_frontend）。
+
+        子节点本地调用 jarvis_agent.utils 的插件管理函数，返回结构化 JSON。
+        通过 PrettyOutput 的 Sink 机制捕获函数内部输出，一并返回给 master 展示。
+        """
+        payload = message.get("payload") or {}
+        request_id = message.get("request_id")
+        action = str(payload.get("action") or "")
+        try:
+            from jarvis.jarvis_agent.utils import (
+                install_plugin,
+                list_plugins_info,
+                uninstall_plugin,
+                upgrade_plugin,
+            )
+            from jarvis.jarvis_utils.output import OutputSink, PrettyOutput
+
+            captured: list[str] = []
+
+            class _CaptureSink(OutputSink):
+                def emit(self, event: Any) -> None:  # pragma: no cover - 简单收集
+                    if event.text:
+                        captured.append(event.text)
+
+            sink = _CaptureSink()
+            PrettyOutput.add_sink(sink)
+            try:
+                if action == "list":
+                    plugins = list_plugins_info()
+                    return build_node_message(
+                        PLUGIN_MANAGE_RESPONSE,
+                        {
+                            "success": True,
+                            "action": action,
+                            "plugins": plugins,
+                            "output": captured,
+                        },
+                        request_id=request_id,
+                    )
+                if action == "install":
+                    source = str(payload.get("source") or "")
+                    force = bool(payload.get("force", False))
+                    ok = install_plugin(source, force=force)
+                    return build_node_message(
+                        PLUGIN_MANAGE_RESPONSE,
+                        {
+                            "success": ok,
+                            "action": action,
+                            "output": captured,
+                        },
+                        request_id=request_id,
+                    )
+                if action == "uninstall":
+                    name = str(payload.get("name") or "")
+                    ok = uninstall_plugin(name)
+                    return build_node_message(
+                        PLUGIN_MANAGE_RESPONSE,
+                        {
+                            "success": ok,
+                            "action": action,
+                            "output": captured,
+                        },
+                        request_id=request_id,
+                    )
+                if action == "upgrade":
+                    name = str(payload.get("name") or "")
+                    ok = upgrade_plugin(name)
+                    return build_node_message(
+                        PLUGIN_MANAGE_RESPONSE,
+                        {
+                            "success": ok,
+                            "action": action,
+                            "output": captured,
+                        },
+                        request_id=request_id,
+                    )
+                if action == "serve_frontend":
+                    name = str(payload.get("name") or "")
+                    rel_path = str(payload.get("path") or "")
+                    content, content_type = self._read_plugin_frontend_file(
+                        name, rel_path
+                    )
+                    return build_node_message(
+                        PLUGIN_MANAGE_RESPONSE,
+                        {
+                            "success": True,
+                            "action": action,
+                            "content": content,
+                            "content_type": content_type,
+                        },
+                        request_id=request_id,
+                    )
+                return build_node_message(
+                    PLUGIN_MANAGE_RESPONSE,
+                    {
+                        "success": False,
+                        "action": action,
+                        "error": {
+                            "code": "INVALID_ACTION",
+                            "message": f"unknown action: {action}",
+                        },
+                    },
+                    request_id=request_id,
+                )
+            finally:
+                PrettyOutput.remove_sink(sink)
+        except Exception as exc:
+            return build_node_message(
+                PLUGIN_MANAGE_RESPONSE,
+                {
+                    "success": False,
+                    "action": action,
+                    "error": {
+                        "code": "PLUGIN_MANAGE_FAILED",
+                        "message": str(exc),
+                    },
+                },
+                request_id=request_id,
+            )
+
+    @staticmethod
+    def _read_plugin_frontend_file(plugin_name: str, rel_path: str) -> tuple[str, str]:
+        """读取插件目录下的前端资源文件内容。
+
+        返回 (文件内容, Content-Type)。rel_path 需为相对路径，且必须位于
+        插件目录内（防目录穿越）。
+        """
+        from jarvis.jarvis_utils.config import get_data_dir
+
+        plugin_dir = (
+            pathlib.Path(get_data_dir()) / "plugins" / pathlib.Path(plugin_name).name
+        )
+        safe_rel = str(rel_path or "").lstrip("/")
+        target = (plugin_dir / safe_rel).resolve()
+        if not str(target).startswith(str(plugin_dir.resolve())):
+            raise ValueError("invalid frontend path")
+        if not target.is_file():
+            raise FileNotFoundError(f"frontend file not found: {rel_path}")
+        content = target.read_text(encoding="utf-8")
+        if target.suffix in (".js", ".mjs"):
+            content_type = "application/javascript"
+        elif target.suffix == ".css":
+            content_type = "text/css"
+        elif target.suffix == ".json":
+            content_type = "application/json"
+        else:
+            content_type = "text/plain"
+        return content, content_type
 
     async def _handle_node_http_proxy_request(
         self,

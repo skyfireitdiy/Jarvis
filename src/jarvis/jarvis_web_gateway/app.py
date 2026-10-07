@@ -106,6 +106,7 @@ from jarvis.jarvis_web_gateway.node_protocol import (
     CONFIG_GET_REQUEST,
     CONFIG_SET_REQUEST,
     CODE_UPDATE_TO_MAIN_REQUEST,
+    PLUGIN_MANAGE_REQUEST,
 )
 from jarvis import __version__ as JARVIS_VERSION
 from jarvis.jarvis_web_gateway.node_runtime import AgentRouteInfo, NodeRuntime
@@ -8150,6 +8151,315 @@ def create_app(
                     "error": {"code": "NOT_FOUND", "message": "Timer not found"},
                 }
             return {"success": True}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    async def _run_plugin_manage(
+        node_id: str, action: str, payload: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """在指定节点上执行插件管理操作（list/install/uninstall/upgrade/serve_frontend）。
+
+        node_id 为本地/master 时直接调用 jarvis_agent.utils 的插件管理函数
+        （用 PrettyOutput 的 Sink 捕获函数内部输出）；否则通过节点协议转发到
+        对应子节点执行。
+        """
+        if node_id in (node_runtime.local_node_id, "master"):
+            from jarvis.jarvis_agent.utils import (
+                install_plugin,
+                list_plugins_info,
+                uninstall_plugin,
+                upgrade_plugin,
+            )
+            from jarvis.jarvis_utils.output import OutputSink, PrettyOutput
+
+            captured: list[str] = []
+
+            class _CaptureSink(OutputSink):
+                def emit(self, event: Any) -> None:  # pragma: no cover - 简单收集
+                    if getattr(event, "text", None):
+                        captured.append(event.text)
+
+            sink = _CaptureSink()
+            PrettyOutput.add_sink(sink)
+            try:
+                if action == "list":
+                    plugins = list_plugins_info()
+                    return {
+                        "success": True,
+                        "action": action,
+                        "plugins": plugins,
+                        "output": captured,
+                    }
+                if action == "install":
+                    source = str(payload.get("source") or "")
+                    force = bool(payload.get("force", False))
+                    ok = install_plugin(source, force=force)
+                    return {
+                        "success": ok,
+                        "action": action,
+                        "output": captured,
+                    }
+                if action == "uninstall":
+                    name = str(payload.get("name") or "")
+                    ok = uninstall_plugin(name)
+                    return {
+                        "success": ok,
+                        "action": action,
+                        "output": captured,
+                    }
+                if action == "upgrade":
+                    name = str(payload.get("name") or "")
+                    ok = upgrade_plugin(name)
+                    return {
+                        "success": ok,
+                        "action": action,
+                        "output": captured,
+                    }
+                if action == "serve_frontend":
+                    name = str(payload.get("name") or "")
+                    rel_path = str(payload.get("path") or "")
+                    content, content_type = (
+                        NodeConnectionManager._read_plugin_frontend_file(name, rel_path)
+                    )
+                    return {
+                        "success": True,
+                        "action": action,
+                        "content": content,
+                        "content_type": content_type,
+                    }
+                return {
+                    "success": False,
+                    "action": action,
+                    "error": {
+                        "code": "INVALID_ACTION",
+                        "message": f"unknown action: {action}",
+                    },
+                }
+            finally:
+                PrettyOutput.remove_sink(sink)
+        else:
+            # 检查远程节点状态
+            node_info = node_runtime.node_registry.get(node_id)
+            if node_info is None:
+                return {
+                    "success": False,
+                    "action": action,
+                    "error": {
+                        "code": "NODE_NOT_FOUND",
+                        "message": f"Node not found: {node_id}",
+                    },
+                }
+            if node_info.status != "online":
+                return {
+                    "success": False,
+                    "action": action,
+                    "error": {
+                        "code": "NODE_OFFLINE",
+                        "message": f"Node is offline: {node_id}",
+                    },
+                }
+            response = await node_connection_manager.send_request_to_node(
+                node_id,
+                PLUGIN_MANAGE_REQUEST,
+                {"action": action, **payload},
+                timeout=60.0,
+            )
+            result = response.get("payload") or {}
+            return result
+
+    @app.get("/api/plugins", dependencies=[Depends(verify_token)])
+    async def list_plugins(request: Request, node_id: str = "master") -> Dict[str, Any]:
+        """列出指定节点已安装的插件（需要 admin:plugins 权限）。"""
+        try:
+            user_info = getattr(request.state, "user_info", None)
+            if _check_permission(user_info, "admin:plugins"):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "PERMISSION_DENIED",
+                        "message": "Permission denied: admin:plugins",
+                    },
+                }
+            result = await _run_plugin_manage(node_id, "list", {})
+            if result.get("success"):
+                return {
+                    "success": True,
+                    "data": {
+                        "node_id": node_id,
+                        "plugins": result.get("plugins", []),
+                        "output": result.get("output", []),
+                    },
+                }
+            error = result.get("error") or {
+                "code": "LIST_PLUGINS_FAILED",
+                "message": "Failed to list plugins",
+            }
+            return {"success": False, "error": error}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    @app.post("/api/plugins/install", dependencies=[Depends(verify_token)])
+    async def install_plugin_api(
+        request_body: Dict[str, Any], request: Request
+    ) -> Dict[str, Any]:
+        """在指定节点安装插件（需要 admin:plugins 权限）。"""
+        try:
+            user_info = getattr(request.state, "user_info", None)
+            if _check_permission(user_info, "admin:plugins"):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "PERMISSION_DENIED",
+                        "message": "Permission denied: admin:plugins",
+                    },
+                }
+            node_id = str(request_body.get("node_id") or "master")
+            source = str(request_body.get("source") or "")
+            force = bool(request_body.get("force", False))
+            if not source:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_REQUEST",
+                        "message": "source is required",
+                    },
+                }
+            result = await _run_plugin_manage(
+                node_id, "install", {"source": source, "force": force}
+            )
+            if result.get("success"):
+                return {
+                    "success": True,
+                    "data": {
+                        "node_id": node_id,
+                        "output": result.get("output", []),
+                    },
+                }
+            error = result.get("error") or {
+                "code": "INSTALL_PLUGIN_FAILED",
+                "message": "Failed to install plugin",
+            }
+            return {"success": False, "error": error}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    @app.post("/api/plugins/{name}/uninstall", dependencies=[Depends(verify_token)])
+    async def uninstall_plugin_api(
+        name: str, request_body: Dict[str, Any], request: Request
+    ) -> Dict[str, Any]:
+        """卸载指定节点的插件（需要 admin:plugins 权限）。"""
+        try:
+            user_info = getattr(request.state, "user_info", None)
+            if _check_permission(user_info, "admin:plugins"):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "PERMISSION_DENIED",
+                        "message": "Permission denied: admin:plugins",
+                    },
+                }
+            node_id = str(request_body.get("node_id") or "master")
+            result = await _run_plugin_manage(node_id, "uninstall", {"name": name})
+            if result.get("success"):
+                return {
+                    "success": True,
+                    "data": {
+                        "node_id": node_id,
+                        "output": result.get("output", []),
+                    },
+                }
+            error = result.get("error") or {
+                "code": "UNINSTALL_PLUGIN_FAILED",
+                "message": "Failed to uninstall plugin",
+            }
+            return {"success": False, "error": error}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    @app.post("/api/plugins/{name}/upgrade", dependencies=[Depends(verify_token)])
+    async def upgrade_plugin_api(
+        name: str, request_body: Dict[str, Any], request: Request
+    ) -> Dict[str, Any]:
+        """升级指定节点的插件（需要 admin:plugins 权限）。"""
+        try:
+            user_info = getattr(request.state, "user_info", None)
+            if _check_permission(user_info, "admin:plugins"):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "PERMISSION_DENIED",
+                        "message": "Permission denied: admin:plugins",
+                    },
+                }
+            node_id = str(request_body.get("node_id") or "master")
+            result = await _run_plugin_manage(node_id, "upgrade", {"name": name})
+            if result.get("success"):
+                return {
+                    "success": True,
+                    "data": {
+                        "node_id": node_id,
+                        "output": result.get("output", []),
+                    },
+                }
+            error = result.get("error") or {
+                "code": "UPGRADE_PLUGIN_FAILED",
+                "message": "Failed to upgrade plugin",
+            }
+            return {"success": False, "error": error}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    @app.get(
+        "/api/plugins/{node_id}/{name}/frontend/{path:path}",
+        dependencies=[Depends(verify_token)],
+    )
+    async def serve_plugin_frontend(
+        node_id: str, name: str, path: str, request: Request
+    ) -> Dict[str, Any]:
+        """读取指定节点插件的前端资源文件（需要 admin:plugins 权限）。"""
+        try:
+            user_info = getattr(request.state, "user_info", None)
+            if _check_permission(user_info, "admin:plugins"):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "PERMISSION_DENIED",
+                        "message": "Permission denied: admin:plugins",
+                    },
+                }
+            result = await _run_plugin_manage(
+                node_id, "serve_frontend", {"name": name, "path": path}
+            )
+            if result.get("success"):
+                return {
+                    "success": True,
+                    "data": {
+                        "node_id": node_id,
+                        "name": name,
+                        "content": result.get("content", ""),
+                        "content_type": result.get("content_type", "text/plain"),
+                    },
+                }
+            error = result.get("error") or {
+                "code": "SERVE_FRONTEND_FAILED",
+                "message": "Failed to serve plugin frontend",
+            }
+            return {"success": False, "error": error}
         except Exception as e:
             return {
                 "success": False,

@@ -54,6 +54,7 @@ from jarvis.jarvis_utils.git_utils import get_diff
 from jarvis.jarvis_utils.git_utils import get_diff_between_commits
 from jarvis.jarvis_utils.git_utils import get_diff_file_list
 from jarvis.jarvis_utils.git_utils import get_latest_commit_hash
+from jarvis.jarvis_utils.git_utils import get_last_commit_reject_reason
 from jarvis.jarvis_utils.git_utils import handle_commit_workflow
 from jarvis.jarvis_utils.git_utils import revert_change
 from jarvis.jarvis_utils.git_utils import reset_confirm_add_new_files_flag
@@ -915,7 +916,10 @@ git reset --hard {start_commit}
                         except Exception as e:
                             PrettyOutput.auto_print(f"⚠️ 备份分支创建异常：{str(e)}")
             else:
+                reject_reason = get_last_commit_reject_reason()
                 final_ret += "\n修改被拒绝\n"
+                if reject_reason:
+                    final_ret += f"# 拒绝原因: {reject_reason}\n"
                 final_ret += f"# 补丁预览（按文件）:\n{per_file_preview}"
         else:
             return

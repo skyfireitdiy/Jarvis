@@ -920,6 +920,59 @@ def list_plugins() -> None:
             PrettyOutput.auto_print("")
 
 
+def list_plugins_info() -> List[dict]:
+    """
+    列出所有已安装插件并返回结构化信息（供 HTTP API 使用）。
+
+    扫描 <data_dir>/plugins/ 目录，读取每个插件的 config.yaml，
+    返回包含 name/description/version/dependencies/frontend 等字段的字典列表。
+
+    返回:
+        list[dict]: 每个元素为插件信息字典，字段：
+            - name: 插件名
+            - description: 描述
+            - version: 版本
+            - dependencies: 依赖声明（若存在）
+            - frontend: 前端扩展声明（若存在）
+            - installed: 是否安装（目录存在且 config 可读）
+    """
+    import yaml
+    from pathlib import Path
+    from jarvis.jarvis_utils.config import get_data_dir
+
+    plugins_dir = Path(get_data_dir()) / "plugins"
+    if not plugins_dir.exists():
+        return []
+
+    plugin_dirs = [d for d in plugins_dir.iterdir() if d.is_dir()]
+    result: List[dict] = []
+    for plugin_dir in sorted(plugin_dirs):
+        config_file = plugin_dir / "config.yaml"
+        info: dict = {
+            "name": plugin_dir.name,
+            "description": "",
+            "version": None,
+            "dependencies": None,
+            "frontend": None,
+            "installed": False,
+        }
+        if config_file.exists():
+            try:
+                with open(config_file, "r", encoding="utf-8") as f:
+                    config = yaml.safe_load(f)
+                if isinstance(config, dict):
+                    info["name"] = config.get("name", plugin_dir.name)
+                    info["description"] = config.get("description", "")
+                    info["version"] = config.get("version", None)
+                    info["dependencies"] = config.get("dependencies", None)
+                    info["frontend"] = config.get("frontend", None)
+                    info["installed"] = True
+            except Exception:
+                info["installed"] = False
+        result.append(info)
+    return result
+
+
 def uninstall_plugin(plugin_name: str) -> bool:
     """
     卸载插件

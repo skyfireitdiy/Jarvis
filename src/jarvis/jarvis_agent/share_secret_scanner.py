@@ -74,6 +74,9 @@ WHITELIST_PATTERNS: List[re.Pattern] = [
     re.compile(r"<[^>]*(?:key|token|secret|password)[^>]*>", re.IGNORECASE),
     re.compile(r"\$\{[^}]*(?:KEY|TOKEN|SECRET|PASSWORD)[^}]*\}"),  # ${ENV_VAR}
     re.compile(r"os\.environ|getenv|process\.env|System\.getenv"),  # 从环境变量读取
+    re.compile(
+        r"-for-unit-tests"
+    ),  # 单元测试占位 token（如 test-token-for-unit-tests）
 ]
 
 # 二进制/资源文件后缀直接跳过，避免误报与性能浪费

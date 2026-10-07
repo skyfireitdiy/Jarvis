@@ -31,6 +31,16 @@ from jarvis.jarvis_utils.utils import decode_output
 # 用于避免在同一流程中重复询问用户是否添加新文件/二进制文件/大代码
 _confirm_add_new_files_called = False
 
+# 记录 handle_commit_workflow 最近一次返回 False 时的具体拒绝原因，
+# 供上层（如 code_agent._on_after_tool_call）在"修改被拒绝"提示中展示，
+# 避免用户/Agent 看不到原因而反复重试。
+_last_commit_reject_reason: str = ""
+
+
+def get_last_commit_reject_reason() -> str:
+    """返回 handle_commit_workflow 最近一次拒绝提交的具体原因（可能为空字符串）。"""
+    return _last_commit_reject_reason
+
 
 def reset_confirm_add_new_files_flag() -> None:
     """重置 confirm_add_new_files 的全局标记
@@ -607,9 +617,13 @@ def handle_commit_workflow(start_commit: Optional[str] = None) -> bool:
     Returns:
         bool: 提交是否成功
     """
+    global _last_commit_reject_reason
+    _last_commit_reject_reason = ""
+
     if is_confirm_before_apply_patch() and not user_confirm(
         "是否要提交代码？", default=True
     ):
+        _last_commit_reject_reason = "用户取消了提交确认"
         revert_change()
         return False
 
@@ -636,10 +650,12 @@ def handle_commit_workflow(start_commit: Optional[str] = None) -> bool:
 
         # 原有逻辑：检查工作区是否有未提交的更改
         if not has_uncommitted_changes():
+            _last_commit_reject_reason = "工作区没有未提交的更改"
             return False
 
         # 在提交前检查是否有大量代码删除
         if not check_large_code_deletion():
+            _last_commit_reject_reason = "检测到大量代码删除，已拒绝提交"
             return False
 
         # 获取当前分支的提交总数
@@ -649,6 +665,9 @@ def handle_commit_workflow(start_commit: Optional[str] = None) -> bool:
             text=False,
         )
         if commit_result.returncode != 0:
+            _last_commit_reject_reason = (
+                "无法获取提交总数（git rev-list --count HEAD 失败）"
+            )
             return False
 
         commit_count = int(decode_output(commit_result.stdout).strip())
@@ -663,7 +682,14 @@ def handle_commit_workflow(start_commit: Optional[str] = None) -> bool:
             capture_output=True,
         )
         return True
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as e:
+        # 捕获 git 命令失败的具体错误输出（如 secret scanner / hook 拦截原因）
+        stderr = decode_output(e.stderr) if e.stderr else ""
+        stdout = decode_output(e.stdout) if e.stdout else ""
+        detail = (stderr or stdout or str(e)).strip()
+        _last_commit_reject_reason = (
+            f"git 提交失败（{e.cmd}）：{detail}" if detail else f"git 提交失败：{e}"
+        )
         return False
 
 

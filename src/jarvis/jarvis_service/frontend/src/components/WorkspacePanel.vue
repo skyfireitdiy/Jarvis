@@ -125,6 +125,20 @@
           </svg>
         </button>
         <button
+          v-if="isAdmin"
+          class="workspace-activity-button"
+          :class="{ active: showSidebar && sidebarView === 'plugins' }"
+          tabindex="-1"
+          @mousedown.prevent
+          @click="$emit('setSidebarView', 'plugins')"
+          title="插件管理"
+        >
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 2h4l1 2h2.5a1 1 0 0 1 1 1V13a1 1 0 0 1-1 1H2.5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1H5l1-2Z"/>
+            <path d="M8 6.5v4M6 8.5h4"/>
+          </svg>
+        </button>
+        <button
           class="workspace-activity-button"
           :class="{ active: showSidebar && sidebarView === 'manage' }"
           tabindex="-1"
@@ -150,6 +164,22 @@
           <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="8" cy="8" r="5.5"/>
             <path d="M8 4.5V8l2.5 1.5"/>
+          </svg>
+        </button>
+        <!-- 插件扩展的侧边栏视图入口（方案2：插件 config.yaml 的 frontend.sidebar_views） -->
+        <button
+          v-for="ext in pluginSidebarViews"
+          :key="'plugin-view-' + ext.id"
+          class="workspace-activity-button"
+          :class="{ active: showSidebar && sidebarView === ('plugin:' + ext.id) }"
+          tabindex="-1"
+          :title="ext.title"
+          @mousedown.prevent
+          @click="$emit('setSidebarView', 'plugin:' + ext.id)"
+        >
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 2h4l1 2h2.5a1 1 0 0 1 1 1V13a1 1 0 0 1-1 1H2.5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1H5l1-2Z"/>
+            <path d="M8 6.5v4M6 8.5h4"/>
           </svg>
         </button>
         <button
@@ -291,7 +321,8 @@ const props = defineProps({
   resizeDirections: Array,
   isAdmin: { type: Boolean, default: false },
   isEditable: { type: Boolean, default: false },
-  hasActiveTab: { type: Boolean, default: false }
+  hasActiveTab: { type: Boolean, default: false },
+  pluginSidebarViews: { type: Array, default: () => [] }
 })
 
 const emit = defineEmits([

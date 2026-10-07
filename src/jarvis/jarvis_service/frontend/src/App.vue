@@ -53,6 +53,7 @@
         :isAdmin="!!auth.userInfo?.is_admin"
         :isEditable="isWorkspaceEditable"
         :hasActiveTab="!!activeWorkspaceTabPath"
+        :pluginSidebarViews="pluginSidebarViews"
         @focus="focusWindow('workspace')"
         @startMove="startWorkspacePanelMove"
         @toggleMaximize="toggleWorkspaceMaximize"
@@ -75,7 +76,7 @@
           <aside v-if="showWorkspaceSidebar" class="workspace-sidebar" :style="{ width: workspaceSidebarWidth + 'px' }">
             <div class="workspace-sidebar-resize-handle" @mousedown="startWorkspaceSidebarResize($event)"></div>
             <div class="workspace-sidebar-header">
-              <span class="workspace-sidebar-title">{{ workspaceSidebarView === 'search' ? '全局搜索' : (workspaceSidebarView === 'git' ? 'Git' : (workspaceSidebarView === 'agents' ? 'Agent 列表' : (workspaceSidebarView === 'manage' ? '增强能力清单' : (workspaceSidebarView === 'timers' ? '定时任务' : '目录树')))) }}</span>
+              <span class="workspace-sidebar-title">{{ workspaceSidebarView === 'search' ? '全局搜索' : (workspaceSidebarView === 'git' ? 'Git' : (workspaceSidebarView === 'agents' ? 'Agent 列表' : (workspaceSidebarView === 'manage' ? '增强能力清单' : (workspaceSidebarView === 'timers' ? '定时任务' : (workspaceSidebarView === 'plugins' ? '插件管理' : (isPluginSidebarView(workspaceSidebarView) ? pluginSidebarTitle(workspaceSidebarView) : '目录树')))))) }}</span>
               <button class="icon-btn-small workspace-sidebar-close-mobile" tabindex="-1" @mousedown.prevent @click="closeWorkspaceSidebar" title="关闭侧边栏">✕</button>
               <button class="icon-btn-small workspace-sidebar-close-desktop" tabindex="-1" @mousedown.prevent @click="closeWorkspaceSidebar" title="关闭侧边栏">✕</button>
             </div>
@@ -535,6 +536,18 @@
                 view="timers"
                 :timers="manageTimers"
               />
+            </div>
+            <div v-else-if="workspaceSidebarView === 'plugins'" class="workspace-sidebar-content">
+              <PluginSidebar
+                :fetchWithAuth="fetchWithAuth"
+                :gatewayUrl="gatewayUrl"
+                :getHttpProtocol="getHttpProtocol"
+                :showToast="showToast"
+                :availableNodeOptions="availableNodeOptions"
+              />
+            </div>
+            <div v-else-if="isPluginSidebarView(workspaceSidebarView) && activePluginSidebarComp" class="workspace-sidebar-content">
+              <component :is="activePluginSidebarComp" />
             </div>
             <div v-else class="workspace-sidebar-content">
               <div class="workspace-git-panel">
@@ -1246,6 +1259,8 @@
       :isSyncingConfig="isSyncingConfig"
       :isUpdatingCode="isUpdatingCode"
       :getToken="getAuthToken"
+      :pluginAdminTabs="pluginAdminTabs"
+      :pluginExtensions="pluginExtensions"
       @update:visible="showAdminPanel = $event"
       @confirmRestartGateway="handleRestartGateway"
       @confirmRestartAllNodes="confirmRestartAllNodes"
@@ -1758,7 +1773,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, triggerRef, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, reactive, ref, triggerRef, watch } from 'vue'
 // 必须用 ESM 版入口：包根路径在打包时会被解析到 min/（AMD 格式），
 // 拿不到 monaco.lsp（Monaco 内置的 LSP 客户端），也无法按 ESM 方式使用。
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.main.js'
@@ -1821,6 +1836,8 @@ import TopologyOverlay from './components/TopologyOverlay.vue'
 import PetLobby from './components/PetLobby.vue'
 import OnboardingTour from './components/OnboardingTour.vue'
 import ManageSidebar from './components/ManageSidebar.vue'
+import PluginSidebar from './components/PluginSidebar.vue'
+import { fetchPluginExtensions, loadExtensionComponent } from './pluginExtensions.js'
 import { ACTIONS as actionDefs, SPACE_COMMANDS } from './actions/registry.js'
 import { resolveCurrentAgentId } from './utils/currentAgentResolver.js'
 
@@ -2917,6 +2934,45 @@ const fileSearchResults = ref([])
 const showWorkspaceSidebar = ref(true)
 // 默认展示 Agent 列表（而非文件目录树）
 const workspaceSidebarView = ref('agents')
+// 插件前端扩展清单（方案2）：从各插件 config.yaml 的 frontend 声明解析而来。
+// 每项：{ nodeId, plugin, extType, id, title, entry, url }
+const pluginExtensions = ref([])
+// 按扩展点类型过滤
+const pluginAdminTabs = computed(() => pluginExtensions.value.filter(e => e.extType === 'admin_tabs'))
+const pluginSidebarViews = computed(() => pluginExtensions.value.filter(e => e.extType === 'sidebar_views'))
+// 动态侧边栏 view 的标题映射：view 名 = `plugin:${id}`
+function pluginSidebarTitle(view) {
+  const ext = pluginSidebarViews.value.find(e => `plugin:${e.id}` === view)
+  return ext ? ext.title : ''
+}
+// 加载插件扩展清单（登录后调用）；失败静默，不影响主界面
+async function loadPluginExtensionsForUi() {
+  if (!hasAuthToken()) return
+  const { host, port } = getGatewayAddress()
+  const exts = await fetchPluginExtensions({
+    fetchWithAuth,
+    nodeId: 'master',
+    baseUrl: `${host}:${port}`,
+    getHttpProtocol,
+  })
+  pluginExtensions.value = exts
+}
+// 异步加载插件扩展组件（供侧边栏/管理面板渲染）
+function resolvePluginExtensionComponent(ext) {
+  return loadExtensionComponent(ext, { fetchWithAuth, getHttpProtocol })
+}
+// 判断某个侧边栏 view 是否为插件扩展 view
+function isPluginSidebarView(view) {
+  return typeof view === 'string' && view.startsWith('plugin:')
+}
+// 当前激活的插件侧边栏 view 对应的异步组件（用于 <component :is> 渲染）
+const activePluginSidebarComp = computed(() => {
+  const view = workspaceSidebarView.value
+  if (!isPluginSidebarView(view)) return null
+  const ext = pluginSidebarViews.value.find(e => `plugin:${e.id}` === view)
+  if (!ext) return null
+  return defineAsyncComponent(() => resolvePluginExtensionComponent(ext))
+})
 // 编辑器主区域视图：'file' 显示代码编辑器/diff，'chat' 显示聊天室，'terminal' 显示终端。
 // 已统一为 pane 树模型：唯一 leaf 就是主区域，故主区域视图 = 唯一 leaf 的 view（派生）。
 // 已分割时主区域语义由各 pane 承载，这里返回 'file' 以兼容历史读点。
@@ -5100,6 +5156,13 @@ function setWorkspaceSidebarView(view) {
   if (view === 'timers') {
     // 切到定时任务视图：任务会变化，拉取最新列表（只读展示）
     refreshManageTimers()
+    nextTick(() => {
+      layoutMonacoEditor()
+    })
+    return
+  }
+  if (view === 'plugins') {
+    // 切到插件视图：插件列表可能变化，拉取最新（组件内部通过 watch 自行加载）
     nextTick(() => {
       layoutMonacoEditor()
     })
@@ -19804,6 +19867,8 @@ onMounted(() => {
     // 页面加载时已有 token（loadSavedToken 回填路径不会触发 watch），补推一次给本机 daemon，
     // 保证 daemon 与页面登录态一致；失败静默，不影响连接主流程。
     syncTokenToDaemon(auth.value.token, window.__jarvisAuthBridge.getGateway())
+    // 加载插件声明的前端扩展点（admin_tabs / sidebar_views / tool_panels）
+    loadPluginExtensionsForUi()
   }
 
   updateViewportHeight()
