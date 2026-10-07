@@ -590,6 +590,7 @@ def scaffold_plugin(name: str, output_dir: Optional[str] = None) -> Optional[str
         agents/          Agent 定义目录模板
         orchestration/   编排流水线模板
         frontend/        前端扩展（admin_tab.js / sidebar_view.js，用 window.Vue）
+        plugin/          插件私有功能（api.py 模板，含 PUBLIC_FUNCTIONS 白名单）
     """
     import os
     from pathlib import Path
@@ -605,9 +606,11 @@ def scaffold_plugin(name: str, output_dir: Optional[str] = None) -> Optional[str
 
     tool_class = _scaffold_class_name(name)
     tool_module = _scaffold_tool_module_name(name)
+    # 插件私有功能函数名基（Python 标识符，连字符替换为下划线）
+    func_base = slug.replace("-", "_")
 
     # 目录结构
-    for sub in ("rules", "tools", "agents", "orchestration", "frontend"):
+    for sub in ("rules", "tools", "agents", "orchestration", "frontend", "plugin"):
         (plugin_dir / sub).mkdir(parents=True, exist_ok=True)
 
     # ---------- config.yaml ----------
@@ -616,12 +619,15 @@ name: {slug}
 description: {name}——请补充插件描述。
 version: 0.1.0
 license: MIT
+builtin: true
 # 扩展点说明（按需启用，路径用 {{{{plugin_dir}}}} 占位，运行时自动渲染）：
 # - rules_load_dirs: 规则目录，规则文件带 YAML front matter（name/description）
 # - tool_load_dirs: 工具目录，工具类 name 必须等于文件名 stem
 # - agent_definition_dirs: Agent 定义目录（YAML 格式）
 # - orchestration: 编排流水线（配合 OrganizeAgents + --task-file 消费）
 # - frontend: 前端扩展点（admin_tabs/sidebar_views/tool_panels，JS 用 window.Vue）
+# - plugin/: 插件私有功能（运行在 gateway，供前端代理调用，不暴露给 Agent）
+#   api.py 末尾需定义 PUBLIC_FUNCTIONS 白名单，gateway 只允许调用白名单内函数。
 rules_load_dirs:
   - "{{{{plugin_dir}}}}/rules"
 tool_load_dirs:
@@ -642,6 +648,10 @@ orchestration:
 #     - id: {slug}-view
 #       title: "{name}"
 #       entry: sidebar_view.js
+# 依赖声明（可选，三类：plugins/python/commands）
+# dependencies:
+#   commands:
+#     - git
 """
     (plugin_dir / "config.yaml").write_text(config, encoding="utf-8")
 
@@ -660,7 +670,8 @@ orchestration:
 ├── tools/               # 工具（class XxxTool, name==文件名 stem）
 ├── agents/              # Agent 定义（可选）
 ├── orchestration/       # 编排流水线（可选）
-└── frontend/            # 前端扩展（可选，用 window.Vue）
+├── frontend/            # 前端扩展（可选，用 window.Vue）
+└── plugin/              # 插件私有功能（可选，运行在 gateway，不暴露给 Agent）
 ```
 
 ## 开发指南
@@ -690,6 +701,16 @@ description: <何时触发该规则>
 ### 4. 编排（orchestration/，可选）
 
 YAML 编排流水线，配合 `OrganizeAgents` 与 `jca -n --task-file` 消费。
+
+### 5. 插件私有功能（plugin/，可选）
+
+插件自己使用的功能实现（如 API 封装、业务纯函数）放在 `plugin/api.py`。
+**不声明在 `tool_load_dirs`**，因此不会被 ToolRegistry 加载，Agent 看不到、调不到；
+运行在 gateway，供前端代理调用。约定：
+
+- 每个功能是纯函数，返回 dict：`{{"success": bool, "data": .../ "message": .../ "error": ...}}`。
+- 模块末尾定义 `PUBLIC_FUNCTIONS: list[str]` 白名单，gateway 只允许调用白名单内函数。
+- 前端通过 `POST /api/plugins/{{node_id}}/function-call` 调用（请求体 `{{plugin, function, arguments}}`）。
 
 ## 安装
 
@@ -838,6 +859,33 @@ export default {
     (plugin_dir / "frontend" / "sidebar_view.js").write_text(
         sidebar_view_js, encoding="utf-8"
     )
+
+    # ---------- plugin/api.py ----------
+    api_py = f'''"""
+{name} 插件私有功能层（运行在 gateway，供前端代理调用；不暴露给 Agent）。
+
+本模块不声明在 tool_load_dirs，因此不会被 ToolRegistry 加载，Agent 看不到、调不到；
+gateway 通过插件功能代理端点（POST /api/plugins/{{node_id}}/function-call）动态加载并调用。
+
+约定：
+- 每个功能是纯函数，返回 dict：{{"success": bool, "data": .../ "message": .../ "error": ...}}。
+- 模块末尾定义 PUBLIC_FUNCTIONS 白名单，gateway 只允许调用白名单内函数。
+"""
+from typing import Any
+from typing import Dict
+
+
+def {func_base}_echo(text: str = "") -> Dict[str, Any]:
+    """示例功能：回显输入文本。请在此实现实际业务逻辑。"""
+    if not text:
+        return {{"success": False, "error": "参数错误：text 不能为空"}}
+    return {{"success": True, "data": {{"echo": text}}}}
+
+
+# gateway 只允许调用白名单内的功能（防任意函数被调用）
+PUBLIC_FUNCTIONS: list[str] = ["{func_base}_echo"]
+'''
+    (plugin_dir / "plugin" / "api.py").write_text(api_py, encoding="utf-8")
 
     PrettyOutput.auto_print(
         f"✅ 插件脚手架已生成: {plugin_dir}\n   安装: jarvis --install-plugin {slug}"
