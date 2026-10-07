@@ -449,36 +449,38 @@ defineExpose({ loadPlugins })
   border: 1px solid rgba(32, 200, 255, 0.3);
   flex-shrink: 0;
 }
-/* 能力悬浮框 */
+/* 能力悬浮框：轻量浮层提示，与条目卡片明显区分 */
 .plugin-cap-tooltip {
   position: fixed;
   z-index: 10000;
-  width: 320px;
+  width: 300px;
   max-width: calc(100vw - 16px);
-  background: var(--bg-primary, #0a0f1c);
-  border: 1px solid var(--accent, #20c8ff);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  padding: 10px 12px;
+  background: rgba(10, 15, 28, 0.88);
+  border: 1px solid rgba(32, 200, 255, 0.22);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  padding: 8px 10px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   /* 悬浮框不拦截鼠标，避免挡住下方条目的鼠标响应 */
   pointer-events: none;
   box-sizing: border-box;
 }
 .plugin-cap-tooltip-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--accent, #20c8ff);
-  margin-bottom: 8px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid var(--border-color, #1a2a3a);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary, #8ba3b8);
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(32, 200, 255, 0.12);
 }
 .plugin-cap-tooltip-body {
-  max-height: 260px;
+  max-height: 240px;
   overflow-y: auto;
 }
 .plugin-cap-tooltip-item {
-  margin-top: 6px;
-  font-size: 12px;
+  margin-top: 5px;
+  font-size: 11px;
   line-height: 1.4;
   word-break: break-word;
 }
@@ -487,10 +489,10 @@ defineExpose({ loadPlugins })
 }
 .plugin-cap-tooltip-name {
   color: var(--text-primary, #d6e4f0);
-  font-weight: 600;
+  font-weight: 500;
 }
 .plugin-cap-tooltip-desc {
-  color: var(--text-secondary, #8ba3b8);
+  color: var(--text-tertiary, #5a6b7d);
 }
 .cap-tip-enter-active,
 .cap-tip-leave-active {

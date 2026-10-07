@@ -10,7 +10,6 @@
         <button class="admin-tab" :class="{ active: activeTab === 'groups' }" @click="switchTab('groups')">权限组</button>
         <button class="admin-tab" :class="{ active: activeTab === 'system' }" @click="switchTab('system')">系统配置</button>
         <button class="admin-tab" :class="{ active: activeTab === 'config' }" @click="switchTab('config')">配置文件</button>
-        <button class="admin-tab" :class="{ active: activeTab === 'plugins' }" @click="switchTab('plugins')">插件管理</button>
         <button
           v-for="ext in pluginAdminTabs"
           :key="'plugin-tab-' + ext.id"
@@ -279,76 +278,6 @@
           </div>
         </div>
       </div>
-      <!-- 插件管理 -->
-      <div v-if="activeTab === 'plugins'" class="tab-content">
-        <div class="form-group">
-          <label>插件管理</label>
-          <span class="form-help" style="margin-bottom:10px">按节点管理已安装的插件（需 admin:plugins 权限）。支持列出、安装、升级、卸载插件。</span>
-          <div class="plugin-node-row">
-            <select v-model="pluginNodeId" class="node-select" @change="loadPlugins">
-              <option value="master">本节点 (master)</option>
-              <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">
-                {{ formatNodeOptionLabel(node) }}
-              </option>
-            </select>
-            <button class="ghost-btn" @click="loadPlugins" :disabled="loadingPlugins">
-              {{ loadingPlugins ? '加载中...' : '刷新' }}
-            </button>
-          </div>
-        </div>
-        <!-- 安装插件 -->
-        <div class="form-group">
-          <label>安装插件</label>
-          <div class="plugin-install-row">
-            <input v-model="installSource" placeholder="插件来源（本地目录/压缩包路径或 http(s):// URL）" />
-            <label class="checkbox-label" style="flex-shrink:0">
-              <input type="checkbox" v-model="installForce" />
-              <span>强制覆盖</span>
-            </label>
-            <button class="ghost-btn" @click="installPlugin" :disabled="installingPlugin || !installSource">
-              {{ installingPlugin ? '安装中...' : '安装' }}
-            </button>
-          </div>
-        </div>
-        <!-- 插件列表 -->
-        <div class="form-group">
-          <div v-if="loadingPlugins" style="text-align:center;padding:16px;color:var(--text-secondary,#888)">加载中...</div>
-          <div v-else class="table-scroll">
-            <table class="admin-table">
-              <thead><tr><th>插件名</th><th>版本</th><th>描述</th><th>能力</th><th>依赖</th><th>前端扩展</th><th>操作</th></tr></thead>
-              <tbody>
-                <tr v-for="plugin in plugins" :key="plugin.name">
-                  <td>
-                    {{ plugin.name }}
-                    <span v-if="plugin.builtin" class="plugin-badge">内置</span>
-                  </td>
-                  <td>{{ plugin.version || '-' }}</td>
-                  <td>{{ plugin.description || '-' }}</td>
-                  <td>
-                    <div v-if="plugin.capabilities && plugin.capabilities.length" class="plugin-caps">
-                      <div v-for="(cap, idx) in plugin.capabilities" :key="idx" class="plugin-cap">
-                        <span class="plugin-cap-name">{{ cap.name }}</span>
-                        <span v-if="cap.description" class="plugin-cap-desc">{{ cap.description }}</span>
-                      </div>
-                    </div>
-                    <span v-else>-</span>
-                  </td>
-                  <td>{{ formatDependencies(plugin.dependencies) }}</td>
-                  <td>{{ plugin.frontend ? '是' : '否' }}</td>
-                  <td>
-                    <div v-if="!plugin.builtin" class="btn-group">
-                      <button class="btn-sm" @click="upgradePlugin(plugin)" :disabled="pluginBusy[plugin.name]">升级</button>
-                      <button class="btn-sm danger" @click="uninstallPlugin(plugin)" :disabled="pluginBusy[plugin.name]">卸载</button>
-                    </div>
-                    <span v-else class="plugin-builtin-hint">内置插件</span>
-                  </td>
-                </tr>
-                <tr v-if="plugins.length === 0"><td colspan="7" style="text-align:center;color:var(--text-secondary,#888)">该节点暂无已安装插件</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
       <!-- 插件扩展的 admin_tabs 动态内容（方案2：插件 config.yaml 的 frontend.admin_tabs） -->
       <div v-if="isPluginAdminTab(activeTab) && activePluginAdminTabComp" class="tab-content">
         <component :is="activePluginAdminTabComp" />
@@ -431,15 +360,6 @@ const exporting = ref(false)
 const importing = ref(false)
 const importFileEl = ref(null)
 
-// 插件管理相关状态
-const pluginNodeId = ref('master')
-const plugins = ref([])
-const loadingPlugins = ref(false)
-const installingPlugin = ref(false)
-const installSource = ref('')
-const installForce = ref(false)
-const pluginBusy = ref({})
-
 // 权限Schema：资源→动作列表（动态从后端 /api/permissions/schema 加载，避免硬编码）
 const permissionSchema = ref({})
 const resourceLabels = {
@@ -491,7 +411,6 @@ function switchTab(tab) {
   showResetPassword.value = false
   showEditGroup.value = false
   showGroupAssign.value = false
-  if (tab === 'plugins') loadPlugins()
 }
 
 // ---- 插件扩展的 admin_tabs（方案2：插件 config.yaml 的 frontend.admin_tabs）----
@@ -934,95 +853,7 @@ const maskedNodeSecret = computed(() => {
   return `${secret.slice(0, 8)}${'*'.repeat(secret.length - 16)}${secret.slice(-8)}`
 })
 
-// ===== 插件管理功能 =====
-function formatDependencies(deps) {
-  if (!deps) return '-'
-  if (Array.isArray(deps)) return deps.length ? deps.join(', ') : '-'
-  if (typeof deps === 'object') {
-    const parts = []
-    if (deps.plugins) {
-      const p = deps.plugins
-      if (Array.isArray(p)) parts.push(p.map(x => x.name || x).join(', '))
-      else if (typeof p === 'object') parts.push(Object.keys(p).join(', '))
-      else parts.push(String(p))
-    }
-    if (deps.python) {
-      const py = deps.python
-      if (Array.isArray(py)) parts.push(py.join(', '))
-      else if (typeof py === 'object') parts.push(Object.keys(py).join(', '))
-      else parts.push(String(py))
-    }
-    if (deps.commands) {
-      const c = deps.commands
-      parts.push(Array.isArray(c) ? c.join(', ') : String(c))
-    }
-    return parts.length ? parts.join('; ') : '-'
-  }
-  return String(deps)
-}
 
-async function loadPlugins() {
-  loadingPlugins.value = true
-  try {
-    const resp = await props.fetchWithAuth(buildApiUrl(`/api/node/${encodeURIComponent(pluginNodeId.value)}/plugins`))
-    const result = await resp.json()
-    if (result.success) plugins.value = result.data?.plugins || []
-    else props.showToast(result.error?.message || '加载插件失败', 'error')
-  } catch (e) { props.showToast('加载插件失败: ' + e.message, 'error') }
-  finally { loadingPlugins.value = false }
-}
-
-async function installPlugin() {
-  if (!installSource.value) { props.showToast('请填写插件来源', 'warning'); return }
-  installingPlugin.value = true
-  try {
-    const resp = await props.fetchWithAuth(buildApiUrl(`/api/node/${encodeURIComponent(pluginNodeId.value)}/plugins/install`), {
-      method: 'POST',
-      body: JSON.stringify({
-        source: installSource.value,
-        force: installForce.value,
-      }),
-    })
-    const result = await resp.json()
-    if (result.success) {
-      props.showToast('插件安装成功', 'success')
-      installSource.value = ''
-      installForce.value = false
-      loadPlugins()
-    } else props.showToast(result.error?.message || '插件安装失败', 'error')
-  } catch (e) { props.showToast('插件安装失败: ' + e.message, 'error') }
-  finally { installingPlugin.value = false }
-}
-
-async function upgradePlugin(plugin) {
-  if (!confirm(`确定升级插件 ${plugin.name}？`)) return
-  pluginBusy.value = { ...pluginBusy.value, [plugin.name]: true }
-  try {
-    const resp = await props.fetchWithAuth(buildApiUrl(`/api/node/${encodeURIComponent(pluginNodeId.value)}/plugins/${encodeURIComponent(plugin.name)}/upgrade`), {
-      method: 'POST',
-      body: JSON.stringify({}),
-    })
-    const result = await resp.json()
-    if (result.success) { props.showToast(`插件 ${plugin.name} 已升级`, 'success'); loadPlugins() }
-    else props.showToast(result.error?.message || '插件升级失败', 'error')
-  } catch (e) { props.showToast('插件升级失败: ' + e.message, 'error') }
-  finally { pluginBusy.value = { ...pluginBusy.value, [plugin.name]: false } }
-}
-
-async function uninstallPlugin(plugin) {
-  if (!confirm(`确定卸载插件 ${plugin.name}？此操作不可恢复。`)) return
-  pluginBusy.value = { ...pluginBusy.value, [plugin.name]: true }
-  try {
-    const resp = await props.fetchWithAuth(buildApiUrl(`/api/node/${encodeURIComponent(pluginNodeId.value)}/plugins/${encodeURIComponent(plugin.name)}/uninstall`), {
-      method: 'POST',
-      body: JSON.stringify({}),
-    })
-    const result = await resp.json()
-    if (result.success) { props.showToast(`插件 ${plugin.name} 已卸载`, 'success'); loadPlugins() }
-    else props.showToast(result.error?.message || '插件卸载失败', 'error')
-  } catch (e) { props.showToast('插件卸载失败: ' + e.message, 'error') }
-  finally { pluginBusy.value = { ...pluginBusy.value, [plugin.name]: false } }
-}
 </script>
 
 <style scoped>
@@ -1498,82 +1329,7 @@ async function uninstallPlugin(plugin) {
   cursor: not-allowed;
 }
 
-/* 插件管理 */
-.plugin-node-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.plugin-node-row .node-select {
-  flex: 1;
-  padding: 8px 12px;
-  background: var(--bg-secondary, #0b1424);
-  border: none;
-  border-radius: 6px;
-  color: var(--text-primary, #d6e4f0);
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-.plugin-node-row .node-select:focus {
-  outline: none;
-  border-color: var(--accent, #20c8ff);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-}
-.plugin-install-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.plugin-install-row input {
-  flex: 1;
-  padding: 8px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--border-color, #1a2a3a);
-  background: var(--bg-primary, #080c16);
-  color: var(--text-primary, #d6e4f0);
-  font-size: 13px;
-  outline: none;
-  transition: border-color 0.2s;
-}
-.plugin-install-row input:focus {
-  border-color: var(--accent, #20c8ff);
-}
 
-.plugin-badge {
-  display: inline-block;
-  margin-left: 6px;
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: rgba(32, 200, 255, 0.12);
-  color: var(--accent, #20c8ff);
-  border: 1px solid rgba(32, 200, 255, 0.3);
-  vertical-align: middle;
-}
-.plugin-caps {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-width: 320px;
-}
-.plugin-cap {
-  font-size: 12px;
-  line-height: 1.4;
-  word-break: break-word;
-}
-.plugin-cap-name {
-  color: var(--text-primary, #d6e4f0);
-  font-weight: 600;
-}
-.plugin-cap-desc {
-  margin-left: 4px;
-  color: var(--text-secondary, #8ba3b8);
-}
-.plugin-builtin-hint {
-  font-size: 12px;
-  color: var(--text-secondary, #8ba3b8);
-}
 
 /* ==================== 移动端适配 (< 768px) ==================== */
 @media (max-width: 768px) {
