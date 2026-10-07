@@ -171,7 +171,23 @@ class SkillInstaller:
             # clone 失败时清理残留目录
             if os.path.exists(target_skill_dir):
                 shutil.rmtree(target_skill_dir)
-            raise ValueError(f"Git clone 失败：{result.stderr}")
+            stderr = (result.stderr or "").strip()
+            # 认证类错误通常意味着仓库不存在/私有/需认证，而非网络问题，
+            # 给出更明确的提示，避免误导性的 "could not read Username"
+            auth_hints = (
+                "could not read Username",
+                "Authentication failed",
+                "Invalid username or token",
+                "could not read Password",
+                "Repository not found",
+                "remote: Repository not found",
+            )
+            if any(h in stderr for h in auth_hints):
+                raise ValueError(
+                    f"Git clone 失败：仓库 '{clone_url}' 无法访问（可能不存在、已删除、"
+                    f"为私有仓库或需要认证）。请确认该技能仓库仍可公开访问。\n原始错误：{stderr}"
+                )
+            raise ValueError(f"Git clone 失败：{stderr}")
 
         # 定位技能子目录中的 SKILL.md
         skill_md_path = (

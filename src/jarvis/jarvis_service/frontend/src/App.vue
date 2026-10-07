@@ -16170,9 +16170,14 @@ function _debouncedSaveExecHistory(executionId, targetAgentId) {
           execution_id: msg.execution_id,
           context: msg.context,
           is_finished: msg.is_finished || false,
-          // terminal_content 尚未生成时用 execution_chunks 兜底，
-          // 避免刷新后落盘数据 is_finished 但无内容可显示
-          terminal_content: msg.terminal_content || (msg.execution_chunks || []).join(''),
+          // terminal_content 仅在执行已结束时用 execution_chunks 兜底，
+          // 避免刷新后落盘数据 is_finished 但无内容可显示。
+          // 执行进行中（is_finished=false）必须保持 terminal_content 为空，
+          // 否则切换回该 Agent 时模板会因 !item.terminal_content 不成立而不渲染 xterm，
+          // 导致运行中的终端被错误替换成 Terminal Output 静态文本块。
+          terminal_content: msg.is_finished
+            ? (msg.terminal_content || (msg.execution_chunks || []).join(''))
+            : '',
           execution_chunks: msg.execution_chunks || [],
           seq: msg.seq,
         })
