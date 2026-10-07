@@ -455,13 +455,11 @@ defineExpose({ loadPlugins })
   z-index: 10000;
   width: 300px;
   max-width: calc(100vw - 16px);
-  background: rgba(10, 15, 28, 0.88);
+  background: var(--bg-primary, #0a0f1c);
   border: 1px solid rgba(32, 200, 255, 0.22);
   border-radius: 6px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
   padding: 8px 10px;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   /* 悬浮框不拦截鼠标，避免挡住下方条目的鼠标响应 */
   pointer-events: none;
   box-sizing: border-box;
