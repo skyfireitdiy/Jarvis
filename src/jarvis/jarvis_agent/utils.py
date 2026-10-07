@@ -628,6 +628,11 @@ tool_load_dirs:
   - "{{{{plugin_dir}}}}/tools"
 # agent_definition_dirs:
 #   - "{{{{plugin_dir}}}}/agents"
+# 编排流水线模板声明（配合 @OrganizeAgents 自动发现，用户可直接选编号）
+orchestration:
+  - name: "{slug}-pipeline"
+    description: "{name} 编排流水线"
+    file: "{{{{plugin_dir}}}}/orchestration/{slug}_pipeline.yaml"
 # frontend:
 #   admin_tabs:
 #     - id: {slug}-admin
@@ -1257,6 +1262,65 @@ def list_plugins_info() -> List[dict]:
             except Exception:
                 info["installed"] = False
         result.append(info)
+    return result
+
+
+def list_plugin_orchestrations() -> List[dict]:
+    """
+    列出所有已安装插件声明的编排流水线模板（供前端编排功能使用）。
+
+    扫描 <data_dir>/plugins/ 目录，读取每个插件的 config.yaml，渲染
+    {{plugin_dir}} 模板变量后提取 orchestration 声明，返回模板列表。
+
+    返回:
+        list[dict]: 每个元素为编排模板信息字典，字段：
+            - plugin: 来源插件名
+            - name: 模板名
+            - description: 模板描述
+            - file: 编排文件绝对路径（{{plugin_dir}} 已渲染）
+    """
+    import yaml
+    from pathlib import Path
+    from jarvis.jarvis_utils.config import get_data_dir
+    from jarvis.jarvis_utils.template_utils import render_plugin_config_template
+
+    plugins_dir = Path(get_data_dir()) / "plugins"
+    if not plugins_dir.exists():
+        return []
+
+    result: List[dict] = []
+    for plugin_dir in sorted(d for d in plugins_dir.iterdir() if d.is_dir()):
+        config_file = plugin_dir / "config.yaml"
+        if not config_file.exists():
+            continue
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                config_content = f.read()
+            rendered = render_plugin_config_template(config_content, str(plugin_dir))
+            config = yaml.safe_load(rendered)
+            if not isinstance(config, dict):
+                continue
+            entries = config.get("orchestration")
+            if not isinstance(entries, list):
+                continue
+            plugin_name = str(config.get("name") or plugin_dir.name)
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                name = entry.get("name") or entry.get("id")
+                file_path = entry.get("file") or entry.get("path")
+                if not name or not file_path:
+                    continue
+                result.append(
+                    {
+                        "plugin": plugin_name,
+                        "name": str(name),
+                        "description": str(entry.get("description", "") or ""),
+                        "file": str(file_path),
+                    }
+                )
+        except Exception:
+            continue
     return result
 
 

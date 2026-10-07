@@ -1620,6 +1620,25 @@
                 {{ orchestrateLoading ? '解析中…' : '解析' }}
               </button>
             </div>
+            <!-- 插件编排模板：自动发现已装插件声明的编排模板，点击直接选用 -->
+            <div v-if="orchestratePluginTemplates.length" class="orchestrate-templates">
+              <div class="orchestrate-templates-title">插件编排模板</div>
+              <div class="orchestrate-templates-list">
+                <button
+                  v-for="(tpl, index) in orchestratePluginTemplates"
+                  :key="index"
+                  class="orchestrate-template-tag"
+                  :class="{ active: orchestrateFilePath === tpl.file }"
+                  :title="tpl.file"
+                  @click="selectOrchestratePluginTemplate(tpl)"
+                >
+                  <span class="orchestrate-template-name">{{ tpl.name }}</span>
+                  <span class="orchestrate-template-plugin">[{{ tpl.plugin }}]</span>
+                  <span v-if="tpl.description" class="orchestrate-template-desc">{{ tpl.description }}</span>
+                </button>
+              </div>
+            </div>
+            <div v-else-if="orchestratePluginTemplatesLoading" class="orchestrate-templates-loading">正在加载插件编排模板…</div>
             <!-- 文件浏览面板：内嵌 DirectoryDialog（目录 + .yaml/.yml 文件，逻辑与「打开目录」一致） -->
             <div v-if="orchestrateShowBrowser" class="orchestrate-browse-wrap">
               <DirectoryDialog
@@ -12836,6 +12855,8 @@ async function submitQuickCreateAgent({ task, agentType = 'agent', workingDir = 
 const showOrchestrateModal = ref(false)          // 编排弹窗
 const orchestrateNodeId = ref('master')          // 编排文件所在节点（也是创建 Agent 的默认节点）
 const orchestrateFilePath = ref('')              // 编排文件绝对路径
+const orchestratePluginTemplates = ref([])        // 插件声明的编排模板列表 [{plugin,name,description,file}]
+const orchestratePluginTemplatesLoading = ref(false) // 插件编排模板加载中
 const orchestrateAgents = ref([])                // 解析出的 Agent 表单列表（每项对应一个标签页）
 const orchestrateActiveIndex = ref(0)            // 当前激活的标签页索引
 const orchestrateLoading = ref(false)            // 解析中
@@ -12894,6 +12915,8 @@ async function openOrchestrateModal() {
   orchestrateNodeId.value = allowed.some(n => n.node_id === orchestrateNodeId.value)
     ? orchestrateNodeId.value
     : (getDefaultCreateAgentNodeId() || 'master')
+  // 拉取当前节点上插件声明的编排模板，供用户直接选择
+  loadOrchestratePluginTemplates()
 }
 
 function closeOrchestrateModal() {
@@ -12903,6 +12926,8 @@ function closeOrchestrateModal() {
   orchestrateAgents.value = []
   orchestrateActiveIndex.value = 0
   orchestrateFilePath.value = ''
+  orchestratePluginTemplates.value = []
+  orchestratePluginTemplatesLoading.value = false
   // 复位文件浏览面板状态
   orchestrateShowBrowser.value = false
   orchestrateFileEntries.value = []
@@ -12912,6 +12937,35 @@ function closeOrchestrateModal() {
   orchestrateSelectedIndex.value = -1
   // 复位目录选择场景，避免污染创建 Agent 的「选择目录」
   dirDialogContext.value = 'create-agent'
+}
+
+// 拉取当前节点上插件声明的编排模板列表（供用户直接选择，无需手动输入路径）
+async function loadOrchestratePluginTemplates() {
+  orchestratePluginTemplatesLoading.value = true
+  orchestratePluginTemplates.value = []
+  try {
+    const { host, port } = getGatewayAddress()
+    const nodeId = String(orchestrateNodeId.value || 'master').trim() || 'master'
+    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, nodeId, 'plugins/orchestrations'))
+    const result = await response.json().catch(() => ({}))
+    if (!response.ok || !result.success || !result.data) {
+      orchestratePluginTemplates.value = []
+      return
+    }
+    const templates = Array.isArray(result.data.orchestrations) ? result.data.orchestrations : []
+    orchestratePluginTemplates.value = templates.filter(t => t && t.file)
+  } catch (error) {
+    orchestratePluginTemplates.value = []
+  } finally {
+    orchestratePluginTemplatesLoading.value = false
+  }
+}
+
+// 选择插件编排模板：填入路径并立即解析
+function selectOrchestratePluginTemplate(tpl) {
+  if (!tpl || !tpl.file) return
+  orchestrateFilePath.value = tpl.file
+  parseOrchestrationFile()
 }
 
 // 解析编排文件：调后端接口读取 YAML 并取出 agents 列表
@@ -13235,6 +13289,8 @@ async function onOrchestrateNodeChange() {
   orchestrateFilePath.value = ''
   orchestrateSelectedFile.value = ''
   orchestrateSelectedIndex.value = -1
+  // 节点切换后重新拉取该节点上的插件编排模板
+  loadOrchestratePluginTemplates()
   if (orchestrateShowBrowser.value) {
     await fetchOrchestrateEntries('~')
   }
@@ -25563,6 +25619,55 @@ body::-webkit-scrollbar {
   border: 1px solid #30363d;
   border-radius: 6px;
   overflow: hidden;
+}
+/* 插件编排模板：自动发现并展示，点击直接选用 */
+.orchestrate-templates {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.orchestrate-templates-title {
+  color: #8ba3b8;
+  font-size: 12px;
+}
+.orchestrate-templates-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.orchestrate-template-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #e6edf3;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.orchestrate-template-tag:hover {
+  border-color: #58a6ff;
+  background: #161b22;
+}
+.orchestrate-template-tag.active {
+  border-color: #58a6ff;
+  background: #1f6feb33;
+}
+.orchestrate-template-name {
+  font-weight: 600;
+}
+.orchestrate-template-plugin {
+  color: #8ba3b8;
+}
+.orchestrate-template-desc {
+  color: #8ba3b8;
+}
+.orchestrate-templates-loading {
+  color: #8ba3b8;
+  font-size: 12px;
 }
 .orchestrate-label {
   flex: 0 0 auto;

@@ -1033,6 +1033,49 @@ def get_agent_definition_dirs() -> List[str]:
     ]
 
 
+def get_plugin_orchestrations() -> List[Dict[str, Any]]:
+    """获取所有插件声明的编排流水线模板。
+
+    插件 config.yaml 通过 `orchestration` 字段声明可用的编排模板：
+        orchestration:
+          - name: "demo-pipeline"
+            description: "Demo 插件编排流水线"
+            file: "{{plugin_dir}}/orchestration/demo-plugin_pipeline.yaml"
+
+    返回:
+        List[Dict]: 每项为 {plugin, name, description, file}，
+                    file 为绝对路径（{{plugin_dir}} 已渲染），
+                    plugin 为来源插件名（从 file 路径反推）。
+    """
+    result: List[Dict[str, Any]] = []
+    for entry in GLOBAL_CONFIG_DATA.get("orchestration", []):
+        if not isinstance(entry, dict):
+            continue
+        name = entry.get("name") or entry.get("id")
+        file_path = entry.get("file") or entry.get("path")
+        if not name or not file_path:
+            continue
+        abs_path = os.path.expanduser(os.path.expandvars(str(file_path)))
+        # 从路径反推来源插件名（路径含 plugins/<name>/）
+        plugin = ""
+        try:
+            normalized = abs_path.replace("\\", "/")
+            marker = "/plugins/"
+            if marker in normalized:
+                plugin = normalized.split(marker, 1)[1].split("/", 1)[0]
+        except Exception:
+            plugin = ""
+        result.append(
+            {
+                "plugin": plugin,
+                "name": str(name),
+                "description": str(entry.get("description", "") or ""),
+                "file": abs_path,
+            }
+        )
+    return result
+
+
 def get_roles_dirs() -> List[str]:
     """
     获取 roles 的加载目录。

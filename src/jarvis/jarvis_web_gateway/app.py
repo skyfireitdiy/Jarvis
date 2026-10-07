@@ -10138,6 +10138,32 @@ def create_app(
                 "error": {"code": "INTERNAL_ERROR", "message": repr(e)},
             }
 
+    async def _handle_plugin_orchestrations_request() -> Dict[str, Any]:
+        """列出当前节点上所有插件声明的编排流水线模板。
+
+        供前端「编排」功能使用：用户无需手动输入编排文件路径，可直接从
+        插件声明的编排模板中选择。读取本节点插件目录中的 config.yaml，
+        渲染 {{plugin_dir}} 后提取 orchestration 声明。
+        """
+        try:
+            from jarvis.jarvis_agent.utils import list_plugin_orchestrations
+
+            orchestrations = list_plugin_orchestrations()
+            local_node_id = _node_runtime.local_node_id if _node_runtime else "master"
+            return {
+                "success": True,
+                "data": {
+                    "node_id": local_node_id,
+                    "orchestrations": orchestrations,
+                },
+            }
+        except Exception as e:
+            logger.exception("[PLUGIN] list orchestrations failed: %r", e)
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": repr(e)},
+            }
+
     def _check_permission(
         user_info: Optional[Dict[str, Any]], permission: str
     ) -> Optional[Dict[str, Any]]:
@@ -10256,6 +10282,7 @@ def create_app(
             "/file-rename": "file:write",
             "/directories": "file:read",
             "/parse-orchestration": "file:read",
+            "/plugins/orchestrations": "file:read",
             "/git/log": "file:read",
             "/git/commit-detail": "file:read",
             "/git/diff": "file:read",
@@ -10279,6 +10306,10 @@ def create_app(
             result = await _handle_directories_request(payload)
         elif normalized_method == "POST" and normalized_path == "/parse-orchestration":
             result = await _handle_parse_orchestration_request(payload)
+        elif (
+            normalized_method == "GET" and normalized_path == "/plugins/orchestrations"
+        ):
+            result = await _handle_plugin_orchestrations_request()
         elif normalized_method == "POST" and normalized_path == "/file-content":
             result = await _handle_file_content_request(payload)
         elif normalized_method == "POST" and normalized_path == "/file-stat":

@@ -7,3 +7,7 @@ rules_load_dirs:
   - "{{plugin_dir}}/rules"
 tool_load_dirs:
   - "{{plugin_dir}}/tools"
+orchestration:
+  - name: dark-factory-pipeline
+    description: AI 黑灯工厂编排流水线——Specs 进，可工作的软件出
+    file: "{{plugin_dir}}/orchestration/dark_factory_pipeline.yaml"

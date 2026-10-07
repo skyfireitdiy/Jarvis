@@ -548,7 +548,34 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             import os
             from jarvis.jarvis_utils.input import get_multiline_input
 
-            PrettyOutput.auto_print("请输入编排文件路径（每行一个，输入空行结束）：")
+            # 自动发现插件声明的编排流水线模板，让用户无需手动查找文件路径
+            plugin_orchestrations = []
+            try:
+                from jarvis.jarvis_utils.config import get_plugin_orchestrations
+
+                plugin_orchestrations = get_plugin_orchestrations()
+            except Exception:
+                plugin_orchestrations = []
+
+            if plugin_orchestrations:
+                PrettyOutput.auto_print(
+                    "📋 检测到以下插件编排模板（可直接输入编号选择，或输入自定义路径）："
+                )
+                for idx, orch in enumerate(plugin_orchestrations, start=1):
+                    plugin_tag = f"[{orch['plugin']}] " if orch.get("plugin") else ""
+                    desc = orch.get("description") or ""
+                    PrettyOutput.auto_print(
+                        f"  {idx}. {plugin_tag}{orch['name']}"
+                        + (f" — {desc}" if desc else "")
+                    )
+                    PrettyOutput.auto_print(f"     路径: {orch['file']}")
+                PrettyOutput.auto_print(
+                    "请输入编排文件路径或编号（每行一个，输入空行结束）："
+                )
+            else:
+                PrettyOutput.auto_print(
+                    "请输入编排文件路径（每行一个，输入空行结束）："
+                )
             file_paths_input = get_multiline_input("编排文件路径")
             if not file_paths_input:
                 PrettyOutput.auto_print("❌ 未输入编排文件路径")
@@ -565,6 +592,12 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 line = line.strip()
                 if not line:
                     continue
+                # 0. 支持直接输入插件编排模板编号（如 "1"、"2"）
+                if plugin_orchestrations and line.isdigit():
+                    num = int(line)
+                    if 1 <= num <= len(plugin_orchestrations):
+                        file_paths.append(plugin_orchestrations[num - 1]["file"])
+                        continue
                 # 尝试从行中提取文件路径
                 # 1. 先尝试匹配带引号的路径
                 quoted_match = re.search(r'["\']([^"\']+\.ya?ml)["\']', line)
