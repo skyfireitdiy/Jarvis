@@ -49,7 +49,7 @@ describe("PluginSidebar", () => {
 
   test("挂载时自动加载插件列表并渲染", async () => {
     const fetchWithAuth = makeFetch({
-      "GET http://127.0.0.1:8000/api/plugins?node_id=master": () => ({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
         success: true,
         data: { node_id: "master", plugins: [plugin()] },
       }),
@@ -65,7 +65,7 @@ describe("PluginSidebar", () => {
 
   test("空插件列表显示占位提示", async () => {
     const fetchWithAuth = makeFetch({
-      "GET http://127.0.0.1:8000/api/plugins?node_id=master": () => ({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
         success: true,
         data: { node_id: "master", plugins: [] },
       }),
@@ -79,7 +79,7 @@ describe("PluginSidebar", () => {
 
   test("加载失败时通过 showToast 提示", async () => {
     const fetchWithAuth = makeFetch({
-      "GET http://127.0.0.1:8000/api/plugins?node_id=master": () => ({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
         success: false,
         error: { message: "权限不足" },
       }),
@@ -94,11 +94,11 @@ describe("PluginSidebar", () => {
 
   test("安装插件：填写来源后调用 install API 并刷新列表", async () => {
     const fetchWithAuth = makeFetch({
-      "GET http://127.0.0.1:8000/api/plugins?node_id=master": () => ({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
         success: true,
         data: { node_id: "master", plugins: [] },
       }),
-      "POST http://127.0.0.1:8000/api/plugins/install": () => ({
+      "POST http://127.0.0.1:8000/api/node/master/plugins/install": () => ({
         success: true,
         data: { node_id: "master", output: [] },
       }),
@@ -113,21 +113,21 @@ describe("PluginSidebar", () => {
     // 安装成功应调用 install API
     const installCall = fetchWithAuth.mock.calls.find(
       ([url, opt]) =>
-        opt?.method === "POST" && url.includes("/api/plugins/install"),
+        opt?.method === "POST" && url.includes("/api/node/master/plugins/install"),
     );
     expect(installCall).toBeTruthy();
     const body = JSON.parse(installCall[1].body);
     expect(body.source).toBe("/tmp/my-plugin");
-    expect(body.node_id).toBe("master");
+    expect(body.force).toBe(false);
   });
 
   test("卸载插件：确认后调用 uninstall API", async () => {
     const fetchWithAuth = makeFetch({
-      "GET http://127.0.0.1:8000/api/plugins?node_id=master": () => ({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
         success: true,
         data: { node_id: "master", plugins: [plugin()] },
       }),
-      "POST http://127.0.0.1:8000/api/plugins/demo-plugin/uninstall": () => ({
+      "POST http://127.0.0.1:8000/api/node/master/plugins/demo-plugin/uninstall": () => ({
         success: true,
         data: { node_id: "master", output: [] },
       }),
@@ -143,17 +143,17 @@ describe("PluginSidebar", () => {
       ([url, opt]) => opt?.method === "POST" && url.includes("/uninstall"),
     );
     expect(uninstallCall).toBeTruthy();
-    expect(uninstallCall[0]).toContain("/api/plugins/demo-plugin/uninstall");
+    expect(uninstallCall[0]).toContain("/api/node/master/plugins/demo-plugin/uninstall");
     confirmSpy.mockRestore();
   });
 
   test("升级插件：确认后调用 upgrade API", async () => {
     const fetchWithAuth = makeFetch({
-      "GET http://127.0.0.1:8000/api/plugins?node_id=master": () => ({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
         success: true,
         data: { node_id: "master", plugins: [plugin()] },
       }),
-      "POST http://127.0.0.1:8000/api/plugins/demo-plugin/upgrade": () => ({
+      "POST http://127.0.0.1:8000/api/node/master/plugins/demo-plugin/upgrade": () => ({
         success: true,
         data: { node_id: "master", output: [] },
       }),
@@ -171,13 +171,13 @@ describe("PluginSidebar", () => {
       ([url, opt]) => opt?.method === "POST" && url.includes("/upgrade"),
     );
     expect(upgradeCall).toBeTruthy();
-    expect(upgradeCall[0]).toContain("/api/plugins/demo-plugin/upgrade");
+    expect(upgradeCall[0]).toContain("/api/node/master/plugins/demo-plugin/upgrade");
     confirmSpy.mockRestore();
   });
 
   test("内置插件不显示升级/卸载按钮，并显示内置标记", async () => {
     const fetchWithAuth = makeFetch({
-      "GET http://127.0.0.1:8000/api/plugins?node_id=master": () => ({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
         success: true,
         data: {
           node_id: "master",
@@ -197,7 +197,7 @@ describe("PluginSidebar", () => {
 
   test("展示插件能力清单", async () => {
     const fetchWithAuth = makeFetch({
-      "GET http://127.0.0.1:8000/api/plugins?node_id=master": () => ({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
         success: true,
         data: {
           node_id: "master",

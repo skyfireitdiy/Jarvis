@@ -10172,6 +10172,85 @@ def create_app(
                 "error": {"code": "INTERNAL_ERROR", "message": repr(e)},
             }
 
+    async def _handle_plugin_manage_dispatch(
+        method: str, path: str, payload: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """节点级插件管理分发（list/install/uninstall/upgrade）。
+
+        供节点 HTTP 代理（/api/node/{node_id}/plugins...）在目标节点本地执行，
+        让子节点也能管理自己的插件。权限 admin:plugins 由 master 在转发前统一把关，
+        子节点信任 master 判定，不重复校验。
+        """
+        from jarvis.jarvis_agent.utils import (
+            install_plugin,
+            list_plugins_info,
+            uninstall_plugin,
+            upgrade_plugin,
+        )
+        from jarvis.jarvis_utils.output import OutputSink, PrettyOutput
+
+        captured: list[str] = []
+
+        class _CaptureSink(OutputSink):
+            def emit(self, event: Any) -> None:  # pragma: no cover - 简单收集
+                if getattr(event, "text", None):
+                    captured.append(event.text)
+
+        sink = _CaptureSink()
+        PrettyOutput.add_sink(sink)
+        try:
+            normalized_path = "/" + str(path or "").lstrip("/")
+            local_node_id = _node_runtime.local_node_id if _node_runtime else "master"
+            if method == "GET" and normalized_path == "/plugins":
+                plugins = list_plugins_info()
+                return {
+                    "success": True,
+                    "data": {
+                        "node_id": local_node_id,
+                        "plugins": plugins,
+                        "output": captured,
+                    },
+                }
+            if method == "POST" and normalized_path == "/plugins/install":
+                source = str(payload.get("source") or "")
+                force = bool(payload.get("force", False))
+                ok = install_plugin(source, force=force)
+                return {
+                    "success": bool(ok),
+                    "data": {"node_id": local_node_id, "output": captured},
+                }
+            if method == "POST" and normalized_path.startswith("/plugins/"):
+                rest = normalized_path[len("/plugins/") :].strip("/")
+                if rest.endswith("/uninstall"):
+                    name = rest[: -len("/uninstall")].strip("/")
+                    ok = uninstall_plugin(name)
+                    return {
+                        "success": bool(ok),
+                        "data": {"node_id": local_node_id, "output": captured},
+                    }
+                if rest.endswith("/upgrade"):
+                    name = rest[: -len("/upgrade")].strip("/")
+                    ok = upgrade_plugin(name)
+                    return {
+                        "success": bool(ok),
+                        "data": {"node_id": local_node_id, "output": captured},
+                    }
+            return {
+                "success": False,
+                "error": {
+                    "code": "INVALID_ACTION",
+                    "message": f"unsupported plugin manage path: {method} {path}",
+                },
+            }
+        except Exception as e:
+            logger.exception("[PLUGIN] manage dispatch failed: %r", e)
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": repr(e)},
+            }
+        finally:
+            PrettyOutput.remove_sink(sink)
+
     def _check_permission(
         user_info: Optional[Dict[str, Any]], permission: str
     ) -> Optional[Dict[str, Any]]:
@@ -10318,6 +10397,21 @@ def create_app(
             normalized_method == "GET" and normalized_path == "/plugins/orchestrations"
         ):
             result = await _handle_plugin_orchestrations_request()
+        elif (
+            normalized_path == "/plugins"
+            or normalized_path == "/plugins/install"
+            or normalized_path.startswith("/plugins/")
+        ):
+            # 插件管理：master 统一把关 admin:plugins 权限，子节点信任 master 判定
+            if node_config.is_master:
+                _plugin_perm_resp = _check_permission(
+                    _mock_req.state.user_info, "admin:plugins"
+                )
+                if _plugin_perm_resp:
+                    return _plugin_perm_resp
+            result = await _handle_plugin_manage_dispatch(
+                normalized_method, normalized_path, payload
+            )
         elif normalized_method == "POST" and normalized_path == "/file-content":
             result = await _handle_file_content_request(payload)
         elif normalized_method == "POST" and normalized_path == "/file-stat":

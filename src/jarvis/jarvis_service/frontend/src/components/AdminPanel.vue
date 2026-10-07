@@ -964,7 +964,7 @@ function formatDependencies(deps) {
 async function loadPlugins() {
   loadingPlugins.value = true
   try {
-    const resp = await props.fetchWithAuth(buildApiUrl(`/api/plugins?node_id=${encodeURIComponent(pluginNodeId.value)}`))
+    const resp = await props.fetchWithAuth(buildApiUrl(`/api/node/${encodeURIComponent(pluginNodeId.value)}/plugins`))
     const result = await resp.json()
     if (result.success) plugins.value = result.data?.plugins || []
     else props.showToast(result.error?.message || '加载插件失败', 'error')
@@ -976,10 +976,9 @@ async function installPlugin() {
   if (!installSource.value) { props.showToast('请填写插件来源', 'warning'); return }
   installingPlugin.value = true
   try {
-    const resp = await props.fetchWithAuth(buildApiUrl('/api/plugins/install'), {
+    const resp = await props.fetchWithAuth(buildApiUrl(`/api/node/${encodeURIComponent(pluginNodeId.value)}/plugins/install`), {
       method: 'POST',
       body: JSON.stringify({
-        node_id: pluginNodeId.value,
         source: installSource.value,
         force: installForce.value,
       }),
@@ -999,9 +998,9 @@ async function upgradePlugin(plugin) {
   if (!confirm(`确定升级插件 ${plugin.name}？`)) return
   pluginBusy.value = { ...pluginBusy.value, [plugin.name]: true }
   try {
-    const resp = await props.fetchWithAuth(buildApiUrl(`/api/plugins/${encodeURIComponent(plugin.name)}/upgrade`), {
+    const resp = await props.fetchWithAuth(buildApiUrl(`/api/node/${encodeURIComponent(pluginNodeId.value)}/plugins/${encodeURIComponent(plugin.name)}/upgrade`), {
       method: 'POST',
-      body: JSON.stringify({ node_id: pluginNodeId.value }),
+      body: JSON.stringify({}),
     })
     const result = await resp.json()
     if (result.success) { props.showToast(`插件 ${plugin.name} 已升级`, 'success'); loadPlugins() }
@@ -1014,9 +1013,9 @@ async function uninstallPlugin(plugin) {
   if (!confirm(`确定卸载插件 ${plugin.name}？此操作不可恢复。`)) return
   pluginBusy.value = { ...pluginBusy.value, [plugin.name]: true }
   try {
-    const resp = await props.fetchWithAuth(buildApiUrl(`/api/plugins/${encodeURIComponent(plugin.name)}/uninstall`), {
+    const resp = await props.fetchWithAuth(buildApiUrl(`/api/node/${encodeURIComponent(pluginNodeId.value)}/plugins/${encodeURIComponent(plugin.name)}/uninstall`), {
       method: 'POST',
-      body: JSON.stringify({ node_id: pluginNodeId.value }),
+      body: JSON.stringify({}),
     })
     const result = await resp.json()
     if (result.success) { props.showToast(`插件 ${plugin.name} 已卸载`, 'success'); loadPlugins() }
