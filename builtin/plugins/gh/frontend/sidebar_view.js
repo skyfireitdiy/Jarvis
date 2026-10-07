@@ -154,6 +154,10 @@ export default {
       this.loading = true;
       this.error = "";
       this.message = "";
+      // 切换/刷新瞬间先清空列表，避免请求失败时残留上一个仓库的数据
+      this.items = [];
+      this.selected = null;
+      this.comments = [];
       try {
         const fn = this.tab === "issues" ? "list_issues" : "list_prs";
         const payload = await callFunction(fn, { state: "open" });
