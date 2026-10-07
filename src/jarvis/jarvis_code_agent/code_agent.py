@@ -288,6 +288,15 @@ class CodeAgent(Agent):
             # 去重，保持顺序
             base_tools = list(dict.fromkeys(base_tools))
 
+        # 追加声明了应用于 code_agent 的插件工具（由插件 config 的 code_agent_tools 字段驱动，不硬编码插件名/工具名）
+        from jarvis.jarvis_tools.plugin_registry import PluginRegistry
+
+        registry = PluginRegistry.instance()
+        for plugin_name in registry.get_code_agent_tool_plugins():
+            base_tools.extend(registry.get_plugin_tools(plugin_name))
+        # 去重，保持顺序
+        base_tools = list(dict.fromkeys(base_tools))
+
         return base_tools
 
     def _merge_rule_names(self, cli_rule_names: Optional[str]) -> Optional[str]:

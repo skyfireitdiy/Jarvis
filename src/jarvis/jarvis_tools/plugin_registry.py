@@ -32,6 +32,8 @@ class PluginRegistry:
     def __init__(self) -> None:
         self._plugin_tools: Dict[str, Set[str]] = {}
         self._plugin_rules: Dict[str, Set[str]] = {}
+        # 插件名 -> 是否应用于 code_agent（由插件 config 的 code_agent_tools 字段声明）
+        self._plugin_code_agent_tools: Dict[str, bool] = {}
         self._tool_revoker: Optional[Callable[[str], int]] = None
         self._rules_revoker: Optional[Callable[[str], int]] = None
 
@@ -98,6 +100,26 @@ class PluginRegistry:
         return sorted(set(self._plugin_tools.keys()) | set(self._plugin_rules.keys()))
 
     # ------------------------------------------------------------------
+    # code_agent 适用性登记
+    # ------------------------------------------------------------------
+    def set_plugin_code_agent_tools(self, plugin_name: str, enabled: bool) -> None:
+        """登记/清除插件是否应用于 code_agent。
+
+        由插件 config 的 code_agent_tools 字段声明（加载插件配置时登记）。
+        enabled 为 False 时移除登记，表示该插件不应用于 code_agent。
+        """
+        if enabled:
+            self._plugin_code_agent_tools[plugin_name] = True
+        else:
+            self._plugin_code_agent_tools.pop(plugin_name, None)
+
+    def get_code_agent_tool_plugins(self) -> List[str]:
+        """返回声明了应用于 code_agent 的插件名列表。"""
+        return sorted(
+            name for name, enabled in self._plugin_code_agent_tools.items() if enabled
+        )
+
+    # ------------------------------------------------------------------
     # 撤销
     # ------------------------------------------------------------------
     def unregister_plugin(self, plugin_name: str) -> Dict[str, List[str]]:
@@ -154,6 +176,7 @@ class PluginRegistry:
         """清空全部登记与撤销器（主要用于测试隔离）。"""
         self._plugin_tools.clear()
         self._plugin_rules.clear()
+        self._plugin_code_agent_tools.clear()
         self._tool_revoker = None
         self._rules_revoker = None
 

@@ -3,6 +3,7 @@ name: gh
 description: GitHub 助手——自动处理当前仓库的 PR 和 Issue，复用 GitHub 官方 gh CLI 登录态。
 version: 0.1.0
 builtin: true
+code_agent_tools: true
 license: MIT
 rules_load_dirs:
   - "{{plugin_dir}}/rules"

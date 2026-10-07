@@ -1569,6 +1569,13 @@ def _load_plugin_configs(
             plugin_config = yaml.safe_load(rendered_content)
 
             if isinstance(plugin_config, dict):
+                # 若插件声明了应用于 code_agent，登记到 PluginRegistry（供 code_agent 构建工具列表）
+                if plugin_config.get("code_agent_tools"):
+                    from jarvis.jarvis_tools.plugin_registry import PluginRegistry
+
+                    PluginRegistry.instance().set_plugin_code_agent_tools(
+                        plugin_path.name, True
+                    )
                 # 合并插件配置：后加载的插件覆盖前面的
                 combined_plugin_config = _deep_merge(
                     combined_plugin_config, plugin_config
