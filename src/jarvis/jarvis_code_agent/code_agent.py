@@ -252,6 +252,7 @@ class CodeAgent(Agent):
             "edit_file",  # 查找替换编辑工具
             "edit_file_by_line",  # 按行号替换编辑工具
             "write_file",  # 整文件覆写工具
+            "commit",  # 生成正式提交（自动压缩 CheckPoint 临时提交）
             "load_rule",  # 规则加载工具
             "auto_select_rule",  # 自动规则选择工具
             "virtual_tty",  # 虚拟终端工具，支持交互式操作
