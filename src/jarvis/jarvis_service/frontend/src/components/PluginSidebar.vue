@@ -83,8 +83,6 @@
         v-if="activeCapTip && activeCapTip.capabilities && activeCapTip.capabilities.length"
         class="plugin-cap-tooltip"
         :style="capTipStyle"
-        @mouseenter="keepCapTip"
-        @mouseleave="hideCapabilities"
       >
         <div class="plugin-cap-tooltip-title">{{ activeCapTip.name }} · 能力</div>
         <div class="plugin-cap-tooltip-body">
@@ -101,6 +99,7 @@
     </transition>
   </aside>
 </template>
+
 
 
 <script setup>
@@ -152,11 +151,8 @@ function hideCapabilities() {
   }, 150)
 }
 
-function keepCapTip() {
-  clearTimeout(capTipTimer)
-}
-
 function getGatewayAddress() {
+
   const raw = (props.gatewayUrl || '127.0.0.1:8000').trim()
   if (raw.includes('://')) {
     try {
@@ -464,7 +460,8 @@ defineExpose({ loadPlugins })
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   padding: 10px 12px;
-  pointer-events: auto;
+  /* 悬浮框不拦截鼠标，避免挡住下方条目的鼠标响应 */
+  pointer-events: none;
   box-sizing: border-box;
 }
 .plugin-cap-tooltip-title {
