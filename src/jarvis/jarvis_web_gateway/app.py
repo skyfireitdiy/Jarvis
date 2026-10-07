@@ -4799,9 +4799,9 @@ def create_app(
                     want_stream = "text/event-stream" in accept_header
 
                     # 如果 Accept 头未指定，检查请求体中的 stream 字段（OpenAI SDK 格式）
-                    if not want_stream and raw_body:
+                    if not want_stream and body:
                         try:
-                            body_json = json.loads(raw_body)
+                            body_json = json.loads(body)
                             # 检查stream字段的各种真值形式
                             stream_value = body_json.get("stream")
                             if (
@@ -4816,9 +4816,9 @@ def create_app(
                         except (json.JSONDecodeError, ValueError):
                             # 如果JSON解析失败，检查原始body中是否包含stream关键字
                             body_str = (
-                                raw_body.decode("utf-8", errors="replace")
-                                if isinstance(raw_body, bytes)
-                                else str(raw_body)
+                                body.decode("utf-8", errors="replace")
+                                if isinstance(body, bytes)
+                                else str(body)
                             )
                             if (
                                 '"stream": true' in body_str
@@ -4830,7 +4830,7 @@ def create_app(
                                 )
 
                     logger.info(
-                        f"[HTTP PROXY] 远端代理流式检测：Accept={accept_header}, want_stream={want_stream}, body_length={len(raw_body) if raw_body else 0}"
+                        f"[HTTP PROXY] 远端代理流式检测：Accept={accept_header}, want_stream={want_stream}, body_length={len(body) if body else 0}"
                     )
 
                     if want_stream:
@@ -4846,7 +4846,7 @@ def create_app(
                                     "path": f"http_proxy/{target_url}",
                                     "query": str(request.query_params),
                                     "headers": dict(request.headers),
-                                    "body": raw_body,
+                                    "body": body,
                                     "streaming": True,
                                 },
                             ):
@@ -4874,7 +4874,7 @@ def create_app(
                                 "path": f"http_proxy/{target_url}",
                                 "query": str(request.query_params),
                                 "headers": dict(request.headers),
-                                "body": raw_body,
+                                "body": body,
                             },
                         )
                     payload = response.get("payload") or {}
