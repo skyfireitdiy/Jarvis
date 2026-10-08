@@ -557,6 +557,7 @@
                 @select="selectPipeline"
                 @jump-agent="onOrchestrationJumpAgent"
                 @expand="openOrchestrationOverlay"
+                @remove="removePipeline"
               />
             </div>
             <div v-else class="workspace-sidebar-content">
@@ -9687,6 +9688,14 @@ function closeTopologyOverlay() {
 // 选择某个流程（Tab 切换）
 function selectPipeline(id) {
   activePipelineId.value = id
+}
+// 删除某条编排记录（预览/已结束/运行中的列表项均可删）
+function removePipeline(id) {
+  if (!id) return
+  pipelineStore.removePipeline(id)
+  pipelineVersion.value++ // 刷新 pipelineList
+  if (activePipelineId.value === id) activePipelineId.value = ''
+  showToast('已删除该流水线记录', 'success')
 }
 // 点击 DAG 节点：有 agent_id 时跳转到对应 Agent 面板，否则仅选中流程
 function onOrchestrationJumpAgent(payload) {

@@ -72,6 +72,11 @@
         />
         <span class="orch-list-name">{{ shortName(p) }}</span>
         <span class="orch-list-meta">{{ listMeta(p) }}</span>
+        <span
+          class="orch-list-del"
+          title="删除该流水线记录"
+          @click.stop="removeFromList(p)"
+        >✕</span>
       </button>
     </div>
 
@@ -389,7 +394,7 @@ const props = defineProps({
   mode: { type: String, default: 'compact' }, // compact | full
 })
 
-const emit = defineEmits(['select', 'jump-agent', 'expand'])
+const emit = defineEmits(['select', 'jump-agent', 'expand', 'remove'])
 
 const NODE_W = LAYOUT.NODE_W
 const NODE_H = LAYOUT.NODE_H
@@ -480,6 +485,10 @@ function openFromList(p) {
   emit('select', p.pipelineId)
   emit('expand')
 }
+// compact 列表：删除某项记录（交给父组件执行实际删除）
+function removeFromList(p) {
+  emit('remove', p.pipelineId)
+}
 // 列表行副信息：状态 + 时间
 function listMeta(p) {
   const label = { preview: '预览', running: '运行中', completed: '已完成', failed: '失败', gate_blocked: '等待审批' }[p.finalStatus] || '已完成'
@@ -533,6 +542,22 @@ function listMeta(p) {
 }
 .orch-list-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .orch-list-meta { font-size: 10px; color: #7f8ea3; flex: 0 0 auto; }
+.orch-list-del {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  color: #7f8ea3;
+  font-size: 11px;
+  opacity: 0;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.orch-list-item:hover .orch-list-del { opacity: 0.8; }
+.orch-list-del:hover { opacity: 1 !important; color: #ff5d6c; background: rgba(255, 93, 108, 0.15); }
 
 /* Tabs */
 .orch-tabs {

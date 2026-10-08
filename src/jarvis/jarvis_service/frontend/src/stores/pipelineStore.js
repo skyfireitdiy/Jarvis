@@ -204,6 +204,13 @@ export class PipelineStore {
     this.pipelines.clear();
   }
 
+  // 删除单个流程（预览/已结束/运行中的记录均可删除），并同步持久化。
+  removePipeline(pipelineId) {
+    const removed = this.pipelines.delete(pipelineId);
+    if (removed) this._persist();
+    return removed;
+  }
+
   // 预览：把编排文件的 DAG 结构以「静态图」形式加入仓库（不执行、不创建 Agent）。
   // 与 applyEvent 的 pipeline_start 不同，这里直接标记为已结束的 preview 态，
   // 避免 OrchestrationView 把它当「运行中」显示跳动动画。

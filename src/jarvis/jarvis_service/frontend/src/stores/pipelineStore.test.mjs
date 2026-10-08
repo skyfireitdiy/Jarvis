@@ -221,3 +221,25 @@ test("addPreview：缺 pipelineId 或 nodes 非法时返回 null", () => {
   assert.equal(store.addPreview("p", "not-array"), null);
 });
 
+test("removePipeline：删除单个流程并同步持久化", () => {
+  installLocalStorageMock();
+  const store = new PipelineStore(20, "del");
+  store.addPreview("preview_a", [{ stage: "s1", agent: "a", depends_on: [], input: [], output: "", gate: false, when: null, retry: 0, on_error: "abort" }], "/x/a.yaml");
+  store.addPreview("preview_b", [{ stage: "s1", agent: "b", depends_on: [], input: [], output: "", gate: false, when: null, retry: 0, on_error: "abort" }], "/x/b.yaml");
+  assert.equal(store.listPipelines().length, 2);
+
+  // 删除存在的项
+  assert.equal(store.removePipeline("preview_a"), true);
+  assert.equal(store.listPipelines().length, 1);
+  assert.equal(store.getPipeline("preview_a"), null);
+  assert.ok(store.getPipeline("preview_b"), "未删除的项应保留");
+
+  // 删除不存在的项返回 false
+  assert.equal(store.removePipeline("preview_a"), false);
+
+  // 持久化已同步：新实例只恢复剩余项
+  const restored = new PipelineStore(20, "del");
+  assert.equal(restored.listPipelines().length, 1);
+  assert.equal(restored.getPipeline("preview_b").orchestrationFile, "/x/b.yaml");
+});
+
