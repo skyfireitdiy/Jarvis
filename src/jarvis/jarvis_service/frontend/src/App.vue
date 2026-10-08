@@ -1777,14 +1777,19 @@
                 placeholder="留空默认当前目录，产物 .jarvis/artifacts/ 在其中创建"
               >
             </div>
-            <div class="orchestrate-field orchestrate-field-wide orchestrate-checks">
-              <label class="orchestrate-check"><input v-model="orchestrateDryRun" type="checkbox"> 预演模式（dry-run，只做 DAG 调度预演，不真正执行 Agent）</label>
-            </div>
           </div>
         </div>
         <div class="orchestrate-actions">
           <button class="btn secondary" @click="closeOrchestrateModal">取消</button>
-          <!-- 单一主按钮：编排含 flow 则运行流水线，否则一键创建 Agent，避免两个按钮混淆 -->
+          <!-- 含 flow：提供「预览」静态 DAG 与「运行流水线」两个操作；否则一键创建 Agent -->
+          <button
+            v-if="orchestrateHasFlow"
+            class="btn secondary"
+            :disabled="!orchestrateFilePath || !orchestrateNodes.length"
+            @click="previewOrchestration"
+          >
+            预览
+          </button>
           <button
             v-if="orchestrateHasFlow"
             class="btn primary orchestrate-run-btn"
@@ -12938,6 +12943,7 @@ const orchestratePluginTemplates = ref([])        // 插件声明的编排模板
 const orchestratePluginTemplatesLoading = ref(false) // 插件编排模板加载中
 const orchestrateAgents = ref([])                // 解析出的 Agent 表单列表（每项对应一个标签页）
 const orchestrateHasFlow = ref(false)            // 编排文件是否含 flow 字段（决定「运行流水线」还是「创建 Agent」）
+const orchestrateNodes = ref([])                 // 解析出的 DAG 节点（预览静态图用，不执行）
 const orchestrateActiveIndex = ref(0)            // 当前激活的标签页索引
 const orchestrateLoading = ref(false)            // 解析中
 const orchestrateError = ref('')                 // 解析错误
@@ -12946,7 +12952,6 @@ const orchestrateResults = ref([])               // 批量创建结果 [{ name, 
 // 运行流水线（与 Agent 调用 pipeline_runner 同一路径，驱动 DAG 可视化）
 const orchestrateRunWorkingDir = ref('')         // 运行流水线的工作目录（产物 .jarvis/artifacts/ 在其中创建）
 const orchestrateRunning = ref(false)            // 运行流水线中（仅表示已提交，实际进度由事件驱动）
-const orchestrateDryRun = ref(false)             // 预演模式：只做 DAG 调度预演，不真正执行 Agent
 // 编排文件浏览面板：目录 + 文件合并列表（复用 DirectoryDialog，fileSelectable 模式）
 const orchestrateFileEntries = ref([])           // 当前目录下的目录与文件项（{name,path,type}）
 const orchestrateSelectedFile = ref('')          // 面板中当前选中的文件路径
@@ -12984,6 +12989,7 @@ async function openOrchestrateModal() {
   orchestrateResults.value = []
   orchestrateAgents.value = []
   orchestrateHasFlow.value = false
+  orchestrateNodes.value = []
   orchestrateActiveIndex.value = 0
   orchestrateFilePath.value = ''
   showOrchestrateModal.value = true
@@ -13004,6 +13010,7 @@ function closeOrchestrateModal() {
   orchestrateResults.value = []
   orchestrateAgents.value = []
   orchestrateHasFlow.value = false
+  orchestrateNodes.value = []
   orchestrateActiveIndex.value = 0
   orchestrateFilePath.value = ''
   orchestratePluginTemplates.value = []
@@ -13077,6 +13084,7 @@ async function parseOrchestrationFile() {
     }
     orchestrateAgents.value = agents.map(raw => buildOrchestrateAgentForm(raw, nodeId))
     orchestrateHasFlow.value = !!result.data.has_flow
+    orchestrateNodes.value = Array.isArray(result.data.nodes) ? result.data.nodes : []
     orchestrateFilePath.value = String(result.data.path || path)
     orchestrateActiveIndex.value = 0
   } catch (error) {
@@ -13209,7 +13217,6 @@ async function runOrchestration() {
       body: JSON.stringify({
         orchestration_file: orchestrationFile,
         working_dir: String(orchestrateRunWorkingDir.value || '').trim(),
-        dry_run: !!orchestrateDryRun.value,
         node_id: nodeId,
       }),
     })
@@ -13228,6 +13235,22 @@ async function runOrchestration() {
   } finally {
     orchestrateRunning.value = false
   }
+}
+
+// 预览：用解析出的 DAG 节点绘制静态图（不执行、不创建 Agent），直接加入 pipelineStore 并切到「编排查看」。
+function previewOrchestration() {
+  const nodes = orchestrateNodes.value
+  if (!nodes.length) {
+    orchestrateError.value = '没有可预览的 DAG 节点，请先解析编排文件'
+    return
+  }
+  const orchestrationFile = String(orchestrateFilePath.value || '').trim()
+  const pid = `preview_${Date.now()}`
+  pipelineStore.addPreview(pid, nodes, orchestrationFile)
+  showToast('已生成编排预览（静态 DAG，未执行）', 'success')
+  closeOrchestrateModal()
+  showWorkspaceSidebar.value = true
+  setWorkspaceSidebarView('orchestration')
 }
 
 // ===== 编排文件浏览面板（节点下拉 + 内嵌目录/文件浏览，参考「打开目录」）=====

@@ -10533,12 +10533,29 @@ def create_app(
             flow = config.get("flow")
             has_flow = isinstance(flow, list) and len(flow) > 0
 
+            # 预览用 DAG 节点：复用 pipeline_runner 的 DAG 构建逻辑，保证与实际执行一致。
+            # 无 flow 或构建失败时返回空数组（前端据此提示，不阻塞解析 agents）。
+            nodes: list = []
+            if has_flow:
+                try:
+                    from jarvis.jarvis_tools.pipeline_runner import PipelineRunnerTool
+
+                    agents_by_name = {a.get("name"): a for a in agents if a.get("name")}
+                    default_on_error = str(config.get("default_on_error") or "abort").strip()
+                    dag = PipelineRunnerTool()._build_dag(flow, agents_by_name, default_on_error)
+                    if dag.get("success"):
+                        nodes = dag.get("nodes", [])
+                except Exception:  # pylint: disable=broad-except
+                    logger.exception("[ORCHESTRATION] build dag for preview failed")
+                    nodes = []
+
             return {
                 "success": True,
                 "data": {
                     "path": str(target_path),
                     "agents": agents,
                     "has_flow": has_flow,
+                    "nodes": nodes,
                 },
             }
         except PermissionError:

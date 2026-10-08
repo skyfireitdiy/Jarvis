@@ -203,6 +203,37 @@ export class PipelineStore {
   clear() {
     this.pipelines.clear();
   }
+
+  // 预览：把编排文件的 DAG 结构以「静态图」形式加入仓库（不执行、不创建 Agent）。
+  // 与 applyEvent 的 pipeline_start 不同，这里直接标记为已结束的 preview 态，
+  // 避免 OrchestrationView 把它当「运行中」显示跳动动画。
+  addPreview(pipelineId, nodes, orchestrationFile = "") {
+    if (!pipelineId || !Array.isArray(nodes)) return null;
+    const stages = new Map();
+    for (const n of nodes) {
+      stages.set(n.stage, emptyStage(n));
+    }
+    const state = {
+      pipelineId,
+      orchestrationFile: orchestrationFile || "",
+      specFile: "",
+      workingDir: "",
+      maxWorkers: 0,
+      approve: false,
+      defaultOnError: "abort",
+      stages,
+      stageOrder: nodes.map((n) => n.stage),
+      startedAt: Date.now(),
+      finishedAt: Date.now(),
+      success: true,
+      finalStatus: "preview",
+      gateStage: "",
+      approvalPath: "",
+    };
+    this.pipelines.set(pipelineId, state);
+    this._persist();
+    return state;
+  }
 }
 
 export function isTerminalStatus(status) {

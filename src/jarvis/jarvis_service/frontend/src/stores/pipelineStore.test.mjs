@@ -196,3 +196,28 @@ test("不传 storageKey 时保持纯内存、不碰 localStorage", () => {
   assert.equal(storage.getItem("jarvis_pipeline_store_"), null, "不应写入 localStorage");
 });
 
+test("addPreview：以静态 preview 态加入 DAG，所有 stage 为 pending 且不运行", () => {
+  const store = new PipelineStore();
+  const nodes = [
+    { stage: "s1", agent: "a", depends_on: [], input: [], output: "", gate: false, when: null, retry: 0, on_error: "abort" },
+    { stage: "s2", agent: "b", depends_on: ["s1"], input: [], output: "", gate: false, when: null, retry: 0, on_error: "abort" },
+  ];
+  const st = store.addPreview("preview_x", nodes, "/x/pipeline.yaml");
+  assert.ok(st, "应返回新 state");
+  assert.equal(st.finalStatus, "preview");
+  assert.ok(st.finishedAt, "预览态应视为已结束，避免跳动动画");
+  assert.equal(st.success, true);
+  assert.equal(st.orchestrationFile, "/x/pipeline.yaml");
+  assert.equal(st.stages.get("s1").status, STAGE_STATUS.PENDING);
+  assert.equal(st.stages.get("s2").status, STAGE_STATUS.PENDING);
+  assert.deepEqual(st.stageOrder, ["s1", "s2"]);
+  assert.equal(store.getPipeline("preview_x"), st);
+});
+
+test("addPreview：缺 pipelineId 或 nodes 非法时返回 null", () => {
+  const store = new PipelineStore();
+  assert.equal(store.addPreview("", []), null);
+  assert.equal(store.addPreview("p", null), null);
+  assert.equal(store.addPreview("p", "not-array"), null);
+});
+

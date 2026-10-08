@@ -274,6 +274,7 @@ function onNodeClick(n) {
 }
 .orch-tab-dot { width: 7px; height: 7px; border-radius: 50%; background: #5a6b80; flex: 0 0 auto; }
 .orch-tab-dot.fin-completed { background: #37d67a; box-shadow: 0 0 6px #37d67a; }
+.orch-tab-dot.fin-preview { background: #9db0c8; }
 .orch-tab-dot.fin-failed { background: #ff5d6c; box-shadow: 0 0 6px #ff5d6c; }
 .orch-tab-dot.fin-gate_blocked { background: #f0b429; box-shadow: 0 0 6px #f0b429; }
 .orch-tab-dot.fin-running { background: #20c8ff; box-shadow: 0 0 6px #20c8ff; animation: orch-blink 1.2s ease-in-out infinite; }
