@@ -86,6 +86,14 @@ class PipelineRunnerTool:
                 "type": "integer",
                 "description": "并行度上限（默认 4），限制同时执行的阶段 Agent 数",
             },
+            "dry_run": {
+                "type": "boolean",
+                "description": (
+                    "仅预演编排计划（默认 false）：解析+校验+拓扑排序，输出将要"
+                    "执行的 DAG（阶段/依赖/并行批次/产物/门禁/条件/重试/失败策略），"
+                    "不创建 Agent、不派发任务。用于校验动态生成的编排文件。"
+                ),
+            },
         },
         "required": ["orchestration_file", "spec_file"],
     }
@@ -97,6 +105,7 @@ class PipelineRunnerTool:
         spec_file = str(args.get("spec_file") or "").strip()
         working_dir = str(args.get("working_dir") or "").strip() or "."
         approve = bool(args.get("approve", False))
+        dry_run = bool(args.get("dry_run", False))
         max_workers = int(
             args.get("max_workers", _DEFAULT_MAX_WORKERS) or _DEFAULT_MAX_WORKERS
         )
@@ -157,6 +166,17 @@ class PipelineRunnerTool:
 
         # 读取 spec 摘要作为各阶段背景
         spec_summary = self._read_spec_summary(spec_path)
+
+        # 4.5 dry-run：仅预演编排计划，不创建 Agent、不派发任务
+        if dry_run:
+            return self._dry_run_plan(
+                nodes=nodes,
+                agents_by_name=agents_by_name,
+                default_on_error=default_on_error,
+                max_workers=max_workers,
+                approve=approve,
+                artifact_dir=artifact_dir,
+            )
 
         # 5. 创建常驻 jvs Agent（每个 stage 一个）
         agent_created = self._create_stage_agents(nodes, agents_by_name, work_dir)
@@ -303,6 +323,100 @@ class PipelineRunnerTool:
         if len(order) != len(nodes):
             return None
         return [by_stage[s] for s in order]
+
+    # ------------------------------------------------------------------
+    # dry-run 预演
+    # ------------------------------------------------------------------
+    def _dry_run_plan(
+        self,
+        nodes: List[Dict[str, Any]],
+        agents_by_name: Dict[str, Any],
+        default_on_error: str,
+        max_workers: int,
+        approve: bool,
+        artifact_dir: Path,
+    ) -> Dict[str, Any]:
+        """仅预演编排计划：输出 DAG 执行计划，不创建 Agent、不派发任务。
+
+        用于校验动态生成的编排文件：解析 + 校验 + 拓扑排序 + 分批，
+        打印阶段/依赖/并行批次/产物/门禁/条件/重试/失败策略。
+        """
+        lines: List[str] = []
+        lines.append("🧪 dry-run：编排计划预演（不创建 Agent、不派发任务）")
+        lines.append(f"  产物目录: {artifact_dir}")
+        lines.append(f"  并行度上限: {max_workers}")
+        lines.append(f"  顶层 default_on_error: {default_on_error}")
+        lines.append(f"  门禁 approve: {approve}")
+        lines.append(f"  阶段总数: {len(nodes)}")
+
+        # 拓扑排序（_build_dag 已做环检测，此处再取一次顺序）
+        order = self._topo_sort(nodes)
+        if order is None:
+            return self._error("dry-run 失败：编排存在环，无法拓扑排序")
+
+        # 按"依赖层级"分批：每批为可并行执行的阶段集合
+        batches = self._plan_batches(nodes)
+        lines.append("")
+        lines.append("📋 执行计划（按并行批次）：")
+        for i, batch in enumerate(batches, 1):
+            parallel = len(batch) > 1
+            tag = "并行" if parallel else "串行"
+            lines.append(f"  批次 {i} [{tag}]（{len(batch)} 个阶段）:")
+            for n in batch:
+                lines.append(self._format_stage_plan(n, agents_by_name))
+
+        # 阶段清单（拓扑序）
+        lines.append("")
+        lines.append("🔗 拓扑序: " + " → ".join(n["stage"] for n in order))
+
+        gate_stages = [n["stage"] for n in nodes if n["gate"]]
+        if gate_stages:
+            lines.append(f"🚧 门禁阶段: {', '.join(gate_stages)}（完成后停住等人工审批）")
+
+        return {"success": True, "stdout": "\n".join(lines), "stderr": ""}
+
+    def _plan_batches(self, nodes: List[Dict[str, Any]]) -> List[List[Dict[str, Any]]]:
+        """按依赖层级把节点分批（同批可并行），用于 dry-run 展示。
+
+        与 `_schedule` 的 ready 批次语义一致：每批 = 依赖都在更早批次完成的节点。
+        """
+        by_stage = {n["stage"]: n for n in nodes}
+        remaining = {n["stage"]: set(n["depends_on"]) for n in nodes}
+        done: set = set()
+        batches: List[List[Dict[str, Any]]] = []
+        while remaining:
+            ready = [
+                s for s, deps in remaining.items() if deps.issubset(done)
+            ]
+            if not ready:
+                break  # 有环时 _build_dag 已拦截，此处仅防御
+            batch = [by_stage[s] for s in ready]
+            batches.append(batch)
+            for s in ready:
+                done.add(s)
+                del remaining[s]
+        return batches
+
+    def _format_stage_plan(
+        self, node: Dict[str, Any], agents_by_name: Dict[str, Any]
+    ) -> str:
+        """格式化单个阶段的计划行。"""
+        agent_def = agents_by_name.get(node["agent"], {})
+        working_dir = agent_def.get("working_dir") or "."
+        parts = [f"    - {node['stage']} (agent={node['agent']}, dir={working_dir})"]
+        if node["depends_on"]:
+            parts.append(f"依赖={','.join(node['depends_on'])}")
+        if node["input"]:
+            parts.append(f"输入={','.join(node['input'])}")
+        parts.append(f"产物={node['output'] or '（无）'}")
+        if node["gate"]:
+            parts.append("门禁")
+        if node["when"]:
+            parts.append(f"when={node['when']}")
+        if node["retry"]:
+            parts.append(f"retry={node['retry']}")
+        parts.append(f"on_error={node['on_error']}")
+        return "  ".join(parts)
 
     # ------------------------------------------------------------------
     # 常驻 Agent 创建

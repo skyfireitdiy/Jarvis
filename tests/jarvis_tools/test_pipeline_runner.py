@@ -803,3 +803,164 @@ class TestCreateAgentRetry:
         r = tool._create_stage_agents(self._nodes(), {"a1": {}}, tmp_path)
         assert r["success"] is False
         assert "down" in r["error"]
+
+
+# ---------------------------------------------------------------------------
+# dry-run 预演（方案1：只校验编排计划，不创建 Agent）
+# ---------------------------------------------------------------------------
+class TestDryRun:
+    def _write(self, tmp_path, flow_yaml):
+        (tmp_path / "spec.md").write_text("# NLSpec\nGoal: x\n", encoding="utf-8")
+        orch = tmp_path / "p.yaml"
+        orch.write_text(flow_yaml, encoding="utf-8")
+        return orch
+
+    def test_dry_run_no_agent_created(self, tool, monkeypatch, tmp_path):
+        """dry-run 不创建 Agent、不派发任务。"""
+        orch = self._write(
+            tmp_path,
+            """
+agents:
+  - name: a1
+    working_dir: .
+    task: t
+flow:
+  - stage: s1
+    agent: a1
+    output: .df/x.md
+""",
+        )
+
+        def boom(*a, **k):
+            raise AssertionError("dry-run 不应创建 Agent")
+
+        monkeypatch.setattr(GatewayManagerTool, "_create_agent", boom)
+        monkeypatch.setattr(GatewayManagerTool, "_send_to_agent", boom)
+        r = tool.execute(
+            {
+                "orchestration_file": str(orch),
+                "spec_file": str(tmp_path / "spec.md"),
+                "working_dir": str(tmp_path),
+                "dry_run": True,
+            }
+        )
+        assert r["success"] is True
+        assert "dry-run" in r["stdout"]
+        assert "s1" in r["stdout"]
+
+    def test_dry_run_shows_parallel_batches(self, tool, tmp_path):
+        """dry-run 正确标出并行批次与串行批次。"""
+        orch = self._write(
+            tmp_path,
+            """
+agents:
+  - name: a1
+    working_dir: .
+    task: t
+  - name: a2
+    working_dir: .
+    task: t
+  - name: a3
+    working_dir: .
+    task: t
+flow:
+  - stage: plan
+    agent: a1
+    output: .df/plan.md
+  - stage: gen_a
+    agent: a2
+    depends_on: [plan]
+    output: .df/a.txt
+  - stage: gen_b
+    agent: a3
+    depends_on: [plan]
+    output: .df/b.txt
+""",
+        )
+        r = tool.execute(
+            {
+                "orchestration_file": str(orch),
+                "spec_file": str(tmp_path / "spec.md"),
+                "working_dir": str(tmp_path),
+                "dry_run": True,
+            }
+        )
+        assert r["success"] is True
+        assert "批次 1 [串行]" in r["stdout"]
+        assert "批次 2 [并行]" in r["stdout"]
+
+    def test_dry_run_invalid_flow_reports_error(self, tool, tmp_path):
+        """dry-run 对非法编排（重复 stage）报错。"""
+        orch = self._write(
+            tmp_path,
+            """
+agents:
+  - name: a1
+    working_dir: .
+    task: t
+flow:
+  - stage: s1
+    agent: a1
+  - stage: s1
+    agent: a1
+""",
+        )
+        r = tool.execute(
+            {
+                "orchestration_file": str(orch),
+                "spec_file": str(tmp_path / "spec.md"),
+                "working_dir": str(tmp_path),
+                "dry_run": True,
+            }
+        )
+        assert r["success"] is False
+        assert "重复" in r["stderr"]
+
+    def test_dry_run_shows_gate_and_when(self, tool, tmp_path):
+        """dry-run 展示门禁与 when 信息。"""
+        orch = self._write(
+            tmp_path,
+            """
+agents:
+  - name: a1
+    working_dir: .
+    task: t
+  - name: a2
+    working_dir: .
+    task: t
+flow:
+  - stage: verify
+    agent: a1
+    output: .df/report.json
+  - stage: audit
+    agent: a2
+    depends_on: [verify]
+    when: "verify.pass_rate >= 0.9"
+    output: .df/approval.md
+    gate: true
+""",
+        )
+        r = tool.execute(
+            {
+                "orchestration_file": str(orch),
+                "spec_file": str(tmp_path / "spec.md"),
+                "working_dir": str(tmp_path),
+                "dry_run": True,
+            }
+        )
+        assert r["success"] is True
+        assert "门禁阶段: audit" in r["stdout"]
+        assert "when=verify.pass_rate >= 0.9" in r["stdout"]
+
+    def test_plan_batches_order(self, tool):
+        """_plan_batches：依赖层级分批正确。"""
+        nodes = [
+            {"stage": "a", "depends_on": [], "agent": "x", "input": [], "output": "", "gate": False, "when": None, "retry": 0, "on_error": "abort"},
+            {"stage": "b", "depends_on": ["a"], "agent": "x", "input": [], "output": "", "gate": False, "when": None, "retry": 0, "on_error": "abort"},
+            {"stage": "c", "depends_on": ["a"], "agent": "x", "input": [], "output": "", "gate": False, "when": None, "retry": 0, "on_error": "abort"},
+            {"stage": "d", "depends_on": ["b", "c"], "agent": "x", "input": [], "output": "", "gate": False, "when": None, "retry": 0, "on_error": "abort"},
+        ]
+        batches = tool._plan_batches(nodes)
+        assert [n["stage"] for n in batches[0]] == ["a"]
+        assert sorted(n["stage"] for n in batches[1]) == ["b", "c"]
+        assert [n["stage"] for n in batches[2]] == ["d"]

@@ -472,3 +472,4 @@ execute(args):
 - **`when` 可引用产物 JSON**：`_run_stage` 在产物落盘后，若 `output` 为 `.json` 且顶层为 dict，则读取其字段合并进该阶段 `result`（`status_file` 字段优先），供下游 `when` 的 `stage.field` 引用产物内容（如 `report.pass_rate`）。
 - **常驻 Agent 创建失败重试**：`_create_agent_with_retry` 最多重试 3 次、间隔递增；成功但无 `agent_id` 也视为失败重试；耗尽后返回失败并附最后一次错误。创建在主线程串行完成，**不在调度线程内创建**。
 - **并行实现**：`_schedule` 用 `ThreadPoolExecutor(max_workers=4)` 并发执行同一批 ready 节点的 `_run_stage`；线程内只做"派发 + 等待"（I/O 阻塞），不创建 Agent、不做 CPU 计算。
+- **dry-run 预演（新增 `dry_run` 参数）**：编排文件是每次任务动态生成的，`dry_run=true` 时只做解析+校验+拓扑排序，输出将执行的 DAG（阶段/依赖/并行批次/产物/门禁/when/retry/on_error），**不创建 Agent、不派发任务**，用于执行前校验动态生成的编排文件。默认 `false`，向后兼容。
