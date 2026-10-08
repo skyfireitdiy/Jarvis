@@ -9,14 +9,18 @@
 #
 # 用法：
 #   1. 先在编排弹窗中选择本文件，或直接指定路径；
-#   2. 准备一个 NLSpec 文件（纯文本即可，描述你的需求）；
-#   3. 用 pipeline_runner 工具运行：
+#   2. 用 pipeline_runner 工具运行：
 #        orchestration_file: builtin/agent_orchestration/simple_demo.yaml
-#        spec_file: <你的 spec 文件路径>
 #        working_dir: <工作目录>
-#   4. 想先看编排计划不实际执行，可加 dry_run: true。
+#   3. 想先看编排计划不实际执行，可加 dry_run: true。
 #
-# 说明：所有阶段 Agent 都是常驻 jvs Agent，产物写入 .df/ 目录。
+# 说明：
+#   - 各阶段 Agent 的背景信息可写在顶层 spec 字段（本文件已内嵌），
+#     也可用独立 NLSpec 文件（spec_file 参数）覆盖；两者都没有则用各阶段 task。
+#   - 所有阶段 Agent 都是常驻 jvs Agent，产物写入 .df/ 目录。
+spec: |
+  演示流水线的输入背景：把一份待办事项拆成两份互不依赖的子任务并行处理，
+  最后汇总为一份最终交付物。各阶段只需按自身职责完成并产出对应文件即可。
 agents:
   - name: "demo_planner"
     working_dir: "."

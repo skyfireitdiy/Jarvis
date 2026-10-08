@@ -1536,6 +1536,10 @@ class NodeConnectionManager:
                     request_id=request_id,
                 )
 
+            # has_flow：编排文件是否含非空 flow 字段（供前端决定「运行流水线」还是「创建 Agent」）
+            flow = config.get("flow")
+            has_flow = isinstance(flow, list) and len(flow) > 0
+
             return build_node_message(
                 DIRECTORY_LIST_RESPONSE,
                 {
@@ -1543,6 +1547,7 @@ class NodeConnectionManager:
                     "data": {
                         "path": str(target_path),
                         "agents": agents,
+                        "has_flow": has_flow,
                     },
                 },
                 request_id=request_id,
@@ -1586,14 +1591,14 @@ class NodeConnectionManager:
         orchestration_file = str(payload.get("orchestration_file") or "").strip()
         spec_file = str(payload.get("spec_file") or "").strip()
         working_dir = str(payload.get("working_dir") or "").strip() or "."
-        if not orchestration_file or not spec_file:
+        if not orchestration_file:
             return build_node_message(
                 DIRECTORY_LIST_RESPONSE,
                 {
                     "success": False,
                     "error": {
                         "code": "INVALID_ARGUMENT",
-                        "message": "orchestration_file and spec_file are required",
+                        "message": "orchestration_file is required",
                     },
                 },
                 request_id=request_id,

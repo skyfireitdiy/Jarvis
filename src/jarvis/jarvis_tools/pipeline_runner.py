@@ -76,7 +76,10 @@ class PipelineRunnerTool:
             },
             "spec_file": {
                 "type": "string",
-                "description": "NLSpec 文件路径（流水线输入，作为各阶段背景信息）",
+                "description": (
+                    "NLSpec 文件路径（可选）：流水线输入背景，作为各阶段 Agent 的背景信息。"
+                    "不传时改用编排文件顶层 spec 字段；两者都没有则不注入背景。"
+                ),
             },
             "working_dir": {
                 "type": "string",
@@ -117,15 +120,13 @@ class PipelineRunnerTool:
         # 1. 校验参数
         if not orchestration_file:
             return self._error("缺少必填参数 orchestration_file（编排 YAML 路径）")
-        if not spec_file:
-            return self._error("缺少必填参数 spec_file（NLSpec 文件路径）")
 
         orch_path = Path(orchestration_file)
         if not orch_path.exists() or not orch_path.is_file():
             return self._error(f"编排文件不存在: {orchestration_file}")
 
-        spec_path = Path(spec_file)
-        if not spec_path.exists() or not spec_path.is_file():
+        spec_path = Path(spec_file) if spec_file else None
+        if spec_path is not None and (not spec_path.exists() or not spec_path.is_file()):
             return self._error(f"NLSpec 文件不存在: {spec_file}")
 
         work_dir = Path(working_dir).resolve()
@@ -173,8 +174,17 @@ class PipelineRunnerTool:
             return self._error(dag_build["error"])
         nodes = dag_build["nodes"]
 
-        # 读取 spec 摘要作为各阶段背景
-        spec_summary = self._read_spec_summary(spec_path)
+        # 读取 spec 摘要作为各阶段背景：
+        #   优先取 spec_file 文件前 60 行；否则用编排文件顶层 spec 字段；都没有则空。
+        if spec_path is not None:
+            spec_summary = self._read_spec_summary(spec_path)
+        else:
+            inline_spec = orch.get("spec")
+            spec_summary = (
+                str(inline_spec).strip()
+                if isinstance(inline_spec, str) and str(inline_spec).strip()
+                else ""
+            )
 
         # 4.5 dry-run：仅预演编排计划，不创建 Agent、不派发任务
         if dry_run:

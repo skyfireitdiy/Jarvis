@@ -952,6 +952,61 @@ flow:
         assert "门禁阶段: audit" in r["stdout"]
         assert "when=verify.pass_rate >= 0.9" in r["stdout"]
 
+    def test_dry_run_inline_spec_without_spec_file(self, tool, tmp_path):
+        """不传 spec_file 时，读取编排文件顶层 spec 字段作为各阶段背景（普通编排无需独立 NLSpec）。"""
+        orch = tmp_path / "p.yaml"
+        orch.write_text(
+            """
+spec: |
+  这是内嵌在编排文件里的流水线背景说明。
+agents:
+  - name: a1
+    working_dir: .
+    task: t
+flow:
+  - stage: s1
+    agent: a1
+    output: .df/x.md
+""",
+            encoding="utf-8",
+        )
+        r = tool.execute(
+            {
+                "orchestration_file": str(orch),
+                "working_dir": str(tmp_path),
+                "dry_run": True,
+            }
+        )
+        assert r["success"] is True
+        assert "dry-run" in r["stdout"]
+        assert "s1" in r["stdout"]
+
+    def test_dry_run_no_spec_at_all(self, tool, tmp_path):
+        """编排文件既无 spec 字段也不传 spec_file：仍可运行，各阶段用自身 task 描述即可。"""
+        orch = tmp_path / "p.yaml"
+        orch.write_text(
+            """
+agents:
+  - name: a1
+    working_dir: .
+    task: t
+flow:
+  - stage: s1
+    agent: a1
+    output: .df/x.md
+""",
+            encoding="utf-8",
+        )
+        r = tool.execute(
+            {
+                "orchestration_file": str(orch),
+                "working_dir": str(tmp_path),
+                "dry_run": True,
+            }
+        )
+        assert r["success"] is True
+        assert "s1" in r["stdout"]
+
     def test_plan_batches_order(self, tool):
         """_plan_batches：依赖层级分批正确。"""
         nodes = [

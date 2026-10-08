@@ -1764,17 +1764,17 @@
             </div>
           </div>
 
-          <!-- 运行流水线：与 Agent 调用 pipeline_runner 同一路径，运行进度驱动「编排查看」DAG 可视化 -->
-          <div class="orchestrate-run">
+          <!-- 运行流水线：编排文件含 flow 时显示。与 Agent 调用 pipeline_runner 同一路径，运行进度驱动「编排查看」DAG 可视化 -->
+          <div v-if="orchestrateHasFlow" class="orchestrate-run">
             <div class="orchestrate-run-title">运行流水线</div>
-            <div class="orchestrate-run-hint">需编排文件含 flow 字段；运行进度将在「编排查看」中实时展示。</div>
+            <div class="orchestrate-run-hint">该编排文件含 flow 字段，将按流水线调度执行；运行进度将在「编排查看」中实时展示。</div>
             <div class="orchestrate-field orchestrate-field-wide">
-              <label class="orchestrate-label">NLSpec 文件</label>
+              <label class="orchestrate-label">NLSpec 文件（可选）</label>
               <input
                 v-model="orchestrateSpecFile"
                 class="orchestrate-input"
                 type="text"
-                placeholder="NLSpec 文件绝对路径（运行流水线必填）"
+                placeholder="留空则使用编排文件顶层 spec 字段作为各阶段背景"
               >
             </div>
             <div class="orchestrate-field orchestrate-field-wide">
@@ -1789,18 +1789,21 @@
             <div class="orchestrate-field orchestrate-field-wide orchestrate-checks">
               <label class="orchestrate-check"><input v-model="orchestrateDryRun" type="checkbox"> 预演模式（dry-run，只做 DAG 调度预演，不真正执行 Agent）</label>
             </div>
-            <button
-              class="btn primary orchestrate-run-btn"
-              :disabled="orchestrateRunning || !orchestrateFilePath"
-              @click="runOrchestration"
-            >
-              {{ orchestrateRunning ? '启动中…' : '运行流水线' }}
-            </button>
           </div>
         </div>
         <div class="orchestrate-actions">
           <button class="btn secondary" @click="closeOrchestrateModal">取消</button>
+          <!-- 单一主按钮：编排含 flow 则运行流水线，否则一键创建 Agent，避免两个按钮混淆 -->
           <button
+            v-if="orchestrateHasFlow"
+            class="btn primary orchestrate-run-btn"
+            :disabled="orchestrateRunning || !orchestrateFilePath"
+            @click="runOrchestration"
+          >
+            {{ orchestrateRunning ? '启动中…' : '运行流水线' }}
+          </button>
+          <button
+            v-else
             class="btn primary"
             :disabled="orchestrateCreating || !orchestrateAgents.length"
             @click="createAllOrchestrateAgents"
@@ -12943,6 +12946,7 @@ const orchestrateFilePath = ref('')              // 编排文件绝对路径
 const orchestratePluginTemplates = ref([])        // 插件声明的编排模板列表 [{plugin,name,description,file}]
 const orchestratePluginTemplatesLoading = ref(false) // 插件编排模板加载中
 const orchestrateAgents = ref([])                // 解析出的 Agent 表单列表（每项对应一个标签页）
+const orchestrateHasFlow = ref(false)            // 编排文件是否含 flow 字段（决定「运行流水线」还是「创建 Agent」）
 const orchestrateActiveIndex = ref(0)            // 当前激活的标签页索引
 const orchestrateLoading = ref(false)            // 解析中
 const orchestrateError = ref('')                 // 解析错误
@@ -12989,6 +12993,7 @@ async function openOrchestrateModal() {
   orchestrateError.value = ''
   orchestrateResults.value = []
   orchestrateAgents.value = []
+  orchestrateHasFlow.value = false
   orchestrateActiveIndex.value = 0
   orchestrateFilePath.value = ''
   showOrchestrateModal.value = true
@@ -13008,6 +13013,7 @@ function closeOrchestrateModal() {
   orchestrateError.value = ''
   orchestrateResults.value = []
   orchestrateAgents.value = []
+  orchestrateHasFlow.value = false
   orchestrateActiveIndex.value = 0
   orchestrateFilePath.value = ''
   orchestratePluginTemplates.value = []
@@ -13080,6 +13086,7 @@ async function parseOrchestrationFile() {
       return
     }
     orchestrateAgents.value = agents.map(raw => buildOrchestrateAgentForm(raw, nodeId))
+    orchestrateHasFlow.value = !!result.data.has_flow
     orchestrateFilePath.value = String(result.data.path || path)
     orchestrateActiveIndex.value = 0
   } catch (error) {
@@ -13201,11 +13208,8 @@ async function runOrchestration() {
     orchestrateError.value = '请先选择并解析编排文件'
     return
   }
+  // NLSpec 文件可选：不填时后端读取编排文件顶层 spec 字段作为各阶段背景
   const specFile = String(orchestrateSpecFile.value || '').trim()
-  if (!specFile) {
-    orchestrateError.value = '请输入 NLSpec 文件路径（运行流水线必填）'
-    return
-  }
   orchestrateRunning.value = true
   orchestrateError.value = ''
   try {

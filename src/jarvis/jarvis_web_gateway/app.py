@@ -10529,11 +10529,16 @@ def create_app(
                     },
                 }
 
+            # has_flow：编排文件是否含非空 flow 字段（供前端决定「运行流水线」还是「创建 Agent」）
+            flow = config.get("flow")
+            has_flow = isinstance(flow, list) and len(flow) > 0
+
             return {
                 "success": True,
                 "data": {
                     "path": str(target_path),
                     "agents": agents,
+                    "has_flow": has_flow,
                 },
             }
         except PermissionError:
@@ -10572,14 +10577,7 @@ def create_app(
                     "message": "orchestration_file is required",
                 },
             }
-        if not spec_file:
-            return {
-                "success": False,
-                "error": {
-                    "code": "INVALID_ARGUMENT",
-                    "message": "spec_file is required",
-                },
-            }
+        # spec_file 可选：不传时 pipeline_runner 读取编排文件顶层 spec 字段作为各阶段背景
         try:
             from jarvis.jarvis_tools.pipeline_runner import PipelineRunnerTool
 
