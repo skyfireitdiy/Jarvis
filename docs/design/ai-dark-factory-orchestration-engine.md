@@ -255,3 +255,215 @@ dark-factory/run:
 5. **编排文件字段**：`builtin_input_handler.py:711-729`，无依赖/顺序/产物字段。
 6. **顺序执行机制**：无现成 wait/join；`dispatch` 是 tmux 并行派发（`tmux_wrapper.py:72`）。
 7. **agent 执行入口**：CLI task（jvs:1647/jca:1726）、`/message`（jarvis.py:1527）、交互循环（jvs:1689-1711）；主循环 `agent.run`（`jarvis_agent/__init__.py:1958`）。
+
+---
+
+## 附录 A：pipeline_runner 支持 DAG 编排（方案设计）
+
+> 状态：**待评审（先方案后实现）**
+> 目标：把 `pipeline_runner` 的 `flow` 从**线性列表**升级为 **DAG（有向无环图）**，支持并行、多输入汇聚、条件分支、失败策略与重试。
+> 范围确认（管理员 2026-10-08）：**全做**（并行/多输入/条件/失败策略/重试），并行度默认 4。
+
+## A.1 背景与问题
+
+当前 `pipeline_runner.py`（`src/jarvis/jarvis_tools/pipeline_runner.py`）的 `flow` 是**线性数组**，`execute()` 用 `for idx, stage in enumerate(flow)` 顺序遍历：
+
+- 每阶段**只能指定一个 agent**（`agent_name` 为单字符串，154-157 行校验须在 `agents_by_name` 内）。
+- 输入**只能是上一个阶段的 output**（`stage_input = input_ref or previous_output`，163 行）——无多输入、无分支、无并行、无循环。
+- 阶段失败**即整体中止**（201-207 行），无重试、无容错分支。
+
+**结论**：flow 目前只支持**线性顺序**。要支撑"更复杂的编排流程"（黑灯工厂多验证器并行、按结果分支、多报告汇聚等），需把 flow 升级为 DAG。
+
+## A.2 设计目标与原则
+
+1. **DAG 调度**：支持并行、多输入汇聚、条件分支、失败策略、重试。
+2. **只协调不执行**（不变）：调度器不写码、不测试，只负责调度与产物传递。
+3. **阶段 Agent = 常驻 Agent 实体**：每个 flow 阶段对应一个**常驻 Agent 实体**（经 `_create_agent` 创建，`jvs`/`jca --web-gateway` 待命），通过 `send_to_agent` 发送任务并**同步等待**其完成。**不使用 `jca -n --task-file` 一次性子进程作为并行载体**（受仓库文件锁限制，见 A.5.1）。
+4. **入口按 agent 类型选择**：不硬编码 `jca`；`type: agent` → `jvs`，`type: code_agent` → `jca`（`agent_manager.py:115-118`）。
+5. **向后兼容**：老编排文件（线性 flow）零改动；`flow` 仍可选，无 flow 时 `@OrganizeAgents` 行为不变。
+6. **安全**：`when` 条件用受限表达式解析器，绝不 `eval` 任意代码。
+
+## A.3 核心概念：从"列表"到"图"
+
+**现状**：`flow` 是 `[{stage, agent, input, output, gate}]` 数组，隐式顺序 = 数组下标。
+
+**升级后**：`flow` 仍是数组（保持人类可读、向后兼容），但每个 stage 显式声明 `depends_on`（依赖的上游 stage 列表），引擎据此构建 DAG 并做**拓扑排序 + 并行调度**。
+
+```yaml
+flow:
+  - stage: "plan"
+    agent: "df_planner"
+    output: ".df/plan.md"
+
+  # 两个验证器并行，都依赖 plan
+  - stage: "verify_unit"
+    agent: "df_validator_unit"
+    input: ".df/plan.md"
+    output: ".df/report_unit.json"
+    depends_on: ["plan"]
+
+  - stage: "verify_e2e"
+    agent: "df_validator_e2e"
+    input: ".df/plan.md"
+    output: ".df/report_e2e.json"
+    depends_on: ["plan"]
+
+  # 汇聚：orchestrator 消费两个验证报告
+  - stage: "orchestrate"
+    agent: "df_orchestrator"
+    input: [".df/report_unit.json", ".df/report_e2e.json"]
+    output: ".df/approval.md"
+    depends_on: ["verify_unit", "verify_e2e"]
+    gate: true
+```
+
+**关键点**：
+
+- `depends_on` 缺省时 = 上一个 stage（**保持线性写法完全兼容**，老编排文件无需改动）。
+- `input` 升级为**可列表**（多输入汇聚）。
+- 无依赖的 stage 自动进入并行调度。
+
+## A.4 字段扩展
+
+| 字段 | 现状 | DAG 版 | 说明 |
+|------|------|--------|------|
+| `stage` | 字符串 | 字符串 | 阶段唯一名（图节点 ID） |
+| `agent` | 单字符串 | 单字符串 | 每阶段仍单 agent（保持"只协调"语义） |
+| `depends_on` | ❌ 无 | `[stage名]` 可选 | 显式依赖；缺省=上一个 |
+| `input` | 单字符串 | **字符串或列表** | 多输入汇聚 |
+| `output` | 单字符串 | 单字符串 | 产物路径 |
+| `gate` | bool | bool | 门禁 |
+| `when` | ❌ 无 | 条件表达式（可选） | 条件分支 |
+| `retry` | ❌ 无 | int（可选） | 失败重试次数 |
+| `on_error` | ❌ 无 | `abort`/`continue`/`skip_dependents` | 失败策略 |
+
+## A.5 调度引擎（核心改动）
+
+`execute()` 从 `for` 线性循环改为 **DAG 调度循环**：
+
+```text
+execute(args):
+  1. 校验参数（同现状）
+  2. 解析 flow，构建图：
+     - 节点 = stage；边 = depends_on 关系
+     - 校验：stage 名唯一、agent 存在、depends_on 引用的 stage 存在
+     - 拓扑排序；检测环（有环则报错不执行）
+  3. 初始化产物目录 .df/、spec 摘要（同现状）
+  4. 创建本流水线所需的常驻 Agent 实体（经 _create_agent，type 决定 jvs/jca）
+  5. 调度循环（关键新增）：
+     while 有未完成节点:
+       - ready = 所有依赖已成功完成的节点
+       - 并行向 ready 节点对应的常驻 Agent 发送任务（并发上限 max_workers 默认 4）
+       - 每个节点 = 一个独立 Agent（send_to_agent 发送 → 同步等待完成 → 校验产物）
+       - 收集各节点结果，更新完成集合
+  6. 门禁：任一 gate 节点完成后，若 approve=false 停住（同现状）
+  7. 失败策略：按 on_error 处理
+  8. 返回汇总（stdout 含各阶段状态/产物/耗时）
+```
+
+### A.5.1 关键约束：jca 仓库文件锁（并行可行性的决定因素）
+
+**代码事实**（`code_agent.py:1688-1696`、`utils.py:421-470`）：
+
+- jca 启动时按**仓库根目录**加独占锁：`code_agent_{md5(repo_root)}.lock`（`code_agent.py:1692`）。
+- 锁是**非阻塞独占**：已有存活实例持锁时，新进程**直接 `sys.exit(0)` 退出**（`utils.py:432-436`），不是排队等待。
+- **`--web-gateway` 常驻模式同样会走到该锁**（`code_agent.py:1591-1603` 启动 server 后继续执行到 1690）。
+- **worktree 模式不加锁**（`code_agent.py:1690`），天然隔离不同任务。
+
+**结论**：**同一仓库（同一 repo_root）下，多个 code_agent 无法并行**——第二个及以后的进程会因拿不到仓库锁而直接退出。因此：
+
+- 并行阶段若在**同一仓库**，**必须用 `worktree: true` 隔离**（绕过锁 + 隔离产物/分支）。
+- 并行阶段若在**不同仓库/目录**，天然不冲突，无需 worktree。
+
+### A.5.2 并行实现（常驻 Agent + send_to_agent 同步等待）
+
+每个 flow 阶段就是一个**常驻 Agent 实体**。并行 = 同时向多个互不依赖的常驻 Agent 发送任务并各自等待完成，**而非线程池调度、也非一次性 jca 子进程**。
+
+- **创建**：经 `_create_agent` 创建常驻 Agent（`type` 决定 `jvs`/`jca`），`--web-gateway` 待命，不持有仓库锁的独占执行。
+- **发送**：`send_to_agent` 向各 Agent 发送本阶段任务。
+- **同步等待**：**给消息发送增加同步等待能力**——`send_to_agent` 目前是异步 fire-and-forget（`gateway_manager.py:617` 只发消息、立即返回；`/message` 端点 `jarvis.py:1527` 仅注入输入流）。需新增"等待 Agent 处理完并回传结果"的机制（见 A.5.3）。
+- **并发上限**：`max_workers` 默认 4，限制同时执行的常驻 Agent 数，避免资源打爆。
+- **产物隔离**：`status_file` 用 `stage名` 区分；产物目录 `.df/` 各 stage 独立文件；并行阶段用 worktree 隔离仓库改动。
+
+### A.5.3 新增能力：send_to_agent 同步等待
+
+现状 `send_to_agent` 只投递消息、不等待结果。为支撑"同步等待阶段 Agent 完成"，需新增**同步等待**能力，可选实现：
+
+1. **`send_to_agent` 增加 `wait` 参数**：发送后轮询 Agent 的 `/status`（`code_agent.py:1349` 已有 execution_status 接口），直到 `execution_status` 回到空闲/完成态，再返回结果。
+2. **新增 `send_to_agent_sync` 操作**：封装"发送 + 轮询等待 + 回传结果"，与现有异步 `send_to_agent` 并存，向后兼容。
+3. **结果回传**：Agent 完成阶段任务后，把产物路径/结构化结果通过 `/message` 或专用回传接口返回，编排引擎据此校验产物并进入下一批。
+
+> 注：`/message` 目前只对**无 task 待命 agent** 有效（`jarvis.py:1527-1558` 注入输入流）；常驻 Agent 即此类待命 agent，故同步等待机制与常驻 Agent 方案天然契合。
+
+## A.6 条件分支（`when`）
+
+`when` 用**简单表达式**引用上游阶段结果，满足才执行该节点，否则跳过（标记 skipped，其下游视为"依赖满足"）。
+
+```yaml
+- stage: "verify_e2e"
+  agent: "df_validator_e2e"
+  depends_on: ["verify_unit"]
+  when: "verify_unit.status == 'completed' && verify_unit.pass_rate >= 0.9"
+```
+
+**表达式范围（保守）**：只支持读取上游 stage 的**结构化结果**（从 status_file 或产物 JSON 读取），如 `status`、`pass_rate`、`exit_code`。**不做任意代码求值**（安全考虑，避免注入）。用受限的表达式解析器（如 `asteval` 或手写白名单解析），不 `eval()`。
+
+## A.7 失败策略（`on_error`）
+
+每阶段可声明失败时的行为：
+
+| 值 | 行为 |
+|----|------|
+| `abort`（默认） | 中止整条流水线（同现状） |
+| `continue` | 标记失败，但继续执行不依赖它的节点 |
+| `skip_dependents` | 标记失败，并跳过所有依赖它的下游节点 |
+
+全局可设默认 `default_on_error`，阶段级可覆盖。
+
+## A.8 重试（`retry`）
+
+每阶段可声明 `retry: N`，失败时自动重跑该阶段最多 N 次；重试耗尽仍失败则按 `on_error` 处理。每次重试重新组装 task-file 并清空旧 status_file。
+
+## A.9 兼容性（关键约束）
+
+- **`flow` 仍可选**：无 flow 时 `@OrganizeAgents` 行为不变。
+- **老编排文件零改动**：`depends_on` 缺省 = 上一个 stage，`input` 单字符串也接受（自动转单元素列表）。`dark_factory_pipeline.yaml` 现有线性 flow 无需改。
+- **新增字段全部可选**：`when`/`retry`/`on_error`/`worktree` 缺省时行为 = 现状。
+- **`send_to_agent` 向后兼容**：新增同步等待为**可选参数/新操作**，现有异步调用不受影响。
+- **线性编排仍可用**：无并行需求时，`depends_on` 缺省 = 上一个 stage，等价于现状线性 flow。
+
+## A.10 改动范围
+
+| 文件 | 改动 |
+|------|------|
+| `src/jarvis/jarvis_tools/pipeline_runner.py` | 核心：图构建/拓扑排序/常驻 Agent 创建与调度/条件/失败策略/重试。约 +250~350 行 |
+| `src/jarvis/jarvis_tools/gateway_manager.py` | `send_to_agent` 增加同步等待能力（`wait` 参数或新增 `send_to_agent_sync` 操作） |
+| `src/jarvis/jarvis_agent/jarvis.py` / `code_agent.py` | 如需：`/message` 或 `/status` 补充"任务完成 + 结果回传"语义 |
+| `builtin/plugins/ai-dark-factory/orchestration/dark_factory_pipeline.yaml` | 注释补充 DAG 用法（可选，模板加并行示例） |
+| `docs/design/ai-dark-factory-orchestration-engine.md` | 本文档（本附录） |
+| `tests/jarvis_tools/test_pipeline_runner.py` | 新增 DAG 测试：拓扑排序、并行、多输入、条件、失败策略、环检测、锁处理 |
+
+**不改**：`@OrganizeAgents`、`status_file`、config.yaml（无需新增入口）。
+
+## A.11 风险与对策
+
+| 风险 | 对策 |
+|------|------|
+| 环导致死循环 | 拓扑排序前置检测，有环报错不执行 |
+| **同仓库并行被文件锁卡死** | 并行阶段强制 `worktree: true` 隔离（`code_agent.py:1690` 不加锁）；不同仓库无需处理 |
+| **同步等待超时/挂起** | 轮询 `/status` 设超时（默认可配），超时报错并保留现场 |
+| 并行阶段资源竞争（多个 Agent 同时跑） | 可配 `max_workers`（默认 4），避免打爆机器 |
+| 并行阶段产物写同一路径 | 约定每阶段独立 output 文件；引擎校验 output 唯一；worktree 隔离仓库改动 |
+| `when` 表达式注入 | 受限表达式解析器，白名单，不 eval 任意代码 |
+| 门禁语义在并行下模糊 | 门禁节点仍是单节点；其所有依赖完成后才执行，执行完停住等审批 |
+| 常驻 Agent 创建失败/不可用 | 启动前校验并重试创建；失败按 `on_error` 处理 |
+| 复杂度上升 | 保持"每阶段单 agent"约束，DAG 只解决调度，不引入多 agent 单阶段 |
+
+## A.12 实施步骤（评审通过后）
+
+1. **新增 `send_to_agent` 同步等待能力**（`gateway_manager.py`）：`wait` 参数或 `send_to_agent_sync` 操作，轮询 `/status` 等待完成并回传结果；必要时在 `/message`/`/status` 补充"任务完成 + 结果回传"语义。
+2. 重构 `execute()`：拆出 `_build_dag()`（解析+校验+拓扑排序）、`_create_stage_agents()`（创建常驻 Agent）、`_run_stage()`（send_to_agent 发送 + 同步等待 + 校验产物）、`_schedule()`（并行调度循环）。
+3. 实现 `when` 受限表达式解析、`on_error` 失败策略、`retry`、并行阶段 worktree 隔离。
+4. 更新模板 YAML 注释 + 设计文档。
+5. 补单元测试（mock send_to_agent + /status，覆盖并行/汇聚/条件/失败/环/锁处理）。
+6. 验证：老编排文件行为不变；新 DAG 编排正确并行与汇聚。
