@@ -70,8 +70,16 @@
           class="orch-tab-dot"
           :class="'fin-' + p.finalStatus"
         />
-        <span class="orch-list-name">{{ shortName(p) }}</span>
-        <span class="orch-list-meta">{{ listMeta(p) }}</span>
+        <span class="orch-list-main">
+          <span class="orch-list-row1">
+            <span class="orch-list-name">{{ shortName(p) }}</span>
+            <span class="orch-list-meta">{{ listMeta(p) }}</span>
+          </span>
+          <span class="orch-list-row2">
+            <span class="orch-list-dir" :title="p.workingDir">{{ p.workingDir || '—' }}</span>
+            <span class="orch-list-time">{{ fmtTime(p.startedAt) }}</span>
+          </span>
+        </span>
         <span
           class="orch-list-del"
           title="删除该流水线记录"
@@ -475,7 +483,23 @@ function listMeta(p) {
   if (p.finalStatus === 'preview') return label
   const end = p.finishedAt || Date.now()
   const sec = Math.max(0, Math.round((end - p.startedAt) / 1000))
-  return `${label} · ${sec}s`
+  return `${label} · ${fmtDuration(sec)}`
+}
+// 格式化秒数为可读耗时（如 90s / 3m20s / 1h5m）
+function fmtDuration(sec) {
+  if (sec < 60) return `${sec}s`
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  if (m < 60) return `${m}m${s}s`
+  const h = Math.floor(m / 60)
+  return `${h}h${m % 60}m`
+}
+// 格式化时间戳为 MM-DD HH:mm
+function fmtTime(ts) {
+  if (!ts) return ''
+  const d = new Date(ts)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 </script>
 
@@ -520,8 +544,13 @@ function listMeta(p) {
   background: rgba(32, 200, 255, 0.12);
   color: #eaf6ff;
 }
+.orch-list-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.orch-list-row1 { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.orch-list-row2 { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .orch-list-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .orch-list-meta { font-size: 10px; color: #7f8ea3; flex: 0 0 auto; }
+.orch-list-dir { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: #6b7d93; }
+.orch-list-time { flex: 0 0 auto; font-size: 10px; color: #6b7d93; }
 .orch-list-del {
   flex: 0 0 auto;
   width: 18px;
