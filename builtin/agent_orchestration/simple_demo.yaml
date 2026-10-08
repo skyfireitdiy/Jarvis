@@ -1,0 +1,75 @@
+---
+# 简单编排示例（用于演示流水线 DAG 可视化）
+#
+# 这是一个最小可运行的编排文件，演示「扇出 → 并行 → 汇聚」的 DAG 结构：
+#
+#            ┌─> worker_a ─┐
+#   planner ─┤             ├─> aggregator
+#            └─> worker_b ─┘
+#
+# 用法：
+#   1. 先在编排弹窗中选择本文件，或直接指定路径；
+#   2. 准备一个 NLSpec 文件（纯文本即可，描述你的需求）；
+#   3. 用 pipeline_runner 工具运行：
+#        orchestration_file: builtin/agent_orchestration/simple_demo.yaml
+#        spec_file: <你的 spec 文件路径>
+#        working_dir: <工作目录>
+#   4. 想先看编排计划不实际执行，可加 dry_run: true。
+#
+# 说明：所有阶段 Agent 都是常驻 jvs Agent，产物写入 .df/ 目录。
+agents:
+  - name: "demo_planner"
+    working_dir: "."
+    task: |
+      你是演示流水线的规划器。
+      阅读 NLSpec，把需求拆成两份互不依赖的子任务，分别交给两个执行者。
+      输出一份简短的计划（Markdown），列出两个子任务的目标与验收标准。
+      只规划，不执行。
+
+  - name: "demo_worker_a"
+    working_dir: "."
+    task: |
+      你是演示流水线的执行者 A。
+      依据规划产物，完成分配给 A 的子任务，把结果写成一份简短报告。
+      只做自己那份，不越界。
+
+  - name: "demo_worker_b"
+    working_dir: "."
+    task: |
+      你是演示流水线的执行者 B。
+      依据规划产物，完成分配给 B 的子任务，把结果写成一份简短报告。
+      只做自己那份，不越界。
+
+  - name: "demo_aggregator"
+    working_dir: "."
+    task: |
+      你是演示流水线的汇总者。
+      读取 A、B 两份报告，合并为一份最终交付物，并给出简要总结。
+      只汇总，不重做 A、B 的工作。
+
+# 流水线执行顺序（DAG）：
+#   planner 先跑；worker_a / worker_b 并行；aggregator 等两者都完成后再跑。
+flow:
+  - stage: "planner"
+    agent: "demo_planner"
+    output: ".df/demo_plan.md"          # 规划产物
+
+  - stage: "worker_a"
+    agent: "demo_worker_a"
+    depends_on: ["planner"]             # 依赖规划
+    input: ".df/demo_plan.md"
+    output: ".df/demo_a.md"             # A 的报告
+
+  - stage: "worker_b"
+    agent: "demo_worker_b"
+    depends_on: ["planner"]             # 与 worker_a 并行
+    input: ".df/demo_plan.md"
+    output: ".df/demo_b.md"             # B 的报告
+
+  - stage: "aggregator"
+    agent: "demo_aggregator"
+    depends_on: ["worker_a", "worker_b"]  # 等两个执行者都完成
+    input:
+      - ".df/demo_a.md"
+      - ".df/demo_b.md"
+    output: ".df/demo_final.md"         # 最终交付物
