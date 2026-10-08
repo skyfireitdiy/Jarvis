@@ -260,7 +260,7 @@ dark-factory/run:
 
 ## 附录 A：pipeline_runner 支持 DAG 编排（方案设计）
 
-> 状态：**待评审（先方案后实现）**
+> 状态：**已实现（2026-10-08）**。核心实现见 `src/jarvis/jarvis_tools/pipeline_runner.py`；测试见 `tests/jarvis_tools/test_pipeline_runner.py`（43 用例）。已通过单元测试与 mock 端到端验证；**真实环境端到端验证按管理员要求暂缓**。
 > 目标：把 `pipeline_runner` 的 `flow` 从**线性列表**升级为 **DAG（有向无环图）**，支持并行、多输入汇聚、条件分支、失败策略与重试。
 > 范围确认（管理员 2026-10-08）：**全做**（并行/多输入/条件/失败策略/重试），并行度默认 4。
 
@@ -336,6 +336,7 @@ flow:
 | `when` | ❌ 无 | 条件表达式（可选） | 条件分支 |
 | `retry` | ❌ 无 | int（可选） | 失败重试次数 |
 | `on_error` | ❌ 无 | `abort`/`continue`/`skip_dependents` | 失败策略 |
+| `default_on_error` | ❌ 无 | 顶层可选，同上三值 | 阶段未声明 `on_error` 时的全局默认（非法值回退 `abort`） |
 
 ## A.5 调度引擎（核心改动）
 
@@ -457,10 +458,17 @@ execute(args):
 
 ## A.12 实施步骤（评审通过后）
 
-1. **给 `send_to_agent` 增加 `wait` 参数**（`gateway_manager.py`）：`wait=true` 时轮询 `/status` 等待完成并回传结果；必要时在 `/message`/`/status` 补充"任务完成 + 结果回传"语义。`wait` 缺省为 `false`，向后兼容。
-2. 重构 `execute()`：拆出 `_build_dag()`（解析+校验+拓扑排序）、`_create_stage_agents()`（创建常驻 jvs Agent）、`_run_stage()`（send_to_agent 发送 + wait 同步等待 + 校验产物）、`_schedule()`（并行调度循环）。
-3. 实现 `when` 受限表达式解析、`on_error` 失败策略、`retry`。
-4. **编排系统忽略 flow 阶段的 `type` 字段**（管理员决策 2026-10-08）：阶段 Agent 一律按 `type: agent` → `jvs` 创建，不读取/不依赖编排文件里的 `type`。
-5. 更新模板 YAML 注释 + 设计文档。
-6. 补单元测试（mock send_to_agent + /status，覆盖并行/汇聚/条件/失败/环/锁处理）。
-7. 验证：老编排文件行为不变；新 DAG 编排正确并行与汇聚。
+1. ✅ **给 `send_to_agent` 增加 `wait` 参数**（`gateway_manager.py`）：`wait=true` 时等待完成并回传结果。实际实现以 **`status_file` 作为完成信号**（轮询本地状态文件：completed→成功、failed→失败、超时 1800s），并保留 `/status` 轮询兜底。`wait` 缺省为 `false`，向后兼容。
+2. ✅ 重构 `execute()`：拆出 `_build_dag()`（解析+校验+拓扑排序）、`_create_stage_agents()`（创建常驻 jvs Agent）、`_run_stage()`（send_to_agent 发送 + wait 同步等待 + 校验产物）、`_schedule()`（并行调度循环）。
+3. ✅ 实现 `when` 受限表达式解析、`on_error` 失败策略、`retry`；另补充顶层 `default_on_error`、`output` 全局唯一性校验。
+4. ✅ **编排系统忽略 flow 阶段的 `type` 字段**（管理员决策 2026-10-08）：阶段 Agent 一律按 `type: agent` → `jvs` 创建，不读取/不依赖编排文件里的 `type`。
+5. ✅ 更新模板 YAML 注释 + 设计文档（本附录）。
+6. ✅ 补单元测试（mock `send_to_agent` + `status_file`，覆盖并行/汇聚/条件/失败/环/重试/门禁/产物 JSON 引用/创建重试）。实际 43 用例全绿。
+7. ⏳ 验证：老编排文件行为不变已由单测覆盖；**新 DAG 编排的真实环境端到端验证按管理员要求暂缓**。
+
+### A.12.1 实现补充说明（与初版方案的差异）
+
+- **完成信号用 `status_file`**：常驻 jvs Agent 执行阶段任务后回写 `status_file`，引擎轮询该文件判定完成，比轮询 `/status` 更直接可靠（`/status` 仅作兜底）。
+- **`when` 可引用产物 JSON**：`_run_stage` 在产物落盘后，若 `output` 为 `.json` 且顶层为 dict，则读取其字段合并进该阶段 `result`（`status_file` 字段优先），供下游 `when` 的 `stage.field` 引用产物内容（如 `report.pass_rate`）。
+- **常驻 Agent 创建失败重试**：`_create_agent_with_retry` 最多重试 3 次、间隔递增；成功但无 `agent_id` 也视为失败重试；耗尽后返回失败并附最后一次错误。创建在主线程串行完成，**不在调度线程内创建**。
+- **并行实现**：`_schedule` 用 `ThreadPoolExecutor(max_workers=4)` 并发执行同一批 ready 节点的 `_run_stage`；线程内只做"派发 + 等待"（I/O 阻塞），不创建 Agent、不做 CPU 计算。

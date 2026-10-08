@@ -61,6 +61,21 @@ agents:
 # 流水线执行顺序（可选字段）：供 pipeline_runner 内置编排引擎驱动。
 # 无 flow 时 @OrganizeAgents 仍只创建 agent（向后兼容）；有 flow 时按序驱动。
 # 产物契约：每阶段 output 落盘后传入下一阶段 input；orchestrator 为门禁（gate: true）。
+#
+# ── DAG 编排字段说明（全部可选，缺省即线性行为）──────────────────────────
+# flow 支持 DAG：默认 depends_on 缺省 = 上一个 stage（线性）；显式声明即可并行/多依赖。
+#   stage        阶段名（唯一，供 depends_on/when 引用）
+#   agent        引用 agents 中的 name
+#   input        上游产物路径；单个字符串自动转单元素列表，多输入写列表
+#   output       本阶段产物路径；非空且全局唯一（重复报错）
+#   depends_on   依赖的 stage 列表；缺省 = 上一个 stage（首个 stage 为无依赖）
+#   when         受限表达式：stage.field 比较/逻辑（== != >= <= > < && || !），
+#                不满足则跳过该阶段；字段取自上游 status_file 与产物 JSON 内容
+#   retry        失败重试次数（整数，默认 0）
+#   on_error     失败策略：abort（默认，立即中止）/ continue / skip_dependents
+#   gate         门禁：true 时 approve=false 会停住等人工审批
+# 顶层可选 default_on_error：阶段未声明 on_error 时的全局默认（非法值回退 abort）。
+# ─────────────────────────────────────────────────────────────────────────
 flow:
   - stage: "planner"
     agent: "df_planner"

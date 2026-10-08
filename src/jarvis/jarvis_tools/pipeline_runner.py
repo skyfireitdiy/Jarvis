@@ -23,6 +23,7 @@
 """
 import json
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
 from pathlib import Path
@@ -139,6 +140,7 @@ class PipelineRunnerTool:
             )
 
         agents_by_name = {a.get("name"): a for a in agents if a.get("name")}
+        default_on_error = str(orch.get("default_on_error") or "abort").strip()
 
         # 3. 初始化产物目录
         artifact_dir = work_dir / _ARTIFACT_DIR
@@ -148,7 +150,7 @@ class PipelineRunnerTool:
             return self._error(f"无法创建产物目录 {artifact_dir}: {e}")
 
         # 4. 构建 DAG（解析 + 校验 + 环检测）
-        dag_build = self._build_dag(flow, agents_by_name)
+        dag_build = self._build_dag(flow, agents_by_name, default_on_error)
         if not dag_build["success"]:
             return self._error(dag_build["error"])
         nodes = dag_build["nodes"]
@@ -178,19 +180,27 @@ class PipelineRunnerTool:
     # DAG 构建
     # ------------------------------------------------------------------
     def _build_dag(
-        self, flow: List[Dict[str, Any]], agents_by_name: Dict[str, Any]
+        self,
+        flow: List[Dict[str, Any]],
+        agents_by_name: Dict[str, Any],
+        default_on_error: str = "abort",
     ) -> Dict[str, Any]:
         """解析 flow 为 DAG 节点列表，补全 depends_on/input，环检测。
 
         - `depends_on` 缺省 = 上一个 stage（线性兼容）。
         - `input` 单字符串自动转单元素列表。
-        - 校验 agent 引用、重复 stage 名、环检测。
+        - `on_error` 缺省回退到编排文件顶层 `default_on_error`，再缺省 abort。
+        - 校验 agent 引用、重复 stage 名、output 唯一、环检测。
 
         返回:
             {"success": True, "nodes": [...]} 或 {"success": False, "error": str}
         """
+        if default_on_error not in ("abort", "continue", "skip_dependents"):
+            default_on_error = "abort"
+
         nodes: List[Dict[str, Any]] = []
         stage_names: List[str] = []
+        output_owners: Dict[str, str] = {}
         for idx, stage in enumerate(flow):
             stage_name = str(stage.get("stage") or f"stage_{idx}").strip()
             if not stage_name:
@@ -234,9 +244,21 @@ class PipelineRunnerTool:
             else:
                 input_list = []
 
-            on_error = str(stage.get("on_error") or "abort").strip()
+            on_error = str(stage.get("on_error") or default_on_error).strip()
             if on_error not in ("abort", "continue", "skip_dependents"):
-                on_error = "abort"
+                on_error = default_on_error
+
+            output = str(stage.get("output") or "").strip()
+            if output:
+                if output in output_owners:
+                    return {
+                        "success": False,
+                        "error": (
+                            f"flow 阶段 '{stage_name}' 与 '{output_owners[output]}' "
+                            f"声明了相同的产物路径 '{output}'（产物须唯一）"
+                        ),
+                    }
+                output_owners[output] = stage_name
 
             nodes.append(
                 {
@@ -244,7 +266,7 @@ class PipelineRunnerTool:
                     "agent": agent_name,
                     "depends_on": depends_on,
                     "input": input_list,
-                    "output": str(stage.get("output") or "").strip(),
+                    "output": output,
                     "gate": bool(stage.get("gate", False)),
                     "when": str(stage.get("when") or "").strip() or None,
                     "retry": int(stage.get("retry", 0) or 0),
@@ -302,34 +324,66 @@ class PipelineRunnerTool:
             stage_name = node["stage"]
             agent_def = agents_by_name[node["agent"]]
             working_dir = str(agent_def.get("working_dir") or str(work_dir))
-            create_result = gw._create_agent(
-                agent_type="agent",
-                working_dir=working_dir,
-                name=f"df_{stage_name}",
+            agent_id, last_error = self._create_agent_with_retry(
+                gw, stage_name, working_dir
             )
-            if not create_result["success"]:
-                return {
-                    "success": False,
-                    "error": (
-                        f"创建阶段 [{stage_name}] 常驻 Agent 失败: "
-                        f"{create_result['stderr']}"
-                    ),
-                }
-            try:
-                agent_info = json.loads(create_result["stdout"])
-                agent_id = str(agent_info.get("agent_id") or "")
-            except (json.JSONDecodeError, AttributeError):
-                agent_id = ""
             if not agent_id:
                 return {
                     "success": False,
-                    "error": f"创建阶段 [{stage_name}] 常驻 Agent 后无法获取 agent_id",
+                    "error": (
+                        f"创建阶段 [{stage_name}] 常驻 Agent 失败（已重试）: "
+                        f"{last_error}"
+                    ),
                 }
             agent_map[stage_name] = agent_id
             PrettyOutput.auto_print(
                 f"  🛠 阶段 [{stage_name}] 常驻 Agent 就绪: {agent_id}"
             )
         return {"success": True, "agent_map": agent_map}
+
+    def _create_agent_with_retry(
+        self,
+        gw: Any,
+        stage_name: str,
+        working_dir: str,
+        max_attempts: int = 3,
+    ) -> tuple:
+        """创建常驻 Agent，失败时重试（间隔递增）。
+
+        返回:
+            (agent_id, error): agent_id 非空表示成功；失败时 agent_id 为空字符串，
+            error 为最后一次错误信息。
+        """
+        last_error = ""
+        for attempt in range(1, max_attempts + 1):
+            create_result = gw._create_agent(
+                agent_type="agent",
+                working_dir=working_dir,
+                name=f"df_{stage_name}",
+            )
+            if create_result.get("success"):
+                try:
+                    agent_info = json.loads(create_result["stdout"])
+                    agent_id = str(agent_info.get("agent_id") or "")
+                except (json.JSONDecodeError, AttributeError, TypeError):
+                    agent_id = ""
+                if agent_id:
+                    if attempt > 1:
+                        PrettyOutput.auto_print(
+                            f"  ♻️ 阶段 [{stage_name}] 第 {attempt} 次创建 Agent 成功"
+                        )
+                    return agent_id, ""
+                last_error = "创建成功但无法获取 agent_id"
+            else:
+                last_error = str(create_result.get("stderr") or "未知错误")
+            if attempt < max_attempts:
+                PrettyOutput.auto_print(
+                    f"  ⚠️ 阶段 [{stage_name}] 创建 Agent 失败"
+                    f"（第 {attempt}/{max_attempts} 次）: {last_error}，"
+                    f"{attempt} 秒后重试"
+                )
+                time.sleep(attempt)
+        return "", last_error
 
     # ------------------------------------------------------------------
     # 单阶段执行
@@ -416,6 +470,13 @@ class PipelineRunnerTool:
                     "gate_blocked": False,
                     "approval_path": "",
                 }
+            # 若产物是 JSON，读取其字段合并进 result（status_file 字段优先），
+            # 供下游 when 表达式引用产物内容（如 report.pass_rate）。
+            artifact_json = self._read_artifact_json(output_path)
+            if artifact_json:
+                merged = dict(artifact_json)
+                merged.update(result)
+                result = merged
 
         # 门禁：停住等人工审批
         if node["gate"]:
@@ -941,6 +1002,21 @@ class PipelineRunnerTool:
                 if isinstance(data, dict):
                     return data
         except (json.JSONDecodeError, OSError):
+            pass
+        return {}
+
+    def _read_artifact_json(self, artifact_path: Path) -> Dict[str, Any]:
+        """若产物为 JSON 对象则读取其内容，否则返回空 dict。
+
+        仅接受顶层为 dict 的 JSON，供 when 表达式引用产物字段。
+        """
+        try:
+            if artifact_path.suffix.lower() != ".json":
+                return {}
+            data = json.loads(artifact_path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                return data
+        except (json.JSONDecodeError, OSError, ValueError):
             pass
         return {}
 
