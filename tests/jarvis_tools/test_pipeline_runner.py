@@ -804,6 +804,42 @@ class TestCreateAgentRetry:
         assert r["success"] is False
         assert "down" in r["error"]
 
+    def test_wait_agent_ready_polls_until_ready(self, tool):
+        """_wait_agent_ready 轮询 /status 直到网关代理成功（非 502）。"""
+        calls = {"n": 0}
+
+        class FakeGW:
+            def _request_gateway(self, method, path, error_prefix):
+                calls["n"] += 1
+                if calls["n"] < 3:
+                    return {"success": False, "error": "HTTP 502"}
+                return {"success": True, "data": {}}
+
+        ok, err = tool._wait_agent_ready(FakeGW(), "agent_1", timeout=10, poll_interval=0)
+        assert ok is True
+        assert err == ""
+        assert calls["n"] == 3
+
+    def test_wait_agent_ready_timeout(self, tool):
+        """_wait_agent_ready 持续 502 时超时返回失败。"""
+        class FakeGW:
+            def _request_gateway(self, method, path, error_prefix):
+                return {"success": False, "error": "HTTP 502"}
+
+        ok, err = tool._wait_agent_ready(FakeGW(), "agent_1", timeout=0.2, poll_interval=0)
+        assert ok is False
+        assert "超时" in err
+
+    def test_wait_agent_ready_skips_without_request_gateway(self, tool):
+        """无 _request_gateway 的测试桩直接视为就绪。"""
+        class FakeGW:
+            def _create_agent(self, agent_type, working_dir, name):
+                return {"success": True, "stdout": json.dumps({"agent_id": "x"})}
+
+        ok, err = tool._wait_agent_ready(FakeGW(), "agent_1")
+        assert ok is True
+        assert err == ""
+
 
 # ---------------------------------------------------------------------------
 # dry-run 预演（方案1：只校验编排计划，不创建 Agent）

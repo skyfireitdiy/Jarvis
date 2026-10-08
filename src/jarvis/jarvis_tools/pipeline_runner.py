@@ -515,11 +515,50 @@ class PipelineRunnerTool:
                         f"{last_error}"
                     ),
                 }
+            # 创建 Agent 后进程刚启动、web-gateway 端口尚未监听，立即派发任务会 502；
+            # 这里等待 Agent 就绪（可响应 /status）后再进入调度。
+            ready, ready_err = self._wait_agent_ready(gw, agent_id)
+            if not ready:
+                return {
+                    "success": False,
+                    "error": (
+                        f"阶段 [{stage_name}] 常驻 Agent 就绪等待超时: {ready_err}"
+                    ),
+                }
             agent_map[stage_name] = agent_id
             PrettyOutput.auto_print(
                 f"  🛠 阶段 [{stage_name}] 常驻 Agent 就绪: {agent_id}"
             )
         return {"success": True, "agent_map": agent_map}
+
+    def _wait_agent_ready(
+        self, gw: Any, agent_id: str, timeout: float = 60.0, poll_interval: float = 0.5
+    ) -> tuple:
+        """等待 Agent 的 web-gateway 就绪（可响应 /status 请求）。
+
+        创建 Agent 后进程刚启动、端口尚未监听，网关代理请求会 502；
+        这里轮询 /api/agent/{id}/status 直到网关代理成功（非 502）即视为就绪。
+
+        返回:
+            (ok, error): ok=True 表示就绪，否则为 False 并附错误信息。
+        """
+        # 测试桩（FakeGW）可能未实现 _request_gateway，直接视为就绪
+        request_gateway = getattr(gw, "_request_gateway", None)
+        if request_gateway is None:
+            return True, ""
+        deadline = time.time() + timeout
+        last_err = ""
+        while time.time() < deadline:
+            result = request_gateway(
+                method="GET",
+                path=f"/api/agent/{agent_id}/status",
+                error_prefix=f"Failed to query status of agent {agent_id}",
+            )
+            if result["success"]:
+                return True, ""
+            last_err = str(result.get("error") or "")
+            time.sleep(poll_interval)
+        return False, f"等待 Agent 就绪超时（>{int(timeout)} 秒）: {last_err}"
 
     def _create_agent_with_retry(
         self,
