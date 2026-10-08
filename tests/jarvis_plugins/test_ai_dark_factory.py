@@ -217,10 +217,14 @@ class TestOrchestrationTemplate:
         assert "df_orchestrator" in names
 
     def test_each_agent_has_required_fields(self):
+        """每个 agent 必须声明 name / working_dir / task（不含 type）。
+
+        编排系统忽略阶段 type 字段，阶段 Agent 一律按 type: agent → jvs 创建，
+        因此模板 agent 无需声明 type。
+        """
         data = self._load()
         for a in data["agents"]:
             assert a.get("name"), "agent 缺 name"
-            assert a.get("type"), "agent 缺 type"
             assert a.get("working_dir"), "agent 缺 working_dir"
             assert a.get("task"), "agent 缺 task"
 
