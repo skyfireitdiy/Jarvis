@@ -1701,24 +1701,6 @@
               <input v-model="orchestrateAgents[orchestrateActiveIndex].toolGroup" class="orchestrate-input" type="text" placeholder="default">
             </div>
             <div class="orchestrate-field">
-              <label class="orchestrate-label">配置文件</label>
-              <input v-model="orchestrateAgents[orchestrateActiveIndex].configFile" class="orchestrate-input" type="text" placeholder="可选，Agent 启动用的 --config-file 路径">
-              <!-- 最近使用的配置文件（按节点过滤） -->
-              <div v-if="orchestrateFilteredRecentConfigFiles.length > 0" class="orchestrate-recent-section">
-                <div class="orchestrate-recent-title">最近使用的配置文件</div>
-                <div class="orchestrate-recent-list">
-                  <span
-                    v-for="(item, index) in orchestrateFilteredRecentConfigFiles"
-                    :key="index"
-                    class="orchestrate-recent-tag"
-                    @click="orchestrateAgents[orchestrateActiveIndex].configFile = item.path"
-                    :title="item.path">
-                    {{ item.path.split('/').filter(Boolean).pop() || item.path }}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div class="orchestrate-field">
               <label class="orchestrate-label">目标节点</label>
               <select v-model="orchestrateAgents[orchestrateActiveIndex].nodeId" class="orchestrate-input">
                 <option v-for="node in filteredNodeOptionsForCreateAgent" :key="node.node_id" :value="node.node_id">
@@ -3993,42 +3975,7 @@ function saveRecentWorkDir(path, nodeId) {
     console.error('[HISTORY DIR] 保存历史记录失败:', error)
   }
 }
-// 最近使用的配置文件管理（localStorage持久化存储，供编排弹窗使用）
-// 元素格式：{ path: string, nodeId: string }，按节点区分
-const recentConfigFiles = ref([])
-function loadRecentConfigFiles() {
-  try {
-    const stored = localStorage.getItem('jarvis_recent_config_files')
-    if (stored) {
-      const parsed = JSON.parse(stored)
-      const isValid = Array.isArray(parsed) && parsed.every(item =>
-        item && typeof item === 'object' && typeof item.path === 'string' && typeof item.nodeId === 'string'
-      )
-      recentConfigFiles.value = isValid ? parsed : []
-    } else {
-      recentConfigFiles.value = []
-    }
-  } catch (error) {
-    console.error('[HISTORY CONFIG] 加载历史记录失败:', error)
-    recentConfigFiles.value = []
-  }
-}
-function saveRecentConfigFile(path, nodeId) {
-  try {
-    const normalizedPath = String(path || '').trim()
-    if (!normalizedPath) return
-    const normalizedNodeId = String(nodeId || '').trim() || 'master'
-    // 去重：过滤掉已存在的同节点同路径
-    const filtered = recentConfigFiles.value.filter(item =>
-      !(item.path === normalizedPath && item.nodeId === normalizedNodeId)
-    )
-    // 新路径加到最前面，只保留最近20个
-    recentConfigFiles.value = [{ path: normalizedPath, nodeId: normalizedNodeId }, ...filtered].slice(0, 20)
-    localStorage.setItem('jarvis_recent_config_files', JSON.stringify(recentConfigFiles.value))
-  } catch (error) {
-    console.error('[HISTORY CONFIG] 保存历史记录失败:', error)
-  }
-}
+
 // 文件树状态管理
 const fileTreeState = ref(new Map())        // 每个 Agent 的文件树数据：agent_id -> treeData
 const fileTreeExpanded = ref(new Map())     // 每个 Agent 的展开状态：agent_id -> Set(expandedPaths)
@@ -12429,8 +12376,6 @@ async function openCreateAgentModal(initialNodeId = '') {
   ])
   // 加载最近使用的工作目录
   loadRecentWorkDirs()
-  // 加载最近使用的配置文件（编排弹窗用）
-  loadRecentConfigFiles()
   const target = typeof initialNodeId === 'string' ? initialNodeId.trim() : ''
   // 校验目标节点在可创建范围内，否则回退到默认节点（master）
   const allowed = filteredNodeOptionsForCreateAgent.value.some(n => n.node_id === target)
@@ -12904,7 +12849,6 @@ function buildOrchestrateAgentForm(raw = {}, fallbackNodeId = 'master') {
     workingDir: String(raw.working_dir || '.'),
     llmGroup: String(raw.llm_group || 'default'),
     toolGroup: String(raw.tool_group || 'default'),
-    configFile: String(raw.config_file || ''),
     task: String(raw.task || ''),
     additionalArgs: String(raw.additional_args || ''),
     quickMode: !!raw.quick_mode,
@@ -12925,8 +12869,6 @@ async function openOrchestrateModal() {
   orchestrateActiveIndex.value = 0
   orchestrateFilePath.value = ''
   showOrchestrateModal.value = true
-  // 加载最近使用的配置文件（按节点过滤展示）
-  loadRecentConfigFiles()
   if (!availableNodeOptions.value.length) {
     try { await fetchNodeStatus() } catch (error) { /* 失败时保持空列表，弹窗内会提示 */ }
   }
@@ -13082,7 +13024,6 @@ async function createAllOrchestrateAgents() {
         accessAclRead: form.accessAclRead,
         accessAclInteract: form.accessAclInteract,
         toolGroup: form.toolGroup,
-        configFile: form.configFile,
         additionalArgs: form.additionalArgs,
       })
       orchestrateResults.value.push({
@@ -13091,10 +13032,6 @@ async function createAllOrchestrateAgents() {
         error: result.ok ? '' : (result.error || '创建失败'),
       })
       if (result.ok) created.push(result.agent)
-      // 记录最近使用的配置文件（按目标节点区分），供下次编排快速选择
-      if (result.ok && form.configFile) {
-        saveRecentConfigFile(form.configFile, form.nodeId)
-      }
     }
     // 全部成功则关闭弹窗并收尾（加入列表、刷新、按场景打开 Panel）
     const allOk = orchestrateResults.value.every(r => r.ok)
@@ -13148,12 +13085,6 @@ const orchestrateNavItems = computed(() => [
   ...orchestrateFilteredDirs.value.map(d => ({ type: 'directory', path: d.path })),
   ...orchestrateFilteredFiles.value.map(f => ({ type: 'file', path: f.path })),
 ])
-// 当前编辑 Agent 目标节点下最近使用的配置文件（按节点过滤）
-const orchestrateFilteredRecentConfigFiles = computed(() => {
-  const active = orchestrateAgents.value[orchestrateActiveIndex.value]
-  if (!active || !active.nodeId) return []
-  return recentConfigFiles.value.filter(item => item && item.nodeId === active.nodeId)
-})
 function isOrchestrateFile(name) {
   const lower = String(name || '').toLowerCase()
   return ORCHESTRATE_FILE_EXTENSIONS.some(ext => lower.endsWith(ext))
@@ -25791,39 +25722,6 @@ body::-webkit-scrollbar {
 .orchestrate-dir-row {
   display: flex;
   gap: 8px;
-}
-/* 最近使用的配置文件（按节点过滤）标签 */
-.orchestrate-recent-section {
-  margin-top: 8px;
-}
-.orchestrate-recent-title {
-  font-size: 12px;
-  color: #8ba3b8;
-  margin-bottom: 6px;
-  font-weight: 500;
-}
-.orchestrate-recent-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.orchestrate-recent-tag {
-  display: inline-block;
-  padding: 4px 8px;
-  background-color: #16263a;
-  border-radius: 4px;
-  font-size: 12px;
-  color: #d6e4f0;
-  cursor: pointer;
-  transition: all 0.2s;
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.orchestrate-recent-tag:hover {
-  background-color: #20c8ff;
-  color: #fff;
 }
 .orchestrate-checks {
   flex-direction: row;
