@@ -132,6 +132,7 @@ export class PipelineStore {
         approvalPath: "",
       };
       this.pipelines.set(pid, state);
+      this._persist();
       return state;
     }
 
@@ -144,6 +145,7 @@ export class PipelineStore {
         const node = state.stages.get(stage);
         if (node) node.agentId = agentId;
       }
+      this._persist();
       return state;
     }
 
@@ -159,6 +161,7 @@ export class PipelineStore {
       if (event.error !== undefined) node.error = event.error || "";
       if (event.artifact !== undefined) node.artifact = event.artifact || "";
       if (event.agent_id) node.agentId = event.agent_id;
+      this._persist();
       return state;
     }
 
@@ -169,6 +172,7 @@ export class PipelineStore {
       state.gateStage = event.gate_stage || "";
       state.approvalPath = event.approval_path || "";
       this.pruneFinished();
+      this._persist();
       return state;
     }
 

@@ -143,3 +143,56 @@ test("非对象/无 pipeline_id 事件被忽略", () => {
   assert.equal(store.applyEvent("x"), null);
   assert.equal(store.applyEvent({ type: "pipeline_start" }), null);
 });
+
+// ---- localStorage 持久化（storageKey 非空时开启）----
+function installLocalStorageMock() {
+  const backing = new Map();
+  const storage = {
+    getItem: (k) => (backing.has(k) ? backing.get(k) : null),
+    setItem: (k, v) => backing.set(k, String(v)),
+    removeItem: (k) => backing.delete(k),
+    clear: () => backing.clear(),
+    _backing: backing,
+  };
+  globalThis.localStorage = storage;
+  return storage;
+}
+
+test("开启 storageKey 后 applyEvent 自动持久化，新实例可恢复", () => {
+  const storage = installLocalStorageMock();
+  const store = new PipelineStore(20, "orchestration");
+  store.applyEvent(startEvent("p1", [{ stage: "s1" }, { stage: "s2", depends_on: ["s1"] }]));
+  store.applyEvent({
+    pipeline_id: "p1",
+    type: "stage_update",
+    stage: "s1",
+    status: "completed",
+    artifact: "out.md",
+  });
+  store.applyEvent({
+    pipeline_id: "p1",
+    type: "pipeline_done",
+    success: true,
+    final_status: "completed",
+  });
+
+  // 持久化键存在且内容非空
+  const key = "jarvis_pipeline_store_orchestration";
+  assert.ok(storage.getItem(key), "应写入 localStorage");
+
+  // 新实例（模拟刷新）能从 localStorage 恢复
+  const restored = new PipelineStore(20, "orchestration");
+  const st = restored.getPipeline("p1");
+  assert.ok(st, "刷新后应恢复流程");
+  assert.equal(st.stages.get("s1").status, STAGE_STATUS.COMPLETED);
+  assert.equal(st.stages.get("s1").artifact, "out.md");
+  assert.equal(st.finalStatus, "completed");
+});
+
+test("不传 storageKey 时保持纯内存、不碰 localStorage", () => {
+  const storage = installLocalStorageMock();
+  const store = new PipelineStore();
+  store.applyEvent(startEvent("p1", [{ stage: "s1" }]));
+  assert.equal(storage.getItem("jarvis_pipeline_store_"), null, "不应写入 localStorage");
+});
+

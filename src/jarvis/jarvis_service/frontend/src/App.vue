@@ -11137,7 +11137,8 @@ function openCommandPaletteFileResult(item) {
 const showTopologyOverlay = ref(false) // 网络拓扑大图浮层
 
 // ---- 流水线编排可视化 ----
-const pipelineStore = new PipelineStore()
+// 开启 localStorage 持久化：刷新页面后仍能恢复历史编排（事件广播是纯内存、不落盘）
+const pipelineStore = new PipelineStore(20, 'orchestration')
 const pipelineVersion = ref(0) // 事件到达后自增，触发 computed 重算
 const pipelineList = computed(() => {
   void pipelineVersion.value
