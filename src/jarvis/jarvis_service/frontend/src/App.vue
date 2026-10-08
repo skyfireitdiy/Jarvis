@@ -1716,7 +1716,7 @@
               <span class="orchestrate-tab-name">{{ agent.name || ('Agent ' + (index + 1)) }}</span>
               <span class="orchestrate-tab-close" @click.stop="removeOrchestrateAgent(index)">×</span>
             </button>
-            <button class="orchestrate-tab-add" title="新增一个 Agent" @click="addOrchestrateAgent">＋</button>
+            <button v-if="!orchestrateHasFlow" class="orchestrate-tab-add" title="新增一个 Agent" @click="addOrchestrateAgent">＋</button>
           </div>
 
           <!-- 当前标签页的表单 -->
