@@ -1572,13 +1572,89 @@ class NodeConnectionManager:
                 request_id=request_id,
             )
 
+    def _handle_run_orchestration_request(
+        self, payload: Dict[str, Any], request_id: Optional[str]
+    ) -> Dict[str, Any]:
+        """在子节点上运行编排流水线（child 端）。
+
+        直接调用内置工具 PipelineRunnerTool（与 Agent 调用同一路径），因
+        execute 阻塞，放入后台线程执行并立即返回；真正的 pipeline_id 由
+        execute 内部生成并随 pipeline_start 事件广播。
+        """
+        import threading
+
+        orchestration_file = str(payload.get("orchestration_file") or "").strip()
+        spec_file = str(payload.get("spec_file") or "").strip()
+        working_dir = str(payload.get("working_dir") or "").strip() or "."
+        if not orchestration_file or not spec_file:
+            return build_node_message(
+                DIRECTORY_LIST_RESPONSE,
+                {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_ARGUMENT",
+                        "message": "orchestration_file and spec_file are required",
+                    },
+                },
+                request_id=request_id,
+            )
+        try:
+            from jarvis.jarvis_tools.pipeline_runner import PipelineRunnerTool
+
+            tool = PipelineRunnerTool()
+            args: Dict[str, Any] = {
+                "orchestration_file": orchestration_file,
+                "spec_file": spec_file,
+                "working_dir": working_dir,
+                "approve": bool(payload.get("approve", False)),
+                "dry_run": bool(payload.get("dry_run", False)),
+            }
+            if payload.get("max_workers") is not None:
+                args["max_workers"] = int(payload.get("max_workers"))
+        except Exception as exc:
+            logger.exception(
+                "[NODE] prepare run orchestration failed error=%r", exc
+            )
+            return build_node_message(
+                DIRECTORY_LIST_RESPONSE,
+                {
+                    "success": False,
+                    "error": {"code": "INTERNAL_ERROR", "message": str(exc)},
+                },
+                request_id=request_id,
+            )
+
+        def _run() -> None:
+            try:
+                result = tool.execute(args)
+                if isinstance(result, dict) and not result.get("success", True):
+                    logger.warning(
+                        "[NODE] pipeline run finished with error: %r",
+                        result.get("error"),
+                    )
+            except Exception as exc:  # pylint: disable=broad-except
+                logger.exception("[NODE] pipeline run failed error=%r", exc)
+
+        threading.Thread(
+            target=_run,
+            name="pipeline-run",
+            daemon=True,
+        ).start()
+        return build_node_message(
+            DIRECTORY_LIST_RESPONSE,
+            {"success": True, "data": {"started": True}},
+            request_id=request_id,
+        )
+
     def _handle_directory_list_request(self, message: Dict[str, Any]) -> Dict[str, Any]:
         payload = message.get("payload") or {}
         request_id = message.get("request_id")
         raw_path = str(payload.get("path") or "").strip()
-        # 编排文件解析请求复用本消息类型：仅需读取并解析 YAML，返回 agents 列表
         if payload.get("parse_orchestration"):
             return self._handle_parse_orchestration_request(raw_path, request_id)
+        # 编排流水线运行请求复用本消息类型：直接调用 pipeline_runner 工具
+        if payload.get("run_orchestration"):
+            return self._handle_run_orchestration_request(payload, request_id)
         logger.info(
             "[NODE] _handle_directory_list_request path=%s request_id=%s",
             raw_path,

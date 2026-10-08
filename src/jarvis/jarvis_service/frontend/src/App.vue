@@ -1763,6 +1763,37 @@
               <span v-if="!r.ok" class="orchestrate-result-error">{{ r.error }}</span>
             </div>
           </div>
+
+          <!-- 运行流水线：与 Agent 调用 pipeline_runner 同一路径，运行进度驱动「编排查看」DAG 可视化 -->
+          <div class="orchestrate-run">
+            <div class="orchestrate-run-title">运行流水线</div>
+            <div class="orchestrate-run-hint">需编排文件含 flow 字段；运行进度将在「编排查看」中实时展示。</div>
+            <div class="orchestrate-field orchestrate-field-wide">
+              <label class="orchestrate-label">NLSpec 文件</label>
+              <input
+                v-model="orchestrateSpecFile"
+                class="orchestrate-input"
+                type="text"
+                placeholder="NLSpec 文件绝对路径（运行流水线必填）"
+              >
+            </div>
+            <div class="orchestrate-field orchestrate-field-wide">
+              <label class="orchestrate-label">工作目录</label>
+              <input
+                v-model="orchestrateRunWorkingDir"
+                class="orchestrate-input"
+                type="text"
+                placeholder="留空默认当前目录，产物 .df/ 在其中创建"
+              >
+            </div>
+            <button
+              class="btn primary orchestrate-run-btn"
+              :disabled="orchestrateRunning || !orchestrateFilePath"
+              @click="runOrchestration"
+            >
+              {{ orchestrateRunning ? '启动中…' : '运行流水线' }}
+            </button>
+          </div>
         </div>
         <div class="orchestrate-actions">
           <button class="btn secondary" @click="closeOrchestrateModal">取消</button>
@@ -12913,6 +12944,10 @@ const orchestrateLoading = ref(false)            // 解析中
 const orchestrateError = ref('')                 // 解析错误
 const orchestrateCreating = ref(false)           // 批量创建中
 const orchestrateResults = ref([])               // 批量创建结果 [{ name, ok, error }]
+// 运行流水线（与 Agent 调用 pipeline_runner 同一路径，驱动 DAG 可视化）
+const orchestrateSpecFile = ref('')              // NLSpec 文件绝对路径（运行流水线必填）
+const orchestrateRunWorkingDir = ref('')         // 运行流水线的工作目录（产物 .df/ 在其中创建）
+const orchestrateRunning = ref(false)            // 运行流水线中（仅表示已提交，实际进度由事件驱动）
 // 编排文件浏览面板：目录 + 文件合并列表（复用 DirectoryDialog，fileSelectable 模式）
 const orchestrateFileEntries = ref([])           // 当前目录下的目录与文件项（{name,path,type}）
 const orchestrateSelectedFile = ref('')          // 面板中当前选中的文件路径
@@ -13150,6 +13185,51 @@ function openOrchestrateDirDialog() {
   if (!orchestrateAgents.value.length) return
   dirDialogContext.value = 'orchestrate'
   openDirDialog()
+}
+
+// 运行流水线：调用后端 /run-orchestration（与 Agent 调用 pipeline_runner 同一路径），
+// 运行进度经 pipeline_event 事件驱动 OrchestrationView 的 DAG 可视化。
+async function runOrchestration() {
+  if (orchestrateRunning.value) return
+  const orchestrationFile = String(orchestrateFilePath.value || '').trim()
+  if (!orchestrationFile) {
+    orchestrateError.value = '请先选择并解析编排文件'
+    return
+  }
+  const specFile = String(orchestrateSpecFile.value || '').trim()
+  if (!specFile) {
+    orchestrateError.value = '请输入 NLSpec 文件路径（运行流水线必填）'
+    return
+  }
+  orchestrateRunning.value = true
+  orchestrateError.value = ''
+  try {
+    const { host, port } = getGatewayAddress()
+    const nodeId = String(orchestrateNodeId.value || 'master').trim() || 'master'
+    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, nodeId, 'run-orchestration'), {
+      method: 'POST',
+      body: JSON.stringify({
+        orchestration_file: orchestrationFile,
+        spec_file: specFile,
+        working_dir: String(orchestrateRunWorkingDir.value || '').trim(),
+        node_id: nodeId,
+      }),
+    })
+    const result = await response.json().catch(() => ({}))
+    if (!response.ok || !result.success) {
+      orchestrateError.value = result.error?.message || '运行流水线失败'
+      return
+    }
+    showToast('流水线已启动，可在「编排查看」中查看进度', 'success')
+    // 关闭弹窗，让用户直接看到 DAG 可视化（事件到达后自动刷新）
+    closeOrchestrateModal()
+    showWorkspaceSidebar.value = true
+    setWorkspaceSidebarView('orchestration')
+  } catch (error) {
+    orchestrateError.value = error.message || '运行流水线失败'
+  } finally {
+    orchestrateRunning.value = false
+  }
 }
 
 // ===== 编排文件浏览面板（节点下拉 + 内嵌目录/文件浏览，参考「打开目录」）=====
@@ -25852,6 +25932,17 @@ body::-webkit-scrollbar {
 }
 .orchestrate-result-name { color: #e6edf3; }
 .orchestrate-result-error { color: #ff7b72; opacity: 0.85; }
+.orchestrate-run {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #30363d;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.orchestrate-run-title { font-size: 13px; font-weight: 600; color: #e6edf3; }
+.orchestrate-run-hint { font-size: 12px; color: #8ba3b8; }
+.orchestrate-run-btn { align-self: flex-start; margin-top: 4px; }
 .orchestrate-actions {
   display: flex;
   justify-content: flex-end;

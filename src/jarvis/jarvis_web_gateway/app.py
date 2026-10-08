@@ -10542,6 +10542,76 @@ def create_app(
                 "error": {"code": "INTERNAL_ERROR", "message": repr(e)},
             }
 
+    def _start_pipeline_run(payload: Dict[str, Any]) -> Dict[str, Any]:
+        """在后台线程调用 pipeline_runner 工具运行流水线（与 Agent 调用同一路径）。
+
+        供前端「运行流水线」入口使用：直接复用内置工具 PipelineRunnerTool，
+        因此与 Agent 手动调用 pipeline_runner 走完全相同的执行路径与事件总线，
+        运行进度会经 _pipeline_event_pump 广播给前端驱动 DAG 可视化。
+
+        PipelineRunnerTool.execute 是阻塞式（同步跑完整个 DAG），故放入后台
+        线程执行，本函数立即返回。真正的 pipeline_id 由 execute 内部生成并随
+        pipeline_start 事件广播，前端以事件中的 pipeline_id 为准。
+        """
+        import threading
+
+        orchestration_file = str(payload.get("orchestration_file") or "").strip()
+        spec_file = str(payload.get("spec_file") or "").strip()
+        working_dir = str(payload.get("working_dir") or "").strip() or "."
+        if not orchestration_file:
+            return {
+                "success": False,
+                "error": {
+                    "code": "INVALID_ARGUMENT",
+                    "message": "orchestration_file is required",
+                },
+            }
+        if not spec_file:
+            return {
+                "success": False,
+                "error": {
+                    "code": "INVALID_ARGUMENT",
+                    "message": "spec_file is required",
+                },
+            }
+        try:
+            from jarvis.jarvis_tools.pipeline_runner import PipelineRunnerTool
+
+            tool = PipelineRunnerTool()
+            args: Dict[str, Any] = {
+                "orchestration_file": orchestration_file,
+                "spec_file": spec_file,
+                "working_dir": working_dir,
+                "approve": bool(payload.get("approve", False)),
+                "dry_run": bool(payload.get("dry_run", False)),
+            }
+            if payload.get("max_workers") is not None:
+                args["max_workers"] = int(payload.get("max_workers"))
+        except Exception as e:  # pylint: disable=broad-except
+            logger.exception("[ORCHESTRATION] prepare pipeline run failed: %r", e)
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": repr(e)},
+            }
+
+        def _run() -> None:
+            try:
+                result = tool.execute(args)
+                if isinstance(result, dict) and not result.get("success", True):
+                    logger.warning(
+                        "[ORCHESTRATION] pipeline run finished with error: %r",
+                        result.get("error"),
+                    )
+            except Exception as e:  # pylint: disable=broad-except
+                logger.exception("[ORCHESTRATION] pipeline run failed: %r", e)
+
+        threading.Thread(
+            target=_run,
+            name="pipeline-run",
+            daemon=True,
+        ).start()
+        return {"success": True, "data": {"started": True}}
+
     async def _handle_plugin_orchestrations_request() -> Dict[str, Any]:
         """列出当前节点上所有插件声明的编排流水线模板。
 
@@ -10765,6 +10835,7 @@ def create_app(
             "/file-rename": "file:write",
             "/directories": "file:read",
             "/parse-orchestration": "file:read",
+            "/run-orchestration": "file:read",
             "/plugins/orchestrations": "file:read",
             "/git/log": "file:read",
             "/git/commit-detail": "file:read",
@@ -10789,6 +10860,8 @@ def create_app(
             result = await _handle_directories_request(payload)
         elif normalized_method == "POST" and normalized_path == "/parse-orchestration":
             result = await _handle_parse_orchestration_request(payload)
+        elif normalized_method == "POST" and normalized_path == "/run-orchestration":
+            result = _start_pipeline_run(payload)
         elif (
             normalized_method == "GET" and normalized_path == "/plugins/orchestrations"
         ):
@@ -11395,6 +11468,94 @@ def create_app(
             return await _handle_parse_orchestration_request({"path": path})
         except Exception as e:
             logger.exception("[ORCHESTRATION] parse_orchestration failed: %r", e)
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": repr(e)},
+            }
+
+    @app.post("/api/run-orchestration", dependencies=[Depends(verify_token)])
+    async def run_orchestration(
+        request: Request, body: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """运行指定编排文件的多 Agent 流水线（与 Agent 调用 pipeline_runner 同一路径）。
+
+        供前端「运行流水线」入口使用：直接调用内置工具 PipelineRunnerTool，
+        运行进度经事件总线广播给前端驱动 DAG 可视化。支持跨节点：node_id 非
+        本地时转发到目标节点执行。
+        """
+        from fastapi import HTTPException
+
+        if _check_file_permission(request.state.user_info, "file:read"):
+            raise HTTPException(status_code=403, detail="Permission denied: file:read")
+        try:
+            orchestration_file = str(body.get("orchestration_file") or "").strip()
+            spec_file = str(body.get("spec_file") or "").strip()
+            working_dir = str(body.get("working_dir") or "").strip()
+            resolved_node_id = str(body.get("node_id") or "").strip()
+            target_node_id = resolved_node_id or node_runtime.local_node_id
+
+            if target_node_id not in (node_runtime.local_node_id, "master"):
+                logger.info(
+                    "[ORCHESTRATION] remote run request orchestration_file=%s target_node_id=%s",
+                    orchestration_file,
+                    target_node_id,
+                )
+                node_info = node_runtime.node_registry.get(target_node_id)
+                if node_info is None:
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "NODE_NOT_FOUND",
+                            "message": f"Node not found: {target_node_id}",
+                        },
+                    }
+                if node_info.status != "online":
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "NODE_OFFLINE",
+                            "message": f"Node is offline: {target_node_id}",
+                        },
+                    }
+                response = await node_connection_manager.send_request_to_node(
+                    target_node_id,
+                    DIRECTORY_LIST_REQUEST,
+                    {
+                        "run_orchestration": True,
+                        "orchestration_file": orchestration_file,
+                        "spec_file": spec_file,
+                        "working_dir": working_dir,
+                        "approve": bool(body.get("approve", False)),
+                        "dry_run": bool(body.get("dry_run", False)),
+                        "max_workers": body.get("max_workers"),
+                    },
+                )
+                payload = response.get("payload") or {}
+                if payload.get("success"):
+                    return {"success": True, "data": payload.get("data") or {}}
+                error = payload.get("error") or {}
+                return {
+                    "success": False,
+                    "error": {
+                        "code": error.get("code", "RUN_ORCHESTRATION_FAILED"),
+                        "message": error.get(
+                            "message", "Remote orchestration run failed"
+                        ),
+                    },
+                }
+
+            return _start_pipeline_run(
+                {
+                    "orchestration_file": orchestration_file,
+                    "spec_file": spec_file,
+                    "working_dir": working_dir,
+                    "approve": bool(body.get("approve", False)),
+                    "dry_run": bool(body.get("dry_run", False)),
+                    "max_workers": body.get("max_workers"),
+                }
+            )
+        except Exception as e:
+            logger.exception("[ORCHESTRATION] run_orchestration failed: %r", e)
             return {
                 "success": False,
                 "error": {"code": "INTERNAL_ERROR", "message": repr(e)},

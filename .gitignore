@@ -179,4 +179,6 @@ test
 .swl
 # Harbor 评测产物
 jobs/
+# pipeline_runner 流水线运行产物（运行时生成，不入库）
+.df/
 
