@@ -1466,7 +1466,7 @@ def _build_plugin_capabilities(config: dict, plugin_dir=None) -> List[dict]:
 
     返回:
         list[dict]: 每个元素为 {type, name, description}，type 取值：
-            rules / tools / agents / orchestration / frontend / custom
+            rules / tools / agents / orchestration / frontend / replace_map / custom
     """
     capabilities: List[dict] = []
 
@@ -1556,6 +1556,21 @@ def _build_plugin_capabilities(config: dict, plugin_dir=None) -> List[dict]:
                         str(name),
                         str(entry.get("description", "") or ""),
                     )
+    # 指令模板（replace_map）：用户在输入框输入 <tag> 即被替换为对应指令模板
+    replace_map = config.get("replace_map")
+    if isinstance(replace_map, dict):
+        for tag, info in replace_map.items():
+            if not isinstance(info, dict):
+                continue
+            desc = str(info.get("description", "") or "")
+            append_mode = info.get("append")
+            if append_mode:
+                desc = (desc + "（追加到当前输入）") if desc else "追加到当前输入"
+            _append(
+                "replace_map",
+                f"指令 <{tag}>",
+                desc or f"输入 <{tag}> 触发对应指令模板",
+            )
 
     return capabilities
 

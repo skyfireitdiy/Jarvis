@@ -195,7 +195,7 @@ describe("PluginSidebar", () => {
     expect(wrapper.text()).not.toContain("卸载");
   });
 
-  test("能力不显示在条目中，鼠标悬浮时通过悬浮框展示", async () => {
+  test("能力不显示在条目中，右键菜单弹出能力详情弹窗展示", async () => {
     const fetchWithAuth = makeFetch({
       "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
         success: true,
@@ -220,11 +220,15 @@ describe("PluginSidebar", () => {
     expect(wrapper.find(".plugin-item-capabilities").exists()).toBe(false);
     expect(wrapper.text()).not.toContain("事件钩子 on_task_start");
     expect(wrapper.text()).not.toContain("@mycmd");
-    // 悬浮框初始不渲染
-    expect(wrapper.find(".plugin-cap-tooltip").exists()).toBe(false);
-    // 鼠标悬浮到插件条目时展示能力悬浮框
-    await wrapper.find(".plugin-item").trigger("mouseenter");
-    expect(wrapper.find(".plugin-cap-tooltip").exists()).toBe(true);
+    // 右键菜单初始不渲染
+    expect(wrapper.find(".plugin-cap-menu").exists()).toBe(false);
+    // 右键点击插件条目时展示右键菜单
+    await wrapper.find(".plugin-item").trigger("contextmenu");
+    expect(wrapper.find(".plugin-cap-menu").exists()).toBe(true);
+    expect(wrapper.text()).toContain("能力详情");
+    // 点击“能力详情”弹出弹窗，展示全部能力
+    await wrapper.find(".plugin-cap-menu-item").trigger("click");
+    expect(wrapper.find(".cap-modal").exists()).toBe(true);
     expect(wrapper.text()).toContain("事件钩子 on_task_start");
     expect(wrapper.text()).toContain("任务开始触发");
     expect(wrapper.text()).toContain("@mycmd");

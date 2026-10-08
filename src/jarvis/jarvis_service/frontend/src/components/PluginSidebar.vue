@@ -51,8 +51,7 @@
             v-for="plugin in plugins"
             :key="plugin.name"
             class="plugin-item"
-            @mouseenter="showCapabilities(plugin, $event)"
-            @mouseleave="hideCapabilities"
+            @contextmenu.prevent="openCapMenu(plugin, $event)"
           >
             <div class="plugin-item-head">
               <span class="plugin-item-name" :title="plugin.name">{{ plugin.name }}</span>
@@ -60,7 +59,7 @@
                 <button
                   v-if="plugin.capabilities && plugin.capabilities.length"
                   class="plugin-btn plugin-btn-sm plugin-cap-btn"
-                  @click.stop="toggleInlineCapabilities(plugin)"
+                  @click.stop="openCapModal(plugin)"
                 >能力</button>
                 <span class="plugin-item-version">
                   {{ plugin.version || '-' }}
@@ -75,23 +74,6 @@
             <div class="plugin-item-meta">
               <span class="plugin-item-meta-label">前端扩展</span> {{ plugin.frontend ? '是' : '否' }}
             </div>
-            <!-- 移动端内联能力展开区：点击“能力”入口展开，替代 hover 悬浮框 -->
-            <div
-              v-if="expandedCapPlugin === plugin"
-              class="plugin-cap-inline"
-            >
-              <div class="plugin-cap-tooltip-title">{{ plugin.name }} · 能力</div>
-              <div class="plugin-cap-tooltip-body">
-                <div
-                  v-for="(cap, idx) in plugin.capabilities"
-                  :key="idx"
-                  class="plugin-cap-tooltip-item"
-                >
-                  <span class="plugin-cap-tooltip-name">{{ cap.name }}</span>
-                  <span v-if="cap.description" class="plugin-cap-tooltip-desc">：{{ cap.description }}</span>
-                </div>
-              </div>
-            </div>
             <div v-if="!plugin.builtin" class="plugin-item-actions">
               <button class="plugin-btn plugin-btn-sm" :disabled="pluginBusy[plugin.name]" @click="upgradePlugin(plugin)">升级</button>
               <button class="plugin-btn plugin-btn-sm plugin-btn-danger" :disabled="pluginBusy[plugin.name]" @click="uninstallPlugin(plugin)">卸载</button>
@@ -101,33 +83,45 @@
       </div>
     </div>
 
-    <!-- 能力悬浮框：能力不占条目空间，全部放悬浮框展示 -->
-    <transition name="cap-tip">
-      <div
-        v-if="activeCapTip && activeCapTip.capabilities && activeCapTip.capabilities.length"
-        class="plugin-cap-tooltip"
-        :style="capTipStyle"
-      >
-        <div class="plugin-cap-tooltip-title">{{ activeCapTip.name }} · 能力</div>
-        <div class="plugin-cap-tooltip-body">
+    <!-- 右键菜单 -->
+    <div
+      v-if="capMenuVisible"
+      class="plugin-cap-menu"
+      :style="capMenuStyle"
+      @click.stop
+    >
+      <button
+        class="plugin-cap-menu-item"
+        @click="openCapModal(capMenuPlugin)"
+      >能力详情</button>
+    </div>
+
+    <!-- 能力详情弹窗 -->
+    <div v-if="capModalPlugin" class="cap-modal-overlay" @click.self="closeCapModal">
+      <div class="cap-modal">
+        <div class="cap-modal-header">
+          <span class="cap-modal-title">{{ capModalPlugin.name }} · 能力详情</span>
+          <button class="cap-modal-close" @click="closeCapModal">✕</button>
+        </div>
+        <div class="cap-modal-body">
           <div
-            v-for="(cap, idx) in activeCapTip.capabilities"
+            v-for="(cap, idx) in capModalPlugin.capabilities"
             :key="idx"
-            class="plugin-cap-tooltip-item"
+            class="cap-modal-item"
           >
-            <span class="plugin-cap-tooltip-name">{{ cap.name }}</span>
-            <span v-if="cap.description" class="plugin-cap-tooltip-desc">：{{ cap.description }}</span>
+            <span class="cap-modal-name">{{ cap.name }}</span>
+            <span v-if="cap.description" class="cap-modal-desc">：{{ cap.description }}</span>
           </div>
         </div>
       </div>
-    </transition>
+    </div>
   </aside>
 </template>
 
 
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 
 const props = defineProps({
   fetchWithAuth: { type: Function, required: true },
@@ -147,39 +141,41 @@ const installSource = ref('')
 const installForce = ref(false)
 const pluginBusy = ref({})
 
-// 能力悬浮框状态
-const activeCapTip = ref(null)
-const capTipStyle = ref({})
-let capTipTimer = null
-// 移动端能力展开状态（点击入口展开，替代桌面端 hover 悬浮框）
-const expandedCapPlugin = ref(null)
+// 能力详情：右键菜单 + 弹窗
+const capMenuVisible = ref(false)
+const capMenuStyle = ref({})
+const capMenuPlugin = ref(null)
+const capModalPlugin = ref(null)
 
-function toggleInlineCapabilities(plugin) {
+function openCapMenu(plugin, event) {
   if (!plugin.capabilities || !plugin.capabilities.length) return
-  expandedCapPlugin.value = expandedCapPlugin.value === plugin ? null : plugin
-}
-
-function showCapabilities(plugin, event) {
-  if (!plugin.capabilities || !plugin.capabilities.length) return
-  clearTimeout(capTipTimer)
-  const rect = event.currentTarget.getBoundingClientRect()
-  const tipWidth = 320
-  let left = rect.left
-  let top = rect.bottom + 6
-  // 水平：不超出视口右缘
-  if (left + tipWidth > window.innerWidth - 8) left = window.innerWidth - tipWidth - 8
+  capMenuPlugin.value = plugin
+  const menuWidth = 140
+  const menuHeight = 36
+  let left = event.clientX
+  let top = event.clientY
+  // 不超出视口右下缘
+  if (left + menuWidth > window.innerWidth - 8) left = window.innerWidth - menuWidth - 8
   if (left < 8) left = 8
-  // 垂直：下方放不下则向上
-  if (top > window.innerHeight - 40) top = Math.max(8, rect.top - 8)
-  capTipStyle.value = { left: left + 'px', top: top + 'px' }
-  activeCapTip.value = plugin
+  if (top + menuHeight > window.innerHeight - 8) top = window.innerHeight - menuHeight - 8
+  if (top < 8) top = 8
+  capMenuStyle.value = { left: left + 'px', top: top + 'px' }
+  capMenuVisible.value = true
 }
 
-function hideCapabilities() {
-  clearTimeout(capTipTimer)
-  capTipTimer = setTimeout(() => {
-    activeCapTip.value = null
-  }, 150)
+function closeCapMenu() {
+  capMenuVisible.value = false
+  capMenuPlugin.value = null
+}
+
+function openCapModal(plugin) {
+  closeCapMenu()
+  if (!plugin || !plugin.capabilities || !plugin.capabilities.length) return
+  capModalPlugin.value = plugin
+}
+
+function closeCapModal() {
+  capModalPlugin.value = null
 }
 
 function getGatewayAddress() {
@@ -305,7 +301,23 @@ async function uninstallPlugin(plugin) {
   finally { pluginBusy.value = { ...pluginBusy.value, [plugin.name]: false } }
 }
 
-onMounted(loadPlugins)
+onMounted(() => {
+  loadPlugins()
+  document.addEventListener('click', closeCapMenu)
+  document.addEventListener('keydown', onCapKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeCapMenu)
+  document.removeEventListener('keydown', onCapKeydown)
+})
+
+function onCapKeydown(event) {
+  if (event.key === 'Escape') {
+    closeCapMenu()
+    closeCapModal()
+  }
+}
 
 defineExpose({ loadPlugins })
 </script>
@@ -469,22 +481,9 @@ defineExpose({ loadPlugins })
   gap: 8px;
   flex-shrink: 0;
 }
-/* 能力入口按钮：桌面端用 hover 悬浮框，默认隐藏；移动端点击展开内联面板时显示 */
+/* 能力入口按钮：桌面端用右键菜单，默认隐藏；移动端点击直接打开能力详情弹窗时显示 */
 .plugin-cap-btn {
   display: none;
-}
-/* 移动端内联能力展开区 */
-.plugin-cap-inline {
-  margin-top: 8px;
-  padding: 8px 10px;
-  background: rgba(32, 200, 255, 0.05);
-  border: 1px solid rgba(32, 200, 255, 0.22);
-  border-radius: 6px;
-}
-.plugin-cap-inline .plugin-cap-tooltip-title {
-  margin-bottom: 4px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid rgba(32, 200, 255, 0.12);
 }
 .plugin-item-version {
   font-size: 12px;
@@ -503,56 +502,102 @@ defineExpose({ loadPlugins })
   border: 1px solid rgba(32, 200, 255, 0.3);
   flex-shrink: 0;
 }
-/* 能力悬浮框：轻量浮层提示，与条目卡片明显区分 */
-.plugin-cap-tooltip {
+/* 右键菜单：能力详情入口 */
+.plugin-cap-menu {
   position: fixed;
   z-index: 10000;
-  width: 300px;
-  max-width: calc(100vw - 16px);
-  background: var(--bg-primary, #0a0f1c);
-  border: 1px solid rgba(32, 200, 255, 0.22);
+  min-width: 120px;
+  background: var(--bg-secondary, #0b1424);
+  border: 1px solid var(--border-color, #1a2a3a);
   border-radius: 6px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
-  padding: 8px 10px;
-  /* 悬浮框不拦截鼠标，避免挡住下方条目的鼠标响应 */
-  pointer-events: none;
-  box-sizing: border-box;
+  padding: 4px;
 }
-.plugin-cap-tooltip-title {
-  font-size: 11px;
-  font-weight: 500;
+.plugin-cap-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  color: var(--text-primary, #d6e4f0);
+  font-size: 13px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.plugin-cap-menu-item:hover {
+  background: rgba(32, 200, 255, 0.1);
+}
+/* 能力详情弹窗 */
+.cap-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3100 !important;
+}
+.cap-modal {
+  background: var(--bg-secondary, #0b1424);
+  color: var(--text-primary, #d6e4f0);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  width: 520px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.cap-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-color, #1a2a3a);
+}
+.cap-modal-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent, #20c8ff);
+}
+.cap-modal-close {
+  border: none;
+  background: none;
   color: var(--text-secondary, #8ba3b8);
-  margin-bottom: 6px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid rgba(32, 200, 255, 0.12);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
 }
-.plugin-cap-tooltip-body {
-  max-height: 240px;
+.cap-modal-close:hover {
+  background: rgba(255, 60, 72, 0.1);
+  color: var(--color-error, #ff3c48);
+}
+.cap-modal-body {
+  padding: 10px 18px 18px;
   overflow-y: auto;
 }
-.plugin-cap-tooltip-item {
-  margin-top: 5px;
-  font-size: 11px;
-  line-height: 1.4;
+.cap-modal-item {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.5;
   word-break: break-word;
 }
-.plugin-cap-tooltip-item:first-child {
+.cap-modal-item:first-child {
   margin-top: 0;
 }
-.plugin-cap-tooltip-name {
+.cap-modal-name {
   color: var(--text-primary, #d6e4f0);
   font-weight: 500;
 }
-.plugin-cap-tooltip-desc {
+.cap-modal-desc {
   color: var(--text-tertiary, #5a6b7d);
-}
-.cap-tip-enter-active,
-.cap-tip-leave-active {
-  transition: opacity 0.15s ease;
-}
-.cap-tip-enter-from,
-.cap-tip-leave-to {
-  opacity: 0;
 }
 .plugin-item-desc {
   margin-top: 6px;
@@ -609,9 +654,6 @@ defineExpose({ loadPlugins })
 @media (max-width: 768px) {
   .plugin-cap-btn {
     display: inline-block;
-  }
-  .plugin-cap-tooltip {
-    display: none !important;
   }
 }
 </style>
