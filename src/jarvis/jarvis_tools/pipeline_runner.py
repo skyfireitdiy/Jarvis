@@ -2,17 +2,19 @@
 """pipeline_runner 工具：内置多 Agent 编排执行引擎（通用基础设施）。
 
 把编排文件（含 `agents` 定义与可选 `flow` 顺序）解析后，按 `flow` 声明的
-阶段顺序，用 `jca -n --task-file` 逐个驱动阶段 agent，并通过 status_file
-同步等待每个阶段完成、校验产物落盘、把上阶段产物路径写入下阶段 task-file，
-实现"规划 → 生成 → 验证 → 门禁"这类多 Agent 流水线的自动顺序协作。
+阶段构建 DAG（有向无环图），用常驻 `jvs` Agent 并行调度各阶段，通过
+`status_file` 同步等待每个阶段完成、校验产物落盘、把上阶段产物路径传入
+下阶段，实现"规划 → 生成 → 验证 → 门禁"这类多 Agent 流水线的自动编排。
 
 设计取向（详见 docs/design/ai-dark-factory-orchestration-engine.md）：
-- **只协调不执行**（sw-controller 模式）：本工具不写码、不测试，只负责按序
-  调度与产物传递，具体阶段/产物/门禁由使用方的编排文件声明。
+- **只协调不执行**（sw-controller 模式）：本工具不写码、不测试，只负责按
+  依赖关系调度与产物传递，具体阶段/产物/门禁由使用方的编排文件声明。
 - **通用性**：不依赖任何插件业务。任何插件/用户都能用它定义自己的多 Agent
   流水线，黑灯工厂只是使用者之一。
-- **复用现有机制**：复用 `jca -n --task-file`（非交互执行入口）与
-  `status_file`（完成状态回传），不重复造轮子。
+- **DAG 编排**：`flow` 支持 `depends_on`/`input`(多输入)/`when`(条件)/
+  `on_error`(失败策略)/`retry`(重试)，并行度 `max_workers` 默认 4。
+- **复用现有机制**：阶段 Agent 统一为常驻 `jvs` Agent（无仓库文件锁，可并行），
+  通过 `send_to_agent(wait=true, status_file=...)` 同步等待完成。
 - **保持人工审批关口**：`gate: true` 的阶段完成后停住，默认 `approve=false`，
   必须人工确认才放行（不完全无人值守）。
 
@@ -20,9 +22,9 @@
 `@OrganizeAgents` 负责只创建 agent，行为不变）。
 """
 import json
-import shutil
-import subprocess
-import time
+import re
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import as_completed
 from pathlib import Path
 from typing import Any
 from typing import Dict
@@ -31,6 +33,7 @@ from typing import Optional
 
 import yaml
 
+from jarvis.jarvis_tools.gateway_manager import GatewayManagerTool
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # 状态文件轮询间隔（秒）
@@ -39,22 +42,25 @@ _POLL_INTERVAL = 2.0
 _DEFAULT_STAGE_TIMEOUT = 30 * 60
 # 工作产物目录名（相对 working_dir）
 _ARTIFACT_DIR = ".df"
+# 默认并行度
+_DEFAULT_MAX_WORKERS = 4
 
 
 class PipelineRunnerTool:
     """内置多 Agent 编排执行引擎。
 
-    读取编排文件（agents + flow），按 flow 顺序用 `jca -n --task-file` 驱动
-    各阶段 agent，poll status_file 等待完成，传递产物，门禁停住。
+    读取编排文件（agents + flow），把 flow 解析为 DAG，用常驻 jvs Agent 并行
+    调度各阶段，poll status_file 等待完成，传递产物，门禁停住。
     """
 
     name = "pipeline_runner"
     description = (
-        "内置多 Agent 编排执行引擎：读取编排 YAML（agents + flow），按 flow "
-        "声明的阶段顺序，用 jca -n --task-file 逐个驱动阶段 agent，同步等待每个"
-        "阶段完成、校验产物落盘、把上阶段产物路径传入下阶段，实现多 Agent 流水线"
-        "的自动顺序协作。门禁阶段（gate: true）完成后停住，默认 approve=false，"
-        "需人工审批确认才放行。"
+        "内置多 Agent 编排执行引擎：读取编排 YAML（agents + flow），按 flow 声明的"
+        "依赖关系构建 DAG，用常驻 jvs Agent 并行驱动各阶段，同步等待每个阶段完成、"
+        "校验产物落盘、把上阶段产物路径传入下阶段，实现多 Agent 流水线的自动编排。"
+        "支持并行（max_workers 默认 4）、多输入（input 列表）、条件（when）、失败"
+        "策略（on_error: abort/continue/skip_dependents）、重试（retry）。门禁阶段"
+        "（gate: true）完成后停住，默认 approve=false，需人工审批确认才放行。"
     )
     parameters = {
         "type": "object",
@@ -75,17 +81,24 @@ class PipelineRunnerTool:
                 "type": "boolean",
                 "description": "门禁阶段是否已获人工审批（默认 false，需人工确认）",
             },
+            "max_workers": {
+                "type": "integer",
+                "description": "并行度上限（默认 4），限制同时执行的阶段 Agent 数",
+            },
         },
         "required": ["orchestration_file", "spec_file"],
     }
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """按编排文件 flow 驱动多 Agent 流水线。"""
+        """按编排文件 flow 驱动多 Agent 流水线（DAG 调度）。"""
         args = args or {}
         orchestration_file = str(args.get("orchestration_file") or "").strip()
         spec_file = str(args.get("spec_file") or "").strip()
         working_dir = str(args.get("working_dir") or "").strip() or "."
         approve = bool(args.get("approve", False))
+        max_workers = int(
+            args.get("max_workers", _DEFAULT_MAX_WORKERS) or _DEFAULT_MAX_WORKERS
+        )
 
         # 1. 校验参数
         if not orchestration_file:
@@ -104,6 +117,9 @@ class PipelineRunnerTool:
         work_dir = Path(working_dir).resolve()
         if not work_dir.is_dir():
             return self._error(f"工作目录不存在: {working_dir}")
+
+        if max_workers < 1:
+            max_workers = 1
 
         # 2. 读取编排文件
         try:
@@ -131,187 +147,811 @@ class PipelineRunnerTool:
         except Exception as e:  # pylint: disable=broad-except
             return self._error(f"无法创建产物目录 {artifact_dir}: {e}")
 
-        # jca 可用性校验
-        jca_bin = shutil.which("jca")
-        if not jca_bin:
-            return self._error(
-                "未找到 jca 命令。请确认 Jarvis 已安装且 jca 在 PATH 中。"
-            )
+        # 4. 构建 DAG（解析 + 校验 + 环检测）
+        dag_build = self._build_dag(flow, agents_by_name)
+        if not dag_build["success"]:
+            return self._error(dag_build["error"])
+        nodes = dag_build["nodes"]
 
         # 读取 spec 摘要作为各阶段背景
         spec_summary = self._read_spec_summary(spec_path)
 
-        # 4. 遍历 flow 各阶段
-        stdout_lines: List[str] = []
-        previous_output: Optional[str] = None
+        # 5. 创建常驻 jvs Agent（每个 stage 一个）
+        agent_created = self._create_stage_agents(nodes, agents_by_name, work_dir)
+        if not agent_created["success"]:
+            return self._error(agent_created["error"])
+        agent_map = agent_created["agent_map"]
+
+        # 6. 调度执行（并行 DAG）
+        return self._schedule(
+            nodes=nodes,
+            agent_map=agent_map,
+            agents_by_name=agents_by_name,
+            work_dir=work_dir,
+            artifact_dir=artifact_dir,
+            spec_summary=spec_summary,
+            approve=approve,
+            max_workers=max_workers,
+        )
+
+    # ------------------------------------------------------------------
+    # DAG 构建
+    # ------------------------------------------------------------------
+    def _build_dag(
+        self, flow: List[Dict[str, Any]], agents_by_name: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """解析 flow 为 DAG 节点列表，补全 depends_on/input，环检测。
+
+        - `depends_on` 缺省 = 上一个 stage（线性兼容）。
+        - `input` 单字符串自动转单元素列表。
+        - 校验 agent 引用、重复 stage 名、环检测。
+
+        返回:
+            {"success": True, "nodes": [...]} 或 {"success": False, "error": str}
+        """
+        nodes: List[Dict[str, Any]] = []
+        stage_names: List[str] = []
         for idx, stage in enumerate(flow):
-            stage_name = str(stage.get("stage") or f"stage_{idx}")
-            agent_name = str(stage.get("agent") or "")
-            output = str(stage.get("output") or "").strip()
-            input_ref = str(stage.get("input") or "").strip()
-            is_gate = bool(stage.get("gate", False))
+            stage_name = str(stage.get("stage") or f"stage_{idx}").strip()
+            if not stage_name:
+                return {"success": False, "error": f"flow 第 {idx + 1} 项缺少 stage 名"}
+            if stage_name in stage_names:
+                return {
+                    "success": False,
+                    "error": f"flow 中存在重复 stage 名: {stage_name}",
+                }
+            stage_names.append(stage_name)
 
+            agent_name = str(stage.get("agent") or "").strip()
             if agent_name not in agents_by_name:
-                return self._error(
-                    f"flow 阶段 '{stage_name}' 引用了未定义的 agent '{agent_name}'"
-                )
+                return {
+                    "success": False,
+                    "error": f"flow 阶段 '{stage_name}' 引用了未定义的 agent '{agent_name}'",
+                }
 
-            agent_def = agents_by_name[agent_name]
-            task_desc = str(agent_def.get("task") or agent_def.get("task_desc") or "")
-
-            # 组装本阶段 task-file
-            stage_input = input_ref or previous_output
-            taskfile = artifact_dir / f"{stage_name}.task.json"
-            status_file = artifact_dir / f"{stage_name}.status"
-            self._write_task_file(
-                taskfile=taskfile,
-                task_desc=task_desc,
-                stage=stage_name,
-                stage_input=stage_input,
-                output=output,
-                spec_summary=spec_summary,
-                status_file=status_file,
-            )
-
-            PrettyOutput.auto_print(
-                f"▶ 阶段 [{stage_name}] agent={agent_name} 启动（jca -n --task-file）"
-            )
-            # 启动阶段 agent（同步等待子进程退出）
-            try:
-                subprocess.run(
-                    [jca_bin, "-n", "--task-file", str(taskfile)],
-                    cwd=str(work_dir),
-                    capture_output=True,
-                    text=True,
-                    timeout=_DEFAULT_STAGE_TIMEOUT,
-                )
-            except subprocess.TimeoutExpired:
-                return self._error(
-                    f"阶段 [{stage_name}] 超时（>{_DEFAULT_STAGE_TIMEOUT // 60} 分钟），"
-                    f"已中止流水线。产物保留在 {artifact_dir} 便于排查。"
-                )
-            except Exception as e:  # pylint: disable=broad-except
-                return self._error(f"阶段 [{stage_name}] 启动失败: {e}")
-
-            # poll status_file 等待阶段完成
-            stage_ok = self._wait_status(status_file, stage_name)
-            if stage_ok is None:
-                return self._error(f"阶段 [{stage_name}] 状态等待超时")
-
-            if not stage_ok:
-                err = self._read_error_file(status_file)
-                return self._error(
-                    f"阶段 [{stage_name}] 失败（agent={agent_name}）"
-                    + (f": {err}" if err else "")
-                    + f"。产物保留在 {artifact_dir} 便于排查。"
-                )
-
-            # 校验产物落盘
-            if output:
-                output_path = work_dir / output
-                if not output_path.exists():
-                    return self._error(
-                        f"阶段 [{stage_name}] 声明产物 {output} 未落盘，已中止流水线。"
-                    )
-                stdout_lines.append(
-                    f"  ✅ 阶段 [{stage_name}] 完成，产物: {output}"
-                )
-                previous_output = output
-            else:
-                stdout_lines.append(f"  ✅ 阶段 [{stage_name}] 完成")
-
-            # 门禁阶段：停住等人工审批
-            if is_gate:
-                if not approve:
-                    approval_path = work_dir / (output or f"{stage_name}.approval.md")
-                    stdout_lines.append(
-                        f"  ⛔ 门禁阶段 [{stage_name}] 已产出审批报告: {approval_path}"
-                    )
-                    stdout_lines.append(
-                        "  ⛔ 待人工审批：请确认审批报告后，以 approve=true 重跑门禁确认。"
-                    )
+            # depends_on 缺省 = 上一个 stage
+            depends_on = stage.get("depends_on")
+            if depends_on is None:
+                depends_on = [stage_names[idx - 1]] if idx > 0 else []
+            elif isinstance(depends_on, str):
+                depends_on = [depends_on]
+            depends_on = [str(d).strip() for d in (depends_on or [])]
+            for d in depends_on:
+                if d not in stage_names:
                     return {
-                        "success": True,
-                        "stdout": "\n".join(stdout_lines),
-                        "stderr": "",
+                        "success": False,
+                        "error": f"flow 阶段 '{stage_name}' 依赖了不存在的 stage '{d}'",
                     }
-                stdout_lines.append(
-                    f"  ✅ 门禁阶段 [{stage_name}] 已获人工审批，流水线放行"
-                )
+
+            # input 单字符串自动转单元素列表
+            input_ref = stage.get("input")
+            if input_ref is None:
+                input_list: List[str] = []
+            elif isinstance(input_ref, str):
+                input_list = [input_ref.strip()] if input_ref.strip() else []
+            elif isinstance(input_ref, list):
+                input_list = [str(i).strip() for i in input_ref if str(i).strip()]
+            else:
+                input_list = []
+
+            on_error = str(stage.get("on_error") or "abort").strip()
+            if on_error not in ("abort", "continue", "skip_dependents"):
+                on_error = "abort"
+
+            nodes.append(
+                {
+                    "stage": stage_name,
+                    "agent": agent_name,
+                    "depends_on": depends_on,
+                    "input": input_list,
+                    "output": str(stage.get("output") or "").strip(),
+                    "gate": bool(stage.get("gate", False)),
+                    "when": str(stage.get("when") or "").strip() or None,
+                    "retry": int(stage.get("retry", 0) or 0),
+                    "on_error": on_error,
+                }
+            )
+
+        # 环检测（Kahn 拓扑排序，有环返回 None）
+        if self._topo_sort(nodes) is None:
+            return {
+                "success": False,
+                "error": "flow 依赖存在环，无法执行（请检查 depends_on）",
+            }
+        return {"success": True, "nodes": nodes}
+
+    def _topo_sort(self, nodes: List[Dict[str, Any]]) -> Optional[List[Dict[str, Any]]]:
+        """Kahn 拓扑排序；有环返回 None。"""
+        by_stage = {n["stage"]: n for n in nodes}
+        indegree = {n["stage"]: len(n["depends_on"]) for n in nodes}
+        dependents: Dict[str, List[str]] = {n["stage"]: [] for n in nodes}
+        for n in nodes:
+            for d in n["depends_on"]:
+                dependents[d].append(n["stage"])
+
+        queue = [s for s, deg in indegree.items() if deg == 0]
+        order: List[str] = []
+        while queue:
+            s = queue.pop(0)
+            order.append(s)
+            for child in dependents[s]:
+                indegree[child] -= 1
+                if indegree[child] == 0:
+                    queue.append(child)
+        if len(order) != len(nodes):
+            return None
+        return [by_stage[s] for s in order]
+
+    # ------------------------------------------------------------------
+    # 常驻 Agent 创建
+    # ------------------------------------------------------------------
+    def _create_stage_agents(
+        self,
+        nodes: List[Dict[str, Any]],
+        agents_by_name: Dict[str, Any],
+        work_dir: Path,
+    ) -> Dict[str, Any]:
+        """为每个 stage 创建常驻 jvs Agent（type: agent）。
+
+        返回:
+            {"success": True, "agent_map": {stage: agent_id}} 或错误
+        """
+        gw = GatewayManagerTool()
+        agent_map: Dict[str, str] = {}
+        for node in nodes:
+            stage_name = node["stage"]
+            agent_def = agents_by_name[node["agent"]]
+            working_dir = str(agent_def.get("working_dir") or str(work_dir))
+            create_result = gw._create_agent(
+                agent_type="agent",
+                working_dir=working_dir,
+                name=f"df_{stage_name}",
+            )
+            if not create_result["success"]:
+                return {
+                    "success": False,
+                    "error": (
+                        f"创建阶段 [{stage_name}] 常驻 Agent 失败: "
+                        f"{create_result['stderr']}"
+                    ),
+                }
+            try:
+                agent_info = json.loads(create_result["stdout"])
+                agent_id = str(agent_info.get("agent_id") or "")
+            except (json.JSONDecodeError, AttributeError):
+                agent_id = ""
+            if not agent_id:
+                return {
+                    "success": False,
+                    "error": f"创建阶段 [{stage_name}] 常驻 Agent 后无法获取 agent_id",
+                }
+            agent_map[stage_name] = agent_id
+            PrettyOutput.auto_print(
+                f"  🛠 阶段 [{stage_name}] 常驻 Agent 就绪: {agent_id}"
+            )
+        return {"success": True, "agent_map": agent_map}
+
+    # ------------------------------------------------------------------
+    # 单阶段执行
+    # ------------------------------------------------------------------
+    def _run_stage(
+        self,
+        node: Dict[str, Any],
+        agent_id: str,
+        agents_by_name: Dict[str, Any],
+        work_dir: Path,
+        artifact_dir: Path,
+        spec_summary: str,
+        approve: bool,
+    ) -> Dict[str, Any]:
+        """执行单个 stage：组装任务消息 → send_to_agent(wait=true, status_file) → 校验产物。
+
+        返回:
+            {
+              "stage": str, "status": "completed"|"failed",
+              "output": str, "result": {...}, "error": str,
+              "gate_blocked": bool, "approval_path": str,
+            }
+        """
+        stage_name = node["stage"]
+        agent_def = agents_by_name[node["agent"]]
+        task_desc = str(agent_def.get("task") or agent_def.get("task_desc") or "")
+        output = node["output"]
+        input_list = node["input"]
+
+        status_file = artifact_dir / f"{stage_name}.status"
+        # 清空旧 status_file（支持重试）
+        if status_file.exists():
+            try:
+                status_file.unlink()
+            except OSError:
+                pass
+
+        # 组装任务消息
+        message = self._build_stage_message(
+            task_desc=task_desc,
+            stage=stage_name,
+            input_list=input_list,
+            output=output,
+            spec_summary=spec_summary,
+            status_file=str(status_file),
+        )
+
+        PrettyOutput.auto_print(
+            f"▶ 阶段 [{stage_name}] agent={node['agent']} 启动（send_to_agent wait）"
+        )
+
+        gw = GatewayManagerTool()
+        send_result = gw._send_to_agent(
+            agent_id=agent_id,
+            message=message,
+            wait=True,
+            status_file=str(status_file),
+        )
+
+        if not send_result["success"]:
+            return {
+                "stage": stage_name,
+                "status": "failed",
+                "output": output,
+                "result": {},
+                "error": send_result["stderr"] or "阶段 Agent 任务失败",
+                "gate_blocked": False,
+                "approval_path": "",
+            }
+
+        # 读取 status_file 内容作为结构化结果（供 when 表达式引用）
+        result = self._read_status(status_file)
+
+        # 校验产物落盘
+        if output:
+            output_path = work_dir / output
+            if not output_path.exists():
+                return {
+                    "stage": stage_name,
+                    "status": "failed",
+                    "output": output,
+                    "result": result,
+                    "error": f"阶段 [{stage_name}] 声明产物 {output} 未落盘",
+                    "gate_blocked": False,
+                    "approval_path": "",
+                }
+
+        # 门禁：停住等人工审批
+        if node["gate"]:
+            if not approve:
+                approval_path = work_dir / (output or f"{stage_name}.approval.md")
+                return {
+                    "stage": stage_name,
+                    "status": "completed",
+                    "output": output,
+                    "result": result,
+                    "error": "",
+                    "gate_blocked": True,
+                    "approval_path": str(approval_path),
+                }
+            return {
+                "stage": stage_name,
+                "status": "completed",
+                "output": output,
+                "result": result,
+                "error": "",
+                "gate_blocked": False,
+                "approval_path": "",
+            }
+
+        return {
+            "stage": stage_name,
+            "status": "completed",
+            "output": output,
+            "result": result,
+            "error": "",
+            "gate_blocked": False,
+            "approval_path": "",
+        }
+
+    def _build_stage_message(
+        self,
+        task_desc: str,
+        stage: str,
+        input_list: List[str],
+        output: str,
+        spec_summary: str,
+        status_file: str,
+    ) -> str:
+        """组装本阶段任务消息（含写 status_file 的完成指示）。"""
+        parts: List[str] = []
+        task = task_desc.strip()
+        if task:
+            parts.append(task)
+        if spec_summary:
+            parts.append(f"流水线输入 NLSpec:\n{spec_summary}")
+        if input_list:
+            parts.append(
+                "本阶段输入产物:\n" + "\n".join(f"- {i}" for i in input_list)
+            )
+        parts.append(
+            f"请完成本阶段职责后，将产物写入 {output or '（本阶段无产物要求）'}。"
+            f"完成后，把结果写入状态文件 {status_file}，内容为 JSON："
+            f'{{"status": "completed", "output": "<产物路径>"}}；'
+            f"若失败则写 {{\"status\": \"failed\", \"error\": \"<原因>\"}}。"
+        )
+        return "\n\n".join(parts)
+
+    # ------------------------------------------------------------------
+    # 并行调度
+    # ------------------------------------------------------------------
+    def _schedule(
+        self,
+        nodes: List[Dict[str, Any]],
+        agent_map: Dict[str, str],
+        agents_by_name: Dict[str, Any],
+        work_dir: Path,
+        artifact_dir: Path,
+        spec_summary: str,
+        approve: bool,
+        max_workers: int,
+    ) -> Dict[str, Any]:
+        """并行调度 DAG：每轮收集依赖已满足的 ready 节点，线程池并发执行。
+
+        处理 when（条件跳过）、on_error（失败策略）、retry（重试）、门禁。
+        """
+        state: Dict[str, str] = {n["stage"]: "pending" for n in nodes}
+        results: Dict[str, Dict[str, Any]] = {}
+        stdout_lines: List[str] = []
+        gate_blocked_stage: Optional[str] = None
+        gate_approval_path = ""
+
+        def _deps_satisfied(n: Dict[str, Any]) -> bool:
+            for d in n["depends_on"]:
+                if state.get(d) != "completed":
+                    return False
+            return True
+
+        def _deps_blocked(n: Dict[str, Any]) -> bool:
+            # 任一依赖失败/跳过则该节点无法执行
+            return any(state.get(d) in ("failed", "skipped") for d in n["depends_on"])
+
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            while True:
+                # 依赖被阻塞的节点直接跳过
+                for n in nodes:
+                    if state[n["stage"]] == "pending" and _deps_blocked(n):
+                        state[n["stage"]] = "skipped"
+                        results[n["stage"]] = {
+                            "stage": n["stage"],
+                            "status": "skipped",
+                            "output": n["output"],
+                            "result": {},
+                            "error": "依赖失败/跳过，本阶段被跳过",
+                        }
+                        stdout_lines.append(
+                            f"  ⏭ 阶段 [{n['stage']}] 因依赖失败被跳过"
+                        )
+
+                # 收集 ready 节点
+                ready = [
+                    n
+                    for n in nodes
+                    if state[n["stage"]] == "pending"
+                    and _deps_satisfied(n)
+                    and not _deps_blocked(n)
+                ]
+
+                if not ready:
+                    # 无 ready 节点：检查是否全部结束
+                    if all(
+                        s in ("completed", "failed", "skipped")
+                        for s in state.values()
+                    ):
+                        break
+                    # 有 pending 但无 ready 且无 running：死锁保护
+                    if all(s != "running" for s in state.values()):
+                        break
+                    continue
+
+                # when 条件评估（不满足的节点标记 skipped）
+                effective_ready: List[Dict[str, Any]] = []
+                for n in ready:
+                    if n["when"]:
+                        ok, err = self._eval_when(n["when"], results)
+                        if not ok:
+                            state[n["stage"]] = "skipped"
+                            results[n["stage"]] = {
+                                "stage": n["stage"],
+                                "status": "skipped",
+                                "output": n["output"],
+                                "result": {},
+                                "error": (
+                                    f"when 条件不满足: {n['when']}"
+                                    + (f"（{err}）" if err else "")
+                                ),
+                            }
+                            stdout_lines.append(
+                                f"  ⏭ 阶段 [{n['stage']}] 因 when 条件不满足被跳过"
+                            )
+                            continue
+                    effective_ready.append(n)
+
+                if not effective_ready:
+                    continue
+
+                # 并发执行 ready 节点
+                futures = {}
+                for n in effective_ready:
+                    state[n["stage"]] = "running"
+                    agent_id = agent_map[n["stage"]]
+                    futures[
+                        pool.submit(
+                            self._run_stage,
+                            n,
+                            agent_id,
+                            agents_by_name,
+                            work_dir,
+                            artifact_dir,
+                            spec_summary,
+                            approve,
+                        )
+                    ] = n
+
+                for fut in as_completed(futures):
+                    n = futures[fut]
+                    try:
+                        stage_result = fut.result()
+                    except Exception as e:  # pylint: disable=broad-except
+                        stage_result = {
+                            "stage": n["stage"],
+                            "status": "failed",
+                            "output": n["output"],
+                            "result": {},
+                            "error": f"阶段执行异常: {e}",
+                            "gate_blocked": False,
+                            "approval_path": "",
+                        }
+                    self._handle_stage_result(
+                        n=n,
+                        stage_result=stage_result,
+                        state=state,
+                        results=results,
+                        stdout_lines=stdout_lines,
+                        work_dir=work_dir,
+                    )
+                    # 门禁停住
+                    if stage_result.get("gate_blocked"):
+                        gate_blocked_stage = n["stage"]
+                        gate_approval_path = stage_result.get("approval_path", "")
+                    # abort 中止（仅当该阶段最终失败；重试中不中止）
+                    if (
+                        state[n["stage"]] == "failed"
+                        and n["on_error"] == "abort"
+                    ):
+                        return self._abort_result(
+                            stage_name=n["stage"],
+                            error=str(stage_result.get("error", "") or ""),
+                            stdout_lines=stdout_lines,
+                            artifact_dir=artifact_dir,
+                        )
+
+        # 全部调度完成
+        if gate_blocked_stage:
+            stdout_lines.append(
+                f"  ⛔ 门禁阶段 [{gate_blocked_stage}] 已产出审批报告: {gate_approval_path}"
+            )
+            stdout_lines.append(
+                "  ⛔ 待人工审批：请确认审批报告后，以 approve=true 重跑门禁确认。"
+            )
+            return {
+                "success": True,
+                "stdout": "\n".join(stdout_lines),
+                "stderr": "",
+            }
+
+        # 检查是否有 failed 阶段
+        failed = [s for s, st in state.items() if st == "failed"]
+        if failed:
+            errs = [
+                results[s].get("error", "") for s in failed if results.get(s)
+            ]
+            stdout_lines.append("❌ 流水线存在失败阶段")
+            return {
+                "success": False,
+                "stdout": "\n".join(stdout_lines),
+                "stderr": (
+                    "失败阶段: "
+                    + ", ".join(failed)
+                    + "；"
+                    + "；".join(e for e in errs if e)
+                ),
+            }
 
         stdout_lines.append("🏁 流水线全部阶段完成")
         return {"success": True, "stdout": "\n".join(stdout_lines), "stderr": ""}
 
-    # ------------------------------------------------------------------
-    # 内部辅助
-    # ------------------------------------------------------------------
-    def _write_task_file(
+    def _handle_stage_result(
         self,
-        taskfile: Path,
-        task_desc: str,
-        stage: str,
-        stage_input: Optional[str],
-        output: str,
-        spec_summary: str,
-        status_file: Path,
+        n: Dict[str, Any],
+        stage_result: Dict[str, Any],
+        state: Dict[str, str],
+        results: Dict[str, Dict[str, Any]],
+        stdout_lines: List[str],
+        work_dir: Path,
     ) -> None:
-        """组装并写入本阶段 task-file（复用 jca 的 task_desc/background/additional_info/status_file 字段）。"""
-        task = task_desc.strip()
-        if spec_summary:
-            task += f"\n\n流水线输入 NLSpec:\n{spec_summary}"
-        if stage_input:
-            task += f"\n\n本阶段输入产物:\n{stage_input}"
-        data = {
-            "task_desc": task,
-            "background": f"多 Agent 流水线阶段={stage}，输入={stage_input or '无'}，输出={output or '无'}",
-            "additional_info": (
-                f"请完成本阶段职责后，将产物写入 {output or '（本阶段无产物要求）'}，"
-                "完成后正常退出。"
+        """处理单个 stage 的执行结果（含 retry 重试）。"""
+        stage_name = n["stage"]
+        status = stage_result["status"]
+
+        if status == "completed":
+            state[stage_name] = "completed"
+            results[stage_name] = stage_result
+            if stage_result.get("output"):
+                stdout_lines.append(
+                    f"  ✅ 阶段 [{stage_name}] 完成，产物: {stage_result['output']}"
+                )
+            else:
+                stdout_lines.append(f"  ✅ 阶段 [{stage_name}] 完成")
+            return
+
+        # failed：处理 retry 重试
+        retry = n["retry"]
+        if retry > 0:
+            retry_count = results.get(stage_name, {}).get("_retry_count", 0) + 1
+            if retry_count <= retry:
+                stage_result["_retry_count"] = retry_count
+                results[stage_name] = stage_result
+                state[stage_name] = "pending"
+                stdout_lines.append(
+                    f"  🔁 阶段 [{stage_name}] 失败，重试 {retry_count}/{retry}"
+                )
+                return
+            # 重试耗尽，按失败处理
+            state[stage_name] = "failed"
+            results[stage_name] = stage_result
+            stdout_lines.append(
+                f"  ❌ 阶段 [{stage_name}] 失败（重试耗尽）: "
+                f"{stage_result.get('error', '')}"
+            )
+            return
+
+        # 无重试，直接失败
+        state[stage_name] = "failed"
+        results[stage_name] = stage_result
+        stdout_lines.append(
+            f"  ❌ 阶段 [{stage_name}] 失败: {stage_result.get('error', '')}"
+        )
+        # on_error=skip_dependents/continue：失败但不中止，
+        # 依赖它的节点会在下一轮被 _deps_blocked 跳过。
+
+    def _abort_result(
+        self,
+        stage_name: str,
+        error: str,
+        stdout_lines: List[str],
+        artifact_dir: Path,
+    ) -> Dict[str, Any]:
+        """构造 abort 中止结果。"""
+        stdout_lines.append(
+            f"⛔ 流水线因阶段 [{stage_name}] 失败而中止（on_error=abort）"
+        )
+        return {
+            "success": False,
+            "stdout": "\n".join(stdout_lines),
+            "stderr": (
+                f"阶段 [{stage_name}] 失败: {error}。"
+                f"产物保留在 {artifact_dir} 便于排查。"
             ),
-            "status_file": str(status_file),
         }
-        taskfile.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    def _wait_status(self, status_file: Path, stage: str) -> Optional[bool]:
-        """轮询 status_file 直到 completed/failed，返回 True=成功 False=失败 None=超时。"""
-        deadline = time.time() + _DEFAULT_STAGE_TIMEOUT
-        while time.time() < deadline:
-            if status_file.exists():
-                try:
-                    data = json.loads(status_file.read_text(encoding="utf-8"))
-                    status = str(data.get("status") or "")
-                    if status == "completed":
-                        return True
-                    if status == "failed":
-                        return False
-                except (json.JSONDecodeError, OSError):
-                    # 文件可能正在写入，稍后重试
-                    pass
-            time.sleep(_POLL_INTERVAL)
-        return None
+    # ------------------------------------------------------------------
+    # when 受限表达式解析
+    # ------------------------------------------------------------------
+    def _eval_when(self, expr: str, results: Dict[str, Dict[str, Any]]) -> tuple:
+        """受限表达式求值（白名单，不 eval 任意代码）。
 
-    def _read_error_file(self, status_file: Path) -> str:
-        """读取 status_file 对应的 .error 文件内容（若存在）。"""
-        error_file = status_file.with_suffix(".error")
+        支持语法：`stage.field` 引用上游 stage 的 status_file 字段；
+        比较 `==`/`!=`/`>=`/`<=`/`>`/`<`；逻辑 `&&`/`||`/`!`；字面量数字/字符串/布尔。
+
+        返回:
+            (ok, error): ok=True 表示条件满足，否则为 False 并附错误信息
+        """
         try:
-            if error_file.exists():
-                return error_file.read_text(encoding="utf-8").strip()
-        except OSError:
+            substituted = self._substitute_refs(expr, results)
+            value = self._eval_boolean(substituted)
+            return bool(value), ""
+        except Exception as e:  # pylint: disable=broad-except
+            return False, f"when 表达式解析失败: {e}"
+
+    def _substitute_refs(
+        self, expr: str, results: Dict[str, Dict[str, Any]]
+    ) -> str:
+        """把 `stage.field` 引用替换为对应 stage 结果中的字段值（字符串形式）。"""
+
+        def _lookup(match: "re.Match") -> str:
+            stage_name = match.group(1)
+            field = match.group(2)
+            stage_result = results.get(stage_name, {})
+            result_data = stage_result.get("result") or {}
+            value = result_data.get(field)
+            if value is None:
+                return "None"
+            if isinstance(value, bool):
+                return "true" if value else "false"
+            if isinstance(value, (int, float)):
+                return str(value)
+            return json.dumps(str(value), ensure_ascii=False)
+
+        return re.sub(
+            r"([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)", _lookup, expr
+        )
+
+    def _eval_boolean(self, expr: str) -> Any:
+        """安全求值布尔表达式（只支持比较、逻辑、字面量，不 eval 任意代码）。"""
+        expr = expr.strip()
+        # 处理 ||
+        parts = self._split_top_level(expr, "||")
+        if len(parts) > 1:
+            return any(self._eval_boolean(p) for p in parts)
+        # 处理 &&
+        parts = self._split_top_level(expr, "&&")
+        if len(parts) > 1:
+            return all(self._eval_boolean(p) for p in parts)
+        e = parts[0].strip()
+        if e.startswith("!"):
+            return not self._eval_boolean(e[1:])
+        if e.startswith("(") and e.endswith(")"):
+            return self._eval_boolean(e[1:-1])
+        # 比较表达式
+        return self._eval_comparison(e)
+
+    def _split_top_level(self, expr: str, op: str) -> List[str]:
+        """按顶层操作符分割（忽略括号内与引号内的）。"""
+        parts: List[str] = []
+        depth = 0
+        in_quote: Optional[str] = None
+        current = ""
+        i = 0
+        while i < len(expr):
+            ch = expr[i]
+            if in_quote:
+                current += ch
+                if ch == in_quote:
+                    in_quote = None
+                i += 1
+                continue
+            if ch in ("'", '"'):
+                in_quote = ch
+                current += ch
+                i += 1
+                continue
+            if ch == "(":
+                depth += 1
+                current += ch
+                i += 1
+                continue
+            if ch == ")":
+                depth -= 1
+                current += ch
+                i += 1
+                continue
+            if depth == 0 and expr[i : i + len(op)] == op:
+                parts.append(current)
+                current = ""
+                i += len(op)
+                continue
+            current += ch
+            i += 1
+        parts.append(current)
+        return parts
+
+    def _find_top_level_op(self, expr: str, op: str) -> int:
+        """在顶层查找操作符位置（忽略括号与引号内），找不到返回 -1。"""
+        depth = 0
+        in_quote: Optional[str] = None
+        i = 0
+        while i < len(expr):
+            ch = expr[i]
+            if in_quote:
+                if ch == in_quote:
+                    in_quote = None
+                i += 1
+                continue
+            if ch in ("'", '"'):
+                in_quote = ch
+                i += 1
+                continue
+            if ch == "(":
+                depth += 1
+                i += 1
+                continue
+            if ch == ")":
+                depth -= 1
+                i += 1
+                continue
+            if depth == 0 and expr[i : i + len(op)] == op:
+                return i
+            i += 1
+        return -1
+
+    def _eval_comparison(self, e: str) -> bool:
+        """求值单个比较表达式（或布尔/数值字面量）。"""
+        e = e.strip()
+        if e in ("true", "True"):
+            return True
+        if e in ("false", "False"):
+            return False
+        if e == "None":
+            return False
+        # 数值/字符串比较
+        for op in ("==", "!=", ">=", "<=", ">", "<"):
+            idx = self._find_top_level_op(e, op)
+            if idx >= 0:
+                left_s = e[:idx].strip()
+                right_s = e[idx + len(op) :].strip()
+                left = self._coerce(left_s)
+                right = self._coerce(right_s)
+                if op == "==":
+                    return left == right
+                if op == "!=":
+                    return left != right
+                if op == ">=":
+                    return left >= right
+                if op == "<=":
+                    return left <= right
+                if op == ">":
+                    return left > right
+                if op == "<":
+                    return left < right
+        # 无比较符：尝试数值/布尔字面量
+        num = self._coerce(e)
+        if isinstance(num, bool):
+            return num
+        if isinstance(num, (int, float)):
+            return num != 0
+        return bool(num)
+
+    def _coerce(self, s: str) -> Any:
+        """把字面量字符串转为数值/布尔/字符串（用于比较）。"""
+        s = s.strip()
+        if s in ("true", "True"):
+            return True
+        if s in ("false", "False"):
+            return False
+        if s == "None":
+            return None
+        # 带引号的字符串
+        if (s.startswith('"') and s.endswith('"')) or (
+            s.startswith("'") and s.endswith("'")
+        ):
+            return s[1:-1]
+        # 数值
+        try:
+            if "." in s:
+                return float(s)
+            return int(s)
+        except ValueError:
+            return s
+
+    # ------------------------------------------------------------------
+    # 辅助
+    # ------------------------------------------------------------------
+    def _read_status(self, status_file: Path) -> Dict[str, Any]:
+        """读取 status_file 内容（JSON），失败返回空 dict。"""
+        try:
+            if status_file.exists():
+                data = json.loads(status_file.read_text(encoding="utf-8"))
+                if isinstance(data, dict):
+                    return data
+        except (json.JSONDecodeError, OSError):
             pass
-        return ""
+        return {}
 
     def _read_spec_summary(self, spec_path: Path) -> str:
-        """读取 NLSpec 前若干行作为各阶段背景摘要。"""
+        """读取 NLSpec 前 60 行作为摘要。"""
         try:
-            text = spec_path.read_text(encoding="utf-8")
+            lines = spec_path.read_text(encoding="utf-8").splitlines()
+            return "\n".join(lines[:60])
         except OSError:
             return ""
-        lines = text.splitlines()
-        if len(lines) <= 60:
-            return text
-        return "\n".join(lines[:60]) + "\n...（NLSpec 较长，仅展示前 60 行）"
 
-    def _error(self, message: str) -> Dict[str, Any]:
+    def _error(self, msg: str) -> Dict[str, Any]:
         """构造错误返回。"""
-        PrettyOutput.auto_print(f"❌ pipeline_runner: {message}")
-        return {"success": False, "stdout": "", "stderr": message}
+        return {"success": False, "stdout": "", "stderr": msg}

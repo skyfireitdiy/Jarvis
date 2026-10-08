@@ -4,7 +4,9 @@
 import json
 import logging
 import os
-from typing import Any, Dict, Optional, Union
+import time
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
 import httpx
 
@@ -112,6 +114,14 @@ class GatewayManagerTool:
             "message": {
                 "type": "string",
                 "description": "要发送的消息内容（send_to_agent 操作必填）",
+            },
+            "wait": {
+                "type": "boolean",
+                "description": "是否同步等待 Agent 处理完成（send_to_agent 操作可选，默认 false 向后兼容异步 fire-and-forget）。wait=true 时，若提供 status_file 则轮询该本地状态文件（Agent 完成任务后写入，判断 completed/failed）；否则轮询 Agent /status 的 execution_status 变化（兜底，不完全可靠）。",
+            },
+            "status_file": {
+                "type": "string",
+                "description": "阶段完成状态文件路径（send_to_agent 操作可选，配合 wait=true 使用）。Agent 完成任务后把 {\"status\": \"completed\"|\"failed\"} 写入该文件，send_to_agent 轮询它判断完成。",
             },
             # list_model_groups / create_agent / list_directory 操作的参数
             "node_id": {
@@ -252,6 +262,8 @@ class GatewayManagerTool:
         agent_id: Optional[Union[str, list]] = None,
         message: str = "",
         node_id: Optional[str] = None,
+        wait: bool = False,
+        status_file: Optional[str] = None,
         path: str = "",
         command: str = "",
         agent_type: Optional[str] = None,
@@ -331,6 +343,8 @@ class GatewayManagerTool:
             agent_id = args.get("agent_id")
             message = args.get("message", "")
             node_id = args.get("node_id")
+            wait = args.get("wait", False)
+            status_file = args.get("status_file")
             path = args.get("path", "")
             command = args.get("command", "")
             agent_type = args.get("agent_type")
@@ -362,7 +376,9 @@ class GatewayManagerTool:
             target = args.get("target")
         try:
             if action == "send_to_agent":
-                return self._send_to_agent(agent_id, message, node_id=node_id)
+                return self._send_to_agent(
+                    agent_id, message, node_id=node_id, wait=wait, status_file=status_file
+                )
             elif action == "list_agents":
                 return self._list_agents()
             elif action == "list_nodes":
@@ -615,7 +631,12 @@ class GatewayManagerTool:
         }
 
     def _send_to_agent(
-        self, agent_id: Any, message: str, node_id: Optional[str] = None
+        self,
+        agent_id: Any,
+        message: str,
+        node_id: Optional[str] = None,
+        wait: bool = False,
+        status_file: Optional[str] = None,
     ) -> Dict[str, Any]:
         """向指定 Agent(s) 发送消息。
 
@@ -627,6 +648,11 @@ class GatewayManagerTool:
             agent_id: 目标 Agent ID (支持 str 或 List[str])
             message: 消息内容
             node_id: 目标节点 ID（可选，未指定时自动查询 Agent 所在节点）
+            wait: 是否同步等待 Agent 处理完成（默认 False，向后兼容异步 fire-and-forget）。
+                  wait=True 时，若提供 status_file 则轮询该本地状态文件判断完成；
+                  否则轮询各 Agent /status 的 execution_status 变化（兜底，不完全可靠）。
+            status_file: 阶段完成状态文件路径（可选，配合 wait=True 使用）。Agent 完成任务后
+                 把 {"status": "completed"|"failed"} 写入该文件，本方法轮询它判断完成。
 
         返回:
             Dict[str, Any]: 发送结果
@@ -736,11 +762,103 @@ class GatewayManagerTool:
         if all_success:
             stdout_str += "\n\nIf you want to wait for a response, output <Wait>."
 
+        # wait=true：同步等待 Agent 处理完成（方案A：优先轮询 status_file，否则轮询 /status 兜底）
+        if wait:
+            if status_file:
+                wait_ok, wait_err = self._wait_status_file(status_file)
+            else:
+                wait_ok, wait_err = self._wait_agent_status(
+                    target_ids, agent_node_map
+                )
+            if not wait_ok:
+                return {
+                    "success": False,
+                    "stdout": stdout_str,
+                    "stderr": wait_err,
+                }
+            stdout_str += (
+                "\n\n[wait] Agent 已处理完成"
+                + (f"（status_file: {status_file}）" if status_file else "")
+            )
+
         return {
             "success": all_success,
             "stdout": stdout_str,
             "stderr": "" if all_success else "Some messages failed to send",
         }
+
+    def _wait_status_file(
+        self, status_file: str, timeout: float = 1800.0
+    ) -> tuple:
+        """轮询本地 status_file 判断 Agent 是否完成（方案A 的可靠完成信号）。
+
+        Agent 完成任务后把 {"status": "completed"|"failed"} 写入该文件。
+
+        返回:
+            (ok, error): ok=True 表示 completed，否则为 False 并附错误信息
+        """
+        status_path = Path(status_file)
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if status_path.exists():
+                try:
+                    data = json.loads(status_path.read_text(encoding="utf-8"))
+                    status = str(data.get("status") or "")
+                    if status == "completed":
+                        return True, ""
+                    if status == "failed":
+                        err = data.get("error") or ""
+                        return False, f"Agent 任务失败: {err}"
+                except (json.JSONDecodeError, OSError):
+                    # 文件可能正在写入，稍后重试
+                    pass
+            time.sleep(2.0)
+        return False, f"等待 Agent 完成超时（>{int(timeout)} 秒），status_file={status_file}"
+
+    def _wait_agent_status(
+        self, target_ids: List[str], agent_node_map: Dict[str, str], timeout: float = 1800.0
+    ) -> tuple:
+        """轮询各 Agent /status 的 execution_status 变化（兜底，不完全可靠）。
+
+        因 agent 状态机无"空闲/完成"态，仅能通过 execution_status 从 running
+        变化到 waiting_* 态近似判断"一条消息处理完成"。这是方案A 的兜底路径，
+        可靠完成信号应优先使用 status_file。
+
+        返回:
+            (ok, error): ok=True 表示观察到完成信号，否则为 False 并附错误信息
+        """
+        deadline = time.time() + timeout
+        # 记录各 agent 的初始 execution_status，观察其变化
+        while time.time() < deadline:
+            all_done = True
+            for target_id in target_ids:
+                target_node_id = agent_node_map.get(target_id)
+                if target_node_id and target_node_id != "master":
+                    path = f"/api/node/{target_node_id}/agent/{target_id}/status"
+                else:
+                    path = f"/api/agent/{target_id}/status"
+                result = self._request_gateway(
+                    method="GET",
+                    path=path,
+                    error_prefix=f"Failed to query status of agent {target_id}",
+                )
+                if not result["success"]:
+                    all_done = False
+                    continue
+                # /status 返回扁平结构 {"execution_status","status","non_interactive"}
+                status_body = result["data"] or {}
+                execution_status = (
+                    status_body.get("execution_status")
+                    if isinstance(status_body, dict)
+                    else None
+                )
+                # 观察到非 running 状态视为"已处理完当前消息"（近似）
+                if execution_status == "running":
+                    all_done = False
+            if all_done:
+                return True, ""
+            time.sleep(2.0)
+        return False, f"等待 Agent 完成超时（>{int(timeout)} 秒）"
 
     def _resolve_node_id(self, agent_id: str, node_id: Optional[str] = None) -> str:
         """解析 Agent 所在的节点 ID。
