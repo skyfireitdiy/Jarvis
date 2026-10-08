@@ -175,10 +175,11 @@
           title="编排查看"
         >
           <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="3.5" cy="4" r="1.6"/>
-            <circle cx="12.5" cy="4" r="1.6"/>
-            <circle cx="8" cy="12.5" r="1.6"/>
-            <path d="M4.6 5.1 7.1 11.2M11.4 5.1 8.9 11.2M5.1 4h5.8"/>
+            <rect x="1.5" y="2" width="4" height="3.5" rx="1"/>
+            <rect x="1.5" y="10.5" width="4" height="3.5" rx="1"/>
+            <rect x="10.5" y="6.25" width="4" height="3.5" rx="1"/>
+            <path d="M5.5 3.75h2.5v4.25h2.5"/>
+            <path d="M5.5 12.25h2.5V8h2.5"/>
           </svg>
         </button>
         <!-- 插件扩展的侧边栏视图入口（方案2：插件 config.yaml 的 frontend.sidebar_views） -->
