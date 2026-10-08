@@ -1783,7 +1783,7 @@
                 v-model="orchestrateRunWorkingDir"
                 class="orchestrate-input"
                 type="text"
-                placeholder="留空默认当前目录，产物 .df/ 在其中创建"
+                placeholder="留空默认当前目录，产物 .jarvis/artifacts/ 在其中创建"
               >
             </div>
             <div class="orchestrate-field orchestrate-field-wide orchestrate-checks">
@@ -12949,7 +12949,7 @@ const orchestrateCreating = ref(false)           // 批量创建中
 const orchestrateResults = ref([])               // 批量创建结果 [{ name, ok, error }]
 // 运行流水线（与 Agent 调用 pipeline_runner 同一路径，驱动 DAG 可视化）
 const orchestrateSpecFile = ref('')              // NLSpec 文件绝对路径（运行流水线必填）
-const orchestrateRunWorkingDir = ref('')         // 运行流水线的工作目录（产物 .df/ 在其中创建）
+const orchestrateRunWorkingDir = ref('')         // 运行流水线的工作目录（产物 .jarvis/artifacts/ 在其中创建）
 const orchestrateRunning = ref(false)            // 运行流水线中（仅表示已提交，实际进度由事件驱动）
 const orchestrateDryRun = ref(false)             // 预演模式：只做 DAG 调度预演，不真正执行 Agent
 // 编排文件浏览面板：目录 + 文件合并列表（复用 DirectoryDialog，fileSelectable 模式）

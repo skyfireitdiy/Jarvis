@@ -45,8 +45,8 @@ from jarvis.jarvis_utils.output import PrettyOutput
 _POLL_INTERVAL = 2.0
 # 单阶段默认超时（秒）：30 分钟
 _DEFAULT_STAGE_TIMEOUT = 30 * 60
-# 工作产物目录名（相对 working_dir）
-_ARTIFACT_DIR = ".df"
+# 工作产物目录名（相对 working_dir，收进 .jarvis 隐藏目录统一管理）
+_ARTIFACT_DIR = ".jarvis/artifacts"
 # 默认并行度
 _DEFAULT_MAX_WORKERS = 4
 
@@ -80,7 +80,7 @@ class PipelineRunnerTool:
             },
             "working_dir": {
                 "type": "string",
-                "description": "工作目录（默认当前目录），产物 .df/ 在其中创建",
+                "description": "工作目录（默认当前目录），产物 .jarvis/artifacts/ 在其中创建",
             },
             "approve": {
                 "type": "boolean",
@@ -155,8 +155,13 @@ class PipelineRunnerTool:
         agents_by_name = {a.get("name"): a for a in agents if a.get("name")}
         default_on_error = str(orch.get("default_on_error") or "abort").strip()
 
-        # 3. 初始化产物目录
-        artifact_dir = work_dir / _ARTIFACT_DIR
+        # 3. 初始化产物目录（按 pipeline_id 隔离，避免多条流水线同目录冲突）
+        pipeline_id = self._make_pipeline_id(orchestration_file)
+        if dry_run:
+            # dry-run 仅预演不落盘，用公共目录展示即可
+            artifact_dir = work_dir / _ARTIFACT_DIR
+        else:
+            artifact_dir = work_dir / _ARTIFACT_DIR / pipeline_id
         try:
             artifact_dir.mkdir(parents=True, exist_ok=True)
         except Exception as e:  # pylint: disable=broad-except
@@ -182,8 +187,7 @@ class PipelineRunnerTool:
                 artifact_dir=artifact_dir,
             )
 
-        # 4.6 生成 pipeline_id 并广播起始事件（供前端可视化）
-        pipeline_id = self._make_pipeline_id(orchestration_file)
+        # 4.6 广播起始事件（供前端可视化），pipeline_id 已在第 3 步生成
         self._emit(
             pipeline_id,
             "pipeline_start",
@@ -210,7 +214,9 @@ class PipelineRunnerTool:
         )
 
         # 5. 创建常驻 jvs Agent（每个 stage 一个）
-        agent_created = self._create_stage_agents(nodes, agents_by_name, work_dir)
+        agent_created = self._create_stage_agents(
+            nodes, agents_by_name, work_dir, pipeline_id
+        )
         if not agent_created["success"]:
             self._emit(pipeline_id, "pipeline_done", success=False, final_status="failed")
             return self._error(agent_created["error"])
@@ -492,6 +498,7 @@ class PipelineRunnerTool:
         nodes: List[Dict[str, Any]],
         agents_by_name: Dict[str, Any],
         work_dir: Path,
+        pipeline_id: str = "",
     ) -> Dict[str, Any]:
         """为每个 stage 创建常驻 jvs Agent（type: agent）。
 
@@ -505,7 +512,7 @@ class PipelineRunnerTool:
             agent_def = agents_by_name[node["agent"]]
             working_dir = str(agent_def.get("working_dir") or str(work_dir))
             agent_id, last_error = self._create_agent_with_retry(
-                gw, stage_name, working_dir
+                gw, stage_name, working_dir, pipeline_id=pipeline_id
             )
             if not agent_id:
                 return {
@@ -526,6 +533,7 @@ class PipelineRunnerTool:
         gw: Any,
         stage_name: str,
         working_dir: str,
+        pipeline_id: str = "",
         max_attempts: int = 3,
     ) -> tuple:
         """创建常驻 Agent，失败时重试（间隔递增）。
@@ -535,11 +543,15 @@ class PipelineRunnerTool:
             error 为最后一次错误信息。
         """
         last_error = ""
+        # Agent 名加 pipeline_id 前缀，避免多条流水线同目录创建同名 Agent 冲突
+        agent_name = (
+            f"df_{pipeline_id}_{stage_name}" if pipeline_id else f"df_{stage_name}"
+        )
         for attempt in range(1, max_attempts + 1):
             create_result = gw._create_agent(
                 agent_type="agent",
                 working_dir=working_dir,
-                name=f"df_{stage_name}",
+                name=agent_name,
             )
             if create_result.get("success"):
                 try:

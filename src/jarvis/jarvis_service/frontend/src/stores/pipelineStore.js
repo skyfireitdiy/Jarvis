@@ -42,10 +42,64 @@ function emptyStage(node) {
   };
 }
 
+// localStorage 键前缀：持久化键 = `${PIPELINE_STORE_KEY_PREFIX}${storageKey}`
+const PIPELINE_STORE_KEY_PREFIX = "jarvis_pipeline_store_";
+
 export class PipelineStore {
-  constructor(maxFinished = 20) {
+  // storageKey 非空时开启 localStorage 持久化：applyEvent 后自动保存快照，
+  // 构造时自动恢复，使刷新页面后仍能看到已运行的编排（事件广播是纯内存、不落盘）。
+  // 单元测试不传 storageKey，保持纯内存、不碰 localStorage。
+  constructor(maxFinished = 20, storageKey = "") {
     this.maxFinished = maxFinished;
     this.pipelines = new Map();
+    this.storageKey = storageKey;
+    if (storageKey) {
+      this._restoreFromStorage();
+    }
+  }
+
+  _storageKey() {
+    return PIPELINE_STORE_KEY_PREFIX + this.storageKey;
+  }
+
+  // 把当前状态序列化为可 JSON 化的普通对象（Map → 数组）。
+  _serialize() {
+    return [...this.pipelines.values()].map((s) => ({
+      ...s,
+      stages: [...s.stages.entries()].map(([stage, node]) => ({ stage, node })),
+    }));
+  }
+
+  // 从 localStorage 恢复历史流程（构造时调用）。失败/无数据时静默。
+  _restoreFromStorage() {
+    try {
+      const raw = localStorage.getItem(this._storageKey());
+      if (!raw) return;
+      const list = JSON.parse(raw);
+      if (!Array.isArray(list)) return;
+      for (const s of list) {
+        if (!s || !s.pipelineId || !Array.isArray(s.stages)) continue;
+        const stages = new Map();
+        for (const { stage, node } of s.stages) {
+          if (stage) stages.set(stage, node);
+        }
+        this.pipelines.set(s.pipelineId, { ...s, stages });
+      }
+    } catch (err) {
+      // 隐私模式/损坏数据时忽略，保持空内存态
+      console.warn("[PIPELINE] Failed to restore pipeline store:", err);
+    }
+  }
+
+  // 把当前状态写入 localStorage（开启持久化时）。
+  _persist() {
+    if (!this.storageKey) return;
+    try {
+      localStorage.setItem(this._storageKey(), JSON.stringify(this._serialize()));
+    } catch (err) {
+      // 隐私模式/配额满时忽略，不影响内存态
+      console.warn("[PIPELINE] Failed to persist pipeline store:", err);
+    }
   }
 
   // 应用一条事件；未知类型/无 pipeline_id 的事件被忽略。
