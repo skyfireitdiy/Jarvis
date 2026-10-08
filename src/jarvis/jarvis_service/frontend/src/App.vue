@@ -1638,10 +1638,21 @@
               <button class="btn secondary" @click="toggleOrchestrateBrowser">
                 {{ orchestrateShowBrowser ? '收起' : '浏览' }}
               </button>
+              <button class="btn secondary" @click="onOrchestrateLocalSelect">
+                本地选择
+              </button>
               <button class="btn primary" :disabled="orchestrateLoading" @click="parseOrchestrationFile">
                 {{ orchestrateLoading ? '解析中…' : '解析' }}
               </button>
             </div>
+            <!-- 从本机选择编排文件用的隐藏文件选择框（选中后上传到所选节点并回填路径） -->
+            <input
+              ref="orchestrateLocalFileInput"
+              type="file"
+              accept=".yaml,.yml"
+              style="display: none"
+              @change="onOrchestrateLocalFileChange"
+            >
             <!-- 最近使用过的编排文件：点击快速复用，hover 显示删除按钮 -->
             <div v-if="orchestrateRecentFiles.length" class="orchestrate-recent">
               <div class="orchestrate-recent-title">最近使用</div>
@@ -13042,6 +13053,7 @@ const orchestrateSelectedFile = ref('')          // 面板中当前选中的文�
 const orchestrateDialogRef = ref(null)           // 内嵌 DirectoryDialog 引用
 const orchestrateShowBrowser = ref(false)        // 是否展开文件浏览面板
 const orchestrateCurrentDirPath = ref('')        // 浏览面板当前目录路径
+const orchestrateLocalFileInput = ref(null)       // 从本机选择编排文件的隐藏 file input
 const orchestrateDirSearchText = ref('')         // 浏览面板搜索文本
 const orchestrateSelectedIndex = ref(-1)         // 浏览面板键盘导航选中项索引（-1 未选中）
 // 编排文件允许的扩展名（仅展示这些文件供选择）
@@ -13488,6 +13500,50 @@ async function goToOrchestrateParentDir() {
 function onOrchestrateSelectFile(path) {
   orchestrateSelectedFile.value = path
   orchestrateFilePath.value = path
+}
+// 打开本机文件选择框
+function onOrchestrateLocalSelect() {
+  const input = orchestrateLocalFileInput.value
+  if (!input) return
+  input.value = ''
+  input.click()
+}
+// 本机选中编排文件：上传到所选节点后回填节点路径并解析
+async function onOrchestrateLocalFileChange(event) {
+  const input = event?.target
+  const file = input?.files?.[0]
+  if (input) input.value = ''
+  if (!file) return
+  const nodeId = String(orchestrateNodeId.value || 'master').trim() || 'master'
+  orchestrateError.value = ''
+  try {
+    // 上传目标目录：优先当前浏览目录（已打开浏览面板时）；否则拉取家目录绝对路径
+    let baseDir = String(orchestrateCurrentDirPath.value || '').replace(/\/+$/, '')
+    if (!baseDir) {
+      await fetchOrchestrateEntries('~')
+      baseDir = String(orchestrateCurrentDirPath.value || '').replace(/\/+$/, '')
+    }
+    if (!baseDir) {
+      orchestrateError.value = '无法确定上传目录，请先打开「浏览」选择目标目录'
+      return
+    }
+    const data = await readFileAsDataUrl(file)
+    const { host, port } = getGatewayAddress()
+    const targetPath = `${baseDir}/${file.name}`
+    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, nodeId, 'file-upload'), {
+      method: 'POST',
+      body: JSON.stringify({ path: targetPath, data, node_id: nodeId }),
+    })
+    const result = await response.json().catch(() => ({}))
+    if (!response.ok || !result.success) {
+      throw new Error(result.error?.message || '上传失败')
+    }
+    orchestrateFilePath.value = targetPath
+    showToast(`已上传到 ${targetPath}`, 'success')
+    parseOrchestrationFile()
+  } catch (error) {
+    orchestrateError.value = error.message || '上传本地编排文件失败'
+  }
 }
 // 浏览面板搜索框键盘事件：Esc 收起面板；上下键在目录/文件列表中导航；回车进入目录或选中文件
 function handleOrchestrateSearchKeydown(event) {
