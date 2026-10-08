@@ -91,6 +91,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .orch-title { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #eaf6ff; }
 .orch-close {
   width: 28px; height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   border-radius: 8px;
   border: 1px solid rgba(90, 120, 160, 0.28);
   background: rgba(20, 30, 46, 0.7);
