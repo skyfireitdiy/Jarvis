@@ -17,6 +17,8 @@
 
 **结论**：黑灯工厂当前是"创建了流水线角色，但没有流水线调度引擎"。要让 4 个 agent 自动协作，需要**内置编排执行引擎**（方案 B）。
 
+**设计取向**：编排执行引擎（`pipeline_runner`）是**通用基础设施**，与黑灯工厂的具体业务（NLSpec/四层架构/holdout/门禁）无关。它放核心工具目录，任何插件/用户都能用它定义自己的多 Agent 流水线；黑灯工厂只是它的一个使用者（通过编排文件的 `flow` 字段声明自己的阶段与产物契约）。
+
 ---
 
 ## 1. 设计目标与原则
@@ -32,7 +34,7 @@
 
 - **只协调不执行**（sw-controller 模式）：调度器不写码、不测试，只负责按序调度与产物传递。
 - **复用现有机制**：优先复用 `jca -n --task-file` + `status_file`（现成的非交互执行 + 状态回传），不重复造轮子。
-- **最小侵入**：不改动核心 agent 启动逻辑，新增能力以**插件工具**形式提供。
+- **最小侵入**：不改动核心 agent 启动逻辑，新增能力以**核心通用工具**形式提供。
 - **保持人工审批关口**：门禁处停住，符合管理员"不完全无人值守"决策。
 
 ---
@@ -48,7 +50,7 @@
 └──────────────────────────┬──────────────────────────────────┘
                            ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  编排执行引擎 pipeline_runner（新增工具，ai-dark-factory）    │
+│  编排执行引擎 pipeline_runner（核心通用工具，自动注册）       │
 │  ┌────────────────────────────────────────────────────────┐ │
 │  │ 读取编排定义（flow 顺序）                                │ │
 │  │ 对每个阶段：                                            │ │
@@ -104,9 +106,10 @@ flow:
 
 ### 4.1 位置与形态
 
-- **文件**：`builtin/plugins/ai-dark-factory/tools/pipeline_runner.py`
+- **文件**：`src/jarvis/jarvis_tools/pipeline_runner.py`（**核心通用工具**，非插件专用）
 - **类**：`PipelineRunnerTool`（`name = "pipeline_runner"`，等于文件名 stem）
-- **注册**：`config.yaml` 的 `tool_load_dirs` 已含 `tools/`，自动注册。
+- **注册**：核心工具目录被 `ToolRegistry._load_builtin_tools` 自动扫描注册（`registry.py:600-620`），无需任何配置。
+- **通用性**：不依赖任何插件业务。它只做"读编排文件 flow → 按序驱动 agent → 传递产物 → 等待完成"，具体阶段/产物/门禁由**使用方的编排文件**声明。
 - **职责**：读取编排文件 + 按 flow 顺序用 `jca -n --task-file` 驱动各阶段 agent，poll status_file 等待，传递产物，门禁停住。
 
 ### 4.2 参数（parameters）
@@ -210,11 +213,11 @@ dark-factory/run:
 ## 8. 实施步骤
 
 1. **扩展编排文件**：`dark_factory_pipeline.yaml` 新增 `flow` 字段（阶段顺序 + 产物契约）。
-2. **新增工具** `tools/pipeline_runner.py`：实现 `PipelineRunnerTool`（校验/组装 task-file/启动 jca/poll status/产物校验/门禁停住）。
-3. **更新 config.yaml**：`replace_map` 新增 `dark-factory/run`；确认 `tool_load_dirs` 含 tools/。
+2. **新增核心通用工具** `src/jarvis/jarvis_tools/pipeline_runner.py`：实现 `PipelineRunnerTool`（校验/组装 task-file/启动 jca/poll status/产物校验/门禁停住）。放核心目录由 `ToolRegistry._load_builtin_tools` 自动注册（`registry.py:600-620`），无需配置。
+3. **更新 config.yaml**：`replace_map` 新增 `dark-factory/run`（模板调用 pipeline_runner）。
 4. **更新规则**：`orchestration.md` 补充"用 pipeline_runner 驱动流水线"的说明。
 5. **更新设计文档**：记录方案 B 的编排引擎设计。
-6. **补充测试**：`tests/jarvis_plugins/test_ai_dark_factory.py` 增加 pipeline_runner 的单元测试（mock jca 子进程 + status_file）。
+6. **补充测试**：`tests/jarvis_tools/test_pipeline_runner.py` 增加 pipeline_runner 的单元测试（mock jca 子进程 + status_file）。
 
 ---
 
