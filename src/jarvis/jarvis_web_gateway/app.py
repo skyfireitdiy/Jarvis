@@ -2217,6 +2217,9 @@ def create_app(
         await agent_manager.start_monitoring_for_running_agents()
         # 启动流水线进度事件桥接线程（daemon，随进程退出）
         _pipeline_pump_stop.clear()
+        from jarvis.jarvis_tools.pipeline_events import set_local_pump_active
+
+        set_local_pump_active(True)
         threading.Thread(
             target=_pipeline_event_pump,
             name="pipeline-event-pump",
@@ -2255,6 +2258,9 @@ def create_app(
         yield
         # Shutdown
         _pipeline_pump_stop.set()
+        from jarvis.jarvis_tools.pipeline_events import set_local_pump_active
+
+        set_local_pump_active(False)
         agent_manager._save_agents()
         await agent_proxy_manager.cleanup()
         terminal_session_manager.cleanup()
@@ -11556,6 +11562,43 @@ def create_app(
             )
         except Exception as e:
             logger.exception("[ORCHESTRATION] run_orchestration failed: %r", e)
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": repr(e)},
+            }
+
+    @app.post("/api/pipeline-events", dependencies=[Depends(verify_token)])
+    async def pipeline_events_ingest(
+        request: Request, body: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """接收跨进程上报的流水线进度事件，写入本进程事件总线。
+
+        pipeline_runner 运行在 Agent 进程（如用户对话 Agent 调用该工具）时，
+        事件写入的是 Agent 进程内存总线，事件泵（在 web_gateway 进程）读不到。
+        pipeline_runner 会通过 HTTP 把事件上报到本接口，本接口把事件写入
+        web_gateway 进程的事件总线，从而被事件泵广播给前端。
+
+        仅内部桥接用途：事件源（pipeline_runner）与事件泵（web_gateway）同属
+        可信进程，均持有网关 token。权限按 file:read 把关（与 run-orchestration
+        一致，编排运行需要文件读取权限）。
+        """
+        from fastapi import HTTPException
+
+        if _check_file_permission(request.state.user_info, "file:read"):
+            raise HTTPException(status_code=403, detail="Permission denied: file:read")
+        try:
+            from jarvis.jarvis_tools.pipeline_events import get_event_bus
+
+            bus = get_event_bus()
+            events = body.get("events") or []
+            if not isinstance(events, list):
+                return {"success": False, "error": "events must be a list"}
+            for event in events:
+                if isinstance(event, dict):
+                    bus.emit(event)
+            return {"success": True, "data": {"ingested": len(events)}}
+        except Exception as e:
+            logger.exception("[ORCHESTRATION] pipeline_events_ingest failed: %r", e)
             return {
                 "success": False,
                 "error": {"code": "INTERNAL_ERROR", "message": repr(e)},

@@ -36,7 +36,9 @@ from typing import Optional
 import yaml
 
 from jarvis.jarvis_tools.gateway_manager import GatewayManagerTool
+from jarvis.jarvis_tools.pipeline_events import emit_remote
 from jarvis.jarvis_tools.pipeline_events import get_event_bus
+from jarvis.jarvis_tools.pipeline_events import is_local_pump_active
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # 状态文件轮询间隔（秒）
@@ -237,11 +239,20 @@ class PipelineRunnerTool:
         """向全局事件总线写入一条流水线进度事件。
 
         纯副作用：任何异常都被吞掉，绝不影响流水线执行。
+
+        pipeline_runner 可能运行在 web_gateway 进程内（如前端「运行流水线」），
+        也可能运行在 Agent 进程内（如用户对话 Agent 调用本工具）。事件泵
+        （drain 并广播给前端）只存在于 web_gateway 进程，因此：
+        - 本地事件泵已激活（本进程即 web_gateway）：只写本地进程内总线；
+        - 否则（Agent 进程）：除写本地总线外，还通过 HTTP 上报到 master 网关，
+          由网关侧 /api/pipeline-events 写入网关进程总线，从而被事件泵读到。
         """
         try:
             event: Dict[str, Any] = {"pipeline_id": pipeline_id, "type": event_type}
             event.update(fields)
             get_event_bus().emit(event)
+            if not is_local_pump_active():
+                emit_remote(event)
         except Exception:  # pylint: disable=broad-except
             pass
 

@@ -1786,6 +1786,9 @@
                 placeholder="留空默认当前目录，产物 .df/ 在其中创建"
               >
             </div>
+            <div class="orchestrate-field orchestrate-field-wide orchestrate-checks">
+              <label class="orchestrate-check"><input v-model="orchestrateDryRun" type="checkbox"> 预演模式（dry-run，只做 DAG 调度预演，不真正执行 Agent）</label>
+            </div>
             <button
               class="btn primary orchestrate-run-btn"
               :disabled="orchestrateRunning || !orchestrateFilePath"
@@ -12948,6 +12951,7 @@ const orchestrateResults = ref([])               // 批量创建结果 [{ name, 
 const orchestrateSpecFile = ref('')              // NLSpec 文件绝对路径（运行流水线必填）
 const orchestrateRunWorkingDir = ref('')         // 运行流水线的工作目录（产物 .df/ 在其中创建）
 const orchestrateRunning = ref(false)            // 运行流水线中（仅表示已提交，实际进度由事件驱动）
+const orchestrateDryRun = ref(false)             // 预演模式：只做 DAG 调度预演，不真正执行 Agent
 // 编排文件浏览面板：目录 + 文件合并列表（复用 DirectoryDialog，fileSelectable 模式）
 const orchestrateFileEntries = ref([])           // 当前目录下的目录与文件项（{name,path,type}）
 const orchestrateSelectedFile = ref('')          // 面板中当前选中的文件路径
@@ -13212,6 +13216,7 @@ async function runOrchestration() {
         orchestration_file: orchestrationFile,
         spec_file: specFile,
         working_dir: String(orchestrateRunWorkingDir.value || '').trim(),
+        dry_run: !!orchestrateDryRun.value,
         node_id: nodeId,
       }),
     })
