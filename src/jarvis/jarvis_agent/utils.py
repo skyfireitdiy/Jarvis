@@ -1450,6 +1450,23 @@ def _read_tool_meta(tool_file):
     return None, None
 
 
+def _read_agent_meta(agent_file):
+    """解析 Agent 定义 YAML 的 name/description，返回 (name, description)。
+
+    Agent 定义文件是带 YAML front matter 的 YAML，含 name/description。
+    解析失败或缺少 name 时返回 (None, None)。
+    """
+    try:
+        import yaml
+
+        data = yaml.safe_load(agent_file.read_text(encoding="utf-8"))
+    except Exception:
+        return None, None
+    if not isinstance(data, dict):
+        return None, None
+    return data.get("name"), data.get("description")
+
+
 def _build_plugin_capabilities(config: dict, plugin_dir=None) -> List[dict]:
     """
     从插件 config.yaml 构建能力清单（供前端展示，让用户了解插件提供了哪些操作）。
@@ -1511,14 +1528,25 @@ def _build_plugin_capabilities(config: dict, plugin_dir=None) -> List[dict]:
                 "工具",
                 f"提供 {len(tools)} 个工具目录，注册可调用的工具",
             )
-    # Agent 定义
+    # Agent 定义：读取 agents 目录下实际 YAML，展示具体角色名与职责
     agents = config.get("agent_definition_dirs")
     if agents:
-        _append(
-            "agents",
-            "Agent 定义",
-            f"提供 {len(agents)} 个 Agent 定义目录，供内置配置选择器选用",
-        )
+        agent_files = _collect_plugin_files(agents, plugin_dir, (".yaml", ".yml"))
+        if agent_files:
+            for agent_file in agent_files:
+                name, desc = _read_agent_meta(agent_file)
+                if name:
+                    _append(
+                        "agents",
+                        f"Agent：{name}",
+                        desc or f"Agent 定义文件 {agent_file.name}，供内置配置选择器选用",
+                    )
+        else:
+            _append(
+                "agents",
+                "Agent 定义",
+                f"提供 {len(agents)} 个 Agent 定义目录，供内置配置选择器选用",
+            )
     # 编排文件
     orchestration = config.get("orchestration")
     if isinstance(orchestration, list):

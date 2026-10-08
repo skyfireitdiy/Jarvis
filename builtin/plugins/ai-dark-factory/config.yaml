@@ -55,10 +55,3 @@ replace_map:
       4. 按四层流水线推进：规划 → 生成（补齐缺失实现/测试）→ 验证 → 门禁。
       5. 产出审批报告交人工确认；通过后如需合并，用 `gh pr merge <number>`（先与用户确认）。
     description: 用黑灯工厂工作流处理 PR
-capabilities:
-  - name: "编排流水线 dark-factory-pipeline"
-    description: "多 Agent 自主写码/测试/评估的黑灯工厂流水线，Specs 进可工作的软件出，人类审 pass/fail 报告。"
-  - name: "开发规则集"
-    description: "内置 TDD 铁律、Spec 写作、编排、留白纪律 4 条规则，详见上方「规则」清单，约束流水线内各 Agent 的行为。"
-  - name: "流水线工具集"
-    description: "内置门禁计算、留白生成、流水线生成、Spec 校验 4 个工具，详见上方「工具」清单，支撑黑灯工厂自动化。"

@@ -58,5 +58,3 @@ capabilities:
     description: "列出/查看/合并当前仓库的 Pull Request"
   - name: "Issue 管理"
     description: "列出/查看/评论/关闭当前仓库的 Issue"
-  - name: "前端 GitHub 侧边栏"
-    description: "在编辑器侧边栏浏览/操作当前仓库的 Issue 与 PR（列表/详情/评论/关闭/合并）"
