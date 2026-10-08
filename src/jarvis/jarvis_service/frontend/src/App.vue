@@ -9689,13 +9689,49 @@ function closeTopologyOverlay() {
 function selectPipeline(id) {
   activePipelineId.value = id
 }
-// 删除某条编排记录（预览/已结束/运行中的列表项均可删）
-function removePipeline(id) {
+// 删除某条编排记录，并连带删除该流水线运行时创建的所有 Agent
+async function removePipeline(id) {
   if (!id) return
+  const pipeline = pipelineStore.getPipeline(id)
+  // 收集该流水线创建的所有 Agent（pipeline_agents 事件回填到 stage.agentId）
+  const agentIds = []
+  if (pipeline && pipeline.stages) {
+    for (const [, node] of pipeline.stages) {
+      if (node && node.agentId) agentIds.push(node.agentId)
+    }
+  }
+  // 删除流水线创建的 Agent（pipeline_runner 在 master 节点创建）
+  if (agentIds.length) {
+    const { host, port } = getGatewayAddress()
+    const targetNodeId = 'master'
+    let failed = 0
+    for (const agentId of agentIds) {
+      try {
+        const resp = await fetchWithAuth(
+          buildNodeHttpUrl(host, port, targetNodeId, `agents/${agentId}`),
+          { method: 'DELETE' }
+        )
+        const result = await resp.json()
+        if (!resp.ok || !result.success) {
+          failed++
+          console.warn('[PIPELINE] 删除流水线 Agent 失败', agentId, result.error?.message || '')
+        }
+      } catch (e) {
+        failed++
+        console.warn('[PIPELINE] 删除流水线 Agent 失败', agentId, e.message)
+      }
+    }
+    if (failed) {
+      showToast(`已删除流水线记录，但 ${failed}/${agentIds.length} 个 Agent 删除失败`, 'warning')
+    } else {
+      showToast(`已删除流水线记录及其 ${agentIds.length} 个 Agent`, 'success')
+    }
+  } else {
+    showToast('已删除该流水线记录', 'success')
+  }
   pipelineStore.removePipeline(id)
   pipelineVersion.value++ // 刷新 pipelineList
   if (activePipelineId.value === id) activePipelineId.value = ''
-  showToast('已删除该流水线记录', 'success')
 }
 // 点击 DAG 节点：有 agent_id 时跳转到对应 Agent 面板，否则仅选中流程
 function onOrchestrationJumpAgent(payload) {
