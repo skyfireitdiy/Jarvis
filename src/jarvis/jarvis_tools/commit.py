@@ -56,6 +56,21 @@ class CommitTool:
         prefix = str((args or {}).get("prefix") or "").strip()
         suffix = str((args or {}).get("suffix") or "").strip()
 
+        # 自动完成状态下跳过 commit：
+        # 自动完成流程（_execute_auto_complete）会先执行 _review_and_fix 自动评审
+        # （评审依赖修改的 diff），评审通过后再自动 commit。此时若再调用本工具，
+        # 会压缩 CheckPoint 影响评审所依赖的 diff，故直接跳过并返回原因。
+        agent = (args or {}).get("agent")
+        if agent is not None and getattr(agent, "auto_complete", False):
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": (
+                    "Agent 处于自动完成状态，已跳过 commit。自动完成流程会先执行"
+                    "自动评审（依赖修改的 diff），评审通过后会自动提交，无需手动 commit。"
+                ),
+            }
+
         try:
             # 1. 找到压缩起点：最近的非 CheckPoint 提交
             start = find_recent_non_checkout_commit()
@@ -93,7 +108,13 @@ class CommitTool:
                 commit_args["prefix"] = prefix
             if suffix:
                 commit_args["suffix"] = suffix
-            return git_commiter.execute(commit_args)
+            commit_result = git_commiter.execute(commit_args)
+
+            # 4. 提交成功后自动保存当前会话（session），便于后续恢复
+            if commit_result.get("success"):
+                self._save_session_after_commit(args)
+
+            return commit_result
 
         except Exception as e:
             PrettyOutput.auto_print(f"❌ Commit 失败\n\n{str(e)}")
@@ -102,3 +123,14 @@ class CommitTool:
                 "stdout": "",
                 "stderr": f"Commit failed: {str(e)}",
             }
+
+    def _save_session_after_commit(self, args: Dict[str, Any]) -> None:
+        """提交成功后自动保存当前会话，失败不影响提交结果。"""
+        try:
+            agent = (args or {}).get("agent")
+            if agent is None or not hasattr(agent, "save_session"):
+                return
+            if agent.save_session():
+                PrettyOutput.auto_print("💾 已自动保存会话（session）")
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 自动保存会话失败: {e}")
