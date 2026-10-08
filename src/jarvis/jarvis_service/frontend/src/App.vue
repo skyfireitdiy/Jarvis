@@ -1642,6 +1642,24 @@
                 {{ orchestrateLoading ? '解析中…' : '解析' }}
               </button>
             </div>
+            <!-- 最近使用过的编排文件：点击快速复用，hover 显示删除按钮 -->
+            <div v-if="orchestrateRecentFiles.length" class="orchestrate-recent">
+              <div class="orchestrate-recent-title">最近使用</div>
+              <div class="orchestrate-recent-list">
+                <button
+                  v-for="(item, index) in orchestrateRecentFiles"
+                  :key="index"
+                  class="orchestrate-recent-tag"
+                  :class="{ active: orchestrateFilePath === item.path }"
+                  :title="item.path"
+                  @click="selectOrchestrateRecentFile(item)"
+                >
+                  <span class="orchestrate-recent-name">{{ item.path }}</span>
+                  <span class="orchestrate-recent-node">[{{ getNodeDisplayName(item.nodeId) }}]</span>
+                  <span class="orchestrate-recent-remove" title="从最近使用中移除" @click.stop="removeOrchestrateRecentFile(item.path, item.nodeId)">✕</span>
+                </button>
+              </div>
+            </div>
             <!-- 插件编排模板：自动发现已装插件声明的编排模板，点击直接选用 -->
             <div v-if="orchestratePluginTemplates.length" class="orchestrate-templates">
               <div class="orchestrate-templates-title">插件编排模板</div>
@@ -12986,6 +13004,9 @@ const orchestrateNodeId = ref('master')          // 编排文件所在节点（�
 const orchestrateFilePath = ref('')              // 编排文件绝对路径
 const orchestratePluginTemplates = ref([])        // 插件声明的编排模板列表 [{plugin,name,description,file}]
 const orchestratePluginTemplatesLoading = ref(false) // 插件编排模板加载中
+const orchestrateRecentFiles = ref([])            // 最近使用过的编排文件列表 [{path,nodeId}]（localStorage 持久化）
+const ORCHESTRATE_RECENT_KEY = 'jarvis_recent_orchestrations' // 最近编排文件 localStorage 键
+const ORCHESTRATE_RECENT_MAX = 20                // 最近编排文件最多保留条数
 const orchestrateAgents = ref([])                // 解析出的 Agent 表单列表（每项对应一个标签页）
 const orchestrateHasFlow = ref(false)            // 编排文件是否含 flow 字段（决定「运行流水线」还是「创建 Agent」）
 const orchestrateNodes = ref([])                 // 解析出的 DAG 节点（预览静态图用，不执行）
@@ -13047,6 +13068,8 @@ async function openOrchestrateModal() {
     : (getDefaultCreateAgentNodeId() || 'master')
   // 拉取当前节点上插件声明的编排模板，供用户直接选择
   loadOrchestratePluginTemplates()
+  // 加载最近使用过的编排文件历史
+  loadOrchestrateRecentFiles()
 }
 
 function closeOrchestrateModal() {
@@ -13069,6 +13092,64 @@ function closeOrchestrateModal() {
   orchestrateSelectedIndex.value = -1
   // 复位目录选择场景，避免污染创建 Agent 的「选择目录」
   dirDialogContext.value = 'create-agent'
+}
+
+// 最近使用编排文件管理（localStorage 持久化）
+// 元素格式：{ path: string, nodeId: string }，按节点区分
+function loadOrchestrateRecentFiles() {
+  try {
+    const stored = localStorage.getItem(ORCHESTRATE_RECENT_KEY)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      const isValid = Array.isArray(parsed) && parsed.every(item =>
+        item && typeof item === 'object' && typeof item.path === 'string' && typeof item.nodeId === 'string'
+      )
+      orchestrateRecentFiles.value = isValid ? parsed : []
+    } else {
+      orchestrateRecentFiles.value = []
+    }
+  } catch (error) {
+    console.error('[ORCHESTRATE] 加载最近编排文件失败:', error)
+    orchestrateRecentFiles.value = []
+  }
+}
+
+// 记录一次成功解析/使用的编排文件到最近历史
+function saveOrchestrateRecentFile(path, nodeId) {
+  const normalizedPath = String(path || '').trim()
+  if (!normalizedPath) return
+  const normalizedNodeId = String(nodeId || '').trim() || 'master'
+  // 去重：过滤掉已存在的同节点同路径
+  const filtered = orchestrateRecentFiles.value.filter(item =>
+    !(item.path === normalizedPath && item.nodeId === normalizedNodeId)
+  )
+  orchestrateRecentFiles.value = [{ path: normalizedPath, nodeId: normalizedNodeId }, ...filtered].slice(0, ORCHESTRATE_RECENT_MAX)
+  try {
+    localStorage.setItem(ORCHESTRATE_RECENT_KEY, JSON.stringify(orchestrateRecentFiles.value))
+  } catch (error) {
+    console.error('[ORCHESTRATE] 保存最近编排文件失败:', error)
+  }
+}
+
+// 从最近历史中删除一条
+function removeOrchestrateRecentFile(path, nodeId) {
+  const normalizedPath = String(path || '').trim()
+  const normalizedNodeId = String(nodeId || '').trim() || 'master'
+  orchestrateRecentFiles.value = orchestrateRecentFiles.value.filter(item =>
+    !(item.path === normalizedPath && item.nodeId === normalizedNodeId)
+  )
+  try {
+    localStorage.setItem(ORCHESTRATE_RECENT_KEY, JSON.stringify(orchestrateRecentFiles.value))
+  } catch (error) {
+    console.error('[ORCHESTRATE] 删除最近编排文件失败:', error)
+  }
+}
+
+// 选择一条最近使用的编排文件：填入路径并立即解析
+function selectOrchestrateRecentFile(item) {
+  if (!item || !item.path) return
+  orchestrateFilePath.value = item.path
+  parseOrchestrationFile()
 }
 
 // 拉取当前节点上插件声明的编排模板列表（供用户直接选择，无需手动输入路径）
@@ -13132,6 +13213,8 @@ async function parseOrchestrationFile() {
     orchestrateNodes.value = Array.isArray(result.data.nodes) ? result.data.nodes : []
     orchestrateFilePath.value = String(result.data.path || path)
     orchestrateActiveIndex.value = 0
+    // 记录最近使用过的编排文件历史
+    saveOrchestrateRecentFile(orchestrateFilePath.value, orchestrateNodeId.value)
   } catch (error) {
     orchestrateError.value = error.message || '解析编排文件失败'
   } finally {
@@ -25806,6 +25889,60 @@ body::-webkit-scrollbar {
   border: 1px solid #30363d;
   border-radius: 6px;
   overflow: hidden;
+}
+/* 最近使用过的编排文件：点击快速复用，hover 显示删除按钮 */
+.orchestrate-recent {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.orchestrate-recent-title {
+  color: #8ba3b8;
+  font-size: 12px;
+}
+.orchestrate-recent-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.orchestrate-recent-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #e6edf3;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.orchestrate-recent-tag:hover {
+  border-color: #58a6ff;
+  background: #161b22;
+}
+.orchestrate-recent-tag.active {
+  border-color: #58a6ff;
+  background: #1f6feb33;
+}
+.orchestrate-recent-name {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.orchestrate-recent-node {
+  color: #8ba3b8;
+}
+.orchestrate-recent-remove {
+  color: #8ba3b8;
+  font-size: 11px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.orchestrate-recent-remove:hover {
+  color: #f85149;
 }
 /* 插件编排模板：自动发现并展示，点击直接选用 */
 .orchestrate-templates {
