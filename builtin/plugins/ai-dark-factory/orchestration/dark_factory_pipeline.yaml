@@ -5,7 +5,6 @@
 # 设计取向：不完全无人值守——全自动段（规划/生成/验证）可无人值守，门禁处保留人工审批关口。
 agents:
   - name: "df_planner"
-    type: "agent"
     working_dir: "."
     task: |
       你是 AI 黑灯工厂流水线的规划器（Planner）。
@@ -20,7 +19,6 @@ agents:
       二、遵守 spec_writing 规则：约束必须显式，一个功能一个 spec。
       三、计划要可验证：每个子任务都有明确的验收标准。
   - name: "df_generator"
-    type: "agent"
     working_dir: "."
     task: |
       你是 AI 黑灯工厂流水线的生成器（Generator）。
@@ -34,7 +32,6 @@ agents:
       二、遵守 spec_writing 规则：约束显式，不靠判断填补空白。
       三、产出必须可被独立评估，不隐藏测试。
   - name: "df_validator"
-    type: "agent"
     working_dir: "."
     task: |
       你是 AI 黑灯工厂流水线的验证器（Validator）。
@@ -48,7 +45,6 @@ agents:
       二、评估独立客观，不因生成器的实现而放松标准。
       三、报告要结构化，供编排器汇总。
   - name: "df_orchestrator"
-    type: "agent"
     working_dir: "."
     task: |
       你是 AI 黑灯工厂流水线的编排器（Orchestrator），只协调不执行。

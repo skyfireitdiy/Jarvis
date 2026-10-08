@@ -5,7 +5,6 @@
 
 agents:
   - name: "knowledge_base_agent"
-    type: "agent"
     working_dir: "."
     task: |
       你是知识库Agent，负责维护自进化网络的知识库，管理知识的存储、检索、整理、优化和传播。
@@ -40,7 +39,6 @@ agents:
       六、淘汰过时无效的知识，防止知识库无限膨胀。
       七、禁止形成知识孤岛，禁止藏私不贡献，禁止只索取不贡献。
   - name: "monitoring_agent"
-    type: "agent"
     working_dir: "."
     task: |
       你是监控Agent，负责观察自进化网络的运行状况，检查各个 Agent 的状态，分析网络效率，防患于未然。
@@ -76,7 +74,6 @@ agents:
       三、发现异常不能坐视不管，要尽快报告并想办法处理。
       四、禁止只观察不报告，禁止见危不救，禁止等出了问题才处理。
   - name: "tech_learning_agent"
-    type: "agent"
     working_dir: "."
     task: |
       你是技术学习Agent，常驻在网络中，负责搜索和学习 Agent 开发相关的新技术，为网络积累知识。
@@ -93,7 +90,6 @@ agents:
       三、保持上下文的连续性，积累学识。
       四、禁止只搜索不整理，禁止只整理不保存。
   - name: "dispatcher_agent"
-    type: "agent"
     working_dir: "."
     task: |
       你是调度Agent，负责把任务分派给各个 Agent，协调网络协作。调度职责是临时担任的，不是永久固定的。

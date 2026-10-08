@@ -694,15 +694,17 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                     continue
 
                 agent_name = agent_cfg.get("name", f"agent_{i + 1}")
-                agent_type = agent_cfg.get("type", "code_agent")
+                # 编排系统统一按 type:agent（jvs）创建，不再读取编排文件中的 type 字段；
+                # 旧编排文件即使带 type 字段也忽略（向后兼容）。
+                agent_type = "agent"
                 working_dir = os.path.abspath(
                     os.path.expanduser(agent_cfg.get("working_dir", os.getcwd()))
                 )
 
                 # 必填字段校验
-                if not agent_type or not working_dir:
+                if not working_dir:
                     PrettyOutput.auto_print(
-                        f"⚠️ Agent '{agent_name}' 缺少必填字段 type 或 working_dir，跳过"
+                        f"⚠️ Agent '{agent_name}' 缺少必填字段 working_dir，跳过"
                     )
                     fail_count += 1
                     continue

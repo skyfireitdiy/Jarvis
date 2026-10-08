@@ -1685,13 +1685,6 @@
               <label class="orchestrate-label">名称</label>
               <input v-model="orchestrateAgents[orchestrateActiveIndex].name" class="orchestrate-input" type="text" placeholder="留空自动生成">
             </div>
-            <div class="orchestrate-field">
-              <label class="orchestrate-label">Agent 类型</label>
-              <select v-model="orchestrateAgents[orchestrateActiveIndex].type" class="orchestrate-input">
-                <option value="agent">通用 agent</option>
-                <option value="code_agent">code_agent</option>
-              </select>
-            </div>
             <div class="orchestrate-field orchestrate-field-wide">
               <label class="orchestrate-label">工作目录</label>
               <div class="orchestrate-dir-row">
@@ -1747,7 +1740,6 @@
               <textarea v-model="orchestrateAgents[orchestrateActiveIndex].task" class="orchestrate-textarea" rows="3" placeholder="无交互模式下必填"></textarea>
             </div>
             <div class="orchestrate-field orchestrate-field-wide orchestrate-checks">
-              <label class="orchestrate-check"><input v-model="orchestrateAgents[orchestrateActiveIndex].worktree" type="checkbox"> worktree（仅 code_agent）</label>
               <label class="orchestrate-check"><input v-model="orchestrateAgents[orchestrateActiveIndex].quickMode" type="checkbox"> 极速模式</label>
               <label class="orchestrate-check"><input v-model="orchestrateAgents[orchestrateActiveIndex].restoreSession" type="checkbox"> 恢复会话</label>
               <label class="orchestrate-check"><input v-model="orchestrateAgents[orchestrateActiveIndex].noInteractionMode" type="checkbox"> 无交互模式</label>
@@ -12906,18 +12898,15 @@ const ORCHESTRATE_FILE_EXTENSIONS = ['.yaml', '.yml']
 
 // 把编排文件里的单个 agent 配置映射为可编辑表单对象（字段缺失时按后端默认值兜底）
 function buildOrchestrateAgentForm(raw = {}, fallbackNodeId = 'master') {
-  const type = raw.type === 'agent' ? 'agent' : 'code_agent'
   const acl = raw.access_acl && typeof raw.access_acl === 'object' ? raw.access_acl : {}
   return {
     name: String(raw.name || ''),
-    type,
     workingDir: String(raw.working_dir || '.'),
     llmGroup: String(raw.llm_group || 'default'),
     toolGroup: String(raw.tool_group || 'default'),
     configFile: String(raw.config_file || ''),
     task: String(raw.task || ''),
     additionalArgs: String(raw.additional_args || ''),
-    worktree: !!raw.worktree,
     quickMode: !!raw.quick_mode,
     restoreSession: !!raw.restore_session,
     noInteractionMode: !!raw.no_interaction_mode,
@@ -13079,11 +13068,10 @@ async function createAllOrchestrateAgents() {
   try {
     for (const form of orchestrateAgents.value) {
       const result = await createAgentWithOptions({
-        agentType: form.type,
+        agentType: 'agent',
         workingDir: form.workingDir,
         name: form.name,
         llmGroup: form.llmGroup,
-        worktree: form.worktree,
         quickMode: form.quickMode,
         restoreSession: form.restoreSession,
         noInteractionMode: form.noInteractionMode,

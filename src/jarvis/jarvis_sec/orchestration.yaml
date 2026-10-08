@@ -7,7 +7,6 @@
 
 agents:
   - name: "jsec_rule_developer"
-    type: "code_agent"
     working_dir: "."
     task: |
       你是 JSec 规则开发Agent。你是被动执行者，接收来自对抗Agent的反馈来改进检测能力。
@@ -54,7 +53,6 @@ agents:
       重复步骤2-4直到对抗Agent在深度对抗阶段也无法找到规避方法
 
   - name: "jsec_adversary"
-    type: "agent"
     working_dir: "."
     task: |
       你是 JSec 对抗Agent。你是用户的主要交互对象，负责主动发现漏洞、挑战检测规则、驱动系统改进。
