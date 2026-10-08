@@ -9718,6 +9718,24 @@ async function removePipeline(id) {
       if (node && node.agentId) agentIds.push(node.agentId)
     }
   }
+  // 有要删除的 Agent 时，先让用户确认再删
+  if (agentIds.length) {
+    showConfirm(
+      `该流水线创建了 ${agentIds.length} 个 Agent，删除流水线将一并删除这些 Agent，确认删除？`,
+      () => removePipelineWithAgents(id, agentIds),
+      null,
+      false
+    )
+    return
+  }
+  // 无关联 Agent：直接删除流水线记录
+  pipelineStore.removePipeline(id)
+  pipelineVersion.value++ // 刷新 pipelineList
+  if (activePipelineId.value === id) activePipelineId.value = ''
+}
+
+// 用户确认后：删除流水线及其创建的 Agent
+async function removePipelineWithAgents(id, agentIds) {
   // 删除流水线创建的 Agent（pipeline_runner 在 master 节点创建）
   if (agentIds.length) {
     const { host, port } = getGatewayAddress()
