@@ -100,26 +100,6 @@
           />
           <span class="orch-tab-name">{{ shortName(p) }}</span>
         </button>
-        <button
-          class="orch-expand"
-          title="大图查看"
-          @click="$emit('expand')"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 16 16"
-            fill="none"
-          >
-            <path
-              d="M6 2H2v4M10 14h4v-4M14 6V2h-4M2 10v4h4"
-              stroke="currentColor"
-              stroke-width="1.4"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-        </button>
       </div>
 
       <!-- 空态 -->
@@ -596,20 +576,6 @@ function listMeta(p) {
 .orch-tab-dot.fin-failed { background: #ff5d6c; box-shadow: 0 0 6px #ff5d6c; }
 .orch-tab-dot.fin-gate_blocked { background: #f0b429; box-shadow: 0 0 6px #f0b429; }
 .orch-tab-dot.fin-running { background: #20c8ff; box-shadow: 0 0 6px #20c8ff; animation: orch-blink 1.2s ease-in-out infinite; }
-.orch-expand {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px; height: 26px;
-  border-radius: 7px;
-  border: 1px solid rgba(90, 120, 160, 0.28);
-  background: rgba(20, 30, 46, 0.7);
-  color: #9db0c8;
-  cursor: pointer;
-  flex: 0 0 auto;
-}
-.orch-expand:hover { color: #20c8ff; border-color: rgba(32, 200, 255, 0.5); }
 
 /* Empty */
 .orch-empty {
