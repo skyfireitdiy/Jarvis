@@ -74,13 +74,6 @@ class PipelineRunnerTool:
                 "type": "string",
                 "description": "编排 YAML 文件路径（含 agents 定义与可选 flow 顺序）",
             },
-            "spec_file": {
-                "type": "string",
-                "description": (
-                    "NLSpec 文件路径（可选）：流水线输入背景，作为各阶段 Agent 的背景信息。"
-                    "不传时改用编排文件顶层 spec 字段；两者都没有则不注入背景。"
-                ),
-            },
             "working_dir": {
                 "type": "string",
                 "description": "工作目录（默认当前目录），产物 .jarvis/artifacts/ 在其中创建",
@@ -102,14 +95,13 @@ class PipelineRunnerTool:
                 ),
             },
         },
-        "required": ["orchestration_file", "spec_file"],
+        "required": ["orchestration_file"],
     }
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """按编排文件 flow 驱动多 Agent 流水线（DAG 调度）。"""
         args = args or {}
         orchestration_file = str(args.get("orchestration_file") or "").strip()
-        spec_file = str(args.get("spec_file") or "").strip()
         working_dir = str(args.get("working_dir") or "").strip() or "."
         approve = bool(args.get("approve", False))
         dry_run = bool(args.get("dry_run", False))
@@ -124,10 +116,6 @@ class PipelineRunnerTool:
         orch_path = Path(orchestration_file)
         if not orch_path.exists() or not orch_path.is_file():
             return self._error(f"编排文件不存在: {orchestration_file}")
-
-        spec_path = Path(spec_file) if spec_file else None
-        if spec_path is not None and (not spec_path.exists() or not spec_path.is_file()):
-            return self._error(f"NLSpec 文件不存在: {spec_file}")
 
         work_dir = Path(working_dir).resolve()
         if not work_dir.is_dir():
@@ -174,17 +162,13 @@ class PipelineRunnerTool:
             return self._error(dag_build["error"])
         nodes = dag_build["nodes"]
 
-        # 读取 spec 摘要作为各阶段背景：
-        #   优先取 spec_file 文件前 60 行；否则用编排文件顶层 spec 字段；都没有则空。
-        if spec_path is not None:
-            spec_summary = self._read_spec_summary(spec_path)
-        else:
-            inline_spec = orch.get("spec")
-            spec_summary = (
-                str(inline_spec).strip()
-                if isinstance(inline_spec, str) and str(inline_spec).strip()
-                else ""
-            )
+        # 读取编排文件顶层 spec 字段作为各阶段背景（可选；没有则不注入）
+        inline_spec = orch.get("spec")
+        spec_summary = (
+            str(inline_spec).strip()
+            if isinstance(inline_spec, str) and str(inline_spec).strip()
+            else ""
+        )
 
         # 4.5 dry-run：仅预演编排计划，不创建 Agent、不派发任务
         if dry_run:
@@ -202,7 +186,6 @@ class PipelineRunnerTool:
             pipeline_id,
             "pipeline_start",
             orchestration_file=str(orch_path),
-            spec_file=str(spec_path),
             working_dir=str(work_dir),
             max_workers=max_workers,
             approve=approve,
@@ -728,7 +711,7 @@ class PipelineRunnerTool:
         if task:
             parts.append(task)
         if spec_summary:
-            parts.append(f"流水线输入 NLSpec:\n{spec_summary}")
+            parts.append(f"流水线背景:\n{spec_summary}")
         if input_list:
             parts.append(
                 "本阶段输入产物:\n" + "\n".join(f"- {i}" for i in input_list)
@@ -1313,13 +1296,7 @@ class PipelineRunnerTool:
             pass
         return {}
 
-    def _read_spec_summary(self, spec_path: Path) -> str:
-        """读取 NLSpec 前 60 行作为摘要。"""
-        try:
-            lines = spec_path.read_text(encoding="utf-8").splitlines()
-            return "\n".join(lines[:60])
-        except OSError:
-            return ""
+
 
     def _error(self, msg: str) -> Dict[str, Any]:
         """构造错误返回。"""

@@ -1769,15 +1769,6 @@
             <div class="orchestrate-run-title">运行流水线</div>
             <div class="orchestrate-run-hint">该编排文件含 flow 字段，将按流水线调度执行；运行进度将在「编排查看」中实时展示。</div>
             <div class="orchestrate-field orchestrate-field-wide">
-              <label class="orchestrate-label">NLSpec 文件（可选）</label>
-              <input
-                v-model="orchestrateSpecFile"
-                class="orchestrate-input"
-                type="text"
-                placeholder="留空则使用编排文件顶层 spec 字段作为各阶段背景"
-              >
-            </div>
-            <div class="orchestrate-field orchestrate-field-wide">
               <label class="orchestrate-label">工作目录</label>
               <input
                 v-model="orchestrateRunWorkingDir"
@@ -12953,7 +12944,6 @@ const orchestrateError = ref('')                 // 解析错误
 const orchestrateCreating = ref(false)           // 批量创建中
 const orchestrateResults = ref([])               // 批量创建结果 [{ name, ok, error }]
 // 运行流水线（与 Agent 调用 pipeline_runner 同一路径，驱动 DAG 可视化）
-const orchestrateSpecFile = ref('')              // NLSpec 文件绝对路径（运行流水线必填）
 const orchestrateRunWorkingDir = ref('')         // 运行流水线的工作目录（产物 .jarvis/artifacts/ 在其中创建）
 const orchestrateRunning = ref(false)            // 运行流水线中（仅表示已提交，实际进度由事件驱动）
 const orchestrateDryRun = ref(false)             // 预演模式：只做 DAG 调度预演，不真正执行 Agent
@@ -13208,8 +13198,7 @@ async function runOrchestration() {
     orchestrateError.value = '请先选择并解析编排文件'
     return
   }
-  // NLSpec 文件可选：不填时后端读取编排文件顶层 spec 字段作为各阶段背景
-  const specFile = String(orchestrateSpecFile.value || '').trim()
+  // 编排文件顶层 spec 字段由后端读取，作为各阶段 Agent 背景
   orchestrateRunning.value = true
   orchestrateError.value = ''
   try {
@@ -13219,7 +13208,6 @@ async function runOrchestration() {
       method: 'POST',
       body: JSON.stringify({
         orchestration_file: orchestrationFile,
-        spec_file: specFile,
         working_dir: String(orchestrateRunWorkingDir.value || '').trim(),
         dry_run: !!orchestrateDryRun.value,
         node_id: nodeId,

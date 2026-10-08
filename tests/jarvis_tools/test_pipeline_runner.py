@@ -810,7 +810,6 @@ class TestCreateAgentRetry:
 # ---------------------------------------------------------------------------
 class TestDryRun:
     def _write(self, tmp_path, flow_yaml):
-        (tmp_path / "spec.md").write_text("# NLSpec\nGoal: x\n", encoding="utf-8")
         orch = tmp_path / "p.yaml"
         orch.write_text(flow_yaml, encoding="utf-8")
         return orch
@@ -839,7 +838,6 @@ flow:
         r = tool.execute(
             {
                 "orchestration_file": str(orch),
-                "spec_file": str(tmp_path / "spec.md"),
                 "working_dir": str(tmp_path),
                 "dry_run": True,
             }
@@ -880,7 +878,6 @@ flow:
         r = tool.execute(
             {
                 "orchestration_file": str(orch),
-                "spec_file": str(tmp_path / "spec.md"),
                 "working_dir": str(tmp_path),
                 "dry_run": True,
             }
@@ -908,7 +905,6 @@ flow:
         r = tool.execute(
             {
                 "orchestration_file": str(orch),
-                "spec_file": str(tmp_path / "spec.md"),
                 "working_dir": str(tmp_path),
                 "dry_run": True,
             }
@@ -943,7 +939,6 @@ flow:
         r = tool.execute(
             {
                 "orchestration_file": str(orch),
-                "spec_file": str(tmp_path / "spec.md"),
                 "working_dir": str(tmp_path),
                 "dry_run": True,
             }
@@ -953,7 +948,7 @@ flow:
         assert "when=verify.pass_rate >= 0.9" in r["stdout"]
 
     def test_dry_run_inline_spec_without_spec_file(self, tool, tmp_path):
-        """不传 spec_file 时，读取编排文件顶层 spec 字段作为各阶段背景（普通编排无需独立 NLSpec）。"""
+        """读取编排文件顶层 spec 字段作为各阶段背景（普通编排无需独立规格文件）。"""
         orch = tmp_path / "p.yaml"
         orch.write_text(
             """
@@ -982,7 +977,7 @@ flow:
         assert "s1" in r["stdout"]
 
     def test_dry_run_no_spec_at_all(self, tool, tmp_path):
-        """编排文件既无 spec 字段也不传 spec_file：仍可运行，各阶段用自身 task 描述即可。"""
+        """编排文件既无 spec 字段也不传独立规格文件：仍可运行，各阶段用自身 task 描述即可。"""
         orch = tmp_path / "p.yaml"
         orch.write_text(
             """

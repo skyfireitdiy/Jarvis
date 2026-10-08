@@ -1589,7 +1589,6 @@ class NodeConnectionManager:
         import threading
 
         orchestration_file = str(payload.get("orchestration_file") or "").strip()
-        spec_file = str(payload.get("spec_file") or "").strip()
         working_dir = str(payload.get("working_dir") or "").strip() or "."
         if not orchestration_file:
             return build_node_message(
@@ -1609,7 +1608,6 @@ class NodeConnectionManager:
             tool = PipelineRunnerTool()
             args: Dict[str, Any] = {
                 "orchestration_file": orchestration_file,
-                "spec_file": spec_file,
                 "working_dir": working_dir,
                 "approve": bool(payload.get("approve", False)),
                 "dry_run": bool(payload.get("dry_run", False)),

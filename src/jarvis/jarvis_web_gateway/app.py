@@ -10567,7 +10567,6 @@ def create_app(
         import threading
 
         orchestration_file = str(payload.get("orchestration_file") or "").strip()
-        spec_file = str(payload.get("spec_file") or "").strip()
         working_dir = str(payload.get("working_dir") or "").strip() or "."
         if not orchestration_file:
             return {
@@ -10577,14 +10576,12 @@ def create_app(
                     "message": "orchestration_file is required",
                 },
             }
-        # spec_file 可选：不传时 pipeline_runner 读取编排文件顶层 spec 字段作为各阶段背景
         try:
             from jarvis.jarvis_tools.pipeline_runner import PipelineRunnerTool
 
             tool = PipelineRunnerTool()
             args: Dict[str, Any] = {
                 "orchestration_file": orchestration_file,
-                "spec_file": spec_file,
                 "working_dir": working_dir,
                 "approve": bool(payload.get("approve", False)),
                 "dry_run": bool(payload.get("dry_run", False)),
@@ -11493,7 +11490,6 @@ def create_app(
             raise HTTPException(status_code=403, detail="Permission denied: file:read")
         try:
             orchestration_file = str(body.get("orchestration_file") or "").strip()
-            spec_file = str(body.get("spec_file") or "").strip()
             working_dir = str(body.get("working_dir") or "").strip()
             resolved_node_id = str(body.get("node_id") or "").strip()
             target_node_id = resolved_node_id or node_runtime.local_node_id
@@ -11527,7 +11523,6 @@ def create_app(
                     {
                         "run_orchestration": True,
                         "orchestration_file": orchestration_file,
-                        "spec_file": spec_file,
                         "working_dir": working_dir,
                         "approve": bool(body.get("approve", False)),
                         "dry_run": bool(body.get("dry_run", False)),
@@ -11551,7 +11546,6 @@ def create_app(
             return _start_pipeline_run(
                 {
                     "orchestration_file": orchestration_file,
-                    "spec_file": spec_file,
                     "working_dir": working_dir,
                     "approve": bool(body.get("approve", False)),
                     "dry_run": bool(body.get("dry_run", False)),
