@@ -166,6 +166,21 @@
             <path d="M8 4.5V8l2.5 1.5"/>
           </svg>
         </button>
+        <button
+          class="workspace-activity-button"
+          :class="{ active: showSidebar && sidebarView === 'orchestration' }"
+          tabindex="-1"
+          @mousedown.prevent
+          @click="$emit('setSidebarView', 'orchestration')"
+          title="编排查看"
+        >
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="3.5" cy="4" r="1.6"/>
+            <circle cx="12.5" cy="4" r="1.6"/>
+            <circle cx="8" cy="12.5" r="1.6"/>
+            <path d="M4.6 5.1 7.1 11.2M11.4 5.1 8.9 11.2M5.1 4h5.8"/>
+          </svg>
+        </button>
         <!-- 插件扩展的侧边栏视图入口（方案2：插件 config.yaml 的 frontend.sidebar_views） -->
         <button
           v-for="ext in pluginSidebarViews"

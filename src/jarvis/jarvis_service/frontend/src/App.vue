@@ -76,7 +76,7 @@
           <aside v-if="showWorkspaceSidebar" class="workspace-sidebar" :style="{ width: workspaceSidebarWidth + 'px' }">
             <div class="workspace-sidebar-resize-handle" @mousedown="startWorkspaceSidebarResize($event)"></div>
             <div class="workspace-sidebar-header">
-              <span class="workspace-sidebar-title">{{ workspaceSidebarView === 'search' ? '全局搜索' : (workspaceSidebarView === 'git' ? 'Git' : (workspaceSidebarView === 'agents' ? 'Agent 列表' : (workspaceSidebarView === 'manage' ? '增强能力清单' : (workspaceSidebarView === 'timers' ? '定时任务' : (workspaceSidebarView === 'plugins' ? '插件管理' : (isPluginSidebarView(workspaceSidebarView) ? pluginSidebarTitle(workspaceSidebarView) : '目录树')))))) }}</span>
+              <span class="workspace-sidebar-title">{{ workspaceSidebarTitle }}</span>
               <button class="icon-btn-small workspace-sidebar-close-mobile" tabindex="-1" @mousedown.prevent @click="closeWorkspaceSidebar" title="关闭侧边栏">✕</button>
               <button class="icon-btn-small workspace-sidebar-close-desktop" tabindex="-1" @mousedown.prevent @click="closeWorkspaceSidebar" title="关闭侧边栏">✕</button>
             </div>
@@ -548,6 +548,16 @@
             </div>
             <div v-else-if="isPluginSidebarView(workspaceSidebarView) && activePluginSidebarComp" class="workspace-sidebar-content">
               <component :is="activePluginSidebarComp" :workingDir="pluginSidebarWorkingDir" />
+            </div>
+            <div v-else-if="workspaceSidebarView === 'orchestration'" class="workspace-sidebar-content workspace-sidebar-orchestration">
+              <OrchestrationView
+                :pipelines="pipelineList"
+                :activeId="activePipelineId"
+                mode="compact"
+                @select="selectPipeline"
+                @jump-agent="onOrchestrationJumpAgent"
+                @expand="openOrchestrationOverlay"
+              />
             </div>
             <div v-else class="workspace-sidebar-content">
               <div class="workspace-git-panel">
@@ -1418,6 +1428,17 @@
       @close="closeTopologyOverlay"
     />
 
+    <!-- 流水线编排大图 -->
+    <OrchestrationOverlay
+      :visible="showOrchestrationOverlay"
+      :pipelines="pipelineList"
+      :activeId="activePipelineId"
+      @update:visible="showOrchestrationOverlay = $event"
+      @close="closeOrchestrationOverlay"
+      @select="selectPipeline"
+      @jump-agent="onOrchestrationJumpAgent"
+    />
+
     <!-- 命令面板（Ctrl+P） -->
     <CommandPalette
       :visible="showCommandPalette"
@@ -1826,6 +1847,9 @@ import AdminPanel from './components/AdminPanel.vue'
 import AboutModal from './components/AboutModal.vue'
 import CommandPalette from './components/CommandPalette.vue'
 import TopologyOverlay from './components/TopologyOverlay.vue'
+import OrchestrationView from './components/OrchestrationView.vue'
+import OrchestrationOverlay from './components/OrchestrationOverlay.vue'
+import { PipelineStore } from './stores/pipelineStore.js'
 import PetLobby from './components/PetLobby.vue'
 import OnboardingTour from './components/OnboardingTour.vue'
 import ManageSidebar from './components/ManageSidebar.vue'
@@ -2949,6 +2973,21 @@ function pluginSidebarTitle(view) {
   const ext = pluginSidebarViews.value.find(e => `plugin:${e.id}` === view)
   return ext ? ext.title : ''
 }
+// 侧边栏标题：按当前 view 映射；插件动态 view 走 pluginSidebarTitle
+const WORKSPACE_SIDEBAR_TITLES = {
+  search: '全局搜索',
+  git: 'Git',
+  agents: 'Agent 列表',
+  manage: '增强能力清单',
+  timers: '定时任务',
+  plugins: '插件管理',
+  orchestration: '编排查看',
+}
+const workspaceSidebarTitle = computed(() => {
+  const view = workspaceSidebarView.value
+  if (isPluginSidebarView(view)) return pluginSidebarTitle(view)
+  return WORKSPACE_SIDEBAR_TITLES[view] || '目录树'
+})
 // 加载插件扩展清单（登录后调用）；失败静默，不影响主界面
 async function loadPluginExtensionsForUi() {
   if (!hasAuthToken()) return
@@ -9611,6 +9650,40 @@ function closeTopologyOverlay() {
   stopTopologyAccessPolling()
 }
 
+// ---- 流水线编排可视化 ----
+// 选择某个流程（Tab 切换）
+function selectPipeline(id) {
+  activePipelineId.value = id
+}
+// 点击 DAG 节点：有 agent_id 时跳转到对应 Agent 面板，否则仅选中流程
+function onOrchestrationJumpAgent(payload) {
+  const agentId = payload && payload.agentId
+  if (!agentId) return
+  const target = agents.value.find(a => a.agent_id === agentId)
+  if (target) {
+    openAgentInPanel(target)
+  } else {
+    showToast('该阶段对应 Agent 已不存在', 'info')
+  }
+}
+// 打开/关闭编排大图浮层
+function openOrchestrationOverlay() {
+  showOrchestrationOverlay.value = true
+}
+function closeOrchestrationOverlay() {
+  showOrchestrationOverlay.value = false
+}
+// 收到后端 pipeline_event：归并进 store 并触发视图刷新
+function onPipelineEvent(payload) {
+  if (!payload) return
+  pipelineStore.applyEvent(payload)
+  pipelineStore.pruneFinished(20)
+  pipelineVersion.value++
+  if (!activePipelineId.value && payload.pipeline_id) {
+    activePipelineId.value = payload.pipeline_id
+  }
+}
+
 // 公网使用文档站点（MkDocs 发布到 GitHub Pages）
 const DOCS_URL = 'https://skyfireitdiy.github.io/Jarvis/'
 // 打开使用文档（新标签页，不阻塞当前界面）
@@ -11028,6 +11101,16 @@ function openCommandPaletteFileResult(item) {
   openWorkspaceFile(resolveAgentRelativePath(item.file_path, agentId), agentId)
 }
 const showTopologyOverlay = ref(false) // 网络拓扑大图浮层
+
+// ---- 流水线编排可视化 ----
+const pipelineStore = new PipelineStore()
+const pipelineVersion = ref(0) // 事件到达后自增，触发 computed 重算
+const pipelineList = computed(() => {
+  void pipelineVersion.value
+  return pipelineStore.listPipelines()
+})
+const activePipelineId = ref('')
+const showOrchestrationOverlay = ref(false)
 
 // 命令面板关闭后，若没有其它弹窗接管焦点，则把焦点交还给当前 Agent 的输入框
 function focusCurrentPanelInput(force = false) {
@@ -15460,6 +15543,9 @@ function handleMessage(message, agentId = null) {
     }
     // 其他错误不再通过 appendOutput 显示系统错误消息，避免污染会话窗口
     // 错误信息仍通过 console.warn 输出，便于调试
+  } else if (type === 'pipeline_event') {
+    // 流水线编排进度事件：归并进 pipelineStore，驱动 DAG 视图实时刷新
+    onPipelineEvent(payload)
   } else if (type === 'status_update') {
     // 更新 Agent 执行状态
     if (payload?.execution_status) {

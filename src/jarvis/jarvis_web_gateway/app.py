@@ -551,6 +551,37 @@ def _on_agent_status_change(agent_id: str, status: str, data: Any) -> None:
         )
 
 
+# 流水线事件桥接线程的停止标志（lifespan 关闭时置位）
+_pipeline_pump_stop = threading.Event()
+
+
+def _pipeline_event_pump() -> None:
+    """后台线程：把 pipeline_runner 的进度事件广播给所有前端连接。
+
+    pipeline_runner 在独立线程/子进程运行，通过全局事件总线（纯内存队列）
+    写入进度事件；本线程周期性 drain 并逐条经全局 _router 广播为
+    {"type": "pipeline_event", "payload": <event>}。无前端连接时 publish
+    直接返回，事件被丢弃（进度可容忍丢帧，终态以 pipeline_done 为准）。
+    """
+    from jarvis.jarvis_tools.pipeline_events import get_event_bus
+
+    bus = get_event_bus()
+    while not _pipeline_pump_stop.is_set():
+        try:
+            if _router and bus.has_events():
+                for event in bus.drain():
+                    _router.publish(
+                        {"type": "pipeline_event", "payload": event},
+                        session_id=None,
+                    )
+        except Exception as e:  # pylint: disable=broad-except
+            save_exception(
+                e, module="jarvis_web_gateway.app", function="_pipeline_event_pump"
+            )
+        # 用 wait 代替 sleep，便于关闭时立即唤醒退出
+        _pipeline_pump_stop.wait(0.2)
+
+
 class WebGateway(BaseGateway):
     """Web Gateway 实现：桥接输出、输入与执行事件到 WebSocket。"""
 
@@ -2184,6 +2215,13 @@ def create_app(
         agent_manager.set_event_loop(asyncio.get_running_loop())
         daemon_capability_manager.set_event_loop(asyncio.get_running_loop())
         await agent_manager.start_monitoring_for_running_agents()
+        # 启动流水线进度事件桥接线程（daemon，随进程退出）
+        _pipeline_pump_stop.clear()
+        threading.Thread(
+            target=_pipeline_event_pump,
+            name="pipeline-event-pump",
+            daemon=True,
+        ).start()
         # 同步新Token到所有running状态的Agent
         gateway_token = os.environ.get("JARVIS_AUTH_TOKEN", "")
         if gateway_token:
@@ -2216,6 +2254,7 @@ def create_app(
                 child_node_client.start()
         yield
         # Shutdown
+        _pipeline_pump_stop.set()
         agent_manager._save_agents()
         await agent_proxy_manager.cleanup()
         terminal_session_manager.cleanup()

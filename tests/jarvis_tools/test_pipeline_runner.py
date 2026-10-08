@@ -964,3 +964,268 @@ flow:
         assert [n["stage"] for n in batches[0]] == ["a"]
         assert sorted(n["stage"] for n in batches[1]) == ["b", "c"]
         assert [n["stage"] for n in batches[2]] == ["d"]
+
+
+# ---------------------------------------------------------------------------
+# 进度事件埋点（_schedule 状态迁移 → 事件总线）
+# ---------------------------------------------------------------------------
+class TestPipelineEventEmit:
+    """验证 _schedule 在各状态迁移点向事件总线写入正确的 stage_update /
+    pipeline_done 事件，且埋点为纯副作用（不影响返回值/状态机语义）。
+    """
+
+    def _nodes(self):
+        return [
+            {
+                "stage": "s1",
+                "agent": "a1",
+                "depends_on": [],
+                "input": [],
+                "output": "",
+                "gate": False,
+                "when": None,
+                "retry": 0,
+                "on_error": "abort",
+            },
+            {
+                "stage": "s2",
+                "agent": "a2",
+                "depends_on": ["s1"],
+                "input": [],
+                "output": "",
+                "gate": False,
+                "when": None,
+                "retry": 0,
+                "on_error": "abort",
+            },
+        ]
+
+    def _base_kwargs(self, nodes, pipeline_id="pl-test"):
+        return dict(
+            nodes=nodes,
+            agent_map={n["stage"]: f"id_{n['stage']}" for n in nodes},
+            agents_by_name={"a1": {}, "a2": {}},
+            work_dir=Path("."),
+            artifact_dir=Path(".df"),
+            spec_summary="",
+            approve=False,
+            max_workers=4,
+            pipeline_id=pipeline_id,
+        )
+
+    def _completed(self, node):
+        return {
+            "stage": node["stage"],
+            "status": "completed",
+            "output": "",
+            "result": {},
+            "error": "",
+            "gate_blocked": False,
+            "approval_path": "",
+        }
+
+    def _drain(self):
+        from jarvis.jarvis_tools.pipeline_events import get_event_bus
+
+        return get_event_bus().drain()
+
+    def test_all_completed_emits_running_and_done(self, tool, monkeypatch):
+        """全部完成：每个 stage 有 running+completed，末尾 pipeline_done=completed。"""
+        self._drain()  # 清空遗留事件
+        monkeypatch.setattr(
+            tool, "_run_stage", lambda node, *a, **k: self._completed(node)
+        )
+        nodes = self._nodes()
+        r = tool._schedule(**self._base_kwargs(nodes))
+        assert r["success"] is True
+
+        events = self._drain()
+        assert all(e["pipeline_id"] == "pl-test" for e in events)
+        stage_events = [e for e in events if e["type"] == "stage_update"]
+        # s1/s2 各有 running 与 completed
+        for stage in ("s1", "s2"):
+            statuses = [
+                e["status"] for e in stage_events if e["stage"] == stage
+            ]
+            assert statuses.count("running") == 1
+            assert statuses.count("completed") == 1
+        done = [e for e in events if e["type"] == "pipeline_done"]
+        assert len(done) == 1
+        assert done[0]["success"] is True
+        assert done[0]["final_status"] == "completed"
+
+    def test_failed_emits_pipeline_done_failed(self, tool, monkeypatch):
+        """失败：失败 stage 有 failed 事件，末尾 pipeline_done=failed。"""
+        self._drain()
+
+        def fake_run_stage(node, *a, **k):
+            if node["stage"] == "s1":
+                return {
+                    "stage": "s1",
+                    "status": "failed",
+                    "output": "",
+                    "result": {},
+                    "error": "boom",
+                    "gate_blocked": False,
+                    "approval_path": "",
+                }
+            return self._completed(node)
+
+        monkeypatch.setattr(tool, "_run_stage", fake_run_stage)
+        nodes = self._nodes()
+        # on_error=continue：失败不中止，走"存在失败阶段"出口
+        nodes[0]["on_error"] = "continue"
+        r = tool._schedule(**self._base_kwargs(nodes))
+        assert r["success"] is False
+
+        events = self._drain()
+        failed = [
+            e
+            for e in events
+            if e["type"] == "stage_update" and e["status"] == "failed"
+        ]
+        assert any(e["stage"] == "s1" for e in failed)
+        done = [e for e in events if e["type"] == "pipeline_done"]
+        assert len(done) == 1
+        assert done[0]["success"] is False
+        assert done[0]["final_status"] == "failed"
+
+    def test_abort_emits_pipeline_done_aborted(self, tool, monkeypatch):
+        """on_error=abort：失败立即中止，pipeline_done=aborted。"""
+        self._drain()
+
+        def fake_run_stage(node, *a, **k):
+            return {
+                "stage": node["stage"],
+                "status": "failed",
+                "output": "",
+                "result": {},
+                "error": "boom",
+                "gate_blocked": False,
+                "approval_path": "",
+            }
+
+        monkeypatch.setattr(tool, "_run_stage", fake_run_stage)
+        nodes = self._nodes()
+        r = tool._schedule(**self._base_kwargs(nodes))
+        assert r["success"] is False
+
+        events = self._drain()
+        done = [e for e in events if e["type"] == "pipeline_done"]
+        assert len(done) == 1
+        assert done[0]["success"] is False
+        assert done[0]["final_status"] == "aborted"
+
+    def test_skipped_emits_skipped_event(self, tool, monkeypatch):
+        """依赖失败被跳过：s2 有 skipped 事件。"""
+        self._drain()
+
+        def fake_run_stage(node, *a, **k):
+            if node["stage"] == "s1":
+                return {
+                    "stage": "s1",
+                    "status": "failed",
+                    "output": "",
+                    "result": {},
+                    "error": "boom",
+                    "gate_blocked": False,
+                    "approval_path": "",
+                }
+            return self._completed(node)
+
+        monkeypatch.setattr(tool, "_run_stage", fake_run_stage)
+        nodes = self._nodes()
+        # on_error=skip_dependents：s1 失败后 s2 被跳过
+        nodes[0]["on_error"] = "skip_dependents"
+        tool._schedule(**self._base_kwargs(nodes))
+
+        events = self._drain()
+        skipped = [
+            e
+            for e in events
+            if e["type"] == "stage_update" and e["status"] == "skipped"
+        ]
+        assert any(e["stage"] == "s2" for e in skipped)
+
+    def test_retry_emits_retry_event(self, tool, monkeypatch):
+        """retry：首次失败发 retry 事件，重试成功后 completed。"""
+        self._drain()
+        attempts = {"s1": 0}
+
+        def fake_run_stage(node, *a, **k):
+            if node["stage"] == "s1":
+                attempts["s1"] += 1
+                if attempts["s1"] == 1:
+                    return {
+                        "stage": "s1",
+                        "status": "failed",
+                        "output": "",
+                        "result": {},
+                        "error": "flaky",
+                        "gate_blocked": False,
+                        "approval_path": "",
+                    }
+            return self._completed(node)
+
+        monkeypatch.setattr(tool, "_run_stage", fake_run_stage)
+        nodes = self._nodes()
+        nodes[0]["retry"] = 1
+        r = tool._schedule(**self._base_kwargs(nodes))
+        assert r["success"] is True
+
+        events = self._drain()
+        retries = [
+            e
+            for e in events
+            if e["type"] == "stage_update" and e["status"] == "retry"
+        ]
+        assert len(retries) == 1
+        assert retries[0]["stage"] == "s1"
+        assert retries[0]["retry_count"] == 1
+
+    def test_gate_blocked_emits_gate_status(self, tool, monkeypatch):
+        """门禁停住：pipeline_done=gate_blocked 且带 gate_stage。"""
+        self._drain()
+
+        def fake_run_stage(node, *a, **k):
+            return {
+                "stage": node["stage"],
+                "status": "completed",
+                "output": "",
+                "result": {},
+                "error": "",
+                "gate_blocked": node["stage"] == "s1",
+                "approval_path": "/tmp/approval.md",
+            }
+
+        monkeypatch.setattr(tool, "_run_stage", fake_run_stage)
+        nodes = self._nodes()
+        nodes[0]["gate"] = True
+        r = tool._schedule(**self._base_kwargs(nodes))
+        assert r["success"] is True
+
+        events = self._drain()
+        done = [e for e in events if e["type"] == "pipeline_done"]
+        assert len(done) == 1
+        assert done[0]["final_status"] == "gate_blocked"
+        assert done[0]["gate_stage"] == "s1"
+
+    def test_emit_is_pure_side_effect(self, tool, monkeypatch):
+        """事件总线异常不影响执行结果（纯副作用）。"""
+        self._drain()
+
+        class _BoomBus:
+            def emit(self, event):
+                raise RuntimeError("bus down")
+
+        import jarvis.jarvis_tools.pipeline_events as pe
+
+        monkeypatch.setattr(pe, "get_event_bus", lambda: _BoomBus())
+        monkeypatch.setattr(
+            tool, "_run_stage", lambda node, *a, **k: self._completed(node)
+        )
+        nodes = self._nodes()
+        r = tool._schedule(**self._base_kwargs(nodes))
+        assert r["success"] is True
+        assert "全部阶段完成" in r["stdout"]
+

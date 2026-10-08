@@ -24,6 +24,7 @@
 import json
 import re
 import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
 from pathlib import Path
@@ -35,6 +36,7 @@ from typing import Optional
 import yaml
 
 from jarvis.jarvis_tools.gateway_manager import GatewayManagerTool
+from jarvis.jarvis_tools.pipeline_events import get_event_bus
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # 状态文件轮询间隔（秒）
@@ -178,11 +180,42 @@ class PipelineRunnerTool:
                 artifact_dir=artifact_dir,
             )
 
+        # 4.6 生成 pipeline_id 并广播起始事件（供前端可视化）
+        pipeline_id = self._make_pipeline_id(orchestration_file)
+        self._emit(
+            pipeline_id,
+            "pipeline_start",
+            orchestration_file=str(orch_path),
+            spec_file=str(spec_path),
+            working_dir=str(work_dir),
+            max_workers=max_workers,
+            approve=approve,
+            default_on_error=default_on_error,
+            nodes=[
+                {
+                    "stage": n["stage"],
+                    "agent": n["agent"],
+                    "depends_on": list(n["depends_on"]),
+                    "input": list(n["input"]),
+                    "output": n["output"],
+                    "gate": n["gate"],
+                    "when": n["when"],
+                    "retry": n["retry"],
+                    "on_error": n["on_error"],
+                }
+                for n in nodes
+            ],
+        )
+
         # 5. 创建常驻 jvs Agent（每个 stage 一个）
         agent_created = self._create_stage_agents(nodes, agents_by_name, work_dir)
         if not agent_created["success"]:
+            self._emit(pipeline_id, "pipeline_done", success=False, final_status="failed")
             return self._error(agent_created["error"])
         agent_map = agent_created["agent_map"]
+
+        # 5.1 广播 stage → agent_id 映射
+        self._emit(pipeline_id, "pipeline_agents", agent_map=dict(agent_map))
 
         # 6. 调度执行（并行 DAG）
         return self._schedule(
@@ -194,7 +227,29 @@ class PipelineRunnerTool:
             spec_summary=spec_summary,
             approve=approve,
             max_workers=max_workers,
+            pipeline_id=pipeline_id,
         )
+
+    # ------------------------------------------------------------------
+    # 进度事件（供前端可视化，纯副作用，不影响执行语义）
+    # ------------------------------------------------------------------
+    def _emit(self, pipeline_id: str, event_type: str, **fields: Any) -> None:
+        """向全局事件总线写入一条流水线进度事件。
+
+        纯副作用：任何异常都被吞掉，绝不影响流水线执行。
+        """
+        try:
+            event: Dict[str, Any] = {"pipeline_id": pipeline_id, "type": event_type}
+            event.update(fields)
+            get_event_bus().emit(event)
+        except Exception:  # pylint: disable=broad-except
+            pass
+
+    @staticmethod
+    def _make_pipeline_id(orchestration_file: str) -> str:
+        """生成稳定唯一的 pipeline_id：<编排文件名>-<时间戳>-<短随机>。"""
+        stem = Path(orchestration_file).stem or "pipeline"
+        return f"{stem}-{int(time.time())}-{uuid.uuid4().hex[:6]}"
 
     # ------------------------------------------------------------------
     # DAG 构建
@@ -666,6 +721,7 @@ class PipelineRunnerTool:
         spec_summary: str,
         approve: bool,
         max_workers: int,
+        pipeline_id: str = "",
     ) -> Dict[str, Any]:
         """并行调度 DAG：每轮收集依赖已满足的 ready 节点，线程池并发执行。
 
@@ -702,6 +758,15 @@ class PipelineRunnerTool:
                         }
                         stdout_lines.append(
                             f"  ⏭ 阶段 [{n['stage']}] 因依赖失败被跳过"
+                        )
+                        self._emit(
+                            pipeline_id,
+                            "stage_update",
+                            stage=n["stage"],
+                            status="skipped",
+                            agent_id=agent_map.get(n["stage"], ""),
+                            output=n["output"],
+                            error="依赖失败/跳过，本阶段被跳过",
                         )
 
                 # 收集 ready 节点
@@ -745,6 +810,15 @@ class PipelineRunnerTool:
                             stdout_lines.append(
                                 f"  ⏭ 阶段 [{n['stage']}] 因 when 条件不满足被跳过"
                             )
+                            self._emit(
+                                pipeline_id,
+                                "stage_update",
+                                stage=n["stage"],
+                                status="skipped",
+                                agent_id=agent_map.get(n["stage"], ""),
+                                output=n["output"],
+                                error=f"when 条件不满足: {n['when']}",
+                            )
                             continue
                     effective_ready.append(n)
 
@@ -756,6 +830,14 @@ class PipelineRunnerTool:
                 for n in effective_ready:
                     state[n["stage"]] = "running"
                     agent_id = agent_map[n["stage"]]
+                    self._emit(
+                        pipeline_id,
+                        "stage_update",
+                        stage=n["stage"],
+                        status="running",
+                        agent_id=agent_id,
+                        output=n["output"],
+                    )
                     futures[
                         pool.submit(
                             self._run_stage,
@@ -790,6 +872,7 @@ class PipelineRunnerTool:
                         results=results,
                         stdout_lines=stdout_lines,
                         work_dir=work_dir,
+                        pipeline_id=pipeline_id,
                     )
                     # 门禁停住
                     if stage_result.get("gate_blocked"):
@@ -800,6 +883,13 @@ class PipelineRunnerTool:
                         state[n["stage"]] == "failed"
                         and n["on_error"] == "abort"
                     ):
+                        self._emit(
+                            pipeline_id,
+                            "pipeline_done",
+                            success=False,
+                            final_status="aborted",
+                            failed_stage=n["stage"],
+                        )
                         return self._abort_result(
                             stage_name=n["stage"],
                             error=str(stage_result.get("error", "") or ""),
@@ -815,6 +905,14 @@ class PipelineRunnerTool:
             stdout_lines.append(
                 "  ⛔ 待人工审批：请确认审批报告后，以 approve=true 重跑门禁确认。"
             )
+            self._emit(
+                pipeline_id,
+                "pipeline_done",
+                success=True,
+                final_status="gate_blocked",
+                gate_stage=gate_blocked_stage,
+                approval_path=gate_approval_path,
+            )
             return {
                 "success": True,
                 "stdout": "\n".join(stdout_lines),
@@ -828,6 +926,13 @@ class PipelineRunnerTool:
                 results[s].get("error", "") for s in failed if results.get(s)
             ]
             stdout_lines.append("❌ 流水线存在失败阶段")
+            self._emit(
+                pipeline_id,
+                "pipeline_done",
+                success=False,
+                final_status="failed",
+                failed_stages=failed,
+            )
             return {
                 "success": False,
                 "stdout": "\n".join(stdout_lines),
@@ -840,6 +945,12 @@ class PipelineRunnerTool:
             }
 
         stdout_lines.append("🏁 流水线全部阶段完成")
+        self._emit(
+            pipeline_id,
+            "pipeline_done",
+            success=True,
+            final_status="completed",
+        )
         return {"success": True, "stdout": "\n".join(stdout_lines), "stderr": ""}
 
     def _handle_stage_result(
@@ -850,6 +961,7 @@ class PipelineRunnerTool:
         results: Dict[str, Dict[str, Any]],
         stdout_lines: List[str],
         work_dir: Path,
+        pipeline_id: str = "",
     ) -> None:
         """处理单个 stage 的执行结果（含 retry 重试）。"""
         stage_name = n["stage"]
@@ -864,6 +976,14 @@ class PipelineRunnerTool:
                 )
             else:
                 stdout_lines.append(f"  ✅ 阶段 [{stage_name}] 完成")
+            self._emit(
+                pipeline_id,
+                "stage_update",
+                stage=stage_name,
+                status="completed",
+                output=n["output"],
+                artifact=stage_result.get("output", ""),
+            )
             return
 
         # failed：处理 retry 重试
@@ -877,6 +997,16 @@ class PipelineRunnerTool:
                 stdout_lines.append(
                     f"  🔁 阶段 [{stage_name}] 失败，重试 {retry_count}/{retry}"
                 )
+                self._emit(
+                    pipeline_id,
+                    "stage_update",
+                    stage=stage_name,
+                    status="retry",
+                    output=n["output"],
+                    retry_count=retry_count,
+                    retry_max=retry,
+                    error=str(stage_result.get("error", "") or ""),
+                )
                 return
             # 重试耗尽，按失败处理
             state[stage_name] = "failed"
@@ -885,6 +1015,14 @@ class PipelineRunnerTool:
                 f"  ❌ 阶段 [{stage_name}] 失败（重试耗尽）: "
                 f"{stage_result.get('error', '')}"
             )
+            self._emit(
+                pipeline_id,
+                "stage_update",
+                stage=stage_name,
+                status="failed",
+                output=n["output"],
+                error=str(stage_result.get("error", "") or ""),
+            )
             return
 
         # 无重试，直接失败
@@ -892,6 +1030,14 @@ class PipelineRunnerTool:
         results[stage_name] = stage_result
         stdout_lines.append(
             f"  ❌ 阶段 [{stage_name}] 失败: {stage_result.get('error', '')}"
+        )
+        self._emit(
+            pipeline_id,
+            "stage_update",
+            stage=stage_name,
+            status="failed",
+            output=n["output"],
+            error=str(stage_result.get("error", "") or ""),
         )
         # on_error=skip_dependents/continue：失败但不中止，
         # 依赖它的节点会在下一轮被 _deps_blocked 跳过。
