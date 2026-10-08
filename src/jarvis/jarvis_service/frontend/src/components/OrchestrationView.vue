@@ -3,131 +3,377 @@
      - full 模式：浮层大图（宽）
      两者共用同一渲染逻辑，仅尺寸/密度不同。 -->
 <template>
-  <div class="orch-view" :class="mode === 'full' ? 'is-full' : 'is-compact'">
-    <!-- 顶部 Tab：多流程切换 -->
-    <div v-if="pipelines.length" class="orch-tabs">
+  <div
+    class="orch-view"
+    :class="mode === 'full' ? 'is-full' : 'is-compact'"
+  >
+    <!-- compact 模式：侧边栏只放列表，点开某项打开大图浮层查看 DAG -->
+    <div
+      v-if="mode === 'compact'"
+      class="orch-list"
+    >
+      <div
+        v-if="!pipelines.length"
+        class="orch-empty"
+      >
+        <svg
+          width="42"
+          height="42"
+          viewBox="0 0 24 24"
+          fill="none"
+          opacity="0.5"
+        >
+          <circle
+            cx="5"
+            cy="6"
+            r="2.2"
+            stroke="currentColor"
+            stroke-width="1.3"
+          />
+          <circle
+            cx="19"
+            cy="6"
+            r="2.2"
+            stroke="currentColor"
+            stroke-width="1.3"
+          />
+          <circle
+            cx="12"
+            cy="18"
+            r="2.2"
+            stroke="currentColor"
+            stroke-width="1.3"
+          />
+          <path
+            d="M6.5 7.5 10.6 16M17.5 7.5 13.4 16M7 6h10"
+            stroke="currentColor"
+            stroke-width="1.3"
+            stroke-linecap="round"
+          />
+        </svg>
+        <div class="orch-empty-title">
+          暂无编排流程
+        </div>
+        <div class="orch-empty-sub">
+          运行带 flow 的流水线后，这里会实时展示 DAG 进度
+        </div>
+      </div>
       <button
         v-for="p in pipelines"
         :key="p.pipelineId"
-        class="orch-tab"
+        class="orch-list-item"
         :class="{ active: p.pipelineId === activeId }"
         :title="p.orchestrationFile"
-        @click="$emit('select', p.pipelineId)"
+        @click="openFromList(p)"
       >
-        <span class="orch-tab-dot" :class="'fin-' + p.finalStatus"></span>
-        <span class="orch-tab-name">{{ shortName(p) }}</span>
-      </button>
-      <button class="orch-expand" title="大图查看" @click="$emit('expand')">
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-          <path d="M6 2H2v4M10 14h4v-4M14 6V2h-4M2 10v4h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        <span
+          class="orch-tab-dot"
+          :class="'fin-' + p.finalStatus"
+        />
+        <span class="orch-list-name">{{ shortName(p) }}</span>
+        <span class="orch-list-meta">{{ listMeta(p) }}</span>
       </button>
     </div>
 
-    <!-- 空态 -->
-    <div v-if="!active" class="orch-empty">
-      <svg width="42" height="42" viewBox="0 0 24 24" fill="none" opacity="0.5">
-        <circle cx="5" cy="6" r="2.2" stroke="currentColor" stroke-width="1.3"/>
-        <circle cx="19" cy="6" r="2.2" stroke="currentColor" stroke-width="1.3"/>
-        <circle cx="12" cy="18" r="2.2" stroke="currentColor" stroke-width="1.3"/>
-        <path d="M6.5 7.5 10.6 16M17.5 7.5 13.4 16M7 6h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-      </svg>
-      <div class="orch-empty-title">暂无编排流程</div>
-      <div class="orch-empty-sub">运行带 flow 的流水线后，这里会实时展示 DAG 进度</div>
-    </div>
-
+    <!-- full 模式：顶部 Tab 多流程切换 + DAG 大图 -->
     <template v-else>
-      <!-- 统计卡片 -->
-      <div class="orch-stats">
-        <div class="orch-stat" :style="{ '--c': STATUS_COLORS.running }">
-          <span class="orch-stat-v">{{ statCounts.running }}</span>
-          <span class="orch-stat-l">运行中</span>
-        </div>
-        <div class="orch-stat" :style="{ '--c': STATUS_COLORS.completed }">
-          <span class="orch-stat-v">{{ statCounts.completed }}</span>
-          <span class="orch-stat-l">已完成</span>
-        </div>
-        <div class="orch-stat" :style="{ '--c': STATUS_COLORS.failed }">
-          <span class="orch-stat-v">{{ statCounts.failed }}</span>
-          <span class="orch-stat-l">失败</span>
-        </div>
-        <div class="orch-stat" :style="{ '--c': STATUS_COLORS.skipped }">
-          <span class="orch-stat-v">{{ statCounts.skipped }}</span>
-          <span class="orch-stat-l">跳过</span>
-        </div>
-        <div class="orch-stat orch-stat-wide" :style="{ '--c': '#7f8ea3' }">
-          <span class="orch-stat-v">{{ elapsedText }}</span>
-          <span class="orch-stat-l">耗时 · 并行 {{ active.maxWorkers || 1 }}</span>
-        </div>
-      </div>
-
-      <!-- DAG 画布 -->
-      <div class="orch-canvas" @mouseleave="hoverStage = ''">
-        <svg :viewBox="`0 0 ${layout.width} ${layout.height}`" :width="layout.width" :height="layout.height" class="orch-svg">
-          <defs>
-            <filter id="orch-glow" x="-60%" y="-60%" width="220%" height="220%">
-              <feGaussianBlur stdDeviation="2.4" result="b" />
-              <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
-            </filter>
-            <marker id="orch-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-              <path d="M0 0 L10 5 L0 10 z" fill="rgba(120,150,190,0.7)" />
-            </marker>
-            <linearGradient id="orch-edge-flow" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stop-color="rgba(32,200,255,0)" />
-              <stop offset="50%" stop-color="rgba(32,200,255,0.9)" />
-              <stop offset="100%" stop-color="rgba(32,200,255,0)" />
-            </linearGradient>
-          </defs>
-
-          <!-- 连线 -->
-          <g class="orch-edges">
-            <path
-              v-for="(e, i) in layout.edges"
-              :key="'E' + i"
-              :d="edgePath(layout.positions[e.from], layout.positions[e.to])"
-              class="orch-edge"
-              :class="{ 'is-flow': edgeFlowing(e) }"
-              fill="none"
-              marker-end="url(#orch-arrow)"
-            />
-          </g>
-
-          <!-- 节点 -->
-          <g
-            v-for="n in nodes"
-            :key="n.stage"
-            class="orch-node"
-            :class="['st-' + n.status, { 'is-gate': n.gate, 'is-hover': hoverStage === n.stage, 'is-clickable': !!n.agentId }]"
-            :transform="`translate(${layout.positions[n.stage].x},${layout.positions[n.stage].y})`"
-            @mouseenter="hoverStage = n.stage"
-            @click="onNodeClick(n)"
+      <div
+        v-if="pipelines.length"
+        class="orch-tabs"
+      >
+        <button
+          v-for="p in pipelines"
+          :key="p.pipelineId"
+          class="orch-tab"
+          :class="{ active: p.pipelineId === activeId }"
+          :title="p.orchestrationFile"
+          @click="$emit('select', p.pipelineId)"
+        >
+          <span
+            class="orch-tab-dot"
+            :class="'fin-' + p.finalStatus"
+          />
+          <span class="orch-tab-name">{{ shortName(p) }}</span>
+        </button>
+        <button
+          class="orch-expand"
+          title="大图查看"
+          @click="$emit('expand')"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 16 16"
+            fill="none"
           >
-            <rect
-              class="orch-node-bg"
-              :width="NODE_W"
-              :height="NODE_H"
-              rx="10"
-              :filter="n.status === 'running' ? 'url(#orch-glow)' : ''"
+            <path
+              d="M6 2H2v4M10 14h4v-4M14 6V2h-4M2 10v4h4"
+              stroke="currentColor"
+              stroke-width="1.4"
+              stroke-linecap="round"
+              stroke-linejoin="round"
             />
-            <rect class="orch-node-accent" x="0" y="0" width="4" :height="NODE_H" rx="2" />
-            <text class="orch-node-stage" x="14" y="24">{{ n.stage }}</text>
-            <text class="orch-node-agent" x="14" y="42">{{ n.agent }}</text>
-            <text v-if="n.gate" class="orch-node-gate" :x="NODE_W - 12" y="24" text-anchor="end">🚧</text>
-            <text v-if="n.retryCount" class="orch-node-retry" :x="NODE_W - 12" y="42" text-anchor="end">↻{{ n.retryCount }}</text>
-            <circle v-if="n.status === 'running'" class="orch-node-pulse" :cx="NODE_W - 16" cy="14" r="4" />
-          </g>
-        </svg>
+          </svg>
+        </button>
+      </div>
 
-        <!-- hover 详情 -->
-        <div v-if="hoverNode" class="orch-tip" :style="tipStyle">
-          <div class="orch-tip-stage">{{ hoverNode.stage }}</div>
-          <div class="orch-tip-row"><span>Agent</span><b>{{ hoverNode.agent }}</b></div>
-          <div class="orch-tip-row"><span>状态</span><b :style="{ color: statusColor(hoverNode.status) }">{{ statusLabel(hoverNode.status) }}</b></div>
-          <div v-if="hoverNode.output" class="orch-tip-row"><span>产物</span><b>{{ hoverNode.output }}</b></div>
-          <div v-if="hoverNode.dependsOn.length" class="orch-tip-row"><span>依赖</span><b>{{ hoverNode.dependsOn.join(', ') }}</b></div>
-          <div v-if="hoverNode.error" class="orch-tip-row orch-tip-err"><span>错误</span><b>{{ hoverNode.error }}</b></div>
+      <!-- 空态 -->
+      <div
+        v-if="!active"
+        class="orch-empty"
+      >
+        <svg
+          width="42"
+          height="42"
+          viewBox="0 0 24 24"
+          fill="none"
+          opacity="0.5"
+        >
+          <circle
+            cx="5"
+            cy="6"
+            r="2.2"
+            stroke="currentColor"
+            stroke-width="1.3"
+          />
+          <circle
+            cx="19"
+            cy="6"
+            r="2.2"
+            stroke="currentColor"
+            stroke-width="1.3"
+          />
+          <circle
+            cx="12"
+            cy="18"
+            r="2.2"
+            stroke="currentColor"
+            stroke-width="1.3"
+          />
+          <path
+            d="M6.5 7.5 10.6 16M17.5 7.5 13.4 16M7 6h10"
+            stroke="currentColor"
+            stroke-width="1.3"
+            stroke-linecap="round"
+          />
+        </svg>
+        <div class="orch-empty-title">
+          暂无编排流程
+        </div>
+        <div class="orch-empty-sub">
+          运行带 flow 的流水线后，这里会实时展示 DAG 进度
         </div>
       </div>
+
+      <template v-else>
+        <!-- 统计卡片 -->
+        <div class="orch-stats">
+          <div
+            class="orch-stat"
+            :style="{ '--c': STATUS_COLORS.running }"
+          >
+            <span class="orch-stat-v">{{ statCounts.running }}</span>
+            <span class="orch-stat-l">运行中</span>
+          </div>
+          <div
+            class="orch-stat"
+            :style="{ '--c': STATUS_COLORS.completed }"
+          >
+            <span class="orch-stat-v">{{ statCounts.completed }}</span>
+            <span class="orch-stat-l">已完成</span>
+          </div>
+          <div
+            class="orch-stat"
+            :style="{ '--c': STATUS_COLORS.failed }"
+          >
+            <span class="orch-stat-v">{{ statCounts.failed }}</span>
+            <span class="orch-stat-l">失败</span>
+          </div>
+          <div
+            class="orch-stat"
+            :style="{ '--c': STATUS_COLORS.skipped }"
+          >
+            <span class="orch-stat-v">{{ statCounts.skipped }}</span>
+            <span class="orch-stat-l">跳过</span>
+          </div>
+          <div
+            class="orch-stat orch-stat-wide"
+            :style="{ '--c': '#7f8ea3' }"
+          >
+            <span class="orch-stat-v">{{ elapsedText }}</span>
+            <span class="orch-stat-l">耗时 · 并行 {{ active.maxWorkers || 1 }}</span>
+          </div>
+        </div>
+
+        <!-- DAG 画布 -->
+        <div
+          class="orch-canvas"
+          @mouseleave="hoverStage = ''"
+        >
+          <svg
+            :viewBox="`0 0 ${layout.width} ${layout.height}`"
+            :width="layout.width"
+            :height="layout.height"
+            class="orch-svg"
+          >
+            <defs>
+              <filter
+                id="orch-glow"
+                x="-60%"
+                y="-60%"
+                width="220%"
+                height="220%"
+              >
+                <feGaussianBlur
+                  stdDeviation="2.4"
+                  result="b"
+                />
+                <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+              </filter>
+              <marker
+                id="orch-arrow"
+                viewBox="0 0 10 10"
+                refX="9"
+                refY="5"
+                markerWidth="7"
+                markerHeight="7"
+                orient="auto-start-reverse"
+              >
+                <path
+                  d="M0 0 L10 5 L0 10 z"
+                  fill="rgba(120,150,190,0.7)"
+                />
+              </marker>
+              <linearGradient
+                id="orch-edge-flow"
+                x1="0"
+                y1="0"
+                x2="1"
+                y2="0"
+              >
+                <stop
+                  offset="0%"
+                  stop-color="rgba(32,200,255,0)"
+                />
+                <stop
+                  offset="50%"
+                  stop-color="rgba(32,200,255,0.9)"
+                />
+                <stop
+                  offset="100%"
+                  stop-color="rgba(32,200,255,0)"
+                />
+              </linearGradient>
+            </defs>
+
+            <!-- 连线 -->
+            <g class="orch-edges">
+              <path
+                v-for="(e, i) in layout.edges"
+                :key="'E' + i"
+                :d="edgePath(layout.positions[e.from], layout.positions[e.to])"
+                class="orch-edge"
+                :class="{ 'is-flow': edgeFlowing(e) }"
+                fill="none"
+                marker-end="url(#orch-arrow)"
+              />
+            </g>
+
+            <!-- 节点 -->
+            <g
+              v-for="n in nodes"
+              :key="n.stage"
+              class="orch-node"
+              :class="['st-' + n.status, { 'is-gate': n.gate, 'is-hover': hoverStage === n.stage, 'is-clickable': !!n.agentId }]"
+              :transform="`translate(${layout.positions[n.stage].x},${layout.positions[n.stage].y})`"
+              @mouseenter="hoverStage = n.stage"
+              @click="onNodeClick(n)"
+            >
+              <rect
+                class="orch-node-bg"
+                :width="NODE_W"
+                :height="NODE_H"
+                rx="10"
+                :filter="n.status === 'running' ? 'url(#orch-glow)' : ''"
+              />
+              <rect
+                class="orch-node-accent"
+                x="0"
+                y="0"
+                width="4"
+                :height="NODE_H"
+                rx="2"
+              />
+              <text
+                class="orch-node-stage"
+                x="14"
+                y="24"
+              >{{ n.stage }}</text>
+              <text
+                class="orch-node-agent"
+                x="14"
+                y="42"
+              >{{ n.agent }}</text>
+              <text
+                v-if="n.gate"
+                class="orch-node-gate"
+                :x="NODE_W - 12"
+                y="24"
+                text-anchor="end"
+              >🚧</text>
+              <text
+                v-if="n.retryCount"
+                class="orch-node-retry"
+                :x="NODE_W - 12"
+                y="42"
+                text-anchor="end"
+              >↻{{ n.retryCount }}</text>
+              <circle
+                v-if="n.status === 'running'"
+                class="orch-node-pulse"
+                :cx="NODE_W - 16"
+                cy="14"
+                r="4"
+              />
+            </g>
+          </svg>
+
+          <!-- hover 详情 -->
+          <div
+            v-if="hoverNode"
+            class="orch-tip"
+            :style="tipStyle"
+          >
+            <div class="orch-tip-stage">
+              {{ hoverNode.stage }}
+            </div>
+            <div class="orch-tip-row">
+              <span>Agent</span><b>{{ hoverNode.agent }}</b>
+            </div>
+            <div class="orch-tip-row">
+              <span>状态</span><b :style="{ color: statusColor(hoverNode.status) }">{{ statusLabel(hoverNode.status) }}</b>
+            </div>
+            <div
+              v-if="hoverNode.output"
+              class="orch-tip-row"
+            >
+              <span>产物</span><b>{{ hoverNode.output }}</b>
+            </div>
+            <div
+              v-if="hoverNode.dependsOn.length"
+              class="orch-tip-row"
+            >
+              <span>依赖</span><b>{{ hoverNode.dependsOn.join(', ') }}</b>
+            </div>
+            <div
+              v-if="hoverNode.error"
+              class="orch-tip-row orch-tip-err"
+            >
+              <span>错误</span><b>{{ hoverNode.error }}</b>
+            </div>
+          </div>
+        </div>
+      </template>
     </template>
   </div>
 </template>
@@ -228,6 +474,20 @@ function edgePath(a, b) {
 function onNodeClick(n) {
   if (n.agentId) emit('jump-agent', n.agentId)
 }
+
+// compact 列表：点击某项选中该流程并打开大图浮层查看 DAG（侧边栏只放列表，图在浮层看全）
+function openFromList(p) {
+  emit('select', p.pipelineId)
+  emit('expand')
+}
+// 列表行副信息：状态 + 时间
+function listMeta(p) {
+  const label = { preview: '预览', running: '运行中', completed: '已完成', failed: '失败', gate_blocked: '等待审批' }[p.finalStatus] || '已完成'
+  if (p.finalStatus === 'preview') return label
+  const end = p.finishedAt || Date.now()
+  const sec = Math.max(0, Math.round((end - p.startedAt) / 1000))
+  return `${label} · ${sec}s`
+}
 </script>
 
 <style scoped>
@@ -240,6 +500,39 @@ function onNodeClick(n) {
   color: #d8e2f0;
   overflow: hidden;
 }
+
+/* compact 列表 */
+.orch-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.orch-list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(90, 120, 160, 0.22);
+  background: rgba(18, 26, 40, 0.7);
+  color: #9db0c8;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s;
+}
+.orch-list-item:hover { border-color: rgba(32, 200, 255, 0.5); color: #d8e2f0; }
+.orch-list-item.active {
+  border-color: rgba(32, 200, 255, 0.75);
+  background: rgba(32, 200, 255, 0.12);
+  color: #eaf6ff;
+}
+.orch-list-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.orch-list-meta { font-size: 10px; color: #7f8ea3; flex: 0 0 auto; }
 
 /* Tabs */
 .orch-tabs {

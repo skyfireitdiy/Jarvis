@@ -13247,6 +13247,7 @@ function previewOrchestration() {
   const orchestrationFile = String(orchestrateFilePath.value || '').trim()
   const pid = `preview_${Date.now()}`
   pipelineStore.addPreview(pid, nodes, orchestrationFile)
+  pipelineVersion.value++ // 触发 pipelineList computed 重算，让编排查看立即渲染新预览
   showToast('已生成编排预览（静态 DAG，未执行）', 'success')
   closeOrchestrateModal()
   showWorkspaceSidebar.value = true
