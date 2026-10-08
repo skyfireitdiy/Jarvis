@@ -19,6 +19,8 @@
 
 **设计取向**：编排执行引擎（`pipeline_runner`）是**通用基础设施**，与黑灯工厂的具体业务（NLSpec/四层架构/holdout/门禁）无关。它放核心工具目录，任何插件/用户都能用它定义自己的多 Agent 流水线；黑灯工厂只是它的一个使用者（通过编排文件的 `flow` 字段声明自己的阶段与产物契约）。
 
+**编排文件动态生成**：编排文件（含 `agents` 与 `flow`）是**每次任务动态生成的结构化 plan**，由编排 agent 根据 spec、代码库现状与用户讨论共同产出，用户确认后再执行。插件自带的 `dark_factory_pipeline.yaml` 仅作为参考模板，不直接用于每次任务。黑灯工厂在**已有代码库**中工作——generator 阶段直接修改现有代码，不生成到独立目录。
+
 ---
 
 ## 1. 设计目标与原则
@@ -26,7 +28,7 @@
 ### 1.1 目标
 
 1. 一次触发，自动跑完 `规划 → 生成 → 验证 → 门禁` 四层流水线。
-2. 每层之间**自动传递中间产物**（实现计划 → 代码 → pass/fail 报告）。
+2. 每层之间**自动传递中间产物**（实现计划 → 代码库改动 → pass/fail 报告）。
 3. 每层**自动等待完成**后再触发下一层。
 4. 在门禁处**停住等人工审批**，不自动合并（不完全无人值守）。
 
@@ -86,10 +88,10 @@ flow:
   - stage: "generator"
     agent: "df_generator"
     input: ".df/plan.md"           # 依赖上一阶段产物
-    output: ".df/code/"            # 代码目录
+    # 无独立 output：generator 直接在 working_dir（已有代码库）中修改代码
   - stage: "validator"
     agent: "df_validator"
-    input: ".df/code/"
+    input: ".df/plan.md"           # 依赖规划产物；验证对象为修改后的工作目录
     output: ".df/report.json"      # pass/fail 报告
   - stage: "orchestrator"
     agent: "df_orchestrator"
@@ -171,17 +173,20 @@ execute(args):
 dark-factory/run:
   append: false
   template: |
-    请用 pipeline_runner 工具运行黑灯工厂流水线。
-    - 编排文件：builtin/plugins/ai-dark-factory/orchestration/dark_factory_pipeline.yaml
+    请用内置编排引擎 pipeline_runner 运行黑灯工厂流水线。
     - 先确认 NLSpec 已就绪（spec_file），否则用 spec_validator 补全。
+    - 与用户讨论，动态生成编排文件（agents + flow，参考
+      orchestration/dark_factory_pipeline.yaml 模板），落盘 .df/pipeline.yaml，
+      用户确认无误。
+    - 调用 pipeline_runner 执行（approve=false，门禁停住）。
     - 运行后把审批报告交人工审批。
 ```
 
-用户输入 `<dark-factory/run>` 即触发主 agent 调用 pipeline_runner。
+用户输入 `<dark-factory/run>` 即触发主 agent：与用户讨论生成编排文件 → 用户确认 → 调用 pipeline_runner。
 
 ### 5.2 保留 `<dark-factory/issue>` / `<dark-factory/pr>`
 
-这两个入口面向 GitHub Issue/PR 驱动，模板中追加"用 pipeline_runner 跑流水线"步骤，其余不变。
+这两个入口面向 GitHub Issue/PR 驱动，模板中同样改为"动态生成编排文件 + 用户确认 + 用 pipeline_runner 跑流水线"，其余不变。
 
 ### 5.3 手动调用
 
@@ -198,7 +203,7 @@ dark-factory/run:
 | `status_file` | **复用**：作为阶段完成状态回传（`jarvis.py:1758-1801`） |
 | `send_to_agent` | **不使用**（异步，无法同步等待；且带 task agent 已退出） |
 | `no_interaction_mode` | **不使用**（阶段 agent 由 jca -n 驱动，天然非交互） |
-| 4 个工具（spec_validator 等） | **保留**：各阶段 agent 内部仍可调用 |
+| 3 个工具（spec_validator/holdout_generator/gate_calculator） | **保留**：各阶段 agent 内部仍可调用 |
 
 ---
 
@@ -214,7 +219,7 @@ dark-factory/run:
 
 1. **扩展编排文件**：`dark_factory_pipeline.yaml` 新增 `flow` 字段（阶段顺序 + 产物契约）。
 2. **新增核心通用工具** `src/jarvis/jarvis_tools/pipeline_runner.py`：实现 `PipelineRunnerTool`（校验/组装 task-file/启动 jca/poll status/产物校验/门禁停住）。放核心目录由 `ToolRegistry._load_builtin_tools` 自动注册（`registry.py:600-620`），无需配置。
-3. **更新 config.yaml**：`replace_map` 新增 `dark-factory/run`（模板调用 pipeline_runner）。
+3. **更新 config.yaml**：`replace_map` 新增 `dark-factory/run`（模板：与用户讨论动态生成编排文件 → 用户确认 → 调用 pipeline_runner）。
 4. **更新规则**：`orchestration.md` 补充"用 pipeline_runner 驱动流水线"的说明。
 5. **更新设计文档**：记录方案 B 的编排引擎设计。
 6. **补充测试**：`tests/jarvis_tools/test_pipeline_runner.py` 增加 pipeline_runner 的单元测试（mock jca 子进程 + status_file）。

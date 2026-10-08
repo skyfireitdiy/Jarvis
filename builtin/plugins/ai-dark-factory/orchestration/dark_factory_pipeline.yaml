@@ -61,3 +61,25 @@ agents:
       一、遵守 orchestration 规则：只协调不执行，不亲自写码或测试。
       二、不完全无人值守：不自动合并，审批报告交人工审批关口。
       三、人类审 pass/fail 报告，不逐行审码。
+
+# 流水线执行顺序（可选字段）：供 pipeline_runner 内置编排引擎驱动。
+# 无 flow 时 @OrganizeAgents 仍只创建 agent（向后兼容）；有 flow 时按序驱动。
+# 产物契约：每阶段 output 落盘后传入下一阶段 input；orchestrator 为门禁（gate: true）。
+flow:
+  - stage: "planner"
+    agent: "df_planner"
+    output: ".df/plan.md"              # 实现计划
+  - stage: "generator"
+    agent: "df_generator"
+    input: ".df/plan.md"               # 依赖规划产物
+    # 无独立 output：generator 直接在 working_dir（已有代码库）中修改代码，
+    # 产物为代码库的改动（git diff 可查），不生成到独立目录。
+  - stage: "validator"
+    agent: "df_validator"
+    input: ".df/plan.md"               # 依赖规划产物；验证对象为修改后的工作目录
+    output: ".df/report.json"          # pass/fail 报告
+  - stage: "orchestrator"
+    agent: "df_orchestrator"
+    input: ".df/report.json"           # 依赖验证报告
+    output: ".df/approval.md"          # 审批报告（交人工）
+    gate: true                         # 门禁：停住等人工审批

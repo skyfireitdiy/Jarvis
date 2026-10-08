@@ -44,9 +44,29 @@ description: AI Agent 黑灯工厂的编排纪律。当需要编排多 Agent 流
 
 这样既保留黑灯工厂"人类只审 pass/fail 报告、不逐行审码"的效率，又通过人工审批关口控制信任边界，避免纯无人值守的失控风险。
 
-## 编排模板
+## 编排文件：动态生成的结构化 plan
 
-使用 `pipeline_generator` 工具生成 sw-controller 风格的多 Agent 流水线编排 YAML，或直接使用插件自带的 `orchestration/dark_factory_pipeline.yaml` 模板，通过 `@OrganizeAgents` 加载。
+编排文件（含 `agents` 与 `flow`）是**每次任务动态生成的结构化 plan**，由编排 agent 根据 spec、代码库现状与用户讨论共同产出，用户确认后再执行。插件自带的 `orchestration/dark_factory_pipeline.yaml` 仅作为**参考模板**（展示四层架构与 flow 格式），不直接用于每次任务。
+
+编排文件生成要点：
+
+1. **agents**：按四层架构定义 planner / generator / validator / orchestrator 的角色描述（`task`）。
+2. **flow**：声明阶段顺序与产物契约（`stage`/`agent`/`input`/`output`/`gate`）。
+3. **适配已有代码库**：generator 阶段**无独立代码目录产物**——直接在 `working_dir`（已有代码库）中修改现有代码；validator 验证修改后的工作目录。
+4. **门禁**：orchestrator 阶段设 `gate: true`，停住等人工审批。
+5. 生成后落盘到 `.df/pipeline.yaml`，**用户确认无误后再执行**。
+
+## 用内置编排引擎执行（pipeline_runner）
+
+编排文件确认后，用内置编排引擎 `pipeline_runner` 工具**自动按序驱动**四层流水线：
+
+1. **触发**：用户输入 `<dark-factory/run>`，或主 agent 直接调用 `pipeline_runner` 工具。
+2. **驱动方式**：`pipeline_runner` 按 `flow` 顺序，用 `jca -n --task-file` 逐个启动阶段 agent，poll `status_file` 同步等待完成，校验产物落盘后传入下一阶段。
+3. **产物契约**：planner → `.df/plan.md`（实现计划）；generator → **无独立代码目录**，直接在已有代码库中修改（产物为代码库改动，git diff 可查）；validator → `.df/report.json`（pass/fail 报告）；orchestrator → `.df/approval.md`（审批报告）。
+4. **门禁停住**：orchestrator 阶段（`gate: true`）产出审批报告后，引擎**停住**，默认 `approve=false`，等人工审批通过后以 `approve=true` 重跑门禁确认才放行。
+
+- 编排引擎**只协调不执行**：不写码、不测试，只负责按序调度与产物传递。
+- `flow` 为可选字段：无 `flow` 时 `@OrganizeAgents` 仍只创建 agent（向后兼容）。
 
 ## 常见陷阱
 

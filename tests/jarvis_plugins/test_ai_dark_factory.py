@@ -2,9 +2,9 @@
 """AI 黑灯工厂插件（ai-dark-factory）测试。
 
 覆盖：
-1. 4 个工具（spec_validator / holdout_generator / gate_calculator /
-   pipeline_generator）的正常、边界、异常场景；
-2. 编排模板 dark_factory_pipeline.yaml 的格式（agents 列表、四要素齐全）；
+1. 3 个工具（spec_validator / holdout_generator / gate_calculator）的正常、
+   边界、异常场景；
+2. 编排模板 dark_factory_pipeline.yaml 的格式（agents 列表、flow 字段、四要素齐全）；
 3. config.yaml 的可解析性与声明完整性。
 
 所有工具用 importlib 直接加载插件源码文件，不依赖全局配置加载，
@@ -62,11 +62,6 @@ def gate_calculator():
     return _load_tool_class("df_gate_calculator", "gate_calculator.py")()
 
 
-@pytest.fixture(scope="module")
-def pipeline_generator():
-    return _load_tool_class("df_pipeline_generator", "pipeline_generator.py")()
-
-
 class TestToolInterface:
     """工具接口完备性（name/description/parameters/check/execute）。"""
 
@@ -76,7 +71,6 @@ class TestToolInterface:
             ("spec_validator", "spec_validator.py"),
             ("holdout_generator", "holdout_generator.py"),
             ("gate_calculator", "gate_calculator.py"),
-            ("pipeline_generator", "pipeline_generator.py"),
         ],
     )
     def test_interface_complete(self, tool_name, filename):
@@ -201,30 +195,6 @@ class TestGateCalculator:
         assert r["success"] is False
 
 
-class TestPipelineGenerator:
-    """编排 YAML 生成工具。"""
-
-    def test_generate_yaml(self, pipeline_generator):
-        r = pipeline_generator.execute({"feature": "计算器"})
-        assert r["success"] is True
-        data = yaml.safe_load(r["stdout"])
-        agents = data["agents"]
-        assert len(agents) == 4
-        names = [a["name"] for a in agents]
-        assert names == ["df_planner", "df_generator", "df_validator", "df_orchestrator"]
-
-    def test_generated_yaml_has_task(self, pipeline_generator):
-        r = pipeline_generator.execute({"feature": "计算器"})
-        data = yaml.safe_load(r["stdout"])
-        for a in data["agents"]:
-            assert a["task"], f"{a['name']} 缺 task"
-            assert "计算器" in a["task"]
-
-    def test_missing_feature(self, pipeline_generator):
-        r = pipeline_generator.execute({})
-        assert r["success"] is False
-
-
 class TestOrchestrationTemplate:
     """预置编排模板 dark_factory_pipeline.yaml 格式。"""
 
@@ -260,6 +230,35 @@ class TestOrchestrationTemplate:
         orch = next(a for a in data["agents"] if a["name"] == "df_orchestrator")
         task = orch["task"]
         assert "人工审批" in task or "不自动合并" in task or "审批" in task
+
+    def test_has_flow_field(self):
+        """编排模板声明 flow（供 pipeline_runner 驱动）。"""
+        data = self._load()
+        assert "flow" in data, "编排模板缺 flow 字段"
+        assert isinstance(data["flow"], list) and data["flow"]
+        stages = [s["stage"] for s in data["flow"]]
+        # 按序：planner → generator → validator → orchestrator
+        assert stages == ["planner", "generator", "validator", "orchestrator"]
+
+    def test_flow_agents_referenced(self):
+        """flow 每个 stage 引用的 agent 必须存在于 agents 中。"""
+        data = self._load()
+        names = {a["name"] for a in data["agents"]}
+        for s in data["flow"]:
+            assert s.get("agent") in names, f"flow 引用未定义 agent: {s.get('agent')}"
+
+    def test_orchestrator_is_gate(self):
+        """orchestrator 阶段应为门禁（gate: true），停住等人工审批。"""
+        data = self._load()
+        orch_stage = next(s for s in data["flow"] if s["stage"] == "orchestrator")
+        assert orch_stage.get("gate") is True
+
+    def test_generator_no_isolated_output(self):
+        """generator 阶段应无独立代码目录产物（在已有代码库中直接修改）。"""
+        data = self._load()
+        gen_stage = next(s for s in data["flow"] if s["stage"] == "generator")
+        assert "output" not in gen_stage, "generator 不应有独立 output 目录"
+        assert gen_stage.get("input") == ".df/plan.md"
 
 
 class TestPluginConfig:

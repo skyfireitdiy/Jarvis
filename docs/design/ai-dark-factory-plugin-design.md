@@ -25,10 +25,9 @@ builtin/plugins/ai-dark-factory/
 ├── tools/                          # 工具（.py，class XxxTool）
 │   ├── spec_validator.py           # 校验 NLSpec 完整性
 │   ├── holdout_generator.py        # 生成 holdout scenarios
-│   ├── gate_calculator.py          # 评估门禁计算
-│   └── pipeline_generator.py       # 生成编排 YAML
+│   └── gate_calculator.py          # 评估门禁计算
 └── orchestration/
-    └── dark_factory_pipeline.yaml  # 预置多 Agent 流水线编排模板
+    └── dark_factory_pipeline.yaml  # 编排模板（agents + flow，动态生成编排文件的参考）
 ```
 
 ## 3. config.yaml 设计
