@@ -36,7 +36,7 @@
                 <path d="M21 15l-5-5L5 21"></path>
               </svg>
             </button>
-            <div class="message-body markdown-content" v-html="item.html"></div>
+            <div class="message-body markdown-content" v-html="item.html" @click="onMessageBodyClick"></div>
             <!-- 流式输出打字机光标（宠物缩略图） -->
             <span v-if="item.isStreaming && item.output_type === 'STREAM'" class="stream-caret" aria-hidden="true">
               <span class="stream-caret-pet">
@@ -239,7 +239,20 @@ const emit = defineEmits([
   'confirm', 'cancel-confirm',
   'startMove', 'startResize',
   'context-menu',
+  'open-diff-file',
 ])
+
+// 消息内容点击委托：对话中嵌入的 diff 文件路径（data-diff-file-path）点击后，
+// 冒泡到 App 由其在编辑器面板打开该文件。仅处理带该标记的元素。
+function onMessageBodyClick(event) {
+  const target = event?.target?.closest?.('[data-diff-file-path]')
+  if (!target) return
+  const filePath = target.getAttribute('data-diff-file-path')
+  if (!filePath) return
+  event.preventDefault()
+  event.stopPropagation()
+  emit('open-diff-file', filePath)
+}
 
 function handlePanelClick() {
   // 浮动模式下不触发 activate（不在 grid 内，激活无意义）

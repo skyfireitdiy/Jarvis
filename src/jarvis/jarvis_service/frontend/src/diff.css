@@ -23,6 +23,14 @@
   font-size: 14px;
   font-weight: 600;
 }
+/* 对话/编辑器内 diff 的文件路径可点击打开：给出可点击的视觉提示 */
+.diff-file-path[data-diff-file-path] {
+  cursor: pointer;
+}
+.diff-file-path[data-diff-file-path]:hover {
+  color: var(--color-accent, #58a6ff);
+  text-decoration: underline;
+}
 
 .diff-stats {
   color: var(--color-text-secondary);
