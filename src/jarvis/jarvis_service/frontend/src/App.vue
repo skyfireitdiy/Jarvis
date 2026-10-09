@@ -21550,6 +21550,7 @@ body::-webkit-scrollbar {
 
 .workspace-sidebar-agents :deep(.agent-sidebar) {
   width: 100%;
+  height: 100%;
   border-right: none;
   background: transparent;
 }
