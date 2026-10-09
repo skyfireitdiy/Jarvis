@@ -5910,27 +5910,36 @@ function resolveFileTreeAgent(agentId) {
 }
 
 // 由文件的绝对路径反查其所属的目录树 Agent（真实 Agent 或虚拟目录会话）：
-// 按 working_dir 前缀匹配，取最长前缀者（避免嵌套目录下命中父目录 Agent）。
+// 按 working_dir 前缀匹配，取最长前缀者（避免嵌套目录下命中父目录 Agent）；
+// 前缀长度相同时优先活跃 Agent，避免命中同目录下已停止的旧 Agent。
 // 返回 { agentId, agent } 或 null。
 function resolveAgentForPath(path) {
   const raw = String(path || '')
   if (!raw) return null
   const candidates = []
+  // 真实 Agent：附带其是否已停止（虚拟目录会话无「停止」概念，视为活跃）
   for (const agent of agentList.value) {
-    if (agent?.agent_id && agent.working_dir) candidates.push(agent)
+    if (agent?.agent_id && agent.working_dir) {
+      candidates.push({ agent, stopped: isStoppedAgent(agent) })
+    }
   }
   for (const session of virtualWorkspaceSessions.value) {
-    if (session?.agent?.agent_id && session.agent.working_dir) candidates.push(session.agent)
+    if (session?.agent?.agent_id && session.agent.working_dir) {
+      candidates.push({ agent: session.agent, stopped: false })
+    }
   }
   let best = null
   let bestLen = -1
-  for (const agent of candidates) {
+  let bestStopped = true
+  for (const { agent, stopped } of candidates) {
     const dir = String(agent.working_dir).replace(/\/+$/, '')
     if (!dir) continue
     if (raw === dir || raw.startsWith(`${dir}/`)) {
-      if (dir.length > bestLen) {
+      // 更长前缀优先；同长度时活跃 Agent 优先于已停止 Agent
+      if (dir.length > bestLen || (dir.length === bestLen && bestStopped && !stopped)) {
         best = agent
         bestLen = dir.length
+        bestStopped = stopped
       }
     }
   }
@@ -6333,8 +6342,14 @@ async function revealTabInFileTree(path) {
   await ensureWorkspaceSidebarFileTree(agent)
   await nextTick()
 
-  // 逐级展开目录：从根开始按路径片段向下查找并加载
+  // 逐级展开目录：先展开根节点（path=working_dir），再按路径片段逐级向下查找并加载。
+  // 根节点默认是收起态，若不展开，其子节点在可见列表中不渲染，后续选中/滚动都会落空。
   let nodes = fileTreeState.value.get(agentId) || []
+  const rootNode = nodes.find(n => n.path === rootDir)
+  if (rootNode && !rootNode.expanded) {
+    await toggleNodeExpand(agentId, rootNode)
+    await nextTick()
+  }
   let currentPath = rootDir
   for (const seg of segments) {
     currentPath = `${currentPath}/${seg}`
