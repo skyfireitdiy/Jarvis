@@ -37,6 +37,7 @@ Jarvis 是一个 AI 驱动的编码助手，采用多 Agent 架构，帮助你�
 
 - [技术概览](technical/README.md)
 - [实现细节](technical/implementation/README.md)
+- [插件开发指南](plugin_development_guide.md) —— 开发、打包、发布与分发插件包
 
 ### ⚙️ 部署与运维
 
