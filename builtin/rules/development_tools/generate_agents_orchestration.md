@@ -9,6 +9,13 @@ description: 当需要生成Agents编排文件以批量创建Agent时触发。�
 
 此规则用以指导用户创建YAML格式的Agents编排文件，配合`@OrganizeAgents`命令，实现批量创建Agent的功能。
 
+> **两种编排文件（区分语义）**：
+>
+> - **`.yaml` / `.yml`（本规则）** = **组织的编排**：批量创建 Agent，不生成 `flow`，不走流水线调度。
+> - **`.flow`** = **流程的编排**：用 Python DSL 生成 DAG（`agents` + `flow`），走流水线调度执行。DSL 库见 `src/jarvis/jarvis_tools/orchestration_dsl.py`，设计文档见 `docs/design/orchestration-python-dsl.md`。
+>
+> 本规则只覆盖 `.yaml` 组织编排；需要"多阶段依赖/流水线调度"时用 `.flow`。
+
 ## 你必须遵守的原则
 
 ### 1. 文件格式要求

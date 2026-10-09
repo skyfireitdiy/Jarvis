@@ -1479,19 +1479,18 @@ class NodeConnectionManager:
                     request_id=request_id,
                 )
 
-            with open(target_path, "r", encoding="utf-8") as f:
-                content = f.read()
-
             try:
-                config = yaml.safe_load(content)
-            except yaml.YAMLError as e:
+                from jarvis.jarvis_tools.orchestration_loader import load_orchestration
+
+                config = load_orchestration(target_path)
+            except Exception as e:  # pylint: disable=broad-except
                 return build_node_message(
                     DIRECTORY_LIST_RESPONSE,
                     {
                         "success": False,
                         "error": {
-                            "code": "YAML_PARSE_ERROR",
-                            "message": f"Invalid YAML: {e}",
+                            "code": "ORCHESTRATION_PARSE_ERROR",
+                            "message": f"Invalid orchestration file: {e}",
                         },
                     },
                     request_id=request_id,
@@ -1504,7 +1503,7 @@ class NodeConnectionManager:
                         "success": False,
                         "error": {
                             "code": "INVALID_ORCHESTRATION",
-                            "message": "Orchestration file must be a YAML mapping",
+                            "message": "Orchestration file must be a mapping",
                         },
                     },
                     request_id=request_id,

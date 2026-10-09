@@ -3,6 +3,8 @@
 > 状态：**待评审（先方案后实现）**
 > 目标：让黑灯工厂的 4 个 agent（planner → generator → validator → orchestrator）**自动按顺序协作**跑起来，同时保留门禁人工审批关口（不完全无人值守）。
 > 依据：对 Jarvis 多 Agent 编排机制的完整调研（见文末「调研事实」）。
+>
+> **相关**：编排文件现已支持 `.flow`（Python DSL，编译期生成 DAG），黑灯工厂可作为其使用者之一。详见 `docs/design/orchestration-python-dsl.md`。
 
 ---
 

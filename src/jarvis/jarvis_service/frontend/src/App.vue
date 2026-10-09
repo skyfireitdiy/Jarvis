@@ -1638,7 +1638,7 @@
                 v-model="orchestrateFilePath"
                 class="orchestrate-path-input"
                 type="text"
-                placeholder="节点上的 YAML 文件绝对路径，如 /home/user/orchestration.yaml"
+                placeholder="节点上的编排文件绝对路径（.yaml/.yml=组织编排，.flow=流程编排），如 /home/user/pipeline.flow"
                 @keydown.enter.prevent="parseOrchestrationFile"
               >
               <button class="btn secondary" @click="toggleOrchestrateBrowser">
@@ -1655,7 +1655,7 @@
             <input
               ref="orchestrateLocalFileInput"
               type="file"
-              accept=".yaml,.yml"
+              accept=".yaml,.yml,.flow"
               style="display: none"
               @change="onOrchestrateLocalFileChange"
             >
@@ -13062,8 +13062,8 @@ const orchestrateCurrentDirPath = ref('')        // 浏览面板当前目录路�
 const orchestrateLocalFileInput = ref(null)       // 从本机选择编排文件的隐藏 file input
 const orchestrateDirSearchText = ref('')         // 浏览面板搜索文本
 const orchestrateSelectedIndex = ref(-1)         // 浏览面板键盘导航选中项索引（-1 未选中）
-// 编排文件允许的扩展名（仅展示这些文件供选择）
-const ORCHESTRATE_FILE_EXTENSIONS = ['.yaml', '.yml']
+// 编排文件允许的扩展名（仅展示这些文件供选择）：.yaml/.yml=组织编排，.flow=流程编排
+const ORCHESTRATE_FILE_EXTENSIONS = ['.yaml', '.yml', '.flow']
 
 // 把编排文件里的单个 agent 配置映射为可编辑表单对象（字段缺失时按后端默认值兜底）
 function buildOrchestrateAgentForm(raw = {}, fallbackNodeId = 'master') {
@@ -13245,7 +13245,9 @@ async function parseOrchestrationFile() {
       return
     }
     orchestrateAgents.value = agents.map(raw => buildOrchestrateAgentForm(raw, nodeId))
-    orchestrateHasFlow.value = !!result.data.has_flow
+    // 仅 .flow 流程编排走流水线；.yaml/.yml 为组织编排，一律按批量创建处理，忽略其 flow 字段
+    const isFlowOrchestration = String(result.data.path || path).toLowerCase().endsWith('.flow')
+    orchestrateHasFlow.value = isFlowOrchestration && !!result.data.has_flow
     orchestrateNodes.value = Array.isArray(result.data.nodes) ? result.data.nodes : []
     orchestrateFilePath.value = String(result.data.path || path)
     orchestrateActiveIndex.value = 0

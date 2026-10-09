@@ -10488,17 +10488,24 @@ def create_app(
                     },
                 }
 
-            with open(target_path, "r", encoding="utf-8") as f:
-                content = f.read()
-
             try:
-                config = yaml.safe_load(content)
-            except yaml.YAMLError as e:
+                from jarvis.jarvis_tools.orchestration_loader import load_orchestration
+
+                config = load_orchestration(target_path)
+            except ValueError as e:
                 return {
                     "success": False,
                     "error": {
-                        "code": "YAML_PARSE_ERROR",
-                        "message": f"Invalid YAML: {e}",
+                        "code": "ORCHESTRATION_PARSE_ERROR",
+                        "message": f"Invalid orchestration file: {e}",
+                    },
+                }
+            except Exception as e:  # pylint: disable=broad-except
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "ORCHESTRATION_PARSE_ERROR",
+                        "message": f"Invalid orchestration file: {e}",
                     },
                 }
 
@@ -10507,7 +10514,7 @@ def create_app(
                     "success": False,
                     "error": {
                         "code": "INVALID_ORCHESTRATION",
-                        "message": "Orchestration file must be a YAML mapping",
+                        "message": "Orchestration file must be a mapping",
                     },
                 }
 

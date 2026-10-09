@@ -34,9 +34,8 @@ from typing import Dict
 from typing import List
 from typing import Optional
 
-import yaml
-
 from jarvis.jarvis_tools.gateway_manager import GatewayManagerTool
+from jarvis.jarvis_tools.orchestration_loader import load_orchestration
 from jarvis.jarvis_tools.pipeline_events import emit_remote
 from jarvis.jarvis_tools.pipeline_events import get_event_bus
 from jarvis.jarvis_tools.pipeline_events import is_local_pump_active
@@ -61,7 +60,8 @@ class PipelineRunnerTool:
 
     name = "pipeline_runner"
     description = (
-        "内置多 Agent 编排执行引擎：读取编排 YAML（agents + flow），按 flow 声明的"
+        "内置多 Agent 编排执行引擎：读取编排文件（YAML 或 .flow Python DSL，"
+        "含 agents + flow），按 flow 声明的"
         "依赖关系构建 DAG，用常驻 jvs Agent 并行驱动各阶段，同步等待每个阶段完成、"
         "校验产物落盘、把上阶段产物路径传入下阶段，实现多 Agent 流水线的自动编排。"
         "支持并行（max_workers 默认 4）、多输入（input 列表）、条件（when）、失败"
@@ -73,7 +73,7 @@ class PipelineRunnerTool:
         "properties": {
             "orchestration_file": {
                 "type": "string",
-                "description": "编排 YAML 文件路径（含 agents 定义与可选 flow 顺序）",
+                "description": "编排文件路径（.yaml/.yml 或 .flow，含 agents 定义与可选 flow 顺序）",
             },
             "working_dir": {
                 "type": "string",
@@ -125,10 +125,9 @@ class PipelineRunnerTool:
         if max_workers < 1:
             max_workers = 1
 
-        # 2. 读取编排文件
+        # 2. 读取编排文件（统一加载器：按后缀分发 YAML / Python DSL）
         try:
-            content = orch_path.read_text(encoding="utf-8")
-            orch = yaml.safe_load(content) or {}
+            orch = load_orchestration(orch_path)
         except Exception as e:  # pylint: disable=broad-except
             return self._error(f"编排文件解析失败: {e}")
 
