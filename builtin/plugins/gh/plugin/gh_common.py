@@ -68,7 +68,9 @@ def api_request(
         timeout: 超时秒数
 
     返回:
-        dict: {"success": bool, "status": int, "data": dict|list|None, "error": str}
+        dict: {"success": bool, "status": int, "data": dict|list|None,
+               "headers": dict, "error": str}
+        headers 为响应头（键统一小写），供上层解析分页 Link 头使用。
     """
     url = API_BASE + path
     body = None
@@ -81,14 +83,22 @@ def api_request(
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             status = resp.getcode()
+            resp_headers = {k.lower(): v for k, v in resp.headers.items()}
             raw = resp.read().decode("utf-8")
             try:
                 parsed = json.loads(raw) if raw else None
             except Exception:
                 parsed = raw
-            return {"success": True, "status": status, "data": parsed, "error": ""}
+            return {
+                "success": True,
+                "status": status,
+                "data": parsed,
+                "headers": resp_headers,
+                "error": "",
+            }
     except urllib.error.HTTPError as e:
         status = e.code
+        resp_headers = {k.lower(): v for k, v in (e.headers or {}).items()}
         raw = e.read().decode("utf-8", errors="replace")
         message = ""
         try:
@@ -100,6 +110,7 @@ def api_request(
             "success": False,
             "status": status,
             "data": None,
+            "headers": resp_headers,
             "error": f"GitHub API {status}: {message}",
         }
     except urllib.error.URLError as e:
@@ -107,10 +118,57 @@ def api_request(
             "success": False,
             "status": 0,
             "data": None,
+            "headers": {},
             "error": f"网络错误: {e.reason}",
         }
     except Exception as e:
-        return {"success": False, "status": 0, "data": None, "error": str(e)}
+        return {"success": False, "status": 0, "data": None, "headers": {}, "error": str(e)}
+
+
+def parse_link_next(headers: dict) -> str:
+    """从响应头 Link 中解析 rel="next" 的 URL；无则返回空字符串。
+
+    GitHub 分页通过 Link 头返回相邻页 URL，形如：
+      <https://api.github.com/...&page=2>; rel="next", <...&page=5>; rel="last"
+    """
+    link = (headers or {}).get("link", "")
+    if not link:
+        return ""
+    for part in link.split(","):
+        segments = part.split(";")
+        if len(segments) < 2:
+            continue
+        url = segments[0].strip().strip("<>")
+        for seg in segments[1:]:
+            if seg.strip() == 'rel="next"':
+                return url
+    return ""
+
+
+def parse_link_last_page(headers: dict) -> int:
+    """从响应头 Link 中解析 rel="last" 的 page 参数；无则返回 0。"""
+    link = (headers or {}).get("link", "")
+    if not link:
+        return 0
+    for part in link.split(","):
+        segments = part.split(";")
+        if len(segments) < 2:
+            continue
+        url = segments[0].strip().strip("<>")
+        is_last = any(seg.strip() == 'rel="last"' for seg in segments[1:])
+        if not is_last:
+            continue
+        # 从 URL 查询串中取 page 参数
+        if "?" not in url:
+            return 0
+        query = url.split("?", 1)[1]
+        for kv in query.split("&"):
+            if kv.startswith("page="):
+                try:
+                    return int(kv.split("=", 1)[1])
+                except ValueError:
+                    return 0
+    return 0
 
 
 def parse_remote_repo(remote_url: str) -> str:

@@ -116,8 +116,14 @@ export default {
       repoEditing: false,
       tab: "issues",
       loading: false,
+      loadingMore: false,
       error: "",
       items: [],
+      // 分页状态：page 为当前已加载到的页码，hasMore 表示是否还有下一页，
+      // total 为后端推断的总条数（用于「已加载 N / 共 M 条」提示）。
+      page: 1,
+      hasMore: false,
+      total: 0,
       selected: null,
       comments: [],
       // 操作
@@ -253,34 +259,74 @@ export default {
         return s;
       }
     },
+    // 把后端返回的原始条目规范化为列表项。
+    mapItem(it) {
+      return {
+        number: it.number,
+        title: it.title,
+        state: it.state,
+        user: it.user,
+        created_at: it.created_at,
+        updated_at: it.updated_at,
+        body: it.body || "",
+        html_url: it.html_url,
+        comments: it.comments,
+      };
+    },
     async refresh() {
       this.loading = true;
       this.error = "";
       this.message = "";
       // 切换/刷新瞬间先清空列表，避免请求失败时残留上一个仓库的数据
       this.items = [];
+      this.page = 1;
+      this.hasMore = false;
+      this.total = 0;
       this.selected = null;
       this.comments = [];
       try {
         const fn = this.tab === "issues" ? "list_issues" : "list_prs";
-        const payload = await callFunction(fn, { state: "open" });
-        this.items = (payload.data || []).map((it) => ({
-          number: it.number,
-          title: it.title,
-          state: it.state,
-          user: it.user,
-          created_at: it.created_at,
-          updated_at: it.updated_at,
-          body: it.body || "",
-          html_url: it.html_url,
-          comments: it.comments,
-        }));
+        const payload = await callFunction(fn, { state: "open", page: 1 });
+        this.items = (payload.data || []).map((it) => this.mapItem(it));
+        this.page = payload.page || 1;
+        this.hasMore = !!payload.has_more;
+        this.total = payload.total || this.items.length;
         this.selected = null;
         this.comments = [];
       } catch (e) {
         this.error = String((e && e.message) || e);
       } finally {
         this.loading = false;
+      }
+    },
+    // 加载下一页并追加到列表（分页展示，避免一次性拉取过多）。
+    async loadMore() {
+      if (this.loadingMore || !this.hasMore) return;
+      this.loadingMore = true;
+      this.error = "";
+      try {
+        const fn = this.tab === "issues" ? "list_issues" : "list_prs";
+        const nextPage = this.page + 1;
+        const payload = await callFunction(fn, {
+          state: "open",
+          page: nextPage,
+        });
+        const more = (payload.data || []).map((it) => this.mapItem(it));
+        // 去重：避免分页边界重复（如翻页期间数据变动）
+        const seen = new Set(this.items.map((it) => it.number));
+        for (const it of more) {
+          if (!seen.has(it.number)) {
+            this.items.push(it);
+            seen.add(it.number);
+          }
+        }
+        this.page = payload.page || nextPage;
+        this.hasMore = !!payload.has_more;
+        this.total = payload.total || this.items.length;
+      } catch (e) {
+        this.error = String((e && e.message) || e);
+      } finally {
+        this.loadingMore = false;
       }
     },
     async openItem(item) {
@@ -521,6 +567,16 @@ export default {
         </div>
         <div style="margin-top:2px;font-weight:600;">{{ it.title }}</div>
         <div style="font-size:11px;color:#888;margin-top:2px;">@{{ it.user }} · {{ fmtDate(it.created_at) }}</div>
+      </div>
+      <!-- 分页：显示已加载/总数，并提供「加载更多」按钮 -->
+      <div v-if="items.length > 0" style="text-align:center;margin-top:10px;">
+        <div style="font-size:11px;color:#888;margin-bottom:6px;">
+          已加载 {{ items.length }} 条<span v-if="total > items.length">（共约 {{ total }} 条）</span>
+        </div>
+        <button v-if="hasMore" @click="loadMore" :disabled="loadingMore"
+          style="padding:5px 14px;background:#333;color:#ddd;border:none;border-radius:4px;cursor:pointer;font-size:12px;">
+          {{ loadingMore ? '加载中…' : '加载更多' }}
+        </button>
       </div>
     </div>
 
