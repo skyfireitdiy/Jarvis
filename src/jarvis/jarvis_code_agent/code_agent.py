@@ -31,7 +31,6 @@ from jarvis.jarvis_code_agent.code_agent_postprocess import PostProcessManager
 from jarvis.jarvis_agent.builtin_input_handler import (
     builtin_input_handler,
 )
-from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_code_agent.code_agent_prompts import (
     classify_user_request,
     get_system_prompt,
@@ -460,18 +459,6 @@ class CodeAgent(Agent):
                                 f"{current_addon}\n{processed_input}".strip()
                             )
                         # 内置命令已处理完成，继续等待用户输入
-                        user_input = get_multiline_input(
-                            "请输入你的需求（Ctrl+C 退出）"
-                        )
-                        if not user_input:
-                            # 用户取消输入，不保存会话
-                            _should_save_session = False
-                            return None
-                        continue
-
-                    processed_input, is_handled = shell_input_handler(user_input, self)
-                    if is_handled:
-                        # Shell 输入已处理完成，继续等待用户输入
                         user_input = get_multiline_input(
                             "请输入你的需求（Ctrl+C 退出）"
                         )

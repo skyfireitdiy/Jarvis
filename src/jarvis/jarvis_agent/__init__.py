@@ -55,7 +55,6 @@ from jarvis.jarvis_agent.prompts import SUMMARY_REQUEST_PROMPT as SUMMARY_REQUES
 from jarvis.jarvis_agent.protocols import OutputHandlerProtocol
 from jarvis.jarvis_agent.run_loop import AgentRunLoop, ensure_str
 from jarvis.jarvis_agent.session_manager import SessionManager
-from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_agent.task_analyzer import TaskAnalyzer
 from jarvis.jarvis_agent.task_list import TaskListManager
 from jarvis.jarvis_agent.tool_executor import execute_tool_call
@@ -926,7 +925,6 @@ class Agent:
         self.set_use_tools(use_tools)
         self.input_handler = [
             builtin_input_handler,
-            shell_input_handler,
             file_context_handler,
         ]
         self.multiline_inputer = multiline_inputer or get_multiline_input

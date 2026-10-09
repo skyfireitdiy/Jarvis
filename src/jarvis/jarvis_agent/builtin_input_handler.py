@@ -522,10 +522,11 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                     PrettyOutput.auto_print(f"❌ 设置模型组失败: {e}")
             return "", True
         elif tag == "Shell":
-            # 生成 shell 命令（与 Alt+T 功能相同）
-            from jarvis.jarvis_utils.input import _gen_shell_cmd_for_terminal
+            # 直接打开交互式 Shell 终端（与 Alt+T 功能相同）
+            from jarvis.jarvis_utils.input import execute_shell_in_terminal
 
-            return _gen_shell_cmd_for_terminal() + " # JARVIS-NOCONFIRM", False
+            execute_shell_in_terminal(agent)
+            return "", True
         elif tag == "AddDir":
             tag_marker = "'<AddDir>'"
             tag_index = modified_input.find(tag_marker)

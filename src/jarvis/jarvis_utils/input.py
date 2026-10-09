@@ -87,7 +87,7 @@ def _gen_shell_cmd_for_terminal() -> str:
     It's used both for Alt+T in CLI mode and for the Web frontend.
 
     Returns:
-        Shell command string with appropriate interpreter.
+        Shell command string with appropriate interpreter (without any prefix).
     """
     try:
         if _os.name == "nt":
@@ -96,24 +96,84 @@ def _gen_shell_cmd_for_terminal() -> str:
                 if name == "cmd" or _shutil.which(name):
                     if name == "cmd":
                         # Keep session open with /K and set env for spawned shell
-                        return "!cmd /K set terminal=1"
+                        return "cmd /K set terminal=1"
                     else:
                         # PowerShell or pwsh: set env then remain in session
-                        return f"!{name} -NoExit -Command \"$env:terminal='1'\""
+                        return f"{name} -NoExit -Command \"$env:terminal='1'\""
         else:
             shell_path = os.environ.get("SHELL", "")
             if shell_path:
                 base = os.path.basename(shell_path)
                 if base:
-                    return f"!env terminal=1 {base}"
+                    return f"env terminal=1 {base}"
             for name in ("fish", "zsh", "bash", "sh"):
                 if _shutil.which(name):
-                    return f"!env terminal=1 {name}"
-            return "!env terminal=1 bash"
+                    return f"env terminal=1 {name}"
+            return "env terminal=1 bash"
     except Exception:
-        return "!env terminal=1 bash"
+        return "env terminal=1 bash"
     # Fallback for all cases
-    return "!env terminal=1 bash"
+    return "env terminal=1 bash"
+
+
+def _detect_shell_interpreter(script: str) -> str:
+    """根据终端命令内容检测合适的解释器。
+
+    参数:
+        script: 终端命令内容
+
+    返回:
+        解释器名称：'bash'、'powershell'、'cmd' 等
+    """
+    lines = script.strip().splitlines()
+    if not lines:
+        return "bash"
+    first_line = lines[0].strip()
+    if _os.name == "nt":
+        if first_line.startswith("powershell ") or first_line.startswith("pwsh "):
+            return "powershell"
+        if first_line.startswith("cmd "):
+            return "cmd"
+    else:
+        if first_line.startswith("env "):
+            parts = first_line.split()
+            for part in parts:
+                if part in ("bash", "zsh", "fish", "sh"):
+                    return "bash"
+    return "bash"
+
+
+def execute_shell_in_terminal(agent: Any) -> None:
+    """为用户打开一个交互式 Shell 终端。
+
+    该函数供 `<Shell>` 标签与 Alt+T/Ctrl+T 快捷键共用：直接调用 execute_script
+    工具以交互模式执行终端命令，而不是返回以 `!` 开头的行交由输入处理器解析。
+
+    参数:
+        agent: 当前 Agent 实例（用于工具调用上下文）
+    """
+    script = _gen_shell_cmd_for_terminal()
+    PrettyOutput.auto_print(f"🖥️ 打开终端: {script}")
+    try:
+        from jarvis.jarvis_tools.registry import ToolRegistry
+
+        ToolRegistry().handle_tool_calls(
+            {
+                "name": "execute_script",
+                "want": "用户在交互式终端中执行命令",
+                "arguments": {
+                    "interpreter": _detect_shell_interpreter(script),
+                    "script_content": script,
+                    "execution_mode": "interactive",
+                },
+            },
+            agent,
+        )
+    except Exception as e:
+        save_exception(
+            e, module="jarvis_utils.input", function="execute_shell_in_terminal"
+        )
+        PrettyOutput.auto_print(f"❌ 打开终端失败: {e}")
 
 
 # Persistent hint marker for multiline input (shown only once across runs)
@@ -1568,8 +1628,9 @@ def _get_multiline_input_internal(
         This binding works globally (without focus filter) so it can be triggered
         even when LLM is outputting or after interrupting output with Ctrl+C.
         """
-        # Append a special marker to indicate no-confirm execution in shell_input_handler
-        event.app.exit(result=_gen_shell_cmd_for_terminal() + " # JARVIS-NOCONFIRM")
+        # Exit the prompt with a sentinel; the outer get_multiline_input loop
+        # will open an interactive shell terminal and continue prompting.
+        event.app.exit(result=CTRL_T_SENTINEL)
 
     @bindings.add("c-t", eager=True)
     def _(event: KeyPressEvent) -> None:
@@ -1894,8 +1955,10 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                 # Ctrl+C pressed, allow exit and return empty string
                 return ""
             elif user_input == CTRL_T_SENTINEL:
-                # Alt+T pressed, generate shell command for terminal
-                return _gen_shell_cmd_for_terminal() + " # JARVIS-NOCONFIRM"
+                # Alt+T/Ctrl+T pressed: open an interactive shell terminal,
+                # then continue prompting for user input.
+                execute_shell_in_terminal(_get_current_agent_for_input())
+                continue
             elif not user_input:
                 # Empty submission, require user to input something
                 continue
