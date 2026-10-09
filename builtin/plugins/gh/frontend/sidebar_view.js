@@ -114,6 +114,10 @@ export default {
       repo: currentRepo,
       repoInput: "",
       repoEditing: false,
+      // 是否处于「手动指定的自定义仓库」：为真表示当前展示的仓库不是当前
+      // Agent 工作目录对应的仓库，此时不应把 issue/PR 交给当前 Agent 处理
+      // （Agent 的工作目录属于另一个仓库，gh 命令会在错误仓库上执行）。
+      isManualRepo: false,
       tab: "issues",
       loading: false,
       loadingMore: false,
@@ -164,6 +168,7 @@ export default {
         currentRepo = manualRepo;
         this.repo = currentRepo;
         this.repoInput = currentRepo;
+        this.isManualRepo = true;
         return;
       }
       try {
@@ -179,6 +184,7 @@ export default {
         this.repo = "";
         this.repoInput = "";
       }
+      this.isManualRepo = false;
     },
     // 从 localStorage 恢复上次手动指定的仓库（刷新页面后仍生效）。
     restoreManualRepo() {
@@ -230,6 +236,7 @@ export default {
       currentRepo = normalized;
       this.repo = normalized;
       this.repoInput = normalized;
+      this.isManualRepo = true;
       this.repoEditing = false;
       this.refresh();
     },
@@ -401,6 +408,12 @@ export default {
     async handleItem(item) {
       this.closeItemMenu();
       if (!item) return;
+      // 防御性校验：自定义仓库与当前 Agent 工作目录不一致，交给当前 Agent
+      // 会在错误仓库上执行 gh 命令，故直接拒绝（UI 已隐藏该入口）。
+      if (this.isManualRepo) {
+        this.message = "当前为自定义仓库，与 Agent 工作目录不一致，请改用「创建新 Agent 处理」";
+        return;
+      }
       const isIssue = this.tab === "issues";
       const kind = isIssue ? "Issue" : "Pull Request";
       const number = item.number;
@@ -615,7 +628,7 @@ export default {
     <!-- 列表项右键菜单 -->
     <div v-if="menuVisible" :style="menuStyle"
       style="position:fixed;z-index:9999;background:#2d2d30;border:1px solid #454545;border-radius:6px;box-shadow:0 4px 12px #0008;padding:4px;min-width:120px;">
-      <div @click="handleItem(menuItem)"
+      <div v-if="!isManualRepo" @click="handleItem(menuItem)"
         style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">在当前 Agent 中处理</div>
       <div @click="handleItemNewAgent(menuItem)"
         style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">创建新 Agent 处理</div>
