@@ -362,9 +362,6 @@ class Agent:
     # tmux 布局是否已设置（类级标志）
     _tmux_layout_set: bool = False
 
-    # review 是否已执行（CodeAgent 使用，避免重复 review）
-    _review_already_done: bool = False
-
     def agent_type(self) -> str:
         """获取Agent类型"""
         return self._agent_type

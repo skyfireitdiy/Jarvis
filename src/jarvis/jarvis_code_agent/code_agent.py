@@ -79,9 +79,6 @@ class CodeAgent(Agent):
     负责处理代码分析、修改和git操作。
     """
 
-    # 标记 review 是否已执行（避免 CodeAgent.run 重复执行 review）
-    _review_already_done: bool = False
-
     def __init__(
         self,
         need_summary: bool = True,
@@ -425,8 +422,6 @@ class CodeAgent(Agent):
         """
         # 标记是否应该保存会话（内置命令处理完成时不保存）
         _should_save_session = True
-        # 重置 review 标志，确保每次 run 调用时 review 状态干净
-        self._review_already_done = False
         # 重置自动完成提交标记（AutoComplete 路径已提交时跳过本处重复提交）
         self._auto_commit_done = False
         try:
@@ -601,21 +596,8 @@ git reset --hard {start_commit}
                 PrettyOutput.auto_print(f"⚠️ 执行失败: {str(e)}")
                 return str(e)
 
-            # 处理未提交的更改（在 review 之前先提交）
+            # 处理未提交的更改
             self.git_manager.handle_uncommitted_changes()
-
-            # 如果启用了 review，执行 review 和修复循环
-            # AutoComplete 完成后跳过 review（_execute_auto_complete 已执行过）
-            # 检查后立即重置标志，确保仅跳过一次
-            if not self.disable_review and not getattr(
-                self, "_review_already_done", False
-            ):
-                self._review_and_fix(
-                    prefix=prefix,
-                    suffix=suffix,
-                    code_generation_summary=result_str,
-                )
-            self._review_already_done = False  # 重置标志，确保后续 run 调用不受影响
 
             # 根据配置在任务结束时手动调用分析功能（在最终提交之前）
             if self._use_analysis_config:
@@ -1016,27 +998,6 @@ git reset --hard {start_commit}
         """截断 git diff 以适应 token 限制（委托给 CodeReviewer）。"""
         return self._get_code_reviewer().truncate_diff_for_review(git_diff, token_ratio)
 
-    def _generate_fix_summary(self) -> str:
-        """生成修复阶段的总结
-
-        返回:
-            str: 修复总结
-        """
-        try:
-            # 使用父类的 generate_summary 方法
-            summary = self.generate_summary(for_token_limit=False)
-            return summary or ""
-        except KeyboardInterrupt:
-            raise  # 中断信号直接向上传播
-        except Exception as e:
-            # 检查是否为中断导致的异常
-            from jarvis.jarvis_utils.utils import get_interrupt
-
-            if get_interrupt() > 0:
-                raise KeyboardInterrupt("用户中断")
-            PrettyOutput.auto_print(f"⚠ 生成修复总结失败: {str(e)}")
-            return ""
-
     def _generate_review_target(self, max_retries: int = 3) -> str:
         """生成代码审查的目标和验收准则（委托给 CodeReviewer）。"""
         return self._get_code_reviewer().generate_review_target(max_retries)
@@ -1059,49 +1020,6 @@ git reset --hard {start_commit}
     def _check_and_get_git_diff(self) -> Optional[str]:
         """检查并获取 git diff（委托给 CodeReviewer）。"""
         return self._get_code_reviewer().check_and_get_git_diff()
-
-    def _review_and_fix(
-        self,
-        prefix: str = "",
-        suffix: str = "",
-        code_generation_summary: Optional[str] = None,
-    ) -> None:
-        """执行 review 和修复循环（委托给 CodeReviewer.run_review_with_fix）。
-
-        参数:
-            prefix: 前缀
-            suffix: 后缀
-            code_generation_summary: 代码生成总结
-        """
-        # 获取从开始到当前的 git diff（提前检测是否有代码修改）
-        git_diff = self._check_and_get_git_diff()
-        if git_diff is None:
-            return
-
-        if self.disable_review:
-            PrettyOutput.auto_print("ℹ️ 代码审查已禁用，跳过审查")
-            return
-
-        # 获取 CodeReviewer 实例并委托执行审查+修复循环
-        reviewer = self._get_code_reviewer()
-        reviewer.run_review_with_fix(
-            modification_history=code_generation_summary or "",
-            max_iterations=self.review_max_iterations,
-            use_tools=["execute_script", "read_code", "memory"],
-            non_interactive=self.non_interactive,
-            quick_mode=self.quick_mode,
-            on_fix=lambda fix_prompt: self._do_fix(fix_prompt),
-            on_generate_fix_summary=lambda: self._generate_fix_summary(),
-            on_handle_uncommitted_changes=lambda: (
-                self.git_manager.handle_uncommitted_changes()
-            ),
-        )
-
-    def _do_fix(self, fix_prompt: str) -> None:
-        """执行修复（供 run_review_with_fix 的 on_fix 回调调用）。"""
-        if self.model:
-            self.model.set_suppress_output(False)
-        super().run(fix_prompt)
 
 
 @app.command()

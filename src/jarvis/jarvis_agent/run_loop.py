@@ -663,19 +663,6 @@ class AgentRunLoop:
                 - 如果需要继续下一轮，返回 (True, None)
                 - 如果需要返回结果，返回 (False, result)
         """
-        # 在自动完成前执行代码审查（如果支持）
-        if hasattr(ag, "_review_and_fix"):
-            try:
-                ag._review_and_fix()
-                ag._review_already_done = (
-                    True  # 标记已执行 review，避免 CodeAgent.run 重复执行
-                )
-            except Exception as e:
-                save_exception(
-                    e, module="jarvis_agent.run_loop", function="_execute_auto_complete"
-                )
-                pass
-
         # 自动完成时，执行commit流程（参考builtin_input_handler中commit命令实现）
         if (
             hasattr(ag, "git_manager")
@@ -1186,9 +1173,6 @@ class AgentRunLoop:
                     continue
                 action = normalize_next_action(next_action)
                 if action == "continue":
-                    # 用户输入新需求，重置 review 标志
-                    if hasattr(ag, "_review_already_done"):
-                        ag._review_already_done = False
                     run_input_handlers = True
                     continue
                 elif action == "complete":

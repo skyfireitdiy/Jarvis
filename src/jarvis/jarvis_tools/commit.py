@@ -55,23 +55,36 @@ class CommitTool:
         """执行压缩 checkpoint 并生成正式提交。"""
         prefix = str((args or {}).get("prefix") or "").strip()
         suffix = str((args or {}).get("suffix") or "").strip()
-
-        # 自动完成状态下跳过 commit：
-        # 自动完成流程（_execute_auto_complete）会先执行 _review_and_fix 自动评审
-        # （评审依赖修改的 diff），评审通过后再自动 commit。此时若再调用本工具，
-        # 会压缩 CheckPoint 影响评审所依赖的 diff，故直接跳过并返回原因。
         agent = (args or {}).get("agent")
-        if agent is not None and getattr(agent, "auto_complete", False):
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": (
-                    "Agent 处于自动完成状态，已跳过 commit。自动完成流程会先执行"
-                    "自动评审（依赖修改的 diff），评审通过后会自动提交，无需手动 commit。"
-                ),
-            }
+        skip_review = bool((args or {}).get("skip_review", False))
 
         try:
+            # 非交互模式下与 review 联动：未禁用 review 且未显式跳过时，先审查再提交。
+            # 审查通过才真正 commit；审查发现问题则返回错误，不 commit。
+            if (
+                not skip_review
+                and agent is not None
+                and getattr(agent, "non_interactive", False)
+                and not getattr(agent, "disable_review", False)
+            ):
+                review_result = self._run_review(agent)
+                if not review_result.get("ok", True):
+                    issues = review_result.get("issues", []) or []
+                    issues_text = "\n".join(
+                        f"{i + 1}. [{issue.get('type', '未知')}] {issue.get('description', '无描述')}"
+                        f"\n   位置: {issue.get('location', '未知')}"
+                        f"\n   建议: {issue.get('suggestion', '无建议')}"
+                        for i, issue in enumerate(issues)
+                    )
+                    stderr = f"代码审查未通过，已取消提交：\n{issues_text}"
+                    if review_result.get("summary"):
+                        stderr += f"\n\n审查总结：{review_result['summary']}"
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": stderr,
+                    }
+
             # 1. 找到压缩起点：最近的非 CheckPoint 提交
             start = find_recent_non_checkout_commit()
             current_head = get_latest_commit_hash()
@@ -123,6 +136,26 @@ class CommitTool:
                 "stdout": "",
                 "stderr": f"Commit failed: {str(e)}",
             }
+
+    def _run_review(self, agent: Any) -> Dict[str, Any]:
+        """非交互联动：执行单次代码审查（复用 CodeReviewer.run_single_review）。
+
+        返回:
+            dict: 审查结果，包含 ok/issues/summary 字段
+        """
+        try:
+            from jarvis.jarvis_code_agent.code_reviewer import CodeReviewer
+
+            reviewer = CodeReviewer(
+                model=getattr(agent, "model", None),
+                start_commit=getattr(agent, "start_commit", None),
+                non_interactive=getattr(agent, "non_interactive", True),
+                quick_mode=getattr(agent, "quick_mode", False),
+            )
+            return reviewer.run_single_review()
+        except Exception as e:
+            PrettyOutput.auto_print(f"❌ 联动审查失败\n\n{str(e)}")
+            return {"ok": False, "issues": [], "summary": f"联动审查失败: {str(e)}"}
 
     def _save_session_after_commit(self, args: Dict[str, Any]) -> None:
         """提交成功后自动保存当前会话，失败不影响提交结果。"""

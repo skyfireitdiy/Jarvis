@@ -1523,20 +1523,10 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 )
                 return "", True
 
-            # 创建 CodeReviewer 并执行单次审查
-            from jarvis.jarvis_code_agent.code_reviewer import CodeReviewer
+            # 调用 review 工具执行单次审查（复用工具逻辑，而非直接 CodeReviewer）
+            from jarvis.jarvis_tools.review import ReviewTool
 
-            reviewer = CodeReviewer(
-                model=agent.model,
-                start_commit=agent.start_commit
-                if hasattr(agent, "start_commit")
-                else None,
-                non_interactive=agent.non_interactive
-                if hasattr(agent, "non_interactive")
-                else True,
-                quick_mode=agent.quick_mode if hasattr(agent, "quick_mode") else False,
-            )
-            result = reviewer.run_single_review()
+            result = ReviewTool().run_review(agent)
 
             # 审查通过，直接返回
             if result.get("ok", True):
@@ -1554,6 +1544,8 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 default=True,
             ):
                 # 使用CodeReviewer构建修复prompt
+                from jarvis.jarvis_code_agent.code_reviewer import CodeReviewer
+
                 review_prompt = CodeReviewer.build_review_fix_prompt(result)
                 return review_prompt, False
             else:
