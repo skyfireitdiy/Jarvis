@@ -1786,6 +1786,139 @@ def is_enable_memory_organizer() -> bool:
     return False
 
 
+def is_enable_memory_value_filter() -> bool:
+    """
+    获取是否启用写时记忆价值过滤。
+
+    启用后，save 时对未显式标注 importance 的记忆做启发式价值判断：
+    纯客套/过短/无信息量内容将被丢弃，避免污染记忆库。
+    默认开启，可通过 GLOBAL_CONFIG_DATA['enable_memory_value_filter'] 配置关闭。
+
+    返回:
+        bool: 是否启用写时记忆价值过滤，默认为True
+    """
+    return bool(GLOBAL_CONFIG_DATA.get("enable_memory_value_filter", True))
+
+
+def is_enable_memory_compress() -> bool:
+    """
+    获取是否启用存储前压缩。
+
+    启用后，save 超长记忆（超过阈值）时对内容做规则式摘要压缩后再存储，
+    原始完整内容保留在 original_content 字段，控制记忆库体积与检索 token 成本。
+    默认开启，可通过 GLOBAL_CONFIG_DATA['enable_memory_compress'] 配置关闭。
+
+    返回:
+        bool: 是否启用存储前压缩，默认为True
+    """
+    return bool(GLOBAL_CONFIG_DATA.get("enable_memory_compress", True))
+
+
+def get_memory_compress_threshold() -> int:
+    """
+    获取存储前压缩的 token 阈值。
+
+    记忆内容 token 数超过该阈值时触发压缩。默认 2000。
+    可通过 GLOBAL_CONFIG_DATA['memory_compress_threshold'] 配置。
+
+    返回:
+        int: 压缩 token 阈值
+    """
+    return int(GLOBAL_CONFIG_DATA.get("memory_compress_threshold", 2000))
+
+
+def get_context_budget_usage_ratio() -> float:
+    """
+    获取上下文总预算使用率。
+
+    上下文总预算 = 模型 max_input_tokens × 使用率（留出余量，避免顶满窗口）。
+    默认 0.9，可通过 GLOBAL_CONFIG_DATA['context_budget_usage_ratio'] 配置。
+
+    返回:
+        float: 上下文总预算使用率
+    """
+    return float(GLOBAL_CONFIG_DATA.get("context_budget_usage_ratio", 0.9))
+
+
+def get_context_layer_ratios() -> Dict[str, float]:
+    """
+    获取上下文分层注入的预算占比。
+
+    各层占「上下文总预算」的比例，用于把有限的上下文窗口按优先级分配给
+    系统提示、记忆检索、工具描述、规则、对话历史、当前任务等组成部分。
+    默认值参考方案文档，可通过 GLOBAL_CONFIG_DATA['context_layer_ratios'] 覆盖。
+
+    返回:
+        Dict[str, float]: 各层占比（键为层名，值为 0~1 的比例）
+    """
+    defaults = {
+        "system_prompt": 0.20,  # 系统提示（固定）
+        "memory_retrieval": 0.20,  # 记忆检索（动态，按相关性截断）
+        "tool_description": 0.15,  # 工具描述（随启用工具变化）
+        "rules": 0.10,  # 规则/规范
+        "conversation_history": 0.25,  # 对话历史（可压缩）
+        "current_task": 0.10,  # 当前任务/用户输入（固定保留）
+    }
+    configured = GLOBAL_CONFIG_DATA.get("context_layer_ratios")
+    if isinstance(configured, dict):
+        merged = dict(defaults)
+        for key, value in configured.items():
+            try:
+                merged[key] = float(value)
+            except (TypeError, ValueError):
+                pass
+        return merged
+    return defaults
+
+
+def get_context_memory_retrieval_budget() -> int:
+    """
+    获取单次记忆检索注入的 token 上限。
+
+    检索结果按相关性排序后，累计 token 超过该上限即截断。
+    默认 3000，可通过 GLOBAL_CONFIG_DATA['context_memory_retrieval_budget'] 配置。
+
+    返回:
+        int: 单次记忆检索注入 token 上限
+    """
+    return int(GLOBAL_CONFIG_DATA.get("context_memory_retrieval_budget", 3000))
+
+
+def calculate_layer_token_budget(total_tokens: int) -> Dict[str, int]:
+    """
+    按分层占比计算各上下文组成部分的 token 预算。
+
+    基于 get_context_layer_ratios() 的占比，把 total_tokens 分配给
+    系统提示、记忆检索、工具描述、规则、对话历史、当前任务等层。
+    占比为比例（0~1），各层预算 = total_tokens × 占比（向下取整）。
+
+    Args:
+        total_tokens: 上下文总预算（token 数）
+
+    Returns:
+        Dict[str, int]: 各层 token 预算（键为层名）
+    """
+    ratios = get_context_layer_ratios()
+    budgets: Dict[str, int] = {}
+    for layer, ratio in ratios.items():
+        budgets[layer] = int(total_tokens * float(ratio))
+    return budgets
+
+
+def is_pipeline_cleanup_on_failure() -> bool:
+    """
+    获取流水线失败/中止时是否自动清理已创建的常驻 Agent。
+
+    默认开启：流水线因失败或中止结束时，自动删除为各阶段创建的常驻 Agent，
+    避免残留进程占用资源。可通过 GLOBAL_CONFIG_DATA['pipeline_cleanup_on_failure']
+    关闭（如调试时需要保留 Agent 现场）。
+
+    返回:
+        bool: 是否在失败/中止时清理已创建 Agent
+    """
+    return bool(GLOBAL_CONFIG_DATA.get("pipeline_cleanup_on_failure", True))
+
+
 def is_enable_autonomous() -> bool:
     """
     获取是否启用智能增强功能（情绪识别、歧义检测、对话管理、主动交互）。

@@ -23,6 +23,9 @@
             mode="full"
             @select="$emit('select', $event)"
             @jump-agent="$emit('jump-agent', $event)"
+            @approve="$emit('approve', $event)"
+            @reject="$emit('reject', $event)"
+            @retry="$emit('retry', $event)"
           />
         </div>
       </div>
@@ -40,7 +43,7 @@ const props = defineProps({
   activeId: { type: String, default: '' },
 })
 
-const emit = defineEmits(['update:visible', 'close', 'select', 'jump-agent'])
+const emit = defineEmits(['update:visible', 'close', 'select', 'jump-agent', 'approve', 'reject', 'retry'])
 
 function close() {
   emit('update:visible', false)

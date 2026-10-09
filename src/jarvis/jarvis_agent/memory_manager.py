@@ -5,6 +5,7 @@
 """
 
 from typing import Any
+from typing import Optional
 
 from jarvis.jarvis_agent.events import BEFORE_HISTORY_CLEAR
 from jarvis.jarvis_agent.events import TASK_COMPLETED
@@ -57,7 +58,9 @@ class MemoryManager:
             return "memory" in tool_names
         return False
 
-    def prepare_memory_context_prompt(self, user_input: str) -> str:
+    def prepare_memory_context_prompt(
+        self, user_input: str, retrieval_budget: Optional[int] = None
+    ) -> str:
         """主动检索与当前任务相关的历史记忆并注入上下文
 
         与 prepare_memory_tags_prompt 不同，此方法直接执行语义检索，
@@ -65,6 +68,9 @@ class MemoryManager:
 
         参数:
             user_input: 当前任务的用户输入文本
+            retrieval_budget: 单次检索注入的 token 上限；为 None 时使用
+                配置的 get_context_memory_retrieval_budget()。调用方可按
+                上下文分层预算动态传入。
 
         返回:
             str: 格式化后的相关记忆提示，无相关记忆时返回空字符串
@@ -92,14 +98,23 @@ class MemoryManager:
             retriever = SmartRetriever()
             memories = retriever.semantic_search(
                 query=user_input,
-                memory_types=["project_long_term", "global_long_term"],
+                memory_types=["project", "global"],
+                natures=["long_term"],
                 limit=5,
             )
             if not memories:
                 return ""
 
+            # 检索预算：累计 token 超过上限即截断，避免检索结果挤占上下文
+            from jarvis.jarvis_utils.config import get_context_memory_retrieval_budget
+            from jarvis.jarvis_utils.embedding import get_context_token_count
+
+            if retrieval_budget is None:
+                retrieval_budget = get_context_memory_retrieval_budget()
+
             # 格式化检索结果
             prompt = "\n\n📚 基于当前任务自动检索到以下相关历史记忆（供参考）："
+            used_tokens = 0
             for i, memory in enumerate(memories):
                 content = (memory.content or "").strip()
                 if not content:
@@ -108,7 +123,19 @@ class MemoryManager:
                 if len(content) > 500:
                     content = content[:500] + "..."
                 tags_str = "/".join(memory.tags) if memory.tags else "无标签"
-                prompt += f"\n\n[{i + 1}] ({memory.type} | {tags_str})\n{content}"
+                entry = (
+                    f"\n\n[{i + 1}] "
+                    f"({memory.memory_type}/{memory.nature} | {tags_str})\n{content}"
+                )
+                # 累计 token 预算截断
+                try:
+                    entry_tokens = get_context_token_count(entry)
+                except Exception:
+                    entry_tokens = len(entry) // 2
+                if used_tokens + entry_tokens > retrieval_budget:
+                    break
+                used_tokens += entry_tokens
+                prompt += entry
 
             return prompt
         except Exception as e:
@@ -125,8 +152,8 @@ class MemoryManager:
 
         type_names = {
             "short_term": "短期记忆",
-            "project_long_term": "项目长期记忆",
-            "global_long_term": "全局长期记忆",
+            "project_long_term": "项目长期记忆（project/long_term）",
+            "global_long_term": "全局长期记忆（global/long_term）",
         }
 
         for memory_type, tags in memory_tags.items():
@@ -149,8 +176,8 @@ class MemoryManager:
 
         # 构建提示词，让大模型自己判断并保存记忆
         prompt = """回顾本次任务，判断是否有值得记忆的信息。使用 memory 工具（action=save）保存：
-- global_long_term: 新方法/技巧、用户偏好、技术知识
-- project_long_term: 项目发现/配置、实现细节/约定
+- 作用域 memory_type: project(项目) / global(全局) / short_term(短期)
+- 性质 nature: long_term(长期) / procedural(程序性how-to/踩坑) / episodic(情景归档)
 如无值得记忆的信息，直接说明。"""
 
         # 处理记忆保存
@@ -213,9 +240,11 @@ class MemoryManager:
             # 如果有memory工具，添加相关提示（save 与 retrieve 各一行）
             if "memory" in tool_names:
                 memory_prompts += (
-                    "\n    - 有关键信息需要沉淀时，用 memory(action=save) 保存："
-                    "project_long_term 存项目相关（架构决策、关键配置、实现约定），"
-                    "global_long_term 存通用经验与用户偏好，short_term 存当前任务临时信息"
+                    "\n    - 有关键信息需要沉淀时，用 memory(action=save) 保存，"
+                    "用 memory_type 指定作用域(project/global/short_term)、"
+                    "nature 指定性质(long_term/procedural/episodic)："
+                    "project+long_term 存项目相关（架构决策、关键配置、实现约定），"
+                    "global+long_term 存通用经验与用户偏好，short_term 存当前任务临时信息"
                 )
                 memory_prompts += "\n    - 需要过往上下文或方案时，用 memory(action=retrieve) 检索相关记忆"
 

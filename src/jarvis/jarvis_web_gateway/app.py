@@ -10541,8 +10541,12 @@ def create_app(
                     from jarvis.jarvis_tools.pipeline_runner import PipelineRunnerTool
 
                     agents_by_name = {a.get("name"): a for a in agents if a.get("name")}
-                    default_on_error = str(config.get("default_on_error") or "abort").strip()
-                    dag = PipelineRunnerTool()._build_dag(flow, agents_by_name, default_on_error)
+                    default_on_error = str(
+                        config.get("default_on_error") or "abort"
+                    ).strip()
+                    dag = PipelineRunnerTool()._build_dag(
+                        flow, agents_by_name, default_on_error
+                    )
                     if dag.get("success"):
                         nodes = dag.get("nodes", [])
                 except Exception:  # pylint: disable=broad-except
@@ -11608,6 +11612,58 @@ def create_app(
             return {"success": True, "data": {"ingested": len(events)}}
         except Exception as e:
             logger.exception("[ORCHESTRATION] pipeline_events_ingest failed: %r", e)
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": repr(e)},
+            }
+
+    @app.post("/api/pipeline-approval", dependencies=[Depends(verify_token)])
+    async def pipeline_approval(
+        request: Request, body: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """记录一条门禁人工审批决定并广播审批事件（放行/拒绝/重试）。
+
+        门禁阶段停住（gate_blocked）后，前端审批浮层调用本接口记录审批人、
+        时间、动作、备注，并广播 `pipeline_approval` 事件供审计与前端展示。
+        仅记录决定与广播事件，不直接驱动流水线续跑（放行/重试由前端以
+        approve=true 重跑流水线完成）。权限按 file:read 把关（与
+        run-orchestration 一致，编排运行需要文件读取权限）。
+        """
+        from fastapi import HTTPException
+
+        if _check_file_permission(request.state.user_info, "file:read"):
+            raise HTTPException(status_code=403, detail="Permission denied: file:read")
+        try:
+            pipeline_id = str(body.get("pipeline_id") or "").strip()
+            action = str(body.get("action") or "").strip().lower()
+            note = str(body.get("note") or "").strip()
+            # 审批人优先取请求方身份，其次取 body 显式传入
+            ui = request.state.user_info or {}
+            approver = (
+                ui.get("display_name") or ui.get("username") or ui.get("user_id") or ""
+            )
+            if not approver:
+                approver = str(body.get("approver") or "").strip()
+
+            from jarvis.jarvis_tools.pipeline_runner import PipelineRunnerTool
+
+            result = PipelineRunnerTool().record_approval(
+                pipeline_id=pipeline_id,
+                action=action,
+                approver=approver,
+                note=note,
+            )
+            if not result.get("success"):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_APPROVAL",
+                        "message": result.get("error", "Invalid approval"),
+                    },
+                }
+            return {"success": True, "data": result.get("data") or {}}
+        except Exception as e:
+            logger.exception("[ORCHESTRATION] pipeline_approval failed: %r", e)
             return {
                 "success": False,
                 "error": {"code": "INTERNAL_ERROR", "message": repr(e)},

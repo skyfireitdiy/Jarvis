@@ -17,6 +17,7 @@ pipeline_runner 在状态机迁移点通过 `emit()` 写入结构化事件；web
   网关进程内（本地泵已激活）只写本地总线，避免重复上报。
 - **纯内存、无 IO、无外部依赖**（远程上报失败静默，不影响执行语义）。
 """
+
 import os
 from collections import deque
 from threading import Lock
@@ -26,6 +27,11 @@ from typing import List
 
 # 事件队列上限：无消费者时最多驻留的事件数（超出丢弃最旧）
 _MAX_EVENTS = 2000
+
+# 门禁人工审批动作：放行 / 拒绝 / 重试。
+# 事件类型 `pipeline_approval` 的 action 取值即来自此集合（外加 "pending" 表示
+# 门禁停住等待审批）。前端据此渲染三按钮 + 备注输入框。
+APPROVAL_ACTIONS = ("approve", "reject", "retry")
 
 # 全局单例
 _bus: "PipelineEventBus | None" = None

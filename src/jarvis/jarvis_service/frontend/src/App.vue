@@ -558,6 +558,9 @@
                 @jump-agent="onOrchestrationJumpAgent"
                 @expand="openOrchestrationOverlay"
                 @remove="removePipeline"
+                @approve="handleApproval('approve', $event)"
+                @reject="handleApproval('reject', $event)"
+                @retry="handleApproval('retry', $event)"
               />
             </div>
             <div v-else class="workspace-sidebar-content">
@@ -1438,6 +1441,9 @@
       @close="closeOrchestrationOverlay"
       @select="selectPipeline"
       @jump-agent="onOrchestrationJumpAgent"
+      @approve="handleApproval('approve', $event)"
+      @reject="handleApproval('reject', $event)"
+      @retry="handleApproval('retry', $event)"
     />
 
     <!-- 命令面板（Ctrl+P） -->
@@ -13411,7 +13417,64 @@ function previewOrchestration() {
   showWorkspaceSidebar.value = true
   setWorkspaceSidebarView('orchestration')
 }
-
+// 门禁人工审批：记录决定（放行/拒绝/重试），放行/重试时以 approve=true 重跑流水线。
+// 由 OrchestrationView 审批浮层触发（参数 { pipelineId, note }）。
+async function handleApproval(action, { pipelineId, note = '' } = {}) {
+  if (!pipelineId) return
+  const pipeline = pipelineStore.getPipeline(pipelineId)
+  if (!pipeline) {
+    showToast('未找到该流水线记录', 'error')
+    return
+  }
+  const { host, port } = getGatewayAddress()
+  // 1) 先记录审批决定（POST /api/pipeline-approval，master 网关）
+  try {
+    const resp = await fetchWithAuth(buildNodeHttpUrl(host, port, 'master', 'pipeline-approval'), {
+      method: 'POST',
+      body: JSON.stringify({ pipeline_id: pipelineId, action, note }),
+    })
+    const result = await resp.json().catch(() => ({}))
+    if (!resp.ok || !result.success) {
+      showToast(result.error?.message || '记录审批决定失败', 'error')
+      return
+    }
+  } catch (error) {
+    showToast(error.message || '记录审批决定失败', 'error')
+    return
+  }
+  const actionLabel = { approve: '放行', reject: '拒绝', retry: '重试' }[action] || action
+  // 2) 放行/重试：以 approve=true 重跑流水线（门禁确认通过后继续后续阶段）
+  if (action === 'approve' || action === 'retry') {
+    const orchestrationFile = String(pipeline.orchestrationFile || '').trim()
+    const workingDir = String(pipeline.workingDir || '').trim()
+    if (!orchestrationFile) {
+      showToast('流水线缺少编排文件，无法重跑', 'error')
+      return
+    }
+    try {
+      const resp = await fetchWithAuth(buildNodeHttpUrl(host, port, 'master', 'run-orchestration'), {
+        method: 'POST',
+        body: JSON.stringify({
+          orchestration_file: orchestrationFile,
+          working_dir: workingDir,
+          node_id: 'master',
+          approve: true,
+        }),
+      })
+      const result = await resp.json().catch(() => ({}))
+      if (!resp.ok || !result.success) {
+        showToast(result.error?.message || '重跑流水线失败', 'error')
+        return
+      }
+      showToast(`已${actionLabel}，流水线已重跑`, 'success')
+    } catch (error) {
+      showToast(error.message || '重跑流水线失败', 'error')
+      return
+    }
+  } else {
+    showToast(`已${actionLabel}`, 'success')
+  }
+}
 // ===== 编排文件浏览面板（节点下拉 + 内嵌目录/文件浏览，参考「打开目录」）=====
 // 目录项（供 DirectoryDialog 的 filteredDirs 使用，支持搜索过滤）
 const orchestrateFilteredDirs = computed(() => {

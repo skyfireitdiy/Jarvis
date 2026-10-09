@@ -7,6 +7,7 @@ import json
 import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 import pytest
 
 from jarvis.jarvis_memory_organizer.smart_retrieval import (
@@ -25,7 +26,8 @@ class TestMemory:
         """测试从字典创建Memory对象"""
         data = {
             "id": "test_id",
-            "type": "project_long_term",
+            "memory_type": "project",
+            "nature": "long_term",
             "tags": ["tag1", "tag2"],
             "content": "test content",
             "created_at": "2024-01-01T00:00:00",
@@ -34,7 +36,8 @@ class TestMemory:
         memory = Memory.from_dict(data)
 
         assert memory.id == "test_id"
-        assert memory.type == "project_long_term"
+        assert memory.memory_type == "project"
+        assert memory.nature == "long_term"
         assert memory.tags == ["tag1", "tag2"]
         assert memory.content == "test content"
         assert memory.created_at == "2024-01-01T00:00:00"
@@ -45,7 +48,8 @@ class TestMemory:
         memory = Memory.from_dict(data)
 
         assert memory.id == "test_id"
-        assert memory.type == ""
+        assert memory.memory_type == ""
+        assert memory.nature == ""
         assert memory.tags == []
         assert memory.content == ""
 
@@ -53,7 +57,8 @@ class TestMemory:
         """测试转换为字典"""
         memory = Memory(
             id="test_id",
-            type="project_long_term",
+            memory_type="project",
+            nature="long_term",
             tags=["tag1", "tag2"],
             content="test content",
             created_at="2024-01-01T00:00:00",
@@ -62,7 +67,8 @@ class TestMemory:
         data = memory.to_dict()
 
         assert data["id"] == "test_id"
-        assert data["type"] == "project_long_term"
+        assert data["memory_type"] == "project"
+        assert data["nature"] == "long_term"
         assert data["tags"] == ["tag1", "tag2"]
         assert data["content"] == "test content"
 
@@ -183,7 +189,8 @@ class TestSmartRetriever:
         memories = [
             {
                 "id": "memory_1",
-                "type": "project_long_term",
+                "memory_type": "project",
+                "nature": "long_term",
                 "tags": ["code", "python", "testing"],
                 "content": "Python代码测试最佳实践",
                 "created_at": datetime.now().isoformat(),
@@ -191,7 +198,8 @@ class TestSmartRetriever:
             },
             {
                 "id": "memory_2",
-                "type": "project_long_term",
+                "memory_type": "project",
+                "nature": "long_term",
                 "tags": ["architecture", "design", "python"],
                 "content": "Python架构设计模式",
                 "created_at": (datetime.now() - timedelta(days=30)).isoformat(),
@@ -199,7 +207,8 @@ class TestSmartRetriever:
             },
             {
                 "id": "memory_3",
-                "type": "project_long_term",
+                "memory_type": "project",
+                "nature": "long_term",
                 "tags": ["error", "bug", "fix"],
                 "content": "常见错误修复方法",
                 "created_at": (datetime.now() - timedelta(days=7)).isoformat(),
@@ -262,45 +271,94 @@ class TestSmartRetriever:
         assert "code" in expanded or "coding" in expanded
         assert "test" in expanded or "testing" in expanded
 
+    def _patch_intent_platform(self, intent: str):
+        """mock 评估/cheap 平台，让 _identify_intent 返回指定意图"""
+        fake_platform = MagicMock()
+        fake_platform.complete.return_value = intent
+        fake_registry = MagicMock()
+        fake_registry.get_eval_platform.return_value = fake_platform
+        return patch(
+            "jarvis.jarvis_platform.registry.PlatformRegistry.get_global_platform_registry",
+            return_value=fake_registry,
+        )
+
     def test_identify_intent_how_to(self):
-        """测试意图识别 - how_to"""
+        """测试意图识别 - how_to（评估模型分类）"""
         retriever = SmartRetriever()
 
-        assert retriever._identify_intent("如何编写测试") == "how_to"
-        assert retriever._identify_intent("怎么修复bug") == "how_to"
-        assert retriever._identify_intent("How to write tests") == "how_to"
+        with self._patch_intent_platform("how_to"):
+            assert retriever._identify_intent("如何编写测试") == "how_to"
+            assert retriever._identify_intent("怎么修复bug") == "how_to"
 
     def test_identify_intent_definition(self):
-        """测试意图识别 - definition"""
+        """测试意图识别 - definition（评估模型分类）"""
         retriever = SmartRetriever()
 
-        assert retriever._identify_intent("什么是单元测试") == "definition"
-        assert retriever._identify_intent("What is unit testing") == "definition"
+        with self._patch_intent_platform("definition"):
+            assert retriever._identify_intent("什么是单元测试") == "definition"
+            assert retriever._identify_intent("What is unit testing") == "definition"
 
     def test_identify_intent_troubleshooting(self):
-        """测试意图识别 - troubleshooting"""
+        """测试意图识别 - troubleshooting（评估模型分类）"""
         retriever = SmartRetriever()
 
-        # 使用明确的错误相关查询（不包含其他意图的关键词）
-        assert retriever._identify_intent("代码有错误") == "troubleshooting"
-        assert retriever._identify_intent("bug in code") == "troubleshooting"
+        with self._patch_intent_platform("troubleshooting"):
+            assert retriever._identify_intent("代码有错误") == "troubleshooting"
+            assert retriever._identify_intent("bug in code") == "troubleshooting"
 
-    def test_identify_intent_general(self):
-        """测试意图识别 - general"""
+    def test_identify_intent_falls_back_to_cheap(self):
+        """评估模型未配置时回退到 cheap 模型"""
         retriever = SmartRetriever()
+        fake_platform = MagicMock()
+        fake_platform.complete.return_value = "recall"
+        fake_registry = MagicMock()
+        fake_registry.get_eval_platform.return_value = None  # 未配置评估模型
+        fake_registry.get_cheap_platform.return_value = fake_platform
+        with patch(
+            "jarvis.jarvis_platform.registry.PlatformRegistry.get_global_platform_registry",
+            return_value=fake_registry,
+        ):
+            assert retriever._identify_intent("上次那个 bug 怎么修的") == "recall"
 
-        assert retriever._identify_intent("Python代码") == "general"
+    def test_identify_intent_general_when_no_platform(self):
+        """无评估/cheap 模型时返回 general（不硬编码猜测）"""
+        retriever = SmartRetriever()
+        fake_registry = MagicMock()
+        fake_registry.get_eval_platform.return_value = None
+        fake_registry.get_cheap_platform.return_value = None
+        with patch(
+            "jarvis.jarvis_platform.registry.PlatformRegistry.get_global_platform_registry",
+            return_value=fake_registry,
+        ):
+            assert retriever._identify_intent("Python代码") == "general"
+            assert retriever._identify_intent("如何编写测试") == "general"
 
     def test_analyze_query(self):
         """测试查询分析"""
         retriever = SmartRetriever()
 
-        query = retriever._analyze_query("如何编写Python测试代码")
+        with self._patch_intent_platform("how_to"):
+            query = retriever._analyze_query("如何编写Python测试代码")
 
         assert query.query_text == "如何编写Python测试代码"
         assert len(query.extracted_keywords) > 0
         assert len(query.expanded_tags) > 0
         assert query.intent == "how_to"
+
+    def test_nature_boost(self):
+        """测试性质加权：程序性按任务类型、情景按回忆查询"""
+        retriever = SmartRetriever()
+
+        # how_to 意图提升程序性记忆
+        assert retriever._nature_boost("how_to", "procedural") == 1.5
+        # recall/troubleshooting 意图提升情景记忆
+        assert retriever._nature_boost("recall", "episodic") == 1.5
+        assert retriever._nature_boost("troubleshooting", "episodic") == 1.5
+        # 其它组合不改变得分
+        assert retriever._nature_boost("how_to", "episodic") == 1.0
+        assert retriever._nature_boost("recall", "procedural") == 1.0
+        assert retriever._nature_boost("general", "long_term") == 1.0
+        assert retriever._nature_boost("definition", "long_term") == 1.0
 
     def test_calculate_bm25_score(self):
         """测试BM25相似度计算"""
@@ -444,7 +502,7 @@ class TestSmartRetriever:
         """测试按类型加载记忆"""
         retriever = retriever_with_memories
 
-        memories = retriever._load_memories_by_type("project_long_term")
+        memories = retriever._load_memories_by_type("project", "long_term")
 
         assert len(memories) == 3
         assert all(isinstance(m, Memory) for m in memories)
@@ -453,7 +511,7 @@ class TestSmartRetriever:
         """测试加载无效类型的记忆"""
         retriever = SmartRetriever()
 
-        memories = retriever._load_memories_by_type("invalid_type")
+        memories = retriever._load_memories_by_type("invalid", "long_term")
 
         assert memories == []
 
@@ -479,7 +537,7 @@ class TestSmartRetriever:
         retriever = retriever_with_memories
 
         candidates = retriever._retrieve_candidates(
-            ["python", "code"], ["project_long_term"]
+            ["python", "code"], ["project"], ["long_term"]
         )
 
         assert len(candidates) > 0
@@ -490,7 +548,7 @@ class TestSmartRetriever:
         """测试无标签检索候选记忆"""
         retriever = retriever_with_memories
 
-        candidates = retriever._retrieve_candidates([], ["project_long_term"])
+        candidates = retriever._retrieve_candidates([], ["project"], ["long_term"])
 
         # 无标签时应该返回所有记忆
         assert len(candidates) == 3
@@ -501,7 +559,8 @@ class TestSmartRetriever:
 
         memory = Memory(
             id="test",
-            type="project_long_term",
+            memory_type="project",
+            nature="long_term",
             tags=["python", "code"],
             content="Python code testing best practices",
             created_at=datetime.now().isoformat(),
@@ -545,7 +604,8 @@ class TestSmartRetriever:
 
         memory = Memory(
             id="test",
-            type="project_long_term",
+            memory_type="project",
+            nature="long_term",
             tags=["python", "testing"],
             content="Python测试最佳实践",
             created_at=datetime.now().isoformat(),
@@ -581,7 +641,8 @@ class TestSmartRetrieverIntegration:
             memories = [
                 {
                     "id": "arch_1",
-                    "type": "project_long_term",
+                    "memory_type": "project",
+                    "nature": "long_term",
                     "tags": ["architecture", "design", "pattern"],
                     "content": "软件架构设计模式：单例模式、工厂模式、观察者模式",
                     "created_at": datetime.now().isoformat(),
@@ -589,7 +650,8 @@ class TestSmartRetrieverIntegration:
                 },
                 {
                     "id": "test_1",
-                    "type": "project_long_term",
+                    "memory_type": "project",
+                    "nature": "long_term",
                     "tags": ["testing", "pytest", "unit"],
                     "content": "单元测试最佳实践：使用pytest框架，编写独立的测试用例",
                     "created_at": datetime.now().isoformat(),
@@ -597,7 +659,8 @@ class TestSmartRetrieverIntegration:
                 },
                 {
                     "id": "code_1",
-                    "type": "project_long_term",
+                    "memory_type": "project",
+                    "nature": "long_term",
                     "tags": ["code", "python", "best_practice"],
                     "content": "Python编码规范：遵循PEP8，使用类型注解",
                     "created_at": datetime.now().isoformat(),

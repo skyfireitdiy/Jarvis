@@ -2329,7 +2329,8 @@ class Agent:
         # 主动检索与当前任务相关的历史记忆
         if self.session.prompt:
             memory_context_prompt = self.memory_manager.prepare_memory_context_prompt(
-                ensure_str(self.session.prompt)
+                ensure_str(self.session.prompt),
+                retrieval_budget=self._get_memory_retrieval_budget(),
             )
         else:
             memory_context_prompt = ""
@@ -2351,6 +2352,31 @@ class Agent:
         # 标记首次运行初始化已执行（供首轮无工具调用检测使用）
         self._first_run_occurred = True
         self.first = False
+
+    def _get_memory_retrieval_budget(self) -> int:
+        """按上下文分层预算计算记忆检索注入的 token 上限。
+
+        上下文总预算 = 模型最大输入 token × 使用率（留余量），再按
+        memory_retrieval 层占比分配。任何一步失败都回退到配置的固定预算，
+        保证记忆注入不会因预算计算异常而中断。
+        """
+        try:
+            from jarvis.jarvis_utils.config import (
+                calculate_layer_token_budget,
+                get_context_budget_usage_ratio,
+                get_context_memory_retrieval_budget,
+                get_max_input_token_count,
+            )
+
+            total_budget = int(
+                get_max_input_token_count() * get_context_budget_usage_ratio()
+            )
+            budgets = calculate_layer_token_budget(total_budget)
+            return int(budgets.get("memory_retrieval", 0))
+        except Exception:
+            from jarvis.jarvis_utils.config import get_context_memory_retrieval_budget
+
+            return get_context_memory_retrieval_budget()
 
     def _create_temp_model(
         self, system_prompt: str = "", force_model_type: Optional[str] = None

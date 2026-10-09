@@ -21,7 +21,12 @@ export const STAGE_STATUS = {
   RETRY: "retry",
 };
 
-const TERMINAL_STATUSES = new Set(["completed", "failed", "aborted", "gate_blocked"]);
+const TERMINAL_STATUSES = new Set([
+  "completed",
+  "failed",
+  "aborted",
+  "gate_blocked",
+]);
 
 function emptyStage(node) {
   return {
@@ -95,7 +100,10 @@ export class PipelineStore {
   _persist() {
     if (!this.storageKey) return;
     try {
-      localStorage.setItem(this._storageKey(), JSON.stringify(this._serialize()));
+      localStorage.setItem(
+        this._storageKey(),
+        JSON.stringify(this._serialize()),
+      );
     } catch (err) {
       // 隐私模式/配额满时忽略，不影响内存态
       console.warn("[PIPELINE] Failed to persist pipeline store:", err);
@@ -130,6 +138,7 @@ export class PipelineStore {
         finalStatus: "running",
         gateStage: "",
         approvalPath: "",
+        approvals: [],
       };
       this.pipelines.set(pid, state);
       this._persist();
@@ -168,10 +177,29 @@ export class PipelineStore {
     if (type === "pipeline_done") {
       state.finishedAt = Date.now();
       state.success = !!event.success;
-      state.finalStatus = event.final_status || (event.success ? "completed" : "failed");
+      state.finalStatus =
+        event.final_status || (event.success ? "completed" : "failed");
       state.gateStage = event.gate_stage || "";
       state.approvalPath = event.approval_path || "";
+      // 旧数据（持久化恢复）可能没有 approvals，兜底为空数组
+      if (!Array.isArray(state.approvals)) state.approvals = [];
       this.pruneFinished();
+      this._persist();
+      return state;
+    }
+
+    // 门禁人工审批事件：pending（等待审批）/ approve / reject / retry
+    // 追加到 state.approvals 作为审批日志，供前端浮层展示与审计。
+    if (type === "pipeline_approval") {
+      if (!Array.isArray(state.approvals)) state.approvals = [];
+      state.approvals.push({
+        action: event.action || "",
+        approver: event.approver || "",
+        note: event.note || "",
+        gateStage: event.gate_stage || "",
+        approvalPath: event.approval_path || "",
+        ts: event.ts || Date.now(),
+      });
       this._persist();
       return state;
     }
@@ -185,7 +213,9 @@ export class PipelineStore {
 
   // 按开始时间倒序返回全部流程（最新在前）。
   listPipelines() {
-    return [...this.pipelines.values()].sort((a, b) => b.startedAt - a.startedAt);
+    return [...this.pipelines.values()].sort(
+      (a, b) => b.startedAt - a.startedAt,
+    );
   }
 
   isFinished(state) {
@@ -236,6 +266,7 @@ export class PipelineStore {
       finalStatus: "preview",
       gateStage: "",
       approvalPath: "",
+      approvals: [],
     };
     this.pipelines.set(pipelineId, state);
     this._persist();

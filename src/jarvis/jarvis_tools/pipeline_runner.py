@@ -21,6 +21,7 @@
 编排文件 `flow` 为可选字段；无 `flow` 时本工具报错提示（此时应由
 `@OrganizeAgents` 负责只创建 agent，行为不变）。
 """
+
 import json
 import re
 import time
@@ -211,7 +212,11 @@ class PipelineRunnerTool:
             nodes, agents_by_name, work_dir, pipeline_id
         )
         if not agent_created["success"]:
-            self._emit(pipeline_id, "pipeline_done", success=False, final_status="failed")
+            # 清理已创建的部分 Agent，避免残留
+            self._cleanup_agents(agent_created.get("agent_map") or {})
+            self._emit(
+                pipeline_id, "pipeline_done", success=False, final_status="failed"
+            )
             return self._error(agent_created["error"])
         agent_map = agent_created["agent_map"]
 
@@ -254,6 +259,88 @@ class PipelineRunnerTool:
                 emit_remote(event)
         except Exception:  # pylint: disable=broad-except
             pass
+
+    def _emit_approval(
+        self,
+        pipeline_id: str,
+        action: str,
+        approver: str = "",
+        note: str = "",
+        gate_stage: str = "",
+        approval_path: str = "",
+    ) -> None:
+        """广播一条门禁人工审批事件（pipeline_approval）。
+
+        纯副作用（同 _emit）：任何异常都被吞掉，绝不影响流水线执行。
+        事件字段：pipeline_id / type=pipeline_approval / action / approver /
+        note / gate_stage / approval_path / ts（时间戳）。
+        action 取值：pending（门禁停住等待审批）、approve、reject、retry。
+        """
+        self._emit(
+            pipeline_id,
+            "pipeline_approval",
+            action=action,
+            approver=str(approver or ""),
+            note=str(note or ""),
+            gate_stage=str(gate_stage or ""),
+            approval_path=str(approval_path or ""),
+            ts=time.time(),
+        )
+
+    def record_approval(
+        self,
+        pipeline_id: str,
+        action: str,
+        approver: str = "",
+        note: str = "",
+    ) -> Dict[str, Any]:
+        """记录一条门禁人工审批决定并广播审批事件（供前端/API 调用）。
+
+        门禁停住后，人工对 gate 阶段做出放行(approve)/拒绝(reject)/重试(retry)
+        决定。本方法只负责**记录决定并广播审计事件**（谁、何时、动作、备注），
+        不直接驱动流水线续跑——放行/重试由调用方以 approve=true 重跑流水线完成，
+        拒绝则流水线终止。纯记录与事件广播，幂等、无副作用、不抛异常。
+
+        参数:
+            pipeline_id: 目标流水线 ID（gate_blocked 事件中的 pipeline_id）。
+            action: 审批动作，须为 APPROVAL_ACTIONS 之一。
+            approver: 审批人（display_name/username/user_id，可为空）。
+            note: 审批备注（可为空）。
+
+        返回:
+            {"success": True, "data": {...}} 或 {"success": False, "error": str}
+        """
+        try:
+            from jarvis.jarvis_tools.pipeline_events import APPROVAL_ACTIONS
+
+            action = str(action or "").strip().lower()
+            if action not in APPROVAL_ACTIONS:
+                return {
+                    "success": False,
+                    "error": (
+                        f"无效审批动作 '{action}'，须为 {', '.join(APPROVAL_ACTIONS)}"
+                    ),
+                }
+            if not str(pipeline_id or "").strip():
+                return {"success": False, "error": "缺少必填参数 pipeline_id"}
+            self._emit_approval(
+                pipeline_id,
+                action=action,
+                approver=approver,
+                note=note,
+            )
+            return {
+                "success": True,
+                "data": {
+                    "pipeline_id": str(pipeline_id).strip(),
+                    "action": action,
+                    "approver": str(approver or ""),
+                    "note": str(note or ""),
+                    "ts": time.time(),
+                },
+            }
+        except Exception as e:  # pylint: disable=broad-except
+            return {"success": False, "error": f"记录审批失败: {e}"}
 
     @staticmethod
     def _make_pipeline_id(orchestration_file: str) -> str:
@@ -436,7 +523,9 @@ class PipelineRunnerTool:
 
         gate_stages = [n["stage"] for n in nodes if n["gate"]]
         if gate_stages:
-            lines.append(f"🚧 门禁阶段: {', '.join(gate_stages)}（完成后停住等人工审批）")
+            lines.append(
+                f"🚧 门禁阶段: {', '.join(gate_stages)}（完成后停住等人工审批）"
+            )
 
         return {"success": True, "stdout": "\n".join(lines), "stderr": ""}
 
@@ -450,9 +539,7 @@ class PipelineRunnerTool:
         done: set = set()
         batches: List[List[Dict[str, Any]]] = []
         while remaining:
-            ready = [
-                s for s, deps in remaining.items() if deps.issubset(done)
-            ]
+            ready = [s for s, deps in remaining.items() if deps.issubset(done)]
             if not ready:
                 break  # 有环时 _build_dag 已拦截，此处仅防御
             batch = [by_stage[s] for s in ready]
@@ -514,7 +601,10 @@ class PipelineRunnerTool:
                         f"创建阶段 [{stage_name}] 常驻 Agent 失败（已重试）: "
                         f"{last_error}"
                     ),
+                    "agent_map": agent_map,
                 }
+            # 先记录已创建的 Agent，供失败时清理（含就绪超时场景）
+            agent_map[stage_name] = agent_id
             # 创建 Agent 后进程刚启动、web-gateway 端口尚未监听，立即派发任务会 502；
             # 这里等待 Agent 就绪（可响应 /status）后再进入调度。
             ready, ready_err = self._wait_agent_ready(gw, agent_id)
@@ -524,8 +614,8 @@ class PipelineRunnerTool:
                     "error": (
                         f"阶段 [{stage_name}] 常驻 Agent 就绪等待超时: {ready_err}"
                     ),
+                    "agent_map": agent_map,
                 }
-            agent_map[stage_name] = agent_id
             PrettyOutput.auto_print(
                 f"  🛠 阶段 [{stage_name}] 常驻 Agent 就绪: {agent_id}"
             )
@@ -752,14 +842,12 @@ class PipelineRunnerTool:
         if spec_summary:
             parts.append(f"流水线背景:\n{spec_summary}")
         if input_list:
-            parts.append(
-                "本阶段输入产物:\n" + "\n".join(f"- {i}" for i in input_list)
-            )
+            parts.append("本阶段输入产物:\n" + "\n".join(f"- {i}" for i in input_list))
         parts.append(
             f"请完成本阶段职责后，将产物写入 {output or '（本阶段无产物要求）'}。"
             f"完成后，把结果写入状态文件 {status_file}，内容为 JSON："
             f'{{"status": "completed", "output": "<产物路径>"}}；'
-            f"若失败则写 {{\"status\": \"failed\", \"error\": \"<原因>\"}}。"
+            f'若失败则写 {{"status": "failed", "error": "<原因>"}}。'
         )
         return "\n\n".join(parts)
 
@@ -811,9 +899,7 @@ class PipelineRunnerTool:
                             "result": {},
                             "error": "依赖失败/跳过，本阶段被跳过",
                         }
-                        stdout_lines.append(
-                            f"  ⏭ 阶段 [{n['stage']}] 因依赖失败被跳过"
-                        )
+                        stdout_lines.append(f"  ⏭ 阶段 [{n['stage']}] 因依赖失败被跳过")
                         self._emit(
                             pipeline_id,
                             "stage_update",
@@ -836,8 +922,7 @@ class PipelineRunnerTool:
                 if not ready:
                     # 无 ready 节点：检查是否全部结束
                     if all(
-                        s in ("completed", "failed", "skipped")
-                        for s in state.values()
+                        s in ("completed", "failed", "skipped") for s in state.values()
                     ):
                         break
                     # 有 pending 但无 ready 且无 running：死锁保护
@@ -934,10 +1019,7 @@ class PipelineRunnerTool:
                         gate_blocked_stage = n["stage"]
                         gate_approval_path = stage_result.get("approval_path", "")
                     # abort 中止（仅当该阶段最终失败；重试中不中止）
-                    if (
-                        state[n["stage"]] == "failed"
-                        and n["on_error"] == "abort"
-                    ):
+                    if state[n["stage"]] == "failed" and n["on_error"] == "abort":
                         self._emit(
                             pipeline_id,
                             "pipeline_done",
@@ -945,6 +1027,8 @@ class PipelineRunnerTool:
                             final_status="aborted",
                             failed_stage=n["stage"],
                         )
+                        # 清理已创建的常驻 Agent，避免残留
+                        self._cleanup_agents(agent_map)
                         return self._abort_result(
                             stage_name=n["stage"],
                             error=str(stage_result.get("error", "") or ""),
@@ -968,6 +1052,13 @@ class PipelineRunnerTool:
                 gate_stage=gate_blocked_stage,
                 approval_path=gate_approval_path,
             )
+            # 广播一条「等待审批」事件，供前端弹出审批浮层（放行/拒绝/重试）
+            self._emit_approval(
+                pipeline_id,
+                action="pending",
+                gate_stage=gate_blocked_stage,
+                approval_path=str(gate_approval_path or ""),
+            )
             return {
                 "success": True,
                 "stdout": "\n".join(stdout_lines),
@@ -977,9 +1068,7 @@ class PipelineRunnerTool:
         # 检查是否有 failed 阶段
         failed = [s for s, st in state.items() if st == "failed"]
         if failed:
-            errs = [
-                results[s].get("error", "") for s in failed if results.get(s)
-            ]
+            errs = [results[s].get("error", "") for s in failed if results.get(s)]
             stdout_lines.append("❌ 流水线存在失败阶段")
             self._emit(
                 pipeline_id,
@@ -988,6 +1077,8 @@ class PipelineRunnerTool:
                 final_status="failed",
                 failed_stages=failed,
             )
+            # 清理已创建的常驻 Agent，避免残留
+            self._cleanup_agents(agent_map)
             return {
                 "success": False,
                 "stdout": "\n".join(stdout_lines),
@@ -1097,6 +1188,36 @@ class PipelineRunnerTool:
         # on_error=skip_dependents/continue：失败但不中止，
         # 依赖它的节点会在下一轮被 _deps_blocked 跳过。
 
+    def _cleanup_agents(self, agent_map: Dict[str, str]) -> None:
+        """流水线失败/中止时清理已创建的常驻 Agent（尽力而为、幂等）。
+
+        遍历 agent_map 删除各阶段创建的 Agent，避免残留进程占用资源。
+        - 幂等：重复删除已不存在的 Agent 不报错；
+        - 尽力而为：任何异常/失败都被吞掉，绝不影响流水线结果；
+        - 只删 Agent，不删产物（artifacts 保留）。
+        是否清理受配置 is_pipeline_cleanup_on_failure() 控制。
+        """
+        try:
+            from jarvis.jarvis_utils.config import is_pipeline_cleanup_on_failure
+
+            if not is_pipeline_cleanup_on_failure():
+                return
+        except Exception:  # pylint: disable=broad-except
+            return
+
+        agent_ids = [str(aid) for aid in agent_map.values() if aid]
+        if not agent_ids:
+            return
+        try:
+            gw = GatewayManagerTool()
+            # 测试桩（FakeGW）可能未实现 _delete_agent，直接跳过
+            delete_agent = getattr(gw, "_delete_agent", None)
+            if delete_agent is None:
+                return
+            delete_agent(agent_id=agent_ids)
+        except Exception:  # pylint: disable=broad-except
+            pass
+
     def _abort_result(
         self,
         stage_name: str,
@@ -1136,9 +1257,7 @@ class PipelineRunnerTool:
         except Exception as e:  # pylint: disable=broad-except
             return False, f"when 表达式解析失败: {e}"
 
-    def _substitute_refs(
-        self, expr: str, results: Dict[str, Dict[str, Any]]
-    ) -> str:
+    def _substitute_refs(self, expr: str, results: Dict[str, Dict[str, Any]]) -> str:
         """把 `stage.field` 引用替换为对应 stage 结果中的字段值（字符串形式）。"""
 
         def _lookup(match: "re.Match") -> str:
@@ -1334,8 +1453,6 @@ class PipelineRunnerTool:
         except (json.JSONDecodeError, OSError, ValueError):
             pass
         return {}
-
-
 
     def _error(self, msg: str) -> Dict[str, Any]:
         """构造错误返回。"""

@@ -198,6 +198,69 @@
           </div>
         </div>
 
+        <!-- 门禁审批浮层（full 模式、gate_blocked 时显示） -->
+        <div
+          v-if="isGateBlocked"
+          class="orch-approval"
+        >
+          <div class="orch-approval-head">
+            <span class="orch-approval-title">⛔ 门禁待审批</span>
+            <span class="orch-approval-stage">阶段：{{ active.gateStage || '—' }}</span>
+          </div>
+          <div
+            v-if="active.approvalPath"
+            class="orch-approval-path"
+            :title="active.approvalPath"
+          >
+            审批报告：{{ active.approvalPath }}
+          </div>
+          <textarea
+            v-model="approvalNote"
+            class="orch-approval-note"
+            rows="2"
+            placeholder="审批备注（可选）"
+          />
+          <div class="orch-approval-actions">
+            <button
+              class="orch-btn is-approve"
+              :disabled="approvalBusy"
+              @click="submitApproval('approve')"
+            >✓ 放行</button>
+            <button
+              class="orch-btn is-reject"
+              :disabled="approvalBusy"
+              @click="submitApproval('reject')"
+            >✕ 拒绝</button>
+            <button
+              class="orch-btn is-retry"
+              :disabled="approvalBusy"
+              @click="submitApproval('retry')"
+            >↻ 重试</button>
+          </div>
+          <div
+            v-if="approvalLog.length"
+            class="orch-approval-log"
+          >
+            <div class="orch-approval-log-title">
+              审批日志
+            </div>
+            <div
+              v-for="(a, i) in approvalLog"
+              :key="i"
+              class="orch-approval-item"
+            >
+              <span class="orch-approval-act" :class="'act-' + a.action">{{ approvalActionLabel(a.action) }}</span>
+              <span class="orch-approval-who">{{ a.approver || '系统' }}</span>
+              <span
+                v-if="a.note"
+                class="orch-approval-note-text"
+                :title="a.note"
+              >{{ a.note }}</span>
+              <span class="orch-approval-time">{{ fmtApprovalTime(a.ts) }}</span>
+            </div>
+          </div>
+        </div>
+
         <!-- DAG 画布 -->
         <div
           class="orch-canvas"
@@ -382,7 +445,7 @@ const props = defineProps({
   mode: { type: String, default: 'compact' }, // compact | full
 })
 
-const emit = defineEmits(['select', 'jump-agent', 'expand', 'remove'])
+const emit = defineEmits(['select', 'jump-agent', 'expand', 'remove', 'approve', 'reject', 'retry'])
 
 const NODE_W = LAYOUT.NODE_W
 const NODE_H = LAYOUT.NODE_H
@@ -501,10 +564,47 @@ function fmtTime(ts) {
   const pad = (n) => String(n).padStart(2, '0')
   return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
+
+// ---- 门禁审批浮层 ----
+const approvalNote = ref('')
+const approvalBusy = ref(false)
+
+// 仅 full 模式且当前流程为 gate_blocked（等待审批）时显示审批浮层
+const isGateBlocked = computed(() => {
+  if (props.mode !== 'full') return false
+  return !!active.value && active.value.finalStatus === 'gate_blocked'
+})
+
+// 审批日志：取当前流程的 approvals（含 pending/approve/reject/retry），按时间倒序
+const approvalLog = computed(() => {
+  const st = active.value
+  if (!st || !Array.isArray(st.approvals)) return []
+  return [...st.approvals].sort((a, b) => (b.ts || 0) - (a.ts || 0))
+})
+
+function approvalActionLabel(action) {
+  return { pending: '待审批', approve: '放行', reject: '拒绝', retry: '重试' }[action] || action || '—'
+}
+
+function fmtApprovalTime(ts) {
+  if (!ts) return ''
+  const d = new Date(ts)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+// 提交审批决定：把动作与备注交给父组件处理（父组件负责调后端记录并重跑）
+function submitApproval(action) {
+  if (approvalBusy.value || !active.value) return
+  const note = approvalNote.value.trim()
+  emit(action, { pipelineId: active.value.pipelineId, note })
+  approvalNote.value = ''
+}
 </script>
 
 <style scoped>
 .orch-view {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -716,6 +816,104 @@ function fmtTime(ts) {
 .orch-tip-row span { color: #7f8ea3; flex: 0 0 34px; }
 .orch-tip-row b { color: #c6d4e6; font-weight: 500; word-break: break-all; }
 .orch-tip-err b { color: #ff8a94; }
+
+/* Approval panel */
+.orch-approval {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 8;
+  width: 300px;
+  max-width: calc(100% - 24px);
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(14, 22, 34, 0.97);
+  border: 1px solid rgba(240, 180, 41, 0.5);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55), 0 0 24px rgba(240, 180, 41, 0.15);
+  font-size: 12px;
+  color: #d8e2f0;
+}
+.orch-approval-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.orch-approval-title { font-size: 13px; font-weight: 600; color: #f0b429; }
+.orch-approval-stage { font-size: 11px; color: #9db0c8; }
+.orch-approval-path {
+  font-size: 11px;
+  color: #8b9cb3;
+  margin-bottom: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.orch-approval-note {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(90, 120, 160, 0.3);
+  background: rgba(10, 16, 26, 0.8);
+  color: #d8e2f0;
+  font-size: 12px;
+  font-family: inherit;
+}
+.orch-approval-note:focus { outline: none; border-color: rgba(32, 200, 255, 0.6); }
+.orch-approval-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.orch-btn {
+  flex: 1;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(90, 120, 160, 0.35);
+  background: rgba(20, 30, 46, 0.8);
+  color: #d8e2f0;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.orch-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.orch-btn.is-approve:hover:not(:disabled) { border-color: #37d67a; color: #37d67a; background: rgba(55, 214, 122, 0.12); }
+.orch-btn.is-reject:hover:not(:disabled) { border-color: #ff5d6c; color: #ff5d6c; background: rgba(255, 93, 108, 0.12); }
+.orch-btn.is-retry:hover:not(:disabled) { border-color: #20c8ff; color: #20c8ff; background: rgba(32, 200, 255, 0.12); }
+.orch-approval-log {
+  margin-top: 10px;
+  border-top: 1px solid rgba(90, 120, 160, 0.2);
+  padding-top: 8px;
+  max-height: 160px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.orch-approval-log-title { font-size: 11px; color: #7f8ea3; }
+.orch-approval-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #9db0c8;
+}
+.orch-approval-act {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-size: 10px;
+}
+.orch-approval-act.act-pending { background: rgba(240, 180, 41, 0.18); color: #f0b429; }
+.orch-approval-act.act-approve { background: rgba(55, 214, 122, 0.18); color: #37d67a; }
+.orch-approval-act.act-reject { background: rgba(255, 93, 108, 0.18); color: #ff5d6c; }
+.orch-approval-act.act-retry { background: rgba(32, 200, 255, 0.18); color: #20c8ff; }
+.orch-approval-who { flex: 0 0 auto; color: #c6d4e6; }
+.orch-approval-note-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #8b9cb3; }
+.orch-approval-time { flex: 0 0 auto; color: #6b7d93; font-size: 10px; }
 
 @keyframes orch-dash { to { stroke-dashoffset: -16; } }
 @keyframes orch-pulse { 0%, 100% { opacity: 1; r: 4; } 50% { opacity: 0.35; r: 5.5; } }

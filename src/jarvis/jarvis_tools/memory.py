@@ -12,6 +12,9 @@ from jarvis.jarvis_utils.config import (
     calculate_token_limit,
     get_data_dir,
     get_max_input_token_count,
+    get_memory_compress_threshold,
+    is_enable_memory_compress,
+    is_enable_memory_value_filter,
     save_exception,
 )
 from jarvis.jarvis_utils.embedding import get_context_token_count
@@ -43,15 +46,16 @@ class MemoryTool:
     name = "memory"
     description = """统一的记忆管理工具，支持三种操作（每次只执行一种，参数随操作而异）：
 
-1. **save**：把信息存入短期/长期记忆库（支持批量）；记忆类型 project_long_term=项目长期、global_long_term=全局长期、short_term=短期
+1. **save**：把信息存入记忆库（支持批量）。记忆有两个正交维度：memory_type=作用域(project项目/global全局/short_term短期)，nature=性质(long_term长期/procedural程序性how-to/episodic情景归档)。例如 project+long_term=项目长期、global+procedural=全局程序性。可选 importance 标注重要性（high/medium/low，默认走启发式价值过滤），可选 source 标注来源。
 
-2. **retrieve**：检索记忆库中的信息，支持按类型与标签过滤、可选语义检索
+2. **retrieve**：检索记忆库中的信息，支持按作用域(memory_type)、性质(nature)与标签过滤、可选语义检索
 
 3. **clear**：按类型/标签/ID 清除指定记忆。注意：清除不可恢复
 
 **要点**：
 - 每次只能执行一种操作（save/retrieve/clear）
-- 参数随操作类型不同"""
+- 参数随操作类型不同
+- save 时系统会自动做写时价值过滤与超长压缩：未显式标注 importance 且内容无价值（过短/纯客套）会被自动过滤；超长内容会做摘要压缩，原始完整内容保留在 original_content。这些是自动机制，无需 Agent 干预。"""
 
     parameters = {
         "type": "object",
@@ -69,12 +73,13 @@ class MemoryTool:
                     "properties": {
                         "memory_type": {
                             "type": "string",
-                            "enum": [
-                                "project_long_term",
-                                "global_long_term",
-                                "short_term",
-                            ],
-                            "description": "记忆类型",
+                            "enum": ["project", "global", "short_term"],
+                            "description": "记忆作用域：project=项目、global=全局、short_term=短期",
+                        },
+                        "nature": {
+                            "type": "string",
+                            "enum": ["long_term", "procedural", "episodic"],
+                            "description": "记忆性质：long_term=长期、procedural=程序性(how-to/踩坑经验)、episodic=情景(历史归档)",
                         },
                         "tags": {
                             "type": "array",
@@ -84,6 +89,15 @@ class MemoryTool:
                         "content": {
                             "type": "string",
                             "description": "要保存的记忆内容",
+                        },
+                        "importance": {
+                            "type": "string",
+                            "enum": ["high", "medium", "low"],
+                            "description": "重要性标注（可选，默认走启发式价值过滤）",
+                        },
+                        "source": {
+                            "type": "string",
+                            "description": "来源标注（可选，如任务名/会话ID）",
                         },
                     },
                     "required": ["memory_type", "tags", "content"],
@@ -95,14 +109,17 @@ class MemoryTool:
                 "type": "array",
                 "items": {
                     "type": "string",
-                    "enum": [
-                        "project_long_term",
-                        "global_long_term",
-                        "short_term",
-                        "all",
-                    ],
+                    "enum": ["project", "global", "short_term", "all"],
                 },
-                "description": "要检索的记忆类型列表（仅 retrieve 使用；all 表示全部）",
+                "description": "按作用域过滤记忆（仅 retrieve 使用；all 表示全部作用域）",
+            },
+            "natures": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                    "enum": ["long_term", "procedural", "episodic", "all"],
+                },
+                "description": "按性质过滤记忆（可选，仅 retrieve 使用；all 表示全部性质）",
             },
             "tags": {
                 "type": "array",
@@ -143,14 +160,29 @@ class MemoryTool:
         self.project_memory_dir = Path(".jarvis/memory")
         self.global_memory_dir = Path(get_data_dir()) / "memory"
 
-    def _get_memory_dir(self, memory_type: str) -> Path:
-        """根据记记忆类型型获取存储目录"""
-        if memory_type == "project_long_term":
-            return Path(self.project_memory_dir)
-        elif memory_type in ["global_long_term", "short_term"]:
-            return Path(self.global_memory_dir) / memory_type
-        else:
-            raise ValueError(f"未知的记记忆类型型: {memory_type}")
+    def _get_memory_dir(self, memory_type: str, nature: str = "long_term") -> Path:
+        """根据作用域(memory_type)与性质(nature)获取存储目录
+
+        作用域：project=项目、global=全局；性质：long_term=长期、procedural=程序性、episodic=情景。
+        short_term 存内存不落盘，此处返回其占位目录（实际由调用方处理）。
+        """
+        if memory_type == "project":
+            if nature == "long_term":
+                return Path(self.project_memory_dir)
+            elif nature == "procedural":
+                return Path(self.project_memory_dir) / "procedural"
+            elif nature == "episodic":
+                return Path(self.project_memory_dir) / "episodic"
+        elif memory_type == "global":
+            if nature == "long_term":
+                return Path(self.global_memory_dir) / "global_long_term"
+            elif nature == "procedural":
+                return Path(self.global_memory_dir) / "procedural"
+            elif nature == "episodic":
+                return Path(self.global_memory_dir) / "episodic"
+        elif memory_type == "short_term":
+            return Path(self.global_memory_dir) / "short_term"
+        raise ValueError(f"未知的记忆类型: memory_type={memory_type}, nature={nature}")
 
     def _generate_memory_id(self) -> str:
         """生成唯一的记忆ID"""
@@ -160,13 +192,207 @@ class MemoryTool:
 
     # ========== save 操作相关方法 ==========
 
+    # 无信息量的客套/占位内容，启发式过滤时丢弃
+    _LOW_VALUE_PHRASES = (
+        "好的",
+        "明白",
+        "收到",
+        "知道了",
+        "了解",
+        "嗯",
+        "哦",
+        "ok",
+        "okay",
+        "好的，明白",
+        "好的明白",
+        "好的收到",
+        "没问题",
+        "可以",
+        "行",
+        "好",
+        "谢谢",
+        "感谢",
+        "不客气",
+        "再见",
+        "你好",
+        "hello",
+        "hi",
+        "thanks",
+        "done",
+        "完成",
+        "好的好的",
+        "嗯嗯",
+        "是的",
+        "对",
+        "对的",
+    )
+
+    def _should_store_memory(self, memory_data: Dict[str, Any]) -> bool:
+        """写时记忆价值过滤：判断一条记忆是否值得存储。
+
+        规则：
+        1. 用户显式标注 importance（high/medium/low）→ 一律保留（尊重显式意图）。
+        2. 未显式标注 → 启发式判断：
+           - 去除空白后内容过短（< 8 字符）→ 丢弃
+           - 纯客套/占位内容（命中 _LOW_VALUE_PHRASES）→ 丢弃
+           - 其余内容保守保留（避免误删有价值信息）。
+        3. 过滤仅对落盘/内存存储生效，不影响调用方已收集的标签等副作用。
+        """
+        # 用户显式标注 importance 时尊重其意图
+        if "importance" in memory_data:
+            return True
+
+        content = (memory_data.get("content") or "").strip()
+        if not content:
+            return False
+
+        # 过短内容无信息量
+        if len(content) < 8:
+            return False
+
+        # 纯客套/占位内容
+        lowered = content.lower()
+        if lowered in self._LOW_VALUE_PHRASES:
+            return False
+        for phrase in self._LOW_VALUE_PHRASES:
+            if phrase and lowered == phrase:
+                return False
+
+        return True
+
+    # 高信号关键词：含这些词的句子在规则式压缩时优先保留
+    _HIGH_SIGNAL_KEYWORDS = (
+        "决策",
+        "结论",
+        "决定",
+        "选择",
+        "偏好",
+        "原因",
+        "因为",
+        "所以",
+        "因此",
+        "用户",
+        "修复",
+        "问题",
+        "方案",
+        "配置",
+        "版本",
+        "地址",
+        "路径",
+        "命令",
+        "bug",
+        "bug",
+        "error",
+        "错误",
+        "注意",
+        "重要",
+        "必须",
+        "禁止",
+        "推荐",
+        "成功",
+        "失败",
+        "步骤",
+        "流程",
+        "结果",
+        "目标",
+        "实现",
+        "新增",
+        "删除",
+    )
+
+    def _compress_memory_content(self, content: str) -> str:
+        """规则式摘要压缩：对超长记忆内容做提取式压缩。
+
+        策略（保留关键信息、控制体积）：
+        1. 用 token 估算判断是否超过压缩阈值，未超过则原样返回。
+        2. 超过阈值时：
+           - 保留开头若干句（背景/上下文）
+           - 提取含高信号关键词的句子（决策/结论/偏好/事实等）
+           - 保留结尾若干句（结论/总结）
+           - 去重后拼接，避免重复句子。
+        3. 压缩结果仍可能较长时做字符级截断兜底。
+
+        返回:
+            str: 压缩后的内容；未超阈值时返回原内容。
+        """
+        text = (content or "").strip()
+        if not text:
+            return text
+
+        try:
+            if get_context_token_count(text) <= get_memory_compress_threshold():
+                return text
+        except Exception:
+            # token 估算失败时退化为字符长度判断
+            if len(text) <= get_memory_compress_threshold() * 2:
+                return text
+
+        # 按句子切分
+        import re
+
+        sentences = [s.strip() for s in re.split(r"[。！？!?\n]+", text) if s.strip()]
+
+        # 保留开头 3 句与结尾 3 句
+        head = sentences[:3]
+        tail = sentences[-3:] if len(sentences) > 6 else []
+
+        # 提取含高信号关键词的句子
+        signal = []
+        for s in sentences[3:-3] if len(sentences) > 6 else []:
+            lowered = s.lower()
+            if any(kw in lowered for kw in self._HIGH_SIGNAL_KEYWORDS):
+                signal.append(s)
+
+        # 去重（保持顺序）
+        seen = set()
+        merged = []
+        for s in head + signal + tail:
+            key = s[:20]
+            if key not in seen:
+                seen.add(key)
+                merged.append(s)
+
+        compressed = "；".join(merged)
+        # 字符级兜底截断，防止极端超长
+        max_chars = max(600, int(len(text) * 0.6))
+        if len(compressed) > max_chars:
+            compressed = compressed[:max_chars]
+        return compressed
+
     def _save_single_memory(
         self, memory_data: Dict[str, Any], agent: Any = None
     ) -> Dict[str, Any]:
         """保存单条记忆"""
-        memory_type = memory_data["memory_type"]
+        memory_type = memory_data["memory_type"]  # 作用域: project/global/short_term
+        nature = memory_data.get(
+            "nature", "long_term"
+        )  # 性质: long_term/procedural/episodic
         tags = memory_data.get("tags", [])
         content = memory_data.get("content", "")
+
+        # 写时记忆价值过滤：未显式标注 importance 且内容无价值时丢弃
+        if is_enable_memory_value_filter() and not self._should_store_memory(
+            memory_data
+        ):
+            return {
+                "memory_id": None,
+                "memory_type": memory_type,
+                "nature": nature,
+                "tags": tags,
+                "storage": "filtered",
+                "message": "记忆内容价值不足，已过滤不保存",
+            }
+
+        # 存储前压缩：超长内容做规则式摘要，原始内容保留到 original_content
+        original_content = content
+        if is_enable_memory_compress() and content:
+            try:
+                compressed = self._compress_memory_content(content)
+                if compressed != content:
+                    content = compressed
+            except Exception:
+                # 压缩失败不影响保存，保留原文
+                content = original_content
 
         # 收集记忆标签到 agent 的 memory_tags 属性
         if agent and hasattr(agent, "add_memory_tags") and tags:
@@ -182,12 +408,18 @@ class MemoryTool:
         # 创建记忆对象
         memory_obj = {
             "id": memory_id,
-            "type": memory_type,
+            "memory_type": memory_type,
+            "nature": nature,
             "tags": tags,
             "content": content,
+            "importance": memory_data.get("importance", "medium"),
+            "source": memory_data.get("source", ""),
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat(),
         }
+        # 压缩过时保留原始完整内容，便于必要时查原文
+        if content != original_content:
+            memory_obj["original_content"] = original_content
 
         if memory_type == "short_term":
             # 短期记忆保存到全局变量
@@ -205,6 +437,7 @@ class MemoryTool:
             result = {
                 "memory_id": memory_id,
                 "memory_type": memory_type,
+                "nature": nature,
                 "tags": tags,
                 "storage": "memory",
                 "message": f"短期记忆已成功保存到内存，ID: {memory_id}",
@@ -212,7 +445,7 @@ class MemoryTool:
         else:
             # 长期记忆保存到文件
             # 获取存储目录并确保存在
-            memory_dir = self._get_memory_dir(memory_type)
+            memory_dir = self._get_memory_dir(memory_type, nature)
             memory_dir.mkdir(parents=True, exist_ok=True)
 
             # 保存记忆文件
@@ -232,6 +465,7 @@ class MemoryTool:
             result = {
                 "memory_id": memory_id,
                 "memory_type": memory_type,
+                "nature": nature,
                 "tags": tags,
                 "file_path": str(memory_file),
                 "message": f"记忆已成功保存，ID: {memory_id}",
@@ -310,45 +544,50 @@ class MemoryTool:
     # ========== retrieve 操作相关方法 ==========
 
     def _retrieve_from_type(
-        self, memory_type: str, tags: Optional[List[str]] = None
+        self,
+        memory_type: str,
+        tags: Optional[List[str]] = None,
+        natures: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
-        """从指定类型中检索记忆"""
+        """从指定作用域(memory_type)与性质(natures)中检索记忆"""
         memories: List[Dict[str, Any]] = []
 
         if memory_type == "short_term":
             # 从全局变量获取短期记忆
             memories = get_short_term_memories(tags)
         else:
-            # 从文件系统获取长期记忆
-            memory_dir = self._get_memory_dir(memory_type)
+            # 从文件系统获取记忆（按性质分别读取）
+            nature_list = natures or ["long_term", "procedural", "episodic"]
+            for nature in nature_list:
+                memory_dir = self._get_memory_dir(memory_type, nature)
+                if not memory_dir.exists():
+                    continue
 
-            if not memory_dir.exists():
-                return memories
+                # 遍历记忆文件
+                for memory_file in memory_dir.glob("*.json"):
+                    try:
+                        with open(memory_file, "r", encoding="utf-8") as f:
+                            memory_data = json.load(f)
 
-            # 遍历记忆文件
-            for memory_file in memory_dir.glob("*.json"):
-                try:
-                    with open(memory_file, "r", encoding="utf-8") as f:
-                        memory_data = json.load(f)
+                        # 如果指定了标签，检查是否匹配
+                        if tags:
+                            memory_tags = memory_data.get("tags", [])
+                            if not any(tag in memory_tags for tag in tags):
+                                continue
 
-                    # 如果指定了标签，检查是否匹配
-                    if tags:
-                        memory_tags = memory_data.get("tags", [])
-                        if not any(tag in memory_tags for tag in tags):
-                            continue
-
-                    memories.append(memory_data)
-                except Exception as e:
-                    PrettyOutput.auto_print(
-                        f"⚠️ 读取记忆文件 {memory_file} 失败: {str(e)}"
-                    )
+                        memories.append(memory_data)
+                    except Exception as e:
+                        PrettyOutput.auto_print(
+                            f"⚠️ 读取记忆文件 {memory_file} 失败: {str(e)}"
+                        )
 
         return memories
 
     def _execute_retrieve(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行检索记忆操作"""
         try:
-            memory_types = args.get("memory_types", [])
+            memory_types = args.get("memory_types", [])  # 作用域过滤
+            natures = args.get("natures", [])  # 性质过滤
             tags = args.get("tags", [])
             limit = args.get("limit", None)
             smart_search = args.get("smart_search", False)
@@ -356,22 +595,28 @@ class MemoryTool:
 
             # 如果启用智能检索模式
             if smart_search:
-                return self._execute_smart_search(args, memory_types, query, limit)
+                return self._execute_smart_search(
+                    args, memory_types, query, limit, natures
+                )
 
-            # 确定要检索的记记忆类型型
-            if "all" in memory_types:
-                types_to_search = [
-                    "project_long_term",
-                    "global_long_term",
-                    "short_term",
-                ]
+            # 确定要检索的作用域
+            if not memory_types or "all" in memory_types:
+                types_to_search = ["project", "global", "short_term"]
             else:
                 types_to_search = memory_types
 
-            # 从各个类型中检索记忆
+            # 确定要检索的性质
+            if not natures or "all" in natures:
+                natures_to_search = ["long_term", "procedural", "episodic"]
+            else:
+                natures_to_search = natures
+
+            # 从各个作用域+性质组合中检索记忆
             all_memories = []
             for memory_type in types_to_search:
-                memories = self._retrieve_from_type(memory_type, tags)
+                memories = self._retrieve_from_type(
+                    memory_type, tags, natures_to_search
+                )
                 all_memories.extend(memories)
 
             # 按创建时间排序（最新的在前）
@@ -431,14 +676,17 @@ class MemoryTool:
             if tags:
                 markdown_output += f"**使用标签过滤**: {', '.join(tags)}\n\n"
 
-            markdown_output += f"**记记忆类型型**: {', '.join(types_to_search)}\n\n"
+            markdown_output += f"**作用域**: {', '.join(types_to_search)}\n\n"
 
             markdown_output += "---\n\n"
 
             # 输出所有记忆
             for i, memory in enumerate(all_memories):
                 markdown_output += f"## {i + 1}. {memory.get('id', '未知ID')}\n\n"
-                markdown_output += f"**类型**: {memory.get('type', '未知类型')}\n\n"
+                markdown_output += (
+                    f"**作用域**: {memory.get('memory_type', '未知')}\n\n"
+                )
+                markdown_output += f"**性质**: {memory.get('nature', '未知')}\n\n"
                 markdown_output += f"**标签**: {', '.join(memory.get('tags', []))}\n\n"
                 markdown_output += (
                     f"**创建时间**: {memory.get('created_at', '未知时间')}\n\n"
@@ -453,7 +701,15 @@ class MemoryTool:
                 metadata = {
                     k: v
                     for k, v in memory.items()
-                    if k not in ["id", "type", "tags", "created_at", "content"]
+                    if k
+                    not in [
+                        "id",
+                        "memory_type",
+                        "nature",
+                        "tags",
+                        "created_at",
+                        "content",
+                    ]
                 }
                 if metadata:
                     markdown_output += "**其他信息**:\n"
@@ -480,6 +736,7 @@ class MemoryTool:
         memory_types: List[str],
         query: str,
         limit: Optional[int],
+        natures: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """执行智能语义检索"""
         try:
@@ -490,22 +747,26 @@ class MemoryTool:
                     "stderr": "智能检索模式需要提供 query 参数",
                 }
 
-            # 确定要检索的记记忆类型型（智能检索不支持 short_term）
-            if "all" in memory_types:
-                types_to_search = ["project_long_term", "global_long_term"]
+            # 确定要检索的作用域（智能检索不支持 short_term）
+            if not memory_types or "all" in memory_types:
+                types_to_search = ["project", "global"]
             else:
                 types_to_search = [
-                    t
-                    for t in memory_types
-                    if t in ["project_long_term", "global_long_term"]
+                    t for t in memory_types if t in ["project", "global"]
                 ]
 
             if not types_to_search:
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": "智能检索模式仅支持 project_long_term 和 global_long_term 类型",
+                    "stderr": "智能检索模式仅支持 project 和 global 作用域",
                 }
+
+            # 确定要检索的性质
+            if not natures or "all" in natures:
+                natures_to_search = ["long_term", "procedural", "episodic"]
+            else:
+                natures_to_search = natures
 
             # 使用 SmartRetriever 进行语义检索
             retriever = _get_smart_retriever()
@@ -513,6 +774,7 @@ class MemoryTool:
             memories = retriever.semantic_search(
                 query=query,
                 memory_types=types_to_search,
+                natures=natures_to_search,
                 limit=search_limit,
             )
 
@@ -556,13 +818,16 @@ class MemoryTool:
             markdown_output = "# 智能语义检索结果\n\n"
             markdown_output += f"**查询**: {query}\n\n"
             markdown_output += f"**检索到 {len(memories)} 条相关记忆**\n\n"
-            markdown_output += f"**记记忆类型型**: {', '.join(types_to_search)}\n\n"
+            markdown_output += f"**作用域**: {', '.join(types_to_search)}\n\n"
+            markdown_output += f"**性质**: {', '.join(natures_to_search)}\n\n"
             markdown_output += "---\n\n"
 
             # 输出所有记忆
             for i, memory in enumerate(memories):
                 markdown_output += f"## {i + 1}. {memory.id}\n\n"
-                markdown_output += f"**类型**: {memory.type}\n\n"
+                markdown_output += (
+                    f"**类型**: {memory.memory_type} / {memory.nature}\n\n"
+                )
                 markdown_output += f"**标签**: {', '.join(memory.tags)}\n\n"
                 markdown_output += f"**创建时间**: {memory.created_at}\n\n"
 
@@ -623,11 +888,12 @@ class MemoryTool:
     def _clear_long_term_memories(
         self,
         memory_type: str,
+        nature: str,
         tags: Optional[List[str]] = None,
         memory_ids: Optional[List[str]] = None,
     ) -> Dict[str, int]:
-        """清除长期记忆"""
-        memory_dir = self._get_memory_dir(memory_type)
+        """清除长期记忆（指定作用域+性质）"""
+        memory_dir = self._get_memory_dir(memory_type, nature)
 
         if not memory_dir.exists():
             return {"total": 0, "removed": 0}
@@ -678,7 +944,8 @@ class MemoryTool:
     def _execute_clear(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行清除记忆操作"""
         try:
-            memory_types = args.get("memory_types", [])
+            memory_types = args.get("memory_types", [])  # 作用域
+            natures = args.get("natures", [])  # 性质
             tags = args.get("tags", [])
             memory_ids = args.get("memory_ids", [])
             confirm = args.get("confirm", False)
@@ -690,27 +957,36 @@ class MemoryTool:
                     "stderr": "必须设置 confirm=true 才能执行清除操作",
                 }
 
-            # 确定要清除的记记忆类型型
-            if "all" in memory_types:
-                types_to_clear = ["project_long_term", "global_long_term", "short_term"]
+            # 确定要清除的作用域
+            if not memory_types or "all" in memory_types:
+                types_to_clear = ["project", "global", "short_term"]
             else:
                 types_to_clear = memory_types
+
+            # 确定要清除的性质
+            if not natures or "all" in natures:
+                natures_to_clear = ["long_term", "procedural", "episodic"]
+            else:
+                natures_to_clear = natures
 
             # 统计结果
             results = {}
             total_removed = 0
 
-            # 清除各类型的记忆
+            # 清除各作用域+性质的记忆
             for memory_type in types_to_clear:
                 if memory_type == "short_term":
                     result = self._clear_short_term_memories(tags, memory_ids)
+                    results[memory_type] = result
+                    total_removed += result["removed"]
                 else:
-                    result = self._clear_long_term_memories(
-                        memory_type, tags, memory_ids
-                    )
-
-                results[memory_type] = result
-                total_removed += result["removed"]
+                    for nature in natures_to_clear:
+                        result = self._clear_long_term_memories(
+                            memory_type, nature, tags, memory_ids
+                        )
+                        key = f"{memory_type}/{nature}"
+                        results[key] = result
+                        total_removed += result["removed"]
 
             # 生成结果报告
             report = "# 记忆清除报告\n\n"

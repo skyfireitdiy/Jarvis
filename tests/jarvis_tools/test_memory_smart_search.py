@@ -10,7 +10,8 @@ from jarvis.jarvis_tools.memory import MemoryTool
 def _make_memory(mid: str, content: str) -> Memory:
     return Memory(
         id=mid,
-        type="project_long_term",
+        memory_type="project",
+        nature="long_term",
         tags=["tag"],
         content=content,
         created_at="2026-01-01",
@@ -43,7 +44,7 @@ class TestSmartSearchTokenLimit:
             ),
         ):
             result = tool._execute_smart_search(
-                args={}, memory_types=["project_long_term"], query="测试", limit=None
+                args={}, memory_types=["project"], query="测试", limit=None
             )
         assert result["success"] is True
         assert "m1" in result["stdout"]
@@ -65,7 +66,7 @@ class TestSmartSearchTokenLimit:
             ),
         ):
             result = tool._execute_smart_search(
-                args={}, memory_types=["project_long_term"], query="测试", limit=None
+                args={}, memory_types=["project"], query="测试", limit=None
             )
         assert result["success"] is True
         # m1 超长应被截断，m2 可能因 m1 已超预算也不返回
@@ -87,7 +88,7 @@ class TestSmartSearchTokenLimit:
         ):
             result = tool._execute_smart_search(
                 args={"agent": agent},
-                memory_types=["project_long_term"],
+                memory_types=["project"],
                 query="测试",
                 limit=None,
             )
@@ -107,7 +108,7 @@ class TestSmartSearchTokenLimit:
             ),
         ):
             result = tool._execute_smart_search(
-                args={}, memory_types=["project_long_term"], query="测试", limit=None
+                args={}, memory_types=["project"], query="测试", limit=None
             )
         assert result["success"] is True
         assert "m1" in result["stdout"]

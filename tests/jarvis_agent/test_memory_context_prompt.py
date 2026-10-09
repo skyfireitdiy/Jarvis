@@ -8,9 +8,15 @@ from jarvis.jarvis_memory_organizer.smart_retrieval import Memory
 
 
 def _make_memory(mid: str, content: str, tags=None, mtype="project_long_term"):
+    # 兼容平铺类型名（如 project_long_term / global_long_term），拆分为双字段
+    if mtype.startswith("global"):
+        memory_type, nature = "global", mtype.split("_", 1)[1]
+    else:
+        memory_type, nature = "project", mtype.split("_", 1)[1]
     return Memory(
         id=mid,
-        type=mtype,
+        memory_type=memory_type,
+        nature=nature,
         tags=tags or ["tag"],
         content=content,
         created_at="2026-01-01",
@@ -79,8 +85,8 @@ class TestPrepareMemoryContextPrompt:
         assert "📚" in result
         assert "项目配置：使用 pytest 进行测试" in result
         assert "通用经验：代码审查要点" in result
-        assert "project_long_term" in result
-        assert "global_long_term" in result
+        assert "project/long_term" in result
+        assert "global/long_term" in result
         assert "测试/pytest" in result
 
     def test_long_content_truncated(self, monkeypatch):
@@ -112,7 +118,8 @@ class TestPrepareMemoryContextPrompt:
             manager.prepare_memory_context_prompt("修复 bug")
         retriever.semantic_search.assert_called_once_with(
             query="修复 bug",
-            memory_types=["project_long_term", "global_long_term"],
+            memory_types=["project", "global"],
+            natures=["long_term"],
             limit=5,
         )
 
@@ -126,3 +133,60 @@ class TestPrepareMemoryContextPrompt:
         ):
             result = manager.prepare_memory_context_prompt("测试任务")
         assert result == ""
+
+    def test_retrieval_budget_truncation(self, monkeypatch):
+        """检索结果累计 token 超过预算时截断"""
+        from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
+
+        manager = _make_manager()
+        monkeypatch.setattr("pathlib.Path.exists", lambda self: True)
+        # 5 条记忆，每条 token 估算约 25（含标签与编号前缀）
+        memories = [_make_memory(f"m{i}", f"记忆内容 {i}") for i in range(5)]
+        retriever = MagicMock()
+        retriever.semantic_search.return_value = memories
+        key = "context_memory_retrieval_budget"
+        original = GLOBAL_CONFIG_DATA.get(key)
+        try:
+            # 预算 60：只够放 2 条（25×2=50），第 3 条累计 75 超预算被截断
+            GLOBAL_CONFIG_DATA[key] = 60
+            with patch(
+                "jarvis.jarvis_memory_organizer.smart_retrieval.SmartRetriever",
+                return_value=retriever,
+            ):
+                result = manager.prepare_memory_context_prompt("测试任务")
+        finally:
+            if original is None:
+                GLOBAL_CONFIG_DATA.pop(key, None)
+            else:
+                GLOBAL_CONFIG_DATA[key] = original
+        # 应只注入前 2 条，后续被截断
+        assert "[1]" in result
+        assert "[2]" in result
+        assert "[3]" not in result
+
+    def test_retrieval_budget_no_truncation_when_under(self, monkeypatch):
+        """检索结果未超预算时全部注入"""
+        from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
+
+        manager = _make_manager()
+        monkeypatch.setattr("pathlib.Path.exists", lambda self: True)
+        memories = [_make_memory(f"m{i}", f"记忆内容 {i}") for i in range(3)]
+        retriever = MagicMock()
+        retriever.semantic_search.return_value = memories
+        key = "context_memory_retrieval_budget"
+        original = GLOBAL_CONFIG_DATA.get(key)
+        try:
+            GLOBAL_CONFIG_DATA[key] = 10000  # 大预算，不截断
+            with patch(
+                "jarvis.jarvis_memory_organizer.smart_retrieval.SmartRetriever",
+                return_value=retriever,
+            ):
+                result = manager.prepare_memory_context_prompt("测试任务")
+        finally:
+            if original is None:
+                GLOBAL_CONFIG_DATA.pop(key, None)
+            else:
+                GLOBAL_CONFIG_DATA[key] = original
+        assert "[1]" in result
+        assert "[2]" in result
+        assert "[3]" in result

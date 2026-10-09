@@ -28,7 +28,9 @@ function startEvent(pid, stages) {
 
 test("pipeline_start：建立流程并初始化所有 stage 为 pending", () => {
   const store = new PipelineStore();
-  store.applyEvent(startEvent("p1", [{ stage: "s1" }, { stage: "s2", depends_on: ["s1"] }]));
+  store.applyEvent(
+    startEvent("p1", [{ stage: "s1" }, { stage: "s2", depends_on: ["s1"] }]),
+  );
   const st = store.getPipeline("p1");
   assert.ok(st);
   assert.equal(st.stages.get("s1").status, STAGE_STATUS.PENDING);
@@ -39,15 +41,27 @@ test("pipeline_start：建立流程并初始化所有 stage 为 pending", () => 
 test("pipeline_agents：回填 agentId", () => {
   const store = new PipelineStore();
   store.applyEvent(startEvent("p1", [{ stage: "s1" }]));
-  store.applyEvent({ pipeline_id: "p1", type: "pipeline_agents", agent_map: { s1: "agent-123" } });
+  store.applyEvent({
+    pipeline_id: "p1",
+    type: "pipeline_agents",
+    agent_map: { s1: "agent-123" },
+  });
   assert.equal(store.getPipeline("p1").stages.get("s1").agentId, "agent-123");
 });
 
 test("stage_update：更新状态与错误信息", () => {
   const store = new PipelineStore();
   store.applyEvent(startEvent("p1", [{ stage: "s1" }]));
-  store.applyEvent({ pipeline_id: "p1", type: "stage_update", stage: "s1", status: "running" });
-  assert.equal(store.getPipeline("p1").stages.get("s1").status, STAGE_STATUS.RUNNING);
+  store.applyEvent({
+    pipeline_id: "p1",
+    type: "stage_update",
+    stage: "s1",
+    status: "running",
+  });
+  assert.equal(
+    store.getPipeline("p1").stages.get("s1").status,
+    STAGE_STATUS.RUNNING,
+  );
   store.applyEvent({
     pipeline_id: "p1",
     type: "stage_update",
@@ -93,14 +107,107 @@ test("pipeline_done：置终态并记录 success/finalStatus", () => {
 test("幂等：重复 stage_update 覆盖不追加节点", () => {
   const store = new PipelineStore();
   store.applyEvent(startEvent("p1", [{ stage: "s1" }]));
-  store.applyEvent({ pipeline_id: "p1", type: "stage_update", stage: "s1", status: "running" });
-  store.applyEvent({ pipeline_id: "p1", type: "stage_update", stage: "s1", status: "running" });
+  store.applyEvent({
+    pipeline_id: "p1",
+    type: "stage_update",
+    stage: "s1",
+    status: "running",
+  });
+  store.applyEvent({
+    pipeline_id: "p1",
+    type: "stage_update",
+    stage: "s1",
+    status: "running",
+  });
   assert.equal(store.getPipeline("p1").stages.size, 1);
+});
+
+test("pipeline_approval：追加审批日志到 approvals", () => {
+  const store = new PipelineStore();
+  store.applyEvent(startEvent("p1", [{ stage: "gate1", gate: true }]));
+  // 先广播 pending（等待审批）
+  store.applyEvent({
+    pipeline_id: "p1",
+    type: "pipeline_approval",
+    action: "pending",
+    gate_stage: "gate1",
+    approval_path: "/x/report.md",
+    ts: 1000,
+  });
+  // 再广播一条审批决定（放行）
+  store.applyEvent({
+    pipeline_id: "p1",
+    type: "pipeline_approval",
+    action: "approve",
+    approver: "admin",
+    note: "确认无误",
+    gate_stage: "gate1",
+    approval_path: "/x/report.md",
+    ts: 2000,
+  });
+  const st = store.getPipeline("p1");
+  assert.ok(Array.isArray(st.approvals), "approvals 应为数组");
+  assert.equal(st.approvals.length, 2);
+  assert.equal(st.approvals[0].action, "pending");
+  assert.equal(st.approvals[0].gateStage, "gate1");
+  assert.equal(st.approvals[1].action, "approve");
+  assert.equal(st.approvals[1].approver, "admin");
+  assert.equal(st.approvals[1].note, "确认无误");
+  assert.equal(st.approvals[1].ts, 2000);
+});
+
+test("pipeline_start / addPreview 初始化 approvals 为空数组", () => {
+  const store = new PipelineStore();
+  store.applyEvent(startEvent("p1", [{ stage: "s1" }]));
+  assert.deepEqual(store.getPipeline("p1").approvals, []);
+  const st = store.addPreview(
+    "preview_x",
+    [
+      {
+        stage: "s1",
+        agent: "a",
+        depends_on: [],
+        input: [],
+        output: "",
+        gate: false,
+        when: null,
+        retry: 0,
+        on_error: "abort",
+      },
+    ],
+    "/x/p.yaml",
+  );
+  assert.deepEqual(st.approvals, []);
+});
+
+test("pipeline_done：旧数据无 approvals 时兜底为空数组", () => {
+  const store = new PipelineStore();
+  store.applyEvent(startEvent("p1", [{ stage: "s1" }]));
+  // 模拟持久化恢复的旧数据：无 approvals 字段
+  delete store.getPipeline("p1").approvals;
+  store.applyEvent({
+    pipeline_id: "p1",
+    type: "pipeline_done",
+    success: true,
+    final_status: "completed",
+  });
+  assert.deepEqual(
+    store.getPipeline("p1").approvals,
+    [],
+    "pipeline_done 应兜底初始化 approvals",
+  );
 });
 
 test("未知 pipeline_id 的 stage_update 被忽略", () => {
   const store = new PipelineStore();
-  assert.equal(store.applyEvent({ pipeline_id: "nope", type: "stage_update", stage: "s1" }), null);
+  assert.equal(
+    store.applyEvent({
+      pipeline_id: "nope",
+      type: "stage_update",
+      stage: "s1",
+    }),
+    null,
+  );
   assert.equal(store.pipelines.size, 0);
 });
 
@@ -122,7 +229,11 @@ test("pruneFinished：仅保留最近 N 条已结束流程，运行中不裁剪"
   for (let i = 0; i < 3; i++) {
     store.applyEvent(startEvent(`done${i}`, [{ stage: "s1" }]));
     store.getPipeline(`done${i}`).startedAt = i;
-    store.applyEvent({ pipeline_id: `done${i}`, type: "pipeline_done", success: true });
+    store.applyEvent({
+      pipeline_id: `done${i}`,
+      type: "pipeline_done",
+      success: true,
+    });
   }
   // 1 条运行中（较早开始，不应被裁剪）
   store.applyEvent(startEvent("live", [{ stage: "s1" }]));
@@ -161,7 +272,9 @@ function installLocalStorageMock() {
 test("开启 storageKey 后 applyEvent 自动持久化，新实例可恢复", () => {
   const storage = installLocalStorageMock();
   const store = new PipelineStore(20, "orchestration");
-  store.applyEvent(startEvent("p1", [{ stage: "s1" }, { stage: "s2", depends_on: ["s1"] }]));
+  store.applyEvent(
+    startEvent("p1", [{ stage: "s1" }, { stage: "s2", depends_on: ["s1"] }]),
+  );
   store.applyEvent({
     pipeline_id: "p1",
     type: "stage_update",
@@ -193,14 +306,38 @@ test("不传 storageKey 时保持纯内存、不碰 localStorage", () => {
   const storage = installLocalStorageMock();
   const store = new PipelineStore();
   store.applyEvent(startEvent("p1", [{ stage: "s1" }]));
-  assert.equal(storage.getItem("jarvis_pipeline_store_"), null, "不应写入 localStorage");
+  assert.equal(
+    storage.getItem("jarvis_pipeline_store_"),
+    null,
+    "不应写入 localStorage",
+  );
 });
 
 test("addPreview：以静态 preview 态加入 DAG，所有 stage 为 pending 且不运行", () => {
   const store = new PipelineStore();
   const nodes = [
-    { stage: "s1", agent: "a", depends_on: [], input: [], output: "", gate: false, when: null, retry: 0, on_error: "abort" },
-    { stage: "s2", agent: "b", depends_on: ["s1"], input: [], output: "", gate: false, when: null, retry: 0, on_error: "abort" },
+    {
+      stage: "s1",
+      agent: "a",
+      depends_on: [],
+      input: [],
+      output: "",
+      gate: false,
+      when: null,
+      retry: 0,
+      on_error: "abort",
+    },
+    {
+      stage: "s2",
+      agent: "b",
+      depends_on: ["s1"],
+      input: [],
+      output: "",
+      gate: false,
+      when: null,
+      retry: 0,
+      on_error: "abort",
+    },
   ];
   const st = store.addPreview("preview_x", nodes, "/x/pipeline.yaml");
   assert.ok(st, "应返回新 state");
@@ -224,8 +361,40 @@ test("addPreview：缺 pipelineId 或 nodes 非法时返回 null", () => {
 test("removePipeline：删除单个流程并同步持久化", () => {
   installLocalStorageMock();
   const store = new PipelineStore(20, "del");
-  store.addPreview("preview_a", [{ stage: "s1", agent: "a", depends_on: [], input: [], output: "", gate: false, when: null, retry: 0, on_error: "abort" }], "/x/a.yaml");
-  store.addPreview("preview_b", [{ stage: "s1", agent: "b", depends_on: [], input: [], output: "", gate: false, when: null, retry: 0, on_error: "abort" }], "/x/b.yaml");
+  store.addPreview(
+    "preview_a",
+    [
+      {
+        stage: "s1",
+        agent: "a",
+        depends_on: [],
+        input: [],
+        output: "",
+        gate: false,
+        when: null,
+        retry: 0,
+        on_error: "abort",
+      },
+    ],
+    "/x/a.yaml",
+  );
+  store.addPreview(
+    "preview_b",
+    [
+      {
+        stage: "s1",
+        agent: "b",
+        depends_on: [],
+        input: [],
+        output: "",
+        gate: false,
+        when: null,
+        retry: 0,
+        on_error: "abort",
+      },
+    ],
+    "/x/b.yaml",
+  );
   assert.equal(store.listPipelines().length, 2);
 
   // 删除存在的项
@@ -240,6 +409,8 @@ test("removePipeline：删除单个流程并同步持久化", () => {
   // 持久化已同步：新实例只恢复剩余项
   const restored = new PipelineStore(20, "del");
   assert.equal(restored.listPipelines().length, 1);
-  assert.equal(restored.getPipeline("preview_b").orchestrationFile, "/x/b.yaml");
+  assert.equal(
+    restored.getPipeline("preview_b").orchestrationFile,
+    "/x/b.yaml",
+  );
 });
-

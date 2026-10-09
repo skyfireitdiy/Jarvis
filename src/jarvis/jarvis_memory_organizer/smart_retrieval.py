@@ -22,10 +22,15 @@ class Memory:
     """记忆数据类
 
     存储记忆的基本信息。
+
+    采用双字段正交维度：
+    - memory_type（作用域）：project / global
+    - nature（性质）：long_term / procedural / episodic
     """
 
     id: str = ""
-    type: str = ""
+    memory_type: str = ""
+    nature: str = ""
     tags: List[str] = field(default_factory=list)
     content: str = ""
     created_at: str = ""
@@ -36,7 +41,8 @@ class Memory:
         """从字典创建Memory对象"""
         return cls(
             id=data.get("id", ""),
-            type=data.get("type", ""),
+            memory_type=data.get("memory_type", ""),
+            nature=data.get("nature", ""),
             tags=data.get("tags", []),
             content=data.get("content", ""),
             created_at=data.get("created_at", ""),
@@ -47,7 +53,8 @@ class Memory:
         """转换为字典"""
         return {
             "id": self.id,
-            "type": self.type,
+            "memory_type": self.memory_type,
+            "nature": self.nature,
             "tags": self.tags,
             "content": self.content,
             "created_at": self.created_at,
@@ -137,6 +144,7 @@ class SmartRetriever:
         self,
         query: str,
         memory_types: Optional[List[str]] = None,
+        natures: Optional[List[str]] = None,
         limit: int = 10,
     ) -> List[Memory]:
         """语义检索
@@ -145,7 +153,8 @@ class SmartRetriever:
 
         Args:
             query: 查询文本
-            memory_types: 要检索的记忆类型列表，默认检索所有类型
+            memory_types: 要检索的作用域列表（project/global），默认检索所有作用域
+            natures: 要检索的性质列表（long_term/procedural/episodic），默认检索所有性质
             limit: 返回结果的最大数量
 
         Returns:
@@ -156,15 +165,17 @@ class SmartRetriever:
 
         # 2. 确定检索类型
         if memory_types is None:
-            memory_types = ["project_long_term", "global_long_term"]
+            memory_types = ["project", "global"]
+        if natures is None:
+            natures = ["long_term", "procedural", "episodic"]
 
         # 3. 检索候选记忆
         candidates = self._retrieve_candidates(
-            semantic_query.expanded_tags, memory_types
+            semantic_query.expanded_tags, memory_types, natures
         )
 
         # 4. 加载所有记忆以构建语料库
-        all_memories = self._load_all_memories(memory_types)
+        all_memories = self._load_all_memories(memory_types, natures)
         corpus = [memory.content for memory in all_memories]
 
         # 5. 计算相关性得分并排序
@@ -187,6 +198,10 @@ class SmartRetriever:
                 + time_freshness * 0.15
                 + usage_frequency * 0.15
             )
+
+            # 性质增强：程序性记忆按任务类型（how_to）匹配、情景记忆按回忆查询匹配
+            nature_boost = self._nature_boost(semantic_query.intent, memory.nature)
+            total_score *= nature_boost
 
             scored_memories.append((memory, total_score))
 
@@ -226,7 +241,9 @@ class SmartRetriever:
 
         # 3. 检索候选记忆
         candidates = self._retrieve_candidates(
-            expanded_tags, ["project_long_term", "global_long_term"]
+            expanded_tags,
+            ["project", "global"],
+            ["long_term", "procedural", "episodic"],
         )
 
         # 4. 计算推荐得分
@@ -264,7 +281,7 @@ class SmartRetriever:
 
         # 2. 加载所有记忆
         all_memories = self._load_all_memories(
-            ["project_long_term", "global_long_term"]
+            ["project", "global"], ["long_term", "procedural", "episodic"]
         )
 
         # 3. 计算关联得分
@@ -441,57 +458,102 @@ class SmartRetriever:
         return list(expanded_tags)
 
     def _identify_intent(self, query: str) -> str:
-        """识别查询意图"""
-        query_lower = query.lower()
+        """识别查询意图
 
-        # 简单的意图识别规则
-        if any(word in query_lower for word in ["如何", "怎么", "how", "方法"]):
-            return "how_to"
-        elif any(word in query_lower for word in ["什么", "是什么", "what", "定义"]):
-            return "definition"
-        elif any(word in query_lower for word in ["为什么", "why", "原因"]):
-            return "reason"
-        elif any(
-            word in query_lower for word in ["错误", "问题", "error", "bug", "fix"]
-        ):
-            return "troubleshooting"
-        elif any(word in query_lower for word in ["最佳", "推荐", "best", "recommend"]):
-            return "recommendation"
-        else:
+        用评估模型对查询做结构化分类；未配置评估模型时回退到 cheap 模型。
+        两者均不可用或调用失败时返回 "general"（不硬编码猜测）。
+        """
+        try:
+            from jarvis.jarvis_platform.registry import PlatformRegistry
+
+            registry = PlatformRegistry.get_global_platform_registry()
+            platform = registry.get_eval_platform()
+            if platform is None:
+                platform = registry.get_cheap_platform()
+            if platform is None:
+                return "general"
+
+            categories = "how_to, definition, reason, troubleshooting, recommendation, recall, general"
+            prompt = (
+                "请把以下用户查询归类到最匹配的一个意图类别。"
+                f"可选类别：{categories}。\n"
+                "类别含义：\n"
+                "- how_to：询问如何做/怎么做（方法、步骤、流程）\n"
+                "- definition：询问概念/术语的定义或解释\n"
+                "- reason：询问原因/为什么\n"
+                "- troubleshooting：排查/修复错误、bug、问题\n"
+                "- recommendation：寻求推荐/最佳方案/建议\n"
+                "- recall：回忆/查找过去发生的事（上次、之前、当时）\n"
+                "- general：以上都不匹配\n"
+                "只输出一个类别名，不要输出其它内容。\n\n"
+                f"用户查询：{query}"
+            )
+            result = platform.complete(prompt)
+            if not result or result == "<输出被用户中断>":
+                return "general"
+            result = result.strip().lower()
+            for cat in (
+                "how_to",
+                "definition",
+                "reason",
+                "troubleshooting",
+                "recommendation",
+                "recall",
+                "general",
+            ):
+                if cat in result:
+                    return cat
+            return "general"
+        except Exception:
             return "general"
 
+    def _nature_boost(self, intent: str, nature: str) -> float:
+        """根据查询意图对记忆性质做加权增强。
+
+        程序性记忆（procedural）按任务类型匹配：how_to 意图时加权；
+        情景记忆（episodic）按回忆查询匹配：recall / troubleshooting 意图时加权。
+        其余情况返回 1.0（不改变原始得分）。
+
+        Args:
+            intent: 查询意图（how_to/definition/reason/troubleshooting/recommendation/recall/general）
+            nature: 记忆性质（long_term/procedural/episodic）
+
+        Returns:
+            float: 加权系数
+        """
+        if intent == "how_to" and nature == "procedural":
+            return 1.5
+        if intent in ("recall", "troubleshooting") and nature == "episodic":
+            return 1.5
+        return 1.0
+
     def _retrieve_candidates(
-        self, tags: List[str], memory_types: List[str]
+        self, tags: List[str], memory_types: List[str], natures: List[str]
     ) -> List[Memory]:
         """检索候选记忆"""
         candidates = []
 
         for memory_type in memory_types:
-            memories = self._load_memories_by_type(memory_type)
-            for memory in memories:
-                # 检查标签匹配
-                if tags:
-                    memory_tags_lower = [t.lower() for t in memory.tags]
-                    tags_lower = [t.lower() for t in tags]
-                    if any(tag in memory_tags_lower for tag in tags_lower):
+            for nature in natures:
+                memories = self._load_memories_by_type(memory_type, nature)
+                for memory in memories:
+                    # 检查标签匹配
+                    if tags:
+                        memory_tags_lower = [t.lower() for t in memory.tags]
+                        tags_lower = [t.lower() for t in tags]
+                        if any(tag in memory_tags_lower for tag in tags_lower):
+                            candidates.append(memory)
+                    else:
                         candidates.append(memory)
-                else:
-                    candidates.append(memory)
 
         return candidates
 
-    def _load_memories_by_type(self, memory_type: str) -> List[Memory]:
-        """加载指定类型的所有记忆"""
+    def _load_memories_by_type(self, memory_type: str, nature: str) -> List[Memory]:
+        """加载指定作用域和性质的所有记忆"""
         memories: List[Memory] = []
 
-        if memory_type == "project_long_term":
-            memory_dir = self.project_memory_dir
-        elif memory_type == "global_long_term":
-            memory_dir = self.global_memory_dir / memory_type
-        else:
-            return memories
-
-        if not memory_dir.exists():
+        memory_dir = self._get_type_dir(memory_type, nature)
+        if memory_dir is None or not memory_dir.exists():
             return memories
 
         for memory_file in memory_dir.glob("*.json"):
@@ -504,35 +566,50 @@ class SmartRetriever:
 
         return memories
 
-    def _load_all_memories(self, memory_types: List[str]) -> List[Memory]:
-        """加载所有指定类型的记忆"""
+    def _get_type_dir(self, memory_type: str, nature: str) -> Optional[Path]:
+        """根据作用域和性质返回存储目录（与 MemoryTool._get_memory_dir 保持一致）"""
+        if memory_type == "project":
+            if nature == "long_term":
+                return self.project_memory_dir
+            elif nature == "procedural":
+                return self.project_memory_dir / "procedural"
+            elif nature == "episodic":
+                return self.project_memory_dir / "episodic"
+        elif memory_type == "global":
+            if nature == "long_term":
+                return self.global_memory_dir / "global_long_term"
+            elif nature == "procedural":
+                return self.global_memory_dir / "procedural"
+            elif nature == "episodic":
+                return self.global_memory_dir / "episodic"
+        return None
+
+    def _load_all_memories(
+        self, memory_types: List[str], natures: List[str]
+    ) -> List[Memory]:
+        """加载所有指定作用域和性质的记忆"""
         all_memories = []
         for memory_type in memory_types:
-            all_memories.extend(self._load_memories_by_type(memory_type))
+            for nature in natures:
+                all_memories.extend(self._load_memories_by_type(memory_type, nature))
         return all_memories
 
     def _load_memory_by_id(self, memory_id: str) -> Optional[Memory]:
         """根据ID加载记忆"""
         # 在项目记忆中查找
-        memory_file = self.project_memory_dir / f"{memory_id}.json"
-        if memory_file.exists():
-            try:
-                with open(memory_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    return Memory.from_dict(data)
-            except Exception:
-                pass
-
-        # 在全局记忆中查找
-        for memory_type in ["global_long_term"]:
-            memory_file = self.global_memory_dir / memory_type / f"{memory_id}.json"
-            if memory_file.exists():
-                try:
-                    with open(memory_file, "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                        return Memory.from_dict(data)
-                except Exception:
-                    pass
+        for memory_type in ["project", "global"]:
+            for nature in ["long_term", "procedural", "episodic"]:
+                memory_dir = self._get_type_dir(memory_type, nature)
+                if memory_dir is None:
+                    continue
+                memory_file = memory_dir / f"{memory_id}.json"
+                if memory_file.exists():
+                    try:
+                        with open(memory_file, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                            return Memory.from_dict(data)
+                    except Exception:
+                        pass
 
         return None
 

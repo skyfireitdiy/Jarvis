@@ -42,14 +42,34 @@ class MemoryOrganizer:
         registry = PlatformRegistry.get_global_platform_registry()
         self.platform = registry.get_normal_platform()
 
+    def _resolve_memory_dir(self, memory_type: str) -> Path:
+        """把记忆类型名解析为存储目录（兼容平铺名与双字段名）
+
+        支持：
+        - 平铺名：project_long_term / global_long_term / project_procedural ...
+        - 双字段名：project/long_term / global/procedural ...
+        - 仅作用域：project / global（默认 long_term）
+        """
+        if "/" in memory_type:
+            scope, nature = memory_type.split("/", 1)
+        elif "_" in memory_type:
+            scope, nature = memory_type.split("_", 1)
+        else:
+            scope, nature = memory_type, "long_term"
+
+        if scope == "project":
+            if nature == "long_term":
+                return self.project_memory_dir
+            return self.project_memory_dir / nature
+        elif scope == "global":
+            if nature == "long_term":
+                return self.global_memory_dir / "global_long_term"
+            return self.global_memory_dir / nature
+        raise ValueError(f"不支持的记忆类型: {memory_type}")
+
     def _get_memory_files(self, memory_type: str) -> List[Path]:
         """获取指定类型的所有记忆文件"""
-        if memory_type == "project_long_term":
-            memory_dir = self.project_memory_dir
-        elif memory_type == "global_long_term":
-            memory_dir = self.global_memory_dir / memory_type
-        else:
-            raise ValueError(f"不支持的记忆类型: {memory_type}")
+        memory_dir = self._resolve_memory_dir(memory_type)
 
         if not memory_dir.exists():
             return []
@@ -589,13 +609,19 @@ class MemoryOrganizer:
         # 生成新的记忆ID
         memory["id"] = f"merged_{uuid.uuid4().hex[:8]}"
         memory["created_at"] = datetime.now().isoformat()
-        memory["type"] = memory_type
+        memory["updated_at"] = datetime.now().isoformat()
+        # 记录作用域与性质（兼容平铺名解析）
+        if "/" in memory_type:
+            scope, nature = memory_type.split("/", 1)
+        elif "_" in memory_type:
+            scope, nature = memory_type.split("_", 1)
+        else:
+            scope, nature = memory_type, "long_term"
+        memory["memory_type"] = scope
+        memory["nature"] = nature
 
         # 确定保存路径
-        if memory_type == "project_long_term":
-            memory_dir = self.project_memory_dir
-        else:
-            memory_dir = self.global_memory_dir / memory_type
+        memory_dir = self._resolve_memory_dir(memory_type)
 
         memory_dir.mkdir(parents=True, exist_ok=True)
 
@@ -670,7 +696,14 @@ class MemoryOrganizer:
 
             # 添加记忆类型信息并移除文件路径
             for memory in memories:
-                memory["memory_type"] = memory_type
+                if "/" in memory_type:
+                    scope, nature = memory_type.split("/", 1)
+                elif "_" in memory_type:
+                    scope, nature = memory_type.split("_", 1)
+                else:
+                    scope, nature = memory_type, "long_term"
+                memory["memory_type"] = scope
+                memory["nature"] = nature
                 memory.pop("file_path", None)
 
             all_memories.extend(memories)
@@ -729,12 +762,14 @@ class MemoryOrganizer:
                 skipped_count += 1
                 continue
 
+            # 组装用于目录解析的类型名（优先作用域/性质组合）
+            nature = memory.get("nature")
+            resolve_type = f"{memory_type}/{nature}" if nature else memory_type
+
             # 确定保存路径
-            if memory_type == "project_long_term":
-                memory_dir = self.project_memory_dir
-            elif memory_type == "global_long_term":
-                memory_dir = self.global_memory_dir / memory_type
-            else:
+            try:
+                memory_dir = self._resolve_memory_dir(resolve_type)
+            except ValueError:
                 PrettyOutput.auto_print(f"⚠️ 跳过不支持的记忆类型: {memory_type}")
                 skipped_count += 1
                 continue
@@ -759,9 +794,16 @@ class MemoryOrganizer:
             # 保存记忆
             with open(memory_file, "w", encoding="utf-8") as f:
                 # 清理记忆数据
+                if "/" in resolve_type:
+                    scope, nature = resolve_type.split("/", 1)
+                elif "_" in resolve_type:
+                    scope, nature = resolve_type.split("_", 1)
+                else:
+                    scope, nature = resolve_type, "long_term"
                 clean_memory = {
                     "id": memory["id"],
-                    "type": memory_type,
+                    "memory_type": scope,
+                    "nature": nature,
                     "tags": memory.get("tags", []),
                     "content": memory.get("content", ""),
                     "created_at": memory.get("created_at", ""),
@@ -824,9 +866,13 @@ def organize(
     """
     # 验证参数
     set_llm_group(llm_group)
-    if memory_type not in ["project_long_term", "global_long_term"]:
+    try:
+        organizer = MemoryOrganizer()
+        organizer._resolve_memory_dir(memory_type)
+    except ValueError:
         PrettyOutput.auto_print(
-            f"❌ 错误：不支持的记忆类型 '{memory_type}'，请选择 'project_long_term' 或 'global_long_term'"
+            f"❌ 错误：不支持的记忆类型 '{memory_type}'，"
+            "支持 project_long_term / global_long_term / project/long_term 等"
         )
         raise typer.Exit(1)
 
@@ -885,8 +931,12 @@ def export(
         organizer = MemoryOrganizer()
 
         # 验证记忆类型（先收集无效类型，统一打印一次）
-        valid_types = ["project_long_term", "global_long_term"]
-        invalid_types = [mt for mt in memory_types if mt not in valid_types]
+        invalid_types = []
+        for mt in memory_types:
+            try:
+                organizer._resolve_memory_dir(mt)
+            except ValueError:
+                invalid_types.append(mt)
         if invalid_types:
             invalid_str = ", ".join(f"'{mt}'" for mt in invalid_types)
             PrettyOutput.auto_print(f"❌ 错误：不支持的记忆类型: {invalid_str}")

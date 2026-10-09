@@ -150,7 +150,9 @@ class TestBuildDag:
             {"stage": "s1", "agent": "a1"},
             {"stage": "s2", "agent": "a2", "on_error": "continue"},
         ]
-        r = tool._build_dag(flow, {"a1": {}, "a2": {}}, default_on_error="skip_dependents")
+        r = tool._build_dag(
+            flow, {"a1": {}, "a2": {}}, default_on_error="skip_dependents"
+        )
         nodes = {n["stage"]: n for n in r["nodes"]}
         assert nodes["s1"]["on_error"] == "skip_dependents"  # 回退到全局默认
         assert nodes["s2"]["on_error"] == "continue"  # 阶段级覆盖
@@ -274,7 +276,15 @@ class TestSchedule:
     def test_all_completed(self, tool, monkeypatch):
         calls = []
 
-        def fake_run_stage(node, agent_id, agents_by_name, work_dir, artifact_dir, spec_summary, approve):
+        def fake_run_stage(
+            node,
+            agent_id,
+            agents_by_name,
+            work_dir,
+            artifact_dir,
+            spec_summary,
+            approve,
+        ):
             calls.append(node["stage"])
             return {
                 "stage": node["stage"],
@@ -438,7 +448,7 @@ class TestSchedule:
     def test_when_skip(self, tool, monkeypatch):
         """when 条件不满足时跳过节点。"""
         nodes = self._nodes()
-        nodes[1]["when"] = 'prev.score < 0'  # 无 prev 结果，视为不满足
+        nodes[1]["when"] = "prev.score < 0"  # 无 prev 结果，视为不满足
         executed = []
 
         def fake_run_stage(node, *args, **kwargs):
@@ -484,7 +494,9 @@ class TestRunStage:
         agents_by_name = {"a1": {"task": "规划"}}
 
         class FakeGW:
-            def _send_to_agent(self, agent_id, message, wait=False, status_file: str = ""):
+            def _send_to_agent(
+                self, agent_id, message, wait=False, status_file: str = ""
+            ):
                 # 模拟阶段 Agent 写 status_file
                 Path(status_file).write_text(
                     json.dumps({"status": "completed", "output": "plan.md"}),
@@ -492,7 +504,9 @@ class TestRunStage:
                 )
                 return {"success": True, "stdout": "", "stderr": ""}
 
-        monkeypatch.setattr(GatewayManagerTool, "_send_to_agent", FakeGW()._send_to_agent)
+        monkeypatch.setattr(
+            GatewayManagerTool, "_send_to_agent", FakeGW()._send_to_agent
+        )
         r = tool._run_stage(
             node, "id_s1", agents_by_name, work_dir, artifact_dir, "", False
         )
@@ -519,14 +533,18 @@ class TestRunStage:
         agents_by_name = {"a1": {"task": "规划"}}
 
         class FakeGW:
-            def _send_to_agent(self, agent_id, message, wait=False, status_file: str = ""):
+            def _send_to_agent(
+                self, agent_id, message, wait=False, status_file: str = ""
+            ):
                 Path(status_file).write_text(
                     json.dumps({"status": "completed", "output": "missing.md"}),
                     encoding="utf-8",
                 )
                 return {"success": True, "stdout": "", "stderr": ""}
 
-        monkeypatch.setattr(GatewayManagerTool, "_send_to_agent", FakeGW()._send_to_agent)
+        monkeypatch.setattr(
+            GatewayManagerTool, "_send_to_agent", FakeGW()._send_to_agent
+        )
         r = tool._run_stage(
             node, "id_s1", agents_by_name, work_dir, artifact_dir, "", False
         )
@@ -556,7 +574,9 @@ class TestRunStage:
             def _send_to_agent(self, agent_id, message, wait=False, status_file=None):
                 return {"success": False, "stdout": "", "stderr": "gateway down"}
 
-        monkeypatch.setattr(GatewayManagerTool, "_send_to_agent", FakeGW()._send_to_agent)
+        monkeypatch.setattr(
+            GatewayManagerTool, "_send_to_agent", FakeGW()._send_to_agent
+        )
         r = tool._run_stage(
             node, "id_s1", agents_by_name, work_dir, artifact_dir, "", False
         )
@@ -619,13 +639,17 @@ class TestArtifactJson:
         )
 
         class FakeGW:
-            def _send_to_agent(self, agent_id, message, wait=False, status_file: str = ""):
+            def _send_to_agent(
+                self, agent_id, message, wait=False, status_file: str = ""
+            ):
                 Path(status_file).write_text(
                     json.dumps({"status": "completed"}), encoding="utf-8"
                 )
                 return {"success": True, "stdout": "", "stderr": ""}
 
-        monkeypatch.setattr(GatewayManagerTool, "_send_to_agent", FakeGW()._send_to_agent)
+        monkeypatch.setattr(
+            GatewayManagerTool, "_send_to_agent", FakeGW()._send_to_agent
+        )
         r = tool._run_stage(
             self._node("report.json"),
             "id_s1",
@@ -650,13 +674,17 @@ class TestArtifactJson:
         )
 
         class FakeGW:
-            def _send_to_agent(self, agent_id, message, wait=False, status_file: str = ""):
+            def _send_to_agent(
+                self, agent_id, message, wait=False, status_file: str = ""
+            ):
                 Path(status_file).write_text(
                     json.dumps({"status": "completed"}), encoding="utf-8"
                 )
                 return {"success": True, "stdout": "", "stderr": ""}
 
-        monkeypatch.setattr(GatewayManagerTool, "_send_to_agent", FakeGW()._send_to_agent)
+        monkeypatch.setattr(
+            GatewayManagerTool, "_send_to_agent", FakeGW()._send_to_agent
+        )
         r = tool._run_stage(
             self._node("report.json"),
             "id_s1",
@@ -676,13 +704,17 @@ class TestArtifactJson:
         (work_dir / "plan.md").write_text("hello", encoding="utf-8")
 
         class FakeGW:
-            def _send_to_agent(self, agent_id, message, wait=False, status_file: str = ""):
+            def _send_to_agent(
+                self, agent_id, message, wait=False, status_file: str = ""
+            ):
                 Path(status_file).write_text(
                     json.dumps({"status": "completed"}), encoding="utf-8"
                 )
                 return {"success": True, "stdout": "", "stderr": ""}
 
-        monkeypatch.setattr(GatewayManagerTool, "_send_to_agent", FakeGW()._send_to_agent)
+        monkeypatch.setattr(
+            GatewayManagerTool, "_send_to_agent", FakeGW()._send_to_agent
+        )
         r = tool._run_stage(
             self._node("plan.md"),
             "id_s1",
@@ -724,7 +756,11 @@ class TestCreateAgentRetry:
                 calls["n"] += 1
                 if calls["n"] < 3:
                     return {"success": False, "stdout": "", "stderr": "busy"}
-                return {"success": True, "stdout": json.dumps({"agent_id": "id_x"}), "stderr": ""}
+                return {
+                    "success": True,
+                    "stdout": json.dumps({"agent_id": "id_x"}),
+                    "stderr": "",
+                }
 
         monkeypatch.setattr("time.sleep", lambda *a, **k: None)
         agent_id, err = tool._create_agent_with_retry(FakeGW(), "s1", ".")
@@ -756,7 +792,11 @@ class TestCreateAgentRetry:
                 calls["n"] += 1
                 if calls["n"] < 2:
                     return {"success": True, "stdout": "{}", "stderr": ""}
-                return {"success": True, "stdout": json.dumps({"agent_id": "id_y"}), "stderr": ""}
+                return {
+                    "success": True,
+                    "stdout": json.dumps({"agent_id": "id_y"}),
+                    "stderr": "",
+                }
 
         monkeypatch.setattr("time.sleep", lambda *a, **k: None)
         agent_id, err = tool._create_agent_with_retry(FakeGW(), "s1", ".")
@@ -783,14 +823,13 @@ class TestCreateAgentRetry:
             lambda: FakeGW(),
         )
         monkeypatch.setattr("time.sleep", lambda *a, **k: None)
-        r = tool._create_stage_agents(
-            self._nodes(), {"a1": {}}, tmp_path
-        )
+        r = tool._create_stage_agents(self._nodes(), {"a1": {}}, tmp_path)
         assert r["success"] is True
         assert r["agent_map"]["s1"] == "id_df_s1"
 
     def test_create_stage_agents_fail_after_retry(self, tool, monkeypatch, tmp_path):
         """重试耗尽 → 返回失败并附错误。"""
+
         class FakeGW:
             def _create_agent(self, agent_type, working_dir, name):
                 return {"success": False, "stdout": "", "stderr": "down"}
@@ -815,23 +854,29 @@ class TestCreateAgentRetry:
                     return {"success": False, "error": "HTTP 502"}
                 return {"success": True, "data": {}}
 
-        ok, err = tool._wait_agent_ready(FakeGW(), "agent_1", timeout=10, poll_interval=0)
+        ok, err = tool._wait_agent_ready(
+            FakeGW(), "agent_1", timeout=10, poll_interval=0
+        )
         assert ok is True
         assert err == ""
         assert calls["n"] == 3
 
     def test_wait_agent_ready_timeout(self, tool):
         """_wait_agent_ready 持续 502 时超时返回失败。"""
+
         class FakeGW:
             def _request_gateway(self, method, path, error_prefix):
                 return {"success": False, "error": "HTTP 502"}
 
-        ok, err = tool._wait_agent_ready(FakeGW(), "agent_1", timeout=0.2, poll_interval=0)
+        ok, err = tool._wait_agent_ready(
+            FakeGW(), "agent_1", timeout=0.2, poll_interval=0
+        )
         assert ok is False
         assert "超时" in err
 
     def test_wait_agent_ready_skips_without_request_gateway(self, tool):
         """无 _request_gateway 的测试桩直接视为就绪。"""
+
         class FakeGW:
             def _create_agent(self, agent_type, working_dir, name):
                 return {"success": True, "stdout": json.dumps({"agent_id": "x"})}
@@ -839,6 +884,138 @@ class TestCreateAgentRetry:
         ok, err = tool._wait_agent_ready(FakeGW(), "agent_1")
         assert ok is True
         assert err == ""
+
+
+# ---------------------------------------------------------------------------
+# 失败/中止时清理常驻 Agent（task-22 编排可靠性）
+# ---------------------------------------------------------------------------
+class TestCleanupAgents:
+    def test_cleanup_deletes_all_agents(self, tool, monkeypatch):
+        """_cleanup_agents 删除 agent_map 中所有 Agent。"""
+        deleted = []
+
+        class FakeGW:
+            def _delete_agent(self, agent_id):
+                deleted.extend(agent_id if isinstance(agent_id, list) else [agent_id])
+                return {"success": True, "stdout": "", "stderr": ""}
+
+        monkeypatch.setattr(
+            "jarvis.jarvis_tools.pipeline_runner.GatewayManagerTool",
+            lambda: FakeGW(),
+        )
+        tool._cleanup_agents({"s1": "id_a", "s2": "id_b"})
+        assert set(deleted) == {"id_a", "id_b"}
+
+    def test_cleanup_skips_when_disabled(self, tool, monkeypatch):
+        """配置关闭清理时不做删除。"""
+        from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
+
+        deleted = []
+
+        class FakeGW:
+            def _delete_agent(self, agent_id):
+                deleted.append(agent_id)
+                return {"success": True, "stdout": "", "stderr": ""}
+
+        monkeypatch.setattr(
+            "jarvis.jarvis_tools.pipeline_runner.GatewayManagerTool",
+            lambda: FakeGW(),
+        )
+        key = "pipeline_cleanup_on_failure"
+        original = GLOBAL_CONFIG_DATA.get(key)
+        try:
+            GLOBAL_CONFIG_DATA[key] = False
+            tool._cleanup_agents({"s1": "id_a"})
+        finally:
+            if original is None:
+                GLOBAL_CONFIG_DATA.pop(key, None)
+            else:
+                GLOBAL_CONFIG_DATA[key] = original
+        assert deleted == []
+
+    def test_cleanup_skips_without_delete_agent(self, tool, monkeypatch):
+        """测试桩无 _delete_agent 时直接跳过，不报错。"""
+
+        class FakeGW:
+            def _create_agent(self, agent_type, working_dir, name):
+                return {"success": True, "stdout": "{}"}
+
+        monkeypatch.setattr(
+            "jarvis.jarvis_tools.pipeline_runner.GatewayManagerTool",
+            lambda: FakeGW(),
+        )
+        # 不应抛异常
+        tool._cleanup_agents({"s1": "id_a"})
+
+    def test_cleanup_empty_map(self, tool, monkeypatch):
+        """空 agent_map 不调用删除。"""
+        called = {"n": 0}
+
+        class FakeGW:
+            def _delete_agent(self, agent_id):
+                called["n"] += 1
+                return {"success": True}
+
+        monkeypatch.setattr(
+            "jarvis.jarvis_tools.pipeline_runner.GatewayManagerTool",
+            lambda: FakeGW(),
+        )
+        tool._cleanup_agents({})
+        assert called["n"] == 0
+
+    def test_abort_calls_cleanup(self, tool, monkeypatch):
+        """on_error=abort 中止时调用 _cleanup_agents。"""
+        cleaned = {"n": 0}
+
+        def fake_run_stage(node, *args, **kwargs):
+            return {
+                "stage": node["stage"],
+                "status": "failed" if node["stage"] == "s1" else "completed",
+                "output": "",
+                "result": {},
+                "error": "boom",
+                "gate_blocked": False,
+                "approval_path": "",
+            }
+
+        monkeypatch.setattr(tool, "_run_stage", fake_run_stage)
+        monkeypatch.setattr(
+            tool,
+            "_cleanup_agents",
+            lambda agent_map: cleaned.__setitem__("n", cleaned["n"] + 1),
+        )
+        # 使用 TestSchedule 的节点
+        r = tool._schedule(**TestSchedule()._base_kwargs(tool, TestSchedule()._nodes()))
+        assert r["success"] is False
+        assert cleaned["n"] == 1
+
+    def test_failure_calls_cleanup(self, tool, monkeypatch):
+        """流水线存在失败阶段时调用 _cleanup_agents。"""
+        cleaned = {"n": 0}
+
+        def fake_run_stage(node, *args, **kwargs):
+            return {
+                "stage": node["stage"],
+                "status": "failed",
+                "output": "",
+                "result": {},
+                "error": "boom",
+                "gate_blocked": False,
+                "approval_path": "",
+            }
+
+        monkeypatch.setattr(tool, "_run_stage", fake_run_stage)
+        monkeypatch.setattr(
+            tool,
+            "_cleanup_agents",
+            lambda agent_map: cleaned.__setitem__("n", cleaned["n"] + 1),
+        )
+        nodes = TestSchedule()._nodes()
+        nodes[0]["on_error"] = "continue"
+        nodes[1]["on_error"] = "continue"
+        r = tool._schedule(**TestSchedule()._base_kwargs(tool, nodes))
+        assert r["success"] is False
+        assert cleaned["n"] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -1041,10 +1218,50 @@ flow:
     def test_plan_batches_order(self, tool):
         """_plan_batches：依赖层级分批正确。"""
         nodes = [
-            {"stage": "a", "depends_on": [], "agent": "x", "input": [], "output": "", "gate": False, "when": None, "retry": 0, "on_error": "abort"},
-            {"stage": "b", "depends_on": ["a"], "agent": "x", "input": [], "output": "", "gate": False, "when": None, "retry": 0, "on_error": "abort"},
-            {"stage": "c", "depends_on": ["a"], "agent": "x", "input": [], "output": "", "gate": False, "when": None, "retry": 0, "on_error": "abort"},
-            {"stage": "d", "depends_on": ["b", "c"], "agent": "x", "input": [], "output": "", "gate": False, "when": None, "retry": 0, "on_error": "abort"},
+            {
+                "stage": "a",
+                "depends_on": [],
+                "agent": "x",
+                "input": [],
+                "output": "",
+                "gate": False,
+                "when": None,
+                "retry": 0,
+                "on_error": "abort",
+            },
+            {
+                "stage": "b",
+                "depends_on": ["a"],
+                "agent": "x",
+                "input": [],
+                "output": "",
+                "gate": False,
+                "when": None,
+                "retry": 0,
+                "on_error": "abort",
+            },
+            {
+                "stage": "c",
+                "depends_on": ["a"],
+                "agent": "x",
+                "input": [],
+                "output": "",
+                "gate": False,
+                "when": None,
+                "retry": 0,
+                "on_error": "abort",
+            },
+            {
+                "stage": "d",
+                "depends_on": ["b", "c"],
+                "agent": "x",
+                "input": [],
+                "output": "",
+                "gate": False,
+                "when": None,
+                "retry": 0,
+                "on_error": "abort",
+            },
         ]
         batches = tool._plan_batches(nodes)
         assert [n["stage"] for n in batches[0]] == ["a"]
@@ -1130,9 +1347,7 @@ class TestPipelineEventEmit:
         stage_events = [e for e in events if e["type"] == "stage_update"]
         # s1/s2 各有 running 与 completed
         for stage in ("s1", "s2"):
-            statuses = [
-                e["status"] for e in stage_events if e["stage"] == stage
-            ]
+            statuses = [e["status"] for e in stage_events if e["stage"] == stage]
             assert statuses.count("running") == 1
             assert statuses.count("completed") == 1
         done = [e for e in events if e["type"] == "pipeline_done"]
@@ -1166,9 +1381,7 @@ class TestPipelineEventEmit:
 
         events = self._drain()
         failed = [
-            e
-            for e in events
-            if e["type"] == "stage_update" and e["status"] == "failed"
+            e for e in events if e["type"] == "stage_update" and e["status"] == "failed"
         ]
         assert any(e["stage"] == "s1" for e in failed)
         done = [e for e in events if e["type"] == "pipeline_done"]
@@ -1261,9 +1474,7 @@ class TestPipelineEventEmit:
 
         events = self._drain()
         retries = [
-            e
-            for e in events
-            if e["type"] == "stage_update" and e["status"] == "retry"
+            e for e in events if e["type"] == "stage_update" and e["status"] == "retry"
         ]
         assert len(retries) == 1
         assert retries[0]["stage"] == "s1"
@@ -1296,6 +1507,35 @@ class TestPipelineEventEmit:
         assert done[0]["final_status"] == "gate_blocked"
         assert done[0]["gate_stage"] == "s1"
 
+    def test_gate_blocked_emits_pending_approval(self, tool, monkeypatch):
+        """门禁停住：额外广播一条 pipeline_approval action=pending 事件。"""
+        self._drain()
+
+        def fake_run_stage(node, *a, **k):
+            return {
+                "stage": node["stage"],
+                "status": "completed",
+                "output": "",
+                "result": {},
+                "error": "",
+                "gate_blocked": node["stage"] == "s1",
+                "approval_path": "/tmp/approval.md",
+            }
+
+        monkeypatch.setattr(tool, "_run_stage", fake_run_stage)
+        nodes = self._nodes()
+        nodes[0]["gate"] = True
+        r = tool._schedule(**self._base_kwargs(nodes))
+        assert r["success"] is True
+
+        events = self._drain()
+        approvals = [e for e in events if e["type"] == "pipeline_approval"]
+        assert len(approvals) == 1
+        assert approvals[0]["action"] == "pending"
+        assert approvals[0]["gate_stage"] == "s1"
+        assert approvals[0]["approval_path"] == "/tmp/approval.md"
+        assert "ts" in approvals[0]
+
     def test_emit_is_pure_side_effect(self, tool, monkeypatch):
         """事件总线异常不影响执行结果（纯副作用）。"""
         self._drain()
@@ -1315,3 +1555,67 @@ class TestPipelineEventEmit:
         assert r["success"] is True
         assert "全部阶段完成" in r["stdout"]
 
+
+# ---------------------------------------------------------------------------
+# 门禁人工审批记录（record_approval）
+# ---------------------------------------------------------------------------
+class TestRecordApproval:
+    """验证 record_approval 记录审批决定并广播 pipeline_approval 事件。"""
+
+    def _drain(self):
+        from jarvis.jarvis_tools.pipeline_events import get_event_bus
+
+        return get_event_bus().drain()
+
+    def test_approve_records_and_emits(self, tool):
+        """放行：返回成功并广播 action=approve 事件（含审批人/备注/时间）。"""
+        self._drain()
+        r = tool.record_approval(
+            pipeline_id="pl-1", action="approve", approver="alice", note="ok"
+        )
+        assert r["success"] is True
+        assert r["data"]["action"] == "approve"
+        assert r["data"]["approver"] == "alice"
+        assert r["data"]["note"] == "ok"
+        events = self._drain()
+        appr = [e for e in events if e["type"] == "pipeline_approval"]
+        assert len(appr) == 1
+        assert appr[0]["action"] == "approve"
+        assert appr[0]["approver"] == "alice"
+        assert appr[0]["note"] == "ok"
+        assert appr[0]["pipeline_id"] == "pl-1"
+        assert "ts" in appr[0]
+
+    def test_reject_and_retry_actions(self, tool):
+        """拒绝/重试：均成功广播对应 action。"""
+        for action in ("reject", "retry"):
+            self._drain()
+            r = tool.record_approval(pipeline_id="pl-1", action=action)
+            assert r["success"] is True
+            assert r["data"]["action"] == action
+            events = self._drain()
+            appr = [e for e in events if e["type"] == "pipeline_approval"]
+            assert len(appr) == 1
+            assert appr[0]["action"] == action
+
+    def test_invalid_action_rejected(self, tool):
+        """非法动作：返回失败且不广播事件。"""
+        self._drain()
+        r = tool.record_approval(pipeline_id="pl-1", action="banana")
+        assert r["success"] is False
+        assert "无效审批动作" in r["error"]
+        events = self._drain()
+        assert not [e for e in events if e["type"] == "pipeline_approval"]
+
+    def test_missing_pipeline_id_rejected(self, tool):
+        """缺少 pipeline_id：返回失败。"""
+        r = tool.record_approval(pipeline_id="", action="approve")
+        assert r["success"] is False
+        assert "pipeline_id" in r["error"]
+
+    def test_action_case_insensitive(self, tool):
+        """动作大小写不敏感：Approve 归一为 approve。"""
+        self._drain()
+        r = tool.record_approval(pipeline_id="pl-1", action="Approve")
+        assert r["success"] is True
+        assert r["data"]["action"] == "approve"
