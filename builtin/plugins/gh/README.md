@@ -15,6 +15,8 @@ GitHub 助手插件——自动处理当前仓库的 PR 和 Issue，复用 GitHu
 
 gh 插件默认处理**当前工作目录对应的 GitHub 仓库**（读取 git remote origin 自动解析）。若需操作其他仓库，可执行 `gh repo set-default owner/repo`，或命令加 `--repo owner/repo` 参数显式指定。
 
+- **侧边栏切换仓库**：侧边栏顶部「切换」按钮可手动输入 `owner/repo`（支持粘贴 GitHub 地址），查看其他仓库的 Issue/PR；点「跟随当前目录」恢复为自动解析。手动指定的仓库会记入本地存储，刷新后仍生效。
+
 ## 认证方式
 
 插件复用 GitHub 官方 `gh` CLI 的登录态（`gh auth login`），通过 `gh auth token` 读取 token，不自行存储 token。

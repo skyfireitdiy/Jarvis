@@ -10,6 +10,11 @@ const PLUGIN = "gh";
 // 当前解析出的仓库（owner/repo），由 resolveRepo 根据 workingDir 动态确定。
 // 初始为空：不硬编码默认仓库，避免插件发布后其他用户看到固定仓库。
 let currentRepo = "";
+// 手动切换的仓库（owner/repo）。为空表示跟随 workingDir 自动解析；
+// 非空表示用户显式指定了其他仓库，此时不再被 resolveRepo 覆盖。
+let manualRepo = "";
+// 记住手动指定的仓库，刷新页面后仍生效（key 按插件固定）。
+const MANUAL_REPO_KEY = "jarvis_gh_manual_repo";
 
 // 复刻 App.vue 的 gateway 地址解析（侧边栏组件无 props 注入，需自行解析）
 function parseGatewayAddress(address) {
@@ -107,6 +112,8 @@ export default {
   data() {
     return {
       repo: currentRepo,
+      repoInput: "",
+      repoEditing: false,
       tab: "issues",
       loading: false,
       error: "",
@@ -124,6 +131,7 @@ export default {
     };
   },
   mounted() {
+    this.restoreManualRepo();
     this.resolveRepo().then(() => this.refresh());
     // 点击别处 / 按 Esc 关闭右键菜单
     this._onDocClick = () => this.closeItemMenu();
@@ -145,16 +153,96 @@ export default {
   },
   methods: {
     async resolveRepo() {
+      // 手动指定的仓库优先：不再被 workingDir 自动解析覆盖。
+      if (manualRepo) {
+        currentRepo = manualRepo;
+        this.repo = currentRepo;
+        this.repoInput = currentRepo;
+        return;
+      }
       try {
         const payload = await callFunction("resolve_repo", {
           working_dir: this.workingDir || "",
         });
         currentRepo = (payload && payload.repo) || "";
         this.repo = currentRepo;
-      } catch (e) {
+        this.repoInput = currentRepo;
+      } catch {
         // 解析失败：清空仓库（不硬编码默认仓库）
         currentRepo = "";
         this.repo = "";
+        this.repoInput = "";
+      }
+    },
+    // 从 localStorage 恢复上次手动指定的仓库（刷新页面后仍生效）。
+    restoreManualRepo() {
+      try {
+        const saved = (localStorage.getItem(MANUAL_REPO_KEY) || "").trim();
+        if (saved) manualRepo = saved;
+      } catch {
+        /* localStorage 不可用时忽略 */
+      }
+    },
+    // 规范化用户输入的仓库：去空白、去 .git 后缀，校验 owner/repo 两段格式。
+    // 返回规范化后的 owner/repo；非法时返回空字符串。
+    normalizeRepoInput(raw) {
+      let value = String(raw || "").trim();
+      if (value.endsWith(".git")) value = value.slice(0, -4);
+      // 允许粘贴完整 URL / ssh 地址，提取 owner/repo
+      if (value.includes("://")) {
+        // https://github.com/owner/repo 或 ssh://git@github.com/owner/repo
+        value = value.replace(/^[a-z]+:\/\//i, "");
+        value = value.replace(/^[^@/]*@/, "");
+        value = value.replace(/^[^/]+\//, "");
+      } else if (value.includes("@")) {
+        // scp 风格 git@github.com:owner/repo
+        value = value.replace(/^[^@/]*@/, "");
+        value = value.replace(/^[^:/]+\//, "");
+        const colon = value.indexOf(":");
+        if (colon !== -1) value = value.slice(colon + 1);
+      }
+      value = value.replace(/^\/+|\/+$/g, "");
+      const parts = value.split("/").filter((p) => p);
+      if (parts.length !== 2) return "";
+      if (!/^[\w.-]+$/.test(parts[0]) || !/^[\w.-]+$/.test(parts[1])) return "";
+      return `${parts[0]}/${parts[1]}`;
+    },
+    // 切换到用户输入的仓库。
+    setRepo() {
+      const normalized = this.normalizeRepoInput(this.repoInput);
+      if (!normalized) {
+        this.error = "仓库格式不正确，请填写 owner/repo（如 octocat/Hello-World）";
+        return;
+      }
+      this.error = "";
+      manualRepo = normalized;
+      try {
+        localStorage.setItem(MANUAL_REPO_KEY, normalized);
+      } catch {
+        /* 忽略存储失败 */
+      }
+      currentRepo = normalized;
+      this.repo = normalized;
+      this.repoInput = normalized;
+      this.repoEditing = false;
+      this.refresh();
+    },
+    // 恢复为「跟随当前工作目录」自动解析的仓库。
+    useCurrentDirRepo() {
+      manualRepo = "";
+      try {
+        localStorage.removeItem(MANUAL_REPO_KEY);
+      } catch {
+        /* 忽略 */
+      }
+      this.repoEditing = false;
+      this.resolveRepo().then(() => this.refresh());
+    },
+    toggleRepoEdit() {
+      this.repoEditing = !this.repoEditing;
+      if (this.repoEditing) {
+        this.repoInput = this.repo || "";
+        this.error = "";
       }
     },
     fmtDate(s) {
@@ -390,7 +478,26 @@ export default {
   <div style="padding:12px;font-size:13px;color:#ddd;overflow:auto;height:100%;box-sizing:border-box;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
       <strong style="font-size:14px;">GitHub</strong>
-      <span style="font-size:11px;color:#888;">{{ repo || '未检测到仓库' }}</span>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:11px;color:#888;" :title="repo || ''">{{ repo || '未检测到仓库' }}</span>
+        <button @click="toggleRepoEdit" title="切换到其他仓库"
+          style="padding:2px 6px;background:#333;color:#ddd;border:none;border-radius:4px;cursor:pointer;font-size:11px;">切换</button>
+      </div>
+    </div>
+
+    <!-- 仓库切换：手动输入 owner/repo 查看其他仓库；也可恢复为跟随当前工作目录 -->
+    <div v-if="repoEditing" style="margin-bottom:10px;padding:8px;background:#252526;border-radius:6px;">
+      <div style="font-size:11px;color:#888;margin-bottom:4px;">仓库（owner/repo，可粘贴 GitHub 地址）</div>
+      <div style="display:flex;gap:6px;">
+        <input v-model="repoInput" type="text" placeholder="如 octocat/Hello-World"
+          @keydown.enter.prevent="setRepo"
+          style="flex:1;min-width:0;padding:5px 8px;background:#1e1e1e;color:#ddd;border:1px solid #444;border-radius:4px;font-size:12px;">
+        <button @click="setRepo" style="padding:5px 10px;background:#1f6feb;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;">确定</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:6px;">
+        <button @click="useCurrentDirRepo" style="padding:4px 8px;background:#333;color:#ddd;border:none;border-radius:4px;cursor:pointer;font-size:11px;">跟随当前目录</button>
+        <button @click="repoEditing = false" style="padding:4px 8px;background:#333;color:#ddd;border:none;border-radius:4px;cursor:pointer;font-size:11px;">取消</button>
+      </div>
     </div>
 
     <!-- 消息 -->
