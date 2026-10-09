@@ -59,6 +59,15 @@ _AGENT_KEYS = (
     "additional_args",
 )
 
+# loop 项允许的字段（第 2 层：运行时循环原语）
+_LOOP_KEYS = (
+    "loop",
+    "body",
+    "until",
+    "max_iterations",
+    "on_error",
+)
+
 
 def stage(
     name: str,
@@ -119,6 +128,71 @@ def stage(
     return item
 
 
+def loop(
+    name: str,
+    body: Any,
+    until: str,
+    max_iterations: int = 5,
+    on_error: Optional[str] = None,
+) -> Dict[str, Any]:
+    """声明一个运行时循环节点（第 2 层：子图循环）。
+
+    循环体 `body` 是一组已声明的 stage 名（子图）；引擎执行时把 body 整段
+    按依赖跑一遍，然后求值 `until`，未满足则重置 body 内 stage 重跑，
+    直到满足或达 `max_iterations`。
+
+    参数:
+        name: 循环节点名（唯一，供 depends_on 引用）。
+        body: 循环体 stage 名（字符串或列表），须非空且引用已声明的 stage。
+        until: 退出条件表达式（运行时求值，复用 when 求值器；支持
+            `stage.field` 引用与 `file(path)`/`contains(text, substr)`）。
+        max_iterations: 最大迭代轮次（正整数，防死循环）。
+        on_error: 失败策略（abort/continue/skip_dependents）；None 交由引擎
+            回退到顶层 default_on_error。
+
+    返回:
+        loop 项字典（供 Pipeline.add 追加）。
+
+    异常:
+        ValueError: name/until 为空、body 为空、max_iterations 非正整数。
+    """
+    loop_name = str(name or "").strip()
+    if not loop_name:
+        raise ValueError("loop 缺少 name")
+
+    if body is None:
+        body_list: List[str] = []
+    elif isinstance(body, str):
+        body_list = [body.strip()] if body.strip() else []
+    elif isinstance(body, (list, tuple)):
+        body_list = [str(b).strip() for b in body if str(b).strip()]
+    else:
+        raise ValueError(f"loop '{loop_name}' 的 body 须为字符串或列表")
+    if not body_list:
+        raise ValueError(f"loop '{loop_name}' 的 body 不能为空")
+
+    until_expr = str(until or "").strip()
+    if not until_expr:
+        raise ValueError(f"loop '{loop_name}' 缺少 until 退出条件")
+
+    try:
+        max_iter = int(max_iterations)
+    except (TypeError, ValueError):
+        raise ValueError(f"loop '{loop_name}' 的 max_iterations 须为正整数") from None
+    if max_iter < 1:
+        raise ValueError(f"loop '{loop_name}' 的 max_iterations 须为正整数")
+
+    item: Dict[str, Any] = {
+        "loop": loop_name,
+        "body": body_list,
+        "until": until_expr,
+        "max_iterations": max_iter,
+    }
+    if on_error:
+        item["on_error"] = str(on_error).strip()
+    return item
+
+
 class Pipeline:
     """编排容器：累积 agents 与 flow 声明，导出与 YAML 同构的结构。
 
@@ -131,6 +205,7 @@ class Pipeline:
         self._flow: List[Dict[str, Any]] = []
         self._agent_names: set = set()
         self._stage_names: set = set()
+        self._loop_names: set = set()
         self._spec_text: str = ""
         self._default_on_error: str = ""
 
@@ -138,12 +213,38 @@ class Pipeline:
     # 声明
     # ------------------------------------------------------------------
     def add(self, stage_item: Dict[str, Any]) -> "Pipeline":
-        """追加一个阶段（由 `stage()` 构造）。返回 self 以支持链式调用。"""
+        """追加一个阶段或循环节点（由 `stage()` / `loop()` 构造）。
+
+        - stage 项：以 `stage` 字段为名，校验唯一。
+        - loop 项（第 2 层）：以 `loop` 字段为名，校验唯一，且 body 内引用的
+          stage 须已声明。
+
+        返回 self 以支持链式调用。
+        """
         if not isinstance(stage_item, dict):
-            raise TypeError("add() 需要 stage() 返回的字典")
+            raise TypeError("add() 需要 stage()/loop() 返回的字典")
+        if "loop" in stage_item:
+            loop_name = str(stage_item.get("loop") or "").strip()
+            if not loop_name:
+                raise ValueError("loop 项缺少 loop 名")
+            if loop_name in self._loop_names:
+                raise ValueError(f"重复的 loop 名: {loop_name}")
+            if loop_name in self._stage_names:
+                raise ValueError(f"loop 名与 stage 名冲突: {loop_name}")
+            for b in stage_item.get("body") or []:
+                if b not in self._stage_names:
+                    raise ValueError(
+                        f"loop '{loop_name}' 的 body 引用了未声明的 stage '{b}'"
+                    )
+            self._loop_names.add(loop_name)
+            self._flow.append(stage_item)
+            return self
+
         name = str(stage_item.get("stage") or "").strip()
         if name in self._stage_names:
             raise ValueError(f"重复的 stage 名: {name}")
+        if name in self._loop_names:
+            raise ValueError(f"stage 名与 loop 名冲突: {name}")
         self._stage_names.add(name)
         self._flow.append(stage_item)
         return self

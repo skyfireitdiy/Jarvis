@@ -67,6 +67,9 @@ class PipelineRunnerTool:
         "支持并行（max_workers 默认 4）、多输入（input 列表）、条件（when）、失败"
         "策略（on_error: abort/continue/skip_dependents）、重试（retry）。门禁阶段"
         "（gate: true）完成后停住，默认 approve=false，需人工审批确认才放行。"
+        ".flow DSL 还支持运行时循环原语 loop(name, body, until, max_iterations)："
+        "body 为已声明 stage 名组成的子图，整段重跑直到 until 满足或达上限；until "
+        "可用白名单函数 file(path)（读 work_dir 内产物正文）与 contains(text, substr)。"
     )
     parameters = {
         "type": "object",
@@ -190,20 +193,7 @@ class PipelineRunnerTool:
             max_workers=max_workers,
             approve=approve,
             default_on_error=default_on_error,
-            nodes=[
-                {
-                    "stage": n["stage"],
-                    "agent": n["agent"],
-                    "depends_on": list(n["depends_on"]),
-                    "input": list(n["input"]),
-                    "output": n["output"],
-                    "gate": n["gate"],
-                    "when": n["when"],
-                    "retry": n["retry"],
-                    "on_error": n["on_error"],
-                }
-                for n in nodes
-            ],
+            nodes=[self._node_event_payload(n) for n in nodes],
         )
 
         # 5. 创建常驻 jvs Agent（每个 stage 一个）
@@ -258,6 +248,29 @@ class PipelineRunnerTool:
                 emit_remote(event)
         except Exception:  # pylint: disable=broad-except
             pass
+
+    @staticmethod
+    def _node_event_payload(n: Dict[str, Any]) -> Dict[str, Any]:
+        """把 DAG 节点转为事件负载（含 loop 复合节点字段，供前端可视化）。"""
+        payload: Dict[str, Any] = {
+            "stage": n["stage"],
+            "agent": n["agent"],
+            "depends_on": list(n["depends_on"]),
+            "input": list(n["input"]),
+            "output": n["output"],
+            "gate": n["gate"],
+            "when": n["when"],
+            "retry": n["retry"],
+            "on_error": n["on_error"],
+        }
+        if n.get("kind") == "loop":
+            payload["kind"] = "loop"
+            payload["until"] = n.get("until", "")
+            payload["max_iterations"] = n.get("max_iterations", 0)
+            payload["body_stages"] = [
+                b["stage"] for b in n.get("body_stages", [])
+            ]
+        return payload
 
     def _emit_approval(
         self,
@@ -369,10 +382,59 @@ class PipelineRunnerTool:
         if default_on_error not in ("abort", "continue", "skip_dependents"):
             default_on_error = "abort"
 
+        # 先展开 loop 项为普通 stage 列表，并记录 loop 归属。
+        # loop 项形如 {"loop": name, "body": [stage名...], "until": expr,
+        #             "max_iterations": n, "on_error": ...}
+        flat_flow: List[Dict[str, Any]] = []
+        loop_defs: Dict[str, Dict[str, Any]] = {}
+        stage_to_loop: Dict[str, str] = {}
+        for idx, item in enumerate(flow):
+            if not isinstance(item, dict):
+                return {"success": False, "error": f"flow 第 {idx + 1} 项不是对象"}
+            loop_name = str(item.get("loop") or "").strip()
+            if not loop_name:
+                flat_flow.append(item)
+                continue
+            if loop_name in loop_defs:
+                return {
+                    "success": False,
+                    "error": f"flow 中存在重复 loop 名: {loop_name}",
+                }
+            body = item.get("body")
+            if isinstance(body, str):
+                body = [body]
+            body = [str(b).strip() for b in (body or []) if str(b).strip()]
+            if not body:
+                return {
+                    "success": False,
+                    "error": f"loop '{loop_name}' 的 body 不能为空",
+                }
+            until = str(item.get("until") or "").strip()
+            if not until:
+                return {
+                    "success": False,
+                    "error": f"loop '{loop_name}' 缺少 until 条件",
+                }
+            try:
+                max_iterations = int(item.get("max_iterations", 5))
+            except (TypeError, ValueError):
+                max_iterations = 0
+            if max_iterations < 1:
+                return {
+                    "success": False,
+                    "error": f"loop '{loop_name}' 的 max_iterations 必须为正整数",
+                }
+            loop_defs[loop_name] = {
+                "until": until,
+                "max_iterations": max_iterations,
+                "body": body,
+                "on_error": item.get("on_error"),
+            }
+
         nodes: List[Dict[str, Any]] = []
         stage_names: List[str] = []
         output_owners: Dict[str, str] = {}
-        for idx, stage in enumerate(flow):
+        for idx, stage in enumerate(flat_flow):
             stage_name = str(stage.get("stage") or f"stage_{idx}").strip()
             if not stage_name:
                 return {"success": False, "error": f"flow 第 {idx + 1} 项缺少 stage 名"}
@@ -380,6 +442,11 @@ class PipelineRunnerTool:
                 return {
                     "success": False,
                     "error": f"flow 中存在重复 stage 名: {stage_name}",
+                }
+            if stage_name in loop_defs:
+                return {
+                    "success": False,
+                    "error": f"stage 名 '{stage_name}' 与 loop 名冲突",
                 }
             stage_names.append(stage_name)
 
@@ -444,6 +511,15 @@ class PipelineRunnerTool:
                     "on_error": on_error,
                 }
             )
+            for lname, ldef in loop_defs.items():
+                if stage_name in ldef["body"]:
+                    stage_to_loop[stage_name] = lname
+
+        if loop_defs:
+            result = self._fold_loops_into_dag(nodes, loop_defs, stage_to_loop)
+            if not result["success"]:
+                return result
+            nodes = result["nodes"]
 
         # 环检测（Kahn 拓扑排序，有环返回 None）
         if self._topo_sort(nodes) is None:
@@ -452,6 +528,98 @@ class PipelineRunnerTool:
                 "error": "flow 依赖存在环，无法执行（请检查 depends_on）",
             }
         return {"success": True, "nodes": nodes}
+
+    def _fold_loops_into_dag(
+        self,
+        nodes: List[Dict[str, Any]],
+        loop_defs: Dict[str, Dict[str, Any]],
+        stage_to_loop: Dict[str, str],
+    ) -> Dict[str, Any]:
+        """把 body stage 折叠进 loop 复合节点，返回不含 body stage 的顶层节点列表。
+
+        - body 内 stage 从顶层移除，作为 loop 节点的 ``body_stages`` 保留。
+        - loop 节点 ``depends_on`` = body 内 stage 对外部（非 body）stage 的依赖并集。
+        - 顶层其它 stage 若依赖 body 内 stage，改写为依赖对应 loop 节点。
+        - body 内 stage 之间互相依赖允许（在 loop 内顺序执行），但 body 内 stage
+          不得依赖 body 外的 stage（否则重跑语义不清），也不得跨 loop。
+        """
+        node_by_stage = {n["stage"]: n for n in nodes}
+
+        # 校验 body 引用存在、不跨 loop
+        for lname, ldef in loop_defs.items():
+            for b in ldef["body"]:
+                if b not in node_by_stage:
+                    return {
+                        "success": False,
+                        "error": f"loop '{lname}' 的 body 引用了不存在的 stage '{b}'",
+                    }
+                owner = stage_to_loop.get(b)
+                if owner != lname:
+                    return {
+                        "success": False,
+                        "error": (
+                            f"loop '{lname}' 的 body 中 stage '{b}' "
+                            f"不属于该 loop（可能被多个 loop 引用）"
+                        ),
+                    }
+
+        folded: List[Dict[str, Any]] = []
+        for lname, ldef in loop_defs.items():
+            body = ldef["body"]
+            body_set = set(body)
+            external_deps: List[str] = []
+            for b in body:
+                for d in node_by_stage[b]["depends_on"]:
+                    if d in body_set:
+                        continue
+                    if d in stage_to_loop:
+                        return {
+                            "success": False,
+                            "error": (
+                                f"loop '{lname}' 的 body stage '{b}' "
+                                f"依赖了其它 loop '{stage_to_loop[d]}' 的 stage '{d}'"
+                            ),
+                        }
+                    if d not in external_deps:
+                        external_deps.append(d)
+            body_stages = [node_by_stage[b] for b in body]
+            # body 内 stage 的 depends_on 只保留 body 内引用（loop 内执行时用）
+            for bs in body_stages:
+                bs["depends_on"] = [d for d in bs["depends_on"] if d in body_set]
+            loop_node = {
+                "stage": lname,
+                "kind": "loop",
+                "agent": None,
+                "depends_on": external_deps,
+                "input": [],
+                "output": "",
+                "gate": False,
+                "when": None,
+                "retry": 0,
+                "on_error": str(ldef.get("on_error") or "abort").strip()
+                if str(ldef.get("on_error") or "abort").strip()
+                in ("abort", "continue", "skip_dependents")
+                else "abort",
+                "until": ldef["until"],
+                "max_iterations": ldef["max_iterations"],
+                "body_stages": body_stages,
+            }
+            folded.append(loop_node)
+
+        # 顶层 stage：去掉 body stage，依赖改写为 loop 节点
+        stage_to_loop_node = {b: lname for lname, ldef in loop_defs.items() for b in ldef["body"]}
+        for n in nodes:
+            if n["stage"] in stage_to_loop_node:
+                continue
+            new_deps: List[str] = []
+            for d in n["depends_on"]:
+                mapped = stage_to_loop_node.get(d, d)
+                if mapped not in new_deps:
+                    new_deps.append(mapped)
+            n["depends_on"] = new_deps
+            folded.append(n)
+
+        return {"success": True, "nodes": folded}
 
     def _topo_sort(self, nodes: List[Dict[str, Any]]) -> Optional[List[Dict[str, Any]]]:
         """Kahn 拓扑排序；有环返回 None。"""
@@ -572,6 +740,21 @@ class PipelineRunnerTool:
     # ------------------------------------------------------------------
     # 常驻 Agent 创建
     # ------------------------------------------------------------------
+    def _iter_agent_nodes(
+        self, nodes: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """展开节点列表为「需要创建 Agent 的节点」：普通 stage + loop 的 body stage。
+
+        loop 复合节点自身无 agent，其 body_stages 才是真正执行任务的节点。
+        """
+        out: List[Dict[str, Any]] = []
+        for n in nodes:
+            if n.get("kind") == "loop":
+                out.extend(n.get("body_stages", []))
+            else:
+                out.append(n)
+        return out
+
     def _create_stage_agents(
         self,
         nodes: List[Dict[str, Any]],
@@ -586,7 +769,7 @@ class PipelineRunnerTool:
         """
         gw = GatewayManagerTool()
         agent_map: Dict[str, str] = {}
-        for node in nodes:
+        for node in self._iter_agent_nodes(nodes):
             stage_name = node["stage"]
             agent_def = agents_by_name[node["agent"]]
             working_dir = str(agent_def.get("working_dir") or str(work_dir))
@@ -726,7 +909,10 @@ class PipelineRunnerTool:
         output = node["output"]
         input_list = node["input"]
 
-        status_file = artifact_dir / f"{stage_name}.status"
+        suffix = str(node.get("_status_suffix") or "").strip()
+        status_file = artifact_dir / (
+            f"{stage_name}.{suffix}.status" if suffix else f"{stage_name}.status"
+        )
         # 清空旧 status_file（支持重试）
         if status_file.exists():
             try:
@@ -819,6 +1005,123 @@ class PipelineRunnerTool:
             "status": "completed",
             "output": output,
             "result": result,
+            "error": "",
+            "gate_blocked": False,
+            "approval_path": "",
+        }
+
+    def _run_loop(
+        self,
+        node: Dict[str, Any],
+        agent_map: Dict[str, str],
+        agents_by_name: Dict[str, Any],
+        work_dir: Path,
+        artifact_dir: Path,
+        spec_summary: str,
+        approve: bool,
+        pipeline_id: str = "",
+    ) -> Dict[str, Any]:
+        """执行 loop 复合节点：整段重跑 body_stages 直到 until 满足或达上限。
+
+        body 内 stage 按内部依赖顺序执行；每轮迭代结束求值 until（可读产物文件）。
+        返回与 `_run_stage` 同构的 stage_result（stage=loop 名）。
+        """
+        loop_name = node["stage"]
+        body_stages: List[Dict[str, Any]] = node.get("body_stages", [])
+        until = node.get("until", "")
+        max_iterations = int(node.get("max_iterations", 5) or 5)
+        order = self._topo_sort(body_stages) or body_stages
+
+        last_results: Dict[str, Dict[str, Any]] = {}
+        for iteration in range(1, max_iterations + 1):
+            self._emit(
+                pipeline_id,
+                "loop_iteration",
+                stage=loop_name,
+                iteration=iteration,
+                max_iterations=max_iterations,
+            )
+            PrettyOutput.auto_print(
+                f"🔁 loop [{loop_name}] 第 {iteration}/{max_iterations} 轮"
+            )
+            iter_results: Dict[str, Dict[str, Any]] = {}
+            for bs in order:
+                bs_name = bs["stage"]
+                agent_id = agent_map.get(bs_name, "")
+                # 每轮使用独立 status_file，避免上一轮结果干扰
+                bs_run = dict(bs)
+                bs_run["_status_suffix"] = f"iter{iteration}"
+                stage_result = self._run_stage(
+                    bs_run,
+                    agent_id,
+                    agents_by_name,
+                    work_dir,
+                    artifact_dir,
+                    spec_summary,
+                    approve,
+                )
+                iter_results[bs_name] = stage_result
+                self._emit(
+                    pipeline_id,
+                    "stage_update",
+                    stage=bs_name,
+                    status=stage_result["status"],
+                    agent_id=agent_id,
+                    output=bs["output"],
+                    artifact=stage_result.get("output", ""),
+                    loop=loop_name,
+                    iteration=iteration,
+                )
+                if stage_result["status"] != "completed":
+                    # body 内阶段失败：按 loop 的 on_error 决定
+                    return {
+                        "stage": loop_name,
+                        "status": "failed",
+                        "output": "",
+                        "result": {"iterations": iteration},
+                        "error": (
+                            f"loop [{loop_name}] 第 {iteration} 轮阶段 "
+                            f"[{bs_name}] 失败: {stage_result.get('error', '')}"
+                        ),
+                        "gate_blocked": False,
+                        "approval_path": "",
+                    }
+            last_results = iter_results
+            ok, err = self._eval_until(until, iter_results, work_dir)
+            if ok:
+                PrettyOutput.auto_print(
+                    f"🔁 loop [{loop_name}] 第 {iteration} 轮满足 until，结束循环"
+                )
+                return {
+                    "stage": loop_name,
+                    "status": "completed",
+                    "output": "",
+                    "result": {
+                        "iterations": iteration,
+                        "until_satisfied": True,
+                    },
+                    "error": "",
+                    "gate_blocked": False,
+                    "approval_path": "",
+                }
+            if err:
+                PrettyOutput.auto_print(f"⚠ loop [{loop_name}] until 求值异常: {err}")
+
+        # 达到上限仍未满足 until：视为完成（不再无限循环），但标注未满足
+        PrettyOutput.auto_print(
+            f"🔁 loop [{loop_name}] 已达最大迭代 {max_iterations} 轮，until 未满足"
+        )
+        return {
+            "stage": loop_name,
+            "status": "completed",
+            "output": "",
+            "result": {
+                "iterations": max_iterations,
+                "until_satisfied": False,
+                "body_results": {
+                    k: {"status": v.get("status")} for k, v in last_results.items()
+                },
+            },
             "error": "",
             "gate_blocked": False,
             "approval_path": "",
@@ -968,7 +1271,7 @@ class PipelineRunnerTool:
                 futures = {}
                 for n in effective_ready:
                     state[n["stage"]] = "running"
-                    agent_id = agent_map[n["stage"]]
+                    agent_id = agent_map.get(n["stage"], "")
                     self._emit(
                         pipeline_id,
                         "stage_update",
@@ -977,18 +1280,33 @@ class PipelineRunnerTool:
                         agent_id=agent_id,
                         output=n["output"],
                     )
-                    futures[
-                        pool.submit(
-                            self._run_stage,
-                            n,
-                            agent_id,
-                            agents_by_name,
-                            work_dir,
-                            artifact_dir,
-                            spec_summary,
-                            approve,
-                        )
-                    ] = n
+                    if n.get("kind") == "loop":
+                        futures[
+                            pool.submit(
+                                self._run_loop,
+                                n,
+                                agent_map,
+                                agents_by_name,
+                                work_dir,
+                                artifact_dir,
+                                spec_summary,
+                                approve,
+                                pipeline_id,
+                            )
+                        ] = n
+                    else:
+                        futures[
+                            pool.submit(
+                                self._run_stage,
+                                n,
+                                agent_id,
+                                agents_by_name,
+                                work_dir,
+                                artifact_dir,
+                                spec_summary,
+                                approve,
+                            )
+                        ] = n
 
                 for fut in as_completed(futures):
                     n = futures[fut]
@@ -1256,8 +1574,55 @@ class PipelineRunnerTool:
         except Exception as e:  # pylint: disable=broad-except
             return False, f"when 表达式解析失败: {e}"
 
+    def _eval_until(
+        self,
+        expr: str,
+        results: Dict[str, Dict[str, Any]],
+        work_dir: Optional[Path] = None,
+    ) -> tuple:
+        """求值 loop 的 until 条件（在 _eval_when 基础上增加 file()/contains()）。
+
+        白名单函数：
+        - `file("相对产物路径")`：读取 work_dir 下产物文件正文（限 work_dir 内、≤1MB、
+          不存在返回空串）。**惰性求值**：仅在比较/contains 时读取，不把文件正文
+          拼进表达式字符串（避免大文件拖慢解析）。
+        - `contains(text, substr)`：text 是否包含 substr（大小写敏感）。
+
+        返回:
+            (ok, error): ok=True 表示条件满足。
+        """
+        try:
+            substituted = self._substitute_refs(expr, results)
+            value = self._eval_boolean(substituted, work_dir=work_dir)
+            return bool(value), ""
+        except Exception as e:  # pylint: disable=broad-except
+            return False, f"until 表达式解析失败: {e}"
+
+    def _read_artifact_text(
+        self, rel_path: str, work_dir: Optional[Path], max_bytes: int = 1024 * 1024
+    ) -> str:
+        """读取 work_dir 下产物文件正文；限目录内、限大小，异常返回空串。"""
+        if work_dir is None or not rel_path:
+            return ""
+        try:
+            base = Path(work_dir).resolve()
+            target = (base / rel_path).resolve()
+            # 防越界：目标必须位于 work_dir 内
+            if base != target and base not in target.parents:
+                return ""
+            if not target.is_file():
+                return ""
+            with open(target, "rb") as fh:
+                data = fh.read(max_bytes)
+            return data.decode("utf-8", errors="replace")
+        except (OSError, ValueError):
+            return ""
+
     def _substitute_refs(self, expr: str, results: Dict[str, Dict[str, Any]]) -> str:
-        """把 `stage.field` 引用替换为对应 stage 结果中的字段值（字符串形式）。"""
+        """把 `stage.field` 引用替换为对应 stage 结果中的字段值（字符串形式）。
+
+        跳过引号内的内容（如 `file("report.md")` 的路径字面量不应被当作 stage 引用）。
+        """
 
         def _lookup(match: "re.Match") -> str:
             stage_name = match.group(1)
@@ -1273,28 +1638,51 @@ class PipelineRunnerTool:
                 return str(value)
             return json.dumps(str(value), ensure_ascii=False)
 
-        return re.sub(
-            r"([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)", _lookup, expr
-        )
+        # 先按引号切分，只替换引号外的片段
+        segments = re.split(r'("(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\')', expr)
+        for i in range(0, len(segments), 2):
+            segments[i] = re.sub(
+                r"([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)",
+                _lookup,
+                segments[i],
+            )
+        return "".join(segments)
 
-    def _eval_boolean(self, expr: str) -> Any:
+    def _eval_boolean(self, expr: str, work_dir: Optional[Path] = None) -> Any:
         """安全求值布尔表达式（只支持比较、逻辑、字面量，不 eval 任意代码）。"""
         expr = expr.strip()
         # 处理 ||
         parts = self._split_top_level(expr, "||")
         if len(parts) > 1:
-            return any(self._eval_boolean(p) for p in parts)
+            return any(self._eval_boolean(p, work_dir=work_dir) for p in parts)
         # 处理 &&
         parts = self._split_top_level(expr, "&&")
         if len(parts) > 1:
-            return all(self._eval_boolean(p) for p in parts)
+            return all(self._eval_boolean(p, work_dir=work_dir) for p in parts)
         e = parts[0].strip()
         if e.startswith("!"):
-            return not self._eval_boolean(e[1:])
+            return not self._eval_boolean(e[1:], work_dir=work_dir)
         if e.startswith("(") and e.endswith(")"):
-            return self._eval_boolean(e[1:-1])
+            return self._eval_boolean(e[1:-1], work_dir=work_dir)
+        # 白名单函数 contains(text, substr)
+        contains_val = self._eval_contains(e, work_dir=work_dir)
+        if contains_val is not None:
+            return contains_val
         # 比较表达式
-        return self._eval_comparison(e)
+        return self._eval_comparison(e, work_dir=work_dir)
+
+    def _eval_contains(self, e: str, work_dir: Optional[Path] = None) -> Optional[bool]:
+        """求值 `contains(text, substr)`；非该形式返回 None。"""
+        e = e.strip()
+        if not e.startswith("contains(") or not e.endswith(")"):
+            return None
+        inner = e[len("contains(") : -1]
+        args = self._split_top_level(inner, ",")
+        if len(args) != 2:
+            raise ValueError(f"contains() 需要 2 个参数: {e}")
+        text = self._coerce(args[0].strip(), work_dir=work_dir)
+        sub = self._coerce(args[1].strip(), work_dir=work_dir)
+        return str(sub) in str(text)
 
     def _split_top_level(self, expr: str, op: str) -> List[str]:
         """按顶层操作符分割（忽略括号内与引号内的）。"""
@@ -1365,7 +1753,7 @@ class PipelineRunnerTool:
             i += 1
         return -1
 
-    def _eval_comparison(self, e: str) -> bool:
+    def _eval_comparison(self, e: str, work_dir: Optional[Path] = None) -> bool:
         """求值单个比较表达式（或布尔/数值字面量）。"""
         e = e.strip()
         if e in ("true", "True"):
@@ -1380,8 +1768,8 @@ class PipelineRunnerTool:
             if idx >= 0:
                 left_s = e[:idx].strip()
                 right_s = e[idx + len(op) :].strip()
-                left = self._coerce(left_s)
-                right = self._coerce(right_s)
+                left = self._coerce(left_s, work_dir=work_dir)
+                right = self._coerce(right_s, work_dir=work_dir)
                 if op == "==":
                     return left == right
                 if op == "!=":
@@ -1395,15 +1783,18 @@ class PipelineRunnerTool:
                 if op == "<":
                     return left < right
         # 无比较符：尝试数值/布尔字面量
-        num = self._coerce(e)
+        num = self._coerce(e, work_dir=work_dir)
         if isinstance(num, bool):
             return num
         if isinstance(num, (int, float)):
             return num != 0
         return bool(num)
 
-    def _coerce(self, s: str) -> Any:
-        """把字面量字符串转为数值/布尔/字符串（用于比较）。"""
+    def _coerce(self, s: str, work_dir: Optional[Path] = None) -> Any:
+        """把字面量字符串转为数值/布尔/字符串（用于比较）。
+
+        额外支持白名单函数 `file("相对产物路径")`：惰性读取 work_dir 下产物正文。
+        """
         s = s.strip()
         if s in ("true", "True"):
             return True
@@ -1411,6 +1802,10 @@ class PipelineRunnerTool:
             return False
         if s == "None":
             return None
+        # 白名单函数 file("...")
+        file_match = re.fullmatch(r'file\(\s*"([^"]*)"\s*\)', s)
+        if file_match:
+            return self._read_artifact_text(file_match.group(1), work_dir)
         # 带引号的字符串
         if (s.startswith('"') and s.endswith('"')) or (
             s.startswith("'") and s.endswith("'")

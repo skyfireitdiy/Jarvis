@@ -340,7 +340,7 @@
               v-for="n in nodes"
               :key="n.stage"
               class="orch-node"
-              :class="['st-' + n.status, { 'is-gate': n.gate, 'is-hover': hoverStage === n.stage, 'is-clickable': !!n.agentId }]"
+              :class="['st-' + n.status, { 'is-gate': n.gate, 'is-loop': n.kind === 'loop', 'is-hover': hoverStage === n.stage, 'is-clickable': !!n.agentId }]"
               :transform="`translate(${layout.positions[n.stage].x},${layout.positions[n.stage].y})`"
               @mouseenter="hoverStage = n.stage"
               @click="onNodeClick(n)"
@@ -377,6 +377,20 @@
                 y="24"
                 text-anchor="end"
               >🚧</text>
+              <text
+                v-if="n.kind === 'loop'"
+                class="orch-node-loop"
+                :x="NODE_W - 12"
+                y="24"
+                text-anchor="end"
+              >🔁</text>
+              <text
+                v-if="n.kind === 'loop' && n.maxIterations"
+                class="orch-node-loop-iter"
+                :x="NODE_W - 12"
+                y="42"
+                text-anchor="end"
+              >{{ n.iteration || 0 }}/{{ n.maxIterations }}</text>
               <text
                 v-if="n.retryCount"
                 class="orch-node-retry"
@@ -779,6 +793,10 @@ function submitApproval(action) {
 .orch-node-agent { fill: #8b9cb3; font-size: 10.5px; }
 .orch-node-gate { font-size: 12px; }
 .orch-node-retry { fill: #f0b429; font-size: 10px; }
+.orch-node-loop { font-size: 12px; }
+.orch-node-loop-iter { fill: #b98cff; font-size: 10px; }
+.orch-node.is-loop .orch-node-bg { stroke-dasharray: 6 3; }
+.orch-node.is-loop .orch-node-accent { fill: #b98cff; }
 .orch-node-pulse { fill: #20c8ff; animation: orch-pulse 1.1s ease-in-out infinite; }
 .orch-node.is-clickable { cursor: pointer; }
 .orch-node.is-hover .orch-node-bg { stroke-width: 2; }

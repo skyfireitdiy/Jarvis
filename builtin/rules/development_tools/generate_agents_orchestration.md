@@ -15,6 +15,8 @@ description: 当需要生成Agents编排文件以批量创建Agent时触发。�
 > - **`.flow`** = **流程的编排**：用 Python DSL 生成 DAG（`agents` + `flow`），走流水线调度执行。DSL 库见 `src/jarvis/jarvis_tools/orchestration_dsl.py`，设计文档见 `docs/design/orchestration-python-dsl.md`。
 >
 > 本规则只覆盖 `.yaml` 组织编排；需要"多阶段依赖/流水线调度"时用 `.flow`。
+>
+> **`.flow` 还支持运行时循环原语** `loop(name, body, until, max_iterations)`：`body` 为已声明 stage 名组成的子图，整段重跑直到 `until` 满足或达上限；`until` 可用白名单函数 `file(path)`（读 work_dir 内产物正文）与 `contains(text, substr)`。详见设计文档第 11 章。
 
 ## 你必须遵守的原则
 

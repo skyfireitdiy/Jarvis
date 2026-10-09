@@ -15,6 +15,7 @@ from typing import cast
 import pytest
 
 from jarvis.jarvis_tools.orchestration_dsl import Pipeline
+from jarvis.jarvis_tools.orchestration_dsl import loop
 from jarvis.jarvis_tools.orchestration_dsl import stage
 from jarvis.jarvis_tools.orchestration_loader import load_orchestration
 from jarvis.jarvis_tools.pipeline_runner import PipelineRunnerTool
@@ -107,6 +108,72 @@ class TestPipeline:
         bad = cast("dict", "not-a-dict")
         with pytest.raises(TypeError):
             p.add(bad)
+
+
+class TestLoop:
+    def test_minimal(self):
+        item = loop("fix", body=["translate", "compile"], until="compile.ok == true")
+        assert item == {
+            "loop": "fix",
+            "body": ["translate", "compile"],
+            "until": "compile.ok == true",
+            "max_iterations": 5,
+        }
+
+    def test_body_str_and_on_error(self):
+        item = loop("fix", body="compile", until="compile.ok == true",
+                    max_iterations=3, on_error="continue")
+        assert item["body"] == ["compile"]
+        assert item["max_iterations"] == 3
+        assert item["on_error"] == "continue"
+
+    def test_missing_name(self):
+        with pytest.raises(ValueError):
+            loop("", body=["s"], until="s.ok == true")
+
+    def test_empty_body(self):
+        with pytest.raises(ValueError):
+            loop("fix", body=[], until="s.ok == true")
+
+    def test_missing_until(self):
+        with pytest.raises(ValueError):
+            loop("fix", body=["s"], until="")
+
+    def test_bad_max_iterations(self):
+        with pytest.raises(ValueError):
+            loop("fix", body=["s"], until="s.ok == true", max_iterations=0)
+
+    def test_add_loop_ok(self):
+        p = Pipeline()
+        p.agent("a1")
+        p.add(stage("translate", agent="a1"))
+        p.add(stage("compile", agent="a1"))
+        p.add(loop("fix", body=["translate", "compile"], until="compile.ok == true"))
+        data = p.to_dict()
+        assert data["flow"][-1]["loop"] == "fix"
+
+    def test_add_loop_body_unknown_stage(self):
+        p = Pipeline()
+        p.agent("a1")
+        p.add(stage("translate", agent="a1"))
+        with pytest.raises(ValueError):
+            p.add(loop("fix", body=["translate", "nope"], until="x.ok == true"))
+
+    def test_duplicate_loop(self):
+        p = Pipeline()
+        p.agent("a1")
+        p.add(stage("s", agent="a1"))
+        p.add(loop("fix", body=["s"], until="s.ok == true"))
+        with pytest.raises(ValueError):
+            p.add(loop("fix", body=["s"], until="s.ok == true"))
+
+    def test_loop_name_conflicts_with_stage(self):
+        p = Pipeline()
+        p.agent("a1")
+        p.add(stage("s", agent="a1"))
+        p.add(loop("fix", body=["s"], until="s.ok == true"))
+        with pytest.raises(ValueError):
+            p.add(stage("fix", agent="a1"))
 
 
 # ---------------------------------------------------------------------------

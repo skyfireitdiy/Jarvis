@@ -44,6 +44,16 @@ function emptyStage(node) {
     error: "",
     artifact: "",
     retryCount: 0,
+    // loop 复合节点（kind === "loop"）的额外字段
+    kind: node.kind || "",
+    until: node.until || "",
+    maxIterations: node.max_iterations || 0,
+    iteration: 0,
+    bodyStages: Array.isArray(node.body_stages)
+      ? node.body_stages.map((b) =>
+          typeof b === "string" ? b : b && b.stage ? b.stage : "",
+        ).filter(Boolean)
+      : [],
   };
 }
 
@@ -170,6 +180,22 @@ export class PipelineStore {
       if (event.error !== undefined) node.error = event.error || "";
       if (event.artifact !== undefined) node.artifact = event.artifact || "";
       if (event.agent_id) node.agentId = event.agent_id;
+      // loop body stage 的迭代进度：记录到对应 loop 节点
+      if (event.loop) {
+        const loopNode = state.stages.get(event.loop);
+        if (loopNode && event.iteration) loopNode.iteration = event.iteration;
+      }
+      this._persist();
+      return state;
+    }
+
+    // loop 迭代事件：更新 loop 节点的当前迭代轮次
+    if (type === "loop_iteration") {
+      const node = state.stages.get(event.stage);
+      if (node) {
+        node.iteration = event.iteration || node.iteration;
+        if (event.max_iterations) node.maxIterations = event.max_iterations;
+      }
       this._persist();
       return state;
     }

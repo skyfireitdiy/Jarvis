@@ -311,22 +311,119 @@ for i in range(2):
 
 ---
 
+## 11. 第 2 层：运行时循环原语（`loop`）—— 已实施
+
+> 状态：**已实施**。实现见 `src/jarvis/jarvis_tools/orchestration_dsl.py`（`loop()` 构造器）、
+> `src/jarvis/jarvis_tools/pipeline_runner.py`（`_fold_loops_into_dag` / `_run_loop` / `_eval_until`）、
+> 前端 `pipelineStore.js` / `OrchestrationView.vue`。
+
+### 11.1 语义
+
+DSL 新增 `loop(name, body, until, max_iterations=5, on_error=None)`：
+
+- `name`：loop 节点名（与 stage 名共享命名空间，不得冲突）。
+- `body`：**已声明 stage 名**组成的子图（字符串或列表，非空）。
+- `until`：循环终止条件表达式（非空），**每轮 body 全部阶段执行完后求值**。
+- `max_iterations`：正整数上限（默认 5）；达到上限仍未满足 `until` 时 loop 视为
+  `completed`（`until_satisfied=false`），不无限循环。
+- `on_error`：body 内阶段失败时的处理（默认 `abort`）。
+
+关键点：**body 是"整段重跑"**（不是单阶段重试）。每轮 body 内阶段按内部依赖顺序执行一遍，
+每轮使用独立 status 文件（`{stage}.iter{N}.status`）隔离，避免上一轮结果干扰。
+
+### 11.2 `until` 表达式：读产物文件
+
+`until` 复用既有 `when` 求值框架（`_substitute_refs` / `_eval_boolean` / `_eval_comparison`），
+新增两个**白名单函数**（不 eval 任意代码）：
+
+- `file(path)`：读取 `work_dir` 下产物文件正文。
+  - **越界防护**：路径 resolve 后必须仍在 `work_dir` 内，否则报错。
+  - **大小上限**：只读前 1MB（`open(...,'rb').read(max_bytes)`），防爆内存。
+  - 文件不存在返回空串。
+- `contains(text, substr)`：子串匹配，返回布尔。
+
+示例：
+
+```python
+loop(
+    "fix_until_ok",
+    body=["compile", "fix"],
+    until='contains(file("build.log"), "BUILD SUCCESS")',
+    max_iterations=5,
+)
+```
+
+**性能注意**：`file()` 是**惰性求值**——文件正文不会拼进表达式字符串。这是必须的，
+因为 `_split_top_level` / `_find_top_level_op` 是逐字符 Python 循环，把 1MB 文本拼进
+表达式会卡死（曾导致 pytest 挂 90s+）。另外 `_substitute_refs` 已改为**跳过引号内内容**，
+避免误替换 `file("report.md")` 里的路径。
+
+### 11.3 DAG 折叠与调度
+
+- `_build_dag` 先展开 loop 项（校验名唯一、body 非空、until 非空、`max_iterations ≥ 1`），
+  再调用 `_fold_loops_into_dag` 把 body stage 折叠进 loop 复合节点：
+  - `kind="loop"`、`body_stages`、`until`、`max_iterations`；
+  - loop 节点 `depends_on` = body 对外部依赖的并集；
+  - 顶层依赖 body stage 的节点改写为依赖 loop 节点；
+  - body 内 stage 互相依赖允许；依赖**其它 loop** 的 stage 报错。
+- `_iter_agent_nodes`：展开为需建 Agent 的节点（普通 stage + loop 的 body_stages），
+  供 `_create_stage_agents` 使用。
+- `_schedule`：loop 节点走 `_run_loop`，普通节点走 `_run_stage`；`agent_id` 用
+  `agent_map.get(...)` 取。
+
+### 11.4 事件协议（向后兼容）
+
+- 新增 `loop_iteration` 事件：`{stage, iteration, max_iterations}`，每轮开始时广播。
+- `stage_update` 对 body stage 增加可选字段 `loop`（所属 loop 名）与 `iteration`。
+- `pipeline_start` 的 `nodes` 对 loop 节点额外携带 `kind` / `until` / `max_iterations` /
+  `body_stages`（由 `_node_event_payload` 构造）；普通 stage 字段**不变**。
+
+### 11.5 前端
+
+- `pipelineStore.js`：`emptyStage` 增加 `kind/until/maxIterations/iteration/bodyStages`；
+  处理 `loop_iteration` 事件更新当前轮次；`stage_update` 带 `loop` 时更新对应 loop 节点。
+- `OrchestrationView.vue`：loop 节点加 `is-loop` class（虚线边框 + 紫色 accent），
+  右上角显示 🔁，右侧显示 `iteration/maxIterations`。
+
+### 11.6 边界与不变量
+
+- **无 loop 的现有编排行为完全不变**（YAML 与 `.flow` 都如此）：`_build_dag` 对普通 stage
+  输出字段不变；调度路径不变；事件字段不变；前端渲染不变。
+- `until` 必须**白名单**，禁 eval 任意代码；`file()` 禁越界读 `work_dir` 之外的任意文件。
+- body 内 stage 失败 → loop `failed`（按 loop 的 `on_error` 处理）。
+
+### 11.7 验证
+
+- `pytest tests/jarvis_tools/test_pipeline_runner.py tests/jarvis_tools/test_orchestration_dsl.py tests/jarvis_plugins/test_ai_dark_factory.py tests/jarvis_web_gateway/test_pipeline_events_ingest.py` → 161 passed。
+- `ruff check` 两文件 → All checks passed。
+- 前端 `node --test src/stores/pipelineStore.test.mjs` → 18 passed；`vite build` 成功；`eslint` 改动文件 0 error。
+
+---
+
 ## 附：改动影响面速查
 
 ```text
-新增：
+新增（第 1 层）：
   orchestration_dsl.py        （DSL 库）
   orchestration_loader.py     （统一加载器）
   test_orchestration_dsl.py   （单测，18 用例）
 
-修改：
+修改（第 1 层）：
   pipeline_runner.py          （改用 load_orchestration；工具 description/参数描述）
   app.py                      （_handle_parse_orchestration_request 改用 load_orchestration）
   node_manager.py             （同上，child 端）
   App.vue                     （支持 .flow 后缀、placeholder、accept、has_flow 门控）
 
-不动：
-  _build_dag / _topo_sort / _schedule / _run_stage / _eval_when
-  pipeline_events.py / pipelineStore.js / OrchestrationView.vue / dagLayout.js
-  pipeline_events.py / pipelineStore.js / OrchestrationView.vue / dagLayout.js
+新增/修改（第 2 层 loop）：
+  orchestration_dsl.py        （loop() 构造器 + Pipeline.add 支持）
+  pipeline_runner.py          （_fold_loops_into_dag / _iter_agent_nodes / _run_loop /
+                               _eval_until / _eval_contains / _read_artifact_text /
+                               _node_event_payload；_run_stage 支持 _status_suffix）
+  pipelineStore.js            （loop 字段 + loop_iteration 事件）
+  OrchestrationView.vue       （loop 节点渲染）
+  test_orchestration_dsl.py   （TestLoop 10 用例）
+  test_pipeline_runner.py     （TestBuildDagLoop 11 + TestLoop 6 + TestEvalUntil 7 用例）
+
+不动（第 2 层）：
+  _topo_sort 的对外行为 / 现有 YAML 编排语义 / 现有事件字段
 ```

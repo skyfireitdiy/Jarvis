@@ -184,6 +184,149 @@ class TestBuildDag:
 
 
 # ---------------------------------------------------------------------------
+# loop 折叠进 DAG
+# ---------------------------------------------------------------------------
+class TestBuildDagLoop:
+    def test_loop_folds_body_stages(self, tool):
+        """body 内 stage 折叠进 loop 节点，顶层不再单独出现。"""
+        flow = [
+            {"stage": "setup", "agent": "a1", "output": ".df/setup.md"},
+            {"stage": "write", "agent": "a2", "depends_on": ["setup"]},
+            {"stage": "check", "agent": "a3", "depends_on": ["write"]},
+            {
+                "loop": "refine",
+                "body": ["write", "check"],
+                "until": 'contains(file("check.md"), "OK")',
+                "max_iterations": 3,
+            },
+        ]
+        agents = {"a1": {}, "a2": {}, "a3": {}}
+        r = tool._build_dag(flow, agents)
+        assert r["success"] is True
+        stages = {n["stage"] for n in r["nodes"]}
+        assert stages == {"setup", "refine"}
+        loop_node = next(n for n in r["nodes"] if n["stage"] == "refine")
+        assert loop_node["kind"] == "loop"
+        assert loop_node["depends_on"] == ["setup"]
+        assert loop_node["until"] == 'contains(file("check.md"), "OK")'
+        assert loop_node["max_iterations"] == 3
+        assert [b["stage"] for b in loop_node["body_stages"]] == ["write", "check"]
+
+    def test_loop_body_internal_dep_kept(self, tool):
+        """body 内 stage 之间的依赖保留在 body_stages 内。"""
+        flow = [
+            {"stage": "write", "agent": "a1"},
+            {"stage": "check", "agent": "a2", "depends_on": ["write"]},
+            {"loop": "L", "body": ["write", "check"], "until": "x", "max_iterations": 2},
+        ]
+        r = tool._build_dag(flow, {"a1": {}, "a2": {}})
+        loop_node = next(n for n in r["nodes"] if n["stage"] == "L")
+        body = {b["stage"]: b for b in loop_node["body_stages"]}
+        assert body["write"]["depends_on"] == []
+        assert body["check"]["depends_on"] == ["write"]
+
+    def test_downstream_rewritten_to_loop(self, tool):
+        """顶层 stage 依赖 body 内 stage → 改写为依赖 loop 节点。"""
+        flow = [
+            {"stage": "write", "agent": "a1"},
+            {"stage": "check", "agent": "a2", "depends_on": ["write"]},
+            {"loop": "L", "body": ["write", "check"], "until": "x", "max_iterations": 2},
+            {"stage": "publish", "agent": "a3", "depends_on": ["check"]},
+        ]
+        r = tool._build_dag(flow, {"a1": {}, "a2": {}, "a3": {}})
+        assert r["success"] is True
+        pub = next(n for n in r["nodes"] if n["stage"] == "publish")
+        assert pub["depends_on"] == ["L"]
+
+    def test_body_unknown_stage(self, tool):
+        flow = [{"loop": "L", "body": ["ghost"], "until": "x", "max_iterations": 2}]
+        r = tool._build_dag(flow, {})
+        assert r["success"] is False
+        assert "不存在" in r["error"]
+
+    def test_body_stage_depends_outside_rejected(self, tool):
+        """body 内 stage 依赖 body 外 stage → loop 节点继承该外部依赖。"""
+        flow = [
+            {"stage": "setup", "agent": "a1"},
+            {"stage": "write", "agent": "a2", "depends_on": ["setup"]},
+            {"loop": "L", "body": ["write"], "until": "x", "max_iterations": 2},
+        ]
+        r = tool._build_dag(flow, {"a1": {}, "a2": {}})
+        assert r["success"] is True
+        loop_node = next(n for n in r["nodes"] if n["stage"] == "L")
+        assert loop_node["depends_on"] == ["setup"]
+
+    def test_body_stage_depends_other_loop_rejected(self, tool):
+        """body 内 stage 依赖另一个 loop 的 stage → 报错。"""
+        flow = [
+            {"stage": "s1", "agent": "a1"},
+            {"loop": "L1", "body": ["s1"], "until": "x", "max_iterations": 2},
+            {"stage": "s2", "agent": "a2", "depends_on": ["s1"]},
+            {"loop": "L2", "body": ["s2"], "until": "y", "max_iterations": 2},
+        ]
+        r = tool._build_dag(flow, {"a1": {}, "a2": {}})
+        assert r["success"] is False
+        assert "其它 loop" in r["error"]
+
+    def test_loop_name_conflicts_with_stage(self, tool):
+        flow = [
+            {"stage": "s1", "agent": "a1"},
+            {"loop": "s1", "body": ["s1"], "until": "x", "max_iterations": 2},
+        ]
+        r = tool._build_dag(flow, {"a1": {}})
+        assert r["success"] is False
+        assert "冲突" in r["error"] or "重复" in r["error"]
+    def test_duplicate_loop_name(self, tool):
+        flow = [
+            {"stage": "s1", "agent": "a1"},
+            {"loop": "L", "body": ["s1"], "until": "x", "max_iterations": 2},
+            {"loop": "L", "body": ["s1"], "until": "y", "max_iterations": 2},
+        ]
+        r = tool._build_dag(flow, {"a1": {}})
+        assert r["success"] is False
+        assert "重复" in r["error"]
+
+    def test_loop_missing_until(self, tool):
+        flow = [
+            {"stage": "s1", "agent": "a1"},
+            {"loop": "L", "body": ["s1"], "max_iterations": 2},
+        ]
+        r = tool._build_dag(flow, {"a1": {}})
+        assert r["success"] is False
+        assert "until" in r["error"]
+
+    def test_loop_bad_max_iterations(self, tool):
+        flow = [
+            {"stage": "s1", "agent": "a1"},
+            {"loop": "L", "body": ["s1"], "until": "x", "max_iterations": 0},
+        ]
+        r = tool._build_dag(flow, {"a1": {}})
+        assert r["success"] is False
+        assert "max_iterations" in r["error"]
+
+    def test_no_loop_output_unchanged(self, tool):
+        """无 loop 时节点字段与改动前一致（无 kind 等额外字段）。"""
+        flow = [
+            {"stage": "s1", "agent": "a1", "output": ".df/a.md"},
+            {"stage": "s2", "agent": "a2", "depends_on": ["s1"]},
+        ]
+        r = tool._build_dag(flow, {"a1": {}, "a2": {}})
+        assert r["success"] is True
+        for n in r["nodes"]:
+            assert set(n.keys()) == {
+                "stage",
+                "agent",
+                "depends_on",
+                "input",
+                "output",
+                "gate",
+                "when",
+                "retry",
+                "on_error",
+            }
+
+
+# ---------------------------------------------------------------------------
 # when 受限表达式解析
 # ---------------------------------------------------------------------------
 class TestEvalWhen:
@@ -467,6 +610,253 @@ class TestSchedule:
         r = tool._schedule(**self._base_kwargs(tool, nodes))
         assert r["success"] is True
         assert executed == ["s1"]  # s2 因 when 不满足被跳过
+
+
+# ---------------------------------------------------------------------------
+# loop 执行与 until 求值
+# ---------------------------------------------------------------------------
+class TestLoop:
+    def _loop_node(self, body, until, max_iterations=5, on_error="abort"):
+        return {
+            "stage": "L",
+            "kind": "loop",
+            "agent": None,
+            "depends_on": [],
+            "input": [],
+            "output": "",
+            "gate": False,
+            "when": None,
+            "retry": 0,
+            "on_error": on_error,
+            "until": until,
+            "max_iterations": max_iterations,
+            "body_stages": body,
+        }
+
+    def _body(self, name, output=""):
+        return {
+            "stage": name,
+            "agent": "a1",
+            "depends_on": [],
+            "input": [],
+            "output": output,
+            "gate": False,
+            "when": None,
+            "retry": 0,
+            "on_error": "abort",
+        }
+
+    def _kwargs(self, node):
+        return dict(
+            node=node,
+            agent_map={"b1": "id_b1", "b2": "id_b2"},
+            agents_by_name={"a1": {}},
+            work_dir=Path("."),
+            artifact_dir=Path(".df"),
+            spec_summary="",
+            approve=False,
+            pipeline_id="p1",
+        )
+
+    def test_until_satisfied_first_iteration(self, tool, monkeypatch):
+        """第一轮 until 满足 → 只跑一轮。"""
+        runs = []
+
+        def fake_run_stage(node, *args, **kwargs):
+            runs.append(node["stage"])
+            return {
+                "stage": node["stage"],
+                "status": "completed",
+                "output": "",
+                "result": {"ok": True},
+                "error": "",
+                "gate_blocked": False,
+                "approval_path": "",
+            }
+
+        monkeypatch.setattr(tool, "_run_stage", fake_run_stage)
+        node = self._loop_node([self._body("b1")], "b1.ok == true", max_iterations=3)
+        r = tool._run_loop(**self._kwargs(node))
+        assert r["status"] == "completed"
+        assert r["result"]["iterations"] == 1
+        assert r["result"]["until_satisfied"] is True
+        assert runs == ["b1"]
+
+    def test_until_satisfied_after_iterations(self, tool, monkeypatch):
+        """until 第 3 轮才满足 → 跑 3 轮。"""
+        counter = {"n": 0}
+
+        def fake_run_stage(node, *args, **kwargs):
+            counter["n"] += 1
+            return {
+                "stage": node["stage"],
+                "status": "completed",
+                "output": "",
+                "result": {"count": counter["n"]},
+                "error": "",
+                "gate_blocked": False,
+                "approval_path": "",
+            }
+
+        monkeypatch.setattr(tool, "_run_stage", fake_run_stage)
+        node = self._loop_node([self._body("b1")], "b1.count >= 3", max_iterations=5)
+        r = tool._run_loop(**self._kwargs(node))
+        assert r["status"] == "completed"
+        assert r["result"]["iterations"] == 3
+        assert r["result"]["until_satisfied"] is True
+
+    def test_max_iterations_reached(self, tool, monkeypatch):
+        """until 永不满足 → 跑满上限，标记未满足。"""
+
+        def fake_run_stage(node, *args, **kwargs):
+            return {
+                "stage": node["stage"],
+                "status": "completed",
+                "output": "",
+                "result": {"ok": False},
+                "error": "",
+                "gate_blocked": False,
+                "approval_path": "",
+            }
+
+        monkeypatch.setattr(tool, "_run_stage", fake_run_stage)
+        node = self._loop_node([self._body("b1")], "b1.ok == true", max_iterations=3)
+        r = tool._run_loop(**self._kwargs(node))
+        assert r["status"] == "completed"
+        assert r["result"]["iterations"] == 3
+        assert r["result"]["until_satisfied"] is False
+
+    def test_body_stage_failure(self, tool, monkeypatch):
+        """body 内阶段失败 → loop 失败。"""
+
+        def fake_run_stage(node, *args, **kwargs):
+            return {
+                "stage": node["stage"],
+                "status": "failed",
+                "output": "",
+                "result": {},
+                "error": "boom",
+                "gate_blocked": False,
+                "approval_path": "",
+            }
+
+        monkeypatch.setattr(tool, "_run_stage", fake_run_stage)
+        node = self._loop_node([self._body("b1")], "b1.ok == true", max_iterations=3)
+        r = tool._run_loop(**self._kwargs(node))
+        assert r["status"] == "failed"
+        assert "boom" in r["error"]
+
+    def test_body_internal_order(self, tool, monkeypatch):
+        """body 内依赖顺序：b1 先于 b2。"""
+        order = []
+
+        def fake_run_stage(node, *args, **kwargs):
+            order.append(node["stage"])
+            return {
+                "stage": node["stage"],
+                "status": "completed",
+                "output": "",
+                "result": {"ok": True},
+                "error": "",
+                "gate_blocked": False,
+                "approval_path": "",
+            }
+
+        monkeypatch.setattr(tool, "_run_stage", fake_run_stage)
+        b1 = self._body("b1")
+        b2 = self._body("b2")
+        b2["depends_on"] = ["b1"]
+        node = self._loop_node([b2, b1], "b1.ok == true", max_iterations=1)
+        tool._run_loop(**self._kwargs(node))
+        assert order == ["b1", "b2"]
+
+    def test_schedule_dispatches_loop(self, tool, monkeypatch):
+        """_schedule 对 loop 节点调用 _run_loop 而非 _run_stage。"""
+        called = {"loop": 0, "stage": 0}
+
+        def fake_run_loop(*args, **kwargs):
+            called["loop"] += 1
+            return {
+                "stage": "L",
+                "status": "completed",
+                "output": "",
+                "result": {},
+                "error": "",
+                "gate_blocked": False,
+                "approval_path": "",
+            }
+
+        def fake_run_stage(*args, **kwargs):
+            called["stage"] += 1
+            return {
+                "stage": "s1",
+                "status": "completed",
+                "output": "",
+                "result": {},
+                "error": "",
+                "gate_blocked": False,
+                "approval_path": "",
+            }
+
+        monkeypatch.setattr(tool, "_run_loop", fake_run_loop)
+        monkeypatch.setattr(tool, "_run_stage", fake_run_stage)
+        nodes = [self._loop_node([self._body("b1")], "b1.ok == true")]
+        r = tool._schedule(
+            nodes=nodes,
+            agent_map={"b1": "id_b1"},
+            agents_by_name={"a1": {}},
+            work_dir=Path("."),
+            artifact_dir=Path(".df"),
+            spec_summary="",
+            approve=False,
+            max_workers=2,
+        )
+        assert r["success"] is True
+        assert called["loop"] == 1
+        assert called["stage"] == 0
+
+
+class TestEvalUntil:
+    def test_file_contains_true(self, tool, tmp_path):
+        (tmp_path / "report.md").write_text("all tests PASS", encoding="utf-8")
+        ok, err = tool._eval_until('contains(file("report.md"), "PASS")', {}, tmp_path)
+        assert ok is True
+        assert err == ""
+
+    def test_file_contains_false(self, tool, tmp_path):
+        (tmp_path / "report.md").write_text("FAIL", encoding="utf-8")
+        ok, _ = tool._eval_until('contains(file("report.md"), "PASS")', {}, tmp_path)
+        assert ok is False
+
+    def test_file_missing_empty(self, tool, tmp_path):
+        ok, _ = tool._eval_until('contains(file("nope.md"), "PASS")', {}, tmp_path)
+        assert ok is False
+
+    def test_file_path_traversal_blocked(self, tool, tmp_path):
+        """越界路径（../）读取失败，返回空串。"""
+        secret = tmp_path.parent / "secret_until.txt"
+        secret.write_text("PASS", encoding="utf-8")
+        ok, _ = tool._eval_until(
+            'contains(file("../secret_until.txt"), "PASS")', {}, tmp_path
+        )
+        assert ok is False
+
+    def test_until_stage_ref(self, tool, tmp_path):
+        results = {"b1": {"result": {"pass_rate": 0.95}}}
+        ok, _ = tool._eval_until("b1.pass_rate >= 0.9", results, tmp_path)
+        assert ok is True
+
+    def test_contains_with_stage_ref(self, tool, tmp_path):
+        results = {"b1": {"result": {"verdict": "OK"}}}
+        ok, _ = tool._eval_until('contains(b1.verdict, "OK")', results, tmp_path)
+        assert ok is True
+
+    def test_file_size_capped(self, tool, tmp_path):
+        """超大文件读取被截断，仍返回内容（不抛异常）。"""
+        (tmp_path / "big.md").write_text("x" * (1024 * 1024 + 100), encoding="utf-8")
+        ok, err = tool._eval_until('contains(file("big.md"), "x")', {}, tmp_path)
+        assert ok is True
+        assert err == ""
 
 
 # ---------------------------------------------------------------------------
