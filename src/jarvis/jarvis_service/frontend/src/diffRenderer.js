@@ -40,6 +40,17 @@ const langMap = {
 };
 
 /**
+ * 渲染 diff 标题栏中的文件路径。
+ * 加 data-diff-file-path 标记，供消息容器做事件委托，点击即可在编辑器中打开该文件。
+ * @param {string} filePath - 文件路径（相对或绝对）
+ * @returns {string} 转义后的 HTML
+ */
+function renderFilePath(filePath) {
+  const path = filePath || "Unknown";
+  return `<span class="diff-file-path" data-diff-file-path="${escapeHtml(path)}" title="点击可在编辑器中打开">📝 ${escapeHtml(path)}</span>`;
+}
+
+/**
  * 根据文件名获取语言类型
  * @param {string} filename - 文件名
  * @returns {string} 语言类型
@@ -131,7 +142,7 @@ export function renderInlineDiff(diffData) {
 
   // 标题
   html += '<div class="diff-header">';
-  html += `<span class="diff-file-path">📝 ${escapeHtml(file_path || "Unknown")}</span>`;
+  html += renderFilePath(file_path);
   html += `<span class="diff-stats">[<span class="diff-additions">+${additions}</span> / <span class="diff-deletions">-${deletions}</span>]</span>`;
   html += "</div>";
 
@@ -234,7 +245,7 @@ export function renderSideBySideDiff(diffData) {
 
   // 标题
   html += '<div class="diff-header">';
-  html += `<span class="diff-file-path">📝 ${escapeHtml(file_path || "Unknown")}</span>`;
+  html += renderFilePath(file_path);
   html += `<span class="diff-stats">[<span class="diff-additions">+${additions}</span> / <span class="diff-deletions">-${deletions}</span>]</span>`;
   html += "</div>";
 

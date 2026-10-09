@@ -755,7 +755,7 @@
                   <div class="workspace-pane-diff-wrap" @mousedown="activateWorkspacePane(pane.id)">
                     <div v-if="pane.diff" class="workspace-diff-view">
                       <div class="workspace-diff-header">
-                        <span class="workspace-diff-title" :title="(pane.diff.filePath || '') + '（按住 Ctrl/Cmd 点击可在编辑器中打开）'" @click="onDiffTitleClick($event, pane)">{{ pane.diff.filePath }}</span>
+                        <span class="workspace-diff-title" :title="(pane.diff.filePath || '') + '（点击可在编辑器中打开）'" @click="onDiffTitleClick($event, pane)">{{ pane.diff.filePath }}</span>
                         <span v-if="pane.diff.commitHash" class="workspace-diff-hash">{{ pane.diff.commitHash.slice(0, 7) }}</span>
                         <span v-if="pane.diff.truncated" class="workspace-diff-truncated">（已截断）</span>
                         <button class="workspace-diff-nav" @click.stop="navigatePaneDiff(pane.id, 'prev')" title="上一个差异">▲</button>
@@ -892,6 +892,7 @@
                       @set-terminal-ref="(executionId, el, agentId) => setPanelTerminalRef(getPanePanel(pane), executionId, el, agentId)"
                       @show-toast="showToast"
                       @context-menu="onPanelContextMenu(getPanePanel(pane), $event)"
+                      @open-diff-file="onOpenDiffFileFromMessage"
                     />
                   </div>
                   <div v-else class="workspace-pane-placeholder" @click="activateWorkspacePane(pane.id)">
@@ -6797,11 +6798,9 @@ function viewGitTargetDiff() {
   viewDiff(agent)
 }
 
-// diff 标题栏文件名：按住 Ctrl/Cmd 点击时，在编辑器面板打开该文件。
+// diff 标题栏文件名：点击时在编辑器面板打开该文件。
 // diff 的 filePath 是相对 Git 工作目录的路径，需拼成绝对路径后再交给编辑器。
 async function onDiffTitleClick(event, pane) {
-  // 仅 Ctrl/Cmd+点击触发，普通点击不处理（避免误触）
-  if (!event || !(event.ctrlKey || event.metaKey)) return
   const filePath = pane?.diff?.filePath
   if (!filePath) return
   const workingDir = getGitWorkingDir()
@@ -6812,6 +6811,22 @@ async function onDiffTitleClick(event, pane) {
   event.preventDefault()
   event.stopPropagation()
   await openWorkspaceFile(absPath, effectiveGitAgentId.value)
+}
+
+// 对话消息中嵌入的 diff 文件路径点击打开：
+// diff 的 file_path 通常是相对路径，按承载该会话的 Agent 的 working_dir 拼成绝对路径，
+// 再交给编辑器打开。找不到 Agent 工作目录时，回退到 Git 目标工作目录。
+async function onOpenDiffFileFromMessage(filePath) {
+  if (!filePath) return
+  // 定位承载该会话的 panel：优先当前激活 pane 的 session panel
+  const pane = activePane.value
+  const panel = pane && pane.view === 'session' ? getPanePanel(pane) : null
+  const agent = getPanelAgent(panel) || getCurrentAgentOrNull()
+  const workingDir = String(agent?.working_dir || '').trim() || getGitWorkingDir()
+  const absPath = filePath.startsWith('/')
+    ? filePath
+    : (workingDir ? `${workingDir.replace(/\/$/, '')}/${filePath.replace(/^\//, '')}` : filePath)
+  await openWorkspaceFile(absPath, agent?.agent_id || effectiveGitAgentId.value)
 }
 
 // 查看某文件在某提交中的 diff
