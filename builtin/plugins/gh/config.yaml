@@ -15,6 +15,7 @@ frontend:
 dependencies:
   commands:
     - gh
+    - git
 replace_map:
   gh/issue:
     append: false

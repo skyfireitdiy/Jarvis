@@ -467,6 +467,65 @@ export default {
         this.busy = false;
       }
     },
+    // 自定义仓库 Issue：Fork 原仓库并 clone 到所选目录，再在该目录创建 CodeAgent 处理。
+    // 流程：选目录 → fork（已存在复用）→ clone → 创建 CodeAgent。
+    async handleItemForkCloneAgent(item) {
+      this.closeItemMenu();
+      if (!item) return;
+      const repo = currentRepo;
+      if (!repo) {
+        this.message = "失败: 未解析到仓库";
+        return;
+      }
+      const number = item.number;
+      const pick =
+        typeof window !== "undefined" && window.__jarvisPickDirectory;
+      const create =
+        typeof window !== "undefined" && window.__jarvisCreateAgentForTask;
+      if (typeof pick !== "function") {
+        this.message = "宿主未提供目录选择通道，无法选择目录";
+        return;
+      }
+      if (typeof create !== "function") {
+        this.message = "宿主未提供创建通道，无法创建 Agent";
+        return;
+      }
+      this.busy = true;
+      try {
+        this.message = "请选择 Fork 后 clone 的目标目录…";
+        const targetDir = await pick();
+        if (!targetDir) {
+          this.message = "已取消";
+          return;
+        }
+        this.message = `正在 Fork 并 Clone ${repo}…`;
+        const prepared = await callFunction("prepare_issue_repo", {
+          repo: repo,
+          target_dir: targetDir,
+        });
+        const localDir = (prepared && prepared.local_dir) || "";
+        if (!localDir) {
+          this.message = "失败: 未获取到本地目录";
+          return;
+        }
+        this.message = `正在创建 CodeAgent（${localDir}）…`;
+        const res = await create({
+          agentType: "code_agent",
+          workingDir: localDir,
+          task: this.buildItemPrompt(item),
+          name: `Issue #${number}`,
+        });
+        if (res && res.success) {
+          this.message = `已创建 CodeAgent 处理 Issue #${number}（${localDir}）`;
+        } else {
+          this.message = "失败: " + ((res && res.error) || "创建失败");
+        }
+      } catch (e) {
+        this.message = "失败: " + String((e && e.message) || e);
+      } finally {
+        this.busy = false;
+      }
+    },
     // ---- 写操作 ----
     async postComment() {
       const body = (this.commentText || "").trim();
@@ -632,6 +691,8 @@ export default {
         style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">在当前 Agent 中处理</div>
       <div @click="handleItemNewAgent(menuItem)"
         style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">创建新 Agent 处理</div>
+      <div v-if="isManualRepo && tab === 'issues'" @click="handleItemForkCloneAgent(menuItem)"
+        style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">Fork 并创建 CodeAgent 处理</div>
     </div>
   </div>
   `,

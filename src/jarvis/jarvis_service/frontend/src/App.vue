@@ -1148,7 +1148,7 @@
     <div v-if="showOpenDirDialog" class="open-dir-overlay" @click.self="closeOpenDirDialog">
       <div class="open-dir-modal">
         <div class="open-dir-header">
-          <h2>{{ openDirSource === 'git' ? '选择 Git 目录' : '打开目录' }}</h2>
+          <h2>{{ openDirSource === 'git' ? '选择 Git 目录' : (openDirSource === 'plugin' ? '选择目录' : '打开目录') }}</h2>
           <button class="open-dir-close" @click="closeOpenDirDialog">×</button>
         </div>
         <div class="open-dir-body">
@@ -1193,7 +1193,7 @@
         </div>
         <div class="open-dir-actions">
           <button class="btn secondary" @click="closeOpenDirDialog">取消</button>
-          <button class="btn primary" @click="confirmOpenDir">{{ openDirSource === 'git' ? '确定' : '打开' }}</button>
+          <button class="btn primary" @click="confirmOpenDir">{{ openDirSource === 'git' ? '确定' : (openDirSource === 'plugin' ? '选择' : '打开') }}</button>
         </div>
       </div>
     </div>
@@ -2509,6 +2509,7 @@ try {
 // 暴露「创建新普通 Agent 处理任务」的钩子给插件前端扩展（如 gh 插件的右键「创建新 Agent 处理」）。
 // 使用普通 Agent（agent_type='agent'）而非代码 Agent，避免同工作目录下代码 Agent 的互斥限制。
 // 以交互模式创建并把提示词作为初始任务，用户可随时干预；创建后自动打开该 Agent 面板。
+// options.agentType 可指定 agent 类型（默认 'agent'，向后兼容；传 'code_agent' 时创建代码 Agent）。
 // 返回 { success, agentId } 或 { success: false, error }。
 try {
   window.__jarvisCreateAgentForTask = async (options = {}) => {
@@ -2516,8 +2517,9 @@ try {
     const task = String(options.task || '').trim()
     if (!workingDir) return { success: false, error: '工作目录为空' }
     if (!task) return { success: false, error: '任务提示词为空' }
+    const agentType = String(options.agentType || 'agent').trim() || 'agent'
     const result = await createAgentWithOptions({
-      agentType: 'agent',
+      agentType,
       workingDir,
       name: options.name || '',
       task,
@@ -2526,6 +2528,27 @@ try {
     if (!result.ok) return { success: false, error: result.error }
     await afterAgentCreated(result.agent)
     return { success: true, agentId: result.agent.agent_id }
+  }
+} catch (e) {
+  /* ignore */
+}
+
+// 暴露「选择目录」的钩子给插件前端扩展（如 gh 插件的「Fork 并创建 CodeAgent 处理」需先选目录）。
+// 复用宿主已有的「打开目录」弹窗（含节点选择 + 目录浏览）；用户确认后返回选中的绝对路径，
+// 取消则返回 null。返回 Promise<string|null>。
+try {
+  window.__jarvisPickDirectory = () => {
+    return new Promise((resolve) => {
+      // 已有未结束的选择请求时，先以 null 结束上一个，避免 Promise 悬挂
+      if (pluginPickDirResolver) {
+        const prev = pluginPickDirResolver
+        pluginPickDirResolver = null
+        prev(null)
+      }
+      pluginPickDirResolver = resolve
+      openDirSource.value = 'plugin'
+      openOpenDirDialog()
+    })
   }
 } catch (e) {
   /* ignore */
@@ -3978,8 +4001,10 @@ const openDirNodeId = ref('master')         // 目标节点
 const openDirPath = ref('')                 // 目标目录（绝对路径）
 const openDirInput = ref(null)              // 手填路径输入框引用
 const openDirDialogRef = ref(null)          // 「打开目录」弹窗内嵌的 DirectoryDialog 引用
-// 打开目录弹窗的来源：'workspace'=目录树打开工作区 / 'git'=Git 面板选择 Git 管理目录
+// 打开目录弹窗的来源：'workspace'=目录树打开工作区 / 'git'=Git 面板选择 Git 管理目录 / 'plugin'=插件请求选择目录
 const openDirSource = ref('workspace')
+// 插件请求选择目录时的 Promise resolver：确认时 resolve(路径)，取消时 resolve(null)
+let pluginPickDirResolver = null
 // Git 面板自定义 Git 管理目录（用户指定，优先于 Agent 根目录）：{ nodeId, path }
 const gitCustomDir = ref(null)
 // 自定义 Git 目录的持久化 key：刷新后自动恢复
@@ -4035,6 +4060,12 @@ async function openGitDirDialog() {
 }
 function closeOpenDirDialog() {
   showOpenDirDialog.value = false
+  // 插件请求选择目录场景：取消时以 null 结束 Promise
+  if (openDirSource.value === 'plugin' && pluginPickDirResolver) {
+    const resolve = pluginPickDirResolver
+    pluginPickDirResolver = null
+    resolve(null)
+  }
   // 复位场景，避免后续创建 Agent 的「选择目录」被误判为「打开目录」场景
   dirDialogContext.value = 'create-agent'
   openDirSource.value = 'workspace'
@@ -4082,6 +4113,16 @@ async function confirmOpenDir() {
   // 复位场景，避免后续创建 Agent 的「选择目录」被误判为「打开目录」场景
   dirDialogContext.value = 'create-agent'
   resetDirectorySelectionState()
+  if (openDirSource.value === 'plugin') {
+    // 插件请求选择目录：以选中路径结束 Promise（不打开工作区）
+    openDirSource.value = 'workspace'
+    if (pluginPickDirResolver) {
+      const resolve = pluginPickDirResolver
+      pluginPickDirResolver = null
+      resolve(targetPath)
+    }
+    return
+  }
   if (openDirSource.value === 'git') {
     // Git 面板：把选中的目录设为 Git 管理目标，并刷新 Git 视图
     openDirSource.value = 'workspace'

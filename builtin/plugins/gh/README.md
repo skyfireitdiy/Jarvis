@@ -10,6 +10,7 @@ GitHub 助手插件——自动处理当前仓库的 PR 和 Issue，复用 GitHu
 - **Issue 管理**：列出、查看、评论、关闭当前仓库的 Issue
 - **GitHub 认证**：复用 GitHub 官方 `gh` CLI 登录态（`gh auth login`），写操作（合并/评论/关闭）需认证
 - **前端侧边栏**：编辑器活动栏 → GitHub 图标，直接浏览/操作 Issue 与 PR（列表/详情/评论/关闭/合并）
+- **Fork 并创建 CodeAgent 处理**：浏览自定义仓库的 Issue 时，右键 Issue 选择「Fork 并创建 CodeAgent 处理」，插件会 Fork 该仓库、Clone 到所选目录，并在该目录创建一个 CodeAgent 来解决问题（需 gh 已登录）
 
 ## 默认仓库
 

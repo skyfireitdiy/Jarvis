@@ -12,6 +12,7 @@ gateway 通过插件功能代理端点动态加载本模块并调用。
 """
 
 import os
+import subprocess
 import sys
 from typing import Any
 from typing import Dict
@@ -375,6 +376,196 @@ def close_issue(
 
 
 # ---------------------------------------------------------------------------
+# Fork / Clone（需已登录 token）
+# ---------------------------------------------------------------------------
+def _run_command(args: List[str], cwd: Optional[str] = None, timeout: int = 300) -> Dict[str, Any]:
+    """参数化执行外部命令（禁止 shell 拼接，避免注入）。
+
+    返回 {"success": bool, "stdout": str, "stderr": str, "returncode": int}。
+    命令不存在或超时时 success=False，error 说明原因。
+    """
+    try:
+        result = subprocess.run(
+            args,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except FileNotFoundError:
+        return {
+            "success": False,
+            "returncode": -1,
+            "stdout": "",
+            "stderr": "",
+            "error": f"命令不存在: {args[0]}（请确认已安装）",
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "success": False,
+            "returncode": -1,
+            "stdout": "",
+            "stderr": "",
+            "error": f"命令执行超时（>{timeout}s）: {' '.join(args)}",
+        }
+    except Exception as e:  # noqa: BLE001
+        return {
+            "success": False,
+            "returncode": -1,
+            "stdout": "",
+            "stderr": "",
+            "error": str(e),
+        }
+    return {
+        "success": result.returncode == 0,
+        "returncode": result.returncode,
+        "stdout": (result.stdout or "").strip(),
+        "stderr": (result.stderr or "").strip(),
+        "error": "",
+    }
+
+
+def _current_login() -> str:
+    """获取当前 gh 登录用户名；未登录返回空字符串。"""
+    res = _run_command(["gh", "api", "user", "--jq", ".login"], timeout=15)
+    if not res["success"]:
+        return ""
+    return res["stdout"].strip()
+
+
+def fork_repo(repo: Optional[str] = None) -> Dict[str, Any]:
+    """Fork 指定仓库到当前登录账号下。
+
+    已存在同名 fork 时直接复用（不重复 fork）。返回：
+    {"success": True, "fork_repo": "owner/repo", "message": str}。
+    未登录 gh 或 fork 失败时返回 {"success": False, "error": str}。
+    """
+    repo, _repo_err = _require_repo(repo)
+    if _repo_err:
+        return {"success": False, "error": _repo_err}
+
+    login = _current_login()
+    if not login:
+        return {
+            "success": False,
+            "error": "Fork 仓库需要登录。请先在终端执行 gh auth login 登录 GitHub。",
+        }
+
+    # 目标 fork 名 = 当前登录用户 / 原仓库名
+    repo_name = repo.split("/", 1)[1]
+    fork_repo = f"{login}/{repo_name}"
+
+    # 已存在同名 fork 则复用
+    existing = gh_common.api_request(
+        "GET", f"/repos/{fork_repo}", token=gh_common.get_token()
+    )
+    if existing["success"]:
+        return {
+            "success": True,
+            "fork_repo": fork_repo,
+            "message": f"已存在同名 fork，直接复用：{fork_repo}",
+        }
+
+    res = _run_command(["gh", "repo", "fork", repo, "--clone=false"])
+    if not res["success"]:
+        detail = res["stderr"] or res["error"] or "未知错误"
+        return {"success": False, "error": f"Fork 失败: {detail}"}
+    return {
+        "success": True,
+        "fork_repo": fork_repo,
+        "message": f"已 Fork 到 {fork_repo}",
+    }
+
+
+def clone_repo(
+    repo: Optional[str] = None, target_dir: Optional[str] = None
+) -> Dict[str, Any]:
+    """将仓库 clone 到 target_dir 下（同名子目录）。
+
+    - 目标目录下已存在同名子目录且为同一仓库（origin 匹配）时复用，不重复 clone。
+    - 已存在同名子目录但 origin 不匹配（非该仓库）时报错，避免覆盖用户数据。
+    返回 {"success": True, "local_dir": str}。
+    """
+    repo, _repo_err = _require_repo(repo)
+    if _repo_err:
+        return {"success": False, "error": _repo_err}
+    target_dir = (target_dir or "").strip()
+    if not target_dir:
+        return {"success": False, "error": "请提供 target_dir（clone 目标目录）"}
+    if not os.path.isdir(target_dir):
+        return {"success": False, "error": f"目标目录不存在: {target_dir}"}
+
+    repo_name = repo.split("/", 1)[1]
+    local_dir = os.path.join(target_dir, repo_name)
+
+    if os.path.exists(local_dir):
+        if not os.path.isdir(local_dir):
+            return {"success": False, "error": f"目标路径已存在且不是目录: {local_dir}"}
+        # 已存在：校验是否同一仓库
+        existing_repo = gh_common.resolve_repo_from_dir(local_dir)
+        if existing_repo == repo:
+            return {
+                "success": True,
+                "local_dir": local_dir,
+                "message": f"目录已存在同一仓库，直接复用：{local_dir}",
+            }
+        if existing_repo:
+            return {
+                "success": False,
+                "error": (
+                    f"目标目录已存在且属于其他仓库（{existing_repo}）：{local_dir}，"
+                    "请更换目标目录或先移除该目录。"
+                ),
+            }
+        return {
+            "success": False,
+            "error": f"目标目录已存在且不是 git 仓库: {local_dir}，请更换目标目录。",
+        }
+
+    res = _run_command(["git", "clone", f"https://github.com/{repo}.git", local_dir])
+    if not res["success"]:
+        detail = res["stderr"] or res["error"] or "未知错误"
+        return {"success": False, "error": f"Clone 失败: {detail}"}
+    return {
+        "success": True,
+        "local_dir": local_dir,
+        "message": f"已 Clone 到 {local_dir}",
+    }
+
+
+def prepare_issue_repo(
+    repo: Optional[str] = None, target_dir: Optional[str] = None
+) -> Dict[str, Any]:
+    """组合操作：先 fork 原仓库，再把 fork 后的仓库 clone 到 target_dir。
+
+    供自定义仓库 Issue 的「Fork 并创建 CodeAgent 处理」流程使用。
+    返回 {"success": True, "fork_repo": str, "local_dir": str, "message": str}。
+    """
+    repo, _repo_err = _require_repo(repo)
+    if _repo_err:
+        return {"success": False, "error": _repo_err}
+
+    fork_result = fork_repo(repo)
+    if not fork_result.get("success"):
+        return {"success": False, "error": fork_result.get("error", "Fork 失败")}
+    fork_repo_name = fork_result["fork_repo"]
+
+    clone_result = clone_repo(fork_repo_name, target_dir)
+    if not clone_result.get("success"):
+        return {
+            "success": False,
+            "error": clone_result.get("error", "Clone 失败"),
+            "fork_repo": fork_repo_name,
+        }
+    return {
+        "success": True,
+        "fork_repo": fork_repo_name,
+        "local_dir": clone_result["local_dir"],
+        "message": f"已 Fork 并 Clone 到 {clone_result['local_dir']}",
+    }
+
+
+# ---------------------------------------------------------------------------
 # 仓库解析
 # ---------------------------------------------------------------------------
 def resolve_repo(working_dir: Optional[str] = None) -> Dict[str, Any]:
@@ -399,4 +590,7 @@ PUBLIC_FUNCTIONS: List[str] = [
     "comment",
     "close_issue",
     "resolve_repo",
+    "fork_repo",
+    "clone_repo",
+    "prepare_issue_repo",
 ]
