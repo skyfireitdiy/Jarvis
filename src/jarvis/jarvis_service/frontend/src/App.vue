@@ -1585,7 +1585,7 @@
       @change="onFileTreeUploadInputChange"
     >
 
-    <!-- 编辑器标签栏右键菜单：关闭右侧所有 / 关闭所有 / 仅保留当前 -->
+    <!-- 编辑器标签栏右键菜单：在文件树中显示 / 关闭右侧所有 / 关闭所有 / 仅保留当前 -->
     <div
       v-if="tabContextMenu.visible"
       class="file-tree-context-menu"
@@ -5909,6 +5909,43 @@ function resolveFileTreeAgent(agentId) {
   return agentList.value.find(a => a.agent_id === agentId) || getVirtualWorkspaceAgent(agentId)
 }
 
+// 由文件的绝对路径反查其所属的目录树 Agent（真实 Agent 或虚拟目录会话）：
+// 按 working_dir 前缀匹配，取最长前缀者（避免嵌套目录下命中父目录 Agent）；
+// 前缀长度相同时优先活跃 Agent，避免命中同目录下已停止的旧 Agent。
+// 返回 { agentId, agent } 或 null。
+function resolveAgentForPath(path) {
+  const raw = String(path || '')
+  if (!raw) return null
+  const candidates = []
+  // 真实 Agent：附带其是否已停止（虚拟目录会话无「停止」概念，视为活跃）
+  for (const agent of agentList.value) {
+    if (agent?.agent_id && agent.working_dir) {
+      candidates.push({ agent, stopped: isStoppedAgent(agent) })
+    }
+  }
+  for (const session of virtualWorkspaceSessions.value) {
+    if (session?.agent?.agent_id && session.agent.working_dir) {
+      candidates.push({ agent: session.agent, stopped: false })
+    }
+  }
+  let best = null
+  let bestLen = -1
+  let bestStopped = true
+  for (const { agent, stopped } of candidates) {
+    const dir = String(agent.working_dir).replace(/\/+$/, '')
+    if (!dir) continue
+    if (raw === dir || raw.startsWith(`${dir}/`)) {
+      // 更长前缀优先；同长度时活跃 Agent 优先于已停止 Agent
+      if (dir.length > bestLen || (dir.length === bestLen && bestStopped && !stopped)) {
+        best = agent
+        bestLen = dir.length
+        bestStopped = stopped
+      }
+    }
+  }
+  return best ? { agentId: best.agent_id, agent: best } : null
+}
+
 // 读取持久化的「已打开目录」记录
 function loadVirtualWorkspaceDirs() {
   try {
@@ -6223,7 +6260,9 @@ const tabContextActions = computed(() => {
   const index = paths.indexOf(tabContextMenu.value.path)
   const hasRight = index >= 0 && index < paths.length - 1
   const hasOthers = paths.length > 1
+  const canReveal = !!resolveAgentForPath(tabContextMenu.value.path)
   return [
+    { id: 'reveal-in-tree', icon: '⌖', label: '在文件树中显示', enabled: canReveal },
     { id: 'close-right', icon: '⇥', label: '关闭右侧所有', enabled: hasRight },
     { id: 'close-all', icon: '✕', label: '关闭所有', enabled: hasOthers },
     { id: 'keep-current', icon: '◎', label: '仅保留当前', enabled: hasOthers },
@@ -6242,6 +6281,11 @@ async function runTabContextAction(act) {
   }
 
   let targets = []
+  if (act.id === 'reveal-in-tree') {
+    closeTabContextMenu()
+    await revealTabInFileTree(menu.path)
+    return
+  }
   if (act.id === 'close-right') {
     targets = paths.slice(index + 1)
   } else if (act.id === 'close-all') {
@@ -6271,6 +6315,58 @@ async function runTabContextAction(act) {
   for (const path of targets) {
     await closeWorkspaceTab(path, paneId, true)
   }
+}
+
+// 在左侧文件树中定位并高亮某个已打开文件（类似 VSCode 的 Reveal in Explorer）：
+// 1) 反查文件所属 Agent/虚拟目录会话；2) 打开侧边栏并切到「文件」视图；
+// 3) 展开 Agent 节点；4) 按路径逐级展开目录（必要时按需加载子节点）；
+// 5) 选中并滚动到该文件节点。
+async function revealTabInFileTree(path) {
+  const resolved = resolveAgentForPath(path)
+  if (!resolved) return
+  const { agentId, agent } = resolved
+  const rootDir = String(agent.working_dir).replace(/\/+$/, '')
+  const raw = String(path)
+  const rel = raw === rootDir ? '' : raw.slice(rootDir.length + 1)
+  const segments = rel ? rel.split('/').filter(Boolean) : []
+
+  // 打开侧边栏并切到文件视图
+  setWorkspaceSidebarView('files')
+  // 展开该 Agent 的节点
+  if (!expandedAgents.value.has(agentId)) {
+    expandedAgents.value.add(agentId)
+  }
+  fileTreeSelectedAgentId.value = agentId
+  await nextTick()
+  // 确保文件树已初始化（setWorkspaceSidebarView 内部也会触发，这里兜底）
+  await ensureWorkspaceSidebarFileTree(agent)
+  await nextTick()
+
+  // 逐级展开目录：先展开根节点（path=working_dir），再按路径片段逐级向下查找并加载。
+  // 根节点默认是收起态，若不展开，其子节点在可见列表中不渲染，后续选中/滚动都会落空。
+  let nodes = fileTreeState.value.get(agentId) || []
+  const rootNode = nodes.find(n => n.path === rootDir)
+  if (rootNode && !rootNode.expanded) {
+    await toggleNodeExpand(agentId, rootNode)
+    await nextTick()
+  }
+  let currentPath = rootDir
+  for (const seg of segments) {
+    currentPath = `${currentPath}/${seg}`
+    let node = findNode(nodes, currentPath)
+    if (!node) break
+    if (!node.expanded) {
+      await toggleNodeExpand(agentId, node)
+      await nextTick()
+    }
+    nodes = node.children || []
+  }
+
+  // 选中并滚动到目标文件节点
+  fileTreeSelectedAgentId.value = agentId
+  fileTreeSelectedPath.value = path
+  await nextTick()
+  scrollFileTreeNodeIntoView(path)
 }
 
 // ===== 文件树节点图标：按文件类型区分（自绘 16x16 stroke 线性 SVG，与 agent 图标风格一致）=====
