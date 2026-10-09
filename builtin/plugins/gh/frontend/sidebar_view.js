@@ -238,16 +238,13 @@ export default {
       this.menuVisible = false;
       this.menuItem = null;
     },
-    // 生成提示词并发送给当前活跃 Agent 处理该 issue/PR
-    async handleItem(item) {
-      this.closeItemMenu();
-      if (!item) return;
+    // 生成处理该 issue/PR 的提示词
+    buildItemPrompt(item) {
       const isIssue = this.tab === "issues";
-      const kind = isIssue ? "Issue" : "Pull Request";
       const repo = currentRepo || "(当前仓库)";
       const number = item.number;
       const title = item.title || "";
-      const prompt = isIssue
+      return isIssue
         ? [
             `请处理当前仓库 ${repo} 的 GitHub Issue #${number}：${title}`,
             "",
@@ -265,17 +262,62 @@ export default {
             "2. 评估是否可合并或需修改；如需修改，遵循 gh_rule 与相关开发规则补齐实现/测试。",
             "3. 合并前先与我确认（含合并方式），再执行。",
           ].join("\n");
+    },
+    // 在当前活跃 Agent 中处理该 issue/PR
+    async handleItem(item) {
+      this.closeItemMenu();
+      if (!item) return;
+      const isIssue = this.tab === "issues";
+      const kind = isIssue ? "Issue" : "Pull Request";
+      const number = item.number;
       const send =
         typeof window !== "undefined" && window.__jarvisSendToActiveAgent;
       if (typeof send !== "function") {
         this.message = "宿主未提供发送通道，无法处理";
         return;
       }
-      const res = send(prompt);
+      const res = send(this.buildItemPrompt(item));
       if (res && res.success) {
         this.message = `已把 ${kind} #${number} 的处理提示词发送给当前 Agent`;
       } else {
         this.message = "失败: " + ((res && res.error) || "发送失败");
+      }
+    },
+    // 创建新普通 Agent 处理该 issue/PR
+    async handleItemNewAgent(item) {
+      this.closeItemMenu();
+      if (!item) return;
+      const isIssue = this.tab === "issues";
+      const kind = isIssue ? "Issue" : "Pull Request";
+      const number = item.number;
+      const create =
+        typeof window !== "undefined" && window.__jarvisCreateAgentForTask;
+      if (typeof create !== "function") {
+        this.message = "宿主未提供创建通道，无法创建 Agent";
+        return;
+      }
+      const workingDir = (this.workingDir || "").trim();
+      if (!workingDir) {
+        this.message = "失败: 未解析到工作目录";
+        return;
+      }
+      this.busy = true;
+      this.message = `正在创建新 Agent 处理 ${kind} #${number}…`;
+      try {
+        const res = await create({
+          workingDir: workingDir,
+          task: this.buildItemPrompt(item),
+          name: `${kind} #${number}`,
+        });
+        if (res && res.success) {
+          this.message = `已创建新 Agent 处理 ${kind} #${number}`;
+        } else {
+          this.message = "失败: " + ((res && res.error) || "创建失败");
+        }
+      } catch (e) {
+        this.message = "失败: " + String((e && e.message) || e);
+      } finally {
+        this.busy = false;
       }
     },
     // ---- 写操作 ----
@@ -411,7 +453,9 @@ export default {
     <div v-if="menuVisible" :style="menuStyle"
       style="position:fixed;z-index:9999;background:#2d2d30;border:1px solid #454545;border-radius:6px;box-shadow:0 4px 12px #0008;padding:4px;min-width:120px;">
       <div @click="handleItem(menuItem)"
-        style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">处理</div>
+        style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">在当前 Agent 中处理</div>
+      <div @click="handleItemNewAgent(menuItem)"
+        style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">创建新 Agent 处理</div>
     </div>
   </div>
   `,

@@ -2505,6 +2505,31 @@ try {
   /* ignore */
 }
 
+// 暴露「创建新普通 Agent 处理任务」的钩子给插件前端扩展（如 gh 插件的右键「创建新 Agent 处理」）。
+// 使用普通 Agent（agent_type='agent'）而非代码 Agent，避免同工作目录下代码 Agent 的互斥限制。
+// 以交互模式创建并把提示词作为初始任务，用户可随时干预；创建后自动打开该 Agent 面板。
+// 返回 { success, agentId } 或 { success: false, error }。
+try {
+  window.__jarvisCreateAgentForTask = async (options = {}) => {
+    const workingDir = String(options.workingDir || '').trim()
+    const task = String(options.task || '').trim()
+    if (!workingDir) return { success: false, error: '工作目录为空' }
+    if (!task) return { success: false, error: '任务提示词为空' }
+    const result = await createAgentWithOptions({
+      agentType: 'agent',
+      workingDir,
+      name: options.name || '',
+      task,
+      noInteractionMode: false,
+    })
+    if (!result.ok) return { success: false, error: result.error }
+    await afterAgentCreated(result.agent)
+    return { success: true, agentId: result.agent.agent_id }
+  }
+} catch (e) {
+  /* ignore */
+}
+
 // URL 解析辅助函数：支持 HTTPS 协议和域名
 
 // 获取当前页面的 HTTP 协议（http:// 或 https://）
