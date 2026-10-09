@@ -40,6 +40,7 @@ from jarvis.jarvis_utils.git_utils import (
     get_diff_between_commits,
     find_git_root,
     advance_start_commit,
+    find_recent_non_checkout_commit,
 )
 
 
@@ -1200,18 +1201,45 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             # 获取提交历史
             start_commit = getattr(agent, "start_commit", None)
             if start_commit is None:
-                # 非 code agent：直接提交当前工作区变更
-                from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
+                # 非 code agent（或获取不到起始 commit）：从 HEAD 往前找第一个
+                # 非 CheckPoint 提交作为初始起点，把此前 CodeAgent 留下的临时
+                # 提交一并压缩为正式提交，避免临时提交残留历史。
+                start_commit = find_recent_non_checkout_commit()
+                if start_commit:
+                    PrettyOutput.auto_print(
+                        f"ℹ️ 检测到 CheckPoint 临时提交，从 {start_commit[:7]} 起压缩为正式提交"
+                    )
+                    commits = git_manager.show_commit_between(start_commit, end_commit)
+                    post_process_func = getattr(
+                        getattr(agent, "post_process_manager", None),
+                        "post_process_modified_files",
+                        None,
+                    )
+                    if post_process_func is None:
+                        post_process_func = lambda *args, **kwargs: None  # noqa: E731
 
-                git_commiter = GitCommitTool()
-                git_commiter.execute(
-                    {
-                        "prefix": getattr(agent, "prefix", ""),
-                        "suffix": getattr(agent, "suffix", ""),
-                        "agent": agent,
-                        "llm_group": get_llm_group(),
-                    }
-                )
+                    git_manager.handle_commit_confirmation(
+                        commits,
+                        start_commit,
+                        prefix=getattr(agent, "prefix", ""),
+                        suffix=getattr(agent, "suffix", ""),
+                        agent=agent,
+                        post_process_func=post_process_func,
+                        skip_confirm=True,
+                    )
+                else:
+                    # 全新仓库（无任何非 CheckPoint 提交）：直接提交当前工作区变更
+                    from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
+
+                    git_commiter = GitCommitTool()
+                    git_commiter.execute(
+                        {
+                            "prefix": getattr(agent, "prefix", ""),
+                            "suffix": getattr(agent, "suffix", ""),
+                            "agent": agent,
+                            "llm_group": get_llm_group(),
+                        }
+                    )
             else:
                 # 任务期间可能已有正式提交（用户手动提交或此前 <Commit> 产生）。
                 # 先把任务起始点前移到最后一个非临时提交，避免后续
