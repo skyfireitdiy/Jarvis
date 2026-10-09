@@ -322,7 +322,7 @@ uv tool install playwright
 uv tool install ddgr
 ```
 
-> Docker 相关说明请参考仓库中的容器/部署文档；主安装入口已统一为“源码下载 + 仓库内置 `uv` + `uv tool` 安装”方式。
+> Docker 相关说明请参考 [Docker 使用指南](docs/docker_usage.md)；主安装入口已统一为“源码下载 + 仓库内置 `uv` + `uv tool` 安装”方式。
 
 ### 第一个任务
 
