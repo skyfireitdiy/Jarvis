@@ -2483,6 +2483,28 @@ try {
   /* ignore */
 }
 
+// 暴露「向当前活跃 Agent 发送提示词」的钩子给插件前端扩展（如 gh 插件的右键「处理」）。
+// 目标 Agent 与插件侧边栏的工作目录保持一致：Git 目标 Agent（gitAgentId || currentAgentId），
+// 保证提示词发给正在展示该仓库的 Agent。发送复用既有 input_result 通道：Agent 等待输入时
+// 立即提交，否则进入输入缓冲区，待其下次请求输入时消费。
+// 返回 { success, agentId } 或 { success: false, error }，供插件给出明确反馈。
+try {
+  window.__jarvisSendToActiveAgent = (text, options = {}) => {
+    const content = String(text || '').trim()
+    if (!content) return { success: false, error: '提示词为空' }
+    const agentId = options.agentId || effectiveGitAgentId.value || currentAgentId.value
+    if (!agentId) return { success: false, error: '当前没有活跃的 Agent' }
+    const ws = sockets.value.get(agentId)
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      return { success: false, error: '目标 Agent 未连接，请先在会话面板中打开该 Agent' }
+    }
+    sendInputDirectly(content, 'multi', agentId)
+    return { success: true, agentId }
+  }
+} catch (e) {
+  /* ignore */
+}
+
 // URL 解析辅助函数：支持 HTTPS 协议和域名
 
 // 获取当前页面的 HTTP 协议（http:// 或 https://）
