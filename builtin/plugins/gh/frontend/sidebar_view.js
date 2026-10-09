@@ -117,10 +117,25 @@ export default {
       commentText: "",
       busy: false,
       message: "",
+      // 列表项右键菜单
+      menuVisible: false,
+      menuStyle: {},
+      menuItem: null,
     };
   },
   mounted() {
     this.resolveRepo().then(() => this.refresh());
+    // 点击别处 / 按 Esc 关闭右键菜单
+    this._onDocClick = () => this.closeItemMenu();
+    this._onDocKeydown = (e) => {
+      if (e.key === "Escape") this.closeItemMenu();
+    };
+    document.addEventListener("click", this._onDocClick);
+    document.addEventListener("keydown", this._onDocKeydown);
+  },
+  beforeUnmount() {
+    document.removeEventListener("click", this._onDocClick);
+    document.removeEventListener("keydown", this._onDocKeydown);
   },
   watch: {
     workingDir() {
@@ -199,6 +214,111 @@ export default {
     back() {
       this.selected = null;
       this.comments = [];
+    },
+    // ---- 列表项右键菜单 ----
+    openItemMenu(item, event) {
+      this.menuItem = item;
+      const menuWidth = 140;
+      const menuHeight = 40;
+      let left = event.clientX;
+      let top = event.clientY;
+      // 不超出视口右下缘
+      if (left + menuWidth > window.innerWidth - 8) {
+        left = window.innerWidth - menuWidth - 8;
+      }
+      if (left < 8) left = 8;
+      if (top + menuHeight > window.innerHeight - 8) {
+        top = window.innerHeight - menuHeight - 8;
+      }
+      if (top < 8) top = 8;
+      this.menuStyle = { left: left + "px", top: top + "px" };
+      this.menuVisible = true;
+    },
+    closeItemMenu() {
+      this.menuVisible = false;
+      this.menuItem = null;
+    },
+    // 生成处理该 issue/PR 的提示词
+    buildItemPrompt(item) {
+      const isIssue = this.tab === "issues";
+      const repo = currentRepo || "(当前仓库)";
+      const number = item.number;
+      const title = item.title || "";
+      return isIssue
+        ? [
+            `请处理当前仓库 ${repo} 的 GitHub Issue #${number}：${title}`,
+            "",
+            "遵循 gh_rule 处理该 Issue：",
+            `1. 用 \`gh issue view ${number}\` 查看该 Issue 详情（标题、作者、body、labels、状态），先复述内容确认理解正确。`,
+            "2. 阅读 body 与现有评论，判断问题类型并形成处理方案。",
+            "3. 如需写码实现，遵循 gh_rule 与相关开发规则完成修改。",
+            "4. 写操作（评论/关闭）前先与我确认，再执行。",
+          ].join("\n")
+        : [
+            `请处理当前仓库 ${repo} 的 GitHub Pull Request #${number}：${title}`,
+            "",
+            "遵循 gh_rule 处理该 PR：",
+            `1. 用 \`gh pr view ${number}\` 与 \`gh pr diff ${number}\` 查看详情与改动。`,
+            "2. 评估是否可合并或需修改；如需修改，遵循 gh_rule 与相关开发规则补齐实现/测试。",
+            "3. 合并前先与我确认（含合并方式），再执行。",
+          ].join("\n");
+    },
+    // 在当前活跃 Agent 中处理该 issue/PR
+    async handleItem(item) {
+      this.closeItemMenu();
+      if (!item) return;
+      const isIssue = this.tab === "issues";
+      const kind = isIssue ? "Issue" : "Pull Request";
+      const number = item.number;
+      const send =
+        typeof window !== "undefined" && window.__jarvisSendToActiveAgent;
+      if (typeof send !== "function") {
+        this.message = "宿主未提供发送通道，无法处理";
+        return;
+      }
+      const res = send(this.buildItemPrompt(item));
+      if (res && res.success) {
+        this.message = `已把 ${kind} #${number} 的处理提示词发送给当前 Agent`;
+      } else {
+        this.message = "失败: " + ((res && res.error) || "发送失败");
+      }
+    },
+    // 创建新普通 Agent 处理该 issue/PR
+    async handleItemNewAgent(item) {
+      this.closeItemMenu();
+      if (!item) return;
+      const isIssue = this.tab === "issues";
+      const kind = isIssue ? "Issue" : "Pull Request";
+      const number = item.number;
+      const create =
+        typeof window !== "undefined" && window.__jarvisCreateAgentForTask;
+      if (typeof create !== "function") {
+        this.message = "宿主未提供创建通道，无法创建 Agent";
+        return;
+      }
+      const workingDir = (this.workingDir || "").trim();
+      if (!workingDir) {
+        this.message = "失败: 未解析到工作目录";
+        return;
+      }
+      this.busy = true;
+      this.message = `正在创建新 Agent 处理 ${kind} #${number}…`;
+      try {
+        const res = await create({
+          workingDir: workingDir,
+          task: this.buildItemPrompt(item),
+          name: `${kind} #${number}`,
+        });
+        if (res && res.success) {
+          this.message = `已创建新 Agent 处理 ${kind} #${number}`;
+        } else {
+          this.message = "失败: " + ((res && res.error) || "创建失败");
+        }
+      } catch (e) {
+        this.message = "失败: " + String((e && e.message) || e);
+      } finally {
+        this.busy = false;
+      }
     },
     // ---- 写操作 ----
     async postComment() {
@@ -286,7 +406,7 @@ export default {
       </div>
       <div v-if="loading" style="color:#888;padding:20px;text-align:center;">加载中…</div>
       <div v-else-if="items.length === 0" style="color:#888;padding:20px;text-align:center;">暂无 {{ tab === 'issues' ? 'issue' : 'PR' }}</div>
-      <div v-for="it in items" :key="it.number" @click="openItem(it)"
+      <div v-for="it in items" :key="it.number" @click="openItem(it)" @contextmenu.prevent="openItemMenu(it, $event)"
         style="padding:8px;margin-bottom:6px;background:#252526;border-radius:6px;cursor:pointer;border-left:3px solid #58a6ff;">
         <div style="display:flex;justify-content:space-between;">
           <span style="color:#888;">#{{ it.number }}</span>
@@ -327,6 +447,15 @@ export default {
         style="width:100%;box-sizing:border-box;margin-top:8px;padding:6px;background:#1e1e1e;color:#ddd;border:1px solid #444;border-radius:4px;font-size:12px;"></textarea>
       <button @click="postComment" :disabled="busy || !commentText.trim()"
         style="margin-top:6px;padding:6px 12px;background:#1f6feb;color:#fff;border:none;border-radius:4px;cursor:pointer;">发布评论</button>
+    </div>
+
+    <!-- 列表项右键菜单 -->
+    <div v-if="menuVisible" :style="menuStyle"
+      style="position:fixed;z-index:9999;background:#2d2d30;border:1px solid #454545;border-radius:6px;box-shadow:0 4px 12px #0008;padding:4px;min-width:120px;">
+      <div @click="handleItem(menuItem)"
+        style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">在当前 Agent 中处理</div>
+      <div @click="handleItemNewAgent(menuItem)"
+        style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">创建新 Agent 处理</div>
     </div>
   </div>
   `,
