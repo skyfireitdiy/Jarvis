@@ -151,8 +151,10 @@ gh 插件默认处理**当前工作目录对应的 GitHub 仓库**（读取 git 
 处理 issue/PR 过程中若**修改了代码**，CodeAgent 每次变更都会自动生成一个以 `CheckPoint #N` 开头的临时提交（仅用于过程回退，不应直接进入历史）。当需求真正完成时，**必须调用 `commit` 工具**生成正式提交——它会自动把这些 CheckPoint 临时提交压缩为一个正式提交（用 LLM 生成提交信息）。
 
 - 代码改动完成后、汇报结果前，调用 `commit` 工具提交。
+- **不要用 `git commit` 代替 `commit` 工具**：改动往往已被自动 CheckPoint 抢先提交，此时 `git commit` 会因工作区干净而报 `nothing to commit`，正式提交信息丢失；后续 PR squash 合并后，主干提交标题会退化为 `CheckPoint #N (#PR)`。务必用 `commit` 工具生成正式提交。
 - 不要直接把 `CheckPoint #N` 临时提交当作最终结果汇报；正式提交由 `commit` 工具生成。
 - 若用户要求手动提交或指定提交信息，可改用 `git commit` 并遵循用户要求。
+- **补救**：若已误将 `CheckPoint #N` 合入主干，可在本地对该提交调用 `commit` 工具生成正式提交（内容不变、仅信息不同），再用 `git push --force-with-lease=main:<旧commit> origin main` 改写远端主干提交信息（改写历史属破坏性操作，须先与用户确认）。
 
 ## 代码改动走 PR（开源规范流程）
 
