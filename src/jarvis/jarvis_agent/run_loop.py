@@ -450,6 +450,9 @@ class AgentRunLoop:
                                     [self.agent.session.addon_prompt, summary_text]
                                 )
                             )
+                            # 全量压缩清空了 session.prompt，设置强制继续标志，
+                            # 使后续轮次即使无工具调用也不落入 _get_next_user_action 交还用户
+                            self.agent._force_continue_after_compress = True
 
                         PrettyOutput.auto_print("✅ 完整摘要压缩完成，对话上下文已更新")
                 except Exception as e:
@@ -1166,6 +1169,13 @@ class AgentRunLoop:
                         continue
                     if track_result is not None:
                         return track_result
+
+                # 全量压缩后强制继续：压缩清空了 session.prompt（摘要已放入 addon_prompt），
+                # 若模型本轮未调用工具，跳过 _get_next_user_action，避免把控制权交还用户导致任务中断。
+                # 标志在消费后立即清除，仅对压缩后的下一轮生效，不影响交互模式正常行为。
+                if ag._force_continue_after_compress:
+                    ag._force_continue_after_compress = False
+                    continue
 
                 # 获取下一步用户输入
                 try:

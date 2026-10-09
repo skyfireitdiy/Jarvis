@@ -719,6 +719,9 @@ class Agent:
         self._pre_compressed_summary: Optional[str] = None  # 后台预压缩生成的摘要
         self._pre_compressing: bool = False  # 是否正在后台预压缩
         self._pre_compress_snapshot_count: int = 0  # 预压缩时快照的消息数量
+        # 全量压缩后强制继续标志：压缩清空了 session.prompt，若模型下一轮未调用工具，
+        # 主循环据此跳过 _get_next_user_action，避免把控制权交还用户导致任务中断
+        self._force_continue_after_compress: bool = False
 
     def add_memory_tags(self, tags: List[str]) -> None:
         """添加记忆标签到 memory_tags 集合
