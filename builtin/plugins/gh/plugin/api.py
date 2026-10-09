@@ -34,20 +34,75 @@ def _require_repo(repo: Optional[str]) -> tuple:
     return repo, ""
 
 
+# 单页最大条数（GitHub REST API 上限为 100）
+_MAX_PER_PAGE = 100
+
+
+def _normalize_paging(page: Any, per_page: Any) -> tuple:
+    """规范化分页参数，返回 (page, per_page)。
+
+    page 从 1 开始；per_page 限制在 [1, 100]。非法值回退默认。
+    """
+    try:
+        page_num = int(page)
+    except (TypeError, ValueError):
+        page_num = 1
+    if page_num < 1:
+        page_num = 1
+    try:
+        per_page_num = int(per_page)
+    except (TypeError, ValueError):
+        per_page_num = _MAX_PER_PAGE
+    if per_page_num < 1:
+        per_page_num = _MAX_PER_PAGE
+    if per_page_num > _MAX_PER_PAGE:
+        per_page_num = _MAX_PER_PAGE
+    return page_num, per_page_num
+
+
+def _paging_meta(headers: dict, page: int, per_page: int, count: int) -> dict:
+    """根据响应头与当前页信息，构造分页元数据。
+
+    返回 {"total": int, "has_more": bool, "page": int, "per_page": int}。
+    total 由 Link 头 rel="last" 的 page 推断（GitHub 列表接口不直接返回总数），
+    无法推断时退化为「已加载条数」。
+    """
+    last_page = gh_common.parse_link_last_page(headers)
+    has_more = bool(gh_common.parse_link_next(headers))
+    if last_page > 0:
+        # 最后一页可能不满 per_page，用 (last_page-1)*per_page + 当前页条数估算
+        if has_more:
+            total = last_page * per_page
+        else:
+            total = (last_page - 1) * per_page + count
+    else:
+        total = (page - 1) * per_page + count
+    return {"total": total, "has_more": has_more, "page": page, "per_page": per_page}
+
+
 # ---------------------------------------------------------------------------
 # 读操作
 # ---------------------------------------------------------------------------
-def list_issues(repo: Optional[str] = None, state: str = "open") -> Dict[str, Any]:
-    """列出仓库的 Issues（排除 PR）。"""
+def list_issues(
+    repo: Optional[str] = None,
+    state: str = "open",
+    page: Any = 1,
+    per_page: Any = _MAX_PER_PAGE,
+) -> Dict[str, Any]:
+    """列出仓库的 Issues（排除 PR），支持分页。
+
+    返回 data 为当前页 issue 列表，并附 total/has_more/page/per_page 分页元数据。
+    """
     repo, _repo_err = _require_repo(repo)
     if _repo_err:
         return {"success": False, "error": _repo_err}
     state = (state or "open").strip()
     if state not in ("open", "closed", "all"):
         return {"success": False, "error": f"无效 state: {state}"}
+    page, per_page = _normalize_paging(page, per_page)
     resp = gh_common.api_request(
         "GET",
-        f"/repos/{repo}/issues?state={state}&per_page=100",
+        f"/repos/{repo}/issues?state={state}&per_page={per_page}&page={page}",
         token=gh_common.get_token(),
     )
     if not resp["success"]:
@@ -71,20 +126,36 @@ def list_issues(repo: Optional[str] = None, state: str = "open") -> Dict[str, An
                 "html_url": issue.get("html_url"),
             }
         )
-    return {"success": True, "data": result, "repo": repo, "state": state}
+    meta = _paging_meta(resp.get("headers", {}), page, per_page, len(result))
+    return {
+        "success": True,
+        "data": result,
+        "repo": repo,
+        "state": state,
+        **meta,
+    }
 
 
-def list_prs(repo: Optional[str] = None, state: str = "open") -> Dict[str, Any]:
-    """列出仓库的 Pull Requests。"""
+def list_prs(
+    repo: Optional[str] = None,
+    state: str = "open",
+    page: Any = 1,
+    per_page: Any = _MAX_PER_PAGE,
+) -> Dict[str, Any]:
+    """列出仓库的 Pull Requests，支持分页。
+
+    返回 data 为当前页 PR 列表，并附 total/has_more/page/per_page 分页元数据。
+    """
     repo, _repo_err = _require_repo(repo)
     if _repo_err:
         return {"success": False, "error": _repo_err}
     state = (state or "open").strip()
     if state not in ("open", "closed", "all"):
         return {"success": False, "error": f"无效 state: {state}"}
+    page, per_page = _normalize_paging(page, per_page)
     resp = gh_common.api_request(
         "GET",
-        f"/repos/{repo}/pulls?state={state}&per_page=100",
+        f"/repos/{repo}/pulls?state={state}&per_page={per_page}&page={page}",
         token=gh_common.get_token(),
     )
     if not resp["success"]:
@@ -105,7 +176,14 @@ def list_prs(repo: Optional[str] = None, state: str = "open") -> Dict[str, Any]:
                 "html_url": pr.get("html_url"),
             }
         )
-    return {"success": True, "data": result, "repo": repo, "state": state}
+    meta = _paging_meta(resp.get("headers", {}), page, per_page, len(result))
+    return {
+        "success": True,
+        "data": result,
+        "repo": repo,
+        "state": state,
+        **meta,
+    }
 
 
 def get_issue(
