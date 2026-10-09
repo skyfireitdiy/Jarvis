@@ -20216,15 +20216,6 @@ function moveFocusInDirection(dir) {
 // 移动端历史管理变量
 let historyStateCount = 0
 
-// 监听页面刷新/跳转：仅当存在集成终端（独立终端会话）时提示用户，
-// 因为终端里的进程状态无法在刷新后恢复。仅连接网关不会有需要保存的状态。
-const handleBeforeUnload = (e) => {
-  if (terminalSessions.value.length > 0) {
-    e.preventDefault()
-    e.returnValue = '' // Chrome需要returnValue
-  }
-}
-
 // 移动端：打开浮层时推送历史状态
 const pushOverlayState = () => {
   if (windowWidth.value <= 768) {
@@ -20609,8 +20600,6 @@ onMounted(() => {
   }
   window.addEventListener('resize', handleResize)
 
-  window.addEventListener('beforeunload', handleBeforeUnload)
-  
   // 移动端：监听返回键（popstate事件）
   handlePopState = () => {
     
@@ -20737,9 +20726,6 @@ onUnmounted(() => {
   // 移除窗口resize监听
   window.removeEventListener('resize', handleResize)
 
-  // 移除beforeunload监听
-  window.removeEventListener('beforeunload', handleBeforeUnload)
-  
   // 移除返回键监听
   window.removeEventListener('popstate', handlePopState)
 
