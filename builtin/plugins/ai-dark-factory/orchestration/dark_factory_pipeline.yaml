@@ -1,8 +1,13 @@
 ---
 # AI Agent 黑灯工厂流水线编排模板
-# 依据 ai-dark-factory 插件的 orchestration 规则（sw-controller 只协调不执行，四层架构）。
-# 协作：planner 规划 → generator 生成（TDD）→ validator 评估 → orchestrator 汇总交人工审批。
-# 设计取向：不完全无人值守——全自动段（规划/生成/验证）可无人值守，门禁处保留人工审批关口。
+# 依据 ai-dark-factory 插件的 orchestration 规则（sw-controller 只协调不执行）。
+# 协作：planner 规划 → holdout 生成隐藏验收场景 → generator 生成（TDD）
+#       → validator 独立评估 → regression 防回归 → orchestrator 汇总交人工审批。
+# 设计取向：不完全无人值守——全自动段（规划/生成/验证/回归）可无人值守，
+#           门禁处保留人工审批关口。
+#
+# ⚠ 本文件仅为【参考模板】，展示四层架构与 flow 格式/能力。
+#   每次任务应动态生成编排文件（落盘 .df/pipeline.yaml），与用户确认后再执行。
 agents:
   - name: "df_planner"
     working_dir: "."
@@ -18,6 +23,20 @@ agents:
       一、只规划，不写代码，不越界执行。
       二、遵守 spec_writing 规则：约束必须显式，一个功能一个 spec。
       三、计划要可验证：每个子任务都有明确的验收标准。
+  - name: "df_holdout"
+    working_dir: "."
+    task: |
+      你是 AI 黑灯工厂流水线的验收场景生成器（Holdout Generator）。
+      读取 NLSpec 与实现计划，生成【编码侧不可见】的 holdout scenarios。
+      ## 职责
+      一、用 holdout_generator 工具生成场景骨架，再结合 spec 的 Goal/Interfaces
+        逐条细化为针对本功能的验收场景（覆盖正常/边界/异常/契约/兼容）。
+      二、场景必须源自 spec：每条场景对应 spec 的一个 Goal 或 Interface 契约。
+      三、把场景写入 .df/holdout.json，标记 hidden=true。
+      ## 行事准则
+      一、遵守 holdout_discipline 规则：场景绝不透露给编码 agent。
+      二、只生成验收场景，不写实现代码、不评估。
+      三、场景要可执行、可判定 pass/fail。
   - name: "df_generator"
     working_dir: "."
     task: |
@@ -31,28 +50,45 @@ agents:
       一、遵守 tdd_iron_rule 规则：无失败测试不写代码。
       二、遵守 spec_writing 规则：约束显式，不靠判断填补空白。
       三、产出必须可被独立评估，不隐藏测试。
+      四、绝不查看 .df/holdout.json（holdout scenarios 编码侧不可见）。
   - name: "df_validator"
     working_dir: "."
     task: |
       你是 AI 黑灯工厂流水线的验证器（Validator）。
       持有 holdout scenarios（编码侧不可见），用它们独立评估生成器的产出。
       ## 职责
-      一、用 holdout scenarios 测试生成器的产出，逐场景记录 pass/fail。
+      一、读取 .df/holdout.json，用 holdout scenarios 测试生成器的产出，
+        逐场景记录 pass/fail。
       二、每个场景跑 3 次，2-of-3 通过以平滑 LLM 方差。
-      三、输出各场景的 pass/fail 报告。
+      三、输出各场景的 pass/fail 报告到 .df/report.json。
       ## 行事准则
       一、遵守 holdout_discipline 规则：holdout scenarios 绝不透露给编码 agent。
       二、评估独立客观，不因生成器的实现而放松标准。
       三、报告要结构化，供编排器汇总。
+  - name: "df_regression"
+    working_dir: "."
+    task: |
+      你是 AI 黑灯工厂流水线的回归验证器（Regression）。
+      跑既有测试套件，确认生成器的改动未引入回归。
+      ## 职责
+      一、识别并运行项目既有测试命令（如 pytest / 项目约定的测试命令）。
+      二、记录通过/失败结果与失败详情，写入 .df/regression.json。
+      三、只验证回归，不修改代码、不评估新功能（新功能由 validator 评估）。
+      ## 行事准则
+      一、只跑既有测试，不新增测试、不改代码。
+      二、回归失败必须如实报告，不得忽略。
+      三、报告结构化，供编排器汇总。
   - name: "df_orchestrator"
     working_dir: "."
     task: |
       你是 AI 黑灯工厂流水线的编排器（Orchestrator），只协调不执行。
-      汇总验证器的 pass/fail 报告，计算门禁指标，输出审批报告交人工审批关口。
+      汇总验证器与回归器的报告，计算门禁指标，输出审批报告交人工审批关口。
       ## 职责
-      一、用 gate_calculator 工具计算场景通过率、假阳性率、人类推翻率。
-      二、判断是否达到门禁标准（场景通过率 >= 90%）。
-      三、输出结构化审批报告：各场景通过率、失败场景详情、改动 diff 摘要。
+      一、读取 .df/gate_metrics.json 历史台账（若存在），把累计的
+        false_positives/human_overrides/total_human_reviews 与本次结果一起
+        交给 gate_calculator 计算场景通过率、假阳性率、人类推翻率。
+      二、判断是否达到门禁标准（场景通过率 >= 90% 且回归通过）。
+      三、输出结构化审批报告：各场景通过率、失败场景详情、回归结果、改动 diff 摘要。
       ## 行事准则
       一、遵守 orchestration 规则：只协调不执行，不亲自写码或测试。
       二、不完全无人值守：不自动合并，审批报告交人工审批关口。
@@ -62,8 +98,8 @@ agents:
 # 无 flow 时 @OrganizeAgents 仍只创建 agent（向后兼容）；有 flow 时按序驱动。
 # 产物契约：每阶段 output 落盘后传入下一阶段 input；orchestrator 为门禁（gate: true）。
 #
-# ── DAG 编排字段说明（全部可选，缺省即线性行为）──────────────────────────
-# flow 支持 DAG：默认 depends_on 缺省 = 上一个 stage（线性）；显式声明即可并行/多依赖。
+# ── 编排引擎能力清单（供动态生成编排文件时选用）──────────────────────────
+# 线性/DAG：默认 depends_on 缺省 = 上一个 stage（线性）；显式声明即可并行/多依赖。
 #   stage        阶段名（唯一，供 depends_on/when 引用）
 #   agent        引用 agents 中的 name
 #   input        上游产物路径；单个字符串自动转单元素列表，多输入写列表
@@ -75,22 +111,42 @@ agents:
 #   on_error     失败策略：abort（默认，立即中止）/ continue / skip_dependents
 #   gate         门禁：true 时 approve=false 会停住等人工审批
 # 顶层可选 default_on_error：阶段未声明 on_error 时的全局默认（非法值回退 abort）。
+# 顶层可选 spec：作为各阶段背景注入（可选；也可用 pipeline_runner 的 spec_file 参数）。
+# 并行：顶层 max_workers（默认 4），限制同时执行的阶段 Agent 数。
+# loop 运行时循环原语（整段重跑直到 until 满足或达上限）：
+#   - loop: "<loop 名>"
+#     body: [stageA, stageB]        # 已声明 stage 组成的子图
+#     until: "contains(file(\".df/report.json\"), \"\\\"pass_rate\\\": 1.0\")"
+#     max_iterations: 3
+#   until 白名单函数：file("相对产物路径")（读 work_dir 内产物正文）、
+#                     contains(text, substr)。
+#   适用：需要"重跑直到达标"的场景（如修复→重验循环）。
 # ─────────────────────────────────────────────────────────────────────────
 flow:
   - stage: "planner"
     agent: "df_planner"
     output: ".df/plan.md"              # 实现计划
+  - stage: "holdout"
+    agent: "df_holdout"
+    input: ".df/plan.md"               # 依赖规划产物
+    output: ".df/holdout.json"         # 隐藏验收场景（编码侧不可见，仅传 validator）
   - stage: "generator"
     agent: "df_generator"
-    input: ".df/plan.md"               # 依赖规划产物
+    input: ".df/plan.md"               # 只吃规划产物；绝不注入 holdout（隔离）
     # 无独立 output：generator 直接在 working_dir（已有代码库）中修改代码，
     # 产物为代码库的改动（git diff 可查），不生成到独立目录。
   - stage: "validator"
     agent: "df_validator"
-    input: ".df/plan.md"               # 依赖规划产物；验证对象为修改后的工作目录
+    input: ".df/holdout.json"          # 只吃 holdout 场景（隔离），验证修改后的工作目录
     output: ".df/report.json"          # pass/fail 报告
+    retry: 1                           # 失败重试 1 次（2-of-3 由 validator 内部实现）
+  - stage: "regression"
+    agent: "df_regression"
+    input: ".df/report.json"           # 依赖验证报告
+    output: ".df/regression.json"      # 回归结果
+    on_error: "abort"                  # 回归失败即中止，交人工
   - stage: "orchestrator"
     agent: "df_orchestrator"
-    input: ".df/report.json"           # 依赖验证报告
+    input: [".df/report.json", ".df/regression.json"]   # 依赖验证+回归报告
     output: ".df/approval.md"          # 审批报告（交人工）
     gate: true                         # 门禁：停住等人工审批

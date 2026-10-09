@@ -204,16 +204,18 @@ class TestOrchestrationTemplate:
         with open(path, encoding="utf-8") as f:
             return yaml.safe_load(f)
 
-    def test_has_four_layer_agents(self):
+    def test_has_all_layer_agents(self):
         data = self._load()
         assert "agents" in data
         agents = data["agents"]
-        assert len(agents) == 4
+        assert len(agents) == 6
         names = [a["name"] for a in agents]
-        # 四层架构：planner / generator / validator / orchestrator
+        # 架构：planner / holdout / generator / validator / regression / orchestrator
         assert "df_planner" in names
+        assert "df_holdout" in names
         assert "df_generator" in names
         assert "df_validator" in names
+        assert "df_regression" in names
         assert "df_orchestrator" in names
 
     def test_each_agent_has_required_fields(self):
@@ -241,8 +243,15 @@ class TestOrchestrationTemplate:
         assert "flow" in data, "编排模板缺 flow 字段"
         assert isinstance(data["flow"], list) and data["flow"]
         stages = [s["stage"] for s in data["flow"]]
-        # 按序：planner → generator → validator → orchestrator
-        assert stages == ["planner", "generator", "validator", "orchestrator"]
+        # 按序：planner → holdout → generator → validator → regression → orchestrator
+        assert stages == [
+            "planner",
+            "holdout",
+            "generator",
+            "validator",
+            "regression",
+            "orchestrator",
+        ]
 
     def test_flow_agents_referenced(self):
         """flow 每个 stage 引用的 agent 必须存在于 agents 中。"""
@@ -263,6 +272,33 @@ class TestOrchestrationTemplate:
         gen_stage = next(s for s in data["flow"] if s["stage"] == "generator")
         assert "output" not in gen_stage, "generator 不应有独立 output 目录"
         assert gen_stage.get("input") == ".df/plan.md"
+
+    def test_holdout_stage_exists(self):
+        """holdout 阶段生成隐藏验收场景，产物 .df/holdout.json。"""
+        data = self._load()
+        ho = next(s for s in data["flow"] if s["stage"] == "holdout")
+        assert ho.get("output") == ".df/holdout.json"
+        assert ho.get("agent") == "df_holdout"
+
+    def test_holdout_isolated_from_generator(self):
+        """holdout 产物只传 validator，绝不注入 generator（隔离纪律）。"""
+        data = self._load()
+        gen_stage = next(s for s in data["flow"] if s["stage"] == "generator")
+        gen_inputs = gen_stage.get("input")
+        gen_inputs = gen_inputs if isinstance(gen_inputs, list) else [gen_inputs]
+        assert ".df/holdout.json" not in gen_inputs, "holdout 不得注入 generator"
+        val_stage = next(s for s in data["flow"] if s["stage"] == "validator")
+        val_inputs = val_stage.get("input")
+        val_inputs = val_inputs if isinstance(val_inputs, list) else [val_inputs]
+        assert ".df/holdout.json" in val_inputs, "validator 应消费 holdout 场景"
+
+    def test_regression_stage_exists(self):
+        """regression 阶段跑既有测试防回归，失败即中止。"""
+        data = self._load()
+        reg = next(s for s in data["flow"] if s["stage"] == "regression")
+        assert reg.get("agent") == "df_regression"
+        assert reg.get("output") == ".df/regression.json"
+        assert reg.get("on_error") == "abort"
 
 
 class TestPluginConfig:

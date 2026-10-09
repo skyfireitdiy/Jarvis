@@ -22,6 +22,13 @@ description: AI Agent 黑灯工厂的验收场景隔离纪律。当需要生成�
 
 用 `holdout_generator` 工具生成 holdout scenarios。生成的场景是纯英文验收测试，标记为编码侧不可见，仅提供给评估器。
 
+## 在流水线中的落地方式
+
+1. **独立生成环节**：flow 中在 planner 之后、generator 之前设 `holdout` 阶段，由独立 agent（`df_holdout`）执行——它读取 NLSpec，用 `holdout_generator` 生成场景骨架，再结合 spec 的 Goal/Interfaces 细化为针对本功能的验收场景，落盘 `.df/holdout.json`（标记 `hidden=true`）。
+2. **一致性**：每条场景必须对应 spec 的一个 Goal 或 Interface 契约，确保场景源自 spec。
+3. **隔离传递**：`.df/holdout.json` **只作为 validator 的 `input`，绝不注入 generator**（generator 的 `input` 只有 `.df/plan.md`）。
+4. **独立评估**：validator 读取 `.df/holdout.json` 执行场景，逐场景记录 pass/fail，产物 `.df/report.json`。
+
 ## 门禁标准
 
 - **场景通过率 ≥90%**：才建议通过门禁。
