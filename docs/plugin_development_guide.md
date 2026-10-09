@@ -281,12 +281,29 @@ jarvis --upgrade-plugin my-plugin
 
 欢迎将你的插件贡献到社区。遵循标准的 Fork & Pull Request 工作流（详见 [参与贡献](jarvis_book/7.参与贡献.md) 与仓库根 `CONTRIBUTING.md`）：
 
-1. **Fork** 本仓库并创建特性分支（如 `feat/plugin-<name>`），**不要直接向 `main` 提交**。
+1. **Fork** 本仓库并创建特性分支（如 `feat/plugin-<name>`），**不要直接向 `main` 提交**：
+
+   ```bash
+   gh repo fork skyfireitdiy/Jarvis --clone   # fork 并 clone；fork 成为 origin，原仓库变为 upstream
+   cd Jarvis
+   git checkout -b feat/plugin-<name>
+   ```
+
 2. 在分支上新增/修改插件（建议放在 `builtin/plugins/<name>/` 或独立插件仓库）。
 3. 本地验证通过后提交，提交信息遵循规范（`feat:` / `fix:` / `docs:` 等）。
-4. 推送分支并创建 Pull Request，描述需包含：背景、改动清单、验证方式。
+4. 推送分支并创建 Pull Request，描述需包含：背景、改动清单、验证方式：
+
+   ```bash
+   git push -u origin feat/plugin-<name>
+   gh pr create --repo skyfireitdiy/Jarvis --base main \
+     --head <你的用户名>:feat/plugin-<name> \
+     --title "feat(plugin): 新增 <name> 插件" --body-file <描述文件>
+   ```
+
 5. 若解决某个 Issue，在 PR 描述中用 `Closes #<编号>` 关联。
 6. 等待维护者审查与合并。
+
+> **保持 fork 同步**：上游有新提交时，可用 `gh repo sync <你的用户名>/Jarvis` 将 fork 与上游同步。
 
 ## 十、验证检查清单
 
