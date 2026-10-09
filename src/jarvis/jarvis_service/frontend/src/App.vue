@@ -755,7 +755,7 @@
                   <div class="workspace-pane-diff-wrap" @mousedown="activateWorkspacePane(pane.id)">
                     <div v-if="pane.diff" class="workspace-diff-view">
                       <div class="workspace-diff-header">
-                        <span class="workspace-diff-title" :title="pane.diff.filePath">{{ pane.diff.filePath }}</span>
+                        <span class="workspace-diff-title" :title="(pane.diff.filePath || '') + '（按住 Ctrl/Cmd 点击可在编辑器中打开）'" @click="onDiffTitleClick($event, pane)">{{ pane.diff.filePath }}</span>
                         <span v-if="pane.diff.commitHash" class="workspace-diff-hash">{{ pane.diff.commitHash.slice(0, 7) }}</span>
                         <span v-if="pane.diff.truncated" class="workspace-diff-truncated">（已截断）</span>
                         <button class="workspace-diff-nav" @click.stop="navigatePaneDiff(pane.id, 'prev')" title="上一个差异">▲</button>
@@ -6699,6 +6699,23 @@ function viewGitTargetDiff() {
     return
   }
   viewDiff(agent)
+}
+
+// diff 标题栏文件名：按住 Ctrl/Cmd 点击时，在编辑器面板打开该文件。
+// diff 的 filePath 是相对 Git 工作目录的路径，需拼成绝对路径后再交给编辑器。
+async function onDiffTitleClick(event, pane) {
+  // 仅 Ctrl/Cmd+点击触发，普通点击不处理（避免误触）
+  if (!event || !(event.ctrlKey || event.metaKey)) return
+  const filePath = pane?.diff?.filePath
+  if (!filePath) return
+  const workingDir = getGitWorkingDir()
+  if (!workingDir) return
+  const absPath = filePath.startsWith('/')
+    ? filePath
+    : `${workingDir.replace(/\/$/, '')}/${filePath.replace(/^\//, '')}`
+  event.preventDefault()
+  event.stopPropagation()
+  await openWorkspaceFile(absPath, effectiveGitAgentId.value)
 }
 
 // 查看某文件在某提交中的 diff
@@ -21307,6 +21324,11 @@ body::-webkit-scrollbar {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.workspace-pane-diff-wrap .workspace-diff-title:hover {
+  text-decoration: underline;
 }
 
 .workspace-pane-diff-wrap .workspace-diff-hash {
