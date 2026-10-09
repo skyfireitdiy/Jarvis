@@ -450,7 +450,7 @@ commit信息
                             commit_message = f"{commit_message}\n{suffix}"
                         # 追加协作者署名（Co-Authored-By 尾注），用于在 GitHub 上
                         # 体现协作身份（贡献归属仍由 author 决定）。已存在则不重复追加。
-                        co_author = "Jarvis <skyfireitdiy@hotmail.com>"
+                        co_author = "Jarvis-AI-42 <skyfireitdiy@gmail.com>"
                         if "co-authored-by:" not in commit_message.lower():
                             commit_message = (
                                 f"{commit_message}\n\nCo-Authored-By: {co_author}"
