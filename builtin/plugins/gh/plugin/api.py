@@ -536,7 +536,8 @@ def clone_repo(
 def prepare_issue_repo(
     repo: Optional[str] = None, target_dir: Optional[str] = None
 ) -> Dict[str, Any]:
-    """组合操作：先 fork 原仓库，再把 fork 后的仓库 clone 到 target_dir。
+    """组合操作：先 fork 原仓库，再把 fork 后的仓库 clone 到 target_dir，
+    并配置 upstream remote 指向原仓库。
 
     供自定义仓库 Issue 的「Fork 并创建 CodeAgent 处理」流程使用。
     返回 {"success": True, "fork_repo": str, "local_dir": str, "message": str}。
@@ -557,12 +558,46 @@ def prepare_issue_repo(
             "error": clone_result.get("error", "Clone 失败"),
             "fork_repo": fork_repo_name,
         }
+    local_dir = clone_result["local_dir"]
+
+    # 设置 upstream 指向原仓库，使后续 git fetch upstream / gh pr create 可用
+    upstream_url = f"https://github.com/{repo}.git"
+    upstream_msg = _ensure_upstream_remote(local_dir, upstream_url)
     return {
         "success": True,
         "fork_repo": fork_repo_name,
-        "local_dir": clone_result["local_dir"],
-        "message": f"已 Fork 并 Clone 到 {clone_result['local_dir']}",
+        "local_dir": local_dir,
+        "message": f"已 Fork 并 Clone 到 {local_dir}；{upstream_msg}",
     }
+
+
+def _ensure_upstream_remote(local_dir: str, upstream_url: str) -> str:
+    """确保本地仓库配置了指向原仓库的 upstream remote（幂等）。
+
+    已存在同名 upstream 且指向相同 URL 时跳过；指向不同 URL 时更新。
+    返回描述信息（供 message 拼接）。
+    """
+    existing = _run_command(
+        ["git", "remote", "get-url", "upstream"], cwd=local_dir, timeout=15
+    )
+    if existing["success"]:
+        if existing["stdout"].strip() == upstream_url:
+            return "upstream 已指向原仓库"
+        _run_command(
+            ["git", "remote", "set-url", "upstream", upstream_url],
+            cwd=local_dir,
+            timeout=15,
+        )
+        return f"upstream 已更新指向原仓库 {upstream_url}"
+    res = _run_command(
+        ["git", "remote", "add", "upstream", upstream_url],
+        cwd=local_dir,
+        timeout=15,
+    )
+    if not res["success"]:
+        detail = res["stderr"] or res["error"] or "未知错误"
+        return f"设置 upstream 失败: {detail}"
+    return f"upstream 已指向原仓库 {upstream_url}"
 
 
 # ---------------------------------------------------------------------------
