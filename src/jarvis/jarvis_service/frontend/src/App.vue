@@ -708,12 +708,14 @@
           <WorkspacePaneTree
             :node="workspacePaneTree"
             :activePaneId="activePaneId"
+            :maximizedPaneId="maximizedPaneId"
             :canSplit="windowWidth > 768"
             :getTitle="getWorkspacePaneTitle"
             :getStatus="getWorkspacePaneStatus"
             @activate="activateWorkspacePane"
             @split="splitWorkspacePane"
             @close="closeWorkspacePane"
+            @maximize="toggleMaximizeWorkspacePane"
             @startResize="startWorkspacePaneResize"
           >
             <template #pane-content="{ pane, active }">
@@ -3419,6 +3421,9 @@ function createWorkspacePaneLeaf(view = 'file', sessionPanelId = null, agentId =
 // 根默认单 leaf：未分割时行为与改动前完全一致
 const workspacePaneTree = ref(createWorkspacePaneLeaf('file'))
 const activePaneId = ref(workspacePaneTree.value.id)
+// 处于「临时最大化」的 leaf id：该 leaf 用 CSS 提升为全屏浮层（DOM 不移动，Monaco/xterm 实例零重建），
+// 再次点击还原即移除 class 嵌回原布局。null 表示无最大化。
+const maximizedPaneId = ref(null)
 // 是否已发生分割（>1 个 leaf）。未分割时模板走原有渲染路径，保证零回归。
 const workspacePaneCount = computed(() => {
   let count = 0
@@ -3478,6 +3483,24 @@ function activateWorkspacePane(paneId, { moveFocus = false } = {}) {
     remountMonacoEditor()
     // 方向键切换时，把键盘焦点也移到新 pane 的内容上（否则焦点停留在旧 pane）
     if (moveFocus) focusWorkspacePane(paneId)
+  })
+}
+// 临时最大化/还原指定 leaf：最大化时该 leaf 由 CSS 提升为全屏浮层（DOM 不移动，
+// Monaco/xterm 实例不重建），还原即移除 class 嵌回原布局。
+function toggleMaximizeWorkspacePane(paneId) {
+  if (!findWorkspacePaneById(workspacePaneTree.value, paneId)) return
+  if (maximizedPaneId.value === paneId) {
+    maximizedPaneId.value = null
+  } else {
+    // 最大化前先激活该 pane，并让 workspace 面板置顶，避免被其它更高层面板遮挡。
+    activateWorkspacePane(paneId)
+    focusWindow('workspace')
+    maximizedPaneId.value = paneId
+  }
+  // 布局尺寸变化，通知 Monaco/diff 重新 layout
+  nextTick(() => {
+    remountMonacoEditor()
+    layoutGitDiffEditor()
   })
 }
 // 把键盘焦点移到指定 pane 的内容上（用于方向键切换激活区域后让焦点跟随）
@@ -3636,6 +3659,8 @@ function splitWorkspacePane(paneId, direction) {
     if (currentPath) workspaceViewPanes.set(target.id, currentPath)
   }
   activePaneId.value = newLeaf.id
+  // 分割会改变布局，若此前处于最大化则先还原
+  maximizedPaneId.value = null
   persistWorkspacePaneLayout()
   nextTick(() => {
     remountMonacoEditor()
@@ -3677,6 +3702,10 @@ function closeWorkspacePane(paneId) {
   if (!findWorkspacePaneById(workspacePaneTree.value, activePaneId.value)) {
     activePaneId.value = findFirstWorkspacePaneId(workspacePaneTree.value)
   }
+  // 被关闭的 pane 若正处于最大化，清除最大化状态
+  if (maximizedPaneId.value && !findWorkspacePaneById(workspacePaneTree.value, maximizedPaneId.value)) {
+    maximizedPaneId.value = null
+  }
   // 已统一为 pane 树模型：关闭后回到未分割（只剩一个 leaf）时，该 leaf 就是主区域，
   // 其 view/内容自然保留，无需迁回 workspaceMainView。
   persistWorkspacePaneLayout()
@@ -3699,6 +3728,7 @@ function collapseWorkspacePanes() {
   const leaf = createWorkspacePaneLeaf('file')
   workspacePaneTree.value = leaf
   activePaneId.value = leaf.id
+  maximizedPaneId.value = null
   // 收起分割：回到全局标签栏，清空各 pane 的独立列表
   workspacePaneTabs.clear()
   workspacePaneTabsVersion.value += 1
@@ -20124,6 +20154,16 @@ function handleGlobalKeydown(event) {
     // 最低优先级：退出宠物大厅中已选中的宠物（无选中时不做任何事）
     if (petLobbyRef.value && typeof petLobbyRef.value.closeActivePanel === 'function') {
       petLobbyRef.value.closeActivePanel()
+    }
+
+    // 有 pane 处于临时最大化时，Esc 还原回原布局
+    if (maximizedPaneId.value) {
+      maximizedPaneId.value = null
+      nextTick(() => {
+        remountMonacoEditor()
+        layoutGitDiffEditor()
+      })
+      return
     }
 
     // 焦点在 Monaco 编辑器或可编辑输入框（无对话框/菜单需要关闭）时，按 ESC 移除焦点，

@@ -9,12 +9,14 @@
       <WorkspacePaneTree
         :node="node.children[0]"
         :activePaneId="activePaneId"
+        :maximizedPaneId="maximizedPaneId"
         :canClose="true"
         :getTitle="getTitle"
         :getStatus="getStatus"
         @activate="(id) => $emit('activate', id)"
         @split="(id, dir) => $emit('split', id, dir)"
         @close="(id) => $emit('close', id)"
+        @maximize="(id) => $emit('maximize', id)"
         @startResize="(ev, n) => $emit('startResize', ev, n)"
       >
         <template #pane-content="slotProps">
@@ -31,12 +33,14 @@
       <WorkspacePaneTree
         :node="node.children[1]"
         :activePaneId="activePaneId"
+        :maximizedPaneId="maximizedPaneId"
         :canClose="true"
         :getTitle="getTitle"
         :getStatus="getStatus"
         @activate="(id) => $emit('activate', id)"
         @split="(id, dir) => $emit('split', id, dir)"
         @close="(id) => $emit('close', id)"
+        @maximize="(id) => $emit('maximize', id)"
         @startResize="(ev, n) => $emit('startResize', ev, n)"
       >
         <template #pane-content="slotProps">
@@ -50,7 +54,10 @@
   <div
     v-else
     class="workspace-pane-leaf"
-    :class="{ 'workspace-pane-leaf-active': node.id === activePaneId }"
+    :class="{
+      'workspace-pane-leaf-active': node.id === activePaneId,
+      'workspace-pane-leaf-maximized': node.id === maximizedPaneId,
+    }"
     :data-pane-id="node.id"
     @mousedown="$emit('activate', node.id)"
   >
@@ -58,10 +65,13 @@
       :node="node"
       :canSplit="canSplit"
       :canClose="canClose"
+      :canMaximize="canMaximize"
+      :maximized="node.id === maximizedPaneId"
       :getTitle="getTitle"
       :getStatus="getStatus"
       @split="(id, dir) => $emit('split', id, dir)"
       @close="(id) => $emit('close', id)"
+      @maximize="(id) => $emit('maximize', id)"
     />
     <div class="workspace-pane-leaf-body">
       <slot name="pane-content" :pane="node" :active="node.id === activePaneId" />
@@ -76,13 +86,15 @@ import WorkspacePaneHeader from './WorkspacePaneHeader.vue'
 const props = defineProps({
   node: { type: Object, required: true },
   activePaneId: { type: String, default: null },
+  maximizedPaneId: { type: String, default: null },
   canClose: { type: Boolean, default: true },
   canSplit: { type: Boolean, default: true },
+  canMaximize: { type: Boolean, default: true },
   getTitle: { type: Function, default: null },
   getStatus: { type: Function, default: null },
 })
 
-defineEmits(['activate', 'split', 'close', 'startResize'])
+defineEmits(['activate', 'split', 'close', 'startResize', 'maximize'])
 
 function childStyle(index) {
   const ratio = props.node.type === 'split' ? props.node.ratio : 0.5
@@ -148,6 +160,18 @@ function childStyle(index) {
 }
 
 .workspace-pane-leaf-active {
+  border-color: var(--color-accent);
+}
+
+/* 临时最大化：把该 leaf 用 fixed 提升为全屏浮层（DOM 不移动，Monaco/xterm 实例零重建）。
+   还原即移除本 class，无缝嵌回原布局。 */
+.workspace-pane-leaf-maximized {
+  position: fixed;
+  inset: 0;
+  z-index: 2500;
+  width: auto;
+  height: auto;
+  background: var(--color-bg-primary, #1e1e1e);
   border-color: var(--color-accent);
 }
 
