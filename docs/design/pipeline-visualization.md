@@ -111,7 +111,7 @@ def get_event_bus() -> PipelineEventBus      # 全局单例
 
 | 事件 | 触发点 | 关键字段 |
 | --- | --- | --- |
-| `pipeline_start` | `execute()` 在 `_build_dag` 成功后（:165 附近） | `pipeline_id`、`orchestration_file`、`spec_file`、`working_dir`、`nodes`（stage/agent/depends_on/output/gate/when）、`max_workers`、`approve` |
+| `pipeline_start` | `execute()` 在 `_build_dag` 成功后（:165 附近） | `pipeline_id`、`orchestration_file`、`working_dir`、`nodes`（stage/agent/depends_on/output/gate/when）、`max_workers`、`approve` |
 | `pipeline_agents` | `_create_stage_agents` 完成后（:185 附近） | `pipeline_id`、`agent_map`（stage→agent_id） |
 | `stage_update` | `_schedule` 中 `state[stage]` 每次迁移时 | `pipeline_id`、`stage`、`status`、`agent_id`、`output`、`error?`、`retry?`、`detail?` |
 | `pipeline_done` | `_schedule` 返回前（:810 起各出口） | `pipeline_id`、`success`、`final_status`（completed/failed/gate_blocked）、`gate_stage?`、`approval_path?` |

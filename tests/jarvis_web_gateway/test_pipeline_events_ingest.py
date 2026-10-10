@@ -70,7 +70,6 @@ def _sample_event():
         "pipeline_id": "test-pipeline-123456",
         "type": "pipeline_start",
         "orchestration_file": "/tmp/simple_demo.yaml",
-        "spec_file": "/tmp/spec.md",
         "working_dir": "/tmp",
         "nodes": [
             {

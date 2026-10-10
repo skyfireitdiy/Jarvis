@@ -135,7 +135,6 @@ export class PipelineStore {
       const state = {
         pipelineId: pid,
         orchestrationFile: event.orchestration_file || "",
-        specFile: event.spec_file || "",
         workingDir: event.working_dir || "",
         maxWorkers: event.max_workers || 0,
         approve: !!event.approve,
@@ -279,7 +278,6 @@ export class PipelineStore {
     const state = {
       pipelineId,
       orchestrationFile: orchestrationFile || "",
-      specFile: "",
       workingDir: "",
       maxWorkers: 0,
       approve: false,
