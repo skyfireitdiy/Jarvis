@@ -1952,6 +1952,9 @@ import { fetchPluginExtensions, loadExtensionComponent } from './pluginExtension
 import { ACTIONS as actionDefs, SPACE_COMMANDS } from './actions/registry.js'
 import { resolveCurrentAgentId } from './utils/currentAgentResolver.js'
 import { useAudioNotifications } from './composables/useAudioNotifications.js'
+import { useInputHistory } from './composables/useInputHistory.js'
+import { useAuthBridge } from './composables/useAuthBridge.js'
+import { useDaemonSync } from './composables/useDaemonSync.js'
 
 const PLANTUML_SERVER_URL = 'https://www.plantuml.com/plantuml/svg/'
 const PLANTUML_BLOCK_LANGUAGE = 'plantuml'
@@ -8391,15 +8394,7 @@ const panelAutoScrolls = ref(new Map()) // 每个 Panel 的自动滚动开关（
 const panelAutoReads = ref(new Map()) // 每个 Panel 的自动朗读开关（key: agentId, value: boolean，默认 false）
 const inputBuffers = ref(new Map()) // 每个 Agent 的输入缓冲区（key: agentId, value：内容）
 
-// 历史输入记录
-const INPUT_HISTORY_STORAGE_KEY = 'jarvis_input_history'
-const MAX_INPUT_HISTORY_COUNT = 100
 const COMPLETION_USAGE_STORAGE_KEY = 'jarvis_completion_usage_stats'
-
-const inputHistory = ref([]) // 历史输入记录数组
-const historyIndex = ref(-1) // 当前浏览的历史记录索引（-1 表示未浏览历史）
-const currentTempInput = ref('') // 用户正在编辑的临时内容
-const panelTempInputs = ref(new Map()) // 每个 Panel 的临时编辑内容 (key: agentId, value: 内容)
 
 function loadCompletionUsageStats() {
   const savedValue = localStorage.getItem(COMPLETION_USAGE_STORAGE_KEY)
@@ -8502,33 +8497,6 @@ function recordCompletionSelection(item) {
 
   completionUsageStats.value = nextCompletionUsageStats
   saveCompletionUsageStats(nextCompletionUsageStats)
-}
-
-function loadInputHistory() {
-  const savedValue = localStorage.getItem(INPUT_HISTORY_STORAGE_KEY)
-  if (!savedValue) {
-    return []
-  }
-
-  try {
-    const parsedValue = JSON.parse(savedValue)
-    if (!Array.isArray(parsedValue)) {
-      return []
-    }
-
-    return parsedValue
-      .filter(historyItem => typeof historyItem === 'string' && historyItem.trim())
-      .slice(0, MAX_INPUT_HISTORY_COUNT)
-  } catch {
-    return []
-  }
-}
-
-function saveInputHistory() {
-  localStorage.setItem(
-    INPUT_HISTORY_STORAGE_KEY,
-    JSON.stringify(inputHistory.value.slice(0, MAX_INPUT_HISTORY_COUNT))
-  )
 }
 
 // Toast 提示
@@ -8965,6 +8933,43 @@ const {
   panels,
   isAutoReadEnabled,
 })
+// 历史输入管理（拆自独立 composable）
+const {
+  inputHistory,
+  lobbyHistoryIndex,
+  lobbyHistoryTemp,
+  loadInputHistory,
+  saveToHistory,
+  navigateHistory,
+  onLobbyHistoryNav,
+} = useInputHistory({
+  inputText,
+  panelInputTexts,
+})
+// 本机 daemon 登录态同步（拆自独立 composable）
+const {
+  daemonPort,
+  localDaemonOnline,
+  getDaemonUrl,
+  saveDaemonPortSetting,
+  startLocalDaemonProbe,
+  stopLocalDaemonProbe,
+  syncTokenToDaemon,
+} = useDaemonSync({
+  auth,
+  terminalName,
+  autoInstallBrowserExt,
+  getGateway: () => window.__jarvisAuthBridge?.getGateway?.(),
+})
+// 浏览器扩展登录态桥接（拆自独立 composable）
+const { installAuthBridge } = useAuthBridge({
+  auth,
+  terminalName,
+  gatewayUrl,
+  parseGatewayAddress,
+  syncTokenToDaemon,
+})
+installAuthBridge()
 // 获取 Panel 的终端列表
 function getPanelTerminals(panel) {
   if (!panel || !panel.agentId) return []
@@ -15589,31 +15594,6 @@ function getLobbyLatestOutput(agentId) {
   return null
 }
 
-// 宠物大厅：输入历史翻阅（与 Panel 行为一致，返回翻阅后的文本）
-const lobbyHistoryIndex = new Map() // agentId -> index（-1 表示回到最新）
-const lobbyHistoryTemp = new Map() // agentId -> 翻阅前暂存的内容
-function onLobbyHistoryNav(agentId, direction, currentText = '') {
-  const current = currentText || ''
-  let index = lobbyHistoryIndex.has(agentId) ? lobbyHistoryIndex.get(agentId) : -1
-  if (direction === 'up') {
-    if (index < inputHistory.value.length - 1) {
-      if (index === -1) lobbyHistoryTemp.set(agentId, current)
-      index++
-      lobbyHistoryIndex.set(agentId, index)
-      return inputHistory.value[index]
-    }
-    return current
-  } else {
-    if (index > -1) {
-      index--
-      lobbyHistoryIndex.set(agentId, index)
-      if (index === -1) return lobbyHistoryTemp.get(agentId) || ''
-      return inputHistory.value[index]
-    }
-    return current
-  }
-}
-
 // 宠物大厅：发送完成信号（与 Panel 的 completeFromPanel 行为一致）
 function onLobbyComplete(agentId) {
   if (!agentId) return
@@ -17291,80 +17271,6 @@ function clearTerminalCache(agentId) {
   // 清除该 agent 的所有终端缓存（已完成的终端从历史重建，无需保留termInfo）
   terminals.value = terminals.value.filter(t => t.agentId !== agentId)
   const afterCount = terminals.value.length
-}
-
-// ============ 历史输入记录管理 ============
-
-// 保存输入到历史记录
-function saveToHistory(text) {
-  if (!text || !text.trim()) return
-  
-  // 避免保存重复的历史记录
-  const lastHistory = inputHistory.value[0]
-  if (lastHistory && lastHistory.trim() === text.trim()) {
-    return
-  }
-  
-  // 将新输入添加到历史记录开头
-  inputHistory.value.unshift(text)
-  
-  // 限制历史记录数量
-  if (inputHistory.value.length > MAX_INPUT_HISTORY_COUNT) {
-    inputHistory.value.pop()
-  }
-
-  saveInputHistory()
-  
-  // 重置历史浏览状态
-  historyIndex.value = -1
-  currentTempInput.value = ''
-}
-
-// 翻阅历史记录
-function navigateHistory(direction, agentId = null) {
-  // direction: 'up' 或 'down'
-  // agentId: 指定 Panel 的 agentId，传入时操作 Panel 隔离的输入
-
-  const isPanel = agentId !== null
-  const getInput = () => isPanel ? (panelInputTexts.value.get(agentId) || '') : inputText.value
-  const setInput = (val) => {
-    if (isPanel) {
-      panelInputTexts.value.set(agentId, val)
-    } else {
-      inputText.value = val
-    }
-  }
-  const getTemp = () => isPanel ? (panelTempInputs.value.get(agentId) || '') : currentTempInput.value
-  const setTemp = (val) => {
-    if (isPanel) {
-      panelTempInputs.value.set(agentId, val)
-    } else {
-      currentTempInput.value = val
-    }
-  }
-
-  if (direction === 'up') {
-    // 向上翻阅：加载更早的历史记录
-    if (historyIndex.value < inputHistory.value.length - 1) {
-      // 第一次翻阅时，保存当前正在编辑的内容
-      if (historyIndex.value === -1) {
-        setTemp(getInput())
-      }
-      historyIndex.value++
-      setInput(inputHistory.value[historyIndex.value])
-    }
-  } else if (direction === 'down') {
-    // 向下翻阅：加载更新的历史记录
-    if (historyIndex.value > -1) {
-      historyIndex.value--
-      if (historyIndex.value === -1) {
-        // 回到最新状态，恢复临时编辑的内容
-        setInput(getTemp())
-      } else {
-        setInput(inputHistory.value[historyIndex.value])
-      }
-    }
-  }
 }
 
 // 检查光标是否在第一行
@@ -20572,188 +20478,6 @@ function sendHeartbeat() {
   
   // 检查是否有连接超时
   checkHeartbeatTimeout()
-}
-
-// ========== 浏览器扩展登录态桥接 ==========
-// 供 Jarvis 浏览器扩展读取当前登录态，避免用户重复登录或手填 Token。
-// 扩展通过主世界脚本调用 window.__jarvisAuthBridge.getToken() 获取 Token，
-// 并通过 getGateway() 获取当前配置的网关地址（网关与前端可能不同域名），
-// 以便扩展把 Token 关联到正确的网关。
-window.__jarvisAuthBridge = {
-  // 优先返回内存中的 Token；内存为空时回退 localStorage（免登录场景下
-  // jarvis_auth_token 已持久化），让浏览器扩展在持久化 Token 失效时能靠页面兜底恢复。
-  // 注意：本页面只服务当前配置的单个网关（见 getGateway），localStorage 中的
-  // Token 即属于该网关，扩展会按 getGateway() 声明的网关做匹配，天然支持多网关。
-  getToken: () => auth.value.token || localStorage.getItem('jarvis_auth_token') || null,
-  // 终端名称：供扩展随 hello 上报给网关，使网关能区分不同终端。
-  getName: () => terminalName.value || null,
-  getGateway: () => {
-    const parsed = parseGatewayAddress(gatewayUrl.value)
-    if (!parsed) return null
-    // 网关地址可能以 ws(s):// 配置（前端连 WebSocket 用），但这里要交给
-    // daemon 作为「HTTP 基地址」使用，必须保留传输安全性：
-    // wss→https、ws→http。若一律降级成 http，daemon 会以明文 ws 去连
-    // HTTPS 端口，被 nginx 以 400 拒绝，表现为 websocket: bad handshake。
-    const schemeMap = { ws: 'http', wss: 'https', http: 'http', https: 'https' }
-    const scheme = schemeMap[parsed.protocol] || parsed.protocol || 'http'
-    const host = parsed.host || window.location.hostname || '127.0.0.1'
-    const port = parsed.port || '8000'
-    return `${scheme}://${host}:${port}`
-  },
-  // 供真实浏览器验证/排查时手动触发一次 daemon 同步
-  syncToDaemon: () => syncTokenToDaemon(auth.value.token, window.__jarvisAuthBridge.getGateway()),
-}
-
-// ========== 本机 daemon 登录态同步 ==========
-// 前端 token 变化时，自动把「远程网关地址 + token」推送给本机 jarvis-daemon，
-// 让 daemon 无需用户手动配置即可感知登录态（daemon 侧多网关并存，互不顶掉）。
-// 注意：gateway 是远程网关地址，daemon 地址是本机回环，两者必须分开。
-const DAEMON_DEFAULT_URL = 'http://127.0.0.1:17800'
-const DAEMON_URL_STORAGE_KEY = 'jarvis_daemon_url'
-const DAEMON_DEFAULT_PORT = '17800'
-
-// 规范化 daemon 地址：去空白、补 http:// 前缀、去尾部斜杠。
-// 空串返回空串（调用方决定是否回退默认值），便于设置页区分「未配置」。
-function normalizeDaemonUrl(value) {
-  let url = String(value || '').trim()
-  if (!url) return ''
-  if (!/^https?:\/\//i.test(url)) url = 'http://' + url
-  return url.replace(/\/+$/, '')
-}
-
-// 从已保存的 daemon 地址中提取端口号（设置页只暴露端口，IP 恒为回环 127.0.0.1）。
-function extractDaemonPort(url) {
-  const normalized = normalizeDaemonUrl(url)
-  if (!normalized) return ''
-  try {
-    return new URL(normalized).port || ''
-  } catch (e) {
-    return ''
-  }
-}
-
-// 解析本机 daemon 地址：默认回环 17800，允许 localStorage 覆盖（设置页可改端口，便于端口被占用时自定义）
-function getDaemonUrl() {
-  let url = ''
-  try {
-    url = localStorage.getItem(DAEMON_URL_STORAGE_KEY) || ''
-  } catch (e) {
-    url = ''
-  }
-  return normalizeDaemonUrl(url) || DAEMON_DEFAULT_URL
-}
-
-// 设置页展示用的端口（未配置时展示默认端口，便于用户在此基础上改）
-function loadDaemonPort() {
-  let url = ''
-  try {
-    url = localStorage.getItem(DAEMON_URL_STORAGE_KEY) || ''
-  } catch (e) {
-    url = ''
-  }
-  return extractDaemonPort(url) || DAEMON_DEFAULT_PORT
-}
-const daemonPort = ref(loadDaemonPort())
-// 保存 daemon 端口：只接受端口号（IP 恒为本机回环 127.0.0.1）。
-// 写 localStorage 后立即用新地址重新推送一次登录态，使用户改完端口无需刷新页面即可让后续请求走新端口。
-function saveDaemonPortSetting(nextValue = daemonPort.value) {
-  const port = String(nextValue || '').trim()
-  // 留空或等于默认端口则清除覆盖项，回到默认地址
-  if (!port || port === DAEMON_DEFAULT_PORT) {
-    daemonPort.value = DAEMON_DEFAULT_PORT
-    try {
-      localStorage.removeItem(DAEMON_URL_STORAGE_KEY)
-    } catch (error) {
-      console.warn('[DAEMON] Failed to clear daemon port:', error)
-    }
-  } else {
-    daemonPort.value = port
-    try {
-      localStorage.setItem(DAEMON_URL_STORAGE_KEY, `http://127.0.0.1:${port}`)
-    } catch (error) {
-      console.warn('[DAEMON] Failed to save daemon port:', error)
-    }
-  }
-  // 端口变化后立即重新推送一次给本机 daemon（与终端名称/扩展开关一致的做法）
-  syncTokenToDaemon(auth.value.token, window.__jarvisAuthBridge.getGateway())
-}
-
-// 本机是否已安装并运行 daemon：探测本机回环 /api/status（daemon 监听 127.0.0.1，CORS 全开、无需鉴权）。
-// 用本机探测而非网关 /api/daemon/sessions：后者是全局会话，多机在线时会串到别人的设备。
-// 探测成功即认为「本机已装 daemon」，前端据此隐藏大厅的安装引导入口（与浏览器扩展的隐藏逻辑一致）。
-const localDaemonOnline = ref(false)
-let localDaemonProbeTimer = null
-async function probeLocalDaemon() {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 1500)
-  try {
-    const resp = await fetch(`${getDaemonUrl()}/api/status`, {
-      signal: controller.signal,
-      credentials: 'omit',
-    })
-    if (!resp.ok) {
-      localDaemonOnline.value = false
-      return
-    }
-    const data = await resp.json()
-    localDaemonOnline.value = !!data?.success
-  } catch (e) {
-    // daemon 未安装/未启动属预期情况，静默视为离线
-    localDaemonOnline.value = false
-  } finally {
-    clearTimeout(timer)
-  }
-}
-function startLocalDaemonProbe() {
-  if (localDaemonProbeTimer) return
-  probeLocalDaemon()
-  localDaemonProbeTimer = setInterval(probeLocalDaemon, 10000)
-}
-function stopLocalDaemonProbe() {
-  if (localDaemonProbeTimer) {
-    clearInterval(localDaemonProbeTimer)
-    localDaemonProbeTimer = null
-  }
-}
-
-// 把当前登录态同步到本机 daemon。
-// token 非空 → POST /api/auth {gateway, token, name}；token 为空 → POST /api/logout {gateway}。
-// name 即「终端名称」，daemon 会在向网关登录（hello 帧）时带上，供网关区分终端。
-// 完全 fire-and-forget：不 await、不抛错、不弹 toast、不阻塞主流程；daemon 不存在时静默。
-function syncTokenToDaemon(token, gateway) {
-  try {
-    if (!gateway) return
-    const daemonUrl = getDaemonUrl()
-    const isLogout = !token
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 1500)
-    fetch(`${daemonUrl}${isLogout ? '/api/logout' : '/api/auth'}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(
-        isLogout
-          ? { gateway }
-          : {
-              gateway,
-              token,
-              name: terminalName.value || '',
-              // 随登录态一并推送「自动安装/更新浏览器扩展」开关，daemon 据此决定
-              // 是否在网关扩展版本变化时自动同步（daemon 只存内存态，不落盘）。
-              auto_install_browser_ext: autoInstallBrowserExt.value,
-            },
-      ),
-      signal: controller.signal,
-      credentials: 'omit',
-    })
-      .then(() => {})
-      .catch((e) => {
-        // daemon 不存在（连接被拒）或超时属预期情况，只留 debug 级日志，不产生噪音
-        console.debug('[AUTH] sync token to daemon skipped:', e?.message || e)
-      })
-      .finally(() => clearTimeout(timer))
-  } catch (e) {
-    console.debug('[AUTH] sync token to daemon failed:', e?.message || e)
-  }
 }
 
 watch(
