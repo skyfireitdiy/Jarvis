@@ -723,9 +723,9 @@ export default {
       style="position:fixed;z-index:9999;background:#2d2d30;border:1px solid #454545;border-radius:6px;box-shadow:0 4px 12px #0008;padding:4px;min-width:120px;">
       <div v-if="!isManualRepo" @click="handleItem(menuItem)"
         style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">在当前 Agent 中处理{{ agentName ? '（' + agentName + '）' : '' }}</div>
-      <div @click="handleItemNewAgent(menuItem)"
+      <div v-if="!isManualRepo" @click="handleItemNewAgent(menuItem)"
         style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">创建新 Agent 处理</div>
-      <div v-if="isManualRepo && tab === 'issues'" @click="handleItemForkCloneAgent(menuItem)"
+      <div v-if="isManualRepo" @click="handleItemForkCloneAgent(menuItem)"
         style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">Fork 并创建 CodeAgent 处理</div>
     </div>
   </div>
