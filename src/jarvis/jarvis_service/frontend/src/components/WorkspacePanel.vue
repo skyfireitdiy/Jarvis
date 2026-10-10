@@ -134,8 +134,7 @@
           title="插件管理"
         >
           <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M6 2h4l1 2h2.5a1 1 0 0 1 1 1V13a1 1 0 0 1-1 1H2.5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1H5l1-2Z"/>
-            <path d="M8 6.5v4M6 8.5h4"/>
+            <path d="M9.5 2.5h3a1 1 0 0 1 1 1v3h-1.2a1.3 1.3 0 0 0 0 2.6H13.5v3a1 1 0 0 1-1 1h-3v-1.2a1.3 1.3 0 0 0-2.6 0V13h-3a1 1 0 0 1-1-1V9.5h1.2a1.3 1.3 0 0 0 0-2.6H2.5v-3a1 1 0 0 1 1-1h3v1.2a1.3 1.3 0 0 0 2.6 0V2.5Z"/>
           </svg>
         </button>
         <button
@@ -195,8 +194,7 @@
         >
           <span v-if="ext.iconSvg" class="workspace-activity-plugin-icon" v-html="ext.iconSvg"></span>
           <svg v-else viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M6 2h4l1 2h2.5a1 1 0 0 1 1 1V13a1 1 0 0 1-1 1H2.5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1H5l1-2Z"/>
-            <path d="M8 6.5v4M6 8.5h4"/>
+            <path d="M6.5 2.5a1.5 1.5 0 0 1 3 0V3h2.5a1 1 0 0 1 1 1v2.5h.5a1.5 1.5 0 0 1 0 3H13V12a1 1 0 0 1-1 1H9.5v.5a1.5 1.5 0 0 1-3 0V13H4a1 1 0 0 1-1-1V9.5h-.5a1.5 1.5 0 0 1 0-3H3V4a1 1 0 0 1 1-1h2.5v-.5Z"/>
           </svg>
         </button>
         <!-- 插件扩展的 tool_panel 入口（插件 config.yaml 的 frontend.tool_panels） -->
@@ -212,8 +210,7 @@
         >
           <span v-if="ext.iconSvg" class="workspace-activity-plugin-icon" v-html="ext.iconSvg"></span>
           <svg v-else viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M6 2h4l1 2h2.5a1 1 0 0 1 1 1V13a1 1 0 0 1-1 1H2.5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1H5l1-2Z"/>
-            <path d="M8 6.5v4M6 8.5h4"/>
+            <path d="M6.5 2.5a1.5 1.5 0 0 1 3 0V3h2.5a1 1 0 0 1 1 1v2.5h.5a1.5 1.5 0 0 1 0 3H13V12a1 1 0 0 1-1 1H9.5v.5a1.5 1.5 0 0 1-3 0V13H4a1 1 0 0 1-1-1V9.5h-.5a1.5 1.5 0 0 1 0-3H3V4a1 1 0 0 1 1-1h2.5v-.5Z"/>
           </svg>
         </button>
         <button
