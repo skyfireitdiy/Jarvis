@@ -412,9 +412,13 @@ class RulesManager:
                     "project": "项目",
                     "global": "全局",
                     "central": "中心库",
-                    "config0": "配置目录",
                 }
-                label = source_labels.get(prefix, prefix)
+                # configN 前缀统一归为"配置目录"
+                label = (
+                    "配置目录"
+                    if prefix.startswith("config")
+                    else source_labels.get(prefix, prefix)
+                )
                 if label not in by_source:
                     by_source[label] = []
                 by_source[label].append((rule_name, name))
@@ -435,8 +439,9 @@ class RulesManager:
                         rule_path = os.path.join(
                             self.central_repo_path, "rules", rel_name
                         )
-                    elif full_name.startswith("config0:"):
-                        rule_path = os.path.join(self.root_dir, rel_name)
+                    else:
+                        # configN 前缀统一用 get_rule_file_path 解析（避免索引错位）
+                        rule_path = self.get_rule_file_path(full_name)
 
                     description = (
                         self._extract_rule_description(rule_path) if rule_path else ""
@@ -794,7 +799,11 @@ class RulesManager:
                     elif prefix.startswith("config"):
                         try:
                             config_num = int(prefix[6:])
-                            target_idx = 2 + config_num
+                            # configN 对应 rules_dirs[N]（N>=1，rules_dirs[0] 为全局目录）
+                            if 1 <= config_num < len(self.rules_dirs):
+                                target_idx = (
+                                    len(all_rules_dirs) - len(self.rules_dirs)
+                                ) + config_num
                         except ValueError:
                             pass
 
@@ -874,8 +883,13 @@ class RulesManager:
                     # 全局规则目录
                     prefix = "global:"
                 else:
-                    # 配置的规则目录
-                    prefix = "config0:"
+                    # 配置的规则目录：按 rules_dirs 中的实际索引编号
+                    # （rules_dirs[0] 为全局目录用 global: 前缀，故 config 从 1 开始）
+                    try:
+                        config_num = self.rules_dirs.index(rules_dir)
+                    except ValueError:
+                        config_num = -1
+                    prefix = f"config{config_num}:" if config_num >= 1 else "config0:"
 
                 try:
                     for root, dirs, files in os.walk(rules_dir, topdown=True):
@@ -1162,7 +1176,11 @@ class RulesManager:
                     elif prefix.startswith("config"):
                         try:
                             config_num = int(prefix[6:])
-                            target_idx = 2 + config_num
+                            # configN 对应 rules_dirs[N]（N>=1，rules_dirs[0] 为全局目录）
+                            if 1 <= config_num < len(self.rules_dirs):
+                                target_idx = (
+                                    len(all_rules_dirs) - len(self.rules_dirs)
+                                ) + config_num
                         except ValueError:
                             pass
 
