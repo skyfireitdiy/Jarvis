@@ -1,0 +1,32 @@
+---
+name: autoworker
+description: >-
+  AutoWorker——把一批任务组织在后端工作目录下，通过前端任务面板管理，
+  支持「创建 Agent 执行任务」+「Agent 调用任务管理工具」双通道，任务状态
+  持久化到各任务子目录的 .jarvis/autoworker。
+version: 0.1.0
+builtin: true
+license: MIT
+tool_load_dirs:
+  - "{{plugin_dir}}/tools"
+# 声明本插件工具应用于 code_agent：Code Agent 构建工具列表时会自动
+# 追加本插件的全部工具（task_manager），无需硬编码工具名。
+code_agent_tools: true
+frontend:
+  sidebar_views:
+    - id: autoworker
+      title: "任务"
+      entry: sidebar_view.js
+      icon: >-
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor"
+        stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+        aria-hidden="true">
+        <path d="M2.5 4.5l1 1 1.5-1.5"/>
+        <path d="M2.5 9.5l1 1 1.5-1.5"/>
+        <path d="M7.5 5h6M7.5 10h6"/>
+        </svg>
+capabilities:
+  - name: "任务面板"
+    description: "编辑器左侧任务面板：创建/编辑/标记任务，右键创建 Agent 执行任务"
+  - name: "任务管理工具"
+    description: "任意 Agent 可调用 task_manager 工具查看/修改任务状态、保存关键信息"
