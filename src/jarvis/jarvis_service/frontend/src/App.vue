@@ -1959,6 +1959,7 @@ import { useChat } from './composables/useChat.js'
 import { useFileTree } from './composables/useFileTree.js'
 import { useTour } from './composables/useTour.js'
 import { usePlugins } from './composables/usePlugins.js'
+import { useTopology } from './composables/useTopology.js'
 import { useGatewayConnection } from './composables/useGatewayConnection.js'
 
 // 图表渲染（plantuml/mermaid/dot），拆自独立 composable
@@ -2832,6 +2833,20 @@ async function fetchGatewayScripts() {
   }
 }
 
+// 网络拓扑大图（拆自 composable useTopology，见下方 useTopology 调用处）
+const {
+  topologyExtensionSessions,
+  topologyDaemonSessions,
+  refreshTopologyAccessSessions,
+  startTopologyAccessPolling,
+  stopTopologyAccessPolling,
+  showTopologyOverlay,
+  openTopologyOverlay,
+  closeTopologyOverlay,
+} = useTopology({
+  fetchBrowserExtensionSessions,
+  fetchDaemonSessions,
+})
 // 刷新能力清单数据（浏览器扩展会话 + daemon 会话 + 已安装脚本 + 网关脚本）。
 // 能力清单缓存：仅在首次打开或手动点刷新按钮时调用，避免频繁请求。
 async function refreshManageCapabilities() {
@@ -2847,37 +2862,11 @@ async function refreshManageCapabilities() {
   manageGatewayScripts.value = Array.isArray(gatewayScripts) ? gatewayScripts : []
 }
 
-// —— 网络拓扑大图中的「接入端」会话列表 ——
-// 浏览器扩展 / 后台服务（daemon）均取网关会话列表：可能有多台设备/多个浏览器接入，
-// 每个会话在拓扑图中渲染为一个节点并显示其 name（用户配置的终端名）。
-// 非管理员只能看到自己的会话（网关侧限制），管理员可见全部。
-const topologyExtensionSessions = ref([])
-const topologyDaemonSessions = ref([])
 // 管理侧边栏展示的定时任务列表（只读，由 Agent 直接控制）
 const manageTimers = ref([])
 // 能力清单：浏览器扩展已安装脚本 + 网关脚本库（缓存，避免频繁请求，仅手动刷新）
 const manageInstalledScripts = ref([])
 const manageGatewayScripts = ref([])
-let topologyAccessTimer = null
-async function refreshTopologyAccessSessions() {
-  const [extSessions, daemonSessions] = await Promise.all([
-    fetchBrowserExtensionSessions(),
-    fetchDaemonSessions(),
-  ])
-  topologyExtensionSessions.value = Array.isArray(extSessions) ? extSessions : []
-  topologyDaemonSessions.value = Array.isArray(daemonSessions) ? daemonSessions : []
-}
-function startTopologyAccessPolling() {
-  if (topologyAccessTimer) return
-  refreshTopologyAccessSessions()
-  topologyAccessTimer = setInterval(refreshTopologyAccessSessions, 5000)
-}
-function stopTopologyAccessPolling() {
-  if (topologyAccessTimer) {
-    clearInterval(topologyAccessTimer)
-    topologyAccessTimer = null
-  }
-}
 
 // 弹窗控制
 const showConnectModal = ref(true)  // 首次打开显示欢迎界面
@@ -9045,18 +9034,6 @@ function petGotoWaitingAgent() {
   openAgentInPanel(target)
   showToast(`已切换到等待输入的 Agent：${target.name || target.agent_id}`, 'success')
 }
-
-// 打开网络拓扑大图（点击宠物旁迷你图或右键菜单触发）
-function openTopologyOverlay() {
-  showTopologyOverlay.value = true
-  startTopologyAccessPolling()
-}
-// 关闭网络拓扑大图：停止接入端会话轮询，避免后台空转
-function closeTopologyOverlay() {
-  showTopologyOverlay.value = false
-  stopTopologyAccessPolling()
-}
-
 // ---- 流水线编排可视化 ----
 // 选择某个流程（Tab 切换）
 function selectPipeline(id) {
@@ -10311,8 +10288,6 @@ function openCommandPaletteFileResult(item) {
   showCommandPalette.value = false
   openWorkspaceFile(resolveAgentRelativePath(item.file_path, agentId), agentId)
 }
-const showTopologyOverlay = ref(false) // 网络拓扑大图浮层
-
 // ---- 流水线编排可视化 ----
 // 开启 localStorage 持久化：刷新页面后仍能恢复历史编排（事件广播是纯内存、不落盘）
 const pipelineStore = new PipelineStore(20, 'orchestration')
