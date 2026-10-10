@@ -123,11 +123,10 @@ flow:
   "type": "object",
   "properties": {
     "orchestration_file": {"type": "string", "description": "编排 YAML 路径"},
-    "spec_file": {"type": "string", "description": "NLSpec 文件路径（流水线输入）"},
     "working_dir": {"type": "string", "description": "工作目录（默认当前目录）"},
     "approve": {"type": "boolean", "description": "门禁阶段是否已获人工审批（默认 false，需人工确认）"}
   },
-  "required": ["orchestration_file", "spec_file"]
+  "required": ["orchestration_file"]
 }
 ```
 
@@ -135,7 +134,7 @@ flow:
 
 ```text
 execute(args):
-  1. 校验参数：orchestration_file、spec_file 存在；编排文件可解析且含 agents + flow。
+  1. 校验参数：orchestration_file 存在；编排文件可解析且含 agents + flow。
   2. 初始化工作目录：创建 .df/ 目录。
   3. 遍历 flow 的每个 stage：
      a. 组装 task-file JSON：
@@ -176,10 +175,11 @@ dark-factory/run:
   append: false
   template: |
     请用内置编排引擎 pipeline_runner 运行黑灯工厂流水线。
-    - 先确认 NLSpec 已就绪（spec_file），否则用 spec_validator 补全。
+    - 先确认 NLSpec 已就绪，否则用 spec_validator 补全。
     - 与用户讨论，动态生成编排文件（agents + flow，参考
-      orchestration/dark_factory_pipeline.yaml 模板），落盘 .df/pipeline.yaml，
-      用户确认无误。
+      orchestration/dark_factory_pipeline.yaml 模板），把 NLSpec 内容写入
+      编排文件顶层 spec 字段（引擎据此注入各阶段 Agent 背景），落盘
+      .df/pipeline.yaml，用户确认无误。
     - 调用 pipeline_runner 执行（approve=false，门禁停住）。
     - 运行后把审批报告交人工审批。
 ```

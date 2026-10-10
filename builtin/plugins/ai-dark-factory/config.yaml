@@ -27,13 +27,13 @@ replace_map:
       - **必须**：门禁阶段停住，把审批报告交人工审批，不自动合并。
       - **禁止**：没有 Spec 就开始实现；未经用户确认就执行编排；未经人工审批自动放行门禁。
       ## 你必须执行的操作
-      1. 确认/补全 NLSpec（spec_file），必要时用 spec_validator 校验。
+      1. 确认/补全 NLSpec，必要时用 spec_validator 校验。
       2. 与用户讨论，动态生成编排文件（含 agents + flow，参考插件自带
-        orchestration/dark_factory_pipeline.yaml 模板），落盘到 .df/pipeline.yaml，
-        用户确认编排文件无误。
+        orchestration/dark_factory_pipeline.yaml 模板），把 NLSpec 内容写入
+        编排文件顶层 spec 字段（引擎据此注入各阶段 Agent 背景），落盘到
+        .df/pipeline.yaml，用户确认编排文件无误。
       3. 调用 pipeline_runner 工具，参数：
          - orchestration_file=<动态生成的编排文件路径>
-         - spec_file=<NLSpec 路径>
          - working_dir=<工作目录>
          - approve=false（门禁停住，等人工审批）
       4. 流水线跑完后，把审批报告路径与各阶段结果呈现给用户，交人工审批。
@@ -59,8 +59,9 @@ replace_map:
       1. 用 `gh issue view <number>` 读取目标 Issue，提取需求。
       2. 用 spec_validator 工具校验/补全 NLSpec 四要素。
       3. 与用户讨论，动态生成编排文件（agents + flow，参考
-        orchestration/dark_factory_pipeline.yaml 模板），落盘 .df/pipeline.yaml，
-        用户确认无误。
+        orchestration/dark_factory_pipeline.yaml 模板），把 NLSpec 内容写入
+        编排文件顶层 spec 字段（引擎据此注入各阶段 Agent 背景），落盘
+        .df/pipeline.yaml，用户确认无误。
       4. 调用 pipeline_runner 工具按 flow 顺序驱动六阶段流水线：
         planner 规划 → holdout 生成隐藏验收场景 → generator 写码（先写测试）
         → validator 用 holdout 评估（隔离）→ regression 跑既有测试防回归
@@ -87,8 +88,9 @@ replace_map:
       1. 用 `gh pr view <number>` 读取 PR 详情，用 `gh pr diff <number>` 查看改动。
       2. 用 spec_validator 校验改动对应的 NLSpec 四要素是否完整。
       3. 与用户讨论，动态生成编排文件（agents + flow，参考
-        orchestration/dark_factory_pipeline.yaml 模板），落盘 .df/pipeline.yaml，
-        用户确认无误。
+        orchestration/dark_factory_pipeline.yaml 模板），把 NLSpec 内容写入
+        编排文件顶层 spec 字段（引擎据此注入各阶段 Agent 背景），落盘
+        .df/pipeline.yaml，用户确认无误。
       4. 调用 pipeline_runner 工具按 flow 顺序驱动六阶段流水线：
         规划 → 生成隐藏场景 → 生成（补齐缺失实现/测试）→ 验证 → 回归 → 门禁（gate 停住）。
       5. 产出审批报告交人工确认；通过后如需合并，用 `gh pr merge <number>`（先与用户确认）。

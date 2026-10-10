@@ -90,7 +90,7 @@ description: AI Agent 黑灯工厂的编排纪律。当需要编排多 Agent 流
 | 失败重试 | `retry`（整数） | 易抖动阶段兜底 |
 | 失败策略 | `on_error: abort/continue/skip_dependents`；顶层 `default_on_error` | 控制失败传播 |
 | 门禁 | `gate: true` | 人工审批关口 |
-| 背景注入 | 顶层 `spec` 字段（或 `spec_file` 参数） | 给所有阶段注入 spec 背景 |
+| 背景注入 | 顶层 `spec` 字段 | 给所有阶段注入 spec 背景 |
 | 运行时循环 | `loop(name, body, until, max_iterations)`：body 为已声明 stage 组成的子图，整段重跑直到 `until` 满足或达上限；`until` 支持 `file("相对路径")`、`contains(text, substr)` | "重跑直到达标"（如修复→重验循环） |
 
 > 注意：`loop` 适合"整段重跑直到达标"，而 holdout 的"每场景跑 3 次取 2-of-3"是**场景内**多次采样，由 validator agent 内部按 holdout_discipline 执行，配合 `retry` 兜底，**不强行套用 loop**。
