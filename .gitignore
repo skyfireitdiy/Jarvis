@@ -182,6 +182,8 @@ jobs/
 # pipeline_runner 流水线运行产物（运行时生成，不入库）
 .df/
 
-src/jarvis/jarvis_service/frontend/src/.jarvis/symbol_cache/codegraph.db
-src/jarvis/jarvis_service/frontend/src/.jarvis/symbol_cache/codegraph.db-shm
-src/jarvis/jarvis_service/frontend/src/.jarvis/symbol_cache/codegraph.db-wal
+# codegraph 符号缓存（symbol_dependency 工具生成，不入库）
+**/.jarvis/symbol_cache/
+**/symbol_cache/codegraph.db
+**/symbol_cache/codegraph.db-shm
+**/symbol_cache/codegraph.db-wal
