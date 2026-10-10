@@ -543,9 +543,9 @@ class GatewayManagerTool:
         """向 Gateway 发送 HTTP 请求。
 
         参数:
-            method: HTTP 方法 (GET/POST/DELETE)
+            method: HTTP 方法 (GET/POST/PATCH/DELETE)
             path: 请求路径 (如 /api/agents)
-            json_data: POST 请求的 JSON 数据
+            json_data: POST/PATCH 请求的 JSON 数据
             params: GET/DELETE 请求的 query 参数
             error_prefix: 错误提示前缀
             timeout: HTTP 请求超时（秒）
@@ -560,6 +560,8 @@ class GatewayManagerTool:
             with httpx.Client(timeout=timeout) as client:
                 if method.upper() == "POST":
                     response = client.post(url, json=json_data, headers=headers)
+                elif method.upper() == "PATCH":
+                    response = client.patch(url, json=json_data, headers=headers)
                 elif method.upper() == "DELETE":
                     response = client.delete(url, headers=headers, params=params)
                 else:
