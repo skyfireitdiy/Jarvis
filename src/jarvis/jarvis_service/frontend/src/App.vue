@@ -1934,6 +1934,7 @@ import QuickCreateAgentModal from './components/QuickCreateAgentModal.vue'
 import SessionPanel from './components/SessionPanel.vue'
 import { renderSideBySideDiff, escapeHtml } from './diffRenderer.js'
 import { parseUnifiedDiff, extractDiffContext } from './gitDiffParser.js'
+import { useDiff } from './composables/useDiff.js'
 import RenameAgentModal from './components/RenameAgentModal.vue'
 import InputPromptModal from './components/InputPromptModal.vue'
 import AdminPanel from './components/AdminPanel.vue'
@@ -2938,20 +2939,7 @@ function setSessionPanelRef(panelId, el) {
 const showMobileMenu = ref(false)     // 移动端菜单
 const activeWindow = ref(null)        // 当前焦点窗口: 'terminal' | 'workspace' | 'chat' | 'session' | null
 
-// Diff 浮动窗口状态
-const showDiffModal = ref(false)      // 显示diff浮动窗口
-const diffFiles = ref([])             // 结构化 diff 文件列表（每个元素含 file_path/additions/deletions/rows）
-const diffActiveIndex = ref(0)        // 当前选中的文件索引
-const diffLoading = ref(false)        // 加载状态
-const diffError = ref('')             // 加载失败时的错误信息
-// 移动端两级导航：false=文件列表，true=选中文件的 diff 详情
-const diffMobileShowDetail = ref(false)
-// 当前选中文件的渲染结果（复用 renderSideBySideDiff）
-const diffActiveHtml = computed(() => {
-  const file = diffFiles.value[diffActiveIndex.value]
-  if (!file) return ''
-  return renderSideBySideDiff(file)
-})
+
 
 // Rules 浮动窗口状态
 const showRulesModal = ref(false)     // 显示rules浮动窗口
@@ -13306,6 +13294,26 @@ function getCurrentAgentNodeId() {
   return String(currentAgent.value?.node_id || '').trim()
 }
 
+// Diff 浮动窗口（状态 + 获取/渲染/文件导航），从 App.vue 拆出到 composables/useDiff.js
+// 依赖 getGatewayAddress/getCurrentAgentNodeId/fetchWithAuth/buildNodeHttpUrl/windowWidth，须在其定义之后调用
+const {
+  showDiffModal,
+  diffFiles,
+  diffActiveIndex,
+  diffLoading,
+  diffError,
+  diffMobileShowDetail,
+  diffActiveHtml,
+  selectDiffFile,
+  viewDiff
+} = useDiff({
+  windowWidth,
+  getGatewayAddress,
+  getCurrentAgentNodeId,
+  fetchWithAuth,
+  buildNodeHttpUrl
+})
+
 // 获取编辑器目标节点ID（优先使用编辑器对应agent的节点ID）
 function getWorkspaceTargetNodeId() {
   const workspaceAgentNodeId = activeWorkspaceSession.value?.agent?.node_id
@@ -14761,65 +14769,7 @@ function deleteAgentGroup(groupId) {
   )
 }
 
-// 选中某个文件：桌面端仅切换右侧内容，移动端进入全屏详情
-function selectDiffFile(index) {
-  diffActiveIndex.value = index
-  // 移动端（窄屏）点击文件后全屏展示该文件 diff，由顶部返回按钮回到列表
-  if (windowWidth.value <= 768) {
-    diffMobileShowDetail.value = true
-  }
-}
 
-// 查看 Agent 的 Diff
-async function viewDiff(agent) {
-  if (!agent || !agent.agent_id) {
-    console.warn('[DIFF] Invalid agent:', agent)
-    return
-  }
-
-  diffLoading.value = true
-  showDiffModal.value = true
-  diffFiles.value = []
-  diffActiveIndex.value = 0
-  diffError.value = ''
-  diffMobileShowDetail.value = false
-
-  try {
-    const { host, port } = getGatewayAddress()
-    const targetNodeId = String(agent?.node_id || '').trim() || String(getCurrentAgentNodeId() || 'master').trim() || 'master'
-    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `agent/${agent.agent_id}/diff`))
-
-    if (!response.ok) {
-      console.warn(`[DIFF] Failed to fetch diff for agent ${agent.agent_id}:`, response.status)
-      diffError.value = '获取 diff 失败'
-      return
-    }
-
-    const result = await response.json()
-
-    // 使用后端返回的结构化数据，添加数据验证
-    if (result.files && Array.isArray(result.files) && result.files.length > 0) {
-      // 验证并过滤有效的文件数据
-      const validFiles = result.files.filter(file => {
-        // 验证文件对象包含必要字段
-        if (!file || typeof file !== 'object') return false
-        if (!file.rows || !Array.isArray(file.rows)) return false
-        // 验证 rows 中的每个元素
-        return file.rows.every(row => {
-          return row && typeof row === 'object' && 
-                 ['equal', 'insert', 'delete', 'replace'].includes(row.type)
-        })
-      })
-
-      diffFiles.value = validFiles
-    }
-  } catch (error) {
-    console.error('[DIFF] Error fetching diff:', error)
-    diffError.value = '获取 diff 失败: ' + (error.message || '')
-  } finally {
-    diffLoading.value = false
-  }
-}
 
 // 查看规则
 async function viewRules(agent) {
