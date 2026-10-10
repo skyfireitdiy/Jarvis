@@ -1,0 +1,245 @@
+/* 缓存管理面板 */
+.buffer-modal {
+  max-width: min(720px, 100%);
+  padding: 0;
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.buffer-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--color-bg-tertiary);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.buffer-panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #36ff7c;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.buffer-panel-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.buffer-panel-btn {
+  padding: 6px 12px;
+  background: var(--color-bg-tertiary);
+  border: none;
+  border-radius: var(--tile-radius-xs);
+  color: #8ba3b8;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.buffer-panel-btn:hover {
+  background: rgba(32, 200, 255, 0.15);
+  border-color: var(--color-accent);
+  color: #20c8ff;
+}
+
+.buffer-panel-btn.close-btn:hover {
+  background: rgba(255, 60, 72, 0.15);
+  border-color: var(--color-error);
+  color: #ff3c48;
+}
+
+.buffer-panel-content {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.buffer-edit-textarea {
+  width: 100%;
+  min-height: 220px;
+  max-height: min(60vh, 520px);
+  background: var(--color-bg-tertiary);
+  border: none;
+  padding: 14px 16px;
+  color: #e6edf3;
+  font-size: 14px;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
+  resize: vertical;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.buffer-edit-textarea::placeholder {
+  color: #8ba3b8;
+}
+
+.buffer-panel-footer {
+  padding: 12px 16px;
+  background: var(--color-bg-tertiary);
+  border-top: 1px solid var(--color-border-subtle);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.buffer-save-btn {
+  padding: 8px 16px;
+  background: rgba(32, 200, 255, 0.15);
+  border: none;
+  border-radius: var(--tile-radius-xs);
+  color: #20c8ff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.buffer-save-btn:hover:not(:disabled) {
+  background: rgba(32, 200, 255, 0.25);
+  border-color: var(--color-accent);
+  transform: translateY(-1px);
+}
+
+.buffer-save-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .buffer-panel {
+    margin-top: 6px;
+    border-radius: 10px;
+  }
+  
+  .buffer-modal {
+    width: 100%;
+    max-width: 100%;
+    max-height: min(80vh, 100%);
+    border-radius: var(--tile-radius-sm);
+  }
+
+  .buffer-panel-header {
+    padding: 10px 12px;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  
+  .buffer-panel-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .buffer-panel-btn {
+    padding: 8px 12px;
+    font-size: 13px;
+    flex: 1;
+    text-align: center;
+  }
+  
+  .buffer-edit-textarea {
+    min-height: 180px;
+    max-height: min(55vh, 420px);
+    font-size: 14px;
+  }
+  
+  .buffer-panel-footer {
+    padding: 10px 12px;
+  }
+  
+  .buffer-save-btn {
+    width: 100%;
+    padding: 10px 16px;
+  }
+}
+
+/* 操作按钮 */
+.action-btn {
+  padding: 11px 20px;
+  background: var(--color-bg-tertiary);
+  border: none;
+  border-radius: var(--tile-radius);
+  color: #8ba3b8;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.action-btn:hover {
+  background: rgba(32, 200, 255, 0.15);
+  border-color: var(--color-accent);
+  color: #20c8ff;
+  transform: translateY(-1px);
+}
+
+.action-btn:active {
+  transform: translateY(0);
+}
+
+.clear-buffer-btn:hover {
+  background: rgba(255, 60, 72, 0.15);
+  border-color: var(--color-error);
+  color: #ff3c48;
+}
+
+/* 输入操作按钮组 */
+.input-wrapper .input-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.cancel-btn {
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  border-radius: var(--tile-radius-xs);
+  color: #8ba3b8;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.cancel-btn:hover {
+  background: #0b1424;
+  color: #e6edf3;
+}
+
+.interrupt-wrapper {
+  padding: 12px 16px;
+}
+
+.interrupt-btn {
+  width: 100%;
+  padding: 8px;
+  background: #ff3c48;
+  border: none;
+  border-radius: var(--tile-radius-xs);
+  color: #d6e4f0;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.interrupt-btn:hover {
+  background: #ff3c48;
+}
+

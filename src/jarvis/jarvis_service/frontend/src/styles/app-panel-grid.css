@@ -1,0 +1,227 @@
+/* Panel 网格布局 */
+.panel-grid {
+  flex: 1;
+  width: 100%;
+  overflow: hidden;
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  box-sizing: border-box;
+  min-height: 0;
+  min-width: 0;
+  /* 「分屏」入口以本容器为定位上下文 */
+  position: relative;
+}
+
+/* 空状态：无任何可见 Panel 时的欢迎背景特效 */
+.empty-stage {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  overflow: hidden;
+  min-height: 0;
+  border-radius: var(--tile-radius);
+}
+
+/* 缓慢漂移的网格底板 */
+.empty-stage-grid {
+  position: absolute;
+  inset: -20%;
+  background-image:
+    linear-gradient(rgba(32, 200, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(32, 200, 255, 0.06) 1px, transparent 1px);
+  background-size: 52px 52px, 52px 52px;
+  mask-image: radial-gradient(circle at 50% 50%, #000 0%, transparent 72%);
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 0%, transparent 72%);
+  animation: emptyGridDrift 32s linear infinite;
+}
+
+/* 极光光斑 */
+.empty-stage-glow {
+  position: absolute;
+  width: 60vmax;
+  height: 60vmax;
+  border-radius: 50%;
+  filter: blur(40px);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.empty-stage-glow-a {
+  top: -18%;
+  left: -12%;
+  background: radial-gradient(circle, rgba(32, 200, 255, 0.28) 0%, transparent 62%);
+  animation: emptyGlowPulse 9s ease-in-out infinite;
+}
+
+.empty-stage-glow-b {
+  bottom: -22%;
+  right: -14%;
+  background: radial-gradient(circle, rgba(54, 255, 124, 0.22) 0%, transparent 62%);
+  animation: emptyGlowPulse 11s ease-in-out infinite reverse;
+}
+
+/* 中心旋转光环 */
+.empty-stage-orbit {
+  position: relative;
+  width: 168px;
+  height: 168px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.empty-stage-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(32, 200, 255, 0.35);
+  border-top-color: var(--color-accent);
+  box-shadow: 0 0 24px rgba(32, 200, 255, 0.25);
+  animation: emptySpin 14s linear infinite;
+}
+
+.empty-stage-ring-2 {
+  inset: 18px;
+  border-color: rgba(54, 255, 124, 0.3);
+  border-bottom-color: var(--color-success);
+  box-shadow: 0 0 20px rgba(54, 255, 124, 0.2);
+  animation: emptySpin 9s linear infinite reverse;
+}
+
+.empty-stage-core {
+  position: relative;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle, rgba(32, 200, 255, 0.18) 0%, transparent 72%);
+  box-shadow: inset 0 0 30px rgba(32, 200, 255, 0.25);
+}
+
+.empty-stage-logo {
+  width: 64px;
+  height: 64px;
+  filter: drop-shadow(0 0 14px rgba(32, 200, 255, 0.6));
+  animation: emptyFloat 6s ease-in-out infinite;
+}
+
+/* 文案区 */
+.empty-stage-text {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 0 24px;
+}
+
+.empty-stage-title {
+  font-size: 34px;
+  letter-spacing: 0.32em;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  text-shadow: 0 0 22px rgba(32, 200, 255, 0.55);
+  margin: 0;
+}
+
+.empty-stage-slogan {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  background: var(--gradient-accent);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  margin: 0;
+}
+
+.empty-stage-sub {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.empty-stage-quadrants {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
+  max-width: 620px;
+}
+
+.empty-stage-quadrant {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 14px;
+  border-radius: var(--tile-radius-sm);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border-subtle);
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.empty-stage-quadrant b {
+  font-size: 12px;
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.empty-stage-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.empty-stage-hint kbd {
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  font-size: 11px;
+}
+
+@keyframes emptyGridDrift {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-52px, -52px, 0); }
+}
+
+@keyframes emptySpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes emptyFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes emptyGlowPulse {
+  0%, 100% { opacity: 0.38; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.08); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .empty-stage-grid,
+  .empty-stage-glow,
+  .empty-stage-ring,
+  .empty-stage-logo {
+    animation: none;
+  }
+}
+

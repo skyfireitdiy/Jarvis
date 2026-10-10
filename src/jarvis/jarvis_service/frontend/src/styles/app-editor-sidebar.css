@@ -1,0 +1,581 @@
+/* 编辑器会话视图：未选择会话时的占位 */
+.workspace-session-placeholder {
+  margin: auto;
+  text-align: center;
+  color: #8ba3b8;
+  max-width: 280px;
+  padding: 24px;
+}
+
+/* 编辑器侧边栏内嵌 Agent 列表：占满侧边栏 */
+.workspace-sidebar-agents {
+  overflow: hidden;
+}
+
+.workspace-sidebar-agents :deep(.agent-sidebar) {
+  width: 100%;
+  height: 100%;
+  border-right: none;
+  background: transparent;
+}
+
+.workspace-sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  width: 8px;
+  height: 100%;
+  cursor: ew-resize;
+  z-index: 5;
+}
+
+.workspace-sidebar-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.workspace-sidebar-resize-handle:hover::after {
+  background: #20c8ff;
+}
+
+.workspace-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 10px;
+  min-height: 28px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.workspace-sidebar-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+/* 移动端专用关闭按钮：桌面端隐藏（桌面端用原有按钮，两者行为一致） */
+.workspace-sidebar-close-mobile {
+  display: none;
+}
+
+.workspace-sidebar-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.workspace-file-tree-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.workspace-file-tree-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.workspace-file-tree-empty {
+  padding: 12px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  text-align: center;
+}
+/* 目录树顶部「打开目录」入口 */
+.workspace-open-dir-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px;
+  padding: 7px 10px;
+  border: 1px dashed var(--color-border-subtle);
+  border-radius: var(--tile-radius-sm, 4px);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.workspace-open-dir-btn:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-active);
+}
+.workspace-open-dir-icon {
+  font-size: 13px;
+}
+/* 虚拟目录会话（未创建 Agent 时直接打开的目录） */
+.workspace-agent-node.virtual-dir .agent-node-id {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 按节点打开目录的弹窗：单弹窗（上选节点，下内嵌目录筛选）。
+   注意：这里必须自带居中定位样式，不能依赖 DirectoryDialog 的 scoped 类
+   （.palette-overlay/.palette-panel 带 data-v 属性，App.vue 拿不到）。 */
+.open-dir-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 8, 16, 0.55);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 2900;
+  padding: 10vh 20px 20px;
+}
+.open-dir-modal {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--tile-radius);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  max-width: 700px;
+  width: 95%;
+  max-height: 78vh;
+  display: flex;
+  flex-direction: column;
+}
+.open-dir-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.open-dir-header h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.open-dir-close {
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.open-dir-close:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-hover);
+}
+.open-dir-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.open-dir-label {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+.open-dir-node-select,
+.open-dir-path-input {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--tile-radius-sm, 4px);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  box-sizing: border-box;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.open-dir-node-select:focus,
+.open-dir-path-input:focus {
+  outline: none;
+  border-color: var(--color-border-active);
+}
+/* 内嵌目录筛选容器：撑满弹窗剩余高度，内部 DirectoryDialog(embedded) 自带滚动 */
+.open-dir-browse-wrap {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  margin-top: 4px;
+}
+.open-dir-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 10px 12px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+.open-dir-actions .btn {
+  padding: 7px 16px;
+  border: none;
+  border-radius: var(--tile-radius-sm, 4px);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.open-dir-actions .btn.secondary {
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-subtle);
+}
+.open-dir-actions .btn.secondary:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+.open-dir-actions .btn.primary {
+  background: var(--color-accent);
+  color: #060911;
+}
+
+/* Agent 节点样式 */
+.workspace-agent-node {
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.workspace-agent-node.selected {
+  background: var(--color-bg-tertiary);
+}
+
+.workspace-agent-node.selected .agent-node-content {
+  background: var(--color-bg-tertiary);
+}
+
+.stopped-agents-group {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.stopped-agents-header {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  background: var(--color-bg-secondary);
+  font-weight: 500;
+  gap: 6px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.stopped-agents-header:hover {
+  background: var(--color-bg-tertiary);
+}
+
+.stopped-agents-title {
+  flex: 1;
+}
+
+.expand-arrow {
+  transition: transform 0.2s ease;
+  display: inline-block;
+}
+
+.expand-arrow.expanded {
+  transform: rotate(90deg);
+}
+
+.stopped-agents-list {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.workspace-agent-node.stopped {
+  opacity: 0.7;
+}
+
+.agent-node-content {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  background: var(--color-bg-secondary);
+  font-weight: 500;
+  gap: 6px;
+}
+
+.agent-node-content:hover {
+  background: var(--color-bg-hover);
+}
+
+.agent-icon {
+  font-size: 14px;
+}
+
+.agent-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-node-id {
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* 虚拟目录节点的「移除」按钮：默认隐藏，悬停该行时显示 */
+.agent-node-remove {
+  flex: none;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+.agent-node-content:hover .agent-node-remove {
+  display: inline-flex;
+}
+.agent-node-remove:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-danger, #f56c6c);
+}
+
+.agent-file-tree {
+  border-left: 2px solid var(--color-border-subtle);
+  margin-left: 12px;
+}
+
+.workspace-sidebar-placeholder {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+  padding: 20px;
+  color: var(--color-text-secondary);
+}
+
+.workspace-sidebar-placeholder-icon {
+  font-size: 22px;
+}
+
+.workspace-sidebar-placeholder-text {
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.workspace-sidebar-agent-select {
+  width: 100%;
+  font-size: 12px;
+  padding: 3px 4px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 4px;
+  background: var(--color-bg-secondary, var(--color-bg-primary));
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.workspace-global-search-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.workspace-global-search-mode-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.workspace-global-search-mode-tab {
+  flex: 1;
+  padding: 6px 10px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.workspace-global-search-mode-tab.active {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.workspace-global-search-mode-tab:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.workspace-global-search-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  box-sizing: border-box;
+  /* 覆盖 .workspace-panel 的 user-select: none，否则移动端点击输入框无法唤起软键盘 */
+  user-select: text;
+  -webkit-user-select: text;
+  touch-action: manipulation;
+}
+
+.workspace-global-search-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.workspace-global-search-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.workspace-global-search-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-primary);
+}
+
+.workspace-global-search-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.workspace-global-search-btn {
+  min-width: 30px;
+  width: 30px;
+  height: 30px;
+  font-size: 15px;
+}
+
+.workspace-global-search-results {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+}
+
+.workspace-global-search-summary {
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.workspace-global-search-empty {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.workspace-global-search-file-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.workspace-global-search-file-path {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-accent);
+  cursor: pointer;
+  word-break: break-all;
+}
+
+.workspace-global-search-file-count {
+  margin-left: 4px;
+  color: var(--color-text-secondary);
+}
+
+.workspace-global-search-file-result {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.workspace-global-search-file-result:hover {
+  background: var(--color-bg-hover);
+}
+
+.workspace-global-search-file-result-name {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.workspace-global-search-file-result-path {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  word-break: break-all;
+}
+
+.workspace-global-search-match {
+  width: 100%;
+  display: flex;
+  gap: 10px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--tile-radius-xs);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.workspace-global-search-match:hover {
+  border-color: var(--color-border-active);
+  background: var(--color-bg-hover);
+}
+
+.workspace-global-search-line {
+  flex: 0 0 auto;
+  min-width: 32px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.workspace-global-search-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.workspace-global-search-text mark {
+  background: rgba(255, 133, 32, 0.32);
+  color: #ff8520;
+}
+

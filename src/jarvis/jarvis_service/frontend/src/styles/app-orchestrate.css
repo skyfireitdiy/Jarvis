@@ -1,0 +1,337 @@
+/* ========== 编排弹窗样式 ========== */
+.orchestrate-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+}
+.orchestrate-modal {
+  width: min(900px, 94vw);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+.orchestrate-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid #30363d;
+}
+.orchestrate-header h2 {
+  margin: 0;
+  font-size: 16px;
+  color: #e6edf3;
+}
+.orchestrate-close {
+  background: transparent;
+  border: none;
+  color: #8ba3b8;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+.orchestrate-close:hover { color: #e6edf3; }
+.orchestrate-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 18px;
+}
+.orchestrate-source {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.orchestrate-source-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+/* 编排文件浏览面板：内嵌 DirectoryDialog，固定高度以承载滚动列表 */
+.orchestrate-browse-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 320px;
+  min-height: 0;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  overflow: hidden;
+}
+/* 最近使用过的编排文件：点击快速复用，hover 显示删除按钮 */
+.orchestrate-recent {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.orchestrate-recent-title {
+  color: #8ba3b8;
+  font-size: 12px;
+}
+.orchestrate-recent-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.orchestrate-recent-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #e6edf3;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.orchestrate-recent-tag:hover {
+  border-color: #58a6ff;
+  background: #161b22;
+}
+.orchestrate-recent-tag.active {
+  border-color: #58a6ff;
+  background: #1f6feb33;
+}
+.orchestrate-recent-name {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.orchestrate-recent-node {
+  color: #8ba3b8;
+}
+.orchestrate-recent-remove {
+  color: #8ba3b8;
+  font-size: 11px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.orchestrate-recent-remove:hover {
+  color: #f85149;
+}
+/* 插件编排模板：自动发现并展示，点击直接选用 */
+.orchestrate-templates {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.orchestrate-templates-title {
+  color: #8ba3b8;
+  font-size: 12px;
+}
+.orchestrate-templates-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.orchestrate-template-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #e6edf3;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.orchestrate-template-tag:hover {
+  border-color: #58a6ff;
+  background: #161b22;
+}
+.orchestrate-template-tag.active {
+  border-color: #58a6ff;
+  background: #1f6feb33;
+}
+.orchestrate-template-name {
+  font-weight: 600;
+}
+.orchestrate-template-plugin {
+  color: #8ba3b8;
+}
+.orchestrate-template-desc {
+  color: #8ba3b8;
+}
+.orchestrate-templates-loading {
+  color: #8ba3b8;
+  font-size: 12px;
+}
+.orchestrate-label {
+  flex: 0 0 auto;
+  min-width: 68px;
+  color: #8ba3b8;
+  font-size: 13px;
+}
+.orchestrate-node-select,
+.orchestrate-path-input,
+.orchestrate-input,
+.orchestrate-textarea {
+  flex: 1;
+  min-width: 0;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #e6edf3;
+  padding: 7px 10px;
+  font-size: 13px;
+}
+.orchestrate-textarea {
+  resize: vertical;
+  font-family: inherit;
+}
+.orchestrate-error {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: rgba(248, 81, 73, 0.12);
+  border: 1px solid rgba(248, 81, 73, 0.4);
+  border-radius: 6px;
+  color: #ff7b72;
+  font-size: 13px;
+}
+.orchestrate-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid #30363d;
+  padding-bottom: 8px;
+}
+.orchestrate-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px 6px 0 0;
+  color: #8ba3b8;
+  padding: 6px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  max-width: 220px;
+}
+.orchestrate-tab.active {
+  background: #1f6feb;
+  border-color: #1f6feb;
+  color: #fff;
+}
+.orchestrate-tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.orchestrate-tab-close {
+  font-size: 15px;
+  line-height: 1;
+  opacity: 0.7;
+}
+.orchestrate-tab-close:hover { opacity: 1; }
+.orchestrate-tab-add {
+  background: transparent;
+  border: 1px dashed #30363d;
+  border-radius: 6px;
+  color: #8ba3b8;
+  padding: 6px 10px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.orchestrate-tab-add:hover { color: #e6edf3; border-color: #8ba3b8; }
+.orchestrate-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.orchestrate-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.orchestrate-field-wide {
+  grid-column: 1 / -1;
+}
+.orchestrate-field .orchestrate-label {
+  min-width: 0;
+}
+.orchestrate-dir-row {
+  display: flex;
+  gap: 8px;
+}
+.orchestrate-checks {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.orchestrate-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #c9d1d9;
+  font-size: 13px;
+  cursor: pointer;
+}
+.orchestrate-empty {
+  padding: 24px;
+  text-align: center;
+  color: #8ba3b8;
+  font-size: 13px;
+}
+.orchestrate-results {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.orchestrate-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+.orchestrate-result.ok {
+  background: rgba(63, 185, 80, 0.12);
+  color: #3fb950;
+}
+.orchestrate-result.fail {
+  background: rgba(248, 81, 73, 0.12);
+  color: #ff7b72;
+}
+.orchestrate-result-name { color: #e6edf3; }
+.orchestrate-result-error { color: #ff7b72; opacity: 0.85; }
+.orchestrate-run {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #30363d;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.orchestrate-run-title { font-size: 13px; font-weight: 600; color: #e6edf3; }
+.orchestrate-run-hint { font-size: 12px; color: #8ba3b8; }
+.orchestrate-run-btn { align-self: flex-start; margin-top: 4px; }
+.orchestrate-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 18px;
+  border-top: 1px solid #30363d;
+}
+@media (max-width: 640px) {
+  .orchestrate-form { grid-template-columns: 1fr; }
+  .orchestrate-source-row { flex-wrap: wrap; }
+}
+/* ========== 编排弹窗样式结束 ========== */

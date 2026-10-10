@@ -1,0 +1,273 @@
+/* 终端 */
+.terminal-wrapper {
+  margin-top: 14px;
+  border: none;
+  border-radius: 10px;
+  overflow: hidden;
+  max-height: 600px;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-tertiary);
+}
+
+.terminal-host {
+  background: var(--color-bg-secondary);
+  flex: 1;
+  min-height: 400px;
+  overflow: hidden;
+  user-select: text;
+}
+
+.terminal-history {
+  margin-top: 14px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: none;
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-tertiary);
+  /* max-height 由动态样式控制 */
+}
+
+.terminal-history-header {
+  padding: 10px 16px;
+  background: var(--color-bg-secondary);
+  border-bottom: 0.5px solid var(--color-border-subtle);
+  color: #8ba3b8;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.terminal-history-content {
+  background: var(--color-bg-secondary);
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 16px;
+  margin: 0;
+  overflow-x: auto;
+  overflow-y: auto;
+  color: #d6e4f0;
+  white-space: pre;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+
+/* 输入区 */
+.input-area {
+  background: var(--color-bg-secondary);
+  border-top: 0.5px solid var(--color-border-subtle);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  flex-shrink: 0;
+}
+
+.input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 单行输入模式（已废弃，统一使用多行） */
+.input-wrapper.single-line {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.input-wrapper.single-line .input-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+}
+
+.input-wrapper.single-line input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 15px;
+  background: var(--color-bg-tertiary);
+  border: none;
+  border-radius: 10px;
+  color: #e6edf3;
+  font-size: 14px;
+}
+
+.input-wrapper.single-line input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  background: var(--color-bg-secondary);
+}
+
+.input-wrapper.single-line .send-btn {
+  padding: 10px 20px;
+}
+
+/* 通用 */
+.input-hint {
+  margin: 0;
+  font-size: 13px;
+  color: #8ba3b8;
+}
+
+.send-btn {
+  background: #36ff7c;
+  border: none;
+  border-radius: var(--tile-radius);
+  color: #d6e4f0;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 11px 22px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.send-btn:hover:not(:disabled) {
+  background: #36ff7c;
+  transform: translateY(-1px);
+}
+
+.send-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.complete-btn {
+  background: #20c8ff;
+  border: none;
+  border-radius: var(--tile-radius);
+  color: #d6e4f0;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 11px 22px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.complete-btn:hover:not(:disabled) {
+  background: #20c8ff;
+  transform: translateY(-1px);
+}
+
+.complete-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.complete-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 输入框统一样式 */
+.input-wrapper textarea {
+  width: 100%;
+  min-height: 120px;
+  max-height: 300px;
+  background: var(--color-bg-tertiary);
+  border: none;
+  border-radius: 10px;
+  padding: 14px;
+  color: #e6edf3;
+  font-size: 14px;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.input-wrapper textarea:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  background: var(--color-bg-secondary);
+}
+
+/* 缓冲区指示器 */
+/* Agent 运行中进度指示器 */
+.agent-thinking-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--color-bg-tertiary);
+  border: none;
+  border-radius: var(--tile-radius);
+  margin: 8px 0;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.thinking-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--color-accent-subtle);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.thinking-text {
+  font-size: 14px;
+  color: #20c8ff;
+  font-weight: 500;
+}
+
+/* 旋转动画 */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 淡入动画 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.buffer-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(54, 255, 124, 0.15);
+  border: none;
+  border-radius: var(--tile-radius);
+  margin: 8px 0;
+  cursor: pointer;
+}
+
+.buffer-indicator:hover {
+  background: rgba(54, 255, 124, 0.25);
+  border-color: var(--color-success);
+  transform: translateY(-1px);
+}
+
+.buffer-icon {
+  font-size: 18px;
+}
+
+.buffer-text {
+  font-size: 13px;
+  color: #36ff7c;
+  font-weight: 500;
+}
+
