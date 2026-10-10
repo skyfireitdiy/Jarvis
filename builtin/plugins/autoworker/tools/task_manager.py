@@ -1,9 +1,13 @@
 """
-AutoWorker 任务管理工具（Agent 侧）。
+AutoWorker 待办事项（TODO）管理工具（Agent 侧）。
+
+与内置 task_list_manager 的区别：本工具只维护「待办清单」本身（与前端任务面板
+同源、跨会话持久化），不拆解任务、不驱动子 Agent 执行；task_list_manager 负责把
+复杂任务拆成子任务并调度执行。
 
 用途:
-- 让任意 Agent 管理与自己相关的任务：查看任务列表/详情、更新任务信息、
-  标记任务状态（pending/running/completed/abandoned）、保存关键信息（notes）。
+- 让任意 Agent 管理待办事项：查看待办列表/详情、更新待办信息、
+  标记状态（pending/running/completed/abandoned）、写备注（notes）。
 - Agent 通常以任务子目录为 working_dir 启动，因此默认定位到「当前任务」
   （即 working_dir 下的 .jarvis/autoworker/task.json）；也可显式传入 workdir/task_id
   操作其他任务（如创建子任务）。
@@ -99,9 +103,13 @@ class TaskManagerTool:
     # 文件名必须与工具名一致，便于注册表自动加载
     name = "task_manager"
     description = (
-        "AutoWorker 任务管理：查看/更新任务、标记状态（pending/running/completed/"
-        "abandoned）、保存关键信息（notes）。默认作用于当前任务（working_dir 所在任务），"
-        "也可通过 workdir/task_id 操作其他任务。"
+        "待办事项（TODO）管理：维护后端工作目录下持久化的待办清单，与前端「任务」"
+        "面板同源。可创建/编辑待办、标记状态（pending/running/completed/abandoned）、"
+        "写备注（notes）、按需查看列表或详情。适合记录「要做什么、做到哪了」这类跨会话"
+        "留存的事项。默认作用于当前待办（working_dir 所在任务的 task.json），也可通过 "
+        "workdir/task_id 操作其他待办。"
+        "注意：本工具只管理待办清单本身，不拆解/不执行任务；若要把复杂任务拆成子任务"
+        "并驱动子 Agent 执行，请用 task_list_manager。"
     )
     parameters = {
         "type": "object",

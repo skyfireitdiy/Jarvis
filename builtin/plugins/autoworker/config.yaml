@@ -9,6 +9,9 @@ builtin: true
 license: MIT
 tool_load_dirs:
   - "{{plugin_dir}}/tools"
+# 声明本插件工具应用于 code_agent：Code Agent 构建工具列表时会自动
+# 追加本插件的全部工具（task_manager），无需硬编码工具名。
+code_agent_tools: true
 frontend:
   sidebar_views:
     - id: autoworker
