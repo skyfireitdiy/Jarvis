@@ -41,8 +41,8 @@ gh pr comment 123 --body "评论内容"
 # 关闭 issue（不可逆）
 gh issue close 60
 
-# 合并 PR（不可逆，可指定 --squash / --rebase / --merge）
-gh pr merge 123 --squash
+# 合并 PR（不可逆，默认 --rebase 原样合并，不压缩提交）
+gh pr merge 123 --rebase
 ```
 
 ## 默认仓库
@@ -109,7 +109,7 @@ gh 插件默认处理**当前工作目录对应的 GitHub 仓库**（读取 git 
 
 - **合并是高风险不可逆操作**，必须向用户确认：
   - 要合并的 PR 编号与标题；
-  - 合并方式（`--squash` / `--rebase` / `--merge`，默认 `merge`，可按需指定）。
+  - 合并方式（`--squash` / `--rebase` / `--merge`，**默认 `--rebase` 原样合并、不压缩提交**，可按需指定）。
 - 得到用户明确同意后，才执行 `gh pr merge`。
 
 ### 4. 评论（可选）
