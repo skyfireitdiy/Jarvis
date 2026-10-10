@@ -409,12 +409,32 @@ export default {
       this.menuVisible = false;
       this.menuItem = null;
     },
-    // 生成处理该 issue/PR 的提示词
-    buildItemPrompt(item) {
+    // 生成处理该 issue/PR 的提示词。
+    // isFork=true 时用于「Fork 并创建 CodeAgent 处理」：目标是修改代码后向上游原仓库提 PR。
+    buildItemPrompt(item, isFork = false) {
       const isIssue = this.tab === "issues";
       const repo = currentRepo || "(当前仓库)";
       const number = item.number;
       const title = item.title || "";
+      if (isFork) {
+        // 自定义仓库（fork 的他人仓库）：非本仓库，目标是改代码后向上游提 PR
+        const head = `请处理 GitHub ${isIssue ? "Issue" : "Pull Request"} #${number}：${title}`;
+        const upstream = [
+          `目标仓库 ${repo} 不是我们的仓库，而是其他开源项目的仓库。`,
+          "本地目录是 fork 的 clone（origin 指向你的 fork，upstream 已配置指向原仓库）。",
+          "目标是：修改代码修复问题，然后向上游原仓库提交 Pull Request。",
+        ].join("\n");
+        const flow = [
+          "开源贡献流程：",
+          "1. 从上游主干切出特性分支：`git fetch upstream && git checkout -b fix/issue-<编号> upstream/<上游主干>`。",
+          "2. 在分支上完成改动，遵循相关开发规则（含测试）。",
+          "3. 用 `commit` 工具生成正式提交。",
+          `4. 推送分支到 fork：\`git push origin <分支名>\`。`,
+          `5. 向上游提 PR：\`gh pr create --repo ${repo} --head <你的fork>:<分支名> --base <上游主干> --title <标题>\`，并在描述中用 \`Closes #${number}\` 关联该 Issue。`,
+          "6. 写操作（评论/关闭/合并）前先与我确认，再执行。",
+        ].join("\n");
+        return [head, "", upstream, "", flow].join("\n");
+      }
       return isIssue
         ? [
             `请处理当前仓库 ${repo} 的 GitHub Issue #${number}：${title}`,
@@ -542,7 +562,7 @@ export default {
         const res = await create({
           agentType: "code_agent",
           workingDir: localDir,
-          task: this.buildItemPrompt(item),
+          task: this.buildItemPrompt(item, true),
           name: `Issue #${number}`,
         });
         if (res && res.success) {

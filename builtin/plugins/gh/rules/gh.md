@@ -163,13 +163,23 @@ gh 插件默认处理**当前工作目录对应的 GitHub 仓库**（读取 git 
 ### 标准流程
 
 1. **确认基线**：先 `git fetch origin` 并确认当前主干（默认 `main`）状态，避免基于过期历史。
-2. **（外部贡献者）Fork 仓库**：无写权限时先 `gh repo fork <owner>/<repo> --clone`（fork 会成为 `origin`，原仓库变为 `upstream`）。有写权限时跳过本步。
+2. **（外部贡献者）Fork 仓库**：无写权限时先 `gh repo fork <owner>/<repo> --clone=false`，再手动 `git clone https://github.com/<你的账号>/<repo>.git`（fork 会成为 `origin`），并 `git remote add upstream https://github.com/<owner>/<repo>.git` 把原仓库设为 `upstream`。有写权限时跳过本步。
 3. **建特性分支**：从主干切出语义化命名的分支，如 `feat/<主题>`、`fix/<主题>`、`docs/<主题>`。
 4. **在分支上完成改动并提交**：改动完成后调用 `commit` 工具生成正式提交（见上节）。
 5. **推送分支**：`git push -u origin <分支名>`。
 6. **创建 PR**：用 `gh pr create --base main --head <分支名> --title <标题> --body-file <描述文件>` 创建 PR，描述需包含：背景、改动清单、验证方式。
 7. **关联 Issue**：若该 PR 解决某个 Issue，在 PR 描述中用 `Closes #<编号>` 关联（合并后自动关闭）；不要在处理过程中提前手动关闭 Issue。
 8. **收尾汇报**：向用户汇报 PR 链接与状态。
+
+### Fork 他人仓库处理其 Issue（gh 插件「Fork 并创建 CodeAgent」场景）
+
+当 gh 插件通过「Fork 并创建 CodeAgent 处理」入口处理**其他开源项目仓库**的 Issue 时，本地目录是 fork 的 clone（`origin` 指向你的 fork，`upstream` 已指向原仓库），目标是修改代码后**向上游原仓库提 PR**：
+
+1. **切特性分支**：从上游主干切出分支：`git fetch upstream && git checkout -b fix/issue-<编号> upstream/<上游主干>`。
+2. **在分支上完成改动并提交**：改动完成后调用 `commit` 工具生成正式提交。
+3. **推送分支到 fork**：`git push origin <分支名>`。
+4. **向上游提 PR**：`gh pr create --repo <原仓库 owner/repo> --head <你的fork>:<分支名> --base <上游主干> --title <标题>`，描述中用 `Closes #<编号>` 关联该 Issue。
+5. **写操作前确认**：创建 PR、评论、关闭等对外可见操作前先与用户确认。
 
 ### 约束
 
