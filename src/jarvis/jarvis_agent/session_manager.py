@@ -438,6 +438,91 @@ class SessionManager:
             PrettyOutput.auto_print("⚠️  已取消会话恢复。")
             return None
 
+    def build_session_snapshot(
+        self, timestamp: Optional[str] = None
+    ) -> Optional[Tuple[str, List[Tuple[str, Any, Optional[Any]]]]]:
+        """在内存中构造一次完整会话落盘所需的全部文件内容（不落盘）。
+
+        返回 (session_file, files)，其中 files 为
+        [(file_path, data, default_encoder), ...]，覆盖：
+        - 主会话文件（messages）
+        - _commit.json
+        - _state.json
+        - _tasklist.json
+
+        该方法是 save_session 与实时保存守护进程共用的数据构造入口，
+        保证两种路径落盘的文件名与内容格式完全一致。
+
+        参数:
+            timestamp: 会话时间戳（%Y%m%d_%H%M%S）；为空时取当前时间。
+
+        返回:
+            (session_file, files)；若没有用户消息（无需保存）则返回 None。
+        """
+        session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
+        os.makedirs(session_dir, exist_ok=True)
+        if not timestamp:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # 确定会话名称
+        if self.current_session_name:
+            session_name = self.current_session_name
+        else:
+            session_name = self._generate_session_name()
+            self.current_session_name = session_name
+
+        session_file = os.path.join(
+            session_dir,
+            f"{session_name}_saved_session_{self.agent_name}_{timestamp}.json",
+        )
+
+        # 检查是否有用户消息，如果没有则不保存
+        try:
+            has_user_message = any(
+                msg.get("role") == "user" for msg in self.model.get_messages()
+            )
+            if not has_user_message:
+                return None
+        except Exception:
+            # 如果检查失败（如 messages 不存在），为了安全起见仍然执行保存
+            pass
+
+        # 主会话文件内容（与 BasePlatform.save 一致）
+        try:
+            messages = self.model.get_messages()
+        except Exception:
+            messages = []
+        main_data: Dict[str, Any] = {"messages": messages}
+
+        files: List[Tuple[str, Any, Optional[Any]]] = [
+            (session_file, main_data, None),
+        ]
+
+        # _commit.json
+        commit_info = self._build_commit_info(session_file)
+        if commit_info is not None:
+            files.append((session_file[:-5] + "_commit.json", commit_info, None))
+
+        # _state.json
+        state_data = self._build_agent_state(timestamp)
+        if state_data is not None:
+            from jarvis.jarvis_agent import SafeEncoder
+
+            state_file = os.path.join(
+                session_dir, f"{self._get_session_file_prefix()}_{timestamp}_state.json"
+            )
+            files.append((state_file, state_data, SafeEncoder().default))
+
+        # _tasklist.json
+        tasklist_data = self._build_task_lists()
+        if tasklist_data is not None:
+            tasklist_file = os.path.join(
+                session_dir, f"{self._get_session_file_prefix()}_tasklist.json"
+            )
+            files.append((tasklist_file, tasklist_data, None))
+
+        return session_file, files
+
     def save_session(self) -> bool:
         """Saves the current session state to a file."""
         session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
@@ -491,12 +576,14 @@ class SessionManager:
 
         return result
 
-    def _save_commit_info(self, session_file: str) -> None:
-        """
-        保存 commit 信息到辅助文件。
+    def _build_commit_info(self, session_file: str) -> Optional[Dict[str, Any]]:
+        """在内存中构造 _commit.json 的内容（不落盘）。
 
-        Args:
-            session_file: 会话文件路径
+        参数:
+            session_file: 会话文件路径（用于提取时间戳）
+
+        返回:
+            commit 信息字典；构造失败返回 None。
         """
         try:
             from jarvis.jarvis_utils.git_utils import get_latest_commit_hash
@@ -545,6 +632,25 @@ class SessionManager:
                 commit_info["last_backup_commit"] = last_backup_commit
             if self.current_session_name:
                 commit_info["session_name"] = self.current_session_name
+
+            return commit_info
+
+        except Exception as e:
+            # 构造 commit 信息失败不影响主流程
+            PrettyOutput.auto_print(f"⚠️  保存 commit 信息失败: {e}")
+            return None
+
+    def _save_commit_info(self, session_file: str) -> None:
+        """
+        保存 commit 信息到辅助文件。
+
+        Args:
+            session_file: 会话文件路径
+        """
+        try:
+            commit_info = self._build_commit_info(session_file)
+            if commit_info is None:
+                return
 
             # 写入 _commit.json 文件
             commit_file = (
@@ -1160,34 +1266,21 @@ class SessionManager:
 
         return f"saved_session_{self.agent_name}"
 
-    def _save_task_lists(self) -> bool:
-        """保存当前 Agent 的任务列表到文件。
+    def _build_task_lists(self) -> Optional[Dict[str, Any]]:
+        """在内存中构造 _tasklist.json 的内容（不落盘）。
 
-        文件命名规则：{prefix}_tasklist.json
-        与会话文件保存在同一目录下，便于关联。
-
-        Returns:
-            bool: 是否成功保存
+        返回:
+            任务列表数据字典；无任务列表或构造失败返回 None。
         """
-
-        import os
-
         try:
             # 检查agent和task_list_manager是否存在
             if not self.agent:
-                return True
+                return None
             if (
                 not hasattr(self.agent, "task_list_manager")
                 or not self.agent.task_list_manager.task_lists
             ):
-                return True  # 没有任务列表，视为成功
-
-            # 构建文件路径
-            session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
-            os.makedirs(session_dir, exist_ok=True)
-
-            prefix = self._get_session_file_prefix()
-            tasklist_file = os.path.join(session_dir, f"{prefix}_tasklist.json")
+                return None  # 没有任务列表
 
             # 收集所有任务列表数据
             task_lists_data = {}
@@ -1205,13 +1298,42 @@ class SessionManager:
                 "global_tasklist_counter": TaskListManager._global_tasklist_counter,
             }
 
+            return {
+                "task_lists": task_lists_data,
+                "manager_state": manager_state,
+            }
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 保存任务列表失败: {e}")
+            return None
+
+    def _save_task_lists(self) -> bool:
+        """保存当前 Agent 的任务列表到文件。
+
+        文件命名规则：{prefix}_tasklist.json
+        与会话文件保存在同一目录下，便于关联。
+
+        Returns:
+            bool: 是否成功保存
+        """
+
+        import os
+
+        try:
+            tasklist_data = self._build_task_lists()
+            if tasklist_data is None:
+                return True  # 没有任务列表，视为成功
+
+            # 构建文件路径
+            session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
+            os.makedirs(session_dir, exist_ok=True)
+
+            prefix = self._get_session_file_prefix()
+            tasklist_file = os.path.join(session_dir, f"{prefix}_tasklist.json")
+
             # 保存到文件
             atomic_write_json(
                 tasklist_file,
-                {
-                    "task_lists": task_lists_data,
-                    "manager_state": manager_state,
-                },
+                tasklist_data,
                 ensure_ascii=False,
                 indent=2,
             )
@@ -1306,16 +1428,17 @@ class SessionManager:
             PrettyOutput.auto_print(f"⚠️ 恢复任务列表失败: {e}")
             return False
 
-    def _save_agent_state(self, timestamp: str) -> None:
-        """保存SessionManager和Agent运行时状态到文件。
+    def _build_agent_state(self, timestamp: str) -> Optional[Dict[str, Any]]:
+        """在内存中构造 _state.json 的内容（不落盘）。
 
-        Args:
-            timestamp: 会话时间戳，用于生成文件名
+        参数:
+            timestamp: 会话时间戳，用于 metadata 记录
+
+        返回:
+            状态数据字典；无 agent 时返回 None。
         """
-        import os
-
         if not self.agent:
-            return
+            return None
 
         # 保存短期记忆
         short_term_memories = []
@@ -1323,26 +1446,11 @@ class SessionManager:
             from jarvis.jarvis_utils.globals import get_short_term_memories
 
             short_term_memories = get_short_term_memories()
-            if short_term_memories:
-                PrettyOutput.auto_print(
-                    f"💾 保存 {len(short_term_memories)} 条短期记忆"
-                )
-            else:
-                PrettyOutput.auto_print("💾 没有短期记忆需要保存")
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 获取短期记忆失败: {e}")
 
-        session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
-        os.makedirs(session_dir, exist_ok=True)
-
-        prefix = self._get_session_file_prefix()
-        state_file = os.path.join(
-            session_dir,
-            f"{prefix}_{timestamp}_state.json",
-        )
-
         # 构建要保存的状态数据
-        state_data = {
+        state_data: Dict[str, Any] = {
             "short_term_memories": short_term_memories,
             "session_manager": {
                 "prompt": self.prompt,
@@ -1416,6 +1524,32 @@ class SessionManager:
                 state_data["timer"] = timer_state
         except Exception as e:
             PrettyOutput.auto_print(f"⚠ 保存定时器状态失败: {e}")
+
+        return state_data
+
+    def _save_agent_state(self, timestamp: str) -> None:
+        """保存SessionManager和Agent运行时状态到文件。
+
+        Args:
+            timestamp: 会话时间戳，用于生成文件名
+        """
+        import os
+
+        if not self.agent:
+            return
+
+        state_data = self._build_agent_state(timestamp)
+        if state_data is None:
+            return
+
+        session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
+        os.makedirs(session_dir, exist_ok=True)
+
+        prefix = self._get_session_file_prefix()
+        state_file = os.path.join(
+            session_dir,
+            f"{prefix}_{timestamp}_state.json",
+        )
 
         # 导入SafeEncoder（避免循环导入）
         from jarvis.jarvis_agent import SafeEncoder

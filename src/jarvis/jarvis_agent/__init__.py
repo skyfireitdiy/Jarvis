@@ -421,7 +421,12 @@ class Agent:
 
     def __del__(self) -> None:
         # 只有在记录启动时才停止记录
-        pass
+        # 兜底：若 run() 未走完（异常/未被调用），仍通知守护进程正常退出，
+        # 避免其把"进程正常销毁"误判为意外 kill 而落盘。
+        try:
+            self._notify_session_daemon_quit()
+        except Exception:
+            pass
 
     def get_user_origin_input(self) -> Union[str, List[ContentBlock]]:
         """获取原始用户输入
@@ -612,6 +617,84 @@ class Agent:
         # 动态回调加载
         self._load_after_tool_callbacks()
         self._load_all_event_callbacks()
+
+        # 会话实时保存守护进程（仅主 Agent 启用；被意外 kill 时落盘最新快照）
+        self._session_daemon = None
+        self._session_daemon_quit_sent = False
+        self._start_session_daemon()
+
+    def _start_session_daemon(self) -> None:
+        """启动会话实时保存守护子进程（仅主 Agent）。
+
+        仅当 ``allow_savesession=True``（jvs/jca 主程序）时启用；子 Agent
+        不启用。Windows 等无 ``os.fork`` 平台自动降级为不启用。
+        """
+        if not self.allow_savesession:
+            return
+        try:
+            from jarvis.jarvis_agent.session_daemon import SessionDaemon
+
+            daemon = SessionDaemon()
+            if daemon.start():
+                self._session_daemon = daemon
+                # 记录创建守护进程的进程 PID：仅该进程有权通知守护进程退出，
+                # 防止子进程（若将来通过 fork/multiprocessing 创建）误发 quit
+                self._session_daemon_owner_pid = os.getpid()
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_agent.__init__", function="_start_session_daemon"
+            )
+            self._session_daemon = None
+
+    def _send_session_snapshot(self) -> None:
+        """构造当前会话快照并发送给守护子进程（内存保存，不落盘）。
+
+        由 ``_fire_after_tool_call`` 在每次工具调用后触发，保证守护进程
+        内存中的快照始终接近最新状态。
+        """
+        daemon = getattr(self, "_session_daemon", None)
+        if daemon is None or not daemon.enabled:
+            return
+        # 仅创建守护进程的进程有权发送快照；子进程一律不发
+        owner_pid = getattr(self, "_session_daemon_owner_pid", None)
+        if owner_pid is not None and os.getpid() != owner_pid:
+            return
+        try:
+            from jarvis.jarvis_agent.session_daemon import build_snapshot_files
+
+            snapshot = self.session.build_session_snapshot()
+            if not snapshot:
+                return
+            session_file, files = snapshot
+            daemon.send_snapshot(build_snapshot_files(session_file, files))
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_agent.__init__", function="_send_session_snapshot"
+            )
+
+    def _notify_session_daemon_quit(self) -> None:
+        """通知守护子进程"正常退出"（幂等，不落盘）。
+
+        正常退出路径已由 save_session 落盘，守护进程只需清理内存并退出。
+        """
+        if getattr(self, "_session_daemon_quit_sent", False):
+            return
+        self._session_daemon_quit_sent = True
+        daemon = getattr(self, "_session_daemon", None)
+        if daemon is None:
+            return
+        # 仅创建守护进程的进程有权通知其退出；子进程一律不发
+        owner_pid = getattr(self, "_session_daemon_owner_pid", None)
+        if owner_pid is not None and os.getpid() != owner_pid:
+            return
+        try:
+            daemon.send_quit()
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_agent.__init__",
+                function="_notify_session_daemon_quit",
+            )
 
     def _init_base_attributes(
         self,
@@ -1206,6 +1289,8 @@ class Agent:
 
     def _fire_after_tool_call(self) -> None:
         """触发 AFTER_TOOL_CALL（委托至 CallbackLoader）"""
+        # 会话实时保存：每次工具调用后刷新守护进程内存中的快照
+        self._send_session_snapshot()
         return self._callback_loader.fire_after_tool_call()
 
     def _exec_native_one(self, call: Dict[str, Any]) -> str:
@@ -2136,6 +2221,8 @@ class Agent:
         finally:
             if not isinstance(self, CodeAgent):
                 clear_current_agent()
+            # 正常退出：通知守护进程清理内存（不落盘）
+            self._notify_session_daemon_quit()
 
     def analysis(self, satisfaction_feedback: str = "") -> None:
         """直接执行任务分析（跳过用户确认）
