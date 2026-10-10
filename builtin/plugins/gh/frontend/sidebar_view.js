@@ -147,6 +147,14 @@ export default {
     this.restoreManualRepo();
     this.refreshAgentName();
     this.resolveRepo().then(() => this.refresh());
+    // 订阅宿主 agent_changed 事件：切换 Agent 时即使 workingDir 不变（同目录切换），
+    // 顶部「当前 Agent」也能同步更新（watch workingDir 只在值变化时触发）。
+    const on = typeof window !== "undefined" && window.__jarvisOn;
+    if (typeof on === "function") {
+      this._offAgentChanged = on("agent_changed", () => {
+        this.refreshAgentName();
+      });
+    }
     // 点击别处 / 按 Esc 关闭右键菜单
     this._onDocClick = () => this.closeItemMenu();
     this._onDocKeydown = (e) => {
@@ -156,6 +164,7 @@ export default {
     document.addEventListener("keydown", this._onDocKeydown);
   },
   beforeUnmount() {
+    if (typeof this._offAgentChanged === "function") this._offAgentChanged();
     document.removeEventListener("click", this._onDocClick);
     document.removeEventListener("keydown", this._onDocKeydown);
   },
