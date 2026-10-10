@@ -54,6 +54,7 @@
         :isEditable="isWorkspaceEditable"
         :hasActiveTab="!!activeWorkspaceTabPath"
         :pluginSidebarViews="pluginSidebarViews"
+        :pluginToolPanels="pluginToolPanels"
         @focus="focusWindow('workspace')"
         @startMove="startWorkspacePanelMove"
         @toggleMaximize="toggleWorkspaceMaximize"
@@ -547,7 +548,30 @@
               />
             </div>
             <div v-else-if="isPluginSidebarView(workspaceSidebarView) && activePluginSidebarComp" class="workspace-sidebar-content">
-              <component :is="activePluginSidebarComp" :workingDir="pluginSidebarWorkingDir" />
+              <component
+                :is="activePluginSidebarComp"
+                :workingDir="pluginSidebarWorkingDir"
+                :agentInfo="pluginActiveAgentInfo"
+                :userInfo="auth.userInfo || null"
+                :nodes="availableNodeOptions"
+                :gatewayUrl="gatewayUrl"
+                :fetchWithAuth="fetchWithAuth"
+                :getHttpProtocol="getHttpProtocol"
+                :showToast="showToast"
+              />
+            </div>
+            <div v-else-if="isPluginToolView(workspaceSidebarView) && activePluginToolPanelComp" class="workspace-sidebar-content">
+              <component
+                :is="activePluginToolPanelComp"
+                :workingDir="pluginSidebarWorkingDir"
+                :agentInfo="pluginActiveAgentInfo"
+                :userInfo="auth.userInfo || null"
+                :nodes="availableNodeOptions"
+                :gatewayUrl="gatewayUrl"
+                :fetchWithAuth="fetchWithAuth"
+                :getHttpProtocol="getHttpProtocol"
+                :showToast="showToast"
+              />
             </div>
             <div v-else-if="workspaceSidebarView === 'orchestration'" class="workspace-sidebar-content workspace-sidebar-orchestration">
               <OrchestrationView
@@ -2574,6 +2598,164 @@ try {
 } catch (e) {
   /* ignore */
 }
+// ========== 插件统一接口族（Issue #97）==========
+// 在既有 __jarvis* 单点接口之上，补齐一套「信息查询 + UI 控制」的统一接口族，
+// 让插件扩展（sidebar_views / admin_tabs / tool_panels）不再依赖宿主逐个补函数。
+// 所有接口沿用 try/catch 包裹模式：宿主环境异常时静默降级，不影响主界面。
+// 事件订阅（__jarvisOn/__jarvisOff）见下方「插件事件订阅机制」小节。
+
+// 获取当前登录用户信息（auth.userInfo）；未登录或未加载时返回 null。
+try {
+  window.__jarvisGetUserInfo = () => auth.value.userInfo || null
+} catch (e) {
+  /* ignore */
+}
+
+// 获取节点列表（availableNodeOptions，含 node_id/status 等字段；master 恒在列）。
+// 返回数组副本，避免插件直接改动宿主响应式状态。
+try {
+  window.__jarvisGetNodes = () => (Array.isArray(availableNodeOptions.value) ? [...availableNodeOptions.value] : [])
+} catch (e) {
+  /* ignore */
+}
+
+// 显示 toast 通知（复用宿主 showToast）。
+// message: 文本；type: 'success' | 'error' | 'info'（默认 success）。
+try {
+  window.__jarvisShowToast = (message, type = 'success') => showToast(String(message || ''), type)
+} catch (e) {
+  /* ignore */
+}
+
+// 切换工作区侧边栏视图（复用宿主 setWorkspaceSidebarView）。
+// view: 内置视图名（agents/files/search/git/manage/timers/plugins/orchestration）
+//       或插件视图（'plugin:<id>' / 'plugin-tool:<id>'）。
+try {
+  window.__jarvisSwitchSidebarView = (view) => {
+    const target = String(view || '').trim()
+    if (!target) return { success: false, error: '视图名为空' }
+    setWorkspaceSidebarView(target)
+    return { success: true }
+  }
+} catch (e) {
+  /* ignore */
+}
+
+// 打开宿主面板/导航（复用宿主既有入口）。
+// kind 支持：
+//   'admin'        打开管理面板
+//   'settings'     打开设置
+//   'workspace'    打开工作区（并切到 Agent 列表）
+//   'git'          打开工作区并切到 Git 侧边栏
+//   'plugins'      打开工作区并切到插件管理侧边栏
+//   'topology'     打开网络拓扑
+//   'docs'         打开使用文档
+// 返回 { success } 或 { success: false, error }。
+try {
+  window.__jarvisOpenPanel = (kind) => {
+    const target = String(kind || '').trim()
+    switch (target) {
+      case 'admin':
+        showAdminPanel.value = true
+        pushOverlayState()
+        return { success: true }
+      case 'settings':
+        showSettingsModal.value = true
+        return { success: true }
+      case 'workspace':
+        openWorkspaceAgentList()
+        return { success: true }
+      case 'git':
+        if (!showWorkspacePanel.value) {
+          showWorkspacePanel.value = true
+          if (windowWidth.value <= 768) pushOverlayState()
+        }
+        setWorkspaceSidebarView('git')
+        return { success: true }
+      case 'plugins':
+        if (!showWorkspacePanel.value) {
+          showWorkspacePanel.value = true
+          if (windowWidth.value <= 768) pushOverlayState()
+        }
+        setWorkspaceSidebarView('plugins')
+        return { success: true }
+      case 'topology':
+        openTopologyOverlay()
+        return { success: true }
+      case 'docs':
+        openDocs()
+        return { success: true }
+      default:
+        return { success: false, error: `未知面板: ${target}` }
+    }
+  }
+} catch (e) {
+  /* ignore */
+}
+
+// 获取当前网关信息（host/port/protocol），供插件构造 API 地址。
+// 返回 { host, port, protocol }；解析失败时回退默认值。
+try {
+  window.__jarvisGetGatewayInfo = () => {
+    const { host, port } = getGatewayAddress()
+    return {
+      host,
+      port,
+      protocol: getHttpProtocol(),
+    }
+  }
+} catch (e) {
+  /* ignore */
+}
+
+// ========== 插件事件订阅机制（Issue #97）==========
+// 宿主在关键状态变化处 emit 事件，插件通过 window.__jarvisOn(event, handler) 订阅、
+// window.__jarvisOff(event, handler) 取消订阅。handler 收到 (payload) 参数。
+// 事件清单：
+//   'agent_changed'  当前活跃 Agent 变化（payload: { agentId, agentName, workingDir } 或 null）
+//   'token_changed'  token 变化（payload: { token }，登出为 null）
+//   'user_changed'   当前用户信息变化（payload: { userInfo } 或 null）
+//   'nodes_changed'  节点列表变化（payload: { nodes }）
+const __jarvisEventListeners = new Map()
+try {
+  window.__jarvisOn = (event, handler) => {
+    if (typeof handler !== 'function') return () => {}
+    const key = String(event || '')
+    if (!key) return () => {}
+    if (!__jarvisEventListeners.has(key)) __jarvisEventListeners.set(key, new Set())
+    __jarvisEventListeners.get(key).add(handler)
+    // 返回取消订阅函数，便于插件在组件卸载时清理
+    return () => window.__jarvisOff(key, handler)
+  }
+  window.__jarvisOff = (event, handler) => {
+    const key = String(event || '')
+    const set = __jarvisEventListeners.get(key)
+    if (!set) return
+    if (handler) {
+      set.delete(handler)
+    } else {
+      set.clear()
+    }
+  }
+} catch (e) {
+  /* ignore */
+}
+// 宿主内部 emit 辅助函数（不暴露给插件，供本文件状态变化处调用）
+function __jarvisEmit(event, payload) {
+  try {
+    const set = __jarvisEventListeners.get(String(event || ''))
+    if (!set) return
+    set.forEach((handler) => {
+      try {
+        handler(payload)
+      } catch (e) {
+        console.warn(`[PluginEvents] handler for "${event}" failed:`, e)
+      }
+    })
+  } catch (e) {
+    /* ignore */
+  }
+}
 
 // URL 解析辅助函数：支持 HTTPS 协议和域名
 
@@ -3129,12 +3311,18 @@ const pluginExtensions = ref([])
 // 按扩展点类型过滤
 const pluginAdminTabs = computed(() => pluginExtensions.value.filter(e => e.extType === 'admin_tabs'))
 const pluginSidebarViews = computed(() => pluginExtensions.value.filter(e => e.extType === 'sidebar_views'))
+const pluginToolPanels = computed(() => pluginExtensions.value.filter(e => e.extType === 'tool_panels'))
 // 动态侧边栏 view 的标题映射：view 名 = `plugin:${id}`
 function pluginSidebarTitle(view) {
   const ext = pluginSidebarViews.value.find(e => `plugin:${e.id}` === view)
   return ext ? ext.title : ''
 }
-// 侧边栏标题：按当前 view 映射；插件动态 view 走 pluginSidebarTitle
+// tool_panels 扩展点复用侧边栏渲染：view 名 = `plugin-tool:${id}`
+function pluginToolPanelTitle(view) {
+  const ext = pluginToolPanels.value.find(e => `plugin-tool:${e.id}` === view)
+  return ext ? ext.title : ''
+}
+// 侧边栏标题：按当前 view 映射；插件动态 view 走 pluginSidebarTitle / pluginToolPanelTitle
 const WORKSPACE_SIDEBAR_TITLES = {
   search: '全局搜索',
   git: 'Git',
@@ -3147,6 +3335,7 @@ const WORKSPACE_SIDEBAR_TITLES = {
 const workspaceSidebarTitle = computed(() => {
   const view = workspaceSidebarView.value
   if (isPluginSidebarView(view)) return pluginSidebarTitle(view)
+  if (isPluginToolView(view)) return pluginToolPanelTitle(view)
   return WORKSPACE_SIDEBAR_TITLES[view] || '目录树'
 })
 // 加载插件扩展清单（登录后调用）；失败静默，不影响主界面
@@ -3169,6 +3358,10 @@ function resolvePluginExtensionComponent(ext) {
 function isPluginSidebarView(view) {
   return typeof view === 'string' && view.startsWith('plugin:')
 }
+// 判断某个侧边栏 view 是否为插件 tool_panel 扩展 view
+function isPluginToolView(view) {
+  return typeof view === 'string' && view.startsWith('plugin-tool:')
+}
 // 缓存插件侧边栏的异步组件实例，避免 computed 每次返回新的 defineAsyncComponent。
 // 若每次返回新实例，Vue 重渲染 <component :is> 时会视为不同组件反复卸载/重载，
 // 导致插件组件"先渲染正常、随后被清空为空"。
@@ -3183,6 +3376,19 @@ const activePluginSidebarComp = computed(() => {
     pluginSidebarCompCache.set(ext.id, defineAsyncComponent(() => resolvePluginExtensionComponent(ext)))
   }
   return pluginSidebarCompCache.get(ext.id)
+})
+// 当前激活的插件 tool_panel view 对应的异步组件（复用 pluginSidebarCompCache 缓存，
+// 但用 plugin-tool: 前缀作 key，避免与同名 sidebar_views 扩展互相覆盖）
+const activePluginToolPanelComp = computed(() => {
+  const view = workspaceSidebarView.value
+  if (!isPluginToolView(view)) return null
+  const ext = pluginToolPanels.value.find(e => `plugin-tool:${e.id}` === view)
+  if (!ext) return null
+  const cacheKey = `plugin-tool:${ext.id}`
+  if (!pluginSidebarCompCache.has(cacheKey)) {
+    pluginSidebarCompCache.set(cacheKey, defineAsyncComponent(() => resolvePluginExtensionComponent(ext)))
+  }
+  return pluginSidebarCompCache.get(cacheKey)
 })
 // 编辑器主区域视图：'file' 显示代码编辑器/diff，'chat' 显示聊天室，'terminal' 显示终端。
 // 已统一为 pane 树模型：唯一 leaf 就是主区域，故主区域视图 = 唯一 leaf 的 view（派生）。
@@ -6668,6 +6874,18 @@ function getGitWorkingDir() {
 
 // 插件侧边栏（如 gh）跟随 Git 面板目标工作目录，用于解析当前仓库
 const pluginSidebarWorkingDir = computed(() => getGitWorkingDir())
+// 插件侧边栏注入的当前活跃 Agent 信息（与 __jarvisGetActiveAgentInfo 同源：Git 目标 Agent 优先）
+const pluginActiveAgentInfo = computed(() => {
+  const agentId = effectiveGitAgentId.value
+  const agent = agentId ? (agentList.value.find(a => a.agent_id === agentId) || null) : null
+  return agent
+    ? {
+        agentId: agent.agent_id,
+        agentName: agent.name || agent.agent_id,
+        workingDir: agent.working_dir || '',
+      }
+    : null
+})
 
 // 调用后端 Git 只读接口
 async function callGitApi(apiPath, payload) {
@@ -20546,8 +20764,37 @@ watch(
     } catch (e) {
       console.warn('[AUTH] broadcast token change failed:', e)
     }
+    // 通知插件订阅者 token 变化
+    __jarvisEmit('token_changed', { token: newToken || null })
     // token 变化（含登出置空）时同步给本机 daemon
     syncTokenToDaemon(newToken, window.__jarvisAuthBridge.getGateway())
+  }
+)
+
+// 用户信息变化时通知插件订阅者（登录/刷新/登出统一走这里）
+watch(
+  () => auth.value.userInfo,
+  (newUserInfo) => {
+    __jarvisEmit('user_changed', { userInfo: newUserInfo || null })
+  }
+)
+
+// 当前 Agent 切换时通知插件订阅者（payload 与 __jarvisGetActiveAgentInfo 结构一致）
+watch(
+  () => currentAgentId.value,
+  (newAgentId) => {
+    const agent = agentList.value.find(a => a.agent_id === newAgentId) || null
+    __jarvisEmit('agent_changed', agent
+      ? { agentId: agent.agent_id, agentName: agent.name || agent.agent_id, workingDir: agent.working_dir || '' }
+      : null)
+  }
+)
+
+// 节点列表变化时通知插件订阅者
+watch(
+  () => availableNodeOptions.value,
+  (nodes) => {
+    __jarvisEmit('nodes_changed', { nodes: Array.isArray(nodes) ? [...nodes] : [] })
   }
 )
 

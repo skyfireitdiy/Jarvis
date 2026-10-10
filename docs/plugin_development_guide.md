@@ -184,6 +184,75 @@ YAML 编排流水线，配合 `OrganizeAgents` 与 `jca -n --task-file` 消费�
 
 前端通过 `GET /api/plugins/{node_id}/{name}/frontend/{path}` 动态加载插件 JS，用 Blob URL `import()` 加载为 Vue 组件。插件 JS 应**单文件自包含**（不引用相对路径资源），否则 Blob module 无法解析。
 
+#### 6.1 三个扩展点
+
+| 扩展点 | 渲染位置 | 说明 |
+|--------|----------|------|
+| `admin_tabs` | 管理面板 tab | 在管理面板（AdminPanel）新增一个 tab |
+| `sidebar_views` | 工作区侧边栏 | 在活动栏新增入口，view 名为 `plugin:<id>` |
+| `tool_panels` | 工作区侧边栏 | 在活动栏新增入口，view 名为 `plugin-tool:<id>`，与 `sidebar_views` 独立 |
+
+#### 6.2 统一 props（宿主自动注入）
+
+宿主在渲染插件组件时会自动注入以下 props（插件组件通过 `props` 声明接收，未声明则忽略）：
+
+```js
+export default {
+  name: 'MyView',
+  props: {
+    workingDir: String,   // 当前工作目录
+    agentInfo: Object,    // 当前活跃 Agent 信息 { agentId, agentName, workingDir } 或 null
+    userInfo: Object,     // 当前登录用户信息 { user_id, username, display_name, is_admin } 或 null
+    nodes: Array,         // 节点列表 [{ node_id, status, ... }]
+    gatewayUrl: String,   // 网关地址
+    fetchWithAuth: Function, // 带认证的 fetch(url, options)
+    getHttpProtocol: Function, // () => 'http' | 'https'
+    showToast: Function,  // (message, type) 显示 toast
+  },
+  render(h) {
+    return h('div', {}, '插件内容');
+  },
+};
+```
+
+#### 6.3 window.__jarvis* 接口族
+
+插件组件也可通过全局 `window.__jarvis*` 接口访问宿主能力（无需声明 props）：
+
+| 接口 | 签名 | 说明 |
+|------|------|------|
+| `__jarvisFetch` | `(url, options) => Promise<Response>` | 带认证的 fetch，自动携带 token |
+| `__jarvisSendToActiveAgent` | `(text, options) => {success, agentId}` | 向当前活跃 Agent 发送提示词 |
+| `__jarvisGetActiveAgentInfo` | `() => {agentId, agentName, workingDir} \| null` | 获取当前活跃 Agent 信息 |
+| `__jarvisCreateAgentForTask` | `(options) => Promise<{success, agentId}>` | 创建新 Agent 处理任务 |
+| `__jarvisPickDirectory` | `() => Promise<string \| null>` | 打开目录选择弹窗 |
+| `__jarvisGetUserInfo` | `() => userInfo \| null` | 获取当前登录用户信息 |
+| `__jarvisGetNodes` | `() => Array` | 获取节点列表（数组副本） |
+| `__jarvisShowToast` | `(message, type='success')` | 显示 toast 通知 |
+| `__jarvisSwitchSidebarView` | `(view) => {success}` | 切换工作区侧边栏视图（内置或 `plugin:<id>`/`plugin-tool:<id>`） |
+| `__jarvisOpenPanel` | `(kind) => {success}` | 打开面板/导航（admin/settings/workspace/git/plugins/topology/docs） |
+| `__jarvisGetGatewayInfo` | `() => {host, port, protocol}` | 获取当前网关信息 |
+
+#### 6.4 事件订阅
+
+插件可通过 `window.__jarvisOn(event, handler)` 订阅宿主事件，返回取消订阅函数；`window.__jarvisOff(event, handler)` 取消订阅（handler 省略则清空该事件全部订阅）。
+
+```js
+const off = window.__jarvisOn('agent_changed', (payload) => {
+  // payload: { agentId, agentName, workingDir } 或 null
+  console.log('当前 Agent 变化', payload);
+});
+// 组件卸载时清理
+// off();
+```
+
+| 事件 | payload | 触发时机 |
+|------|---------|----------|
+| `agent_changed` | `{agentId, agentName, workingDir} \| null` | 当前活跃 Agent 变化 |
+| `token_changed` | `{token}` | token 变化（登出为 null） |
+| `user_changed` | `{userInfo} \| null` | 当前用户信息变化 |
+| `nodes_changed` | `{nodes}` | 节点列表变化 |
+
 ## 五、版本管理
 
 ### 语义化版本

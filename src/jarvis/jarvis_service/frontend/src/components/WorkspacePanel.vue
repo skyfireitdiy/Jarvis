@@ -199,6 +199,23 @@
             <path d="M8 6.5v4M6 8.5h4"/>
           </svg>
         </button>
+        <!-- 插件扩展的 tool_panel 入口（插件 config.yaml 的 frontend.tool_panels） -->
+        <button
+          v-for="ext in pluginToolPanels"
+          :key="'plugin-tool-' + ext.id"
+          class="workspace-activity-button"
+          :class="{ active: showSidebar && sidebarView === ('plugin-tool:' + ext.id) }"
+          tabindex="-1"
+          :title="ext.title"
+          @mousedown.prevent
+          @click="$emit('setSidebarView', 'plugin-tool:' + ext.id)"
+        >
+          <span v-if="ext.iconSvg" class="workspace-activity-plugin-icon" v-html="ext.iconSvg"></span>
+          <svg v-else viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 2h4l1 2h2.5a1 1 0 0 1 1 1V13a1 1 0 0 1-1 1H2.5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1H5l1-2Z"/>
+            <path d="M8 6.5v4M6 8.5h4"/>
+          </svg>
+        </button>
         <button
           class="workspace-activity-button"
           tabindex="-1"
@@ -339,7 +356,8 @@ const props = defineProps({
   isAdmin: { type: Boolean, default: false },
   isEditable: { type: Boolean, default: false },
   hasActiveTab: { type: Boolean, default: false },
-  pluginSidebarViews: { type: Array, default: () => [] }
+  pluginSidebarViews: { type: Array, default: () => [] },
+  pluginToolPanels: { type: Array, default: () => [] }
 })
 
 const emit = defineEmits([

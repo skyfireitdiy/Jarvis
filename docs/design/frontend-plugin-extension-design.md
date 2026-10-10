@@ -149,6 +149,18 @@ export default {
 3. **AdminPanel 渲染动态 tab**：从扩展清单构建动态 tab，用 `<component :is>` 渲染
 4. **侧边栏动态 view**：从扩展清单构建侧边栏 view 入口，渲染插件组件
 
+### 已实现（Issue #97，2026-10）
+
+在方案2 基础上补齐插件侧可用的宿主能力：
+
+1. **统一 `window.__jarvis*` 接口族**（App.vue，try/catch 包裹、异常静默降级）：
+   - 信息查询：`__jarvisGetActiveAgentInfo` / `__jarvisGetUserInfo` / `__jarvisGetNodes` / `__jarvisGetGatewayInfo`
+   - UI 控制：`__jarvisShowToast` / `__jarvisSwitchSidebarView` / `__jarvisOpenPanel`
+   - 既有兼容：`__jarvisFetch` / `__jarvisSendToActiveAgent` / `__jarvisCreateAgentForTask` / `__jarvisPickDirectory`
+2. **统一 props 注入**：`sidebar_views`（App.vue:550）与 `admin_tabs`（AdminPanel.vue:283）渲染时自动注入 `workingDir`/`agentInfo`/`userInfo`/`nodes`/`gatewayUrl`/`fetchWithAuth`/`getHttpProtocol`/`showToast`（admin_tabs 不含 workingDir/agentInfo）。
+3. **tool_panels 前端渲染**：作为工作区侧边栏 view（`plugin-tool:<id>`）渲染，WorkspacePanel 活动栏新增入口，与 `sidebar_views`（`plugin:<id>`）独立，组件缓存 key 用 `plugin-tool:` 前缀避免冲突。
+4. **事件订阅机制**：`window.__jarvisOn(event, handler)`（返回取消订阅函数）/ `window.__jarvisOff(event, handler)`。宿主在状态变化处 emit：`agent_changed` / `token_changed` / `user_changed` / `nodes_changed`。
+
 ## 涉及文件清单
 
 **后端**：

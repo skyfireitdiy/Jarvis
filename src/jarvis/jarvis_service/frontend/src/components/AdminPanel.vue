@@ -280,7 +280,15 @@
       </div>
       <!-- 插件扩展的 admin_tabs 动态内容（方案2：插件 config.yaml 的 frontend.admin_tabs） -->
       <div v-if="isPluginAdminTab(activeTab) && activePluginAdminTabComp" class="tab-content">
-        <component :is="activePluginAdminTabComp" />
+        <component
+          :is="activePluginAdminTabComp"
+          :userInfo="props.auth?.userInfo || null"
+          :nodes="props.availableNodeOptions"
+          :gatewayUrl="props.gatewayUrl"
+          :fetchWithAuth="props.fetchWithAuth"
+          :getHttpProtocol="props.getHttpProtocol"
+          :showToast="props.showToast"
+        />
       </div>
       <!-- 配置文件编辑器弹窗 -->
       <ConfigEditorModal
