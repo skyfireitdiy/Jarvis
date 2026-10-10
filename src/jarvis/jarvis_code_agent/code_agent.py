@@ -645,6 +645,8 @@ git reset --hard {start_commit}
                 # 保存会话失败不影响其他清理操作
                 PrettyOutput.auto_print(f"⚠️ 保存会话失败: {str(e)}")
             clear_current_agent()
+            # 正常退出：通知会话守护进程清理内存（不落盘）
+            self._notify_session_daemon_quit()
 
             # Ensure switching back to the original working directory after CodeAgent completes
             try:
