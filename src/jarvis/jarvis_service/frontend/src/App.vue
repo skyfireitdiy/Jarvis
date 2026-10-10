@@ -8946,30 +8946,6 @@ const {
   inputText,
   panelInputTexts,
 })
-// 本机 daemon 登录态同步（拆自独立 composable）
-const {
-  daemonPort,
-  localDaemonOnline,
-  getDaemonUrl,
-  saveDaemonPortSetting,
-  startLocalDaemonProbe,
-  stopLocalDaemonProbe,
-  syncTokenToDaemon,
-} = useDaemonSync({
-  auth,
-  terminalName,
-  autoInstallBrowserExt,
-  getGateway: () => window.__jarvisAuthBridge?.getGateway?.(),
-})
-// 浏览器扩展登录态桥接（拆自独立 composable）
-const { installAuthBridge } = useAuthBridge({
-  auth,
-  terminalName,
-  gatewayUrl,
-  parseGatewayAddress,
-  syncTokenToDaemon,
-})
-installAuthBridge()
 // 获取 Panel 的终端列表
 function getPanelTerminals(panel) {
   if (!panel || !panel.agentId) return []
@@ -11476,6 +11452,30 @@ function loadTerminalName() {
   }
 }
 const terminalName = ref(loadTerminalName())
+// 本机 daemon 登录态同步（拆自独立 composable）
+const {
+  daemonPort,
+  localDaemonOnline,
+  getDaemonUrl,
+  saveDaemonPortSetting,
+  startLocalDaemonProbe,
+  stopLocalDaemonProbe,
+  syncTokenToDaemon,
+} = useDaemonSync({
+  auth,
+  terminalName,
+  autoInstallBrowserExt,
+  getGateway: () => window.__jarvisAuthBridge?.getGateway?.(),
+})
+// 浏览器扩展登录态桥接（拆自独立 composable）
+const { installAuthBridge } = useAuthBridge({
+  auth,
+  terminalName,
+  gatewayUrl,
+  parseGatewayAddress,
+  syncTokenToDaemon,
+})
+installAuthBridge()
 function saveTerminalNameSetting(nextValue = terminalName.value) {
   terminalName.value = String(nextValue || '').trim()
   try {
