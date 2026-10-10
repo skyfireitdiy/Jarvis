@@ -36,8 +36,10 @@ const {
   getMetadata,
   updateMetadata,
   getStorageInfo,
+  pruneHistory,
   MAX_MESSAGES_PER_PAGE,
   MAX_TOTAL_MESSAGES,
+  MAX_STORAGE_SIZE_BYTES,
 } = historyStorage;
 
 const STORAGE_KEY = "jarvis_chat_history";
@@ -304,4 +306,115 @@ test("异常容错：localStorage.setItem 抛错时不向外抛（saveMessage �
   } finally {
     globalThis.localStorage = original;
   }
+});
+
+// ===== pruneHistory =====
+
+test("导出常量：MAX_STORAGE_SIZE_BYTES=3MB", () => {
+  assert.equal(MAX_STORAGE_SIZE_BYTES, 3 * 1024 * 1024);
+});
+
+test("pruneHistory：体积不超过阈值时不做任何删除", () => {
+  saveMessage({ id: "a1", agent_id: "A", content: "x" });
+  saveMessage({ id: "b1", agent_id: "B", content: "y" });
+  const result = pruneHistory();
+  assert.deepEqual(result, {
+    removedOrphans: 0,
+    removedBySize: 0,
+    totalRemoved: 0,
+    remainingCount: 2,
+    remainingSize: JSON.stringify(rawMessages()).length,
+  });
+  assert.equal(rawMessages().length, 2);
+});
+
+test("pruneHistory：清理 agent_id 缺失的孤儿消息", () => {
+  saveMessage({ id: "a1", agent_id: "A", content: "x" });
+  saveMessage({ id: "orphan1", content: "orphan" });
+  saveMessage({ id: "orphan2", agent_id: "", content: "empty-agent" });
+  const result = pruneHistory({ removeOrphans: true });
+  assert.equal(result.removedOrphans, 2);
+  assert.equal(result.totalRemoved, 2);
+  const saved = rawMessages();
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].id, "a1");
+});
+
+test("pruneHistory：removeOrphans=false 时不删无 agent_id 的消息", () => {
+  saveMessage({ id: "a1", agent_id: "A", content: "x" });
+  saveMessage({ id: "orphan1", content: "orphan" });
+  const result = pruneHistory({ removeOrphans: false });
+  assert.equal(result.removedOrphans, 0);
+  assert.equal(rawMessages().length, 2);
+});
+
+test("pruneHistory：体积超阈值时按 storageTimestamp 删最旧消息", () => {
+  // 构造一批带体积的消息，直接写底层存储以精确控制时间戳
+  const messages = [];
+  for (let i = 0; i < 200; i++) {
+    messages.push({
+      id: `m${i}`,
+      agent_id: "A",
+      content: "x".repeat(5000),
+      storageTimestamp: 1000 + i,
+    });
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+  // 200 条 * ~5KB ≈ 1MB，仍低于 3MB；加大体积到超阈值
+  const big = messages.map((m) => ({ ...m, content: "x".repeat(40000) }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(big));
+
+  const beforeSize = JSON.stringify(rawMessages()).length;
+  assert.ok(beforeSize > MAX_STORAGE_SIZE_BYTES, "前置条件：体积应超过阈值");
+
+  const result = pruneHistory();
+  assert.ok(result.removedBySize > 0, "应按体积删除最旧消息");
+  const saved = rawMessages();
+  const afterSize = JSON.stringify(saved).length;
+  assert.ok(afterSize <= MAX_STORAGE_SIZE_BYTES, "清理后体积应回落到阈值内");
+  // 最旧的（storageTimestamp 最小）应先被删，剩余首条的时间戳应大于被删的最大时间戳
+  const timestamps = saved.map((m) => m.storageTimestamp).sort((a, b) => a - b);
+  const removedMaxTs = 1000 + result.removedBySize - 1;
+  assert.ok(
+    timestamps[0] > removedMaxTs,
+    `最旧 ${result.removedBySize} 条应被删除，剩余最小时间戳 ${timestamps[0]} 应大于被删最大 ${removedMaxTs}`,
+  );
+});
+
+test("pruneHistory：saveMessage 写入后自动触发，超阈值即清理", () => {
+  // 直接写入一批超阈值数据，再 saveMessage 一条，验证写入路径自动清理
+  const messages = [];
+  for (let i = 0; i < 200; i++) {
+    messages.push({
+      id: `m${i}`,
+      agent_id: "A",
+      content: "x".repeat(40000),
+      storageTimestamp: 1000 + i,
+    });
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+  saveMessage({ id: "new", agent_id: "A", content: "hello" });
+  const saved = rawMessages();
+  assert.ok(
+    JSON.stringify(saved).length <= MAX_STORAGE_SIZE_BYTES,
+    "saveMessage 后应自动 prune 到阈值内",
+  );
+  // 新消息应保留（它是最新的）
+  assert.ok(saved.some((m) => m.id === "new"), "新写入的消息不应被删除");
+});
+
+test("pruneHistory：空存储时返回全零统计", () => {
+  const result = pruneHistory();
+  assert.deepEqual(result, {
+    removedOrphans: 0,
+    removedBySize: 0,
+    totalRemoved: 0,
+    remainingCount: 0,
+    remainingSize: 2,
+  });
+});
+
+test("getStorageInfo：包含 maxStorageSize=3MB", () => {
+  const info = getStorageInfo();
+  assert.equal(info.maxStorageSize, MAX_STORAGE_SIZE_BYTES);
 });

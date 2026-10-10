@@ -15314,6 +15314,8 @@ async function deleteAgent(agentId) {
         
         // 清除该 Agent 的历史记录
         historyStorage.clearHistoryForAgent(agentId)
+        // 清理孤儿消息与超限历史
+        historyStorage.pruneHistory()
         
         // 清除该 Agent 的文件树状态
         fileTreeState.value.delete(agentId)
@@ -15387,6 +15389,8 @@ async function regenerateAgent(agent) {
 
         // 清除本地状态
         historyStorage.clearHistoryForAgent(agent.agent_id)
+        // 清理孤儿消息与超限历史
+        historyStorage.pruneHistory()
         fileTreeState.value.delete(agent.agent_id)
         fileTreeExpanded.value.delete(agent.agent_id)
         fileTreeLoading.value.delete(agent.agent_id)
@@ -15486,6 +15490,8 @@ async function batchDeleteAgents() {
               successCount++
               // 清除该 Agent 的历史记录
               historyStorage.clearHistoryForAgent(agentId)
+              // 清理孤儿消息与超限历史
+              historyStorage.pruneHistory()
               // 清除该 Agent 的文件树状态
               fileTreeState.value.delete(agentId)
               fileTreeExpanded.value.delete(agentId)
