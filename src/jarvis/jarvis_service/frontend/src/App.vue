@@ -2507,6 +2507,26 @@ try {
   /* ignore */
 }
 
+// 暴露「获取当前活跃 Agent 信息」的钩子给插件前端扩展（如 gh 插件顶部展示目标 Agent）。
+// 目标 Agent 与 __jarvisSendToActiveAgent 完全一致：Git 目标 Agent（gitAgentId || currentAgentId），
+// 保证插件展示的 Agent 就是提示词实际发送的对象。
+// 返回 { agentId, agentName, workingDir }；无活跃 Agent 时返回 null。
+try {
+  window.__jarvisGetActiveAgentInfo = () => {
+    const agentId = effectiveGitAgentId.value
+    const agent = agentId ? (agentList.value.find(a => a.agent_id === agentId) || null) : null
+    return agent
+      ? {
+          agentId: agent.agent_id,
+          agentName: agent.name || agent.agent_id,
+          workingDir: agent.working_dir || '',
+        }
+      : null
+  }
+} catch (e) {
+  /* ignore */
+}
+
 // 暴露「创建新普通 Agent 处理任务」的钩子给插件前端扩展（如 gh 插件的右键「创建新 Agent 处理」）。
 // 使用普通 Agent（agent_type='agent'）而非代码 Agent，避免同工作目录下代码 Agent 的互斥限制。
 // 以交互模式创建并把提示词作为初始任务，用户可随时干预；创建后自动打开该 Agent 面板。

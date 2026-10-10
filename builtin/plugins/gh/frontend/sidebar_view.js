@@ -118,6 +118,9 @@ export default {
       // Agent 工作目录对应的仓库，此时不应把 issue/PR 交给当前 Agent 处理
       // （Agent 的工作目录属于另一个仓库，gh 命令会在错误仓库上执行）。
       isManualRepo: false,
+      // 当前目标 Agent 名称（宿主 __jarvisGetActiveAgentInfo 提供；无则空）。
+      // 用于 header 与右键菜单标注「在当前 Agent 中处理」的实际接收者。
+      agentName: "",
       tab: "issues",
       loading: false,
       loadingMore: false,
@@ -142,6 +145,7 @@ export default {
   },
   mounted() {
     this.restoreManualRepo();
+    this.refreshAgentName();
     this.resolveRepo().then(() => this.refresh());
     // 点击别处 / 按 Esc 关闭右键菜单
     this._onDocClick = () => this.closeItemMenu();
@@ -157,11 +161,28 @@ export default {
   },
   watch: {
     workingDir() {
-      // agent 切换仓库时重新解析并刷新
+      // agent 切换仓库时重新解析并刷新；目标 Agent 可能随之变化，同步刷新名称
+      this.refreshAgentName();
       this.resolveRepo().then(() => this.refresh());
     },
   },
   methods: {
+    // 从宿主获取当前目标 Agent 名称（与「在当前 Agent 中处理」的实际接收者一致）。
+    // 宿主未提供接口时静默置空（不阻塞插件其余功能）。
+    refreshAgentName() {
+      const getInfo =
+        typeof window !== "undefined" && window.__jarvisGetActiveAgentInfo;
+      if (typeof getInfo !== "function") {
+        this.agentName = "";
+        return;
+      }
+      try {
+        const info = getInfo() || {};
+        this.agentName = (info && info.agentName) || "";
+      } catch {
+        this.agentName = "";
+      }
+    },
     async resolveRepo() {
       // 手动指定的仓库优先：不再被 workingDir 自动解析覆盖。
       if (manualRepo) {
@@ -602,6 +623,10 @@ export default {
           style="padding:2px 6px;background:#333;color:#ddd;border:none;border-radius:4px;cursor:pointer;font-size:11px;">切换</button>
       </div>
     </div>
+    <!-- 当前目标 Agent：与「在当前 Agent 中处理」的实际接收者一致；无 Agent 时提示 -->
+    <div style="font-size:11px;color:#58a6ff;margin-bottom:10px;">
+      当前 Agent: <span :title="agentName || ''">{{ agentName || '未选择 Agent' }}</span>
+    </div>
 
     <!-- 仓库切换：手动输入 owner/repo 查看其他仓库；也可恢复为跟随当前工作目录 -->
     <div v-if="repoEditing" style="margin-bottom:10px;padding:8px;background:#252526;border-radius:6px;">
@@ -688,7 +713,7 @@ export default {
     <div v-if="menuVisible" :style="menuStyle"
       style="position:fixed;z-index:9999;background:#2d2d30;border:1px solid #454545;border-radius:6px;box-shadow:0 4px 12px #0008;padding:4px;min-width:120px;">
       <div v-if="!isManualRepo" @click="handleItem(menuItem)"
-        style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">在当前 Agent 中处理</div>
+        style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">在当前 Agent 中处理{{ agentName ? '（' + agentName + '）' : '' }}</div>
       <div @click="handleItemNewAgent(menuItem)"
         style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">创建新 Agent 处理</div>
       <div v-if="isManualRepo && tab === 'issues'" @click="handleItemForkCloneAgent(menuItem)"
