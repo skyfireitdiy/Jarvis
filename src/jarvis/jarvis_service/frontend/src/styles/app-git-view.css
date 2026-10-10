@@ -1,0 +1,572 @@
+/* ===== 编辑器侧边栏 Git 视图 ===== */
+.workspace-git-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  font-size: 12px;
+}
+
+/* Git 面板：自定义 Git 管理目录行（复用「打开目录」选择任意目录） */
+.workspace-git-dir-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--border-color, #2a2a2a);
+}
+.workspace-git-dir-btn {
+  margin: 6px 0 0;
+}
+.workspace-git-dir-current {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 0 6px;
+  font-size: 12px;
+}
+.workspace-git-dir-label {
+  flex-shrink: 0;
+  color: var(--text-secondary, #b0b0b0);
+}
+.workspace-git-dir-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary, #e0e0e0);
+}
+
+.workspace-git-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-color, #2a2a2a);
+}
+
+.workspace-git-branch {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  color: var(--text-secondary, #b0b0b0);
+}
+
+.workspace-git-branch-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.workspace-git-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.workspace-git-range-count {
+  font-size: 11px;
+  color: var(--text-secondary, #b0b0b0);
+  white-space: nowrap;
+  margin-right: 2px;
+}
+
+.workspace-git-summary {
+  padding: 4px 8px;
+  color: var(--text-secondary, #888);
+  font-size: 11px;
+}
+
+.workspace-git-summary .error {
+  color: #ff5f56;
+}
+
+.workspace-git-commit-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.workspace-git-commit {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  padding: 2px 8px 2px 2px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+}
+
+.workspace-git-commit:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.workspace-git-commit.selected {
+  background: rgba(255, 133, 32, 0.10);
+  border-left-color: #ff8520;
+}
+
+.workspace-git-commit.range-selected {
+  background: rgba(66, 133, 244, 0.15);
+  border-left-color: #4285f4;
+}
+
+.workspace-git-graph {
+  flex: 0 0 20px;
+  display: flex;
+  justify-content: center;
+  color: #6a9fd8;
+}
+
+.git-graph-line {
+  opacity: 0.5;
+}
+
+.git-graph-dot {
+  fill: #6a9fd8;
+  stroke: #1e1e1e;
+  stroke-width: 1.5;
+}
+
+.git-graph-dot.git-graph-merge {
+  fill: #d8a06a;
+}
+
+.workspace-git-commit-body {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 0;
+}
+
+.workspace-git-commit-subject {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary, #e0e0e0);
+}
+
+.workspace-git-commit-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+}
+
+.workspace-git-refs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.git-ref {
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 10px;
+  line-height: 15px;
+  white-space: nowrap;
+}
+
+.git-ref-head {
+  background: rgba(255, 133, 32, 0.22);
+  color: #ff8520;
+}
+
+.git-ref-branch {
+  background: rgba(106, 159, 216, 0.22);
+  color: #6a9fd8;
+}
+
+.git-ref-tag {
+  background: rgba(120, 200, 120, 0.22);
+  color: #7ec87e;
+}
+
+.workspace-git-author {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.workspace-git-hash {
+  font-family: var(--mono-font, monospace);
+  color: #c0a060;
+}
+
+.workspace-git-detail-btn {
+  margin-left: auto;
+  padding: 1px 8px;
+  border: 1px solid var(--border-color, #2a2a2a);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary, #888);
+  font-size: 11px;
+  line-height: 16px;
+  cursor: pointer;
+}
+.workspace-git-detail-btn:hover {
+  color: var(--text-primary, #e0e0e0);
+  border-color: var(--accent-color, #4a90d9);
+}
+
+.workspace-git-commit-detail {
+  margin-top: 6px;
+  padding: 4px 0 2px;
+  border-top: 1px dashed var(--border-color, #2a2a2a);
+  cursor: default;
+}
+
+.workspace-git-detail-summary,
+.workspace-git-detail-empty {
+  padding: 2px 0;
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+}
+
+.workspace-git-detail-empty.error {
+  color: #ff5f56;
+}
+
+.workspace-git-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 3px 4px;
+  background: none;
+  border: none;
+  border-radius: 3px;
+  color: var(--text-primary, #d0d0d0);
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.workspace-git-file:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.workspace-git-file.active {
+  background: rgba(255, 133, 32, 0.14);
+}
+
+.workspace-git-file-status {
+  flex: 0 0 14px;
+  text-align: center;
+  font-weight: 700;
+  font-family: var(--mono-font, monospace);
+}
+
+.git-status-A { color: #7ec87e; }
+.git-status-M { color: #d8a06a; }
+.git-status-D { color: #ff5f56; }
+.git-status-R { color: #6a9fd8; }
+
+.workspace-git-file-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+.workspace-git-file-stat {
+  flex: 0 0 auto;
+  font-family: var(--mono-font, monospace);
+  font-size: 10px;
+}
+
+.git-add-stat { color: #7ec87e; }
+.git-del-stat { color: #ff5f56; }
+
+
+.git-diff-line {
+  display: block;
+  padding: 0 6px;
+  white-space: pre;
+  color: #c8c8c8;
+}
+
+.git-diff-add { background: rgba(80, 180, 80, 0.14); color: #9ee09e; }
+.git-diff-del { background: rgba(220, 80, 80, 0.14); color: #ff9e9e; }
+.git-diff-hunk { color: #6a9fd8; }
+.git-diff-meta { color: #888; }
+
+.workspace-git-empty {
+  padding: 12px 8px;
+  text-align: center;
+  color: var(--text-secondary, #888);
+  font-size: 11px;
+}
+
+.workspace-git-load-more {
+  display: block;
+  width: calc(100% - 16px);
+  margin: 6px 8px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-color, #2a2a2a);
+  border-radius: 4px;
+  color: var(--text-primary, #d0d0d0);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.workspace-git-load-more:hover {
+  background: rgba(255, 255, 255, 0.10);
+}
+
+.workspace-panel-content {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  user-select: text;
+}
+
+.workspace-panel-content-main {
+  flex: 1;
+  padding: 0;
+  min-width: 0;
+  min-height: 0;
+  background: var(--color-bg-secondary);
+}
+
+.workspace-monaco-container {
+  width: 100%;
+  height: 100%;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
+}
+
+.workspace-placeholder {
+  margin: auto;
+  text-align: center;
+  color: #8ba3b8;
+  max-width: 280px;
+  padding: 24px;
+}
+
+.workspace-placeholder-icon {
+  font-size: 36px;
+  margin-bottom: 12px;
+}
+
+.workspace-placeholder-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #e6edf3;
+  margin-bottom: 8px;
+}
+
+.workspace-placeholder-text {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.workspace-resize-handle {
+  position: absolute;
+  z-index: 2;
+}
+
+.workspace-resize-n,
+.workspace-resize-s {
+  left: 10px;
+  right: 10px;
+  height: 10px;
+}
+
+.workspace-resize-e,
+.workspace-resize-w {
+  top: 10px;
+  bottom: 10px;
+  width: 10px;
+}
+
+.workspace-resize-n {
+  top: -5px;
+  cursor: n-resize;
+}
+
+.workspace-resize-s {
+  bottom: -5px;
+  cursor: s-resize;
+}
+
+.workspace-resize-e {
+  right: -5px;
+  cursor: e-resize;
+}
+
+.workspace-resize-w {
+  left: -5px;
+  cursor: w-resize;
+}
+
+.workspace-resize-ne,
+.workspace-resize-nw,
+.workspace-resize-se,
+.workspace-resize-sw {
+  width: 14px;
+  height: 14px;
+}
+
+.workspace-resize-ne {
+  top: -6px;
+  right: -6px;
+  cursor: ne-resize;
+}
+
+.workspace-resize-nw {
+  top: -6px;
+  left: -6px;
+  cursor: nw-resize;
+}
+
+.workspace-resize-se {
+  right: -6px;
+  bottom: -6px;
+  cursor: se-resize;
+}
+
+.workspace-resize-sw {
+  left: -6px;
+  bottom: -6px;
+  cursor: sw-resize;
+}
+
+
+.icon-btn {
+  background: var(--color-bg-hover);
+  border: none;
+  border-radius: var(--tile-radius);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  color: #8ba3b8;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: var(--color-bg-tertiary);
+  color: #e6edf3;
+  transform: translateY(-1px);
+}
+
+.icon-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.chat-btn-wrapper {
+  position: relative;
+  overflow: visible;
+}
+
+.chat-unread-badge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  background: #ff3c48;
+  color: #d6e4f0;
+  font-size: 10px;
+  font-weight: 600;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  line-height: 1;
+  pointer-events: none;
+  z-index: 10;
+  white-space: nowrap;
+}
+
+.manual-interrupt-btn {
+  background: #f0883e;
+  border: none;
+  border-radius: var(--tile-radius);
+  color: #d6e4f0;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.manual-interrupt-btn:hover:not(:disabled) {
+  background: #f0883e;
+  transform: translateY(-1px);
+}
+
+.manual-interrupt-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.manual-interrupt-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #8ba3b8;
+  padding: 4px 10px;
+  background: var(--color-bg-tertiary);
+  border-radius: 20px;
+  border: none;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.dot.offline {
+  background: #ff3c48;
+  color: #ff3c48;
+}
+
+.dot.connecting {
+  background: #ff8520;
+  color: #ff8520;
+}
+
+.dot.reconnecting {
+  background: #ff8520;
+  color: #ff8520;
+}
+
+.dot.online {
+  background: #36ff7c;
+  color: #36ff7c;
+}
+

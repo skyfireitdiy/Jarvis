@@ -1,0 +1,340 @@
+/* ========== Diff 浮动窗口样式 ========== */
+.diff-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+  padding: 20px;
+}
+
+.diff-modal {
+  background: var(--color-bg-secondary);
+  border: none;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.diff-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 0.5px solid var(--color-border-subtle);
+  background: var(--color-bg-secondary);
+}
+
+.diff-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #e6edf3;
+}
+
+.diff-modal-count {
+  font-size: 13px;
+  font-weight: 400;
+  color: #8ba3b8;
+}
+
+.diff-modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.git-commit-info-modal {
+  max-width: 560px;
+}
+
+.git-commit-info-pre {
+  margin: 0;
+  padding: 16px 20px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--mono-font, monospace);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-primary, #e0e0e0);
+  background: var(--color-bg-secondary);
+}
+
+/* 左侧文件列表 + 右侧 diff 对比 */
+.diff-modal-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.diff-file-list {
+  flex: 0 0 280px;
+  width: 280px;
+  overflow: auto;
+  padding: 8px;
+  background: var(--color-bg-secondary);
+  border-right: 0.5px solid var(--color-border-subtle);
+}
+
+.diff-file-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--color-text-primary);
+}
+
+.diff-file-item:hover,
+.diff-file-item.active {
+  background: var(--color-accent-subtle);
+}
+
+.diff-file-item-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diff-file-item-stats {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+  font-size: 12px;
+  font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
+}
+
+.diff-file-view {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 20px;
+  background: var(--color-bg-tertiary);
+}
+
+/* 移动端返回按钮：仅窄屏显示 */
+.diff-mobile-back {
+  display: none;
+}
+
+/* 移动端：两级导航（文件列表 <-> 单文件 diff），避免左侧列表挤占屏幕 */
+@media (max-width: 768px) {
+  .diff-modal-overlay {
+    padding: 0;
+  }
+  .diff-modal {
+    max-width: 100vw;
+    width: 100vw;
+    height: var(--app-height, 100vh);
+    max-height: var(--app-height, 100vh);
+    border-radius: 0;
+  }
+  .diff-modal-body {
+    position: relative;
+  }
+  .diff-file-list {
+    flex: 1 1 auto;
+    width: 100%;
+    border-right: none;
+  }
+  .diff-file-view {
+    display: none;
+    padding: 12px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  }
+  /* 进入详情态：隐藏文件列表，全屏展示 diff */
+  .diff-modal-body.mobile-detail .diff-file-list {
+    display: none;
+  }
+  .diff-modal-body.mobile-detail .diff-file-view {
+    display: block;
+  }
+  .diff-mobile-back {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 8px 10px;
+    border: none;
+    border-radius: 8px;
+    background: var(--color-accent-subtle);
+    color: var(--color-text-primary);
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .diff-mobile-back-icon {
+    font-size: 18px;
+    line-height: 1;
+  }
+  .diff-mobile-back-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+  }
+}
+
+.diff-modal-content {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+  background: var(--color-bg-tertiary);
+}
+
+.diff-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #8ba3b8;
+  font-size: 14px;
+}
+
+.diff-error {
+  color: #ff3c48;
+  padding: 16px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.diff-empty {
+  color: #8ba3b8;
+  padding: 16px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.diff-raw {
+  margin: 0;
+  padding: 16px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--tile-radius);
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #e6edf3;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-x: auto;
+}
+
+/* ========== Diff 浮动窗口样式结束 ========== */
+
+/* ========== Rules 浮动窗口样式 ========== */
+.rules-modal {
+  max-width: 90vw;
+}
+
+.rules-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.rules-table th,
+.rules-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 0.5px solid var(--color-border-subtle);
+}
+
+.rules-table th {
+  background: var(--color-bg-secondary);
+  color: #8ba3b8;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.rules-table td {
+  color: #e6edf3;
+}
+
+.rules-table tr:hover td {
+  background: var(--color-bg-secondary);
+}
+
+.rule-loaded {
+  color: #36ff7c;
+}
+
+.rule-not-loaded {
+  color: #8ba3b8;
+}
+
+.rules-loaded-content-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.rules-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #8ba3b8;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.rules-loaded-content {
+  background: var(--color-bg-tertiary);
+  border: none;
+  border-radius: var(--tile-radius-xs);
+  padding: 12px;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #e6edf3;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.rule-not-loaded {
+  color: #8ba3b8;
+}
+
+.rule-preview {
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #8ba3b8;
+  font-size: 12px;
+}
+
+.tools-section-title {
+  color: #e6edf3;
+  font-size: 14px;
+  font-weight: 600;
+  margin: 16px 0 8px 0;
+  padding: 0 12px;
+}
+
+.tools-section-title:first-child {
+  margin-top: 0;
+}
+
+/* ========== Rules 浮动窗口样式结束 ========== */
+

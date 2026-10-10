@@ -1,0 +1,333 @@
+/* 模态框 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+  padding: 20px;
+}
+
+.modal-content {
+  background: var(--color-bg-secondary);
+  border: none;
+  border-radius: 14px;
+  padding: 28px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.modal-content h3 {
+  margin: 0 0 20px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #e6edf3;
+}
+
+.modal {
+  background: var(--color-bg-secondary);
+  border: none;
+  border-radius: 14px;
+  padding: 28px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.connect-modal h2 {
+  margin: 0 0 24px 0;
+  font-size: 21px;
+  font-weight: 600;
+  color: #e6edf3;
+  letter-spacing: -0.02em;
+}
+
+
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group.inline {
+  display: flex;
+  gap: 12px;
+}
+
+.form-group.inline .form-item {
+  flex: 1;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #8ba3b8;
+  letter-spacing: 0.01em;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 11px 14px;
+  background: var(--color-bg-tertiary);
+  border: none;
+  border-radius: 9px;
+  color: #e6edf3;
+  font-size: 14px;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  background: var(--color-bg-secondary);
+}
+
+.form-group select {
+  width: 100%;
+  padding: 11px 14px;
+  background: var(--color-bg-tertiary);
+  border: none;
+  border-radius: 9px;
+  color: #e6edf3;
+  font-size: 14px;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239ca3af' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px;
+}
+
+.form-group select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  background-color: var(--color-bg-secondary);
+}
+
+.form-group select option {
+  background: #080c16;
+  color: #e6edf3;
+  padding: 8px;
+}
+
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 600;
+  color: #e6edf3;
+  letter-spacing: -0.02em;
+}
+
+.close-btn {
+  background: var(--color-bg-hover);
+  border: none;
+  border-radius: var(--tile-radius);
+  font-size: 22px;
+  color: #8ba3b8;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  background: rgba(255, 60, 72, 0.15);
+  color: #ff3c48;
+  transform: rotate(90deg);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+.acl-user-list {
+  max-height: 150px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--color-bg-tertiary);
+  border-radius: 8px;
+}
+.acl-user-list .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #e6edf3;
+  cursor: pointer;
+  padding: 4px 0;
+}
+.acl-user-list .checkbox-label input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.primary-btn {
+  padding: 10px 20px;
+  background: #36ff7c;
+  border: none;
+  border-radius: 9px;
+  color: #d6e4f0;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary-btn:hover:not(:disabled) {
+  background: #36ff7c;
+  transform: translateY(-1px);
+}
+
+.primary-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.primary-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.danger-btn {
+  padding: 10px 20px;
+  background: #ff3c48;
+  border: none;
+  border-radius: 9px;
+  color: #d6e4f0;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+}
+
+.danger-btn:hover:not(:disabled) {
+  background: #ff3c48;
+  transform: translateY(-1px);
+}
+
+.danger-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.danger-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+
+
+.ghost-btn {
+  padding: 10px 20px;
+  background: var(--color-bg-tertiary);
+  border: none;
+  border-radius: 9px;
+  color: #e6edf3;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ghost-btn:hover {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border-subtle);
+  transform: translateY(-1px);
+}
+
+
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .app {
+    background: var(--color-bg-secondary);
+  }
+  
+  .messages {
+    padding: 12px;
+    padding-left: max(12px, env(safe-area-inset-left, 0px));
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  }
+  
+  .message {
+    padding: 10px 12px;
+  }
+  
+  .message-content {
+    gap: 6px;
+  }
+  
+  .message-content .message-meta-left {
+    gap: 6px 8px;
+    font-size: 11px;
+  }
+  
+  .modal {
+    max-width: 100%;
+    padding: 20px;
+  }
+  
+  .input-controls {
+    flex-direction: column;
+  }
+  
+  .send-btn {
+    width: 100%;
+  }
+
+  .input-area {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+
+/* 补全按钮 */
+.completion-btn {
+  min-width: 44px;
+  background: var(--color-bg-tertiary);
+  border-color: var(--color-accent-subtle);
+  color: #20c8ff;
+}
+
+.completion-btn:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  border-color: var(--color-accent);
+}
+
+.completion-btn:disabled {
+  opacity: 0.3;
+}
+
+.error-message {
+  background-color: #ff3c48;
+  color: white;
+  padding: 12px 16px;
+  border-radius: var(--tile-radius-xs);
+  margin-bottom: 16px;
+  font-size: 14px;
+  text-align: center;
+}
+

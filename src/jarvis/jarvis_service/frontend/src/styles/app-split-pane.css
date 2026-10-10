@@ -1,0 +1,275 @@
+/* 编辑器主区域嵌入的聊天室 / 终端视图：撑满主区域 */
+.workspace-main-embed-view {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.workspace-main-embed-view > * {
+  flex: 1;
+  min-height: 0;
+}
+
+/* 自由分割：每个 pane 的内容容器（撑满 leaf body） */
+.workspace-pane-content-slot {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.workspace-pane-content-slot > * {
+  flex: 1;
+  min-height: 0;
+}
+
+/* 自由分割：file pane 内部的标签栏固定高度，不参与 flex 撑满 */
+.workspace-pane-content-slot > .workspace-pane-tabs {
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+/* 自由分割：每个 pane 自己的保存 / 只读按钮，固定在标签栏右侧不随标签滚动 */
+.workspace-pane-actions {
+  position: sticky;
+  right: 0;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: 6px;
+  background: var(--color-bg-secondary, #1e1e1e);
+}
+
+.workspace-pane-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.workspace-pane-action:hover:not(:disabled) {
+  background: var(--color-bg-hover, rgba(255, 255, 255, 0.08));
+}
+
+.workspace-pane-action.editable {
+  color: var(--color-accent, #4a9eff);
+}
+
+.workspace-pane-action:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* 自由分割：非激活 pane 的占位 */
+.workspace-pane-placeholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px;
+  color: var(--color-text-secondary);
+  text-align: center;
+  cursor: pointer;
+}
+/* 自由分割：非激活 file pane 的只读预览（内容可见但不可编辑，避免误以为编辑器消失） */
+.workspace-pane-preview {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--color-bg-secondary);
+}
+.workspace-pane-preview-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-primary);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.workspace-pane-preview-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-pane-preview-hint {
+  flex: 0 0 auto;
+  opacity: 0.7;
+}
+.workspace-pane-preview-body {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 8px 10px;
+  overflow: auto;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--color-text-secondary);
+  white-space: pre;
+  tab-size: 4;
+  user-select: text;
+}
+
+/* 自由分割：session leaf 内的会话面板容器 */
+.workspace-pane-session-wrap {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.workspace-pane-session-wrap > * {
+  flex: 1;
+  min-height: 0;
+}
+
+/* 自由分割：chat / terminal leaf 内的面板容器（与 session leaf 同型） */
+.workspace-pane-embed-wrap {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.workspace-pane-embed-wrap > * {
+  flex: 1;
+  min-height: 0;
+}
+
+/* 自由分割：diff leaf 内的容器（与 session/chat/terminal leaf 同型） */
+.workspace-pane-diff-wrap {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* diff pane 内的 diff 视图（与 WorkspacePanel.vue 的 .workspace-diff-* 同款，此处为 App.vue 作用域副本） */
+.workspace-pane-diff-wrap .workspace-diff-view {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.workspace-pane-diff-wrap .workspace-diff-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.workspace-pane-diff-wrap .workspace-diff-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.workspace-pane-diff-wrap .workspace-diff-title:hover {
+  text-decoration: underline;
+}
+
+.workspace-pane-diff-wrap .workspace-diff-hash {
+  color: var(--color-text-secondary);
+  font-family: monospace;
+}
+
+.workspace-pane-diff-wrap .workspace-diff-truncated {
+  color: var(--color-warning, #e6a23c);
+}
+
+.workspace-pane-diff-wrap .workspace-diff-toggle,
+.workspace-pane-diff-wrap .workspace-diff-close {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.workspace-pane-diff-wrap .workspace-diff-toggle:hover,
+.workspace-pane-diff-wrap .workspace-diff-close:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-text-secondary);
+}
+
+.workspace-pane-diff-wrap .workspace-diff-nav {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.workspace-pane-diff-wrap .workspace-diff-nav:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-text-secondary);
+}
+
+.workspace-pane-diff-wrap .workspace-diff-status {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.workspace-pane-diff-wrap .workspace-diff-status.error {
+  color: var(--color-danger, #f56c6c);
+}
+
+.workspace-pane-diff-wrap .workspace-diff-monaco {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+

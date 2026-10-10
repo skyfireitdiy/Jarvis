@@ -1,0 +1,123 @@
+/* Session 恢复弹窗 */
+.session-modal {
+  max-width: 450px;
+  width: 90%;
+}
+
+.session-modal h2 {
+  margin: 0 0 20px 0;
+  font-size: 18px;
+  color: #e6edf3;
+}
+
+.session-modal .modal-description {
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: #8ba3b8;
+  line-height: 1.5;
+}
+
+.session-list {
+  max-height: 300px;
+  overflow-y: auto;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--tile-radius);
+  border: none;
+  margin-bottom: 20px;
+}
+
+.session-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.session-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.session-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+.session-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.session-item {
+  padding: 12px 14px;
+  border-bottom: 0.5px solid var(--color-border-subtle);
+  cursor: pointer;
+  border-radius: var(--tile-radius-xs);
+  margin: 4px;
+}
+
+.session-item:last-child {
+  border-bottom: none;
+}
+
+.session-item:hover {
+  background: var(--color-bg-hover);
+}
+
+.session-item.selected {
+  background: rgba(63, 185, 80, 0.15);
+  border-color: var(--color-success);
+}
+
+.session-item.selected:hover {
+  background: rgba(63, 185, 80, 0.2);
+}
+
+.session-name {
+  font-size: 14px;
+  color: #e6edf3;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.session-path {
+  font-size: 11px;
+  color: #8ba3b8;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.session-date {
+  font-size: 11px;
+  color: #8ba3b8;
+  margin-top: 6px;
+}
+
+.session-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: #8ba3b8;
+  font-size: 13px;
+}
+
+/* 输入框带按钮 */
+.input-with-button {
+  display: flex;
+  gap: 10px;
+}
+
+.input-with-button .form-control {
+  flex: 1;
+}
+
+.select-dir-btn {
+  padding: 10px 16px;
+  background: var(--color-bg-tertiary);
+  color: #e6edf3;
+  border: none;
+  border-radius: var(--tile-radius-xs);
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.select-dir-btn:hover {
+  background: var(--color-bg-hover);
+  transform: translateY(-1px);
+}
+
