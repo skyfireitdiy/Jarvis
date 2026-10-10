@@ -4279,9 +4279,14 @@ function restoreWorkspacePaneLayout() {
 let workspacePaneContentsRestored = false
 async function restoreWorkspacePaneContents() {
   if (workspacePaneContentsRestored) return
-  workspacePaneContentsRestored = true
+  // Agent 列表尚未就绪时不得恢复：此时 agentList 为空，session pane 会因
+  // 找不到 Agent 被误降级为空 pane，且恢复信息（leaf.content）会被一次性
+  // 清空、workspacePaneContentsRestored 置位后不再重试。故此处提前返回，
+  // 等下次 fetchAgentList 拿到 Agent 后再触发（不消耗一次性标志）。
+  if (agentList.value.length === 0) return
   const tree = workspacePaneTree.value
   if (!tree) return
+  workspacePaneContentsRestored = true
   const leaves = []
   const walk = (n) => {
     if (!n) return
