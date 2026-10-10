@@ -5,6 +5,14 @@
     <span class="workspace-pane-leaf-title">{{ getTitle ? getTitle(node) : (node.view === 'session' ? '会话' : '文件') }}</span>
     <span v-if="getStatus && getStatus(node)" class="workspace-pane-leaf-status">{{ getStatus(node) }}</span>
     <div class="workspace-pane-leaf-actions">
+      <button
+        v-if="canMaximize"
+        tabindex="-1"
+        class="workspace-pane-leaf-btn"
+        :title="maximized ? '还原区域' : '最大化区域'"
+        @mousedown.prevent
+        @click.stop="$emit('maximize', node.id)"
+      >{{ maximized ? '⤡' : '⛶' }}</button>
       <button v-if="canSplit" tabindex="-1" class="workspace-pane-leaf-btn" title="左右分" @mousedown.prevent @click.stop="$emit('split', node.id, 'row')">◫</button>
       <button v-if="canSplit" tabindex="-1" class="workspace-pane-leaf-btn" title="上下分" @mousedown.prevent @click.stop="$emit('split', node.id, 'column')">⬓</button>
       <button
@@ -26,11 +34,13 @@ const props = defineProps({
   node: { type: Object, required: true },
   canSplit: { type: Boolean, default: true },
   canClose: { type: Boolean, default: true },
+  canMaximize: { type: Boolean, default: true },
+  maximized: { type: Boolean, default: false },
   getTitle: { type: Function, default: null },
   getStatus: { type: Function, default: null },
 })
 
-defineEmits(['split', 'close'])
+defineEmits(['split', 'close', 'maximize'])
 </script>
 
 <style scoped>
