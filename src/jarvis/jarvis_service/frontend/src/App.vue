@@ -9153,6 +9153,8 @@ function sendFromPanel(panel) {
       if (userInput) {
         sendText = `${bufferedText}\n${userInput}`
       }
+      // 缓冲已被消费：若缓存面板正显示该 Agent，关闭面板并重置编辑文本
+      closeBufferPanelIfForAgent(agentId)
     }
     const message = {
       type: 'input_result',
@@ -9539,6 +9541,8 @@ function clearBufferFromPanel(panel) {
   if (!panel || !panel.agentId) return
   const agentId = panel.agentId
   inputBuffers.value.delete(agentId)
+  // 清空后若缓存面板正显示该 Agent，关闭面板并重置编辑文本
+  closeBufferPanelIfForAgent(agentId)
   appendOutput({
     output_type: 'system',
     agent_name: 'system',
@@ -17382,6 +17386,16 @@ function insertTextAtCursor(text, agentId = null) {
 
 
 
+// 缓冲被消费/清空时，若缓存管理面板正显示该 Agent 的缓冲，则关闭面板并重置编辑文本。
+// 避免：① 面板残留旧内容（消费后再次打开显示旧内容）；② 消费后再次加内容时面板自动重弹
+// （showBufferPanel 仍为 true，hasBufferedInput 由 false 变 true 触发 v-if 重新显示）。
+function closeBufferPanelIfForAgent(agentId) {
+  if (bufferPanelAgentId.value === agentId) {
+    showBufferPanel.value = false
+    bufferEditText.value = ''
+  }
+}
+
 function updateInputBuffer(agentId, nextValue) {
   inputBuffers.value.set(agentId, nextValue)
   if (currentAgentId.value === agentId) {
@@ -17498,6 +17512,8 @@ function sendBufferedInput(agentId = null) {
   inputBuffers.value.delete(targetAgentId)
   // 发送缓冲区内容
   sendInputDirectly(bufferedText, 'multi', targetAgentId)
+  // 缓冲已被消费：若缓存面板正显示该 Agent，关闭面板并重置编辑文本
+  closeBufferPanelIfForAgent(targetAgentId)
 }
 
 function clearBuffer() {
@@ -17506,6 +17522,8 @@ function clearBuffer() {
     return
   }
   inputBuffers.value.delete(agentId)
+  // 清空后若缓存面板正显示该 Agent，关闭面板并重置编辑文本
+  closeBufferPanelIfForAgent(agentId)
   appendOutput({
     output_type: 'system',
     agent_name: 'system',
