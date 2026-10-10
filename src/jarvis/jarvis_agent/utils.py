@@ -896,6 +896,22 @@ PUBLIC_FUNCTIONS: list[str] = ["{func_base}_echo"]
     return str(plugin_dir)
 
 
+def _remove_plugin_dir(path) -> None:
+    """
+    安全删除插件目录：软链接（含悬空软链接）用 os.unlink 只删链接本身，
+    真实目录用 shutil.rmtree 递归删除。
+
+    软链接安装的插件卸载/覆盖时，只应删除链接，绝不能误删其指向的本地源码。
+    """
+    import os
+    import shutil
+
+    if os.path.islink(path):
+        os.unlink(path)
+    else:
+        shutil.rmtree(path)
+
+
 def install_plugin(
     source_path: str,
     force: bool = False,
@@ -1140,7 +1156,7 @@ def install_plugin(
                 PrettyOutput.auto_print(
                     f"⚠️  强制覆盖插件目录: {target_dir}（忽略版本比较）"
                 )
-                shutil.rmtree(target_dir)
+                _remove_plugin_dir(target_dir)
             # 双方都有版本号时进行比较
             elif installed_version and plugin_version:
                 cmp = _compare_versions(plugin_version, installed_version)
@@ -1161,17 +1177,26 @@ def install_plugin(
                 else:
                     # 版本无法解析，保守允许覆盖（保持向后兼容）
                     PrettyOutput.auto_print(f"⚠️  插件目录已存在，将覆盖: {target_dir}")
-                shutil.rmtree(target_dir)
+                _remove_plugin_dir(target_dir)
             else:
                 # 已安装插件无版本号（旧格式）或新插件无版本号，允许覆盖以兼容旧插件
                 PrettyOutput.auto_print(f"⚠️  插件目录已存在，将覆盖: {target_dir}")
-                shutil.rmtree(target_dir)
+                _remove_plugin_dir(target_dir)
 
-        # 复制插件到目标目录
-        shutil.copytree(plugin_source_dir, target_dir)
+        # 安装方式：本地目录源建立软链接（本地代码更新后立即生效），
+        # 压缩文件/URL 解压产物仍复制（无本地持续更新需求）。
+        # 判断依据 source.is_dir()：本地目录源直接命中；压缩文件/URL 场景
+        # source 是文件（下载文件或压缩包），plugin_source_dir 是解压临时目录，
+        # 不满足条件，仍走 copytree。
+        if source.is_dir():
+            os.symlink(source, target_dir)
+        else:
+            shutil.copytree(plugin_source_dir, target_dir)
 
-        # 记录来源 URL（供升级机制使用）
-        if source_url:
+        # 记录来源 URL（供升级机制使用）。软链接安装不写标记文件：
+        # target_dir 是软链接，写入会跟随链接落到本地源码目录，污染用户源码；
+        # 是否软链接安装用 os.path.islink(target_dir) 判断即可。
+        if source_url and not source.is_dir():
             try:
                 with open(target_dir / ".source", "w", encoding="utf-8") as f:
                     f.write(source_url)
@@ -1744,6 +1769,7 @@ def uninstall_plugin(plugin_name: str) -> bool:
     Returns:
         bool: 卸载成功返回 True，失败返回 False
     """
+    import os
     from pathlib import Path
     from jarvis.jarvis_utils.config import get_data_dir
     from jarvis.jarvis_utils.output import PrettyOutput
@@ -1754,7 +1780,9 @@ def uninstall_plugin(plugin_name: str) -> bool:
     plugins_dir = Path(get_data_dir()) / "plugins"
     plugin_dir = plugins_dir / plugin_name
 
-    if not plugin_dir.exists():
+    # 用 lexists 判断存在性：软链接安装的插件若本地源码被删，链接悬空，
+    # exists()/is_dir() 会返回 False 导致无法卸载；lexists 不跟随链接。
+    if not os.path.lexists(plugin_dir):
         PrettyOutput.auto_print(f"⚠️ 插件不存在: {plugin_name}")
         return False
 
@@ -1785,9 +1813,8 @@ def uninstall_plugin(plugin_name: str) -> bool:
         PrettyOutput.auto_print(f"⚠️ 撤销插件资源失败（继续卸载）: {str(e)}")
 
     try:
-        import shutil
-
-        shutil.rmtree(plugin_dir)
+        # 软链接只删链接本身，不误删其指向的本地源码
+        _remove_plugin_dir(plugin_dir)
         PrettyOutput.auto_print(f"✅ 插件已卸载: {plugin_name}")
         return True
     except Exception as e:
@@ -1808,6 +1835,7 @@ def upgrade_plugin(plugin_name: str) -> bool:
     Returns:
         bool: 升级成功返回 True，失败返回 False
     """
+    import os
     from pathlib import Path
     from jarvis.jarvis_utils.config import get_data_dir
     from jarvis.jarvis_utils.output import PrettyOutput
@@ -1825,6 +1853,13 @@ def upgrade_plugin(plugin_name: str) -> bool:
     # 防御性拒绝升级内置插件
     if _is_builtin_plugin(plugin_dir):
         PrettyOutput.auto_print(f"⛔ 内置插件不可升级: {plugin_name}")
+        return False
+
+    # 本地软链接安装的插件：源码更新即生效，无需升级（升级会误删本地源码）
+    if os.path.islink(plugin_dir):
+        PrettyOutput.auto_print(
+            f"ℹ️  插件 {plugin_name} 通过本地软链接安装，源码更新即生效，无需升级"
+        )
         return False
 
     # 读取来源 URL

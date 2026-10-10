@@ -709,6 +709,115 @@ dependencies:
         # 空 url 原样返回
         assert _resolve_plugin_dep_url("", "v1", None) == ""
 
+    def test_install_from_directory_creates_symlink(self, tmp_path, monkeypatch):
+        """本地目录安装建立软链接而非复制（Issue #95）"""
+        import os
+        from jarvis.jarvis_agent.utils import install_plugin
+
+        plugin_source = tmp_path / "linked_plugin"
+        plugin_source.mkdir()
+        with open(plugin_source / "config.yaml", "w", encoding="utf-8") as f:
+            f.write("name: linked-plugin\nversion: 1.0\n")
+
+        test_data_dir = tmp_path / ".jarvis"
+        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
+
+        result = install_plugin(str(plugin_source))
+        assert result is True
+
+        target_dir = test_data_dir / "plugins" / "linked-plugin"
+        assert target_dir.is_symlink()
+        assert os.path.realpath(target_dir) == str(plugin_source)
+        # 软链接安装不写 .source（避免跟随链接污染源码目录）
+        assert not (target_dir / ".source").exists()
+
+    def test_install_from_directory_updates_take_effect(self, tmp_path, monkeypatch):
+        """本地源码更新后经软链接立即生效（Issue #95）"""
+        from jarvis.jarvis_agent.utils import install_plugin
+
+        plugin_source = tmp_path / "live_plugin"
+        plugin_source.mkdir()
+        config_path = plugin_source / "config.yaml"
+        config_path.write_text("name: live-plugin\nversion: 1.0\n", encoding="utf-8")
+
+        test_data_dir = tmp_path / ".jarvis"
+        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
+
+        assert install_plugin(str(plugin_source)) is True
+        target_dir = test_data_dir / "plugins" / "live-plugin"
+
+        # 修改本地源码，经软链接应读到新内容（无需重装）
+        config_path.write_text("name: live-plugin\nversion: 2.0\n", encoding="utf-8")
+        content = (target_dir / "config.yaml").read_text(encoding="utf-8")
+        assert "version: 2.0" in content
+
+    def test_install_overwrite_symlink_preserves_source(self, tmp_path, monkeypatch):
+        """覆盖软链接安装时不报错且不删本地源码（Issue #95）"""
+        from jarvis.jarvis_agent.utils import install_plugin
+
+        plugin_source = tmp_path / "ow_plugin"
+        plugin_source.mkdir()
+        with open(plugin_source / "config.yaml", "w", encoding="utf-8") as f:
+            f.write("name: ow-plugin\nversion: 1.0\n")
+
+        test_data_dir = tmp_path / ".jarvis"
+        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
+
+        assert install_plugin(str(plugin_source)) is True
+        target_dir = test_data_dir / "plugins" / "ow-plugin"
+        assert target_dir.is_symlink()
+
+        # 强制覆盖安装：不报错，软链接被替换，本地源码仍在
+        assert install_plugin(str(plugin_source), force=True) is True
+        assert target_dir.is_symlink()
+        assert plugin_source.exists()
+        assert (plugin_source / "config.yaml").exists()
+
+    def test_uninstall_symlink_preserves_source(self, tmp_path, monkeypatch):
+        """卸载软链接安装的插件只删链接不删本地源码（Issue #95）"""
+        from jarvis.jarvis_agent.utils import install_plugin, uninstall_plugin
+
+        plugin_source = tmp_path / "unlink_plugin"
+        plugin_source.mkdir()
+        with open(plugin_source / "config.yaml", "w", encoding="utf-8") as f:
+            f.write("name: unlink-plugin\nversion: 1.0\n")
+
+        test_data_dir = tmp_path / ".jarvis"
+        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
+
+        assert install_plugin(str(plugin_source)) is True
+        target_dir = test_data_dir / "plugins" / "unlink-plugin"
+        assert target_dir.is_symlink()
+
+        assert uninstall_plugin("unlink-plugin") is True
+        # 软链接已删除，本地源码目录仍完整存在
+        assert not target_dir.exists()
+        assert plugin_source.exists()
+        assert (plugin_source / "config.yaml").exists()
+
+    def test_install_from_zip_is_copy(self, tmp_path, monkeypatch):
+        """压缩包安装仍是真实目录复制（非软链接）"""
+        import zipfile
+        from jarvis.jarvis_agent.utils import install_plugin
+
+        plugin_source = tmp_path / "zip_plugin_copy"
+        plugin_source.mkdir()
+        with open(plugin_source / "config.yaml", "w", encoding="utf-8") as f:
+            f.write("name: zip-plugin-copy\nversion: 1.0\n")
+
+        zip_file = tmp_path / "plugin_copy.zip"
+        with zipfile.ZipFile(zip_file, "w") as zf:
+            zf.write(plugin_source / "config.yaml", "config.yaml")
+
+        test_data_dir = tmp_path / ".jarvis"
+        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
+
+        assert install_plugin(str(zip_file)) is True
+        target_dir = test_data_dir / "plugins" / "zip-plugin-copy"
+        assert target_dir.exists()
+        assert not target_dir.is_symlink()
+        assert (target_dir / "config.yaml").exists()
+
 
 class TestAutoDiscoverPlugins:
     """测试自动发现插件功能"""
