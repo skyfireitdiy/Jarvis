@@ -67,6 +67,8 @@ class PipelineRunnerTool:
         "支持并行（max_workers 默认 4）、多输入（input 列表）、条件（when）、失败"
         "策略（on_error: abort/continue/skip_dependents）、重试（retry）。门禁阶段"
         "（gate: true）完成后停住，默认 approve=false，需人工审批确认才放行。"
+        "注意：有 flow 的编排不支持跨节点，agent 定义中的 node_id/proxy_node 会被"
+        "拒绝（阶段间需共享文件系统）；如需跨节点创建 Agent 请用 @OrganizeAgents。"
         ".flow DSL 还支持运行时循环原语 loop(name, body, until, max_iterations)："
         "body 为已声明 stage 名组成的子图，整段重跑直到 until 满足或达上限；until "
         "可用白名单函数 file(path)（读 work_dir 内产物正文）与 contains(text, substr)。"
@@ -145,6 +147,18 @@ class PipelineRunnerTool:
             )
 
         agents_by_name = {a.get("name"): a for a in agents if a.get("name")}
+
+        # 有 flow 的编排不支持跨节点：阶段间产物路径与 status_file 均基于 work_dir，
+        # 跨节点无法共享文件系统。agent 定义中的 node_id/proxy_node 会被静默忽略，
+        # 这里显式报错而非静默吞掉，避免用户误以为编排真的跨节点执行了。
+        for _agent in agents:
+            if _agent.get("node_id") or _agent.get("proxy_node"):
+                return self._error(
+                    "有 flow 的编排不支持跨节点：agent 定义中的 node_id/proxy_node "
+                    "会被忽略，因阶段间需共享文件系统（产物与状态文件均基于 work_dir）。"
+                    "如需跨节点创建 Agent，请使用 @OrganizeAgents（无 flow 编排）。"
+                )
+
         default_on_error = str(orch.get("default_on_error") or "abort").strip()
 
         # 3. 初始化产物目录（按 pipeline_id 隔离，避免多条流水线同目录冲突）

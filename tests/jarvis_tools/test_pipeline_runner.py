@@ -1660,6 +1660,115 @@ flow:
 
 
 # ---------------------------------------------------------------------------
+# 跨节点校验（有 flow 的编排不支持跨节点）
+# ---------------------------------------------------------------------------
+class TestCrossNodeValidation:
+    def _write(self, tmp_path, agents_yaml):
+        orch = tmp_path / "p.yaml"
+        orch.write_text(
+            "agents:\n" + agents_yaml + "flow:\n  - stage: s1\n    agent: a1\n    output: .df/x.md\n",
+            encoding="utf-8",
+        )
+        return orch
+
+    def test_node_id_rejected(self, tool, tmp_path):
+        """agent 定义带 node_id 时明确报错，而非静默忽略。"""
+        orch = self._write(
+            tmp_path,
+            "  - name: a1\n    working_dir: .\n    task: t\n    node_id: worker-1\n",
+        )
+        r = tool.execute(
+            {
+                "orchestration_file": str(orch),
+                "working_dir": str(tmp_path),
+                "dry_run": True,
+            }
+        )
+        assert r["success"] is False
+        assert "不支持跨节点" in r["stderr"]
+
+    def test_proxy_node_rejected(self, tool, tmp_path):
+        """agent 定义带 proxy_node 时明确报错。"""
+        orch = self._write(
+            tmp_path,
+            "  - name: a1\n    working_dir: .\n    task: t\n    proxy_node: proxy-1\n",
+        )
+        r = tool.execute(
+            {
+                "orchestration_file": str(orch),
+                "working_dir": str(tmp_path),
+                "dry_run": True,
+            }
+        )
+        assert r["success"] is False
+        assert "不支持跨节点" in r["stderr"]
+
+    def test_without_node_fields_ok(self, tool, tmp_path):
+        """不带 node_id/proxy_node 的编排正常执行（dry-run）。"""
+        orch = self._write(tmp_path, "  - name: a1\n    working_dir: .\n    task: t\n")
+        r = tool.execute(
+            {
+                "orchestration_file": str(orch),
+                "working_dir": str(tmp_path),
+                "dry_run": True,
+            }
+        )
+        assert r["success"] is True
+        assert "s1" in r["stdout"]
+        """_plan_batches：依赖层级分批正确。"""
+        nodes = [
+            {
+                "stage": "a",
+                "depends_on": [],
+                "agent": "x",
+                "input": [],
+                "output": "",
+                "gate": False,
+                "when": None,
+                "retry": 0,
+                "on_error": "abort",
+            },
+            {
+                "stage": "b",
+                "depends_on": ["a"],
+                "agent": "x",
+                "input": [],
+                "output": "",
+                "gate": False,
+                "when": None,
+                "retry": 0,
+                "on_error": "abort",
+            },
+            {
+                "stage": "c",
+                "depends_on": ["a"],
+                "agent": "x",
+                "input": [],
+                "output": "",
+                "gate": False,
+                "when": None,
+                "retry": 0,
+                "on_error": "abort",
+            },
+            {
+                "stage": "d",
+                "depends_on": ["b", "c"],
+                "agent": "x",
+                "input": [],
+                "output": "",
+                "gate": False,
+                "when": None,
+                "retry": 0,
+                "on_error": "abort",
+            },
+        ]
+        batches = tool._plan_batches(nodes)
+        assert [n["stage"] for n in batches[0]] == ["a"]
+        assert sorted(n["stage"] for n in batches[1]) == ["b", "c"]
+        assert [n["stage"] for n in batches[2]] == ["d"]
+
+
+# ---------------------------------------------------------------------------
 # 进度事件埋点（_schedule 状态迁移 → 事件总线）
 # ---------------------------------------------------------------------------
 class TestPipelineEventEmit:
