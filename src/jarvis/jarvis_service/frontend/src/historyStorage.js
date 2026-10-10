@@ -7,6 +7,9 @@ const STORAGE_KEY = "jarvis_chat_history";
 const METADATA_KEY = "jarvis_chat_metadata";
 const MAX_MESSAGES_PER_PAGE = 50;
 const MAX_TOTAL_MESSAGES = 1000;
+// 存储体积上限阈值（3MB）：超出后 pruneHistory 会按时间删除最旧消息，
+// 避免撑爆移动端 ~5MB 的 localStorage 配额导致 setItem 抛 QuotaExceededError。
+const MAX_STORAGE_SIZE_BYTES = 3 * 1024 * 1024;
 
 /**
  * 生成唯一ID
@@ -70,6 +73,7 @@ function saveMessage(message) {
     }
 
     saveAllMessages(messages);
+    pruneHistory({ removeOrphans: false });
     return true;
   } catch (error) {
     console.error("[historyStorage] Failed to save message:", error);
@@ -104,6 +108,7 @@ function saveMessages(messages) {
     }
 
     saveAllMessages(allMessages);
+    pruneHistory({ removeOrphans: false });
     return true;
   } catch (error) {
     console.error("[historyStorage] Failed to save messages:", error);
@@ -284,6 +289,7 @@ function setHistoryForAgent(agentId, data) {
     }));
     const combined = [...otherMessages, ...newMessages];
     saveAllMessages(combined);
+    pruneHistory({ removeOrphans: false });
     return true;
   } catch (error) {
     console.error("[historyStorage] Failed to set agent history:", error);
@@ -309,6 +315,7 @@ function getStorageInfo() {
         ? new Date(metadata.lastUpdated).toLocaleString()
         : "从未",
       maxMessages: MAX_TOTAL_MESSAGES,
+      maxStorageSize: MAX_STORAGE_SIZE_BYTES,
     };
   } catch (error) {
     console.error("[historyStorage] Failed to get storage info:", error);
@@ -318,6 +325,82 @@ function getStorageInfo() {
       totalSizeFormatted: "0 B",
       lastUpdated: "未知",
       maxMessages: MAX_TOTAL_MESSAGES,
+      maxStorageSize: MAX_STORAGE_SIZE_BYTES,
+    };
+  }
+}
+
+/**
+ * 定期清理历史消息：
+ * 1. 若 removeOrphans 为 true，先移除 agent_id 缺失的孤儿消息
+ *    （删除 Agent 后残留、无法归属的消息）；
+ * 2. 若存储体积仍超过 MAX_STORAGE_SIZE_BYTES，则按 storageTimestamp 升序
+ *    删除最旧消息，直到体积回落到阈值以内。
+ * 写入路径（saveMessage/saveMessages/setHistoryForAgent）自动触发时只做
+ * 体积清理（removeOrphans=false），避免误删无 agent_id 的合法消息；
+ * 删除/重生 Agent 后显式调用（removeOrphans=true）才清理孤儿。
+ * @param {Object} [options] - { removeOrphans: boolean }
+ * @returns {Object} 清理统计：{ removedOrphans, removedBySize, totalRemoved, remainingCount, remainingSize }
+ */
+function pruneHistory(options = {}) {
+  const { removeOrphans = true } = options;
+  try {
+    const allMessages = getAllMessages();
+    if (allMessages.length === 0) {
+      return {
+        removedOrphans: 0,
+        removedBySize: 0,
+        totalRemoved: 0,
+        remainingCount: 0,
+        remainingSize: JSON.stringify([]).length,
+      };
+    }
+
+    // 1. 清理孤儿消息（无 agent_id），仅显式调用时执行
+    let messages = allMessages;
+    let removedOrphans = 0;
+    if (removeOrphans) {
+      messages = allMessages.filter(
+        (msg) => msg.agent_id != null && msg.agent_id !== "",
+      );
+      removedOrphans = allMessages.length - messages.length;
+    }
+
+    // 2. 按体积阈值删除最旧消息
+    let removedBySize = 0;
+    let size = JSON.stringify(messages).length;
+    while (messages.length > 0 && size > MAX_STORAGE_SIZE_BYTES) {
+      // 取 storageTimestamp 最小（最旧）的消息删除；缺失时间戳视为最旧
+      let oldestIndex = 0;
+      for (let i = 1; i < messages.length; i++) {
+        const a = messages[oldestIndex].storageTimestamp || 0;
+        const b = messages[i].storageTimestamp || 0;
+        if (b < a) oldestIndex = i;
+      }
+      messages.splice(oldestIndex, 1);
+      removedBySize++;
+      size = JSON.stringify(messages).length;
+    }
+
+    if (removedOrphans > 0 || removedBySize > 0) {
+      saveAllMessages(messages);
+    }
+
+    return {
+      removedOrphans,
+      removedBySize,
+      totalRemoved: removedOrphans + removedBySize,
+      remainingCount: messages.length,
+      remainingSize: size,
+    };
+  } catch (error) {
+    console.error("[historyStorage] Failed to prune history:", error);
+    return {
+      removedOrphans: 0,
+      removedBySize: 0,
+      totalRemoved: 0,
+      remainingCount: getAllMessages().length,
+      remainingSize: JSON.stringify(getAllMessages()).length,
     };
   }
 }
@@ -346,6 +429,8 @@ export default {
   getMetadata,
   updateMetadata,
   getStorageInfo,
+  pruneHistory,
   MAX_MESSAGES_PER_PAGE,
   MAX_TOTAL_MESSAGES,
+  MAX_STORAGE_SIZE_BYTES,
 };
