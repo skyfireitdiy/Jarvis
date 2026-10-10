@@ -1954,6 +1954,7 @@ import { useAuthBridge } from './composables/useAuthBridge.js'
 import { useDaemonSync } from './composables/useDaemonSync.js'
 import { useTerminal, useTerminalName } from './composables/useTerminal.js'
 import { useDiagramRender } from './composables/useDiagramRender.js'
+import { useSession } from './composables/useSession.js'
 
 // 图表渲染（plantuml/mermaid/dot），拆自独立 composable
 const {
@@ -4199,8 +4200,6 @@ const quickCreateAgentError = ref('') // 一句话创建：错误提示
 const showRenameAgentModal = ref(false) // 重命名 Agent 弹窗
 const renamingAgent = ref(null)          // 正在重命名的 Agent
 const renameAgentName = ref('')           // 重命名的新名称
-const showSessionDialog = ref(false)   // Session 选择对话框
-const availableSessions = ref([])         // 可恢复的 session 列表
 const selectedSession = ref(null)         // 选中的 session
 const showBufferPanel = ref(false)        // 缓存管理面板显示状态
 const bufferPanelAgentId = ref(null)      // 缓存管理面板对应的目标 Agent（点击的 Panel 所属 Agent）
@@ -12732,41 +12731,7 @@ function syncOnlineAgentStatuses() {
   }
 }
 
-// Session 恢复相关函数
-async function restoreSession(sessionFile) {
-  if (!sessionFile || !currentAgentId.value) {
-    console.error('[SESSION] Invalid parameters:', { sessionFile, agentId: currentAgentId.value })
-    return
-  }
-
-  try {
-    const { host, port } = getGatewayAddress()
-    const targetNodeId = String(getCurrentAgentNodeId() || 'master').trim() || 'master'
-    const response = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, `agents/${currentAgentId.value}/sessions`), {
-      method: 'POST',
-      body: JSON.stringify({ session_file: sessionFile, node_id: targetNodeId })
-    })
-
-    const result = await response.json()
-    if (result.success) {
-      showSessionDialog.value = false
-      // 加载历史消息
-      loadHistoryMessages(false)
-    } else {
-      console.error('[SESSION] Failed to restore session:', result.error)
-      alert(`恢复会话失败: ${result.error}`)
-    }
-  } catch (error) {
-    console.error('[SESSION] Error restoring session:', error)
-    alert(`恢复会话失败: ${error.message}`)
-  }
-}
-
-function cancelSessionDialog() {
-  showSessionDialog.value = false
-  // 加载历史消息（用户不恢复 session）
-  loadHistoryMessages(false)
-}
+// Session 恢复逻辑已拆出到 composables/useSession.js（见下方 useSession 调用处）
 
 // 创建 Agent
 // 目录选择相关函数
@@ -13251,7 +13216,21 @@ const {
   fetchWithAuth,
   buildNodeHttpUrl
 })
-
+// Session 恢复（状态 + 恢复/取消），从 App.vue 拆出到 composables/useSession.js
+// 依赖 currentAgentId/getGatewayAddress/getCurrentAgentNodeId/fetchWithAuth/buildNodeHttpUrl/loadHistoryMessages，须在其定义之后调用
+const {
+  showSessionDialog,
+  availableSessions,
+  restoreSession,
+  cancelSessionDialog
+} = useSession({
+  currentAgentId,
+  getGatewayAddress,
+  getCurrentAgentNodeId,
+  fetchWithAuth,
+  buildNodeHttpUrl,
+  loadHistoryMessages
+})
 // 获取编辑器目标节点ID（优先使用编辑器对应agent的节点ID）
 function getWorkspaceTargetNodeId() {
   const workspaceAgentNodeId = activeWorkspaceSession.value?.agent?.node_id
