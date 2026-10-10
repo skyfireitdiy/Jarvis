@@ -111,7 +111,7 @@ agents:
 #   on_error     失败策略：abort（默认，立即中止）/ continue / skip_dependents
 #   gate         门禁：true 时 approve=false 会停住等人工审批
 # 顶层可选 default_on_error：阶段未声明 on_error 时的全局默认（非法值回退 abort）。
-# 顶层可选 spec：作为各阶段背景注入（可选；也可用 pipeline_runner 的 spec_file 参数）。
+# 顶层可选 spec：作为各阶段背景注入（可选；没有则不注入）。
 # 并行：顶层 max_workers（默认 4），限制同时执行的阶段 Agent 数。
 # loop 运行时循环原语（整段重跑直到 until 满足或达上限）：
 #   - loop: "<loop 名>"
