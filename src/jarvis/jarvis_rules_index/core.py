@@ -133,9 +133,13 @@ def format_rules_index(index: dict, as_json: bool = False) -> str:
                 "project": "项目",
                 "global": "全局",
                 "central": "中心库",
-                "config0": "配置目录",
             }
-            label = source_labels.get(prefix, prefix)
+            # configN 前缀统一归为"配置目录"
+            label = (
+                "配置目录"
+                if prefix.startswith("config")
+                else source_labels.get(prefix, prefix)
+            )
             if label not in by_source:
                 by_source[label] = []
             # 存储完整路径以便提取描述
@@ -156,8 +160,11 @@ def format_rules_index(index: dict, as_json: bool = False) -> str:
                 elif full_name.startswith("central:"):
                     # 中心库路径，暂时不处理
                     rule_path = ""
-                elif full_name.startswith("config0:"):
-                    rule_path = os.path.join(os.getcwd(), rel_name)
+                else:
+                    # configN 前缀用 RulesManager 统一解析（避免索引错位）
+                    rule_path = RulesManager(root_dir=os.getcwd()).get_rule_file_path(
+                        full_name
+                    )
 
                 description = _extract_rule_description(rule_path) if rule_path else ""
                 if description:
