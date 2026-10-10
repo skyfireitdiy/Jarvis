@@ -4101,6 +4101,8 @@ function stopWorkspacePaneResize() {
 const EDITOR_PANE_LAYOUT_KEY = 'jarvis_workspace_pane_layout'
 
 // 递归校验并规范化一个节点；非法返回 null（调用方据此回退）
+// 说明：leaf 上允许携带 content 字段（各视图的内容恢复信息，见 persistWorkspacePaneLayout），
+// 该字段仅用于「刷新后恢复内容」，不参与渲染；恢复完成后由 restoreWorkspacePaneContents 移除。
 function sanitizeWorkspacePaneNode(raw) {
   if (!raw || typeof raw !== 'object') return null
   if (raw.type === 'split') {
@@ -4118,20 +4120,41 @@ function sanitizeWorkspacePaneNode(raw) {
     const validViews = ['file', 'session', 'chat', 'terminal', 'diff', 'empty']
     if (!validViews.includes(raw.view)) return null
     if (typeof raw.id !== 'string' || !raw.id) return null
-    // diff 数据不持久化（commitHash 可能失效、diff 文本体积大）：恢复时一律降级为 file leaf
+    const content = raw.content && typeof raw.content === 'object' ? raw.content : null
     if (raw.view === 'diff') {
-      return { type: 'leaf', id: raw.id, view: 'file', sessionPanelId: null }
-    }
-    let sessionPanelId = raw.sessionPanelId
-    if (raw.view === 'session') {
-      // sessionPanelId 必须真实存在；否则回退为 file leaf（避免指向已不存在的 Panel）
-      if (!sessionPanelId || !panels.value.some(p => p.id === sessionPanelId)) {
-        return { type: 'leaf', id: raw.id, view: 'file', sessionPanelId: null }
+      // diff 内容恢复信息：commitHash + filePath（最小信息，diff 文本不持久化）+ agentId（工作目录来源）。
+      // 合法则保留 diff 视图，恢复时重新拉取；非法（如 commit 已失效）降级为空 pane，
+      // 而不是 file pane，避免误导用户以为是文件区域。
+      if (content && typeof content.commitHash === 'string' && content.commitHash
+        && typeof content.filePath === 'string' && content.filePath) {
+        const agentId = typeof content.agentId === 'string' && content.agentId ? content.agentId : null
+        return { type: 'leaf', id: raw.id, view: 'diff', sessionPanelId: null, agentId, content: { commitHash: content.commitHash, filePath: content.filePath, agentId } }
       }
-    } else {
-      sessionPanelId = null
+      return { type: 'leaf', id: raw.id, view: 'empty', sessionPanelId: null, agentId: null, content: null }
     }
-    return { type: 'leaf', id: raw.id, view: raw.view, sessionPanelId }
+    if (raw.view === 'session') {
+      // 只校验持久化的 agentId（用于刷新后重建 panel）；sessionPanelId 是刷新前的
+      // panel id，刷新后 panels 重建必然失效，故不再据此校验（由 restoreWorkspacePaneContents
+      // 按 agentId 重建 panel 后回填）。无 agentId 时回退为 file leaf（保持旧行为）。
+      if (content && typeof content.agentId === 'string' && content.agentId) {
+        return { type: 'leaf', id: raw.id, view: 'session', sessionPanelId: null, agentId: content.agentId, content: { agentId: content.agentId } }
+      }
+      return { type: 'leaf', id: raw.id, view: 'file', sessionPanelId: null, agentId: null, content: null }
+    }
+    if (raw.view === 'file') {
+      // 文件编辑器 pane：持久化打开的文件列表（tabs）、当前绑定文件（activePath）与 agentId（文件系统来源）。
+      let tabs = Array.isArray(content?.tabs) ? content.tabs.filter(t => typeof t === 'string' && t) : []
+      const activePath = typeof content?.activePath === 'string' && content.activePath ? content.activePath : null
+      const agentId = typeof content?.agentId === 'string' && content.agentId ? content.agentId : null
+      return { type: 'leaf', id: raw.id, view: 'file', sessionPanelId: null, agentId, content: { tabs, activePath, agentId } }
+    }
+    if (raw.view === 'terminal') {
+      // 终端 pane：持久化终端会话 id（刷新后由 restoreTerminalSessions 恢复的会话列表中匹配）。
+      const terminalId = typeof content?.terminalId === 'string' && content.terminalId ? content.terminalId : null
+      return { type: 'leaf', id: raw.id, view: 'terminal', sessionPanelId: null, agentId: null, content: terminalId ? { terminalId } : null }
+    }
+    // chat / empty：无内容恢复信息
+    return { type: 'leaf', id: raw.id, view: raw.view, sessionPanelId: null, agentId: null, content: null }
   }
   return null
 }
@@ -4186,11 +4209,39 @@ function persistWorkspacePaneLayout() {
       localStorage.removeItem(EDITOR_PANE_LAYOUT_KEY)
       return
     }
-    const payload = { version: 1, activePaneId: activePaneId.value, tree }
+    // version 2：除布局外，每个 leaf 额外携带 content（各视图的内容恢复信息）
+    const payload = { version: 2, activePaneId: activePaneId.value, tree: serializeWorkspacePaneTree(tree) }
     localStorage.setItem(EDITOR_PANE_LAYOUT_KEY, JSON.stringify(payload))
   } catch (e) {
     // 忽略：localStorage 不可用（隐私模式 / 配额满）时静默降级
   }
+}
+
+// 序列化 pane 树：为每个 leaf 附加 content 字段（内容恢复信息），供刷新后恢复
+function serializeWorkspacePaneTree(tree) {
+  const clone = (node) => {
+    if (!node) return node
+    if (node.type === 'split') {
+      return { type: 'split', direction: node.direction, ratio: node.ratio, children: node.children.map(clone) }
+    }
+    // leaf：按视图提取内容恢复信息（不序列化运行时状态如 diff 文本、Monaco 实例）
+    let content = null
+    if (node.view === 'session') {
+      content = { agentId: node.agentId || null }
+    } else if (node.view === 'file') {
+      content = {
+        tabs: workspacePaneTabs.get(node.id) || [],
+        activePath: workspaceViewPanes.get(node.id) || null,
+        agentId: node.agentId || null,
+      }
+    } else if (node.view === 'diff') {
+      content = node.diff ? { commitHash: node.diff.commitHash || null, filePath: node.diff.filePath || null, agentId: node.agentId || null } : null
+    } else if (node.view === 'terminal') {
+      content = { terminalId: activeTerminalId.value || null }
+    }
+    return { type: 'leaf', id: node.id, view: node.view, sessionPanelId: node.sessionPanelId, agentId: node.agentId, content }
+  }
+  return clone(tree)
 }
 
 // 从 localStorage 恢复（setup 阶段调用）；失败回退默认单 leaf
@@ -4220,6 +4271,113 @@ function restoreWorkspacePaneLayout() {
   activePaneId.value = findWorkspacePaneById(tree, wantActive)
     ? wantActive
     : findFirstWorkspacePaneId(tree)
+}
+
+// ===== 阶段 B：恢复每个 pane 的内容（session 会话 / 文件 / diff / terminal） =====
+// 在 agentList 首次就绪后调用（socket 已连、agentList 已加载、restoreTerminalSessions 已执行）。
+// 幂等：只执行一次；无法恢复的 leaf 降级为空 pane（与 Issue #82 补充说明一致）。
+let workspacePaneContentsRestored = false
+async function restoreWorkspacePaneContents() {
+  if (workspacePaneContentsRestored) return
+  workspacePaneContentsRestored = true
+  const tree = workspacePaneTree.value
+  if (!tree) return
+  const leaves = []
+  const walk = (n) => {
+    if (!n) return
+    if (n.type === 'leaf') leaves.push(n)
+    else (n.children || []).forEach(walk)
+  }
+  walk(tree)
+  for (const leaf of leaves) {
+    const content = leaf.content
+    if (!content) continue
+    try {
+      if (leaf.view === 'session' && content.agentId) {
+        const agent = agentList.value.find(a => a.agent_id === content.agentId)
+        if (!agent) {
+          // Agent 已不存在：降级为空 pane
+          leaf.view = 'empty'
+          leaf.sessionPanelId = null
+          leaf.agentId = null
+        } else {
+          // 复用已有 Panel（同一 Agent 只允许一个 Panel），否则新建
+          let panel = panels.value.find(p => p.agentId === agent.agent_id)
+          if (!panel) {
+            panel = { id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, agentId: agent.agent_id }
+            panels.value.push(panel)
+          }
+          leaf.sessionPanelId = panel.id
+          leaf.agentId = agent.agent_id
+          activePanelId.value = panel.id
+          workspaceSessionPanelId.value = panel.id
+          await switchAgent(agent)
+        }
+      } else if (leaf.view === 'file') {
+        const tabs = content.tabs || []
+        // 逐个打开到本 pane（先激活目标 pane，openWorkspaceFile 会登记到激活 pane 的标签列表）
+        for (const path of tabs) {
+          activateWorkspacePane(leaf.id)
+          await openWorkspaceFile(path, content.agentId)
+        }
+        // 恢复当前绑定文件（activePath 在 tabs 中时激活它）
+        if (content.activePath && tabs.includes(content.activePath)) {
+          activateWorkspacePane(leaf.id)
+          activateWorkspaceTab(content.activePath)
+        }
+      } else if (leaf.view === 'diff' && content.commitHash && content.filePath) {
+        // 临时把 Git 目标切到该 Agent（确保 getGitWorkingDir 命中其工作目录），恢复后还原
+        const savedGitAgentId = gitAgentId.value
+        if (content.agentId) gitAgentId.value = content.agentId
+        try {
+          await loadDiffForPane(leaf.id, content.commitHash, content.filePath)
+        } finally {
+          gitAgentId.value = savedGitAgentId
+        }
+        const pane = findWorkspacePaneById(workspacePaneTree.value, leaf.id)
+        if (pane && pane.view === 'diff' && pane.diff && pane.diff.error) {
+          // diff 拉取失败（如 commit 已失效）：降级为空 pane
+          pane.view = 'empty'
+          pane.diff = null
+          pane.agentId = null
+        }
+      } else if (leaf.view === 'terminal' && content.terminalId) {
+        // 终端会话由 restoreTerminalSessions 恢复；此处仅匹配并激活
+        let session = terminalSessions.value.find(t => t.terminal_id === content.terminalId)
+        if (!session) {
+          // 兜底：再尝试拉取一次存活终端（可能 restoreTerminalSessions 尚未完成）
+          await restoreTerminalSessions()
+          session = terminalSessions.value.find(t => t.terminal_id === content.terminalId)
+        }
+        if (session) {
+          activeTerminalId.value = content.terminalId
+        } else {
+          // 终端会话已不存在：降级为空 pane
+          leaf.view = 'empty'
+          leaf.agentId = null
+        }
+      }
+    } catch (e) {
+      console.warn('[workspace-pane] restore content failed for pane', leaf.id, e)
+      // 恢复失败：降级为空 pane，避免残留半初始化状态
+      leaf.view = 'empty'
+      leaf.sessionPanelId = null
+      leaf.agentId = null
+      leaf.diff = null
+    } finally {
+      // 内容恢复信息用完即清，避免残留到运行时 leaf 上
+      leaf.content = null
+    }
+  }
+  // 确保当前 Agent 与激活 pane 一致（若激活 pane 是 session）
+  const activeLeaf = findWorkspacePaneById(workspacePaneTree.value, activePaneId.value)
+  if (activeLeaf && activeLeaf.view === 'session' && activeLeaf.sessionPanelId) {
+    const panel = panels.value.find(p => p.id === activeLeaf.sessionPanelId)
+    const agent = panel?.agentId ? agentList.value.find(a => a.agent_id === panel.agentId) : null
+    if (agent) await switchAgent(agent)
+  }
+  // 写回规范化后的布局（content 已清空）
+  persistWorkspacePaneLayout()
 }
 const windowWidth = ref(window.innerWidth)  // 窗口宽度，用于响应式检测
 const showCreateAgentModal = ref(false) // 创建 Agent 弹窗
@@ -14514,6 +14672,11 @@ async function fetchAgentList() {
   } finally {
     // 首次拉取结束（无论成功失败）后放行大厅空状态引导，避免有 Agent 时闪现
     agentListLoaded.value = true
+    // 首次拉取到 Agent 列表后恢复每个 pane 的内容（阶段 B；幂等，只执行一次）。
+    // 仅在 socket 已连接时执行：内容恢复依赖文件系统/Git/终端等鉴权能力。
+    if (socket.value) {
+      restoreWorkspacePaneContents()
+    }
   }
 }
 
