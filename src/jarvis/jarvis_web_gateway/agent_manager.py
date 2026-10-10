@@ -608,6 +608,41 @@ class AgentManager:
         self._save_agents()
         return agent.to_dict()
 
+    def update_agent_runtime_config(
+        self,
+        agent_id: str,
+        llm_group: Optional[str] = None,
+        proxy_node: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """更新 Agent 运行时配置（模型组 / 代理节点）。
+
+        由 Agent 在运行中通过命令修改配置（如 <SetConfig> 切换模型组、切换代理节点）
+        后主动上报网关，网关据此更新 AgentInfo，使列表展示的配置与真实运行状态一致。
+
+        Args:
+            agent_id: Agent ID
+            llm_group: 新的模型组名称（None 表示不修改）
+            proxy_node: 新的代理节点 ID（None 表示不修改）
+
+        Returns:
+            更新后的 Agent 信息字典
+
+        Raises:
+            KeyError: Agent 不存在
+        """
+        if agent_id not in self._agents:
+            raise KeyError(f"Agent {agent_id} not found")
+
+        agent = self._agents[agent_id]
+        if llm_group is not None:
+            agent.llm_group = llm_group
+        if proxy_node is not None:
+            agent.proxy_node = proxy_node
+
+        # 保存到文件
+        self._save_agents()
+        return agent.to_dict()
+
     def update_agent_access(
         self, agent_id: str, access_acl: Dict[str, List[str]]
     ) -> Dict[str, Any]:

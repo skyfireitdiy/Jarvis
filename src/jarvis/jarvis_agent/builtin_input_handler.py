@@ -44,6 +44,39 @@ from jarvis.jarvis_utils.git_utils import (
 )
 
 
+def _report_agent_config_change(updates: Dict[str, Any]) -> None:
+    """上报 Agent 运行时配置变化到所属网关。
+
+    运行中通过命令修改配置（如 <SetConfig> 切换模型组、切换代理节点）后调用，
+    让网关更新 AgentInfo，使 Agent 列表展示的配置与真实运行状态一致。
+    上报失败不影响主流程（静默降级）。
+
+    参数:
+        updates: 变化的字段字典，如 {"llm_group": "xxx"} / {"proxy_node": "xxx"}
+    """
+    import jarvis.jarvis_utils.globals as jglobals
+
+    if not jglobals.agent_id or not jglobals.master_url or not updates:
+        return
+    try:
+        from jarvis.jarvis_tools.gateway_manager import GatewayManagerTool
+
+        if not GatewayManagerTool.check():
+            return
+        result = GatewayManagerTool()._request_gateway(
+            "PATCH",
+            f"/api/agents/{jglobals.agent_id}",
+            json_data=updates,
+            error_prefix="Report agent config change failed",
+        )
+        if not result.get("success"):
+            PrettyOutput.auto_print(
+                f"⚠️ 上报配置到网关失败: {result.get('error', '未知错误')}"
+            )
+    except Exception as e:
+        PrettyOutput.auto_print(f"⚠️ 上报配置到网关异常: {e}")
+
+
 def _print_markdown_table(
     title: str,
     headers: List[str],
@@ -444,6 +477,11 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                     PrettyOutput.auto_print(
                         f"✅ 已设置配置：{key_path} = {repr(value)}"
                     )
+                    # 运行中修改模型组/代理节点后上报网关，使 Agent 列表展示的配置与真实运行状态一致
+                    if key_path == "llm_group" and isinstance(value, str):
+                        _report_agent_config_change({"llm_group": value})
+                    elif key_path == "proxy_node" and isinstance(value, str):
+                        _report_agent_config_change({"proxy_node": value})
                 else:
                     PrettyOutput.auto_print(f"❌ {message}")
 
@@ -2190,6 +2228,8 @@ def perform_switch(
         result = switch_platform_type(agent, platform_type, preserve_model_group=False)
         if result:
             agent._model_type = platform_type
+            # 上报网关，使 Agent 列表展示的模型组与真实运行状态一致
+            _report_agent_config_change({"llm_group": new_model_group})
         return result
     except Exception as e:
         PrettyOutput.auto_print(f"❌ 切换模型组失败: {e}")
@@ -2611,6 +2651,8 @@ def switch_proxy_node(agent: Any) -> bool:
         PrettyOutput.auto_print("🔄 已关闭节点代理，正在重建模型...")
         if switch_platform_type(agent, get_platform_type_from_agent(agent)):
             PrettyOutput.auto_print("✅ 已切换为直连（不使用代理）")
+            # 上报网关清空代理，使 Agent 列表展示的代理节点与真实运行状态一致
+            _report_agent_config_change({"proxy_node": ""})
             return True
         PrettyOutput.auto_print("❌ 重建模型失败，代理设置已更新但可能未生效")
         return False
@@ -2636,6 +2678,8 @@ def switch_proxy_node(agent: Any) -> bool:
     PrettyOutput.auto_print(f"🔄 正在切换到节点代理 '{new_node}'...")
     if switch_platform_type(agent, get_platform_type_from_agent(agent)):
         PrettyOutput.auto_print(f"✅ 已成功切换到节点代理 '{new_node}'")
+        # 上报网关，使 Agent 列表展示的代理节点与真实运行状态一致
+        _report_agent_config_change({"proxy_node": new_node})
         return True
     PrettyOutput.auto_print("❌ 重建模型失败，代理设置已更新但可能未生效")
     return False

@@ -6518,7 +6518,7 @@ def create_app(
     async def patch_agent(
         agent_id: str, request_body: Dict[str, Any], request: Request
     ) -> Dict[str, Any]:
-        """更新 Agent 信息（目前只支持重命名）。"""
+        """更新 Agent 信息（支持重命名、模型组、代理节点）。"""
         # 权限检查：只有owner或admin可以更新Agent
         user_info = getattr(request.state, "user_info", None)
         if user_info and user_info.get("user_id") != "system":
@@ -6542,6 +6542,8 @@ def create_app(
                         }
         try:
             name = request_body.get("name")
+            llm_group = request_body.get("llm_group")
+            proxy_node = request_body.get("proxy_node")
             target_node_id = str(request_body.get("node_id") or "").strip()
 
             if name is not None and not isinstance(name, str):
@@ -6550,6 +6552,22 @@ def create_app(
                     "error": {
                         "code": "INVALID_ARGUMENT",
                         "message": "name must be a string or null",
+                    },
+                }
+            if llm_group is not None and not isinstance(llm_group, str):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_ARGUMENT",
+                        "message": "llm_group must be a string",
+                    },
+                }
+            if proxy_node is not None and not isinstance(proxy_node, str):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_ARGUMENT",
+                        "message": "proxy_node must be a string",
                     },
                 }
 
@@ -6563,6 +6581,13 @@ def create_app(
                 node_runtime.local_node_id,
                 "master",
             ):
+                update_body: Dict[str, Any] = {}
+                if name is not None:
+                    update_body["name"] = name
+                if llm_group is not None:
+                    update_body["llm_group"] = llm_group
+                if proxy_node is not None:
+                    update_body["proxy_node"] = proxy_node
                 response = await node_connection_manager.send_request_to_node(
                     resolved_target_node,
                     NODE_HTTP_PROXY_REQUEST,
@@ -6571,7 +6596,7 @@ def create_app(
                         "path": f"agents/{agent_id}",
                         "query": "",
                         "headers": {"content-type": "application/json"},
-                        "body": json.dumps({"name": name}),
+                        "body": json.dumps(update_body),
                     },
                 )
                 payload = response.get("payload") or {}
@@ -6589,7 +6614,12 @@ def create_app(
                 body = payload.get("body") or "{}"
                 return json.loads(body)  # type: ignore[no-any-return]
 
-            result = agent_manager.rename_agent(agent_id, name)
+            if llm_group is not None or proxy_node is not None:
+                result = agent_manager.update_agent_runtime_config(
+                    agent_id, llm_group=llm_group, proxy_node=proxy_node
+                )
+            else:
+                result = agent_manager.rename_agent(agent_id, name)
             return {"success": True, "data": result}
         except KeyError as e:
             return {
