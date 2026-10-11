@@ -13,6 +13,7 @@ CodeAgent 在修改代码的过程中，每次变更都会自动生成一个以 
 可选参数 prefix / suffix 用于给提交信息添加前缀/后缀。
 """
 
+import os
 import subprocess
 from typing import Any
 from typing import Dict
@@ -38,7 +39,14 @@ class CommitTool:
     )
     parameters = {
         "type": "object",
-        "properties": {},
+        "properties": {
+            "working_dir": {
+                "type": "string",
+                "description": "运行工作目录（可选）。指定后在目标目录下执行 git 操作与代码审查，"
+                "执行完自动切回原目录。",
+                "default": "",
+            },
+        },
         "required": [],
     }
 
@@ -48,8 +56,14 @@ class CommitTool:
         suffix = str((args or {}).get("suffix") or "").strip()
         agent = (args or {}).get("agent")
         skip_review = bool((args or {}).get("skip_review", False))
+        working_dir = str((args or {}).get("working_dir") or "").strip() or None
 
+        original_dir = os.getcwd()
         try:
+            # 指定工作目录时切换到目标目录（整个流程作用于该目录），
+            # 结束时无论成功失败都恢复原目录。
+            if working_dir:
+                os.chdir(working_dir)
             # 非交互模式下与 review 联动：未禁用 review 且未显式跳过时，先审查再提交。
             # 审查通过才真正 commit；审查发现问题则返回错误，不 commit。
             if (
@@ -127,6 +141,10 @@ class CommitTool:
                 "stdout": "",
                 "stderr": f"Commit failed: {str(e)}",
             }
+        finally:
+            # 无论成功失败，都恢复调用前的目录
+            if working_dir:
+                os.chdir(original_dir)
 
     def _run_review(self, agent: Any) -> Dict[str, Any]:
         """非交互联动：执行单次代码审查（复用 CodeReviewer.run_single_review）。

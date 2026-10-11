@@ -9,8 +9,10 @@ CodeAgent 在修改代码的过程中，LLM 可在任务执行中主动调用本
 交互模式下不联动，仅执行审查。
 """
 
+import os
 from typing import Any
 from typing import Dict
+from typing import Optional
 
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -29,13 +31,21 @@ class ReviewTool:
     )
     parameters = {
         "type": "object",
-        "properties": {},
+        "properties": {
+            "working_dir": {
+                "type": "string",
+                "description": "运行工作目录（可选）。指定后在目标目录下执行代码审查，"
+                "执行完自动切回原目录。",
+                "default": "",
+            },
+        },
         "required": [],
     }
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行单次代码审查（工具入口）。"""
         agent = (args or {}).get("agent")
+        working_dir = str((args or {}).get("working_dir") or "").strip() or None
 
         # disable_review 开启时直接禁用
         if agent is not None and getattr(agent, "disable_review", False):
@@ -45,7 +55,12 @@ class ReviewTool:
                 "stderr": "代码审查已禁用（disable_review 配置开启），跳过审查。",
             }
 
+        original_dir = os.getcwd()
         try:
+            # 指定工作目录时切换到目标目录（整个流程作用于该目录），
+            # 结束时无论成功失败都恢复原目录。
+            if working_dir:
+                os.chdir(working_dir)
             result = self.run_review(agent)
 
             ok = bool(result.get("ok", True))
@@ -55,7 +70,7 @@ class ReviewTool:
             if ok:
                 # 审查通过：非交互模式下自动接着 commit（联动）
                 if agent is not None and getattr(agent, "non_interactive", False):
-                    self._auto_commit(agent)
+                    self._auto_commit(agent, working_dir)
                 return {
                     "success": True,
                     "stdout": summary or "代码审查通过",
@@ -85,6 +100,10 @@ class ReviewTool:
                 "stdout": "",
                 "stderr": f"Review failed: {str(e)}",
             }
+        finally:
+            # 无论成功失败，都恢复调用前的目录
+            if working_dir:
+                os.chdir(original_dir)
 
     def run_review(self, agent: Any) -> Dict[str, Any]:
         """执行单次代码审查并返回结构化结果（供 execute 与 <Review> 命令复用）。
@@ -103,7 +122,7 @@ class ReviewTool:
         )
         return reviewer.run_single_review()
 
-    def _auto_commit(self, agent: Any) -> None:
+    def _auto_commit(self, agent: Any, working_dir: Optional[str] = None) -> None:
         """非交互模式下审查通过后自动 commit（联动）。
 
         复用 CommitTool 的压缩 checkpoint + 正式提交逻辑。
@@ -113,7 +132,13 @@ class ReviewTool:
             from jarvis.jarvis_tools.commit import CommitTool
 
             commit_tool = CommitTool()
-            commit_result = commit_tool.execute({"agent": agent, "skip_review": True})
+            commit_args: Dict[str, Any] = {
+                "agent": agent,
+                "skip_review": True,
+            }
+            if working_dir:
+                commit_args["working_dir"] = working_dir
+            commit_result = commit_tool.execute(commit_args)
             if commit_result.get("success"):
                 PrettyOutput.auto_print("✅ 审查通过，已自动提交代码")
             else:
