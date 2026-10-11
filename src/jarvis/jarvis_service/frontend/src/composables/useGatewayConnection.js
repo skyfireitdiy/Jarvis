@@ -39,7 +39,6 @@ export function useGatewayConnection({
   autoLoginEnabled,
   userAccessibleNodes,
   gitCustomDir,
-  agentMap,
   parseGatewayAddress,
   buildWebSocketUrl,
   buildWebSocketProtocols,
@@ -681,7 +680,7 @@ function checkHeartbeatTimeout() {
       lastPongTime.value.delete(agentId)
       // 如果是当前活跃 Agent，触发重连
       if (agentId === currentAgentId.value) {
-        const agent = agentMap.value.get(agentId)
+        const agent = agentList.value.find(a => a.agent_id === agentId)
         if (agent && !connectingAgents.value.has(agentId)) {
           connectToAgent(agent).catch(e => console.warn(`[HEARTBEAT] Reconnect failed for ${agentId}:`, e.message))
         }

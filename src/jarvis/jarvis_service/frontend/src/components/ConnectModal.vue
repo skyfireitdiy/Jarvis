@@ -133,7 +133,7 @@ jarvis-service start child</code></pre>
 <script setup>
 import { nextTick, ref, watch } from 'vue'
 
-defineProps({
+const props = defineProps({
   visible: Boolean,
   connecting: Boolean,
   errorMessage: String,
