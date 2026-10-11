@@ -194,7 +194,7 @@ class SkillEvaluator:
                     temperature=0.3,  # 降低随机性，提高一致性
                     max_tokens=500,
                 )
-                return response.choices[0].message.content
+                return str(response.choices[0].message.content or "")
 
             # 尝试直接调用 create 方法
             elif hasattr(self.llm_client, "create"):
@@ -210,7 +210,7 @@ class SkillEvaluator:
                     temperature=0.3,
                     max_tokens=500,
                 )
-                return response.choices[0].message.content
+                return str(response.choices[0].message.content or "")
 
             else:
                 raise ValueError("LLM 客户端不支持的接口类型")
@@ -218,7 +218,7 @@ class SkillEvaluator:
         except Exception as e:
             raise RuntimeError(f"LLM 调用失败：{str(e)}")
 
-    def _parse_response(self, response: str) -> Dict:
+    def _parse_response(self, response: str) -> Dict[str, Any]:
         """解析 LLM 响应（支持 JSON 和自然语言）"""
         import json
         import re
@@ -227,7 +227,9 @@ class SkillEvaluator:
         json_match = re.search(r"\{[^{}]*\}", response, re.DOTALL)
         if json_match:
             try:
-                return json.loads(json_match.group())
+                data = json.loads(json_match.group())
+                if isinstance(data, dict):
+                    return data
             except json.JSONDecodeError:
                 pass
 

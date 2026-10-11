@@ -1,21 +1,18 @@
 # -*- coding: utf-8 -*-
 """jarvis_web_gateway app API tests."""
 
-import json
 import os
 
 # 必须在导入 jarvis 模块之前设置环境变量，避免触发交互式配置
 os.environ["JARVIS_SKIP_INTERACTIVE_CONFIG"] = "1"
 
 from datetime import datetime
-from datetime import timedelta
 from unittest.mock import Mock
 from fastapi.testclient import TestClient
 
 from jarvis.jarvis_gateway.events import GatewayOutputEvent
 from jarvis.jarvis_gateway.output_bridge import SessionOutputRouter
 from jarvis.jarvis_utils.output import OutputType
-from jarvis.jarvis_web_gateway.app import MAX_FILE_SIZE_BYTES
 from jarvis.jarvis_web_gateway.app import _fuzzy_match_score
 from jarvis.jarvis_web_gateway.app import WebGateway
 from jarvis.jarvis_web_gateway.app import create_app

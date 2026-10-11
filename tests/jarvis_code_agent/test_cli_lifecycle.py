@@ -1,10 +1,8 @@
 # -*- coding: utf-8 -*-
 """code_agent cli 生命周期测试"""
 
-from types import SimpleNamespace
 
 
-from jarvis.jarvis_code_agent import code_agent
 
 
 class _DummyServer:

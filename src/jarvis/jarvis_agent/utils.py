@@ -12,6 +12,7 @@ from typing import Any, List
 from typing import Iterable
 from typing import Optional, Union
 from typing import cast
+import pathlib
 
 
 from jarvis.jarvis_platform.content_types import ContentBlock
@@ -1007,11 +1008,16 @@ def install_plugin(
 
             if is_zip:
                 with zipfile.ZipFile(source, "r") as zf:
-                    zf.extractall(temp_dir)
+                    # 校验成员，防止 zip slip 路径穿越（成员名含 ../ 或绝对路径）
+                    for member in zf.infolist():
+                        member_path = os.path.normpath(member.filename)
+                        if member_path.startswith(("..", "/")) or ".." in member_path.split("/"):
+                            raise ValueError(f"zip member escapes dest dir: {member.filename}")
+                    zf.extractall(temp_dir)  # nosec B202 - 上方已校验成员
             else:  # tar formats (including .tar.gz, .tgz)
                 with tarfile.open(source, "r:*") as tf:
                     # 使用 filter='data' 防止路径遍历攻击 (CVE-2007-4559)
-                    tf.extractall(temp_dir, filter="data")
+                    tf.extractall(temp_dir, filter="data")  # nosec B202
 
             # 解压后，查找包含 config.yaml 的目录
             extracted_items = list(Path(temp_dir).iterdir())
@@ -1373,7 +1379,7 @@ def list_plugins_info() -> List[dict]:
     return result
 
 
-def _resolve_plugin_dir(plugin_dir) -> "Path | None":
+def _resolve_plugin_dir(plugin_dir) -> "pathlib.Path | None":
     """将插件目录参数归一化为 Path；无效时返回 None。"""
     from pathlib import Path
 

@@ -1309,9 +1309,9 @@ class Agent:
             registry = self.get_tool_registry()
             if registry is None:
                 return f"工具 {name} 执行失败: 工具注册表不可用"
-            return registry.execute_native_tool_call(
+            return str(registry.execute_native_tool_call(
                 name, call.get("arguments") or {}, self
-            )
+            ))
         except Exception as e:
             return f"工具 {name} 执行异常: {e}"
 
@@ -1363,9 +1363,9 @@ class Agent:
             try:
                 if registry is None:
                     return f"工具 {n} 执行失败: 工具注册表不可用"
-                return registry.execute_native_tool_call(
+                return str(registry.execute_native_tool_call(
                     n, call.get("arguments") or {}, self, record=False
-                )
+                ))
             except Exception as e:
                 return f"工具 {n} 执行异常: {e}"
 

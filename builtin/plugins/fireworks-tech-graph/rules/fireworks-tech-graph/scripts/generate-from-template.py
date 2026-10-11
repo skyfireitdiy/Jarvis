@@ -14,12 +14,11 @@ from __future__ import annotations
 
 import copy
 import json
-import math
 import os
 import re
 import sys
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 from xml.sax.saxutils import escape
 
 Point = Tuple[float, float]

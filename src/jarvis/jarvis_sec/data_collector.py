@@ -1100,7 +1100,7 @@ class DataCollector:
         记录方式：为每个调用创建一个data_flow_node，use_type="condition_protected"。
         """
 
-        def _find_calls(node: Node, calls: list):
+        def _find_calls(node: Node, calls: list[Any]):
             if node.type == "call_expression":
                 func_node = node.child_by_field_name("function")
                 if func_node:

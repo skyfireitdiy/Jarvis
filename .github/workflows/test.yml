@@ -29,6 +29,12 @@ jobs:
       - name: Run tests
         run: pytest -v
 
+      - name: Lint with ruff
+        run: ruff check .
+
+      - name: Security scan with bandit
+        run: bandit -r src/jarvis -q
+
   go-test:
     name: Run go test
     runs-on: ubuntu-latest

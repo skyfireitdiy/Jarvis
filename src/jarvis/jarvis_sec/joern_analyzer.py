@@ -8,7 +8,7 @@ Joern是一个开源（Apache 2.0许可）的代码分析平台，支持C/C++等
 import subprocess
 import tempfile
 import os
-from typing import List, Optional, TYPE_CHECKING
+from typing import Any, List, Optional, TYPE_CHECKING
 
 from .taint_analyzer import (
     TaintAnalyzer,
@@ -363,7 +363,7 @@ sink.reachableByFlows(source).l"""
             # 数据库查询失败时返回原始路径
             return paths
 
-    def _path_involves_call(self, path: TaintPath, call_info: dict) -> bool:
+    def _path_involves_call(self, path: TaintPath, call_info: dict[str, Any]) -> bool:
         """检查污点路径是否涉及某个调用点"""
         # 简单实现：检查调用函数名是否在路径中
         caller_func = call_info.get("caller_function", "")
@@ -371,7 +371,7 @@ sink.reachableByFlows(source).l"""
         return caller_func in path.path or callee_func in path.path
 
     def _extend_path_with_call(
-        self, path: TaintPath, call_info: dict, database: "ProjectDatabase"
+        self, path: TaintPath, call_info: dict[str, Any], database: "ProjectDatabase"
     ) -> TaintPath:
         """扩展污点路径，添加跨函数调用信息"""
         # 创建新的路径列表
@@ -400,12 +400,12 @@ sink.reachableByFlows(source).l"""
             line_number=path.line_number,
         )
 
-    def _path_involves_data_node(self, path: TaintPath, node: dict) -> bool:
+    def _path_involves_data_node(self, path: TaintPath, node: dict[str, Any]) -> bool:
         """检查污点路径是否涉及某个数据流节点"""
         var_name = node.get("var_name", "")
         return var_name in path.path
 
-    def _extend_path_with_data_node(self, path: TaintPath, node: dict) -> TaintPath:
+    def _extend_path_with_data_node(self, path: TaintPath, node: dict[str, Any]) -> TaintPath:
         """扩展污点路径，添加数据流节点信息"""
         new_path = list(path.path)
 

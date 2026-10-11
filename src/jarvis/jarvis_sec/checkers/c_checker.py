@@ -4295,7 +4295,7 @@ def _ast_divide_by_zero_check(
     root = tree.root_node
 
     # 1. 收集 #define 定义的常量宏（值为非零常量）
-    const_macros: set = set()
+    const_macros: set[str] = set()
 
     def _collect_const_macros(node):
         if node.type == "preproc_def":
