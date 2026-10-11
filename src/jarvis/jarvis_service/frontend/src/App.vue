@@ -3520,9 +3520,9 @@ const allOutputs = ref(new Map()) // 按 agent_id 存储消息：agent_id -> out
 const outputs = computed(() => allOutputs.value.get(currentAgentId.value) || []) // 当前 Agent 的消息
 const outputList = ref(null)
 const panelOutputLists = new Map() // panelId -> outputList element
-const historyScrollListenerEl = ref(null) // 当前绑定滚动监听的元素
-const historyScrollHandler = ref(null) // 滚动监听处理函数
-const historyScrollDebounceTimer = ref(null) // 滚动防抖定时器
+// 历史滚动监听状态：普通对象（非响应式）。渲染期间（函数 ref 回调链）对其赋值不会触发
+// Vue 响应式重渲染，避免无限渲染循环（Issue #94 点击 Agent 卡死根因）。
+const historyScrollState = { listenerEl: null, handler: null, debounceTimer: null }
 
 // 从历史记录中获取指定 agent 的最后一条消息的 seq
 function getAgentLastSeq(agentId) {
@@ -4155,9 +4155,7 @@ const {
   sessionPanelRefs,
   panels,
   activePanelId,
-  historyScrollListenerEl,
-  historyScrollHandler,
-  historyScrollDebounceTimer,
+  historyScrollState,
   panelOutputLists,
   outputList,
   inputMode,
@@ -8215,14 +8213,14 @@ onUnmounted(() => {
   clearOnboardingTimer()
 
   // 清理滚动监听
-  if (historyScrollListenerEl.value && historyScrollHandler.value) {
-    historyScrollListenerEl.value.removeEventListener('scroll', historyScrollHandler.value)
-    historyScrollListenerEl.value = null
-    historyScrollHandler.value = null
+  if (historyScrollState.listenerEl && historyScrollState.handler) {
+    historyScrollState.listenerEl.removeEventListener('scroll', historyScrollState.handler)
+    historyScrollState.listenerEl = null
+    historyScrollState.handler = null
   }
-  if (historyScrollDebounceTimer.value) {
-    clearTimeout(historyScrollDebounceTimer.value)
-    historyScrollDebounceTimer.value = null
+  if (historyScrollState.debounceTimer) {
+    clearTimeout(historyScrollState.debounceTimer)
+    historyScrollState.debounceTimer = null
   }
   
   // 清理心跳定时器
