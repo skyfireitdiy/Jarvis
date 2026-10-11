@@ -76,6 +76,7 @@ dependencies = [
     "pymdown-extensions",
     "websockets",
     "httpx",
+    "msgpack>=1.0.0",
     "jieba",
     "aiohttp>=3.9.0",
     "psutil>=5.9.0",

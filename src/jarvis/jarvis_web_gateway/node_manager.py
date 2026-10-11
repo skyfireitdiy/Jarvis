@@ -74,6 +74,8 @@ from .node_protocol import (
     NODE_HEARTBEAT,
     build_error_message,
     build_node_message,
+    decode_node_message,
+    encode_node_message,
 )
 from .node_runtime import AgentRouteInfo, NodeInfo, NodeRuntime
 from .system_info import get_node_description, get_system_info
@@ -86,6 +88,19 @@ logger = logging.getLogger(__name__)
 CHILD_HEARTBEAT_INTERVAL_SECONDS = 10
 CHILD_RECONNECT_MIN_SECONDS = 5
 CHILD_RECONNECT_MAX_SECONDS = 10
+
+
+async def _send_node_message(websocket: Any, message: Dict[str, Any]) -> None:
+    """向节点 WebSocket 发送二进制节点消息。
+
+    兼容两种 WebSocket 实现：FastAPI WebSocket（send_bytes）与
+    websockets 库连接（send）。
+    """
+    data = encode_node_message(message)
+    if hasattr(websocket, "send_bytes"):
+        await websocket.send_bytes(data)
+    else:
+        await websocket.send(data)
 
 
 class NodeConnectionManager:
@@ -114,21 +129,26 @@ class NodeConnectionManager:
         await websocket.accept()
         connection_id = str(uuid.uuid4())
         try:
-            message = await asyncio.wait_for(websocket.receive_json(), timeout=10)
+            raw_message = await asyncio.wait_for(websocket.receive_bytes(), timeout=10)
+            message = decode_node_message(raw_message)
         except Exception:
-            await websocket.send_json(
-                build_error_message(
-                    "NODE_AUTH_REQUIRED",
-                    "first message must be node_auth",
+            await websocket.send_bytes(
+                encode_node_message(
+                    build_error_message(
+                        "NODE_AUTH_REQUIRED",
+                        "first message must be node_auth",
+                    )
                 )
             )
             await websocket.close(code=4401)
             return
 
         if not isinstance(message, dict) or message.get("type") != NODE_AUTH:
-            await websocket.send_json(
-                build_error_message(
-                    "INVALID_NODE_MESSAGE", "first message must be node_auth"
+            await websocket.send_bytes(
+                encode_node_message(
+                    build_error_message(
+                        "INVALID_NODE_MESSAGE", "first message must be node_auth"
+                    )
                 )
             )
             await websocket.close(code=4401)
@@ -138,9 +158,11 @@ class NodeConnectionManager:
         node_id = str(payload.get("node_id") or "").strip()
         secret = str(payload.get("secret") or "").strip()
         if not node_id or not secret:
-            await websocket.send_json(
-                build_error_message(
-                    "NODE_AUTH_FAILED", "node_id and secret are required"
+            await websocket.send_bytes(
+                encode_node_message(
+                    build_error_message(
+                        "NODE_AUTH_FAILED", "node_id and secret are required"
+                    )
                 )
             )
             await websocket.close(code=4401)
@@ -148,17 +170,21 @@ class NodeConnectionManager:
 
         expected_secret = (self._node_runtime.config.node_secret or "").strip()
         if not expected_secret or secret != expected_secret:
-            await websocket.send_json(
-                build_error_message("NODE_AUTH_FAILED", "invalid node credentials")
+            await websocket.send_bytes(
+                encode_node_message(
+                    build_error_message("NODE_AUTH_FAILED", "invalid node credentials")
+                )
             )
             await websocket.close(code=4401)
             return
 
         # 检查是否已存在同名节点
         if node_id in self._connections:
-            await websocket.send_json(
-                build_error_message(
-                    "NODE_ALREADY_CONNECTED", f"node {node_id} is already connected"
+            await websocket.send_bytes(
+                encode_node_message(
+                    build_error_message(
+                        "NODE_ALREADY_CONNECTED", f"node {node_id} is already connected"
+                    )
                 )
             )
             await websocket.close(code=4403)
@@ -175,22 +201,25 @@ class NodeConnectionManager:
                 metadata={},
             )
         )
-        await websocket.send_json(
-            build_node_message(
-                "node_auth_result",
-                {
-                    "success": True,
-                    "node_id": node_id,
-                    "token": os.environ.get("JARVIS_AUTH_TOKEN"),
-                    "heartbeat_interval": 10,
-                },
-                request_id=message.get("request_id"),
+        await websocket.send_bytes(
+            encode_node_message(
+                build_node_message(
+                    "node_auth_result",
+                    {
+                        "success": True,
+                        "node_id": node_id,
+                        "token": os.environ.get("JARVIS_AUTH_TOKEN"),
+                        "heartbeat_interval": 10,
+                    },
+                    request_id=message.get("request_id"),
+                )
             )
         )
 
         try:
             while True:
-                next_message = await websocket.receive_json()
+                raw_next_message = await websocket.receive_bytes()
+                next_message = decode_node_message(raw_next_message)
                 if not isinstance(next_message, dict):
                     continue
                 message_type = next_message.get("type")
@@ -237,54 +266,54 @@ class NodeConnectionManager:
                     continue
                 if message_type == AGENT_CREATE_REQUEST:
                     response = self._handle_agent_create_request(next_message, node_id)
-                    await websocket.send_json(response)
+                    await websocket.send_bytes(encode_node_message(response))
                     continue
                 if message_type == AGENT_HTTP_REQUEST:
                     response = await self._handle_agent_http_request(next_message)
-                    await websocket.send_json(response)
+                    await websocket.send_bytes(encode_node_message(response))
                     continue
                 if message_type == NODE_HTTP_PROXY_REQUEST:
                     response = await self._handle_node_http_proxy_request(
                         websocket, next_message
                     )
                     if response is not None:
-                        await websocket.send_json(response)
+                        await websocket.send_bytes(encode_node_message(response))
                     continue
                 if message_type == AGENT_LIST_REQUEST:
                     response = self._handle_agent_list_request(next_message)
-                    await websocket.send_json(response)
+                    await websocket.send_bytes(encode_node_message(response))
                     continue
                 if message_type == AGENT_STOP_REQUEST:
                     response = self._handle_agent_stop_request(next_message)
-                    await websocket.send_json(response)
+                    await websocket.send_bytes(encode_node_message(response))
                     continue
                 if message_type == AGENT_DELETE_REQUEST:
                     response = self._handle_agent_delete_request(next_message)
-                    await websocket.send_json(response)
+                    await websocket.send_bytes(encode_node_message(response))
                     continue
                 if message_type == AGENT_REGENERATE_REQUEST:
                     response = self._handle_agent_regenerate_request(next_message)
-                    await websocket.send_json(response)
+                    await websocket.send_bytes(encode_node_message(response))
                     continue
                 if message_type == AGENT_WS_REQUEST:
                     response = await self._handle_agent_ws_request(next_message)
-                    await websocket.send_json(response)
+                    await websocket.send_bytes(encode_node_message(response))
                     continue
                 if message_type == AGENT_WS_OPEN_REQUEST:
                     response = await self._handle_agent_ws_open_request(next_message)
-                    await websocket.send_json(response)
+                    await websocket.send_bytes(encode_node_message(response))
                     continue
                 if message_type == AGENT_WS_SEND_REQUEST:
                     response = await self._handle_agent_ws_send_request(next_message)
-                    await websocket.send_json(response)
+                    await websocket.send_bytes(encode_node_message(response))
                     continue
                 if message_type == AGENT_WS_RECV_REQUEST:
                     response = await self._handle_agent_ws_recv_request(next_message)
-                    await websocket.send_json(response)
+                    await websocket.send_bytes(encode_node_message(response))
                     continue
                 if message_type == AGENT_WS_CLOSE_REQUEST:
                     response = await self._handle_agent_ws_close_request(next_message)
-                    await websocket.send_json(response)
+                    await websocket.send_bytes(encode_node_message(response))
                     continue
                 if message_type == DIRECTORY_LIST_REQUEST:
                     logger.info(
@@ -293,7 +322,7 @@ class NodeConnectionManager:
                         request_id,
                     )
                     response = self._handle_directory_list_request(next_message)
-                    await websocket.send_json(response)
+                    await websocket.send_bytes(encode_node_message(response))
                     logger.info(
                         "[NODE] sent directory list response node_id=%s request_id=%s",
                         node_id,
@@ -307,7 +336,7 @@ class NodeConnectionManager:
                         request_id,
                     )
                     response = await self._handle_config_sync_request(next_message)
-                    await websocket.send_json(response)
+                    await websocket.send_bytes(encode_node_message(response))
                     logger.info(
                         "[NODE] sent config sync response node_id=%s request_id=%s",
                         node_id,
@@ -321,7 +350,7 @@ class NodeConnectionManager:
                         request_id,
                     )
                     response = self._handle_plugin_manage_request(next_message)
-                    await websocket.send_json(response)
+                    await websocket.send_bytes(encode_node_message(response))
                     logger.info(
                         "[NODE] sent plugin manage response node_id=%s request_id=%s",
                         node_id,
@@ -387,8 +416,10 @@ class NodeConnectionManager:
                 message_type,
                 request_id,
             )
-            await websocket.send_json(
-                build_node_message(message_type, payload, request_id=request_id)
+            await websocket.send_bytes(
+                encode_node_message(
+                    build_node_message(message_type, payload, request_id=request_id)
+                )
             )
             try:
                 response = await asyncio.wait_for(future, timeout=timeout)
@@ -438,8 +469,10 @@ class NodeConnectionManager:
         queue: asyncio.Queue = asyncio.Queue()
         self._streaming_queues[request_id] = queue
         try:
-            await websocket.send_json(
-                build_node_message(message_type, payload, request_id=request_id)
+            await websocket.send_bytes(
+                encode_node_message(
+                    build_node_message(message_type, payload, request_id=request_id)
+                )
             )
 
             # 等待并逐个 yield 响应消息
@@ -899,21 +932,20 @@ class NodeConnectionManager:
             target_url = f"{target_url}?{query}"
 
         if not target_url.startswith(("http://", "https://")):
-            await websocket.send(
-                json.dumps(
-                    build_node_message(
-                        NODE_HTTP_PROXY_RESPONSE,
-                        {
-                            "success": False,
-                            "error": {
-                                "code": "INVALID_URL",
-                                "message": "URL must start with http:// or https://",
-                            },
-                            "done": True,
+            await _send_node_message(
+                websocket,
+                build_node_message(
+                    NODE_HTTP_PROXY_RESPONSE,
+                    {
+                        "success": False,
+                        "error": {
+                            "code": "INVALID_URL",
+                            "message": "URL must start with http:// or https://",
                         },
-                        request_id=request_id,
-                    )
-                )
+                        "done": True,
+                    },
+                    request_id=request_id,
+                ),
             )
             return
 
@@ -950,63 +982,59 @@ class NodeConnectionManager:
                             {"chunk": chunk},
                             request_id=request_id,
                         )
-                        await websocket.send(json.dumps(msg))
+                        await _send_node_message(websocket, msg)
 
-            await websocket.send(
-                json.dumps(
-                    build_node_message(
-                        NODE_HTTP_PROXY_RESPONSE,
-                        {"done": True},
-                        request_id=request_id,
-                    )
-                )
+            await _send_node_message(
+                websocket,
+                build_node_message(
+                    NODE_HTTP_PROXY_RESPONSE,
+                    {"done": True},
+                    request_id=request_id,
+                ),
             )
         except httpx.TimeoutException:
-            await websocket.send(
-                json.dumps(
-                    build_node_message(
-                        NODE_HTTP_PROXY_RESPONSE,
-                        {
-                            "success": False,
-                            "error": {"code": "TIMEOUT", "message": "Request timeout"},
-                            "done": True,
-                        },
-                        request_id=request_id,
-                    )
-                )
+            await _send_node_message(
+                websocket,
+                build_node_message(
+                    NODE_HTTP_PROXY_RESPONSE,
+                    {
+                        "success": False,
+                        "error": {"code": "TIMEOUT", "message": "Request timeout"},
+                        "done": True,
+                    },
+                    request_id=request_id,
+                ),
             )
         except httpx.RequestError as e:
             logger.exception(f"[STREAMING HTTP PROXY] Request error: {e}")
-            await websocket.send(
-                json.dumps(
-                    build_node_message(
-                        NODE_HTTP_PROXY_RESPONSE,
-                        {
-                            "success": False,
-                            "error": {
-                                "code": "REQUEST_ERROR",
-                                "message": f"Request failed: {str(e)}",
-                            },
-                            "done": True,
+            await _send_node_message(
+                websocket,
+                build_node_message(
+                    NODE_HTTP_PROXY_RESPONSE,
+                    {
+                        "success": False,
+                        "error": {
+                            "code": "REQUEST_ERROR",
+                            "message": f"Request failed: {str(e)}",
                         },
-                        request_id=request_id,
-                    )
-                )
+                        "done": True,
+                    },
+                    request_id=request_id,
+                ),
             )
         except Exception as e:
             logger.exception(f"[STREAMING HTTP PROXY] Unexpected error: {e}")
-            await websocket.send(
-                json.dumps(
-                    build_node_message(
-                        NODE_HTTP_PROXY_RESPONSE,
-                        {
-                            "success": False,
-                            "error": {"code": "INTERNAL_ERROR", "message": str(e)},
-                            "done": True,
-                        },
-                        request_id=request_id,
-                    )
-                )
+            await _send_node_message(
+                websocket,
+                build_node_message(
+                    NODE_HTTP_PROXY_RESPONSE,
+                    {
+                        "success": False,
+                        "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+                        "done": True,
+                    },
+                    request_id=request_id,
+                ),
             )
 
     def _handle_agent_stop_request(self, message: Dict[str, Any]) -> Dict[str, Any]:
@@ -2039,7 +2067,7 @@ class NodeTerminalOutputProxy:
     def publish(self, message: Any, session_id: str = "default") -> None:
         """将终端输出消息通过 NODE_TERMINAL_OUTPUT 发送给 master。"""
         try:
-            output_msg = json.dumps(
+            output_msg = encode_node_message(
                 build_node_message(
                     NODE_TERMINAL_OUTPUT,
                     {
@@ -2224,7 +2252,7 @@ class ChildNodeClient:
         proxy_url = self._get_proxy_for_url(ws_url)
         self._ws = await websockets.connect(ws_url, close_timeout=10, proxy=proxy_url)
         await self._ws.send(
-            json.dumps(
+            encode_node_message(
                 build_node_message(
                     NODE_AUTH,
                     {
@@ -2239,7 +2267,7 @@ class ChildNodeClient:
             )
         )
         raw_message = await self._ws.recv()
-        message = json.loads(raw_message)
+        message = decode_node_message(raw_message)
         if (
             not isinstance(message, dict)
             or message.get("type") != NODE_AUTH_RESULT
@@ -2279,7 +2307,7 @@ class ChildNodeClient:
                 description = get_node_description()
 
                 await self._ws.send(
-                    json.dumps(
+                    encode_node_message(
                         build_node_message(
                             NODE_HEARTBEAT,
                             {
@@ -2297,7 +2325,7 @@ class ChildNodeClient:
                 if self._ws is None:
                     raise RuntimeError("node websocket is closed")
                 raw_next_message = await self._ws.recv()
-                next_message = json.loads(raw_next_message)
+                next_message = decode_node_message(raw_next_message)
                 if not isinstance(next_message, dict):
                     continue
                 message_type = next_message.get("type")
@@ -2313,7 +2341,7 @@ class ChildNodeClient:
                             next_message, "master"
                         )
                     )
-                    await self._ws.send(json.dumps(response))
+                    await self._ws.send(encode_node_message(response))
                     continue
                 if message_type == AGENT_HTTP_REQUEST:
                     response = (
@@ -2321,25 +2349,25 @@ class ChildNodeClient:
                             next_message
                         )
                     )
-                    await self._ws.send(json.dumps(response))
+                    await self._ws.send(encode_node_message(response))
                     continue
                 if message_type == NODE_HTTP_PROXY_REQUEST:
                     response = await self._node_connection_manager._handle_node_http_proxy_request(
                         self._ws, next_message
                     )
-                    await self._ws.send(json.dumps(response))
+                    await self._ws.send(encode_node_message(response))
                     continue
                 if message_type == AGENT_LIST_REQUEST:
                     response = self._node_connection_manager._handle_agent_list_request(
                         next_message
                     )
-                    await self._ws.send(json.dumps(response))
+                    await self._ws.send(encode_node_message(response))
                     continue
                 if message_type == AGENT_STOP_REQUEST:
                     response = self._node_connection_manager._handle_agent_stop_request(
                         next_message
                     )
-                    await self._ws.send(json.dumps(response))
+                    await self._ws.send(encode_node_message(response))
                     continue
                 if message_type == AGENT_DELETE_REQUEST:
                     response = (
@@ -2347,7 +2375,7 @@ class ChildNodeClient:
                             next_message
                         )
                     )
-                    await self._ws.send(json.dumps(response))
+                    await self._ws.send(encode_node_message(response))
                     continue
                 if message_type == AGENT_REGENERATE_REQUEST:
                     response = (
@@ -2355,7 +2383,7 @@ class ChildNodeClient:
                             next_message
                         )
                     )
-                    await self._ws.send(json.dumps(response))
+                    await self._ws.send(encode_node_message(response))
                     continue
                 if message_type == AGENT_WS_REQUEST:
                     response = (
@@ -2363,31 +2391,31 @@ class ChildNodeClient:
                             next_message
                         )
                     )
-                    await self._ws.send(json.dumps(response))
+                    await self._ws.send(encode_node_message(response))
                     continue
                 if message_type == AGENT_WS_OPEN_REQUEST:
                     response = await self._node_connection_manager._handle_agent_ws_open_request(
                         next_message
                     )
-                    await self._ws.send(json.dumps(response))
+                    await self._ws.send(encode_node_message(response))
                     continue
                 if message_type == AGENT_WS_SEND_REQUEST:
                     response = await self._node_connection_manager._handle_agent_ws_send_request(
                         next_message
                     )
-                    await self._ws.send(json.dumps(response))
+                    await self._ws.send(encode_node_message(response))
                     continue
                 if message_type == AGENT_WS_RECV_REQUEST:
                     response = await self._node_connection_manager._handle_agent_ws_recv_request(
                         next_message
                     )
-                    await self._ws.send(json.dumps(response))
+                    await self._ws.send(encode_node_message(response))
                     continue
                 if message_type == AGENT_WS_CLOSE_REQUEST:
                     response = await self._node_connection_manager._handle_agent_ws_close_request(
                         next_message
                     )
-                    await self._ws.send(json.dumps(response))
+                    await self._ws.send(encode_node_message(response))
                     continue
                 if message_type == DIRECTORY_LIST_REQUEST:
                     response = (
@@ -2395,7 +2423,7 @@ class ChildNodeClient:
                             next_message
                         )
                     )
-                    await self._ws.send(json.dumps(response))
+                    await self._ws.send(encode_node_message(response))
                     continue
                 if message_type == CONFIG_SYNC_REQUEST:
                     response = (
@@ -2403,7 +2431,7 @@ class ChildNodeClient:
                             next_message
                         )
                     )
-                    await self._ws.send(json.dumps(response))
+                    await self._ws.send(encode_node_message(response))
                     continue
                 if message_type == CONFIG_GET_REQUEST:
                     response = (
@@ -2411,7 +2439,7 @@ class ChildNodeClient:
                             next_message
                         )
                     )
-                    await self._ws.send(json.dumps(response))
+                    await self._ws.send(encode_node_message(response))
                     continue
                 if message_type == CONFIG_SET_REQUEST:
                     response = (
@@ -2419,21 +2447,21 @@ class ChildNodeClient:
                             next_message
                         )
                     )
-                    await self._ws.send(json.dumps(response))
+                    await self._ws.send(encode_node_message(response))
                     continue
                 if message_type == NODE_TERMINAL_REQUEST:
                     response = await self._handle_node_terminal_request(next_message)
-                    await self._ws.send(json.dumps(response))
+                    await self._ws.send(encode_node_message(response))
                     continue
                 if message_type == SERVICE_RESTART_REQUEST:
                     response = await self._handle_service_restart_request(next_message)
-                    await self._ws.send(json.dumps(response))
+                    await self._ws.send(encode_node_message(response))
                     continue
                 if message_type == CODE_UPDATE_TO_MAIN_REQUEST:
                     response = await self._handle_code_update_to_main_request(
                         next_message
                     )
-                    await self._ws.send(json.dumps(response))
+                    await self._ws.send(encode_node_message(response))
                     continue
                 logger.warning(
                     "[NODE] child unhandled message type=%s request_id=%s",

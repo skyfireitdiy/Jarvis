@@ -3,10 +3,16 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
+import msgpack
+
 PROTOCOL_VERSION = 1
+
+# 二进制帧头魔数：用于自描述消息编码，接收端据此判断是 msgpack 还是 JSON。
+MAGIC = b"\x93JAR"
 
 NODE_AUTH = "node_auth"
 NODE_AUTH_RESULT = "node_auth_result"
@@ -83,3 +89,21 @@ def build_error_message(
         },
         request_id=request_id,
     )
+
+
+def encode_node_message(message: Dict[str, Any]) -> bytes:
+    """将节点消息编码为二进制帧（msgpack + 魔数前缀）。"""
+    return MAGIC + msgpack.packb(message)
+
+
+def decode_node_message(data: Any) -> Dict[str, Any]:
+    """解码节点消息，兼容二进制（msgpack）与旧版 JSON 文本。
+
+    接收端可能收到 bytes（二进制帧）或 str（旧版 JSON 文本帧）。
+    带魔数前缀的按 msgpack 解码，否则按 JSON 解码。
+    """
+    if isinstance(data, str):
+        return json.loads(data)
+    if data.startswith(MAGIC):
+        return msgpack.unpackb(data[len(MAGIC) :])
+    return json.loads(data)
