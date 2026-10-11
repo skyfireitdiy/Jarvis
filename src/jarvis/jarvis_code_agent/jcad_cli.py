@@ -38,7 +38,7 @@ def _write_task_to_temp_file(task_content: str) -> str:
         suffix=".txt",
         prefix="jcad_task_",
         text=True,
-        dir="/tmp",
+        dir="/tmp",  # nosec B108 - mkstemp 本身安全，仅指定 /tmp 目录
     )
 
     # 写入内容

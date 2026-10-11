@@ -2137,7 +2137,7 @@ def create_app(
                 jglobals.master_url = env_master_url
             else:
                 effective_host = host.strip() if host else ""
-                if not effective_host or effective_host in ("0.0.0.0", "::", "[::]"):
+                if not effective_host or effective_host in ("0.0.0.0", "::", "[::]"):  # nosec B104 - 仅字符串比较判断主机值，非真实绑定
                     effective_host = "127.0.0.1"
                 jglobals.master_url = f"http://{effective_host}:{port}"
 
@@ -4504,7 +4504,7 @@ def create_app(
             if node_id in (node_runtime.local_node_id, "master"):
                 interpreter = raw_interpreter or os.environ.get("SHELL") or "bash"
                 working_dir = explicit_working_dir or str(pathlib.Path.home())
-                proc = await asyncio.create_subprocess_shell(
+                proc = await asyncio.create_subprocess_shell(  # nosec B604 - 命令执行功能设计所需（terminal 权限受控）
                     command,
                     shell=True,
                     executable=interpreter,

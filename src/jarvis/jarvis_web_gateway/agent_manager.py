@@ -527,7 +527,7 @@ class AgentManager:
                 f"http://127.0.0.1:{agent_info.port}/sessions/save",
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=10) as resp:
+            with urllib.request.urlopen(req, timeout=10) as resp:  # nosec B310 - 固定本机 127.0.0.1 URL，非用户可控
                 data = json.loads(resp.read().decode("utf-8"))
                 if data.get("success"):
                     session_file = data.get("session_file")

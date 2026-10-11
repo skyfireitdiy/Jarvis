@@ -59,10 +59,10 @@ _PROXY_ENV_VARS: frozenset[str] = frozenset(
 )
 
 # 容器内任务 instruction 的落盘路径
-_INSTRUCTION_PATH = PurePosixPath("/tmp/jarvis-instruction.txt")
+_INSTRUCTION_PATH = PurePosixPath("/tmp/jarvis-instruction.txt")  # nosec B108 - 容器内固定路径
 
 # 容器内离线 wheelhouse 的落盘路径
-_WHEELHOUSE_REMOTE_DIR = PurePosixPath("/tmp/jarvis-wheelhouse")
+_WHEELHOUSE_REMOTE_DIR = PurePosixPath("/tmp/jarvis-wheelhouse")  # nosec B108 - 容器内固定路径
 
 
 class JarvisInstalledAgent(BaseInstalledAgent):
