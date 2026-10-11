@@ -6074,8 +6074,14 @@ def create_app(
 
             resolved_target_node = target_node_id or node_runtime.local_node_id
 
-            # 权限校验：创建 Agent 需要 agent:create 权限（system/admin 由 _check_permission 内部放行）
-            if user_info and user_info.get("user_id") != "system":
+            # 权限校验：创建 Agent 需要 agent:create 权限（system/admin 由 _check_permission 内部放行）。
+            # 仅在 master 上执行：子节点本地没有 auth 数据（权限数据不同步），无法独立判定；
+            # 跨节点请求的权限已由 master 在转发前统一把关，故子节点信任 master 的判定，不再重复校验。
+            if (
+                node_config.is_master
+                and user_info
+                and user_info.get("user_id") != "system"
+            ):
                 if _check_permission(user_info, "agent:create"):
                     return {
                         "success": False,
@@ -8142,7 +8148,10 @@ def create_app(
         """创建定时器。"""
         try:
             user_info = getattr(request.state, "user_info", None)
-            if _check_permission(user_info, "timer:create"):
+            # 权限校验仅在 master 上执行：子节点本地没有 auth 数据（权限数据不同步），
+            # 无法独立判定；跨节点请求的权限已由 master 在转发前统一把关，
+            # 故子节点信任 master 的判定，不再重复校验。
+            if node_config.is_master and _check_permission(user_info, "timer:create"):
                 return {
                     "success": False,
                     "error": {
@@ -8173,7 +8182,7 @@ def create_app(
         """查询所有定时器。"""
         try:
             user_info = getattr(request.state, "user_info", None)
-            if _check_permission(user_info, "timer:read"):
+            if node_config.is_master and _check_permission(user_info, "timer:read"):
                 return {
                     "success": False,
                     "error": {
@@ -8193,7 +8202,7 @@ def create_app(
         """查询单个定时器。"""
         try:
             user_info = getattr(request.state, "user_info", None)
-            if _check_permission(user_info, "timer:read"):
+            if node_config.is_master and _check_permission(user_info, "timer:read"):
                 return {
                     "success": False,
                     "error": {
@@ -8219,7 +8228,7 @@ def create_app(
         """删除指定定时器。"""
         try:
             user_info = getattr(request.state, "user_info", None)
-            if _check_permission(user_info, "timer:delete"):
+            if node_config.is_master and _check_permission(user_info, "timer:delete"):
                 return {
                     "success": False,
                     "error": {
@@ -8715,7 +8724,7 @@ def create_app(
         """列出指定节点已安装的插件（需要 admin:plugins 权限）。"""
         try:
             user_info = getattr(request.state, "user_info", None)
-            if _check_permission(user_info, "admin:plugins"):
+            if node_config.is_master and _check_permission(user_info, "admin:plugins"):
                 return {
                     "success": False,
                     "error": {
@@ -8751,7 +8760,7 @@ def create_app(
         """在指定节点安装插件（需要 admin:plugins 权限）。"""
         try:
             user_info = getattr(request.state, "user_info", None)
-            if _check_permission(user_info, "admin:plugins"):
+            if node_config.is_master and _check_permission(user_info, "admin:plugins"):
                 return {
                     "success": False,
                     "error": {
@@ -8799,7 +8808,7 @@ def create_app(
         """卸载指定节点的插件（需要 admin:plugins 权限）。"""
         try:
             user_info = getattr(request.state, "user_info", None)
-            if _check_permission(user_info, "admin:plugins"):
+            if node_config.is_master and _check_permission(user_info, "admin:plugins"):
                 return {
                     "success": False,
                     "error": {
@@ -8835,7 +8844,7 @@ def create_app(
         """升级指定节点的插件（需要 admin:plugins 权限）。"""
         try:
             user_info = getattr(request.state, "user_info", None)
-            if _check_permission(user_info, "admin:plugins"):
+            if node_config.is_master and _check_permission(user_info, "admin:plugins"):
                 return {
                     "success": False,
                     "error": {
@@ -8874,7 +8883,7 @@ def create_app(
         """读取指定节点插件的前端资源文件（需要 admin:plugins 权限）。"""
         try:
             user_info = getattr(request.state, "user_info", None)
-            if _check_permission(user_info, "admin:plugins"):
+            if node_config.is_master and _check_permission(user_info, "admin:plugins"):
                 return {
                     "success": False,
                     "error": {
