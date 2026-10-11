@@ -38,16 +38,7 @@ class CommitTool:
     )
     parameters = {
         "type": "object",
-        "properties": {
-            "prefix": {
-                "type": "string",
-                "description": "提交信息前缀（可选）。该前缀会被追加到正式提交信息（LLM 生成的主题行）之前；无特殊要求请留空，避免影响提交信息的规范性与可读性。",
-            },
-            "suffix": {
-                "type": "string",
-                "description": "提交信息后缀（可选，加在生成信息之后）",
-            },
-        },
+        "properties": {},
         "required": [],
     }
 
