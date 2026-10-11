@@ -66,7 +66,7 @@ dependencies = [
     "pytest",
     "pytest-xdist",
     "pytest-asyncio",
-    "ruff",
+    "ruff==0.15.7",
     "ty",
     "bandit",
     "build",
@@ -145,6 +145,11 @@ dependencies = [
 
     [tool.mypy]
     ignore_missing_imports = true
+
+    [tool.ruff.lint]
+    # 锁定规则集为经典默认（E4/E7/E9/F），避免新版本 ruff 引入的 UP/BLE 等
+    # 规则导致 CI 与本地检查结果不一致（Issue #146 后新增 ruff CI 步骤曾因此失败）。
+    select = ["E4", "E7", "E9", "F"]
 
     [tool.pytest.ini_options]
     minversion = "6.1.0"
