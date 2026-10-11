@@ -15,6 +15,8 @@ const LEGACY_WORKDIR_KEY = "jarvis_autoworker_workdir";
 const DIRS_KEY_PREFIX = "jarvis_autoworker_dirs_";
 // 每节点当前激活工作目录持久化 key 前缀：jarvis_autoworker_active_<node>。
 const ACTIVE_DIR_KEY_PREFIX = "jarvis_autoworker_active_";
+// 每节点工作目录历史上限（最近使用在前，超出截断）。
+const DIRS_HISTORY_MAX = 10;
 // 轮询间隔（毫秒）。
 const POLL_INTERVAL = 15000;
 
@@ -285,7 +287,9 @@ export default {
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed)) {
-            dirs = parsed.filter((d) => typeof d === "string" && d.trim());
+            dirs = parsed
+              .filter((d) => typeof d === "string" && d.trim())
+              .slice(0, DIRS_HISTORY_MAX);
           }
         }
       } catch {
@@ -320,7 +324,7 @@ export default {
       this.selected = null;
       this.refresh();
     },
-    // 添加一个工作目录到当前节点（去重）
+    // 添加一个工作目录到当前节点：去重置顶（已存在则移到最前）、截断到历史上限
     addDir() {
       const value = (this.dirInput || "").trim();
       if (!value) {
@@ -328,11 +332,10 @@ export default {
         return;
       }
       this.error = "";
-      if (this.dirs.includes(value)) {
-        this.message = "该目录已在列表中";
-        return;
-      }
-      this.dirs.push(value);
+      this.dirs = [value, ...this.dirs.filter((d) => d !== value)].slice(
+        0,
+        DIRS_HISTORY_MAX,
+      );
       this.saveDirs();
       this.dirInput = "";
       // 首次添加时自动激活
@@ -343,10 +346,15 @@ export default {
         this.refresh();
       }
     },
-    // 切换当前激活的工作目录
+    // 切换当前激活的工作目录（同时把该目录移到历史最前）
     useDir(dir) {
       if (!dir || !this.dirs.includes(dir)) return;
       this.workdir = dir;
+      this.dirs = [dir, ...this.dirs.filter((d) => d !== dir)].slice(
+        0,
+        DIRS_HISTORY_MAX,
+      );
+      this.saveDirs();
       this.saveActiveDir();
       this.selected = null;
       this.refresh();
@@ -713,7 +721,7 @@ export default {
       <div style="font-size:11px;color:#888;margin-bottom:4px;">
         节点 {{ nodeLabelById(nodeId) }} 的工作目录（任务子目录的父目录）
       </div>
-      <!-- 已有目录列表 -->
+      <!-- 已有目录列表：最近使用历史（最多 10 条，最近使用在前） -->
       <div v-if="dirs.length" style="margin-bottom:6px;">
         <div v-for="d in dirs" :key="d"
           style="display:flex;align-items:center;gap:6px;padding:3px 6px;margin-bottom:3px;background:#1e1e1e;border-radius:4px;">
