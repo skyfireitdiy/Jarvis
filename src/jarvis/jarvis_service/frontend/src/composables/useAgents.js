@@ -2050,7 +2050,8 @@ export function useAgents({
             quick_mode: Boolean(agent.quick_mode),
             restore_session: sessionFile || Boolean(agent.restore_session),
             no_interaction_mode: Boolean(agent.no_interaction_mode),
-            task: agent.task || undefined,
+            // 无损重生不应携带创建时的初始任务；仅无交互模式（硬约束需 task 才能启动）保留
+            task: agent.no_interaction_mode ? (agent.task || undefined) : undefined,
             node_id: targetNodeId,
             proxy_node: agent.proxy_node || undefined,
             access_acl: agent.access_acl || undefined,
