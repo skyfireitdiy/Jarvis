@@ -532,4 +532,26 @@ describe('useWorkspaceEditor', () => {
       expect(true).toBe(true)
     })
   })
+
+  describe('ensureWorkspaceSidebarFileTree（getter 化 fileTreeState 回归）', () => {
+    it('fileTreeState 为空时调用 initFileTree 初始化（不抛 .get undefined）', async () => {
+      const { api, refs, mocks } = makeHarness()
+      const agent = { agent_id: 'agent-1', working_dir: '/tmp/ws' }
+      await api.ensureWorkspaceSidebarFileTree(agent)
+      expect(mocks.initFileTree).toHaveBeenCalledWith('agent-1', '/tmp/ws')
+    })
+
+    it('fileTreeState 已有节点时不再重复初始化', async () => {
+      const { api, refs, mocks } = makeHarness()
+      refs.fileTreeState.value.set('agent-1', [{ path: '/tmp/ws', name: 'ws', type: 'dir' }])
+      await api.ensureWorkspaceSidebarFileTree({ agent_id: 'agent-1', working_dir: '/tmp/ws' })
+      expect(mocks.initFileTree).not.toHaveBeenCalled()
+    })
+
+    it('无 agent 时不抛错直接返回', async () => {
+      const { api, mocks } = makeHarness()
+      await api.ensureWorkspaceSidebarFileTree(null)
+      expect(mocks.initFileTree).not.toHaveBeenCalled()
+    })
+  })
 })
