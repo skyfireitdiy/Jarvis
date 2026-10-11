@@ -109,8 +109,8 @@ export function useTerminal({
   getGatewayAddress,
   fetchWithAuth,
   getHttpProtocol,
-  sendMessageToAgentById,
-  scrollSessionToBottom,
+  sendMessageToAgentByIdGetter,
+  scrollSessionToBottomGetter,
   getCurrentAgentNodeId,
   showWorkspaceHostView,
   clamp,
@@ -367,7 +367,7 @@ export function useTerminal({
       terminalHosts.value.delete(executionSessionKey)
 
       // xterm 销毁并切换为 Terminal Output 文本块后，滚动外层 session 对话容器一次（自动滚动开启时）
-      scrollSessionToBottom(targetAgentId)
+      scrollSessionToBottomGetter()(targetAgentId)
     }
   
     // 输出到终端
@@ -474,7 +474,7 @@ export function useTerminal({
         cols: newCols,
       },
     }
-    sendMessageToAgentById(termInfo.agentId, message)
+    sendMessageToAgentByIdGetter()(termInfo.agentId, message)
   }
 
   function disposeExecutionTerminal(termInfo) {
@@ -581,7 +581,7 @@ export function useTerminal({
     requestAnimationFrame(() => {
       syncTerminalSize(executionId, termInfo)
       if (isLatestExecution()) {
-        scrollSessionToBottom(targetAgentId)
+        scrollSessionToBottomGetter()(targetAgentId)
       }
     })
 
@@ -589,7 +589,7 @@ export function useTerminal({
     setTimeout(() => {
       syncTerminalSize(executionId, termInfo)
       if (isLatestExecution()) {
-        scrollSessionToBottom(targetAgentId)
+        scrollSessionToBottomGetter()(targetAgentId)
       }
     }, 300)
 
