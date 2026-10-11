@@ -61,7 +61,6 @@ function makeHarness() {
   const autoLoginEnabled = ref(false)
   const userAccessibleNodes = ref(null)
   const gitCustomDir = ref(null)
-  const agentMap = ref(new Map())
 
   const parseGatewayAddress = vi.fn((address) => {
     const m = address.match(/^ws:\/\/([^:/]+):(\d+)$/)
@@ -110,7 +109,6 @@ function makeHarness() {
     autoLoginEnabled,
     userAccessibleNodes,
     gitCustomDir,
-    agentMap,
     parseGatewayAddress,
     buildWebSocketUrl,
     buildWebSocketProtocols,
@@ -143,7 +141,7 @@ function makeHarness() {
   return {
     api, socket, sockets, auth, username, myClientId, terminalSessions, allOutputs,
     currentAgentId, agentList, agentStatuses, showConnectModal, showSettingsModal,
-    autoLoginEnabled, userAccessibleNodes, gitCustomDir, agentMap,
+    autoLoginEnabled, userAccessibleNodes, gitCustomDir,
     lastPongTime: api.lastPongTime, connectingAgents: api.connectingAgents,
     userDisconnected: api.userDisconnected, isAutoConnecting: api.isAutoConnecting,
     reconnecting: api.reconnecting, reconnectAttempts: api.reconnectAttempts,
@@ -614,14 +612,14 @@ describe('useGatewayConnection', () => {
     })
 
     it('checkHeartbeatTimeout 超时连接被清理并触发当前 Agent 重连', () => {
-      const { api, sockets, lastPongTime, connectingAgents, currentAgentId, agentMap } = makeHarness()
+      const { api, sockets, lastPongTime, connectingAgents, currentAgentId, agentList } = makeHarness()
       const ws = { readyState: 1, close: vi.fn() }
       sockets.value.set('a1', ws)
       // 超时：无 lastPong
       lastPongTime.value.delete('a1')
       currentAgentId.value = 'a1'
       const agent = { agent_id: 'a1' }
-      agentMap.value.set('a1', agent)
+      agentList.value = [agent]
       const wsCountBefore = globalThis.WebSocket.instances.length
       api.checkHeartbeatTimeout()
       expect(ws.close).toHaveBeenCalled()

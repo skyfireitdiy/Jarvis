@@ -32,20 +32,22 @@ export function useWorkspacePane({
   getHttpProtocol,
   hasAuthToken,
   windowWidth,
-  clamp,
-  focusWindow,
-  getWorkspaceTabByPath,
-  activeWorkspaceTab,
-  editorViews,
-  workspaceViewPanes,
-  diffEditorViews,
-  workspacePaneTabs,
-  workspacePaneTabsVersion,
-  remountMonacoEditor,
-  scheduleWorkspaceLayout,
-  layoutMonacoEditor,
-  activateWorkspaceTab,
-  openWorkspaceFile,
+  // 以下符号由 useWorkspaceEditor（B 域）定义，本 composable 调用点在其之前，
+  // 故 getter 注入（内部通过 xxx() 二次求值；函数类型经安全包装后调用点不变）。
+  clamp: clampGetter,
+  focusWindow: focusWindowGetter,
+  getWorkspaceTabByPath: getWorkspaceTabByPathGetter,
+  activeWorkspaceTab: activeWorkspaceTabGetter,
+  editorViews: editorViewsGetter,
+  workspaceViewPanes: workspaceViewPanesGetter,
+  diffEditorViews: diffEditorViewsGetter,
+  workspacePaneTabs: workspacePaneTabsGetter,
+  workspacePaneTabsVersion: workspacePaneTabsVersionGetter,
+  remountMonacoEditor: remountMonacoEditorGetter,
+  scheduleWorkspaceLayout: scheduleWorkspaceLayoutGetter,
+  layoutMonacoEditor: layoutMonacoEditorGetter,
+  activateWorkspaceTab: activateWorkspaceTabGetter,
+  openWorkspaceFile: openWorkspaceFileGetter,
   layoutGitDiffEditor,
   disposeDiffEditorForPane,
   disposeAllDiffEditors,
@@ -63,6 +65,21 @@ export function useWorkspacePane({
   restoreTerminalSessions,
   focusFirstIn,
 }) {
+  // —— getter 化依赖的安全包装（函数类型：调用点不变；Map/ref 类型：调用点改 xxx().get()/xxx().value）——
+  const clamp = (...args) => clampGetter()(...args)
+  const focusWindow = (...args) => focusWindowGetter()(...args)
+  const getWorkspaceTabByPath = (...args) => getWorkspaceTabByPathGetter()(...args)
+  const editorViews = () => editorViewsGetter()
+  const workspaceViewPanes = () => workspaceViewPanesGetter()
+  const diffEditorViews = () => diffEditorViewsGetter()
+  const workspacePaneTabs = () => workspacePaneTabsGetter()
+  const workspacePaneTabsVersion = () => workspacePaneTabsVersionGetter()
+  const remountMonacoEditor = () => { const fn = remountMonacoEditorGetter(); if (fn) fn() }
+  const scheduleWorkspaceLayout = () => { const fn = scheduleWorkspaceLayoutGetter(); if (fn) fn() }
+  const layoutMonacoEditor = () => { const fn = layoutMonacoEditorGetter(); if (fn) fn() }
+  const activateWorkspaceTab = (...args) => { const fn = activateWorkspaceTabGetter(); if (fn) return fn(...args) }
+  const openWorkspaceFile = (...args) => { const fn = openWorkspaceFileGetter(); if (fn) return fn(...args) }
+  const activeWorkspaceTab = () => activeWorkspaceTabGetter()
 
 const EDITOR_PANEL_MIN_WIDTH = 360
 const EDITOR_PANEL_MIN_HEIGHT = 260
@@ -339,14 +356,14 @@ function focusWorkspacePane(paneId) {
   const pane = findWorkspacePaneById(workspacePaneTree.value, paneId)
   if (!pane) return
   if (pane.view === 'file') {
-    const view = editorViews.get(paneId)
+    const view = editorViews().get(paneId)
     if (view && typeof view.focus === 'function') {
       view.focus()
       return
     }
   }
   if (pane.view === 'diff') {
-    const entry = diffEditorViews.get(paneId)
+    const entry = diffEditorViews().get(paneId)
     if (entry && entry.editor && typeof entry.editor.focus === 'function') {
       entry.editor.focus()
       return
@@ -478,15 +495,15 @@ function splitWorkspacePane(paneId, direction) {
   }
   // 首次分割：把当前全局标签列表固化到「原 pane」，新 pane 从空开始。
   // 这样两个 pane 的标签栏各自独立，互不影响。
-  if (!workspacePaneTabs.has(target.id)) {
-    workspacePaneTabs.set(target.id, workspaceTabs.value.map(t => t.path))
-    workspacePaneTabsVersion.value += 1
+  if (!workspacePaneTabs().has(target.id)) {
+    workspacePaneTabs().set(target.id, workspaceTabs.value.map(t => t.path))
+    workspacePaneTabsVersion().value += 1
   }
   // 首次分割时把当前打开的文件绑到原 pane 的 workspaceViewPanes；
   // 否则两个 pane 的实例都会 setModel(null) → 都看不到文件。
-  if (target.view === 'file' && !workspaceViewPanes.has(target.id)) {
+  if (target.view === 'file' && !workspaceViewPanes().has(target.id)) {
     const currentPath = activeWorkspaceTabPath.value
-    if (currentPath) workspaceViewPanes.set(target.id, currentPath)
+    if (currentPath) workspaceViewPanes().set(target.id, currentPath)
   }
   activePaneId.value = newLeaf.id
   // 分割会改变布局，若此前处于最大化则先还原
@@ -506,8 +523,8 @@ function closeWorkspacePane(paneId) {
   if (index < 0) return
   parent.children.splice(index, 1)
   // 该 pane 的独立标签列表一并丢弃（其文件若仍被其他 pane 引用则保持）
-  workspacePaneTabs.delete(paneId)
-  workspacePaneTabsVersion.value += 1
+  workspacePaneTabs().delete(paneId)
+  workspacePaneTabsVersion().value += 1
   // 该 pane 若承载 diff，释放其独立 diff 实例
   disposeDiffEditorForPane()(paneId)
   // 父节点只剩一个 child 时，用该 child 顶替父节点（压缩冗余层级）
@@ -560,8 +577,8 @@ function collapseWorkspacePanes() {
   activePaneId.value = leaf.id
   maximizedPaneId.value = null
   // 收起分割：回到全局标签栏，清空各 pane 的独立列表
-  workspacePaneTabs.clear()
-  workspacePaneTabsVersion.value += 1
+  workspacePaneTabs().clear()
+  workspacePaneTabsVersion().value += 1
   // 收起分割：释放所有 diff pane 的独立实例
   disposeAllDiffEditors()()
 }
@@ -660,7 +677,7 @@ function isPaneEmptyForFileOpen(pane) {
   if (!pane) return false
   if (pane.view === 'empty') return true
   if (pane.view === 'file') {
-    return !workspaceViewPanes.has(pane.id) && !(pane.id === activePaneId.value && activeWorkspaceTabPath.value)
+    return !workspaceViewPanes().has(pane.id) && !(pane.id === activePaneId.value && activeWorkspaceTabPath.value)
   }
   return false
 }
@@ -836,7 +853,7 @@ function getWorkspacePaneTitle(pane) {
     return agent ? (agent.name || agent.agent_id) : '会话'
   }
   // 每个 file pane 都有独立编辑器实例，标题显示该 pane 自己绑定的文件
-  const panePath = workspaceViewPanes.get(pane.id) || (pane.id === activePaneId.value ? activeWorkspaceTabPath.value : null)
+  const panePath = workspaceViewPanes().get(pane.id) || (pane.id === activePaneId.value ? activeWorkspaceTabPath.value : null)
   if (panePath) return panePath.split('/').pop() || panePath
   // 文件视图但未绑定任何文件（如刚打开编辑器、或分割出的空 pane）：
   // 内容区是空占位符，标题也应显示「空区域」，与 view='empty' 的语义保持一致。
@@ -847,7 +864,7 @@ function getWorkspacePaneTitle(pane) {
 // 只对 file pane 有意义——取该 pane 自己绑定的文件对应的标签状态。
 function getWorkspacePaneStatus(pane) {
   if (!pane || pane.view !== 'file') return ''
-  const path = workspaceViewPanes.get(pane.id) || (pane.id === activePaneId.value ? activeWorkspaceTabPath.value : null)
+  const path = workspaceViewPanes().get(pane.id) || (pane.id === activePaneId.value ? activeWorkspaceTabPath.value : null)
   if (!path) return ''
   const tab = getWorkspaceTabByPath(path)
   if (!tab) return ''
@@ -863,7 +880,7 @@ function getWorkspacePreviewText() {
   const path = activeWorkspaceTabPath.value
   if (!path) return ''
   const modelData = editorModels.get(path)
-  const content = modelData?.content ?? activeWorkspaceTab.value?.content ?? ''
+  const content = modelData?.content ?? activeWorkspaceTab().value?.content ?? ''
   if (content.length <= EDITOR_PANE_PREVIEW_MAX_CHARS) return content
   return `${content.slice(0, EDITOR_PANE_PREVIEW_MAX_CHARS)}\n\n…（预览已截断，激活后可查看完整内容）`
 }
@@ -1060,8 +1077,8 @@ function serializeWorkspacePaneTree(tree) {
       content = { agentId: node.agentId || null }
     } else if (node.view === 'file') {
       content = {
-        tabs: workspacePaneTabs.get(node.id) || [],
-        activePath: workspaceViewPanes.get(node.id) || null,
+        tabs: workspacePaneTabs().get(node.id) || [],
+        activePath: workspaceViewPanes().get(node.id) || null,
         agentId: node.agentId || null,
       }
     } else if (node.view === 'diff') {
@@ -1218,10 +1235,19 @@ async function restoreWorkspacePaneContents() {
 // 每次 DOM 提交后（激活 pane / 分割树变化 / 标签变化）都重新补齐一次实例：
 // Vue 在 patch 时可能清掉容器里「它不认识的」Monaco DOM，导致实例 DOM 脱离文档；
 // 这里在 post flush 阶段检测并重建，保证每个 file pane 始终有可见的编辑器。
+// 注意：immediate 首次触发发生在 setup 同步阶段，此时 useWorkspaceEditor 尚未执行，
+// scheduleWorkspaceLayout 的 getter 求值会 TDZ（Cannot access before initialization）；
+// 故首次触发用 nextTick 推迟到 setup 完成后（useWorkspaceEditor 已执行）再调度。
+let firstWorkspaceLayoutRun = true
 watch(
   [activePaneId, workspacePaneTree, () => workspaceTabs.value.length, activeWorkspaceTabPath],
   () => {
-    scheduleWorkspaceLayout()
+    if (firstWorkspaceLayoutRun) {
+      firstWorkspaceLayoutRun = false
+      nextTick(() => scheduleWorkspaceLayout())
+    } else {
+      scheduleWorkspaceLayout()
+    }
   },
   { flush: 'post', immediate: true },
 )

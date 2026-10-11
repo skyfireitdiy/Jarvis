@@ -24,7 +24,7 @@ function makeHarness() {
   const terminalName = ref('my-terminal')
   const gatewayUrl = ref('ws://127.0.0.1:8000')
   const syncTokenToDaemon = vi.fn()
-  const api = useAuthBridge({ auth, terminalName, gatewayUrl, parseGatewayAddress, syncTokenToDaemon })
+  const api = useAuthBridge({ auth, terminalName, gatewayUrl: () => gatewayUrl, parseGatewayAddress, syncTokenToDaemon })
   api.installAuthBridge()
   return { api, auth, terminalName, gatewayUrl, syncTokenToDaemon }
 }

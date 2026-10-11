@@ -10,9 +10,12 @@
 // - auth：ref({ password, token, userInfo })
 // - terminalName：ref(string)（终端名称，供扩展随 hello 上报给网关）
 // - gatewayUrl：ref(string)（当前配置的网关地址，ws(s)://host:port）
+//   注意：gatewayUrl 由 useGatewayConnection 定义，本 composable 调用点在其之前，
+//   故以 getter 注入（内部通过 gatewayUrlGetter() 二次求值），避免 TDZ。
 // - parseGatewayAddress：函数（解析网关地址为 { protocol, host, port }）
 // - syncTokenToDaemon：函数（token, gateway）→ 手动触发一次 daemon 同步
-export function useAuthBridge({ auth, terminalName, gatewayUrl, parseGatewayAddress, syncTokenToDaemon }) {
+export function useAuthBridge({ auth, terminalName, gatewayUrl: gatewayUrlGetter, parseGatewayAddress, syncTokenToDaemon }) {
+  const gatewayUrl = () => gatewayUrlGetter()
   function installAuthBridge() {
     window.__jarvisAuthBridge = {
       // 优先返回内存中的 Token；内存为空时回退 localStorage（免登录场景下
@@ -23,7 +26,7 @@ export function useAuthBridge({ auth, terminalName, gatewayUrl, parseGatewayAddr
       // 终端名称：供扩展随 hello 上报给网关，使网关能区分不同终端。
       getName: () => terminalName.value || null,
       getGateway: () => {
-        const parsed = parseGatewayAddress(gatewayUrl.value)
+        const parsed = parseGatewayAddress(gatewayUrl().value)
         if (!parsed) return null
         // 网关地址可能以 ws(s):// 配置（前端连 WebSocket 用），但这里要交给
         // daemon 作为「HTTP 基地址」使用，必须保留传输安全性：
