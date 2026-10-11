@@ -13,10 +13,8 @@ function makeHarness(overrides = {}) {
   const sessionPanelRefs = new Map()
   const panels = ref([])
   const activePanelId = ref(null)
-  const historyScrollListenerEl = ref(null)
-  const historyScrollHandler = ref(null)
-  const historyScrollDebounceTimer = ref(null)
-  const panelOutputLists = ref(new Map())
+  const historyScrollState = { listenerEl: null, handler: null, debounceTimer: null }
+  const panelOutputLists = new Map()
   const outputList = ref(null)
   const inputMode = ref('multi')
   const inputText = ref('')
@@ -82,9 +80,7 @@ function makeHarness(overrides = {}) {
     sessionPanelRefs,
     panels,
     activePanelId,
-    historyScrollListenerEl,
-    historyScrollHandler,
-    historyScrollDebounceTimer,
+    historyScrollState,
     panelOutputLists,
     outputList,
     inputMode,
@@ -150,9 +146,7 @@ function makeHarness(overrides = {}) {
     sessionPanelRefs,
     panels,
     activePanelId,
-    historyScrollListenerEl,
-    historyScrollHandler,
-    historyScrollDebounceTimer,
+    historyScrollState,
     panelOutputLists,
     outputList,
     inputMode,
@@ -767,7 +761,7 @@ describe('usePanel', () => {
         removeEventListener: vi.fn(),
       }
       h.api.setupHistoryScrollListener(el)
-      expect(h.historyScrollListenerEl.value).toStrictEqual(el)
+      expect(h.historyScrollState.listenerEl).toStrictEqual(el)
       expect(el.addEventListener).toHaveBeenCalledWith('scroll', expect.any(Function))
       // 触发滚动回调 → 防抖后加载历史
       h.isLoadingHistory.value = false
@@ -799,31 +793,32 @@ describe('usePanel', () => {
     it('setupHistoryScrollListener：el 为 null 时清理', () => {
       const h = makeHarness()
       const oldEl = { removeEventListener: vi.fn() }
-      h.historyScrollListenerEl.value = oldEl
-      h.historyScrollHandler.value = vi.fn()
+      h.historyScrollState.listenerEl = oldEl
+      h.historyScrollState.handler = vi.fn()
       h.api.setupHistoryScrollListener(null)
       expect(oldEl.removeEventListener).toHaveBeenCalled()
-      expect(h.historyScrollListenerEl.value).toBe(null)
-      expect(h.historyScrollHandler.value).toBe(null)
+      expect(h.historyScrollState.listenerEl).toBe(null)
+      expect(h.historyScrollState.handler).toBe(null)
     })
 
     it('setPanelOutputList：绑定输出列表并设置当前 agent 的输出', () => {
       const h = makeHarness()
       const el = { scrollTop: 0, addEventListener: vi.fn(), removeEventListener: vi.fn() }
       h.api.setPanelOutputList(makePanel(), el)
-      expect(h.panelOutputLists.value.get('panel-1')).toStrictEqual(el)
+      expect(h.panelOutputLists.get('panel-1')).toStrictEqual(el)
       expect(h.outputList.value).toStrictEqual(el)
       // 当前 agent 会补绑滚动监听
       expect(el.addEventListener).toHaveBeenCalledWith('scroll', expect.any(Function))
     })
 
-    it('setPanelOutputList：非当前 agent 不设置全局 outputList', () => {
+    it('setPanelOutputList：非当前 agent 不绑定滚动监听', () => {
       const h = makeHarness()
       h.currentAgentId.value = 'agent-2'
       const el = { scrollTop: 0, addEventListener: vi.fn(), removeEventListener: vi.fn() }
       h.api.setPanelOutputList(makePanel(), el)
-      expect(h.panelOutputLists.value.get('panel-1')).toStrictEqual(el)
-      expect(h.outputList.value).toBe(null)
+      expect(h.panelOutputLists.get('panel-1')).toStrictEqual(el)
+      expect(h.outputList.value).toStrictEqual(el)
+      expect(el.addEventListener).not.toHaveBeenCalled()
     })
 
     it('setPanelTerminalRef：委托 setTerminalRef', () => {

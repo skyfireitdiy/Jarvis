@@ -13,7 +13,7 @@
 //
 // 依赖注入：
 // - 直传（定义在调用点之前）：computed/ref/watch/nextTick/showWorkspacePanel/sessionPanelRefs/panels/activePanelId/
-//   historyScrollListenerEl/historyScrollHandler/historyScrollDebounceTimer/panelOutputLists/outputList/
+//   historyScrollState/panelOutputLists/outputList/
 //   inputMode/inputRequests/panelInputTexts/inputTip/panelInputModes/panelInputTips/panelConfirmData/inputBuffers/
 //   sortCompletionItems/getPanelAgent/getPanelInputMode/saveToHistory/navigateHistory/username/getGatewayAddress/
 //   buildNodeHttpUrl/fetchWithAuth/windowWidth/findWorkspacePaneByView/findWorkspacePaneBySessionPanelId/
@@ -31,9 +31,7 @@ export function usePanel({
   sessionPanelRefs,
   panels,
   activePanelId,
-  historyScrollListenerEl,
-  historyScrollHandler,
-  historyScrollDebounceTimer,
+  historyScrollState,
   panelOutputLists,
   outputList,
   inputMode,
@@ -697,53 +695,53 @@ export function usePanel({
 
   // 设置滚动监听，实现滚动到顶部时加载更多历史
   // 支持动态切换滚动容器（Panel 创建/切换时调用）
+  // 注意：historyScrollState 是普通对象（非响应式），渲染期间（函数 ref 回调链）对其赋值
+  // 不会触发 Vue 响应式重渲染，避免无限渲染循环（Issue #94 点击 Agent 卡死根因）。
   function setupHistoryScrollListener(el) {
     const SCROLL_THRESHOLD = 50 // 滚动到顶部50px以内触发
     const DEBOUNCE_DELAY = 500 // 防抖延迟500ms
 
     // 移除旧元素上的监听
-    if (historyScrollListenerEl.value && historyScrollHandler.value) {
-      historyScrollListenerEl.value.removeEventListener('scroll', historyScrollHandler.value)
+    if (historyScrollState.listenerEl && historyScrollState.handler) {
+      historyScrollState.listenerEl.removeEventListener('scroll', historyScrollState.handler)
     }
 
     // 清除旧的防抖定时器
-    if (historyScrollDebounceTimer.value) {
-      clearTimeout(historyScrollDebounceTimer.value)
-      historyScrollDebounceTimer.value = null
+    if (historyScrollState.debounceTimer) {
+      clearTimeout(historyScrollState.debounceTimer)
+      historyScrollState.debounceTimer = null
     }
 
     if (!el) {
-      historyScrollListenerEl.value = null
-      historyScrollHandler.value = null
+      historyScrollState.listenerEl = null
+      historyScrollState.handler = null
       return
     }
 
-    historyScrollListenerEl.value = el
-    historyScrollHandler.value = () => {
+    const handler = () => {
       // 清除之前的定时器
-      if (historyScrollDebounceTimer.value) {
-        clearTimeout(historyScrollDebounceTimer.value)
+      if (historyScrollState.debounceTimer) {
+        clearTimeout(historyScrollState.debounceTimer)
       }
 
       // 设置新的定时器
-      historyScrollDebounceTimer.value = setTimeout(() => {
+      historyScrollState.debounceTimer = setTimeout(() => {
         const scrollTop = el.scrollTop
         if (scrollTop <= SCROLL_THRESHOLD && !isLoadingHistoryGetter().value && hasMoreHistoryGetter().value) {
           loadHistoryMessagesGetter()(true) // prepend = true, 插入到开头
         }
       }, DEBOUNCE_DELAY)
     }
-
-    el.addEventListener('scroll', historyScrollHandler.value)
+    historyScrollState.listenerEl = el
+    historyScrollState.handler = handler
+    el.addEventListener('scroll', handler)
   }
-
   // 设置 Panel 的输出列表引用
   function setPanelOutputList(panel, el) {
     if (!panel || !panel.agentId) return
-    panelOutputLists.value.set(panel.id, el)
+    panelOutputLists.set(panel.id, el)
+    outputList.value = el
     if (panel.agentId === currentAgentIdGetter().value) {
-      outputList.value = el
-      // Panel 动态创建后补绑滚动监听，确保滚动到顶部可加载历史
       setupHistoryScrollListener(el)
     }
   }
