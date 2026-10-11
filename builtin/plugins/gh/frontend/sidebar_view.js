@@ -18,6 +18,11 @@ const MANUAL_REPO_KEY = "jarvis_gh_manual_repo";
 // 最近手动指定过的仓库历史（JSON 数组，最多 10 条，最近使用在前），用于快速选择切换。
 const REPO_HISTORY_KEY = "jarvis_gh_repo_history";
 const REPO_HISTORY_MAX = 10;
+// 当前平台：'auto' 跟随仓库 remote 自动识别；'github'/'gitee' 为显式指定。
+// 手动指定仓库时（无法从 workingDir 识别）建议显式选择平台。
+let currentPlatform = "auto";
+// 记住平台选择，刷新页面后仍生效。
+const PLATFORM_KEY = "jarvis_gh_platform";
 
 // 复刻 App.vue 的 gateway 地址解析（侧边栏组件无 props 注入，需自行解析）
 function parseGatewayAddress(address) {
@@ -34,7 +39,7 @@ function parseGatewayAddress(address) {
           (url.protocol === "https:" || url.protocol === "wss:" ? "443" : "80"),
         path: url.pathname,
       };
-    } catch (e) {
+    } catch {
       return null;
     }
   }
@@ -67,7 +72,8 @@ function gatewayBase() {
 
 // 通过 gateway 插件功能代理端点调用插件私有功能
 // nodeId 指定目标节点（默认 master）：gh 功能（gh CLI / git / 仓库解析）在所选节点本地执行
-async function callFunction(functionName, args, nodeId) {
+// platform 指定平台（auto/github/gitee，默认 auto 由后端按仓库 remote 识别）
+async function callFunction(functionName, args, nodeId, platform) {
   // 统一走 App.vue 暴露的带认证请求函数 window.__jarvisFetch（自动携带 jarvis
   // 认证信息，token 不暴露给插件）；若宿主未注入则回退到普通 fetch。
   const authedFetch =
@@ -78,6 +84,10 @@ async function callFunction(functionName, args, nodeId) {
   const callArgs = args || {};
   if (!noRepoFns.includes(functionName) && !callArgs.repo) {
     callArgs.repo = currentRepo;
+  }
+  // 平台透传：显式指定时传给后端；auto 时不传（后端按仓库 remote 自动识别）
+  if (platform && String(platform).trim() && String(platform).trim() !== "auto") {
+    callArgs.platform = String(platform).trim();
   }
   const targetNodeId = String(nodeId || "master").trim() || "master";
   const resp = await authedFetch(
@@ -96,7 +106,7 @@ async function callFunction(functionName, args, nodeId) {
   try {
     result = await resp.json();
   } catch (e) {
-    throw new Error("网关响应异常");
+    throw new Error("网关响应异常", { cause: e });
   }
   if (!result.success) {
     const err = result.error || {};
@@ -122,6 +132,8 @@ export default {
       // 节点列表与当前节点（master 恒在列）；gh 功能在所选节点本地执行
       nodes: [],
       nodeId: "master",
+      // 当前平台：auto 跟随仓库 remote 自动识别；github/gitee 显式指定
+      platform: currentPlatform,
       // 是否处于「手动指定的自定义仓库」：为真表示当前展示的仓库不是当前
       // Agent 工作目录对应的仓库，此时不应把 issue/PR 交给当前 Agent 处理
       // （Agent 的工作目录属于另一个仓库，gh 命令会在错误仓库上执行）。
@@ -151,11 +163,14 @@ export default {
       menuVisible: false,
       menuStyle: {},
       menuItem: null,
+      // 帮助弹层：展示插件使用条件（非开箱即用，需配置 CLI 与登录）
+      helpVisible: false,
     };
   },
   mounted() {
     this.initNodes();
     this.restoreManualRepo();
+    this.restorePlatform();
     this.refreshAgentName();
     this.resolveRepo().then(() => this.refresh());
     // 订阅宿主 agent_changed 事件：切换 Agent 时即使 workingDir 不变（同目录切换），
@@ -272,10 +287,16 @@ export default {
       try {
         const payload = await callFunction("resolve_repo", {
           working_dir: this.workingDir || "",
+          platform: this.platform,
         }, this.nodeId);
         currentRepo = (payload && payload.repo) || "";
         this.repo = currentRepo;
         this.repoInput = currentRepo;
+        // 后端返回识别出的平台；显式指定（github/gitee）时以后端为准
+        if (payload && payload.platform) {
+          currentPlatform = payload.platform;
+          this.platform = payload.platform;
+        }
       } catch {
         // 解析失败：清空仓库（不硬编码默认仓库）
         currentRepo = "";
@@ -291,6 +312,34 @@ export default {
         if (saved) manualRepo = saved;
       } catch {
         /* localStorage 不可用时忽略 */
+      }
+    },
+    // 从 localStorage 恢复上次选择的平台（刷新页面后仍生效）。
+    restorePlatform() {
+      try {
+        const saved = (localStorage.getItem(PLATFORM_KEY) || "auto").trim();
+        if (["auto", "github", "gitee"].includes(saved)) {
+          currentPlatform = saved;
+          this.platform = saved;
+        }
+      } catch {
+        /* localStorage 不可用时忽略 */
+      }
+    },
+    // 切换平台：保存选择并刷新列表。
+    onPlatformChange(platform) {
+      currentPlatform = String(platform || "auto").trim() || "auto";
+      this.platform = currentPlatform;
+      try {
+        localStorage.setItem(PLATFORM_KEY, currentPlatform);
+      } catch {
+        /* 忽略 */
+      }
+      // 跟随目录时重新解析平台；手动仓库时直接刷新
+      if (!manualRepo) {
+        this.resolveRepo().then(() => this.refresh());
+      } else {
+        this.refresh();
       }
     },
     // 读取最近手动指定过的仓库历史（最多 REPO_HISTORY_MAX 条，最近使用在前）。
@@ -397,7 +446,7 @@ export default {
       if (!s) return "";
       try {
         return new Date(s).toLocaleString();
-      } catch (e) {
+      } catch {
         return s;
       }
     },
@@ -428,7 +477,7 @@ export default {
       this.comments = [];
       try {
         const fn = this.tab === "issues" ? "list_issues" : "list_prs";
-        const payload = await callFunction(fn, { state: "open", page: 1 }, this.nodeId);
+        const payload = await callFunction(fn, { state: "open", page: 1 }, this.nodeId, this.platform);
         this.items = (payload.data || []).map((it) => this.mapItem(it));
         this.page = payload.page || 1;
         this.hasMore = !!payload.has_more;
@@ -452,7 +501,7 @@ export default {
         const payload = await callFunction(fn, {
           state: "open",
           page: nextPage,
-        }, this.nodeId);
+        }, this.nodeId, this.platform);
         const more = (payload.data || []).map((it) => this.mapItem(it));
         // 去重：避免分页边界重复（如翻页期间数据变动）
         const seen = new Set(this.items.map((it) => it.number));
@@ -477,11 +526,11 @@ export default {
       this.message = "";
       try {
         const fn = this.tab === "issues" ? "get_issue" : "get_pr";
-        const detail = await callFunction(fn, { number: item.number }, this.nodeId);
+        const detail = await callFunction(fn, { number: item.number }, this.nodeId, this.platform);
         this.selected.body = ((detail.data && detail.data.body) || "").trim();
         const comments = await callFunction("list_comments", {
           number: item.number,
-        }, this.nodeId);
+        }, this.nodeId, this.platform);
         this.comments = Array.isArray(comments.data) ? comments.data : [];
       } catch (e) {
         this.error = String((e && e.message) || e);
@@ -521,9 +570,13 @@ export default {
       const repo = currentRepo || "(当前仓库)";
       const number = item.number;
       const title = item.title || "";
+      // 平台对应的 CLI 命令与平台名（Gitee 用 gitee CLI，GitHub 用 gh CLI）
+      const isGitee = this.platform === "gitee";
+      const cli = isGitee ? "gitee" : "gh";
+      const platformName = isGitee ? "Gitee" : "GitHub";
       if (isFork) {
         // 自定义仓库（fork 的他人仓库）：非本仓库，目标是改代码后向上游提 PR
-        const head = `请处理 GitHub ${isIssue ? "Issue" : "Pull Request"} #${number}：${title}`;
+        const head = `请处理 ${platformName} ${isIssue ? "Issue" : "Pull Request"} #${number}：${title}`;
         const upstream = [
           `目标仓库 ${repo} 不是我们的仓库，而是其他开源项目的仓库。`,
           "本地目录是 fork 的 clone（origin 指向你的 fork，upstream 已配置指向原仓库）。",
@@ -535,26 +588,26 @@ export default {
           "2. 在分支上完成改动，遵循相关开发规则（含测试）。",
           "3. 用 `commit` 工具生成正式提交。",
           `4. 推送分支到 fork：\`git push origin <分支名>\`。`,
-          `5. 向上游提 PR：\`gh pr create --repo ${repo} --head <你的fork>:<分支名> --base <上游主干> --title <标题>\`，并在描述中用 \`Closes #${number}\` 关联该 Issue。`,
+          `5. 向上游提 PR：\`${cli} pr create --repo ${repo} --head <你的fork>:<分支名> --base <上游主干> --title <标题>\`，并在描述中用 \`Closes #${number}\` 关联该 Issue。`,
           "6. 写操作（评论/关闭/合并）前先与我确认，再执行。",
         ].join("\n");
         return [head, "", upstream, "", flow].join("\n");
       }
       return isIssue
         ? [
-            `请处理当前仓库 ${repo} 的 GitHub Issue #${number}：${title}`,
+            `请处理当前仓库 ${repo} 的 ${platformName} Issue #${number}：${title}`,
             "",
             "遵循 gh_rule 处理该 Issue：",
-            `1. 用 \`gh issue view ${number}\` 查看该 Issue 详情（标题、作者、body、labels、状态），先复述内容确认理解正确。`,
+            `1. 用 \`${cli} issue view ${number}\` 查看该 Issue 详情（标题、作者、body、labels、状态），先复述内容确认理解正确。`,
             "2. 阅读 body 与现有评论，判断问题类型并形成处理方案。",
             "3. 如需写码实现，遵循 gh_rule 与相关开发规则完成修改。",
             "4. 写操作（评论/关闭）前先与我确认，再执行。",
           ].join("\n")
         : [
-            `请处理当前仓库 ${repo} 的 GitHub Pull Request #${number}：${title}`,
+            `请处理当前仓库 ${repo} 的 ${platformName} Pull Request #${number}：${title}`,
             "",
             "遵循 gh_rule 处理该 PR：",
-            `1. 用 \`gh pr view ${number}\` 与 \`gh pr diff ${number}\` 查看详情与改动。`,
+            `1. 用 \`${cli} pr view ${number}\` 与 \`${cli} pr diff ${number}\` 查看详情与改动。`,
             "2. 评估是否可合并或需修改；如需修改，遵循 gh_rule 与相关开发规则补齐实现/测试。",
             "3. 合并前先与我确认（含合并方式），再执行。",
           ].join("\n");
@@ -661,7 +714,7 @@ export default {
         const prepared = await callFunction("prepare_issue_repo", {
           repo: repo,
           target_dir: targetDir,
-        }, targetNode);
+        }, targetNode, this.platform);
         const localDir = (prepared && prepared.local_dir) || "";
         if (!localDir) {
           this.message = "失败: 未获取到本地目录";
@@ -696,7 +749,7 @@ export default {
         await callFunction("comment", {
           number: this.selected.number,
           body: body,
-        }, this.nodeId);
+        }, this.nodeId, this.platform);
         this.commentText = "";
         this.message = "评论已发布";
         await this.openItem(this.selected);
@@ -711,7 +764,7 @@ export default {
       this.busy = true;
       this.message = "";
       try {
-        await callFunction("close_issue", { number: this.selected.number }, this.nodeId);
+        await callFunction("close_issue", { number: this.selected.number }, this.nodeId, this.platform);
         this.message = "issue 已关闭";
         await this.refresh();
       } catch (e) {
@@ -728,7 +781,7 @@ export default {
         await callFunction("merge_pr", {
           number: this.selected.number,
           merge_method: "merge",
-        }, this.nodeId);
+        }, this.nodeId, this.platform);
         this.message = "PR 已合并";
         await this.refresh();
       } catch (e) {
@@ -751,13 +804,19 @@ export default {
     openExternal(url) {
       if (url) window.open(url, "_blank");
     },
+    // 打开/关闭帮助弹层
+    toggleHelp() {
+      this.helpVisible = !this.helpVisible;
+    },
   },
   template: `
   <div style="padding:12px;font-size:13px;color:#ddd;overflow:auto;height:100%;box-sizing:border-box;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-      <strong style="font-size:14px;">GitHub</strong>
+      <strong style="font-size:14px;">{{ platform === 'gitee' ? 'Gitee' : 'GitHub' }}</strong>
       <div style="display:flex;align-items:center;gap:6px;">
         <span style="font-size:11px;color:#888;" :title="repo || ''">{{ repo || '未检测到仓库' }}</span>
+        <button @click="toggleHelp" title="使用帮助"
+          style="padding:2px 6px;background:#333;color:#ddd;border:none;border-radius:4px;cursor:pointer;font-size:11px;">帮助</button>
         <button @click="toggleRepoEdit" title="切换到其他仓库"
           style="padding:2px 6px;background:#333;color:#ddd;border:none;border-radius:4px;cursor:pointer;font-size:11px;">切换</button>
       </div>
@@ -768,6 +827,16 @@ export default {
       <select v-model="nodeId" @change="onNodeChange(nodeId)"
         style="flex:1;min-width:0;padding:4px 6px;background:#1e1e1e;color:#ddd;border:1px solid #444;border-radius:4px;font-size:12px;">
         <option v-for="n in nodes" :key="n.node_id" :value="n.node_id">{{ nodeLabel(n) }}</option>
+      </select>
+    </div>
+    <!-- 平台：auto 跟随仓库 remote 自动识别；github/gitee 显式指定。切换后自动刷新 -->
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
+      <span style="font-size:11px;color:#888;">平台</span>
+      <select v-model="platform" @change="onPlatformChange(platform)"
+        style="flex:1;min-width:0;padding:4px 6px;background:#1e1e1e;color:#ddd;border:1px solid #444;border-radius:4px;font-size:12px;">
+        <option value="auto">自动识别</option>
+        <option value="github">GitHub</option>
+        <option value="gitee">Gitee</option>
       </select>
     </div>
     <!-- 当前目标 Agent：与「在当前 Agent 中处理」的实际接收者一致；无 Agent 时提示 -->
@@ -874,6 +943,46 @@ export default {
         style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">创建新 Agent 处理</div>
       <div v-if="isManualRepo" @click="handleItemForkCloneAgent(menuItem)"
         style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">Fork 并创建 CodeAgent 处理</div>
+    </div>
+
+    <!-- 帮助弹层：插件使用条件（非开箱即用，需配置 CLI 与登录） -->
+    <div v-if="helpVisible" @click.self="helpVisible = false"
+      style="position:fixed;inset:0;z-index:10000;background:#000a;display:flex;align-items:center;justify-content:center;">
+      <div style="background:#1e1e1e;border:1px solid #454545;border-radius:8px;max-width:560px;width:92%;max-height:80vh;overflow:auto;padding:16px;box-sizing:border-box;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <strong style="font-size:14px;">gh 插件使用说明</strong>
+          <button @click="helpVisible = false" title="关闭"
+            style="padding:2px 8px;background:#333;color:#ddd;border:none;border-radius:4px;cursor:pointer;font-size:12px;">✕</button>
+        </div>
+        <div style="font-size:12px;line-height:1.7;color:#ddd;white-space:pre-wrap;">
+本插件不是开箱即用，使用前需在目标节点完成以下配置：
+
+【1. 安装命令行工具】
+· GitHub：安装官方 gh CLI（https://cli.github.com）
+· Gitee：安装 gitee CLI（https://github.com/oschina/gitee-cli）
+· git（fork/clone 仓库时需要）
+
+【2. 登录认证】
+· GitHub：终端执行 gh auth login（写操作需登录）
+· Gitee：终端执行 gitee auth login
+· 读操作（列出/查看）公开仓库无需登录
+· 用 gh auth status / gitee auth status 查看登录状态
+
+【3. 选择平台】
+· 平台默认「自动识别」：按当前仓库 remote 自动判断
+  （gitee.com → Gitee，其余 → GitHub）
+· 手动指定仓库时建议显式选择平台（GitHub / Gitee）
+
+【4. 选择节点】
+· gh/gitee 命令在所选节点本地执行，需该节点已安装 CLI 并登录
+· 子节点需单独安装与登录，认证不跨节点共享
+
+【5. 使用说明】
+· 列表/查看为读操作，可直接使用
+· 评论/关闭/合并为写操作，执行前会与用户确认
+· 写操作失败提示未登录时，请先在对应节点终端登录
+        </div>
+      </div>
     </div>
   </div>
   `,

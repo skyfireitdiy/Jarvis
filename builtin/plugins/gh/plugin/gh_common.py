@@ -2,32 +2,57 @@
 gh 插件共享辅助模块（不含工具类，供各工具 import 复用）。
 
 提供：
-- GitHub token 的读取（复用 GitHub 官方 gh CLI 的登录态，`gh auth token`）
-- GitHub REST API 请求封装（urllib，不依赖 requests）
+- GitHub/Gitee 双平台支持：token 读取（复用 gh / gitee CLI 登录态）、
+  命令执行封装（参数化，禁 shell 拼接）、平台识别
 - 默认仓库常量
 """
 
 import json
 import subprocess
-import urllib.error
-import urllib.request
+from typing import Any
+from typing import Dict
+from typing import List
 from typing import Optional
 
-# GitHub REST API 基址
-API_BASE = "https://api.github.com"
 # 默认仓库（当前 Jarvis 的 GitHub 仓库）
 DEFAULT_REPO = "skyfireitdiy/Jarvis"
 
+# 支持的平台
+PLATFORMS = ("github", "gitee")
 
-def get_token() -> str:
-    """读取 GitHub token（复用 GitHub 官方 gh CLI 登录态）。
 
-    通过 `gh auth token` 获取当前登录账号的 token；gh CLI 未安装或未登录
-    时返回空字符串。gh 插件自身不提供登录认证，认证由 gh CLI 负责。
+def normalize_platform(platform: Optional[str]) -> str:
+    """规范化平台参数。auto 或非法值回退 github；返回 'github' 或 'gitee'。"""
+    p = (platform or "").strip().lower()
+    if p in ("gitee", "gitee.com"):
+        return "gitee"
+    return "github"
+
+
+def detect_platform_from_remote(remote_url: str) -> str:
+    """根据 git remote URL 的主机名识别平台：gitee.com → gitee，其余 → github。"""
+    url = (remote_url or "").strip().lower()
+    if "gitee.com" in url:
+        return "gitee"
+    return "github"
+
+
+def get_token(platform: Optional[str] = None) -> str:
+    """读取平台 token（复用对应官方 CLI 登录态）。
+
+    - github: `gh auth token`
+    - gitee: `gitee auth token`
+    CLI 未安装或未登录时返回空字符串。插件自身不提供登录认证，认证由 CLI 负责。
     """
+    platform = normalize_platform(platform)
+    cmd = (
+        ["gh", "auth", "token"]
+        if platform == "github"
+        else ["gitee", "auth", "token"]
+    )
     try:
         result = subprocess.run(
-            ["gh", "auth", "token"],
+            cmd,
             capture_output=True,
             text=True,
             timeout=10,
@@ -39,136 +64,93 @@ def get_token() -> str:
     return result.stdout.strip()
 
 
-def _build_headers(token: str) -> dict:
-    """构造请求头。带 token 时加 Authorization。"""
-    headers = {
-        "Accept": "application/vnd.github+json",
-        "User-Agent": "Jarvis-gh-plugin",
-        "X-GitHub-Api-Version": "2022-11-28",
-    }
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    return headers
-
-
-def api_request(
-    method: str,
-    path: str,
-    token: str = "",
-    data: Optional[dict] = None,
-    timeout: int = 30,
-) -> dict:
-    """调用 GitHub REST API。
+def run_cli(
+    platform: Optional[str],
+    args: List[str],
+    cwd: Optional[str] = None,
+    timeout: int = 60,
+) -> Dict[str, Any]:
+    """参数化执行平台 CLI 命令（gh / gitee），禁 shell 拼接，避免注入。
 
     参数:
-        method: HTTP 方法（GET/POST/PUT/PATCH/DELETE）
-        path: API 路径，如 "/repos/skyfireitdiy/Jarvis/pulls"
-        token: GitHub token（写操作必需）
-        data: 请求体 dict（可选）
+        platform: 'github' 或 'gitee'（auto 回退 github）
+        args: 命令参数列表（不含可执行名）
+        cwd: 工作目录（可选）
         timeout: 超时秒数
 
     返回:
-        dict: {"success": bool, "status": int, "data": dict|list|None,
-               "headers": dict, "error": str}
-        headers 为响应头（键统一小写），供上层解析分页 Link 头使用。
+        {"success": bool, "returncode": int, "stdout": str, "stderr": str, "error": str}
     """
-    url = API_BASE + path
-    body = None
-    headers = _build_headers(token)
-    if data is not None:
-        body = json.dumps(data).encode("utf-8")
-        headers["Content-Type"] = "application/json"
-
-    req = urllib.request.Request(url, data=body, headers=headers, method=method)
+    platform = normalize_platform(platform)
+    executable = "gh" if platform == "github" else "gitee"
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            status = resp.getcode()
-            resp_headers = {k.lower(): v for k, v in resp.headers.items()}
-            raw = resp.read().decode("utf-8")
-            try:
-                parsed = json.loads(raw) if raw else None
-            except Exception:
-                parsed = raw
-            return {
-                "success": True,
-                "status": status,
-                "data": parsed,
-                "headers": resp_headers,
-                "error": "",
-            }
-    except urllib.error.HTTPError as e:
-        status = e.code
-        resp_headers = {k.lower(): v for k, v in (e.headers or {}).items()}
-        raw = e.read().decode("utf-8", errors="replace")
-        message = ""
-        try:
-            err_data = json.loads(raw)
-            message = err_data.get("message", "")
-        except Exception:
-            message = raw
+        result = subprocess.run(
+            [executable] + list(args),
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except FileNotFoundError:
         return {
             "success": False,
-            "status": status,
-            "data": None,
-            "headers": resp_headers,
-            "error": f"GitHub API {status}: {message}",
+            "returncode": -1,
+            "stdout": "",
+            "stderr": "",
+            "error": f"命令不存在: {executable}（请确认已安装并加入 PATH）",
         }
-    except urllib.error.URLError as e:
+    except subprocess.TimeoutExpired:
         return {
             "success": False,
-            "status": 0,
-            "data": None,
-            "headers": {},
-            "error": f"网络错误: {e.reason}",
+            "returncode": -1,
+            "stdout": "",
+            "stderr": "",
+            "error": f"命令执行超时（>{timeout}s）: {executable} {' '.join(args)}",
         }
-    except Exception as e:
-        return {"success": False, "status": 0, "data": None, "headers": {}, "error": str(e)}
+    except Exception as e:  # noqa: BLE001
+        return {
+            "success": False,
+            "returncode": -1,
+            "stdout": "",
+            "stderr": "",
+            "error": str(e),
+        }
+    return {
+        "success": result.returncode == 0,
+        "returncode": result.returncode,
+        "stdout": (result.stdout or "").strip(),
+        "stderr": (result.stderr or "").strip(),
+        "error": "",
+    }
 
 
-def parse_link_next(headers: dict) -> str:
-    """从响应头 Link 中解析 rel="next" 的 URL；无则返回空字符串。
+def cli_json(
+    platform: Optional[str],
+    args: List[str],
+    cwd: Optional[str] = None,
+    timeout: int = 60,
+) -> Dict[str, Any]:
+    """执行平台 CLI 命令并把 stdout 解析为 JSON。
 
-    GitHub 分页通过 Link 头返回相邻页 URL，形如：
-      <https://api.github.com/...&page=2>; rel="next", <...&page=5>; rel="last"
+    返回:
+        {"success": bool, "data": Any, "error": str}
+        命令失败或 stdout 非 JSON 时 success=False。
     """
-    link = (headers or {}).get("link", "")
-    if not link:
-        return ""
-    for part in link.split(","):
-        segments = part.split(";")
-        if len(segments) < 2:
-            continue
-        url = segments[0].strip().strip("<>")
-        for seg in segments[1:]:
-            if seg.strip() == 'rel="next"':
-                return url
-    return ""
-
-
-def parse_link_last_page(headers: dict) -> int:
-    """从响应头 Link 中解析 rel="last" 的 page 参数；无则返回 0。"""
-    link = (headers or {}).get("link", "")
-    if not link:
-        return 0
-    for part in link.split(","):
-        segments = part.split(";")
-        if len(segments) < 2:
-            continue
-        url = segments[0].strip().strip("<>")
-        is_last = any(seg.strip() == 'rel="last"' for seg in segments[1:])
-        if not is_last:
-            continue
-        # 从 URL 查询串中取 page 参数
-        if "?" not in url:
-            return 0
-        query = url.split("?", 1)[1]
-        for kv in query.split("&"):
-            if kv.startswith("page="):
-                try:
-                    return int(kv.split("=", 1)[1])
-                except ValueError:
-                    return 0
-    return 0
+    res = run_cli(platform, args, cwd=cwd, timeout=timeout)
+    if not res["success"]:
+        detail = res["stderr"] or res["error"] or "未知错误"
+        return {"success": False, "data": None, "error": detail}
+    stdout = res["stdout"]
+    if not stdout:
+        return {"success": False, "data": None, "error": "命令无输出"}
+    try:
+        return {"success": True, "data": json.loads(stdout), "error": ""}
+    except Exception:
+        return {
+            "success": False,
+            "data": None,
+            "error": f"命令输出不是合法 JSON: {stdout[:200]}",
+        }
 
 
 def parse_remote_repo(remote_url: str) -> str:
@@ -210,8 +192,6 @@ def resolve_repo_from_dir(working_dir: str) -> str:
 
     非 git 仓库或无 origin remote 时返回空字符串。
     """
-    import subprocess
-
     working_dir = (working_dir or "").strip()
     if not working_dir:
         return ""
@@ -230,11 +210,37 @@ def resolve_repo_from_dir(working_dir: str) -> str:
     return parse_remote_repo(result.stdout.strip())
 
 
-def auth_error_hint(status: int) -> str:
-    """根据 HTTP 状态码给出认证提示。"""
+def resolve_platform_from_dir(working_dir: str) -> str:
+    """在指定目录读取 origin remote URL，识别平台（github/gitee）。
+
+    非 git 仓库或无 origin remote 时返回 'github'（默认）。
+    """
+    working_dir = (working_dir or "").strip()
+    if not working_dir:
+        return "github"
+    try:
+        result = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            cwd=working_dir,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except Exception:
+        return "github"
+    if result.returncode != 0:
+        return "github"
+    return detect_platform_from_remote(result.stdout.strip())
+
+
+def auth_error_hint(platform: Optional[str], status: int = 0) -> str:
+    """根据平台与状态码给出认证提示。"""
+    platform = normalize_platform(platform)
+    cli = "gh auth login" if platform == "github" else "gitee auth login"
+    host = "GitHub" if platform == "github" else "Gitee"
     if status in (401, 403):
         return (
-            "认证失败（token 缺失或无效）。请先在终端执行 gh auth login 登录 GitHub，"
-            "或用 gh auth status 查看登录状态。"
+            f"认证失败（token 缺失或无效）。请先在终端执行 {cli} 登录 {host}，"
+            f"或用 {cli.split()[0]} auth status 查看登录状态。"
         )
     return ""
