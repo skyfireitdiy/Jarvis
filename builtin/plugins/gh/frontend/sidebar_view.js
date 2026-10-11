@@ -15,6 +15,9 @@ let currentRepo = "";
 let manualRepo = "";
 // 记住手动指定的仓库，刷新页面后仍生效（key 按插件固定）。
 const MANUAL_REPO_KEY = "jarvis_gh_manual_repo";
+// 最近手动指定过的仓库历史（JSON 数组，最多 10 条，最近使用在前），用于快速选择切换。
+const REPO_HISTORY_KEY = "jarvis_gh_repo_history";
+const REPO_HISTORY_MAX = 10;
 
 // 复刻 App.vue 的 gateway 地址解析（侧边栏组件无 props 注入，需自行解析）
 function parseGatewayAddress(address) {
@@ -118,6 +121,8 @@ export default {
       // Agent 工作目录对应的仓库，此时不应把 issue/PR 交给当前 Agent 处理
       // （Agent 的工作目录属于另一个仓库，gh 命令会在错误仓库上执行）。
       isManualRepo: false,
+      // 最近手动指定过的仓库历史（最多 10 条，最近使用在前），用于快速选择切换。
+      repoHistory: [],
       // 当前目标 Agent 名称（宿主 __jarvisGetActiveAgentInfo 提供；无则空）。
       // 用于 header 与右键菜单标注「在当前 Agent 中处理」的实际接收者。
       agentName: "",
@@ -225,6 +230,36 @@ export default {
         /* localStorage 不可用时忽略 */
       }
     },
+    // 读取最近手动指定过的仓库历史（最多 REPO_HISTORY_MAX 条，最近使用在前）。
+    // 存储损坏/不可用时返回空数组，不影响主流程。
+    getRepoHistory() {
+      try {
+        const raw = localStorage.getItem(REPO_HISTORY_KEY);
+        if (!raw) return [];
+        const list = JSON.parse(raw);
+        if (!Array.isArray(list)) return [];
+        return list
+          .filter((r) => typeof r === "string")
+          .map((r) => r.trim())
+          .filter(Boolean)
+          .slice(0, REPO_HISTORY_MAX);
+      } catch {
+        return [];
+      }
+    },
+    // 把仓库写入历史：去重（已存在则移到最前）、按最近使用排序、截断到上限。
+    saveRepoHistory(repo) {
+      try {
+        const list = this.getRepoHistory().filter((r) => r !== repo);
+        list.unshift(repo);
+        localStorage.setItem(
+          REPO_HISTORY_KEY,
+          JSON.stringify(list.slice(0, REPO_HISTORY_MAX)),
+        );
+      } catch {
+        /* 忽略存储失败 */
+      }
+    },
     // 规范化用户输入的仓库：去空白、去 .git 后缀，校验 owner/repo 两段格式。
     // 返回规范化后的 owner/repo；非法时返回空字符串。
     normalizeRepoInput(raw) {
@@ -263,12 +298,18 @@ export default {
       } catch {
         /* 忽略存储失败 */
       }
+      this.saveRepoHistory(normalized);
       currentRepo = normalized;
       this.repo = normalized;
       this.repoInput = normalized;
       this.isManualRepo = true;
       this.repoEditing = false;
       this.refresh();
+    },
+    // 从历史中快速选择仓库并切换（与 setRepo 等效，无需重新输入）。
+    selectRepoHistory(repo) {
+      this.repoInput = repo;
+      this.setRepo();
     },
     // 恢复为「跟随当前工作目录」自动解析的仓库。
     useCurrentDirRepo() {
@@ -286,6 +327,7 @@ export default {
       if (this.repoEditing) {
         this.repoInput = this.repo || "";
         this.error = "";
+        this.repoHistory = this.getRepoHistory();
       }
     },
     fmtDate(s) {
@@ -669,6 +711,15 @@ export default {
       <div style="display:flex;gap:6px;margin-top:6px;">
         <button @click="useCurrentDirRepo" style="padding:4px 8px;background:#333;color:#ddd;border:none;border-radius:4px;cursor:pointer;font-size:11px;">跟随当前目录</button>
         <button @click="repoEditing = false" style="padding:4px 8px;background:#333;color:#ddd;border:none;border-radius:4px;cursor:pointer;font-size:11px;">取消</button>
+      </div>
+      <!-- 最近使用过的仓库：点击快速切换，无需重新输入 -->
+      <div v-if="repoHistory.length" style="margin-top:8px;">
+        <div style="font-size:11px;color:#888;margin-bottom:4px;">最近使用</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;">
+          <button v-for="r in repoHistory" :key="r" @click="selectRepoHistory(r)"
+            :title="r"
+            style="padding:3px 8px;background:#1e1e1e;color:#58a6ff;border:1px solid #333;border-radius:4px;cursor:pointer;font-size:11px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ r }}</button>
+        </div>
       </div>
     </div>
 
