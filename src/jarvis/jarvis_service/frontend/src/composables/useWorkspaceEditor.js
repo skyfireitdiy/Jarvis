@@ -15,14 +15,13 @@
 // - 直传（定义在本 composable 调用点之前）：fetchWithAuth / getGatewayAddress / getHttpProtocol /
 //   buildNodeHttpUrl / getWebSocketProtocol / buildWebSocketProtocols / getLanguageFromFilename /
 //   getLanguageExtension / showToast / showConfirm / pushOverlayState / getNodeDisplayName /
-//   getCurrentAgentOrNull / isStoppedAgent / closePanel / refreshManageCapabilities /
-//   refreshManageTimers / windowWidth / activeWindow / showWorkspacePanel / showTerminalPanel /
-//   showChatPanel / workspaceSidebarWidth / workspaceSidebarResizeState / agentList / currentAgent /
-//   socket / panels / workspaceHostsChat / workspaceHostsTerminal / workspaceSessionPanelId /
-//   editorShortcutLocked / effectiveGlobalSearchAgentId / normalizeWorkspaceSidebarWidth /
-//   saveWorkspaceSidebarWidth / ACTIVE_Z_INDEX / BASE_Z_INDEX / manageInstalledScripts /
-//   manageGatewayScripts / getDefinition / loadLspServers / getServerByLanguage / getServerByPath /
-//   ensureClient / disposeClient
+//   getCurrentAgentOrNull / isStoppedAgent / refreshManageCapabilities / refreshManageTimers /
+//   windowWidth / activeWindow / showWorkspacePanel / showTerminalPanel / showChatPanel /
+//   workspaceSidebarWidth / workspaceSidebarResizeState / currentAgent / socket /
+//   workspaceHostsChat / workspaceHostsTerminal / editorShortcutLocked /
+//   effectiveGlobalSearchAgentId / normalizeWorkspaceSidebarWidth / saveWorkspaceSidebarWidth /
+//   ACTIVE_Z_INDEX / BASE_Z_INDEX / manageInstalledScripts / manageGatewayScripts / getDefinition /
+//   loadLspServers / getServerByLanguage / getServerByPath / ensureClient / disposeClient
 // - 直传（useWorkspacePane 返回，定义在本调用点之前）：activePaneId / workspaceSessions /
 //   activeWorkspaceSessionId / workspaceTabs / activeWorkspaceTabPath / activeWorkspaceSession /
 //   virtualWorkspaceSessions / editorModels / workspaceFileHeartbeatTimer / isWorkspaceEditable /
@@ -33,12 +32,12 @@
 //   EDITOR_PANEL_MIN_WIDTH / EDITOR_PANEL_MIN_HEIGHT / PANEL_DRAG_ACTIVATION_DISTANCE /
 //   collapseWorkspacePanes / findWorkspacePaneByView / ensureEditorPaneForFileOpen /
 //   ensurePaneForView / setMainViewOnLeaf / setActivePaneView / setActivePaneViewForPane
-// - getter 注入（定义在调用点之后，内部通过 xxx() 二次求值）：useFileTree 返回的
-//   fileTreeState / initFileTree / getVisibleFileTreeNodes / expandedAgents / fileTreeExpanded /
-//   fileTreeLoading / fileTreeSelectedAgentId / fileTreeSelectedPath / selectedAgentId /
-//   revealTabInFileTree；useGitView 返回的 gitLogLoading / refreshGitView / layoutGitDiffEditor /
-//   renderDiffForPane / scheduleDiffLayout；useTopology 返回的 topologyDaemonSessions /
-//   topologyExtensionSessions
+// - getter 注入（定义在调用点之后，内部通过 xxx() 二次求值）：closePanel / agentList / panels /
+//   workspaceSessionPanelId；useFileTree 返回的 fileTreeState / initFileTree /
+//   getVisibleFileTreeNodes / expandedAgents / fileTreeExpanded / fileTreeLoading /
+//   fileTreeSelectedAgentId / fileTreeSelectedPath / selectedAgentId / revealTabInFileTree；
+//   useGitView 返回的 gitLogLoading / refreshGitView / layoutGitDiffEditor / renderDiffForPane /
+//   scheduleDiffLayout；useTopology 返回的 topologyDaemonSessions / topologyExtensionSessions
 import { computed, nextTick, reactive, ref, triggerRef } from 'vue'
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.main.js'
 
@@ -58,7 +57,7 @@ export function useWorkspaceEditor({
   getNodeDisplayName: getNodeDisplayNameGetter,
   getCurrentAgentOrNull: getCurrentAgentOrNullGetter,
   isStoppedAgent: isStoppedAgentGetter,
-  closePanel,
+  closePanel: closePanelGetter,
   refreshManageCapabilities,
   refreshManageTimers,
   windowWidth,
@@ -68,13 +67,13 @@ export function useWorkspaceEditor({
   showChatPanel,
   workspaceSidebarWidth,
   workspaceSidebarResizeState,
-  agentList,
+  agentList: agentListGetter,
   currentAgent: currentAgentGetter,
   socket,
-  panels,
+  panels: panelsGetter,
   workspaceHostsChat: workspaceHostsChatGetter,
   workspaceHostsTerminal: workspaceHostsTerminalGetter,
-  workspaceSessionPanelId,
+  workspaceSessionPanelId: workspaceSessionPanelIdGetter,
   editorShortcutLocked: editorShortcutLockedGetter,
   effectiveGlobalSearchAgentId: effectiveGlobalSearchAgentIdGetter,
   normalizeWorkspaceSidebarWidth,
@@ -1158,7 +1157,7 @@ function resolveAgentRelativePath(relativePath, agentId = null) {
   // 而非 currentAgent——两者可能不一致，导致拼出相对路径触发 Monaco「path must be absolute」）。
   let workingDir = ''
   if (agentId) {
-    const agent = agentList.value.find(a => a.agent_id === agentId)
+    const agent = agentListGetter().value.find(a => a.agent_id === agentId)
     workingDir = agent?.working_dir || ''
   }
   if (!workingDir) workingDir = currentAgent().value?.working_dir || ''
@@ -1169,7 +1168,7 @@ function resolveAgentRelativePath(relativePath, agentId = null) {
 async function fetchGlobalSearchResults(agentId, payload) {
   const { host, port } = getGatewayAddress()
   // 使用传入的agentId对应的node_id
-  const agent = agentList.value.find(a => a.agent_id === agentId)
+  const agent = agentListGetter().value.find(a => a.agent_id === agentId)
   if (!agent) {
     throw new Error(`找不到Agent: ${agentId}`)
   }
@@ -1193,7 +1192,7 @@ async function fetchGlobalSearchResults(agentId, payload) {
 
 async function fetchFileSearchResults(agentId, payload) {
   const { host, port } = getGatewayAddress()
-  const agent = agentList.value.find(a => a.agent_id === agentId)
+  const agent = agentListGetter().value.find(a => a.agent_id === agentId)
   if (!agent) {
     throw new Error(`找不到Agent: ${agentId}`)
   }
@@ -1330,7 +1329,7 @@ function setWorkspaceMainView(view) {
   }
   if (view === 'session') {
     // session 由 pane 承载：交给 ensurePaneForView 定位承载 pane（未分割时唯一 leaf 原地承载）
-    ensurePaneForView('session', workspaceSessionPanelId.value)
+    ensurePaneForView('session', workspaceSessionPanelIdGetter().value)
     return
   }
   // chat / terminal：空则原地、已有则复用、否则分割（不覆盖当前区域）
@@ -1494,7 +1493,7 @@ async function fetchFileContent(path, agentId = null) {
   // 如果提供了agentId，使用对应的node_id；否则使用当前激活编辑器会话的node_id
   let targetNodeId
   if (agentId) {
-    const agent = agentList.value.find(a => a.agent_id === agentId) || getVirtualWorkspaceAgent(agentId)
+    const agent = agentListGetter().value.find(a => a.agent_id === agentId) || getVirtualWorkspaceAgent(agentId)
     if (!agent) {
       throw new Error(`找不到Agent: ${agentId}`)
     }
@@ -1522,7 +1521,7 @@ async function fetchFileStat(path, agentId = null) {
   // 如果提供了agentId，使用对应的node_id；否则使用当前激活编辑器会话的node_id
   let targetNodeId
   if (agentId) {
-    const agent = agentList.value.find(a => a.agent_id === agentId) || getVirtualWorkspaceAgent(agentId)
+    const agent = agentListGetter().value.find(a => a.agent_id === agentId) || getVirtualWorkspaceAgent(agentId)
     if (!agent) {
       throw new Error(`找不到Agent: ${agentId}`)
     }
@@ -1683,7 +1682,7 @@ async function openWorkspaceFile(path, agentId = null) {
     if (virtualSession) {
       activeWorkspaceSessionId.value = agentId
     } else {
-      const targetAgent = (agentId && agentList.value.find(a => a.agent_id === agentId))
+      const targetAgent = (agentId && agentListGetter().value.find(a => a.agent_id === agentId))
         || getCurrentAgentOrNull()
       if (!targetAgent) return
       createWorkspaceForAgent(targetAgent)
@@ -1813,10 +1812,10 @@ function resetWorkspaceHostedPanelState() {
   // 内嵌会话 Panel 只在编辑器内部渲染：编辑器关闭后它们失去宿主，
   // 若继续留在 panels 中会既不可见、又让 hasNoPanel 恒为 false（宠物大厅不显示）。
   // 因此关闭编辑器时一并关闭所有会话 Panel。
-  for (const panel of [...panels.value]) {
-    closePanel(panel.id)
+  for (const panel of [...panelsGetter().value]) {
+    closePanelGetter()(panel.id)
   }
-  workspaceSessionPanelId.value = null
+  workspaceSessionPanelIdGetter().value = null
 }
 
 // 「关闭编辑器」只是隐藏：保留主区域视图、自由分割布局、会话 Panel 与 diff 数据，
@@ -1890,7 +1889,7 @@ function getVirtualWorkspaceAgent(agentId) {
 
 // 目录树/文件操作统一取 agent：优先真实 Agent，其次虚拟目录会话
 function resolveFileTreeAgent(agentId) {
-  return agentList.value.find(a => a.agent_id === agentId) || getVirtualWorkspaceAgent(agentId)
+  return agentListGetter().value.find(a => a.agent_id === agentId) || getVirtualWorkspaceAgent(agentId)
 }
 
 // 由文件的绝对路径反查其所属的目录树 Agent（真实 Agent 或虚拟目录会话）：
@@ -1902,7 +1901,7 @@ function resolveAgentForPath(path) {
   if (!raw) return null
   const candidates = []
   // 真实 Agent：附带其是否已停止（虚拟目录会话无「停止」概念，视为活跃）
-  for (const agent of agentList.value) {
+  for (const agent of agentListGetter().value) {
     if (agent?.agent_id && agent.working_dir) {
       candidates.push({ agent, stopped: isStoppedAgent(agent) })
     }

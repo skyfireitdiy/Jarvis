@@ -2920,7 +2920,12 @@ const EDITOR_SIDEBAR_MAX_WIDTH = 560
 const EDITOR_SIDEBAR_STORAGE_KEY = 'jarvis_workspace_sidebar_width'
 
 function normalizeWorkspaceSidebarWidth(width) {
-  return clamp(width, EDITOR_SIDEBAR_MIN_WIDTH, EDITOR_SIDEBAR_MAX_WIDTH)
+  // 内联 clamp（不依赖 useWorkspaceEditor 返回的 clamp，避免 setup 顶层 TDZ：
+  // 本函数在 useWorkspaceEditor 调用点之前定义，且 loadWorkspaceSidebarWidth 在顶层立即执行）
+  const min = EDITOR_SIDEBAR_MIN_WIDTH
+  const max = EDITOR_SIDEBAR_MAX_WIDTH
+  if (max < min) return min
+  return Math.min(Math.max(width, min), max)
 }
 
 function loadWorkspaceSidebarWidth() {
@@ -3332,7 +3337,7 @@ const {
   buildWebSocketProtocols,
   getLanguageFromFilename,
   getLanguageExtension,
-  closePanel,
+  closePanel: () => closePanel,
   refreshManageCapabilities,
   refreshManageTimers,
   windowWidth,
@@ -3342,10 +3347,10 @@ const {
   showChatPanel,
   workspaceSidebarWidth,
   workspaceSidebarResizeState,
-  agentList,
+  agentList: () => agentList,
   socket,
-  panels,
-  workspaceSessionPanelId,
+  panels: () => panels,
+  workspaceSessionPanelId: () => workspaceSessionPanelId,
   normalizeWorkspaceSidebarWidth,
   saveWorkspaceSidebarWidth,
   ACTIVE_Z_INDEX,

@@ -1235,10 +1235,19 @@ async function restoreWorkspacePaneContents() {
 // 每次 DOM 提交后（激活 pane / 分割树变化 / 标签变化）都重新补齐一次实例：
 // Vue 在 patch 时可能清掉容器里「它不认识的」Monaco DOM，导致实例 DOM 脱离文档；
 // 这里在 post flush 阶段检测并重建，保证每个 file pane 始终有可见的编辑器。
+// 注意：immediate 首次触发发生在 setup 同步阶段，此时 useWorkspaceEditor 尚未执行，
+// scheduleWorkspaceLayout 的 getter 求值会 TDZ（Cannot access before initialization）；
+// 故首次触发用 nextTick 推迟到 setup 完成后（useWorkspaceEditor 已执行）再调度。
+let firstWorkspaceLayoutRun = true
 watch(
   [activePaneId, workspacePaneTree, () => workspaceTabs.value.length, activeWorkspaceTabPath],
   () => {
-    scheduleWorkspaceLayout()
+    if (firstWorkspaceLayoutRun) {
+      firstWorkspaceLayoutRun = false
+      nextTick(() => scheduleWorkspaceLayout())
+    } else {
+      scheduleWorkspaceLayout()
+    }
   },
   { flush: 'post', immediate: true },
 )
