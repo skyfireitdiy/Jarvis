@@ -1222,7 +1222,7 @@ const hasWorkspaceSidebarFileTree = computed(() => {
 
 async function ensureWorkspaceSidebarFileTree(agent = activeWorkspaceSession.value?.agent) {
   if (!agent?.agent_id || !agent.working_dir) return
-  const treeNodes = fileTreeState.value.get(agent.agent_id) || []
+  const treeNodes = fileTreeState().value.get(agent.agent_id) || []
   if (treeNodes.length === 0) {
     await initFileTree(agent.agent_id, agent.working_dir)
   }
@@ -1243,7 +1243,7 @@ function setWorkspaceSidebarView(view) {
     nextTick(() => {
       layoutMonacoEditor()
       layoutGitDiffEditor()
-      if (!gitLogLoading.value) {
+      if (!gitLogLoading().value) {
         refreshGitView()
       }
     })
@@ -1256,8 +1256,8 @@ function setWorkspaceSidebarView(view) {
     // 这两个 ref 与网络拓扑图共享，可能已被拓扑图轮询填充，导致 installedScripts/
     // gatewayScripts 永远不加载（网关脚本库区块不显示）。
     if (
-      !topologyDaemonSessions.value.length &&
-      !topologyExtensionSessions.value.length &&
+      !topologyDaemonSessions().value.length &&
+      !topologyExtensionSessions().value.length &&
       !manageInstalledScripts.value.length &&
       !manageGatewayScripts.value.length
     ) {
@@ -2028,15 +2028,15 @@ function removeWorkspaceDir(agentId) {
   if (session.agent?.virtual !== true) return
 
   // 清理该会话的文件树 / 展开态 / 加载态
-  fileTreeState.value.delete(agentId)
-  fileTreeExpanded.value.delete(agentId)
-  fileTreeLoading.value.delete(agentId)
-  expandedAgents.value.delete(agentId)
-  if (fileTreeSelectedAgentId.value === agentId) {
-    fileTreeSelectedAgentId.value = null
-    fileTreeSelectedPath.value = null
+  fileTreeState().value.delete(agentId)
+  fileTreeExpanded().value.delete(agentId)
+  fileTreeLoading().value.delete(agentId)
+  expandedAgents().value.delete(agentId)
+  if (fileTreeSelectedAgentId().value === agentId) {
+    fileTreeSelectedAgentId().value = null
+    fileTreeSelectedPath().value = null
   }
-  if (selectedAgentId.value === agentId) selectedAgentId.value = null
+  if (selectedAgentId().value === agentId) selectedAgentId().value = null
 
   // 释放编辑器模型
   session.editorModels?.clear()
@@ -2054,7 +2054,7 @@ function removeWorkspaceDir(agentId) {
       resetWorkspaceHostedPanelState()
     }
   }
-  triggerRef(expandedAgents)
+  triggerRef(expandedAgents())
   saveVirtualWorkspaceDirs()
   showToast('已移除目录', 'success')
 }
