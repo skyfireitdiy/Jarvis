@@ -9,10 +9,23 @@
 //       通过插件功能代理端点 /api/plugins/master/function-call 调用插件私有功能层。
 
 const PLUGIN = "autoworker";
-// 后端工作目录持久化 key（按插件固定）。
-const WORKDIR_KEY = "jarvis_autoworker_workdir";
+// 旧版单工作目录持久化 key（v0.1.0，无节点概念，迁移到 master 节点用）。
+const LEGACY_WORKDIR_KEY = "jarvis_autoworker_workdir";
+// 每节点工作目录列表持久化 key 前缀：jarvis_autoworker_dirs_<node>（JSON 数组）。
+const DIRS_KEY_PREFIX = "jarvis_autoworker_dirs_";
+// 每节点当前激活工作目录持久化 key 前缀：jarvis_autoworker_active_<node>。
+const ACTIVE_DIR_KEY_PREFIX = "jarvis_autoworker_active_";
 // 轮询间隔（毫秒）。
 const POLL_INTERVAL = 15000;
+
+// 按节点生成目录列表存储 key
+function dirsKey(nodeId) {
+  return DIRS_KEY_PREFIX + (String(nodeId || "master").trim() || "master");
+}
+// 按节点生成激活目录存储 key
+function activeDirKey(nodeId) {
+  return ACTIVE_DIR_KEY_PREFIX + (String(nodeId || "master").trim() || "master");
+}
 
 // 复刻 App.vue 的 gateway 地址解析（侧边栏组件无 props 注入，需自行解析）
 function parseGatewayAddress(address) {
@@ -61,11 +74,13 @@ function gatewayBase() {
 }
 
 // 通过 gateway 插件功能代理端点调用插件私有功能
-async function callFunction(functionName, args) {
+// nodeId 指定目标节点（默认 master）：任务数据与操作都落在该节点上
+async function callFunction(functionName, args, nodeId) {
   const authedFetch =
     (typeof window !== "undefined" && window.__jarvisFetch) || fetch;
+  const targetNodeId = String(nodeId || "master").trim() || "master";
   const resp = await authedFetch(
-    `${gatewayBase()}/api/plugins/master/function-call`,
+    `${gatewayBase()}/api/plugins/${encodeURIComponent(targetNodeId)}/function-call`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -118,9 +133,14 @@ export default {
       // 状态映射暴露到实例，供模板使用（模板无法访问模块作用域变量）
       STATUS_LABELS,
       STATUS_COLORS,
-      // 后端工作目录（localStorage 持久化）
+      // 节点列表与当前节点（master 恒在列）
+      nodes: [],
+      nodeId: "master",
+      // 当前节点的后端工作目录列表（localStorage 按节点持久化）
+      dirs: [],
+      dirInput: "",
+      // 当前激活的后端工作目录（任务子目录的父目录）
       workdir: "",
-      workdirInput: "",
       workdirEditing: false,
       // 当前活跃 Agent（用于提示）
       agentName: "",
@@ -159,6 +179,7 @@ export default {
     },
   },
   mounted() {
+    this.initNodes();
     this.restoreWorkdir();
     this.refreshAgentName();
     if (this.workdir) this.refresh();
@@ -193,50 +214,199 @@ export default {
     },
   },
   methods: {
-    // ---- 工作目录设置 ----
-    restoreWorkdir() {
+    // ---- 节点管理 ----
+    // 加载节点列表（__jarvisGetNodes，master 恒在列），并恢复上次选中的节点
+    initNodes() {
+      const getNodes =
+        typeof window !== "undefined" && window.__jarvisGetNodes;
+      if (typeof getNodes !== "function") {
+        this.nodes = [{ node_id: "master", status: "running" }];
+        return;
+      }
       try {
-        const saved = (localStorage.getItem(WORKDIR_KEY) || "").trim();
-        if (saved) {
-          this.workdir = saved;
-          this.workdirInput = saved;
+        const list = getNodes() || [];
+        const nodes = Array.isArray(list)
+          ? list.filter((n) => n && String(n.node_id || "").trim())
+          : [];
+        // 确保 master 恒在列
+        if (!nodes.some((n) => n.node_id === "master")) {
+          nodes.unshift({ node_id: "master", status: "running" });
         }
+        this.nodes = nodes;
       } catch {
-        /* localStorage 不可用时忽略 */
+        this.nodes = [{ node_id: "master", status: "running" }];
+        return;
+      }
+      // 恢复上次选中的节点（若仍存在）
+      let savedNode = "master";
+      try {
+        savedNode = (localStorage.getItem("jarvis_autoworker_node") || "master").trim() || "master";
+      } catch {
+        /* 忽略 */
+      }
+      if (this.nodes.some((n) => n.node_id === savedNode)) {
+        this.nodeId = savedNode;
+      } else {
+        this.nodeId = this.nodes[0]?.node_id || "master";
       }
     },
-    toggleWorkdirEdit() {
-      this.workdirEditing = !this.workdirEditing;
-      if (this.workdirEditing) this.workdirInput = this.workdir || "";
+    // 切换节点：保存选择并加载该节点的目录
+    onNodeChange(nodeId) {
+      this.nodeId = String(nodeId || "master").trim() || "master";
+      try {
+        localStorage.setItem("jarvis_autoworker_node", this.nodeId);
+      } catch {
+        /* 忽略 */
+      }
+      this.loadDirs();
     },
-    saveWorkdir() {
-      const value = (this.workdirInput || "").trim();
+    // 节点展示名：优先宿主自定义名，否则回退 node_id
+    nodeLabel(node) {
+      if (!node) return "master";
+      return (node.display_name || node.name || node.node_id || "master");
+    },
+    // 按节点 ID 取展示名（模板用，避免模板内写复杂表达式）
+    nodeLabelById(nodeId) {
+      const target = String(nodeId || "master").trim() || "master";
+      const found = this.nodes.find((n) => n && n.node_id === target);
+      return this.nodeLabel(found || { node_id: target });
+    },
+    // ---- 工作目录（按节点多目录）管理 ----
+    // 恢复当前节点的目录列表与激活目录（含旧版单目录迁移）
+    restoreWorkdir() {
+      this.loadDirs();
+    },
+    // 从 localStorage 加载当前节点目录列表与激活目录
+    loadDirs() {
+      // 旧版单目录迁移：仅 master 节点且从未初始化过新结构时迁移
+      let dirs = [];
+      try {
+        const raw = localStorage.getItem(dirsKey(this.nodeId));
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            dirs = parsed.filter((d) => typeof d === "string" && d.trim());
+          }
+        }
+      } catch {
+        dirs = [];
+      }
+      // 旧版单目录迁移（仅当 master 且新结构为空时）
+      if (this.nodeId === "master" && dirs.length === 0) {
+        try {
+          const legacy = (localStorage.getItem(LEGACY_WORKDIR_KEY) || "").trim();
+          if (legacy) {
+            dirs = [legacy];
+            localStorage.setItem(dirsKey("master"), JSON.stringify(dirs));
+            localStorage.removeItem(LEGACY_WORKDIR_KEY);
+          }
+        } catch {
+          /* 忽略 */
+        }
+      }
+      this.dirs = dirs;
+      // 激活目录：优先存过的，否则取列表第一个
+      let active = "";
+      try {
+        active = (localStorage.getItem(activeDirKey(this.nodeId)) || "").trim();
+      } catch {
+        active = "";
+      }
+      if (!active || !dirs.includes(active)) {
+        active = dirs[0] || "";
+      }
+      this.workdir = active;
+      this.dirInput = "";
+      this.selected = null;
+      this.refresh();
+    },
+    // 添加一个工作目录到当前节点（去重）
+    addDir() {
+      const value = (this.dirInput || "").trim();
       if (!value) {
         this.error = "请填写后端工作目录";
         return;
       }
       this.error = "";
-      this.workdir = value;
-      try {
-        localStorage.setItem(WORKDIR_KEY, value);
-      } catch {
-        /* 忽略存储失败 */
+      if (this.dirs.includes(value)) {
+        this.message = "该目录已在列表中";
+        return;
       }
-      this.workdirEditing = false;
+      this.dirs.push(value);
+      this.saveDirs();
+      this.dirInput = "";
+      // 首次添加时自动激活
+      if (!this.workdir) {
+        this.workdir = value;
+        this.saveActiveDir();
+        this.selected = null;
+        this.refresh();
+      }
+    },
+    // 切换当前激活的工作目录
+    useDir(dir) {
+      if (!dir || !this.dirs.includes(dir)) return;
+      this.workdir = dir;
+      this.saveActiveDir();
       this.selected = null;
       this.refresh();
     },
-    // 用宿主提供的目录选择弹窗挑选工作目录
+    // 从当前节点移除一个工作目录
+    removeDir(dir) {
+      if (!dir) return;
+      this.dirs = this.dirs.filter((d) => d !== dir);
+      this.saveDirs();
+      if (this.workdir === dir) {
+        this.workdir = this.dirs[0] || "";
+        this.saveActiveDir();
+        this.selected = null;
+        this.refresh();
+      }
+    },
+    saveDirs() {
+      try {
+        localStorage.setItem(dirsKey(this.nodeId), JSON.stringify(this.dirs));
+      } catch {
+        /* 忽略存储失败 */
+      }
+    },
+    saveActiveDir() {
+      try {
+        if (this.workdir) {
+          localStorage.setItem(activeDirKey(this.nodeId), this.workdir);
+        } else {
+          localStorage.removeItem(activeDirKey(this.nodeId));
+        }
+      } catch {
+        /* 忽略存储失败 */
+      }
+    },
+    toggleWorkdirEdit() {
+      this.workdirEditing = !this.workdirEditing;
+    },
+    // 用宿主提供的目录选择弹窗挑选工作目录（含节点）
     async pickWorkdir() {
       const pick =
-        typeof window !== "undefined" && window.__jarvisPickDirectory;
+        typeof window !== "undefined" && window.__jarvisPickDirectoryWithNode;
       if (typeof pick !== "function") {
         this.error = "宿主未提供目录选择通道";
         return;
       }
       try {
-        const dir = await pick();
-        if (dir) this.workdirInput = dir;
+        const res = await pick();
+        if (res && res.path) {
+          // 选择的节点可能不同于当前节点：同步切换节点
+          if (res.nodeId && res.nodeId !== this.nodeId) {
+            this.nodeId = res.nodeId;
+            try {
+              localStorage.setItem("jarvis_autoworker_node", this.nodeId);
+            } catch {
+              /* 忽略 */
+            }
+            this.loadDirs();
+          }
+          this.dirInput = res.path;
+        }
       } catch (e) {
         this.error = String((e && e.message) || e);
       }
@@ -270,7 +440,7 @@ export default {
       try {
         const payload = await callFunction("list_tasks", {
           workdir: this.workdir,
-        });
+        }, this.nodeId);
         this.tasks = Array.isArray(payload.data) ? payload.data : [];
         // 同步刷新当前选中任务的详情（若仍在列表）
         if (this.selected) {
@@ -326,7 +496,7 @@ export default {
           description: this.editForm.description,
           tags: this.editForm.tags,
           due_date: this.editForm.due_date,
-        });
+        }, this.nodeId);
         this.message = "已保存";
         await this.refresh(true);
       } catch (e) {
@@ -358,7 +528,7 @@ export default {
           description: this.createForm.description,
           tags: this.createForm.tags,
           due_date: this.createForm.due_date,
-        });
+        }, this.nodeId);
         const created = payload.data || {};
         this.message = `已创建任务 ${created.id || ""}`;
         this.creating = false;
@@ -381,7 +551,7 @@ export default {
           workdir: this.workdir,
           task_id: task.id,
           status: status,
-        });
+        }, this.nodeId);
         this.message = `任务 ${task.id} 已标记为${STATUS_LABELS[status] || status}`;
         await this.refresh(true);
       } catch (e) {
@@ -458,6 +628,7 @@ export default {
           workingDir: taskDir,
           task: this.buildTaskPrompt(task),
           name: `${task.id} ${task.title || ""}`.trim(),
+          nodeId: this.nodeId,
         });
         if (res && res.success) {
           // 标记为执行中
@@ -466,7 +637,7 @@ export default {
               workdir: this.workdir,
               task_id: task.id,
               status: "running",
-            });
+            }, this.nodeId);
           } catch {
             /* 标记失败不阻塞创建结果提示 */
           }
@@ -514,12 +685,22 @@ export default {
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
       <strong style="font-size:14px;">任务</strong>
       <div style="display:flex;align-items:center;gap:6px;">
-        <button @click="toggleWorkdirEdit" title="设置后端工作目录"
+        <button @click="toggleWorkdirEdit" title="设置节点与工作目录"
           style="padding:2px 6px;background:#333;color:#ddd;border:none;border-radius:4px;cursor:pointer;font-size:11px;">设置</button>
         <button @click="refresh()" title="刷新"
           style="padding:2px 6px;background:#333;color:#ddd;border:none;border-radius:4px;cursor:pointer;font-size:11px;">🔄</button>
       </div>
     </div>
+
+    <!-- 节点选择 -->
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+      <span style="font-size:11px;color:#888;white-space:nowrap;">节点:</span>
+      <select v-model="nodeId" @change="onNodeChange(nodeId)"
+        style="flex:1;min-width:0;padding:3px 6px;background:#1e1e1e;color:#ddd;border:1px solid #444;border-radius:4px;font-size:12px;">
+        <option v-for="n in nodes" :key="n.node_id" :value="n.node_id">{{ nodeLabel(n) }}</option>
+      </select>
+    </div>
+
     <div style="font-size:11px;color:#888;margin-bottom:4px;" :title="workdir || ''">
       工作目录: {{ workdir || '未设置' }}
     </div>
@@ -527,18 +708,35 @@ export default {
       当前 Agent: <span :title="agentName || ''">{{ agentName || '未选择 Agent' }}</span>
     </div>
 
-    <!-- 工作目录设置 -->
+    <!-- 设置区：节点下的工作目录管理 -->
     <div v-if="workdirEditing" style="margin-bottom:10px;padding:8px;background:#252526;border-radius:6px;">
-      <div style="font-size:11px;color:#888;margin-bottom:4px;">后端工作目录（任务子目录的父目录）</div>
+      <div style="font-size:11px;color:#888;margin-bottom:4px;">
+        节点 {{ nodeLabelById(nodeId) }} 的工作目录（任务子目录的父目录）
+      </div>
+      <!-- 已有目录列表 -->
+      <div v-if="dirs.length" style="margin-bottom:6px;">
+        <div v-for="d in dirs" :key="d"
+          style="display:flex;align-items:center;gap:6px;padding:3px 6px;margin-bottom:3px;background:#1e1e1e;border-radius:4px;">
+          <span style="flex:1;min-width:0;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+            :style="d === workdir ? { color: '#58a6ff' } : { color: '#ddd' }" :title="d">{{ d }}</span>
+          <button @click="useDir(d)" :disabled="d === workdir"
+            style="padding:2px 6px;background:#238636;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px;">使用</button>
+          <button @click="removeDir(d)"
+            style="padding:2px 6px;background:#333;color:#f85149;border:none;border-radius:4px;cursor:pointer;font-size:11px;">删除</button>
+        </div>
+      </div>
+      <div v-else style="font-size:11px;color:#888;margin-bottom:6px;">该节点暂无工作目录，请添加。</div>
+      <!-- 添加目录 -->
       <div style="display:flex;gap:6px;">
-        <input v-model="workdirInput" type="text" placeholder="如 /home/user/tasks"
-          @keydown.enter.prevent="saveWorkdir"
+        <input v-model="dirInput" type="text" placeholder="如 /home/user/tasks"
+          @keydown.enter.prevent="addDir"
           style="flex:1;min-width:0;padding:5px 8px;background:#1e1e1e;color:#ddd;border:1px solid #444;border-radius:4px;font-size:12px;">
-        <button @click="pickWorkdir" style="padding:5px 8px;background:#333;color:#ddd;border:none;border-radius:4px;cursor:pointer;font-size:12px;">选择</button>
+        <button @click="pickWorkdir" title="用目录选择弹窗挑选"
+          style="padding:5px 8px;background:#333;color:#ddd;border:none;border-radius:4px;cursor:pointer;font-size:12px;">选择</button>
       </div>
       <div style="display:flex;gap:6px;margin-top:6px;">
-        <button @click="saveWorkdir" style="padding:4px 10px;background:#1f6feb;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;">保存</button>
-        <button @click="workdirEditing = false" style="padding:4px 8px;background:#333;color:#ddd;border:none;border-radius:4px;cursor:pointer;font-size:11px;">取消</button>
+        <button @click="addDir" style="padding:4px 10px;background:#1f6feb;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;">添加</button>
+        <button @click="workdirEditing = false" style="padding:4px 8px;background:#333;color:#ddd;border:none;border-radius:4px;cursor:pointer;font-size:11px;">完成</button>
       </div>
     </div>
 
@@ -548,7 +746,7 @@ export default {
 
     <!-- 未设置工作目录 -->
     <div v-if="!workdir" style="color:#888;padding:20px;text-align:center;">
-      请先点击右上角「设置」配置后端工作目录。
+      请先点击右上角「设置」配置当前节点的工作目录。
     </div>
 
     <!-- 列表视图 -->
@@ -566,7 +764,7 @@ export default {
           style="width:100%;box-sizing:border-box;margin-bottom:6px;padding:5px 8px;background:#1e1e1e;color:#ddd;border:1px solid #444;border-radius:4px;font-size:12px;"></textarea>
         <input v-model="createForm.tags" type="text" placeholder="标签（逗号分隔）"
           style="width:100%;box-sizing:border-box;margin-bottom:6px;padding:5px 8px;background:#1e1e1e;color:#ddd;border:1px solid #444;border-radius:4px;font-size:12px;">
-        <input v-model="createForm.due_date" type="text" placeholder="截止时间（如 2026-10-20）"
+        <input v-model="createForm.due_date" type="date" placeholder="截止日期"
           style="width:100%;box-sizing:border-box;margin-bottom:6px;padding:5px 8px;background:#1e1e1e;color:#ddd;border:1px solid #444;border-radius:4px;font-size:12px;">
         <div style="display:flex;gap:6px;">
           <button @click="createTask" :disabled="busy"
@@ -614,7 +812,7 @@ export default {
           style="width:100%;box-sizing:border-box;margin-bottom:6px;padding:5px 8px;background:#1e1e1e;color:#ddd;border:1px solid #444;border-radius:4px;font-size:12px;"></textarea>
         <input v-model="editForm.tags" type="text" placeholder="标签（逗号分隔）"
           style="width:100%;box-sizing:border-box;margin-bottom:6px;padding:5px 8px;background:#1e1e1e;color:#ddd;border:1px solid #444;border-radius:4px;font-size:12px;">
-        <input v-model="editForm.due_date" type="text" placeholder="截止时间（如 2026-10-20）"
+        <input v-model="editForm.due_date" type="date" placeholder="截止日期"
           style="width:100%;box-sizing:border-box;margin-bottom:6px;padding:5px 8px;background:#1e1e1e;color:#ddd;border:1px solid #444;border-radius:4px;font-size:12px;">
         <button @click="saveTask" :disabled="busy"
           style="padding:5px 12px;background:#1f6feb;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;">保存</button>
