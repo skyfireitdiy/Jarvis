@@ -128,7 +128,7 @@ def web(
         # 启动 uvicorn 服务
         uvicorn.run(
             fastapi_app,
-            host="0.0.0.0",
+            host="0.0.0.0",  # nosec B104 - 配置服务需绑定所有接口供局域网访问（设计如此）
             port=port,
             log_level="info",
             timeout_graceful_shutdown=30,  # 优雅关闭：给30秒时间处理现有请求

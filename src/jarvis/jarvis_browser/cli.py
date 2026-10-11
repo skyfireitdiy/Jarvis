@@ -78,7 +78,7 @@ def _get_browser_temp_dir() -> Path:
     if _IS_WINDOWS:
         d = Path(get_data_dir()) / "browser_temp"
     else:
-        d = Path("/tmp") / "playwright_browser"
+        d = Path("/tmp") / "playwright_browser"  # nosec B108 - 固定临时目录，mkdir 安全创建
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -2952,7 +2952,7 @@ async def download_file(
         download_dir = (
             str(Path(get_data_dir()) / "browser_temp" / "playwright_downloads")
             if _IS_WINDOWS
-            else "/tmp/playwright_downloads"
+            else "/tmp/playwright_downloads"  # nosec B108 - 固定下载目录，os.makedirs 安全创建
         )
         os.makedirs(download_dir, exist_ok=True)
 

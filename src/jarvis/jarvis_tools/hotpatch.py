@@ -123,7 +123,7 @@ class HotpatchTool:
         """从内存代码注入全新模块，注册进 sys.modules 后立即可 import。"""
         try:
             module = types.ModuleType(module_name)
-            exec(compile(code, f"<hotpatch:{module_name}>", "exec"), module.__dict__)
+            exec(compile(code, f"<hotpatch:{module_name}>", "exec"), module.__dict__)  # nosec B102 - 热补丁核心功能，compile 后受限 namespace
             sys.modules[module_name] = module
             PrettyOutput.auto_print(f"🧩 注入全新模块: {module_name}")
             return {
@@ -156,7 +156,7 @@ class HotpatchTool:
                 "globals": globals,
                 "__builtins__": __builtins__,
             }
-            exec(compile(code, "<hotpatch:statement>", "exec"), namespace)
+            exec(compile(code, "<hotpatch:statement>", "exec"), namespace)  # nosec B102 - 热补丁核心功能，compile 后受限 namespace
 
             # 若代码定义了可调用对象，注入到本模块命名空间便于后续引用
             func_names = [

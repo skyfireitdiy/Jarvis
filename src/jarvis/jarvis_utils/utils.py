@@ -568,7 +568,7 @@ def _check_pip_updates() -> bool:
         # 获取PyPI上的最新版本
         url = "https://pypi.org/pypi/jarvis-ai-assistant/json"
         try:
-            with urllib.request.urlopen(url, timeout=5) as response:
+            with urllib.request.urlopen(url, timeout=5) as response:  # nosec B310 - 固定 PyPI URL，非用户可控
                 data = json.loads(response.read().decode())
                 latest_version = data["info"]["version"]
         except (urllib.error.URLError, KeyError, ValueError):

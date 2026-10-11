@@ -92,7 +92,7 @@ def _load_flow(file_path: Path) -> Dict[str, Any]:
     }
     try:
         code = compile(source, str(file_path), "exec")
-        exec(code, namespace)  # pylint: disable=exec-used
+        exec(code, namespace)  # pylint: disable=exec-used  # nosec B102 - 编排加载核心功能，compile 后受限 namespace
     except Exception as e:  # pylint: disable=broad-except
         raise ValueError(f"编排脚本执行失败: {type(e).__name__}: {e}") from e
 

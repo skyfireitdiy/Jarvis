@@ -2498,7 +2498,7 @@ class ChildNodeClient:
             except (TypeError, ValueError):
                 exec_timeout = 60.0
             try:
-                proc = await asyncio.create_subprocess_shell(
+                proc = await asyncio.create_subprocess_shell(  # nosec B604 - 命令执行功能设计所需（terminal 权限受控）
                     command,
                     shell=True,
                     executable=interpreter,

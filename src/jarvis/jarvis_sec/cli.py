@@ -548,7 +548,7 @@ def _parallel_collect_file(args: Tuple[str, str]) -> Dict[str, Any]:
     from jarvis.jarvis_sec.data_collector import DataCollector
 
     # 每个子进程创建独立的内存数据库
-    database = ProjectDatabase("/tmp/parallel_collect", in_memory=True)
+    database = ProjectDatabase("/tmp/parallel_collect", in_memory=True)  # nosec B108 - 内存库标识符非实际落盘路径
     database.begin_batch()
     collector = DataCollector(database)
 

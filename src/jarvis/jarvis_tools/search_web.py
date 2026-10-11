@@ -529,7 +529,7 @@ class SearchWebTool:
                 ),
             },
         )
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with urllib.request.urlopen(request, timeout=30) as response:  # nosec B310 - 固定搜索引擎 URL，非用户可控
             return str(response.read().decode("utf-8", "ignore"))
 
     @staticmethod
