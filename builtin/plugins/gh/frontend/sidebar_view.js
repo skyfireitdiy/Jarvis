@@ -80,7 +80,7 @@ async function callFunction(functionName, args, nodeId, platform) {
     (typeof window !== "undefined" && window.__jarvisFetch) || fetch;
   // 除 resolve_repo 外，其余函数都需指定 repo；未解析到仓库时传空，
   // 由后端返回明确错误提示。
-  const noRepoFns = ["resolve_repo"];
+  const noRepoFns = ["resolve_repo", "auth_status", "auth_login"];
   const callArgs = args || {};
   if (!noRepoFns.includes(functionName) && !callArgs.repo) {
     callArgs.repo = currentRepo;
@@ -165,6 +165,16 @@ export default {
       menuItem: null,
       // 帮助弹层：展示插件使用条件（非开箱即用，需配置 CLI 与登录）
       helpVisible: false,
+      // 认证表单状态（帮助弹层内）：authStatus 为 null 表示尚未查询；
+      // authenticated 为 true 时显示「已登录 xxx」，否则显示认证表单。
+      authStatus: null,
+      authLoading: false,
+      authBusy: false,
+      authToken: "",
+      // 认证表单的平台（默认跟随当前平台；auto 时用 github）
+      authPlatform: currentPlatform === "gitee" ? "gitee" : "github",
+      // 认证表单的节点（默认跟随当前节点）
+      authNodeId: "master",
     };
   },
   mounted() {
@@ -807,6 +817,66 @@ export default {
     // 打开/关闭帮助弹层
     toggleHelp() {
       this.helpVisible = !this.helpVisible;
+      if (this.helpVisible) {
+        // 打开时同步认证表单的节点/平台选择，并查询当前认证状态
+        this.authNodeId = this.nodeId;
+        this.authPlatform =
+          this.platform === "gitee" ? "gitee" : "github";
+        this.refreshAuthStatus();
+      }
+    },
+    // 认证表单切换节点/平台：重新查询该节点+平台的认证状态
+    onAuthNodeChange() {
+      this.authStatus = null;
+      this.authToken = "";
+      this.refreshAuthStatus();
+    },
+    onAuthPlatformChange() {
+      this.authStatus = null;
+      this.authToken = "";
+      this.refreshAuthStatus();
+    },
+    // 查询所选节点+平台的认证状态（仅用于展示「已登录/未认证」，不泄露 token）
+    async refreshAuthStatus() {
+      this.authLoading = true;
+      this.authStatus = null;
+      try {
+        const payload = await callFunction(
+          "auth_status",
+          { platform: this.authPlatform },
+          this.authNodeId,
+        );
+        this.authStatus = payload || {};
+      } catch (e) {
+        this.authStatus = { authenticated: false, error: String((e && e.message) || e) };
+      } finally {
+        this.authLoading = false;
+      }
+    },
+    // 提交认证：把 token 交给后端写入 CLI 凭据（仅未认证时执行）。
+    // 成功后清空 token 并刷新状态；失败提示原因（token 不回显、不落日志）。
+    async doAuth() {
+      const token = (this.authToken || "").trim();
+      if (!token) {
+        this.message = "请填写 token";
+        return;
+      }
+      this.authBusy = true;
+      this.message = "";
+      try {
+        await callFunction(
+          "auth_login",
+          { platform: this.authPlatform, token: token },
+          this.authNodeId,
+        );
+        this.authToken = "";
+        this.message = `已在节点 ${this.nodeLabelById(this.authNodeId)} 完成 ${this.authPlatform === "gitee" ? "Gitee" : "GitHub"} 认证`;
+        await this.refreshAuthStatus();
+      } catch (e) {
+        this.message = "认证失败: " + String((e && e.message) || e);
+      } finally {
+        this.authBusy = false;
+      }
     },
   },
   template: `
@@ -963,10 +1033,49 @@ export default {
 · git（fork/clone 仓库时需要）
 
 【2. 登录认证】
-· GitHub：终端执行 gh auth login（写操作需登录）
-· Gitee：终端执行 gitee auth login
 · 读操作（列出/查看）公开仓库无需登录
-· 用 gh auth status / gitee auth status 查看登录状态
+· 写操作（评论/关闭/合并）需对应平台已登录
+· 认证在所选节点本地执行，不跨节点共享
+
+<!-- 认证表单：选择节点+平台+token，仅未认证时显示 -->
+<div style="margin:10px 0;padding:10px;background:#252526;border-radius:6px;">
+  <div style="font-size:12px;font-weight:600;margin-bottom:8px;">🔐 认证</div>
+  <div v-if="authLoading" style="font-size:12px;color:#888;">查询认证状态…</div>
+  <template v-else-if="authStatus && authStatus.authenticated">
+    <div style="font-size:12px;color:#3fb950;">
+      ✓ 已登录 {{ authStatus.platform === 'gitee' ? 'Gitee' : 'GitHub' }}（{{ authStatus.login || '已认证' }}）
+    </div>
+  </template>
+  <template v-else>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+      <span style="font-size:11px;color:#888;width:28px;">节点</span>
+      <select v-model="authNodeId" @change="onAuthNodeChange"
+        style="flex:1;min-width:0;padding:4px 6px;background:#1e1e1e;color:#ddd;border:1px solid #444;border-radius:4px;font-size:12px;">
+        <option v-for="n in nodes" :key="n.node_id" :value="n.node_id">{{ nodeLabel(n) }}</option>
+      </select>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+      <span style="font-size:11px;color:#888;width:28px;">平台</span>
+      <select v-model="authPlatform" @change="onAuthPlatformChange"
+        style="flex:1;min-width:0;padding:4px 6px;background:#1e1e1e;color:#ddd;border:1px solid #444;border-radius:4px;font-size:12px;">
+        <option value="github">GitHub</option>
+        <option value="gitee">Gitee</option>
+      </select>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+      <span style="font-size:11px;color:#888;width:28px;">Token</span>
+      <input v-model="authToken" type="password" placeholder="粘贴 Personal Access Token"
+        @keydown.enter.prevent="doAuth"
+        style="flex:1;min-width:0;padding:5px 8px;background:#1e1e1e;color:#ddd;border:1px solid #444;border-radius:4px;font-size:12px;">
+    </div>
+    <div v-if="authStatus && authStatus.error" style="font-size:11px;color:#f85149;margin-bottom:6px;">{{ authStatus.error }}</div>
+    <button @click="doAuth" :disabled="authBusy || !authToken.trim()"
+      style="padding:6px 14px;background:#1f6feb;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;">
+      {{ authBusy ? '认证中…' : '认证' }}
+    </button>
+    <div style="font-size:11px;color:#888;margin-top:6px;">token 仅发送到所选节点本地写入 CLI 凭据，不会保存到浏览器。</div>
+  </template>
+</div>
 
 【3. 选择平台】
 · 平台默认「自动识别」：按当前仓库 remote 自动判断

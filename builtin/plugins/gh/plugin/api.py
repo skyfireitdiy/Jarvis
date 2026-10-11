@@ -4,6 +4,7 @@ gh 插件私有功能层（运行在 gateway，供前端代理调用；不暴露
 提供 gh 插件的全部业务功能纯函数（GitHub/Gitee 双平台）：
 - list_issues / list_prs / get_issue / get_pr：读操作（匿名可用）
 - merge_pr / comment / close_issue：写操作（需已登录 token，复用 gh/gitee CLI 登录态）
+- auth_status / auth_login：查询/写入 CLI 登录态（前端认证入口）
 - resolve_repo：解析当前工作目录对应的仓库与平台
 - fork_repo / clone_repo / prepare_issue_repo：Fork / Clone（GitHub 语义）
 
@@ -671,10 +672,96 @@ def _current_login(platform: Optional[str] = None) -> str:
             return ""
         user = res["data"]
         return (user or {}).get("login", "") if isinstance(user, dict) else ""
-    res = gh_common.cli_json("github", ["api", "user", "--jq", ".login"])
+    res = gh_common.run_cli("github", ["api", "user", "--jq", ".login"])
     if not res["success"]:
         return ""
-    return str(res["data"] or "").strip()
+    return (res["stdout"] or "").strip()
+
+
+def _cli_installed(platform: str) -> bool:
+    """判断平台 CLI 是否已安装（gh / gitee）。"""
+    executable = "gh" if platform == "github" else "gitee"
+    return _run_command([executable, "--version"], timeout=10)["success"]
+
+
+def auth_status(platform: Optional[str] = None) -> Dict[str, Any]:
+    """查询指定平台在当前节点是否已认证。
+
+    返回 {"success": True, "authenticated": bool, "login": str, "installed": bool}。
+    - installed: 对应 CLI（gh / gitee）是否已安装
+    - authenticated: 是否已登录（CLI 未安装视为未认证）
+    - login: 已登录用户名（未登录为空串）
+    """
+    platform = gh_common.normalize_platform(platform)
+    if not _cli_installed(platform):
+        return {
+            "success": True,
+            "authenticated": False,
+            "login": "",
+            "installed": False,
+            "platform": platform,
+        }
+    login = _current_login(platform)
+    return {
+        "success": True,
+        "authenticated": bool(login),
+        "login": login,
+        "installed": True,
+        "platform": platform,
+    }
+
+
+def auth_login(
+    platform: Optional[str] = None, token: Optional[str] = None
+) -> Dict[str, Any]:
+    """用 token 登录指定平台（仅在该平台未认证时写入凭据）。
+
+    token 通过 stdin 传给对应 CLI 的 `auth login --with-token`，由 CLI 校验并写入
+    凭据存储；已认证时拒绝（避免覆盖已有凭据）。token 不写日志、不回显。
+    返回 {"success": True, "message": str, "login": str}；失败时 success=False。
+    """
+    platform = gh_common.normalize_platform(platform)
+    token = (token or "").strip()
+    if not token:
+        return {"success": False, "error": "请提供 token"}
+    if not _cli_installed(platform):
+        host = "GitHub" if platform == "github" else "Gitee"
+        cli = "gh" if platform == "github" else "gitee"
+        return {
+            "success": False,
+            "error": f"当前节点未安装 {cli} CLI，无法登录 {host}",
+        }
+    if _current_login(platform):
+        return {
+            "success": False,
+            "error": f"当前节点已登录 {platform}，无需重复认证",
+        }
+
+    executable = "gh" if platform == "github" else "gitee"
+    args = ["auth", "login", "--with-token"]
+    try:
+        result = subprocess.run(
+            [executable] + args,
+            input=token + "\n",
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except subprocess.TimeoutExpired:
+        return {"success": False, "error": "认证超时，请重试"}
+    except Exception as e:  # noqa: BLE001
+        return {"success": False, "error": f"认证失败: {e}"}
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip()
+        return {"success": False, "error": f"认证失败: {detail or 'token 无效'}"}
+
+    login = _current_login(platform)
+    host = "GitHub" if platform == "github" else "Gitee"
+    return {
+        "success": True,
+        "message": f"已登录 {host}（{login or platform}）",
+        "login": login,
+    }
 
 
 def fork_repo(
@@ -912,4 +999,6 @@ PUBLIC_FUNCTIONS: List[str] = [
     "fork_repo",
     "clone_repo",
     "prepare_issue_repo",
+    "auth_status",
+    "auth_login",
 ]
