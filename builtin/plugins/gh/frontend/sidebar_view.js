@@ -66,7 +66,8 @@ function gatewayBase() {
 }
 
 // 通过 gateway 插件功能代理端点调用插件私有功能
-async function callFunction(functionName, args) {
+// nodeId 指定目标节点（默认 master）：gh 功能（gh CLI / git / 仓库解析）在所选节点本地执行
+async function callFunction(functionName, args, nodeId) {
   // 统一走 App.vue 暴露的带认证请求函数 window.__jarvisFetch（自动携带 jarvis
   // 认证信息，token 不暴露给插件）；若宿主未注入则回退到普通 fetch。
   const authedFetch =
@@ -78,8 +79,9 @@ async function callFunction(functionName, args) {
   if (!noRepoFns.includes(functionName) && !callArgs.repo) {
     callArgs.repo = currentRepo;
   }
+  const targetNodeId = String(nodeId || "master").trim() || "master";
   const resp = await authedFetch(
-    `${gatewayBase()}/api/plugins/master/function-call`,
+    `${gatewayBase()}/api/plugins/${encodeURIComponent(targetNodeId)}/function-call`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -117,6 +119,9 @@ export default {
       repo: currentRepo,
       repoInput: "",
       repoEditing: false,
+      // 节点列表与当前节点（master 恒在列）；gh 功能在所选节点本地执行
+      nodes: [],
+      nodeId: "master",
       // 是否处于「手动指定的自定义仓库」：为真表示当前展示的仓库不是当前
       // Agent 工作目录对应的仓库，此时不应把 issue/PR 交给当前 Agent 处理
       // （Agent 的工作目录属于另一个仓库，gh 命令会在错误仓库上执行）。
@@ -149,6 +154,7 @@ export default {
     };
   },
   mounted() {
+    this.initNodes();
     this.restoreManualRepo();
     this.refreshAgentName();
     this.resolveRepo().then(() => this.refresh());
@@ -181,6 +187,63 @@ export default {
     },
   },
   methods: {
+    // ---- 节点管理 ----
+    // 加载节点列表（__jarvisGetNodes，master 恒在列），并恢复上次选中的节点
+    initNodes() {
+      const getNodes =
+        typeof window !== "undefined" && window.__jarvisGetNodes;
+      if (typeof getNodes !== "function") {
+        this.nodes = [{ node_id: "master", status: "running" }];
+        return;
+      }
+      try {
+        const list = getNodes() || [];
+        const nodes = Array.isArray(list)
+          ? list.filter((n) => n && String(n.node_id || "").trim())
+          : [];
+        // 确保 master 恒在列
+        if (!nodes.some((n) => n.node_id === "master")) {
+          nodes.unshift({ node_id: "master", status: "running" });
+        }
+        this.nodes = nodes;
+      } catch {
+        this.nodes = [{ node_id: "master", status: "running" }];
+        return;
+      }
+      // 恢复上次选中的节点（若仍存在）
+      let savedNode = "master";
+      try {
+        savedNode = (localStorage.getItem("jarvis_gh_node") || "master").trim() || "master";
+      } catch {
+        /* 忽略 */
+      }
+      if (this.nodes.some((n) => n.node_id === savedNode)) {
+        this.nodeId = savedNode;
+      } else {
+        this.nodeId = this.nodes[0]?.node_id || "master";
+      }
+    },
+    // 切换节点：保存选择并重新解析仓库、刷新列表
+    onNodeChange(nodeId) {
+      this.nodeId = String(nodeId || "master").trim() || "master";
+      try {
+        localStorage.setItem("jarvis_gh_node", this.nodeId);
+      } catch {
+        /* 忽略 */
+      }
+      this.resolveRepo().then(() => this.refresh());
+    },
+    // 节点展示名：优先宿主自定义名，否则回退 node_id
+    nodeLabel(node) {
+      if (!node) return "master";
+      return (node.display_name || node.name || node.node_id || "master");
+    },
+    // 按节点 ID 取展示名（模板用，避免模板内写复杂表达式）
+    nodeLabelById(nodeId) {
+      const target = String(nodeId || "master").trim() || "master";
+      const found = this.nodes.find((n) => n && n.node_id === target);
+      return this.nodeLabel(found || { node_id: target });
+    },
     // 从宿主获取当前目标 Agent 名称（与「在当前 Agent 中处理」的实际接收者一致）。
     // 宿主未提供接口时静默置空（不阻塞插件其余功能）。
     refreshAgentName() {
@@ -209,7 +272,7 @@ export default {
       try {
         const payload = await callFunction("resolve_repo", {
           working_dir: this.workingDir || "",
-        });
+        }, this.nodeId);
         currentRepo = (payload && payload.repo) || "";
         this.repo = currentRepo;
         this.repoInput = currentRepo;
@@ -365,7 +428,7 @@ export default {
       this.comments = [];
       try {
         const fn = this.tab === "issues" ? "list_issues" : "list_prs";
-        const payload = await callFunction(fn, { state: "open", page: 1 });
+        const payload = await callFunction(fn, { state: "open", page: 1 }, this.nodeId);
         this.items = (payload.data || []).map((it) => this.mapItem(it));
         this.page = payload.page || 1;
         this.hasMore = !!payload.has_more;
@@ -389,7 +452,7 @@ export default {
         const payload = await callFunction(fn, {
           state: "open",
           page: nextPage,
-        });
+        }, this.nodeId);
         const more = (payload.data || []).map((it) => this.mapItem(it));
         // 去重：避免分页边界重复（如翻页期间数据变动）
         const seen = new Set(this.items.map((it) => it.number));
@@ -414,11 +477,11 @@ export default {
       this.message = "";
       try {
         const fn = this.tab === "issues" ? "get_issue" : "get_pr";
-        const detail = await callFunction(fn, { number: item.number });
+        const detail = await callFunction(fn, { number: item.number }, this.nodeId);
         this.selected.body = ((detail.data && detail.data.body) || "").trim();
         const comments = await callFunction("list_comments", {
           number: item.number,
-        });
+        }, this.nodeId);
         this.comments = Array.isArray(comments.data) ? comments.data : [];
       } catch (e) {
         this.error = String((e && e.message) || e);
@@ -547,6 +610,7 @@ export default {
           workingDir: workingDir,
           task: this.buildItemPrompt(item),
           name: `${kind} #${number}`,
+          nodeId: this.nodeId,
         });
         if (res && res.success) {
           this.message = `已创建新 Agent 处理 ${kind} #${number}`;
@@ -560,7 +624,7 @@ export default {
       }
     },
     // 自定义仓库 Issue：Fork 原仓库并 clone 到所选目录，再在该目录创建 CodeAgent 处理。
-    // 流程：选目录 → fork（已存在复用）→ clone → 创建 CodeAgent。
+    // 流程：选目录（含节点）→ 在所选节点 fork（已存在复用）→ clone → 创建 CodeAgent。
     async handleItemForkCloneAgent(item) {
       this.closeItemMenu();
       if (!item) return;
@@ -571,7 +635,7 @@ export default {
       }
       const number = item.number;
       const pick =
-        typeof window !== "undefined" && window.__jarvisPickDirectory;
+        typeof window !== "undefined" && window.__jarvisPickDirectoryWithNode;
       const create =
         typeof window !== "undefined" && window.__jarvisCreateAgentForTask;
       if (typeof pick !== "function") {
@@ -585,16 +649,19 @@ export default {
       this.busy = true;
       try {
         this.message = "请选择 Fork 后 clone 的目标目录…";
-        const targetDir = await pick();
-        if (!targetDir) {
+        const picked = await pick();
+        if (!picked || !picked.path) {
           this.message = "已取消";
           return;
         }
+        const targetDir = picked.path;
+        // fork/clone 在所选目录所在节点执行
+        const targetNode = String(picked.nodeId || "master").trim() || "master";
         this.message = `正在 Fork 并 Clone ${repo}…`;
         const prepared = await callFunction("prepare_issue_repo", {
           repo: repo,
           target_dir: targetDir,
-        });
+        }, targetNode);
         const localDir = (prepared && prepared.local_dir) || "";
         if (!localDir) {
           this.message = "失败: 未获取到本地目录";
@@ -606,6 +673,7 @@ export default {
           workingDir: localDir,
           task: this.buildItemPrompt(item, true),
           name: `Issue #${number}`,
+          nodeId: targetNode,
         });
         if (res && res.success) {
           this.message = `已创建 CodeAgent 处理 Issue #${number}（${localDir}）`;
@@ -628,7 +696,7 @@ export default {
         await callFunction("comment", {
           number: this.selected.number,
           body: body,
-        });
+        }, this.nodeId);
         this.commentText = "";
         this.message = "评论已发布";
         await this.openItem(this.selected);
@@ -643,7 +711,7 @@ export default {
       this.busy = true;
       this.message = "";
       try {
-        await callFunction("close_issue", { number: this.selected.number });
+        await callFunction("close_issue", { number: this.selected.number }, this.nodeId);
         this.message = "issue 已关闭";
         await this.refresh();
       } catch (e) {
@@ -660,7 +728,7 @@ export default {
         await callFunction("merge_pr", {
           number: this.selected.number,
           merge_method: "merge",
-        });
+        }, this.nodeId);
         this.message = "PR 已合并";
         await this.refresh();
       } catch (e) {
@@ -693,6 +761,14 @@ export default {
         <button @click="toggleRepoEdit" title="切换到其他仓库"
           style="padding:2px 6px;background:#333;color:#ddd;border:none;border-radius:4px;cursor:pointer;font-size:11px;">切换</button>
       </div>
+    </div>
+    <!-- 目标节点：gh 功能（gh CLI / git / 仓库解析）在所选节点本地执行；切换后自动刷新 -->
+    <div v-if="nodes.length > 0" style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
+      <span style="font-size:11px;color:#888;">节点</span>
+      <select v-model="nodeId" @change="onNodeChange(nodeId)"
+        style="flex:1;min-width:0;padding:4px 6px;background:#1e1e1e;color:#ddd;border:1px solid #444;border-radius:4px;font-size:12px;">
+        <option v-for="n in nodes" :key="n.node_id" :value="n.node_id">{{ nodeLabel(n) }}</option>
+      </select>
     </div>
     <!-- 当前目标 Agent：与「在当前 Agent 中处理」的实际接收者一致；无 Agent 时提示 -->
     <div style="font-size:11px;color:#58a6ff;margin-bottom:10px;">
