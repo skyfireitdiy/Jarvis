@@ -1068,12 +1068,42 @@ describe('useAgents', () => {
   })
   it('regenerateAgent：确认后重生（保存会话→删除→重建）', async () => {
     const { api, showConfirm, fetchWithAuth, showToast } = makeHarness()
-    fetchWithAuth.mockResolvedValue({ ok: true, json: async () => ({ success: true }) })
-    api.regenerateAgent({ agent_id: 'a1', node_id: 'master', name: 'x', agent_type: 'agent', working_dir: '/w' })
+    const calls = []
+    fetchWithAuth.mockImplementation(async (url, opts = {}) => {
+      calls.push({ url, opts })
+      if (opts.method === 'POST' && url.includes('/agents')) {
+        return { ok: true, json: async () => ({ success: true, data: { agent_id: 'a1', node_id: 'master' } }) }
+      }
+      return { ok: true, json: async () => ({ success: true }) }
+    })
+    api.regenerateAgent({ agent_id: 'a1', node_id: 'master', name: 'x', agent_type: 'agent', working_dir: '/w', task: '初始任务' })
     const confirmCb = showConfirm.mock.calls[0][1]
     await confirmCb()
     expect(showToast).toHaveBeenCalledWith('Agent 无损重生成功', 'success')
-    expect(fetchWithAuth).toHaveBeenCalled()
+    // 创建请求的 payload 不应携带创建时的 task（普通交互模式）
+    const createCall = calls.find(c => c.opts.method === 'POST' && c.url.includes('/agents'))
+    expect(createCall).toBeTruthy()
+    const body = JSON.parse(createCall.opts.body)
+    expect(body.task).toBeUndefined()
+  })
+  it('regenerateAgent：no_interaction_mode 时保留 task（硬约束）', async () => {
+    const { api, showConfirm, fetchWithAuth, showToast } = makeHarness()
+    const calls = []
+    fetchWithAuth.mockImplementation(async (url, opts = {}) => {
+      calls.push({ url, opts })
+      if (opts.method === 'POST' && url.includes('/agents')) {
+        return { ok: true, json: async () => ({ success: true, data: { agent_id: 'a1', node_id: 'master' } }) }
+      }
+      return { ok: true, json: async () => ({ success: true }) }
+    })
+    api.regenerateAgent({ agent_id: 'a1', node_id: 'master', name: 'x', agent_type: 'agent', working_dir: '/w', task: '初始任务', no_interaction_mode: true })
+    const confirmCb = showConfirm.mock.calls[0][1]
+    await confirmCb()
+    expect(showToast).toHaveBeenCalledWith('Agent 无损重生成功', 'success')
+    const createCall = calls.find(c => c.opts.method === 'POST' && c.url.includes('/agents'))
+    expect(createCall).toBeTruthy()
+    const body = JSON.parse(createCall.opts.body)
+    expect(body.task).toBe('初始任务')
   })
   it('batchDeleteAgents：无选中时提示', async () => {
     const { api, showToast, selectedAgents } = makeHarness()

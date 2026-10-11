@@ -548,7 +548,8 @@ class AgentManager:
             llm_group=agent_info.llm_group,
             tool_group=agent_info.tool_group,
             config_file=agent_info.config_file,
-            task=agent_info.task,
+            # 无损重生不应携带创建时的初始任务；仅无交互模式（硬约束需 task 才能启动）保留
+            task=agent_info.task if agent_info.no_interaction_mode else None,
             additional_args=agent_info.additional_args,
             worktree=agent_info.worktree,
             node_id=agent_info.node_id,
