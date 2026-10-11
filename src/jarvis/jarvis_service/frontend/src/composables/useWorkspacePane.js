@@ -316,15 +316,19 @@ function findWorkspacePaneParent(node, paneId) {
 }
 function activateWorkspacePane(paneId, { moveFocus = false } = {}) {
   if (!findWorkspacePaneById(workspacePaneTree.value, paneId)) return
-  if (activePaneId.value === paneId) return
-  activePaneId.value = paneId
-  // 激活会话 pane 时同步当前 Agent，使侧边栏 Agent 高亮跟随切换（与 activatePanel 一致）
   const pane = findWorkspacePaneById(workspacePaneTree.value, paneId)
+  // 激活会话 pane 时同步 activePanelId（App 侧 panels 数组的激活状态），
+  // 使 getCurrentPanel()/命令面板「当前 Agent」组能定位到当前聚焦的面板，
+  // 而不是回退到列表最后一个 Agent（Issue #160：Space a 操作作用到错误 Agent）。
+  // 放在早退之前：即使 activePaneId 已指向该 pane（经其它路径设置），也须保证 activePanelId 一致。
   if (pane && pane.view === 'session' && pane.sessionPanelId) {
+    activePanelId().value = pane.sessionPanelId
     const panel = panels().value.find(p => p.id === pane.sessionPanelId)
     const agent = panel?.agentId ? agentList().value.find(a => a.agent_id === panel.agentId) : null
     if (agent) switchAgent()(agent)
   }
+  if (activePaneId.value === paneId) return
+  activePaneId.value = paneId
   // 激活 pane 会切换 Monaco 容器（只有激活 pane 渲染真实容器），需重建视图
   nextTick(() => {
     remountMonacoEditor()

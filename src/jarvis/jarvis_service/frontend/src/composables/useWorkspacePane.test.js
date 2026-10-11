@@ -324,6 +324,22 @@ describe('useWorkspacePane', () => {
     expect(api.activePaneId.value).toBe(newId)
   })
 
+  it('activateWorkspacePane：激活 session pane 同步 activePanelId，即使 activePaneId 已指向该 pane（Issue #160 回归）', () => {
+    const { api, activePanelId, panels } = makeHarness()
+    const rootId = api.workspacePaneTree.value.id
+    panels.value = [{ id: 'panel-1', agentId: 'agent-1' }]
+    // 构造 session pane 承载 panel-1
+    api.setActivePaneView('session', 'panel-1')
+    // 首次激活：同步 activePanelId
+    api.activateWorkspacePane(rootId)
+    expect(activePanelId.value).toBe('panel-1')
+    // 模拟其它路径把 activePanelId 改乱（点击面板只更新 activePaneId 不同步 activePanelId 的旧缺陷）
+    activePanelId.value = 'other-panel'
+    // 再次激活同一 pane（触发早退路径），activePanelId 仍须被同步回 panel-1
+    api.activateWorkspacePane(rootId)
+    expect(activePanelId.value).toBe('panel-1')
+  })
+
   it('moveActivePaneInDirection：未分割时返回 false', () => {
     const { api } = makeHarness()
     expect(api.moveActivePaneInDirection('right')).toBe(false)
