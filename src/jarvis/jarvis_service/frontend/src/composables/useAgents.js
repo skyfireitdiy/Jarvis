@@ -2634,6 +2634,7 @@ export function useAgents({
     scrollToDirSelected,
     findVisiblePanelTextarea,
     insertAtPosition,
+    filteredCompletions,
     insertCompletion,
     fetchAgentList,
     buildCopiedAgentPayload,

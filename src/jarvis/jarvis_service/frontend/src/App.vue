@@ -6202,6 +6202,7 @@ const {
   scrollToDirSelected,
   findVisiblePanelTextarea,
   insertAtPosition,
+  filteredCompletions,
   insertCompletion,
   fetchAgentList,
   buildCopiedAgentPayload,
