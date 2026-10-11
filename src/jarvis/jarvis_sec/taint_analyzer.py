@@ -783,7 +783,9 @@ class TaintAnalyzerFactory:
         """创建分析器实例"""
         analyzer_class = cls._analyzers.get(name)
         if analyzer_class:
-            return analyzer_class(**kwargs)
+            instance = analyzer_class(**kwargs)
+            if isinstance(instance, TaintAnalyzer):
+                return instance
         return None
 
     @classmethod

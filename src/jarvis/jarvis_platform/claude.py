@@ -114,6 +114,7 @@ class ClaudeModel(BasePlatform):
 
         # Normalize api_key to api_keys list for round-robin support
         # Support: single string, comma-separated string, or list
+        self.api_keys: List[str] = []
         if isinstance(self.api_key, list):
             self.api_keys = self.api_key
         elif isinstance(self.api_key, str) and self.api_key:

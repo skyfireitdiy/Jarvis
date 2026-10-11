@@ -37,7 +37,7 @@ class RequestsDownloader(IDownloader):
         try:
             resp = requests.get(url, timeout=self.timeout)
             resp.raise_for_status()
-            return resp.text
+            return str(resp.text)
         except Exception:
             return ""
 

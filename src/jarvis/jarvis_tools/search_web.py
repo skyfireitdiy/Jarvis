@@ -261,7 +261,7 @@ class SearchWebTool:
         if parent is None:
             return ""
         for node in parent.select("p, div.res-desc, span.res-desc"):
-            text = node.get_text(strip=True)
+            text = str(node.get_text(strip=True))
             if text and text != anchor.get_text(strip=True):
                 return text
         return ""
@@ -530,7 +530,7 @@ class SearchWebTool:
             },
         )
         with urllib.request.urlopen(request, timeout=30) as response:
-            return response.read().decode("utf-8", "ignore")
+            return str(response.read().decode("utf-8", "ignore"))
 
     @staticmethod
     def _parse_bing_results(html_content: str) -> list[Dict[str, str]]:

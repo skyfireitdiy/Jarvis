@@ -1785,17 +1785,17 @@ class PipelineRunnerTool:
                 left = self._coerce(left_s, work_dir=work_dir)
                 right = self._coerce(right_s, work_dir=work_dir)
                 if op == "==":
-                    return left == right
+                    return bool(left == right)
                 if op == "!=":
-                    return left != right
+                    return bool(left != right)
                 if op == ">=":
-                    return left >= right
+                    return bool(left >= right)
                 if op == "<=":
-                    return left <= right
+                    return bool(left <= right)
                 if op == ">":
-                    return left > right
+                    return bool(left > right)
                 if op == "<":
-                    return left < right
+                    return bool(left < right)
         # 无比较符：尝试数值/布尔字面量
         num = self._coerce(e, work_dir=work_dir)
         if isinstance(num, bool):

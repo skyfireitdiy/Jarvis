@@ -21,6 +21,7 @@ from __future__ import annotations
 from jarvis.jarvis_utils.exception_utils import save_exception
 import re
 from pathlib import Path
+from typing import Any
 from typing import List
 from typing import Optional
 from typing import Sequence
@@ -1895,7 +1896,7 @@ def _rule_as_cast(
     }
 
     # ---- 第1步：构建变量类型映射 ----
-    var_types: dict = {}
+    var_types: dict[str, str] = {}
 
     # 从函数签名提取参数类型：fn foo(x: u64, y: i32)
     fn_param_pattern = re.compile(r"fn\s+\w+[^)]*\(([^)]*)\)")
@@ -2466,8 +2467,8 @@ def _analyze_toctou_in_function(
     lines: Sequence[str],
     fn_start: int,
     fn_body_lines: List[Tuple[int, str]],
-    check_patterns: List,
-    use_patterns: List,
+    check_patterns: List[Any],
+    use_patterns: List[Any],
     relpath: str,
     issues: List[Issue],
 ) -> None:

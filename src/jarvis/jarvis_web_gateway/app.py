@@ -9275,9 +9275,9 @@ def create_app(
         try:
             # Python 3.12+ 支持 filter；"tar" 保留权限/时间等元数据，同时拒绝
             # 绝对路径与 .. 穿越，与本函数的手工校验互补。旧版本无此参数。
-            tar.extractall(root, filter="tar")
+            tar.extractall(root, filter="tar")  # nosec B202 - 上方已手工校验成员
         except TypeError:
-            tar.extractall(root)
+            tar.extractall(root)  # nosec B202 - 旧版 Python 无 filter，成员已手工校验
 
     async def _handle_file_transfer_download(payload: Dict[str, Any]) -> Dict[str, Any]:
         """处理文件直传的下载分块：读取文件（或目录 tar）的 offset 起 length 字节。

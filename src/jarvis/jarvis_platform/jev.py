@@ -102,6 +102,7 @@ class JevPlatform(BasePlatform):
             self.base_url = os.getenv("TYPESAFE_API_BASE", DEFAULT_BASE_URL)
 
         # 归一化为 api_keys 列表，支持多 Key 轮询（与 openai/claude 平台一致）
+        self.api_keys: List[str] = []
         if isinstance(self.api_key, list):
             self.api_keys = self.api_key
         elif isinstance(self.api_key, str) and self.api_key:
@@ -322,8 +323,8 @@ class JevPlatform(BasePlatform):
         """
         if isinstance(message, list):
             # 多模态输入不支持：仅拼接文本块，避免直接崩溃
-            text_parts = [
-                block.get("text", "")
+            text_parts: List[str] = [
+                str(block.get("text", ""))
                 for block in message
                 if isinstance(block, dict) and block.get("type") == "text"
             ]
@@ -502,7 +503,12 @@ class JevPlatform(BasePlatform):
                 )
 
             try:
-                return resp.json()
+                data = resp.json()
+                if not isinstance(data, dict):
+                    raise RuntimeError(
+                        f"Jev 响应不是对象：{resp.text[:500]}"
+                    )
+                return data
             except Exception as e:
                 raise RuntimeError(
                     f"Jev 响应解析失败：{e}，原始响应：{resp.text[:500]}"

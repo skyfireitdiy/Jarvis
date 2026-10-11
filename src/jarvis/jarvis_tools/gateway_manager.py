@@ -899,7 +899,7 @@ class GatewayManagerTool:
             if agent.get("agent_id") == agent_id:
                 resolved_node_id = agent.get("node_id")
                 if resolved_node_id:
-                    return resolved_node_id
+                    return str(resolved_node_id)
                 else:
                     raise ValueError(f"Agent {agent_id} has no node_id information")
 

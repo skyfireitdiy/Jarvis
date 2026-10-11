@@ -365,7 +365,7 @@ class ProjectDatabase:
                 ),
             )
             conn.commit()
-            return cursor.lastrowid
+            return int(cursor.lastrowid)
 
     def get_file(self, file_path: str) -> Optional[Dict[str, Any]]:
         """获取文件记录"""
@@ -416,7 +416,7 @@ class ProjectDatabase:
         file_record = self.get_file(file_path)
         if not file_record:
             return True  # 文件不存在，视为变化
-        return file_record["hash"] != new_hash
+        return bool(file_record["hash"] != new_hash)
 
     # ============================================================================
     # 批量提交模式
@@ -458,7 +458,7 @@ class ProjectDatabase:
                 ),
             )
             conn.commit()
-            return cursor.lastrowid
+            return int(cursor.lastrowid)
 
     def add_symbols_batch(self, symbols: List[SymbolInfo]) -> int:
         """批量添加符号记录"""
@@ -537,7 +537,7 @@ class ProjectDatabase:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM symbols WHERE file_path = ?", (file_path,))
             conn.commit()
-            return cursor.rowcount
+            return int(cursor.rowcount)
 
     # ============================================================================
     # 调用关系管理
@@ -563,7 +563,7 @@ class ProjectDatabase:
                 ),
             )
             conn.commit()
-            return cursor.lastrowid
+            return int(cursor.lastrowid)
 
     def add_call_relations_batch(self, calls: List[CallRelation]) -> int:
         """批量添加调用关系"""
@@ -638,7 +638,7 @@ class ProjectDatabase:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM call_graph WHERE caller_file = ?", (file_path,))
             conn.commit()
-            return cursor.rowcount
+            return int(cursor.rowcount)
 
     # ============================================================================
     # 数据流管理
@@ -664,7 +664,7 @@ class ProjectDatabase:
                 ),
             )
             conn.commit()
-            return cursor.lastrowid
+            return int(cursor.lastrowid)
 
     def add_data_flow_nodes_batch(self, nodes: List[DataFlowNode]) -> int:
         """批量添加数据流节点"""
@@ -756,7 +756,7 @@ class ProjectDatabase:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM data_flow WHERE file_path = ?", (file_path,))
             conn.commit()
-            return cursor.rowcount
+            return int(cursor.rowcount)
 
     # ============================================================================
     # 指针状态管理
@@ -782,7 +782,7 @@ class ProjectDatabase:
                 ),
             )
             conn.commit()
-            return cursor.lastrowid
+            return int(cursor.lastrowid)
 
     def add_pointer_states_batch(self, states: List[PointerStateRecord]) -> int:
         """批量添加指针状态记录"""
@@ -851,7 +851,7 @@ class ProjectDatabase:
                 "DELETE FROM pointer_states WHERE file_path = ?", (file_path,)
             )
             conn.commit()
-            return cursor.rowcount
+            return int(cursor.rowcount)
 
     # ============================================================================
     # 类型信息管理
@@ -878,7 +878,7 @@ class ProjectDatabase:
                 ),
             )
             conn.commit()
-            return cursor.lastrowid
+            return int(cursor.lastrowid)
 
     def add_type_infos_batch(self, type_infos: List[TypeInfo]) -> int:
         """批量添加类型信息"""
@@ -944,7 +944,7 @@ class ProjectDatabase:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM type_info WHERE file_path = ?", (file_path,))
             conn.commit()
-            return cursor.rowcount
+            return int(cursor.rowcount)
 
     # ============================================================================
     # 分析缓存管理
@@ -965,7 +965,7 @@ class ProjectDatabase:
                 (file_path, analysis_type, result_json),
             )
             conn.commit()
-            return cursor.lastrowid
+            return int(cursor.lastrowid)
 
     def get_cached_analysis(
         self, file_path: str, analysis_type: str
@@ -995,7 +995,7 @@ class ProjectDatabase:
                 "DELETE FROM analysis_cache WHERE file_path = ?", (file_path,)
             )
             conn.commit()
-            return cursor.rowcount
+            return int(cursor.rowcount)
 
     # ============================================================================
     # 统计与查询
