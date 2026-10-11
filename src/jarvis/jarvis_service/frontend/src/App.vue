@@ -2369,12 +2369,15 @@ try {
     if (!workingDir) return { success: false, error: '工作目录为空' }
     if (!task) return { success: false, error: '任务提示词为空' }
     const agentType = String(options.agentType || 'agent').trim() || 'agent'
+    // 目标节点：未指定时默认 master（向后兼容）
+    const nodeId = String(options.nodeId || 'master').trim() || 'master'
     const result = await createAgentWithOptions({
       agentType,
       workingDir,
       name: options.name || '',
       task,
       noInteractionMode: false,
+      nodeId,
     })
     if (!result.ok) return { success: false, error: result.error }
     await afterAgentCreated(result.agent)
@@ -2397,6 +2400,29 @@ try {
         prev(null)
       }
       pluginPickDirResolver = resolve
+      pluginPickDirWithNode = false
+      openDirSource.value = 'plugin'
+      openOpenDirDialog()
+    })
+  }
+} catch (e) {
+  /* ignore */
+}
+
+// 暴露「选择目录（含节点）」的钩子给插件前端扩展（如 autoworker 需同时拿到节点与目录）。
+// 复用宿主「打开目录」弹窗；用户确认后返回 { path, nodeId }，取消则返回 null。
+// 返回 Promise<{ path: string, nodeId: string } | null>。
+try {
+  window.__jarvisPickDirectoryWithNode = () => {
+    return new Promise((resolve) => {
+      // 已有未结束的选择请求时，先以 null 结束上一个，避免 Promise 悬挂
+      if (pluginPickDirResolver) {
+        const prev = pluginPickDirResolver
+        pluginPickDirResolver = null
+        prev(null)
+      }
+      pluginPickDirResolver = resolve
+      pluginPickDirWithNode = true
       openDirSource.value = 'plugin'
       openOpenDirDialog()
     })
@@ -3027,6 +3053,8 @@ const openDirDialogRef = ref(null)          // 「打开目录」弹窗内嵌的
 const openDirSource = ref('workspace')
 // 插件请求选择目录时的 Promise resolver：确认时 resolve(路径)，取消时 resolve(null)
 let pluginPickDirResolver = null
+// 插件请求选择目录时是否返回 { path, nodeId }（true）还是纯路径字符串（false，兼容旧插件）
+let pluginPickDirWithNode = false
 // Git 面板自定义 Git 管理目录（用户指定，优先于 Agent 根目录）：{ nodeId, path }
 const gitCustomDir = ref(null)
 // 自定义 Git 目录的持久化 key：刷新后自动恢复
@@ -3086,6 +3114,7 @@ function closeOpenDirDialog() {
   if (openDirSource.value === 'plugin' && pluginPickDirResolver) {
     const resolve = pluginPickDirResolver
     pluginPickDirResolver = null
+    pluginPickDirWithNode = false
     resolve(null)
   }
   // 复位场景，避免后续创建 Agent 的「选择目录」被误判为「打开目录」场景
@@ -3141,7 +3170,9 @@ async function confirmOpenDir() {
     if (pluginPickDirResolver) {
       const resolve = pluginPickDirResolver
       pluginPickDirResolver = null
-      resolve(targetPath)
+      const withNode = pluginPickDirWithNode
+      pluginPickDirWithNode = false
+      resolve(withNode ? { path: targetPath, nodeId } : targetPath)
     }
     return
   }
