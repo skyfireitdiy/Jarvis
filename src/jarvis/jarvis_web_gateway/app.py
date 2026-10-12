@@ -5259,10 +5259,17 @@ def create_app(
                     "version": JARVIS_VERSION,
                 },
             )
+        # 附带配置中的默认代理节点（前端创建 Agent 时使用）
+        from jarvis.jarvis_utils.config import get_global_config_data
+
+        node_info = node_config.to_dict()
+        node_info["default_proxy_node"] = str(
+            get_global_config_data().get("default_proxy_node") or ""
+        ).strip()
         return {
             "success": True,
             "data": {
-                "node": node_config.to_dict(),
+                "node": node_info,
                 "runtime_status": node_runtime.status,
                 "version": JARVIS_VERSION,
                 "token_sync": {

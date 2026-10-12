@@ -5630,6 +5630,7 @@ const newAgentNoInteractionMode = ref(false) // 新 Agent 是否启用无交互�
 const newAgentTaskDescription = ref('') // 新 Agent 任务描述
 const newAgentCreateError = ref('') // 创建 Agent 时的错误信息
 const newAgentProxyNode = ref('') // 新 Agent 代理节点
+const defaultProxyNode = ref('') // 配置文件中 default_proxy_node 指定的默认代理节点（创建 Agent 时默认选中）
 const newAgentAccessAclRead = ref([]) // 新 Agent ACL read用户ID数组
 const newAgentAccessAclInteract = ref([]) // 新 Agent ACL interact用户ID数组
 const availableUserOptions = ref([]) // 用户列表（用于ACL选择）
@@ -6372,6 +6373,7 @@ const {
   newAgentTaskDescription,
   newAgentCreateError,
   newAgentProxyNode,
+  defaultProxyNode,
   newAgentAccessAclRead,
   newAgentAccessAclInteract,
   availableUserOptions,

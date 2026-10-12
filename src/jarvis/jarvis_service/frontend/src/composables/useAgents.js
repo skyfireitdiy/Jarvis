@@ -163,6 +163,7 @@ export function useAgents({
   newAgentTaskDescription,
   newAgentCreateError,
   newAgentProxyNode,
+  defaultProxyNode,
   newAgentAccessAclRead,
   newAgentAccessAclInteract,
   availableUserOptions,
@@ -672,6 +673,9 @@ export function useAgents({
     // 校验目标节点在可创建范围内，否则回退到默认节点（master）
     const allowed = filteredNodeOptionsForCreateAgent.value.some(n => n.node_id === target)
     newAgentNodeId.value = allowed ? target : getDefaultCreateAgentNodeId()
+    // 默认代理节点：优先配置文件中的 default_proxy_node（若在可选节点列表中），否则无代理
+    const configuredProxy = String(defaultProxyNode.value || '').trim()
+    newAgentProxyNode.value = configuredProxy && availableNodeOptions.value.some(n => n.node_id === configuredProxy) ? configuredProxy : ''
     newAgentDir.value = '~'
     newAgentCreateError.value = ''
     resetDirectorySelectionState()
@@ -799,6 +803,8 @@ export function useAgents({
       }
       const result = await response.json()
       const nodes = Array.isArray(result?.data?.nodes) ? result.data.nodes : []
+      // 缓存配置中的默认代理节点（创建 Agent 时默认选中）
+      defaultProxyNode.value = String(result?.data?.node?.default_proxy_node || '').trim()
       const processedNodes = nodes
         .filter(node => node && String(node.node_id || '').trim())
         .map(node => ({
@@ -931,13 +937,17 @@ export function useAgents({
       noInteractionMode = false,
       task = '',
       nodeId = '',
-      proxyNode = '',
+      proxyNode: proxyNodeInput = '',
       accessAclRead = [],
       accessAclInteract = [],
       toolGroup = '',
       configFile = '',
       additionalArgs = '',
     } = options
+    // 默认代理节点：调用方未显式指定代理节点时，使用配置中的 default_proxy_node（若在可选节点列表中）
+    const configuredProxy = String(defaultProxyNode.value || '').trim()
+    const proxyNode = String(proxyNodeInput || '').trim()
+      || (configuredProxy && availableNodeOptions.value.some(n => n.node_id === configuredProxy) ? configuredProxy : '')
 
     const trimmedDir = String(workingDir || '').trim()
     if (!trimmedDir) return { ok: false, error: '工作目录不能为空' }

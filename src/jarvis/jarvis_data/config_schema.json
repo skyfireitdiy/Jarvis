@@ -99,6 +99,11 @@
       "description": "Git提交信息生成提示模板",
       "default": ""
     },
+    "default_proxy_node": {
+      "type": "string",
+      "description": "创建 Agent 时默认使用的代理节点（前端创建 Agent 弹窗默认选中该代理节点）",
+      "default": ""
+    },
     "llms": {
       "type": "object",
       "description": "可复用的LLM配置定义，可以在llm_groups中通过引用名称来使用",
