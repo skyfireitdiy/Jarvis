@@ -1662,9 +1662,9 @@ def get_tool_filter_threshold() -> int:
     获取AI工具筛选的阈值。
 
     返回:
-        int: 当工具数量超过此阈值时，触发AI筛选。默认为50
+        int: 当工具数量超过此阈值时，触发AI筛选。默认为500
     """
-    return 50
+    return 500
 
 
 def get_script_execution_timeout() -> int:
