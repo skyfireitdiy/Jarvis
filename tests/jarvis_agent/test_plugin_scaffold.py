@@ -27,8 +27,16 @@ def plugin_dir(tmp_path):
 
 
 @pytest.fixture
-def git_plugin_dir(tmp_path):
-    """生成一个初始化了 git 的插件脚手架，返回其目录路径。"""
+def git_plugin_dir(tmp_path, monkeypatch):
+    """生成一个初始化了 git 的插件脚手架，返回其目录路径。
+
+    通过环境变量提供 git 身份（不污染全局 user.name/user.email 配置），
+    保证在无身份配置的 CI 环境也能完成初始提交。
+    """
+    monkeypatch.setenv("GIT_AUTHOR_NAME", "Jarvis Test")
+    monkeypatch.setenv("GIT_AUTHOR_EMAIL", "jarvis-test@example.com")
+    monkeypatch.setenv("GIT_COMMITTER_NAME", "Jarvis Test")
+    monkeypatch.setenv("GIT_COMMITTER_EMAIL", "jarvis-test@example.com")
     result = scaffold_plugin("my-demo-plugin", output_dir=str(tmp_path))
     assert result is not None, "脚手架生成失败"
     return result
