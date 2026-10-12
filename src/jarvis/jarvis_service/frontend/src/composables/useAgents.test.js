@@ -123,6 +123,7 @@ function makeHarness(overrides = {}) {
   const newAgentTaskDescription = ref('')
   const newAgentCreateError = ref('')
   const newAgentProxyNode = ref('')
+  const defaultProxyNode = ref('')
   const newAgentAccessAclRead = ref([])
   const newAgentAccessAclInteract = ref([])
   const availableUserOptions = ref([])
@@ -273,6 +274,7 @@ function makeHarness(overrides = {}) {
     newAgentTaskDescription,
     newAgentCreateError,
     newAgentProxyNode,
+    defaultProxyNode,
     newAgentAccessAclRead,
     newAgentAccessAclInteract,
     availableUserOptions,
@@ -425,6 +427,7 @@ function makeHarness(overrides = {}) {
     newAgentTaskDescription,
     newAgentCreateError,
     newAgentProxyNode,
+    defaultProxyNode,
     newAgentAccessAclRead,
     newAgentAccessAclInteract,
     availableUserOptions,
