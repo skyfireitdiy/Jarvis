@@ -98,6 +98,71 @@ def test_list_tasks(tool_cls, api, workdir):
     assert [t["id"] for t in payload["data"]] == ["T001", "T002"]
 
 
+def test_list_tasks_default_pagination(tool_cls, api, workdir):
+    """list_tasks 默认分页（limit=20），返回 total/has_more 等元信息。"""
+    for i in range(25):
+        api.create_task(workdir=workdir, title=f"任务{i}")
+    tool = tool_cls()
+    payload = json.loads(
+        tool.execute({"action": "list_tasks", "workdir": workdir})["stdout"]
+    )
+    assert payload["total"] == 25
+    assert payload["count"] == 20
+    assert payload["limit"] == 20
+    assert payload["has_more"] is True
+    # 翻到第二页
+    payload = json.loads(
+        tool.execute(
+            {"action": "list_tasks", "workdir": workdir, "limit": 20, "offset": 20}
+        )["stdout"]
+    )
+    assert payload["count"] == 5
+    assert payload["has_more"] is False
+
+
+def test_list_tasks_filter_via_tool(tool_cls, api, workdir):
+    """工具层透传 query/filter_tags/filter_status。"""
+    api.create_task(workdir=workdir, title="登录功能", tags=["auth"])
+    api.create_task(workdir=workdir, title="其他", tags=["ui"])
+    tool = tool_cls()
+    payload = json.loads(
+        tool.execute(
+            {"action": "list_tasks", "workdir": workdir, "query": "登录"}
+        )["stdout"]
+    )
+    assert [t["id"] for t in payload["data"]] == ["T001"]
+    payload = json.loads(
+        tool.execute(
+            {"action": "list_tasks", "workdir": workdir, "filter_tags": ["ui"]}
+        )["stdout"]
+    )
+    assert [t["id"] for t in payload["data"]] == ["T002"]
+    payload = json.loads(
+        tool.execute(
+            {"action": "list_tasks", "workdir": workdir, "filter_status": "pending"}
+        )["stdout"]
+    )
+    assert payload["total"] == 2
+
+
+def test_list_tasks_tool_strips_notes_by_default(tool_cls, api, workdir):
+    """工具层默认不返回备注全文，只给 note_count；include_notes=true 可保留。"""
+    api.create_task(workdir=workdir, title="任务")
+    api.add_note(workdir=workdir, task_id="T001", content="备注内容")
+    tool = tool_cls()
+    payload = json.loads(
+        tool.execute({"action": "list_tasks", "workdir": workdir})["stdout"]
+    )
+    assert "notes" not in payload["data"][0]
+    assert payload["data"][0]["note_count"] == 1
+    payload = json.loads(
+        tool.execute(
+            {"action": "list_tasks", "workdir": workdir, "include_notes": True}
+        )["stdout"]
+    )
+    assert payload["data"][0]["notes"][0]["content"] == "备注内容"
+
+
 def test_create_task(tool_cls, workdir):
     """create_task 通过工具创建任务。"""
     tool = tool_cls()

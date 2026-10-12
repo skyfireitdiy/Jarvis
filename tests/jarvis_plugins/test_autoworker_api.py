@@ -193,6 +193,82 @@ def test_list_tasks_empty(api, workdir):
     assert res["data"] == []
 
 
+def test_list_tasks_notes_option(api, workdir):
+    """默认保留 notes 全文（前端面板依赖）；include_notes=False 时剥离，只留 note_count。"""
+    api.create_task(workdir=workdir, title="任务一")
+    api.add_note(workdir=workdir, task_id="T001", content="备注内容")
+    res = api.list_tasks(workdir=workdir)
+    assert res["data"][0]["notes"][0]["content"] == "备注内容"
+    assert res["data"][0]["note_count"] == 1
+    res = api.list_tasks(workdir=workdir, include_notes=False)
+    item = res["data"][0]
+    assert "notes" not in item
+    assert item["note_count"] == 1
+
+
+def test_list_tasks_filter_query(api, workdir):
+    """query 匹配标题/描述/备注内容，大小写不敏感。"""
+    api.create_task(workdir=workdir, title="Fix Login Bug", description="")
+    api.create_task(workdir=workdir, title="其他", description="包含 login 描述")
+    api.create_task(workdir=workdir, title="无关任务")
+    api.add_note(workdir=workdir, task_id="T003", content="LOGIN 相关备注")
+
+    res = api.list_tasks(workdir=workdir, query="login")
+    assert res["total"] == 3
+    assert [t["id"] for t in res["data"]] == ["T001", "T002", "T003"]
+    res = api.list_tasks(workdir=workdir, query="无关")
+    assert [t["id"] for t in res["data"]] == ["T003"]
+
+
+def test_list_tasks_filter_tags_and_status(api, workdir):
+    """tags 需全部命中；status 精确匹配。"""
+    api.create_task(workdir=workdir, title="A", tags=["x", "y"])
+    api.create_task(workdir=workdir, title="B", tags=["x"])
+    api.set_status(workdir=workdir, task_id="T002", status="completed")
+
+    res = api.list_tasks(workdir=workdir, tags=["x", "y"])
+    assert [t["id"] for t in res["data"]] == ["T001"]
+    res = api.list_tasks(workdir=workdir, tags=["x"])
+    assert [t["id"] for t in res["data"]] == ["T001", "T002"]
+    res = api.list_tasks(workdir=workdir, status="completed")
+    assert [t["id"] for t in res["data"]] == ["T002"]
+    # 过滤条件为「与」
+    res = api.list_tasks(workdir=workdir, tags=["x"], status="completed")
+    assert [t["id"] for t in res["data"]] == ["T002"]
+
+
+def test_list_tasks_pagination(api, workdir):
+    """limit/offset 分页，返回 total/offset/limit/has_more 元信息。"""
+    for i in range(5):
+        api.create_task(workdir=workdir, title=f"任务{i}")
+    res = api.list_tasks(workdir=workdir, limit=2, offset=0)
+    assert res["total"] == 5
+    assert res["count"] == 2
+    assert res["offset"] == 0
+    assert res["limit"] == 2
+    assert res["has_more"] is True
+    assert [t["id"] for t in res["data"]] == ["T001", "T002"]
+
+    res = api.list_tasks(workdir=workdir, limit=2, offset=4)
+    assert res["count"] == 1
+    assert res["has_more"] is False
+    assert [t["id"] for t in res["data"]] == ["T005"]
+
+    # 过滤 + 分页组合
+    res = api.list_tasks(workdir=workdir, query="任务", limit=3, offset=3)
+    assert res["total"] == 5
+    assert res["count"] == 2
+    assert res["has_more"] is False
+
+
+def test_list_tasks_invalid_args(api, workdir):
+    """非法 status / limit 返回失败。"""
+    api.create_task(workdir=workdir, title="任务")
+    assert api.list_tasks(workdir=workdir, status="failed")["success"] is False
+    assert api.list_tasks(workdir=workdir, limit=-1)["success"] is False
+    assert api.list_tasks(workdir=workdir, limit="abc")["success"] is False
+
+
 def test_get_task(api, workdir):
     """按 id 查找任务。"""
     api.create_task(workdir=workdir, title="任务A")
