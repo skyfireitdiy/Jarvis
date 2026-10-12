@@ -111,6 +111,14 @@ async function callFunction(functionName, args, nodeId) {
   return payload;
 }
 
+// 返回本地当天日期（YYYY-MM-DD），用作 <input type="date"> 的默认值。
+// 注意：不能用 toISOString()，它会先转 UTC，东八区等时区可能相差一天。
+function todayStr() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 // 状态展示与排序权重
 const STATUS_LABELS = {
   pending: "待执行",
@@ -154,10 +162,10 @@ export default {
       message: "",
       // 详情/编辑
       selected: null,
-      editForm: { title: "", description: "", tags: "", due_date: "" },
+      editForm: { title: "", description: "", tags: "", due_date: todayStr() },
       // 新建任务表单
       creating: false,
-      createForm: { title: "", description: "", tags: "", due_date: "" },
+      createForm: { title: "", description: "", tags: "", due_date: todayStr() },
       // 右键菜单
       menuVisible: false,
       menuStyle: {},
@@ -480,7 +488,7 @@ export default {
         title: task.title || "",
         description: task.description || "",
         tags: this.tagsText(task.tags),
-        due_date: task.due_date || "",
+        due_date: task.due_date || todayStr(),
       };
       this.message = "";
       this.error = "";
@@ -518,7 +526,7 @@ export default {
     toggleCreate() {
       this.creating = !this.creating;
       if (this.creating) {
-        this.createForm = { title: "", description: "", tags: "", due_date: "" };
+        this.createForm = { title: "", description: "", tags: "", due_date: todayStr() };
         this.error = "";
       }
     },
