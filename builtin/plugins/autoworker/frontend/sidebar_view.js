@@ -4,6 +4,7 @@
 //   - 设置区：配置后端工作目录（localStorage 持久化）；
 //   - 任务列表：按状态分组展示，支持创建/编辑/标记完成/放弃；
 //   - 右键菜单：创建 Agent 执行该任务（Agent working_dir = 任务子目录）；
+//              在工作目录下创建 Agent（Agent working_dir = 插件工作目录；不写提示词、只创建不运行）；
 //   - 定时轮询 + 手动刷新。
 // 认证：所有读写经宿主 window.__jarvisFetch（自动携带 jarvis 认证），
 //       通过插件功能代理端点 /api/plugins/master/function-call 调用插件私有功能层。
@@ -660,6 +661,43 @@ export default {
         this.busy = false;
       }
     },
+    // 在工作目录下创建 Agent（Agent working_dir = 插件工作目录，而非任务子目录）。
+    // 不写入任务提示词、只创建不运行：创建空闲 Agent，运行留给用户自行触发。
+    async createAgentInWorkdir(task) {
+      this.closeItemMenu();
+      const create =
+        typeof window !== "undefined" && window.__jarvisCreateAgentForTask;
+      if (typeof create !== "function") {
+        this.error = "宿主未提供创建通道，无法创建 Agent";
+        return;
+      }
+      const workdir = (this.workdir || "").trim();
+      if (!workdir) {
+        this.error = "工作目录未设置，请先配置";
+        return;
+      }
+      this.busy = true;
+      this.error = "";
+      this.message = "正在在工作目录下创建 Agent…";
+      try {
+        const res = await create({
+          workingDir: workdir,
+          task: "",
+          runTask: false,
+          name: task ? `${task.id} ${task.title || ""}`.trim() : "",
+          nodeId: this.nodeId,
+        });
+        if (res && res.success) {
+          this.message = "已在工作目录下创建 Agent（未运行，请自行触发）";
+        } else {
+          this.error = "失败: " + ((res && res.error) || "创建失败");
+        }
+      } catch (e) {
+        this.error = "失败: " + String((e && e.message) || e);
+      } finally {
+        this.busy = false;
+      }
+    },
     // 把任务交给当前活跃 Agent（发送提示词）
     async handleInCurrentAgent(task) {
       this.closeItemMenu();
@@ -676,10 +714,6 @@ export default {
       } else {
         this.error = "失败: " + ((res && res.error) || "发送失败");
       }
-    },
-    editFromMenu(task) {
-      this.closeItemMenu();
-      if (task) this.openTask(task);
     },
     statusBtnStyle(status) {
       return {
@@ -863,10 +897,10 @@ export default {
       style="position:fixed;z-index:9999;background:#2d2d30;border:1px solid #454545;border-radius:6px;box-shadow:0 4px 12px #0008;padding:4px;min-width:140px;">
       <div @click="createAgentForTask(menuItem)"
         style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">创建 Agent 执行该任务</div>
+      <div @click="createAgentInWorkdir(menuItem)"
+        style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">在工作目录下创建 Agent</div>
       <div @click="handleInCurrentAgent(menuItem)"
         style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">交给当前 Agent{{ agentName ? '（' + agentName + '）' : '' }}</div>
-      <div @click="editFromMenu(menuItem)"
-        style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">编辑</div>
       <div @click="markStatus(menuItem, 'completed')"
         style="padding:6px 10px;font-size:12px;color:#3fb950;cursor:pointer;border-radius:4px;white-space:nowrap;">标记完成</div>
       <div @click="markStatus(menuItem, 'abandoned')"
