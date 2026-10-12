@@ -92,9 +92,25 @@ class GitManager:
         不修改用户的 .gitignore，而是写入 git 本地忽略文件
         .git/info/exclude（不提交、不影响仓库），仅添加 .jarvis/。
 
+        若用户的 .gitignore 中已提及 .jarvis（无论忽略规则还是
+        注释形式），视为用户已表达意图，尊重用户不写入 exclude。
+
         参数:
             git_dir: git根目录路径
         """
+        # 用户 .gitignore 已提及 .jarvis 时尊重用户意图，不写入 exclude
+        try:
+            gitignore_path = os.path.join(git_dir, ".gitignore")
+            if os.path.exists(gitignore_path):
+                with open(
+                    gitignore_path, "r", encoding="utf-8", errors="replace"
+                ) as f:
+                    if ".jarvis" in f.read():
+                        return
+        except Exception:
+            # 读取 .gitignore 失败时继续，不影响主流程
+            pass
+
         try:
             result = subprocess.run(
                 ["git", "rev-parse", "--git-path", "info/exclude"],
