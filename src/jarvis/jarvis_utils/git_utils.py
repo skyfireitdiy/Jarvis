@@ -1581,8 +1581,22 @@ def confirm_add_new_files() -> None:
                 existing_lines = set()
 
             # 确保 .jarvis 被忽略
+            # 若用户 .gitignore 已提及 .jarvis（规则或注释），尊重用户意图不写入
             try:
-                if not any(".jarvis" in line for line in existing_lines):
+                gitignore_path = os.path.join(repo_root, ".gitignore")
+                gitignore_mentions_jarvis = False
+                if os.path.exists(gitignore_path):
+                    with open(
+                        gitignore_path, "r", encoding="utf-8", errors="replace"
+                    ) as f:
+                        gitignore_mentions_jarvis = ".jarvis" in f.read()
+            except Exception:
+                gitignore_mentions_jarvis = False
+
+            try:
+                if not gitignore_mentions_jarvis and not any(
+                    ".jarvis" in line for line in existing_lines
+                ):
                     needs_newline = False
                     if os.path.exists(exclude_path):
                         with open(exclude_path, "r", encoding="utf-8") as f:
@@ -1599,7 +1613,12 @@ def confirm_add_new_files() -> None:
                 )
 
             # 仅对未跟踪的新文件进行忽略（已跟踪文件无法通过 ignore 规则忽略）
+            # 若用户 .gitignore 已提及 .jarvis，则不动 .jarvis 目录下的文件
             files_to_ignore = sorted(set(new_files))
+            if gitignore_mentions_jarvis:
+                files_to_ignore = [
+                    f for f in files_to_ignore if not f.startswith(".jarvis/")
+                ]
 
             # 追加未存在的文件路径到 .git/info/exclude（使用相对于仓库根目录的路径）
             try:
