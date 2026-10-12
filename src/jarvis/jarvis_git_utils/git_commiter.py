@@ -295,7 +295,7 @@ Write the commit message in English (提交信息用英文书写；如需自定�
 # 格式模板
 必须使用以下格式：
 
-[Jarvis Code Agent提交] <类型>(<范围>): <主题>
+<类型>(<范围>): <主题>
 
 [可选] 详述变更内容与原因
 
