@@ -143,6 +143,81 @@ describe("ManageSidebar 定时任务展示（view=timers）", () => {
     });
     expect(wrapper.find(".manage-timer-type").text()).toBe("custom_action");
   });
+
+  test("run_shell_command 显示命令内容", () => {
+    const wrapper = mountSidebar({
+      view: "timers",
+      timers: [
+        timer({
+          metadata: {
+            action: {
+              type: "run_shell_command",
+              params: {
+                command: "echo hello",
+                working_dir: "/tmp",
+                interpreter: "bash",
+              },
+            },
+            schedule: { type: "interval", interval_seconds: 60 },
+          },
+        }),
+      ],
+    });
+    expect(wrapper.find(".manage-timer-content").text()).toBe("echo hello");
+    // 悬浮提示包含完整参数
+    expect(wrapper.find(".manage-timer-content").attributes("title")).toContain(
+      "working_dir",
+    );
+  });
+
+  test("create_agent 显示 Agent 任务描述", () => {
+    const wrapper = mountSidebar({
+      view: "timers",
+      timers: [
+        timer({
+          metadata: {
+            action: {
+              type: "create_agent",
+              params: {
+                agent_type: "code",
+                working_dir: "/workspace",
+                name: "my-agent",
+                task: "实现登录功能",
+              },
+            },
+            schedule: { type: "interval", interval_seconds: 3600 },
+          },
+        }),
+      ],
+    });
+    expect(wrapper.find(".manage-timer-content").text()).toBe("实现登录功能");
+  });
+
+  test("capability_call 显示能力名", () => {
+    const wrapper = mountSidebar({
+      view: "timers",
+      timers: [
+        timer({
+          metadata: {
+            action: {
+              type: "capability_call",
+              params: { session_id: "sess-1", capability: "system.info" },
+            },
+            schedule: { type: "interval", interval_seconds: 30 },
+          },
+        }),
+      ],
+    });
+    expect(wrapper.find(".manage-timer-content").text()).toBe("system.info");
+  });
+
+  test("无 action 参数时不渲染内容行", () => {
+    const wrapper = mountSidebar({
+      view: "timers",
+      timers: [timer({ metadata: { action: { type: "custom_action" } } })],
+    });
+    expect(wrapper.find(".manage-timer-content").exists()).toBe(false);
+  });
 });
 
 describe("ManageSidebar 能力清单展示（view=manage）", () => {

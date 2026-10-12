@@ -27,6 +27,9 @@
             </div>
             <div class="manage-timer-id" :title="task.task_id">{{ shortTaskId(task.task_id) }}</div>
             <div class="manage-timer-schedule">{{ formatSchedule(task) }}</div>
+            <div v-if="actionSummary(task)" class="manage-timer-content" :title="actionDetail(task)">
+              {{ actionSummary(task) }}
+            </div>
             <div v-if="!task.cancelled" class="manage-timer-next">下次触发：{{ formatRunAt(task.run_at) }}</div>
           </div>
         </div>
@@ -216,6 +219,35 @@ const ACTION_LABELS = {
 function actionLabel(task) {
   const type = task?.metadata?.action?.type
   return ACTION_LABELS[type] || type || '未知'
+}
+
+// 定时任务动作内容摘要（列表展示）
+function actionSummary(task) {
+  const action = task?.metadata?.action
+  if (!action) return ''
+  const params = action.params || {}
+  switch (action.type) {
+    case 'run_shell_command':
+      return params.command || ''
+    case 'create_agent':
+      return params.task || params.name || ''
+    case 'capability_call':
+      return params.capability || ''
+    default:
+      return ''
+  }
+}
+
+// 定时任务动作完整内容（悬浮提示）
+function actionDetail(task) {
+  const action = task?.metadata?.action
+  if (!action) return ''
+  const params = action.params || {}
+  try {
+    return JSON.stringify(params, null, 2)
+  } catch (e) {
+    return String(params)
+  }
 }
 
 function shortTaskId(id) {
@@ -453,6 +485,19 @@ function isCapabilityExpanded(sessionId, capName) {
 .manage-timer-schedule {
   font-size: 12px;
   color: var(--color-text-primary);
+}
+
+.manage-timer-content {
+  margin-top: 4px;
+  padding: 4px 6px;
+  font-size: 11px;
+  font-family: 'Consolas', 'Microsoft YaHei', monospace;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-tertiary);
+  border-radius: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .manage-timer-next {
