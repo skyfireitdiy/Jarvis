@@ -540,9 +540,11 @@ describe('useAgents', () => {
     expect(status).toBe('waiting_single')
     expect(agentStatuses.value.get('a1')).toEqual({ execution_status: 'waiting_single', non_interactive: false })
   })
-  it('fetchAgentStatus：本地等待态不被过期 running 覆盖', async () => {
-    const { api, fetchWithAuth, agentStatuses, currentAgentId } = makeHarness()
+  it('fetchAgentStatus：有效等待态（inputRequests 仍在）不被过期 running 覆盖', async () => {
+    const { api, fetchWithAuth, agentStatuses, inputRequests, currentAgentId } = makeHarness()
     currentAgentId.value = 'a1'
+    // 后端确实在等输入：inputRequests 中有未完成请求 + 本地等待态
+    inputRequests.value.set('a1', { mode: 'multi' })
     agentStatuses.value.set('a1', { execution_status: 'waiting_multi', non_interactive: false })
     fetchWithAuth.mockResolvedValue({
       ok: true,
@@ -550,6 +552,32 @@ describe('useAgents', () => {
     })
     const status = await api.fetchAgentStatus({ agent_id: 'a1', node_id: 'master' })
     expect(status).toBe('waiting_multi')
+  })
+  it('fetchAgentStatus：等待态已失效（inputRequests 清理）时信任轮询的 running', async () => {
+    const { api, fetchWithAuth, agentStatuses, currentAgentId } = makeHarness()
+    currentAgentId.value = 'a1'
+    // Ctrl+C 中断后用户已响应、inputRequests 已删除，但 agentStatuses 残留 waiting_multi
+    agentStatuses.value.set('a1', { execution_status: 'waiting_multi', non_interactive: false })
+    fetchWithAuth.mockResolvedValue({
+      ok: true,
+      json: async () => ({ execution_status: 'running', non_interactive: false }),
+    })
+    const status = await api.fetchAgentStatus({ agent_id: 'a1', node_id: 'master' })
+    expect(status).toBe('running')
+    expect(agentStatuses.value.get('a1')).toEqual({ execution_status: 'running', non_interactive: false })
+  })
+  it('fetchAgentStatus：本地确认条仍在时保留 waiting_confirm（不被过期 running 覆盖）', async () => {
+    const { api, fetchWithAuth, agentStatuses, panelConfirmData, currentAgentId } = makeHarness()
+    currentAgentId.value = 'a1'
+    // 本地确认条仍在（如 completeFromPanel 已在本地进入确认态），后端 execution_status 仍停留 waiting_multi
+    panelConfirmData.value.set('a1', { message: '确定要发送完成信号吗？', defaultConfirm: true })
+    agentStatuses.value.set('a1', { execution_status: 'waiting_confirm', non_interactive: false })
+    fetchWithAuth.mockResolvedValue({
+      ok: true,
+      json: async () => ({ execution_status: 'running', non_interactive: false }),
+    })
+    const status = await api.fetchAgentStatus({ agent_id: 'a1', node_id: 'master' })
+    expect(status).toBe('waiting_confirm')
   })
   it('fetchAgentStatus：无 agent 时返回 running', async () => {
     const { api } = makeHarness()

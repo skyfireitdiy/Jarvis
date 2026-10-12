@@ -322,19 +322,26 @@ export function useAgents({
       // agentStatuses 里已记录的等待态（input_request/confirm 处理时写入）作为依据，
       // 只要本地已是等待输入/确认态，而轮询读到过期的 running，就以本地等待态为准，
       // 保证单行输入框不会被在途轮询覆盖回多行。
+      //
+      // 但本地等待态必须"有效"才可信：仅当 inputRequests 中仍有该 Agent 的未完成输入请求
+      // （后端确实在等输入），或 panelConfirmData 中仍有确认条（本地确认态尚未结束）时，
+      // 才用本地等待态覆盖轮询的 running。两者都不存在说明等待已结束（如 Ctrl+C 中断后
+      // 用户已响应、sendInputResult 已删除 inputRequests），此时轮询读到的 running 是真实的，
+      // 应信任 running，否则残留的 waiting_multi 会反复覆盖 running 导致前端永久卡在"等待输入"。
       const pendingInputRequest = inputRequests.value.get(agent.agent_id)
       if (pendingInputRequest && executionStatus === 'running') {
         executionStatus = pendingInputRequest.mode === 'single' ? 'waiting_single' : 'waiting_multi'
       }
       const localWaitingStatus = agentStatuses.value.get(agent.agent_id)?.execution_status
-      if (executionStatus === 'running' && ['waiting_single', 'waiting_multi', 'waiting_confirm'].includes(localWaitingStatus)) {
+      const hasLocalConfirm = panelConfirmData.value.has(agent.agent_id)
+      const waitingStillValid = !!pendingInputRequest || hasLocalConfirm
+      if (executionStatus === 'running' && waitingStillValid && ['waiting_single', 'waiting_multi', 'waiting_confirm'].includes(localWaitingStatus)) {
         executionStatus = localWaitingStatus
       }
 
       // 更新状态映射（存储对象格式）
       // 本地确认条仍在时（如 completeFromPanel 已在本地进入确认态），后端 execution_status
       // 可能仍停留在 waiting_multi，此时不能覆盖本地状态，否则 y/n/Enter 键会失效。
-      const hasLocalConfirm = panelConfirmData.value.has(agent.agent_id)
       if (!hasLocalConfirm) {
         agentStatuses.value.set(agent.agent_id, {execution_status: executionStatus, non_interactive: !!result.non_interactive})
       }
