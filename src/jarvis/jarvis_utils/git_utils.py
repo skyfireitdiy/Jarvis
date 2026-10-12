@@ -1546,7 +1546,7 @@ def confirm_add_new_files() -> None:
             "是否要添加这些变更（如果不需要请修改.gitignore文件以忽略不需要的文件）？",
             True,
         ):
-            # 用户选择 N：处理 .gitignore
+            # 用户选择 N：不修改用户的 .gitignore，改为写入 .git/info/exclude
             try:
                 repo_root_result = subprocess.run(
                     ["git", "rev-parse", "--show-toplevel"],
@@ -1556,56 +1556,54 @@ def confirm_add_new_files() -> None:
                 repo_root = decode_output(repo_root_result.stdout).strip() or "."
             except Exception:
                 repo_root = "."
-            gitignore_path = os.path.join(repo_root, ".gitignore")
 
-            # 检查是否需要添加 .gitignore 内容
-            if os.path.exists(gitignore_path):
-                # .gitignore 已存在：仅追加 .jarvis（如果尚未包含）
-                with open(gitignore_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                if ".jarvis" not in content:
-                    try:
-                        needs_newline = content and not content.endswith("\n")
-                        with open(
-                            gitignore_path, "a", encoding="utf-8", newline="\n"
-                        ) as f:
-                            if needs_newline:
-                                f.write("\n")
-                            f.write("\n.jarvis/\n")
-                        PrettyOutput.auto_print("✅ 已添加 .jarvis/ 到 .gitignore")
-                    except Exception as e:
-                        PrettyOutput.auto_print(
-                            f"⚠ 添加 .jarvis/ 到 .gitignore 失败: {e}"
-                        )
-            else:
-                # .gitignore 不存在：生成完整的各语言默认模板
-                PrettyOutput.auto_print("ℹ 检测到未找到 .gitignore 文件")
-                if user_confirm("是否添加各语言的默认 .gitignore 规则？", True):
-                    default_templates = get_default_gitignore_templates()
-                    try:
-                        with open(
-                            gitignore_path, "w", encoding="utf-8", newline="\n"
-                        ) as f:
-                            f.write(default_templates + "\n")
-                        PrettyOutput.auto_print("✅ 已添加各语言默认 .gitignore 规则")
-                    except Exception as e:
-                        PrettyOutput.auto_print(f"⚠ 添加 .gitignore 失败: {e}")
+            try:
+                exclude_result = subprocess.run(
+                    ["git", "rev-parse", "--git-path", "info/exclude"],
+                    capture_output=True,
+                    check=True,
+                )
+                exclude_path = decode_output(exclude_result.stdout).strip()
+            except Exception:
+                exclude_path = os.path.join(repo_root, ".git", "info", "exclude")
 
-            # 仅对未跟踪的新文件进行忽略（已跟踪文件无法通过 .gitignore 忽略）
-            files_to_ignore = sorted(set(new_files))
+            if not exclude_path or not os.path.isabs(exclude_path):
+                exclude_path = os.path.join(repo_root, exclude_path)
+            exclude_path = os.path.normpath(exclude_path)
 
-            # 读取已存在的 .gitignore 以避免重复添加
+            # 读取已存在的 exclude 内容，避免重复添加
             existing_lines: Set[str] = set()
             try:
-                if os.path.exists(gitignore_path):
-                    with open(gitignore_path, "r", encoding="utf-8") as f:
+                if os.path.exists(exclude_path):
+                    with open(exclude_path, "r", encoding="utf-8") as f:
                         existing_lines = set(line.strip() for line in f if line.strip())
             except Exception:
                 existing_lines = set()
 
-            # 追加未存在的文件路径到 .gitignore（使用相对于仓库根目录的路径）
+            # 确保 .jarvis 被忽略
             try:
-                with open(gitignore_path, "a", encoding="utf-8") as f:
+                if not any(".jarvis" in line for line in existing_lines):
+                    needs_newline = False
+                    if os.path.exists(exclude_path):
+                        with open(exclude_path, "r", encoding="utf-8") as f:
+                            existing = f.read()
+                            needs_newline = existing and not existing.endswith("\n")
+                    with open(exclude_path, "a", encoding="utf-8", newline="\n") as f:
+                        if needs_newline:
+                            f.write("\n")
+                        f.write("\n.jarvis/\n")
+                    PrettyOutput.auto_print("✅ 已添加 .jarvis/ 到 .git/info/exclude")
+            except Exception as e:
+                PrettyOutput.auto_print(
+                    f"⚠ 添加 .jarvis/ 到 .git/info/exclude 失败: {e}"
+                )
+
+            # 仅对未跟踪的新文件进行忽略（已跟踪文件无法通过 ignore 规则忽略）
+            files_to_ignore = sorted(set(new_files))
+
+            # 追加未存在的文件路径到 .git/info/exclude（使用相对于仓库根目录的路径）
+            try:
+                with open(exclude_path, "a", encoding="utf-8") as f:
                     for file in files_to_ignore:
                         abs_path = os.path.abspath(file)
                         rel_path = os.path.relpath(abs_path, repo_root)
@@ -1614,10 +1612,12 @@ def confirm_add_new_files() -> None:
                         if entry not in existing_lines:
                             f.write(entry + "\n")
                 PrettyOutput.auto_print(
-                    "ℹ️ 已将未跟踪文件添加到 .gitignore，正在重新检测..."
+                    "ℹ️ 已将未跟踪文件添加到 .git/info/exclude，正在重新检测..."
                 )
             except Exception as e:
-                PrettyOutput.auto_print(f"⚠️ 更新 .gitignore 失败: {str(e)}")
+                PrettyOutput.auto_print(
+                    f"⚠️ 更新 .git/info/exclude 失败: {str(e)}"
+                )
 
             continue
 
