@@ -2361,13 +2361,16 @@ try {
 // 使用普通 Agent（agent_type='agent'）而非代码 Agent，避免同工作目录下代码 Agent 的互斥限制。
 // 以交互模式创建并把提示词作为初始任务，用户可随时干预；创建后自动打开该 Agent 面板。
 // options.agentType 可指定 agent 类型（默认 'agent'，向后兼容；传 'code_agent' 时创建代码 Agent）。
+// options.runTask 为 false 时表示「只创建不运行」：不要求 task（可为空），创建空闲 Agent，
+// 不发送任何初始提示词，运行留给用户自行触发（默认 true，保持原有行为）。
 // 返回 { success, agentId } 或 { success: false, error }。
 try {
   window.__jarvisCreateAgentForTask = async (options = {}) => {
     const workingDir = String(options.workingDir || '').trim()
     const task = String(options.task || '').trim()
+    const runTask = options.runTask !== false
     if (!workingDir) return { success: false, error: '工作目录为空' }
-    if (!task) return { success: false, error: '任务提示词为空' }
+    if (runTask && !task) return { success: false, error: '任务提示词为空' }
     const agentType = String(options.agentType || 'agent').trim() || 'agent'
     // 目标节点：未指定时默认 master（向后兼容）
     const nodeId = String(options.nodeId || 'master').trim() || 'master'
