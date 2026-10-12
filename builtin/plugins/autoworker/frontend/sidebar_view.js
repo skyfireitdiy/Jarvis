@@ -577,6 +577,33 @@ export default {
         this.busy = false;
       }
     },
+    // ---- 软删除 ----
+    async deleteTask(task) {
+      this.closeItemMenu();
+      if (!task) return;
+      if (!window.confirm(`确定删除任务 ${task.id}「${task.title || ""}」？\n数据将保留（软删除），可从列表移除。`)) {
+        return;
+      }
+      this.busy = true;
+      this.error = "";
+      this.message = "";
+      try {
+        await callFunction("delete_task", {
+          workdir: this.workdir,
+          task_id: task.id,
+        }, this.nodeId);
+        this.message = `任务 ${task.id} 已删除`;
+        // 若删除的是当前详情页任务，返回列表
+        if (this.selected && this.selected.id === task.id) {
+          this.selected = null;
+        }
+        await this.refresh(true);
+      } catch (e) {
+        this.error = String((e && e.message) || e);
+      } finally {
+        this.busy = false;
+      }
+    },
     // ---- 右键菜单 ----
     openItemMenu(task, event) {
       this.menuItem = task;
@@ -887,6 +914,12 @@ export default {
         </button>
       </div>
 
+      <!-- 危险操作 -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
+        <button @click="deleteTask(selected)" :disabled="busy"
+          style="padding:4px 10px;background:transparent;color:#f85149;border:1px solid #f85149;border-radius:4px;cursor:pointer;font-size:11px;">删除任务</button>
+      </div>
+
       <!-- notes -->
       <div style="font-size:12px;font-weight:600;margin:12px 0 6px;">关键信息 ({{ (selected.notes || []).length }})</div>
       <div v-for="(n, i) in (selected.notes || [])" :key="i" style="background:#1e1e1e;padding:6px;border-radius:6px;margin-bottom:6px;">
@@ -913,6 +946,8 @@ export default {
         style="padding:6px 10px;font-size:12px;color:#3fb950;cursor:pointer;border-radius:4px;white-space:nowrap;">标记完成</div>
       <div @click="markStatus(menuItem, 'abandoned')"
         style="padding:6px 10px;font-size:12px;color:#f85149;cursor:pointer;border-radius:4px;white-space:nowrap;">标记放弃</div>
+      <div @click="deleteTask(menuItem)"
+        style="padding:6px 10px;font-size:12px;color:#f85149;cursor:pointer;border-radius:4px;white-space:nowrap;">删除任务</div>
     </div>
   </div>
   `,

@@ -83,6 +83,8 @@ def test_tool_metadata(tool_cls):
         "add_note",
         "list_tasks",
         "get_task",
+        "delete_task",
+        "restore_task",
     }
 
 
@@ -279,3 +281,49 @@ def test_set_status_invalid_via_tool(tool_cls, api, workdir):
         r = tool.execute({"action": "set_status", "status": "failed"})
         assert r["success"] is False
         assert "无效状态" in r["stderr"]
+
+
+def test_delete_task_via_tool(tool_cls, api, workdir):
+    """delete_task 软删除任务，list_tasks 默认隐藏。"""
+    api.create_task(workdir=workdir, title="待删")
+    api.create_task(workdir=workdir, title="保留")
+    tool = tool_cls()
+    r = tool.execute(
+        {"action": "delete_task", "workdir": workdir, "task_id": "T001"}
+    )
+    assert r["success"] is True
+    data = json.loads(r["stdout"])["data"]
+    assert data["deleted"] is True
+    # 列表默认隐藏已删除
+    payload = json.loads(
+        tool.execute({"action": "list_tasks", "workdir": workdir})["stdout"]
+    )
+    assert [t["id"] for t in payload["data"]] == ["T002"]
+    # 数据仍在磁盘
+    assert api.get_task(workdir=workdir, task_id="T001")["success"] is True
+
+
+def test_restore_task_via_tool(tool_cls, api, workdir):
+    """restore_task 恢复已删除任务，列表重新出现。"""
+    api.create_task(workdir=workdir, title="任务")
+    tool = tool_cls()
+    tool.execute({"action": "delete_task", "workdir": workdir, "task_id": "T001"})
+    r = tool.execute(
+        {"action": "restore_task", "workdir": workdir, "task_id": "T001"}
+    )
+    assert r["success"] is True
+    assert "deleted" not in json.loads(r["stdout"])["data"]
+    payload = json.loads(
+        tool.execute({"action": "list_tasks", "workdir": workdir})["stdout"]
+    )
+    assert [t["id"] for t in payload["data"]] == ["T001"]
+    # 未删除任务无需恢复
+    r = tool.execute(
+        {"action": "restore_task", "workdir": workdir, "task_id": "T001"}
+    )
+    assert r["success"] is False
+    # 不存在的任务
+    r = tool.execute(
+        {"action": "delete_task", "workdir": workdir, "task_id": "T999"}
+    )
+    assert r["success"] is False

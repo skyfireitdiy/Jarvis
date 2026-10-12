@@ -50,6 +50,8 @@ _KNOWN_ACTIONS = {
     "add_note",
     "list_tasks",
     "get_task",
+    "delete_task",
+    "restore_task",
 }
 
 
@@ -108,9 +110,9 @@ class TaskManagerTool:
     description = (
         "待办事项（TODO）管理：维护后端工作目录下持久化的待办清单，与前端「任务」"
         "面板同源。可创建/编辑待办、标记状态（pending/running/completed/abandoned）、"
-        "写备注（notes）、按需查看列表或详情。适合记录「要做什么、做到哪了」这类跨会话"
-        "留存的事项。默认作用于当前待办（working_dir 所在任务的 task.json），也可通过 "
-        "workdir/task_id 操作其他待办。"
+        "写备注（notes）、软删除/恢复待办、按需查看列表或详情。适合记录「要做什么、做到哪了」"
+        "这类跨会话留存的事项。默认作用于当前待办（working_dir 所在任务的 task.json），"
+        "也可通过 workdir/task_id 操作其他待办。"
         "注意：本工具只管理待办清单本身，不拆解/不执行任务；若要把复杂任务拆成子任务"
         "并驱动子 Agent 执行，请用 task_list_manager。"
     )
@@ -126,6 +128,8 @@ class TaskManagerTool:
                     "add_note",
                     "list_tasks",
                     "get_task",
+                    "delete_task",
+                    "restore_task",
                 ],
                 "description": "要执行的动作",
             },
@@ -309,6 +313,14 @@ class TaskManagerTool:
                     workdir=ctx["workdir"],
                     task_id=ctx["task_id"],
                     content=args.get("content"),
+                )
+            elif action == "delete_task":
+                result = api.delete_task(
+                    workdir=ctx["workdir"], task_id=ctx["task_id"]
+                )
+            elif action == "restore_task":
+                result = api.restore_task(
+                    workdir=ctx["workdir"], task_id=ctx["task_id"]
                 )
             else:
                 return self._err(f"未知 action: {action}")
