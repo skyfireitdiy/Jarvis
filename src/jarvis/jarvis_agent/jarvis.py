@@ -982,6 +982,11 @@ def run_cli(
         "--plugin-output-dir",
         help="插件脚手架输出目录（默认当前工作目录，配合 --new-plugin 使用）",
     ),
+    plugin_no_git: bool = typer.Option(
+        False,
+        "--no-git",
+        help="不初始化 git 仓库（配合 --new-plugin 使用；默认会 git init + 初始提交，分支 main）",
+    ),
     install_plugin: Optional[str] = typer.Option(
         None,
         "--install-plugin",
@@ -1027,7 +1032,9 @@ def run_cli(
     if new_plugin:
         from jarvis.jarvis_agent.utils import scaffold_plugin as do_scaffold_plugin
 
-        result = do_scaffold_plugin(new_plugin, output_dir=plugin_output_dir)
+        result = do_scaffold_plugin(
+            new_plugin, output_dir=plugin_output_dir, init_git=not plugin_no_git
+        )
         if result:
             raise typer.Exit(code=0)
         else:

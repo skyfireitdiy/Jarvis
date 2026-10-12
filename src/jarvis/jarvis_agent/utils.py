@@ -573,12 +573,16 @@ def _scaffold_tool_module_name(name: str) -> str:
     return _scaffold_slug(name) + "_tool"
 
 
-def scaffold_plugin(name: str, output_dir: Optional[str] = None) -> Optional[str]:
+def scaffold_plugin(
+    name: str, output_dir: Optional[str] = None, init_git: bool = True
+) -> Optional[str]:
     """生成一个符合 Jarvis 加载约定的插件脚手架目录。
 
     参数:
         name: 插件名称（用于生成目录名、config.yaml 的 name、工具/规则/Agent 命名）
         output_dir: 输出目录（默认当前工作目录）
+        init_git: 是否初始化 git 仓库（默认 True，生成 .gitignore/LICENSE 并 git init + 初始提交；
+            git 不可用或提交失败时优雅降级，不抛异常）
 
     返回:
         str: 生成的插件目录绝对路径；失败返回 None
@@ -586,6 +590,8 @@ def scaffold_plugin(name: str, output_dir: Optional[str] = None) -> Optional[str
     生成的骨架包含:
         config.yaml      插件配置（含全部扩展点示例）
         README.md        开发者文档
+        .gitignore       标准 Python 忽略项
+        LICENSE          MIT 开源协议（与 config.yaml 的 license 一致）
         rules/           规则目录（YAML front matter 模板）
         tools/           工具目录（class XxxTool 模板，name==文件名 stem）
         agents/          Agent 定义目录模板
@@ -613,6 +619,83 @@ def scaffold_plugin(name: str, output_dir: Optional[str] = None) -> Optional[str
     # 目录结构
     for sub in ("rules", "tools", "agents", "orchestration", "frontend", "plugin"):
         (plugin_dir / sub).mkdir(parents=True, exist_ok=True)
+
+    # ---------- .gitignore ----------
+    gitignore = """# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 虚拟环境
+.venv/
+venv/
+env/
+ENV/
+
+# 测试与覆盖率
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+
+# 编辑器与 IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Jarvis 本地运行产物
+.jarviscache/
+"""
+    (plugin_dir / ".gitignore").write_text(gitignore, encoding="utf-8")
+
+    # ---------- LICENSE ----------
+    license_text = """MIT License
+
+Copyright (c) 2026 {name}
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+""".replace("{name}", name)
+    (plugin_dir / "LICENSE").write_text(license_text, encoding="utf-8")
 
     # ---------- config.yaml ----------
     config = f"""---
@@ -891,10 +974,60 @@ PUBLIC_FUNCTIONS: list[str] = ["{func_base}_echo"]
 '''
     (plugin_dir / "plugin" / "api.py").write_text(api_py, encoding="utf-8")
 
+    # ---------- git 初始化 ----------
+    if init_git:
+        _init_plugin_git(plugin_dir, slug)
+
     PrettyOutput.auto_print(
         f"✅ 插件脚手架已生成: {plugin_dir}\n   安装: jarvis --install-plugin {slug}"
     )
     return str(plugin_dir)
+
+
+def _init_plugin_git(plugin_dir: pathlib.Path, slug: str) -> None:
+    """为插件脚手架初始化 git 仓库并创建初始提交。
+
+    生成 .gitignore/LICENSE 后执行 git init、git add、git commit、分支改名为 main。
+    git 不可用、未配置身份或提交失败时优雅降级（打印提示，不抛异常），
+    保证脚手架生成本身永远成功。
+    """
+    import subprocess
+
+    def _git(*args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            ["git", *args],
+            cwd=str(plugin_dir),
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+    try:
+        if _git("init", "-q").returncode != 0:
+            PrettyOutput.auto_print("⚠️ git init 失败，跳过 git 初始化")
+            return
+        if _git("checkout", "-q", "-b", "main").returncode != 0:
+            # 旧版 git 或已存在分支时忽略，继续后续步骤
+            pass
+        if _git("add", "-A").returncode != 0:
+            PrettyOutput.auto_print("⚠️ git add 失败，跳过 git 初始化")
+            return
+        commit = _git(
+            "commit", "-q", "-m", f"Initial commit for {slug} plugin scaffold"
+        )
+        if commit.returncode != 0:
+            # 未配置 user.name/user.email 等场景：提示用户自行提交
+            PrettyOutput.auto_print(
+                "⚠️ git 初始提交失败（可能未配置 user.name/user.email），"
+                "请在插件目录执行 git commit 完成首次提交"
+            )
+            return
+        PrettyOutput.auto_print(
+            f"✅ 已初始化 git 仓库并创建初始提交（分支 main）: {plugin_dir}"
+        )
+    except (OSError, subprocess.SubprocessError) as e:
+        # git 未安装或执行异常：优雅降级，不阻断脚手架生成
+        PrettyOutput.auto_print(f"⚠️ git 初始化失败（{e}），跳过 git 初始化")
 
 
 def _remove_plugin_dir(path) -> None:
