@@ -255,14 +255,41 @@ class SessionManager:
             # 读取失败不影响主流程，返回 None
             return None
 
-    def _parse_session_files(
-        self,
-    ) -> List[Tuple[str, Optional[str], Optional[str], str]]:
+    def _read_auto_save(self, session_file: str) -> bool:
         """
-        解析会话文件列表，返回包含文件路径、时间戳、会话名称和commit状态的列表。
+        从会话的 commit 信息文件中读取是否为自动保存。
+
+        Args:
+            session_file: 会话文件路径
 
         Returns:
-            会话信息列表，每个元素为 (文件路径, 时间戳, 会话名称, commit状态)，按时间戳降序排列。
+            True 表示为自动保存（守护进程实时落盘），否则为 False。
+        """
+        try:
+            # 构建对应的 _commit.json 文件路径
+            commit_file = (
+                session_file[:-5] + "_commit.json"
+            )  # 去掉 ".json" 加上 "_commit.json"
+
+            if not os.path.exists(commit_file):
+                return False
+
+            with open(commit_file, "r", encoding="utf-8") as f:
+                commit_info = cast(Dict[str, Any], json.load(f))
+                return bool(commit_info.get("auto_save", False))
+
+        except Exception:
+            # 读取失败不影响主流程，返回 False
+            return False
+
+    def _parse_session_files(
+        self,
+    ) -> List[Tuple[str, Optional[str], Optional[str], str, bool]]:
+        """
+        解析会话文件列表，返回包含文件路径、时间戳、会话名称、commit状态和自动保存标识的列表。
+
+        Returns:
+            会话信息列表，每个元素为 (文件路径, 时间戳, 会话名称, commit状态, 是否自动保存)，按时间戳降序排列。
             如果文件没有时间戳，时间戳为 None；如果没有会话名称，会话名称为 None。
             commit状态可能的值："consistent"（一致）、"inconsistent"（不一致）、"no_commit"（无commit信息）
         """
@@ -273,7 +300,10 @@ class SessionManager:
             timestamp = self._extract_timestamp(file_path)
             session_name = self._read_session_name(file_path)
             commit_status = self._check_commit_status(file_path)
-            sessions.append((file_path, timestamp, session_name, commit_status))
+            auto_save = self._read_auto_save(file_path)
+            sessions.append(
+                (file_path, timestamp, session_name, commit_status, auto_save)
+            )
 
         # 按时间戳降序排列（最新的在前），没有时间戳的排在最后
         sessions.sort(key=lambda x: (x[1] is None, x[1] or ""), reverse=True)
@@ -340,7 +370,7 @@ class SessionManager:
 
     def _find_sessions_by_commit(
         self, commit_hash: str
-    ) -> List[Tuple[str, Optional[str], Optional[str], str]]:
+    ) -> List[Tuple[str, Optional[str], Optional[str], str, bool]]:
         """
         查找与指定commit匹配的会话列表。
 
@@ -348,7 +378,7 @@ class SessionManager:
             commit_hash: 要匹配的commit hash
 
         Returns:
-            匹配的会话列表，每个元素为 (文件路径, 时间戳, 会话名称)，按时间戳降序排列。
+            匹配的会话列表，每个元素为 (文件路径, 时间戳, 会话名称, commit状态, 是否自动保存)，按时间戳降序排列。
         """
         files = self._list_session_files()
         matching_sessions = []
@@ -369,8 +399,9 @@ class SessionManager:
                     timestamp = self._extract_timestamp(file_path)
                     session_name = self._read_session_name(file_path)
                     commit_status = self._check_commit_status(file_path)
+                    auto_save = self._read_auto_save(file_path)
                     matching_sessions.append(
-                        (file_path, timestamp, session_name, commit_status)
+                        (file_path, timestamp, session_name, commit_status, auto_save)
                     )
 
             except Exception:
@@ -382,13 +413,16 @@ class SessionManager:
         return matching_sessions
 
     def _prompt_to_restore_matching_sessions(
-        self, matching_sessions: List[Tuple[str, Optional[str], Optional[str], str]]
+        self,
+        matching_sessions: List[
+            Tuple[str, Optional[str], Optional[str], str, bool]
+        ],
     ) -> Optional[str]:
         """
         提示用户选择是否恢复匹配的会话。
 
         Args:
-            matching_sessions: 匹配的会话列表，每个元素为 (文件路径, 时间戳, 会话名称, commit状态)
+            matching_sessions: 匹配的会话列表，每个元素为 (文件路径, 时间戳, 会话名称, commit状态, 是否自动保存)
 
         Returns:
             恢复的会话文件路径，如果用户选择不恢复则返回 None
@@ -397,13 +431,18 @@ class SessionManager:
             return None
 
         PrettyOutput.auto_print("🔍 检测到与当前commit一致的历史会话：")
-        for idx, (file_path, timestamp, session_name, commit_status) in enumerate(
-            matching_sessions, 1
-        ):
+        for idx, (
+            file_path,
+            timestamp,
+            session_name,
+            commit_status,
+            auto_save,
+        ) in enumerate(matching_sessions, 1):
             time_str = timestamp if timestamp else "(无时间戳)"
             name_str = f" - {session_name}" if session_name else ""
+            auto_str = " [自动保存]" if auto_save else ""
             PrettyOutput.auto_print(
-                f"  {idx}. {os.path.basename(file_path)} [{time_str}]{name_str}"
+                f"  {idx}. {os.path.basename(file_path)} [{time_str}]{name_str}{auto_str}"
             )
 
         try:
@@ -439,7 +478,7 @@ class SessionManager:
             return None
 
     def build_session_snapshot(
-        self, timestamp: Optional[str] = None
+        self, timestamp: Optional[str] = None, auto_save: bool = False
     ) -> Optional[Tuple[str, List[Tuple[str, Any, Optional[Any]]]]]:
         """在内存中构造一次完整会话落盘所需的全部文件内容（不落盘）。
 
@@ -455,6 +494,8 @@ class SessionManager:
 
         参数:
             timestamp: 会话时间戳（%Y%m%d_%H%M%S）；为空时取当前时间。
+            auto_save: 是否为自动保存（守护进程实时落盘）。为 True 时在
+                _commit.json 中写入 "auto_save": true 标识，便于恢复时区分。
 
         返回:
             (session_file, files)；若没有用户消息（无需保存）则返回 None。
@@ -499,7 +540,7 @@ class SessionManager:
         ]
 
         # _commit.json
-        commit_info = self._build_commit_info(session_file)
+        commit_info = self._build_commit_info(session_file, auto_save=auto_save)
         if commit_info is not None:
             files.append((session_file[:-5] + "_commit.json", commit_info, None))
 
@@ -576,11 +617,16 @@ class SessionManager:
 
         return result
 
-    def _build_commit_info(self, session_file: str) -> Optional[Dict[str, Any]]:
+    def _build_commit_info(
+        self, session_file: str, auto_save: bool = False
+    ) -> Optional[Dict[str, Any]]:
         """在内存中构造 _commit.json 的内容（不落盘）。
 
         参数:
             session_file: 会话文件路径（用于提取时间戳）
+            auto_save: 是否为自动保存（守护进程实时落盘）。为 True 时在
+                _commit.json 中写入 "auto_save": true，便于恢复时区分
+                自动保存与手动保存的会话。
 
         返回:
             commit 信息字典；构造失败返回 None。
@@ -626,6 +672,8 @@ class SessionManager:
                 "agent_name": agent_name,
                 "timestamp": timestamp_iso,
             }
+            if auto_save:
+                commit_info["auto_save"] = True
             if start_commit:
                 commit_info["start_commit"] = start_commit
             if last_backup_commit:
@@ -1071,11 +1119,12 @@ class SessionManager:
 
         # 如果只有一个会话文件，直接恢复
         if len(sessions) == 1:
-            session_file, timestamp, session_name, commit_status = sessions[0]
+            session_file, timestamp, session_name, commit_status, auto_save = sessions[0]
             time_str = timestamp if timestamp else "(无时间戳)"
             name_str = f" [{session_name}]" if session_name else ""
+            auto_str = " [自动保存]" if auto_save else ""
             PrettyOutput.auto_print(
-                f"📂 恢复会话{name_str}: {os.path.basename(session_file)} ({time_str})"
+                f"📂 恢复会话{name_str}{auto_str}: {os.path.basename(session_file)} ({time_str})"
             )
 
             # 检查 commit 一致性
@@ -1113,11 +1162,12 @@ class SessionManager:
         # 检查是否为非交互模式
         if self.non_interactive:
             # 非交互模式：自动恢复最新的会话
-            session_file, timestamp, session_name, commit_status = sessions[0]
+            session_file, timestamp, session_name, commit_status, auto_save = sessions[0]
             time_str = timestamp if timestamp else "(无时间戳)"
             name_str = f" [{session_name}]" if session_name else ""
+            auto_str = " [自动保存]" if auto_save else ""
             PrettyOutput.auto_print(
-                f"🤖 非交互模式：自动恢复最新会话{name_str}: {os.path.basename(session_file)} ({time_str})"
+                f"🤖 非交互模式：自动恢复最新会话{name_str}{auto_str}: {os.path.basename(session_file)} ({time_str})"
             )
 
             # 检查 commit 一致性
@@ -1153,11 +1203,16 @@ class SessionManager:
 
         # 交互模式：显示列表让用户选择
         session_list_text = "📋 找到多个会话文件：\n"
-        for idx, (file_path, timestamp, session_name, commit_status) in enumerate(
-            sessions, 1
-        ):
+        for idx, (
+            file_path,
+            timestamp,
+            session_name,
+            commit_status,
+            auto_save,
+        ) in enumerate(sessions, 1):
             time_str = timestamp if timestamp else "(无时间戳)"
             name_str = f" - {session_name}" if session_name else ""
+            auto_str = " [自动保存]" if auto_save else ""
 
             # 根据commit状态添加标注
             commit_status_str = ""
@@ -1168,7 +1223,7 @@ class SessionManager:
             elif commit_status == "no_commit":
                 commit_status_str = " [无commit信息]"
 
-            session_list_text += f"  {idx}. {os.path.basename(file_path)} [{time_str}]{name_str}{commit_status_str}\n"
+            session_list_text += f"  {idx}. {os.path.basename(file_path)} [{time_str}]{name_str}{auto_str}{commit_status_str}\n"
         # 添加取消选项
         session_list_text += "  0. 取消恢复"
         PrettyOutput.auto_print(session_list_text)
@@ -1199,11 +1254,14 @@ class SessionManager:
                 break
 
             # 恢复选中的会话
-            session_file, timestamp, session_name, commit_status = sessions[choice_idx]
+            session_file, timestamp, session_name, commit_status, auto_save = sessions[
+                choice_idx
+            ]
             time_str = timestamp if timestamp else "(无时间戳)"
             name_str = f" [{session_name}]" if session_name else ""
+            auto_str = " [自动保存]" if auto_save else ""
             PrettyOutput.auto_print(
-                f"📂 恢复会话{name_str}: {os.path.basename(session_file)} ({time_str})"
+                f"📂 恢复会话{name_str}{auto_str}: {os.path.basename(session_file)} ({time_str})"
             )
 
             # 检查 commit 一致性

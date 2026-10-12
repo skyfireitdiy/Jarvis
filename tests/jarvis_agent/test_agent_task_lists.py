@@ -348,7 +348,9 @@ class TestAgentTaskLists:
         with patch.object(
             self.agent.session,
             "_parse_session_files",
-            return_value=[("fake_session.json", "20240101_120000", None, "consistent")],
+            return_value=[
+                ("fake_session.json", "20240101_120000", None, "consistent", False)
+            ],
         ):
             with patch.object(
                 self.agent.session, "_check_commit_consistency", return_value=True
