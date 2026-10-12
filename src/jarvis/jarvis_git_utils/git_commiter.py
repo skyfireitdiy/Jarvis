@@ -291,7 +291,7 @@ class GitCommitTool:
                     custom_prompt
                     if custom_prompt
                     else """根据代码差异生成提交信息：
-提交信息应当用中文书写
+Write the commit message in English (提交信息用英文书写；如需自定义语言与格式，可在 config.yaml 的 git_commit_prompt 中覆盖本模板)
 # 格式模板
 必须使用以下格式：
 
