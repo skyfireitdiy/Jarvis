@@ -625,6 +625,7 @@
                       <button class="icon-btn-small" @click="exitGitRangeSelect" title="退出范围选择">✕</button>
                     </template>
                     <template v-else>
+                      <button class="icon-btn-small" @click="commitGitChanges" title="提交（压缩 CheckPoint 并生成正式提交）">✔</button>
                       <button class="icon-btn-small" @click="viewGitTargetDiff" title="查看变更（当前 Git 目标 Agent 的 diff）">⇄</button>
                       <button class="icon-btn-small" @click="enterGitRangeSelect" title="选择范围生成下载补丁">☑</button>
                       <button class="icon-btn-small" @click="refreshGitView" :disabled="gitLogLoading" title="刷新">⟳</button>
@@ -3521,7 +3522,7 @@ const {
   isNarrowGitDiffViewport, getGitTargetAgent, getGitTargetNodeId, getGitWorkingDir,
   callGitApi, fetchGitLog, fetchGitBranches, refreshGitView,
   toggleGitCommitDetail, enterGitRangeSelect, exitGitRangeSelect, toggleGitRangeSelect,
-  downloadGitPatch, viewGitTargetDiff, onDiffTitleClick, onOpenDiffFileFromMessage,
+  downloadGitPatch, viewGitTargetDiff, commitGitChanges, onDiffTitleClick, onOpenDiffFileFromMessage,
   viewGitFileDiff, ensureGitDiffFullText, layoutGitDiffEditor,
   disposeDiffEditorForPane, disposeAllDiffEditors, ensureDiffEditorForPane,
   renderDiffForPane, loadDiffForPane, togglePaneDiffSideBySide, togglePaneDiffShowFull,

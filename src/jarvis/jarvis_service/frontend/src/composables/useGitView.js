@@ -321,6 +321,23 @@ function viewGitTargetDiff() {
   viewDiff()(agent)
 }
 
+// 在当前 Git 目标目录执行 commit 工具：压缩 CheckPoint 临时提交并生成正式提交。
+// 后端在对应目录下调用 CommitTool（LLM 生成提交信息），成功后刷新 Git 视图。
+async function commitGitChanges() {
+  const workingDir = getGitWorkingDir()
+  if (!workingDir) {
+    showToast()('请先选择 Git 目标目录', 'error')
+    return
+  }
+  try {
+    await callGitApi('git/commit', { path: workingDir })
+    showToast()('提交成功')
+    await refreshGitView()
+  } catch (error) {
+    showToast()(error.message || '提交失败', 'error')
+  }
+}
+
 // diff 标题栏文件名：点击时在编辑器面板打开该文件。
 // diff 的 filePath 是相对 Git 工作目录的路径，需拼成绝对路径后再交给编辑器。
 async function onDiffTitleClick(event, pane) {
@@ -811,6 +828,7 @@ function showGitCommitInfoModal(commit) {
     toggleGitRangeSelect,
     downloadGitPatch,
     viewGitTargetDiff,
+    commitGitChanges,
     onDiffTitleClick,
     onOpenDiffFileFromMessage,
     viewGitFileDiff,

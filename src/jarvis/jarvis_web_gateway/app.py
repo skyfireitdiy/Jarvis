@@ -10294,11 +10294,67 @@ def create_app(
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
+    async def _handle_git_commit_request(payload: Dict[str, Any]) -> Dict[str, Any]:
+        """在指定 git 仓库目录执行 commit 工具（压缩 CheckPoint 临时提交并生成正式提交）。
+
+        CommitTool 内部会：
+        1. 找到最近的非 CheckPoint 提交作为压缩起点；
+        2. 若起点之后存在 CheckPoint 临时提交，用 git reset --soft 压缩到暂存区；
+        3. 复用 GitCommitTool 基于暂存区差异用 LLM 生成正式提交信息并提交。
+
+        LLM 生成提交信息是阻塞式且可能耗时较长（并可能触发前端确认），
+        故用 asyncio.to_thread 放入线程池执行，避免阻塞事件循环。
+        """
+        import asyncio
+
+        try:
+            resolved = _resolve_git_repo_path(payload)
+            if not resolved.get("success"):
+                return resolved
+            repo_path = str(resolved["data"]["path"])
+
+            def _run_commit() -> Dict[str, Any]:
+                try:
+                    from jarvis.jarvis_tools.commit import CommitTool
+
+                    tool = CommitTool()
+                    result = tool.execute({"working_dir": repo_path})
+                    return result or {}
+                except Exception as e:  # noqa: BLE001
+                    logger.exception("[GIT] commit failed: %r", e)
+                    return {
+                        "success": False,
+                        "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+                    }
+
+            result = await asyncio.to_thread(_run_commit)
+            if not result.get("success"):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "COMMIT_FAILED",
+                        "message": result.get("stderr") or "commit failed",
+                    },
+                }
+            return {
+                "success": True,
+                "data": {
+                    "path": repo_path,
+                    "stdout": result.get("stdout", ""),
+                    "stderr": result.get("stderr", ""),
+                },
+            }
+        except Exception as e:  # noqa: BLE001
+            logger.exception("[GIT] git commit failed: %r", e)
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
     async def _handle_git_file_content_request(
         payload: Dict[str, Any],
     ) -> Dict[str, Any]:
         """获取某文件在指定提交（或指定 revision）中的完整内容（只读）。
-
         用于前端展示「文件全文 + 绝对行号」的 diff：
         - ref 为提交号时，返回该提交版本的全文（新版本）
         - ref 为 "<hash>^" 等 revision 时，返回对应版本全文（旧版本）
@@ -10918,6 +10974,7 @@ def create_app(
             "/git/branches": "file:read",
             "/git/file-content": "file:read",
             "/git/patch": "file:read",
+            "/git/commit": "file:write",
         }
         _required_perm = _file_perm_map.get(normalized_path)
         if normalized_path.startswith("/data/"):
@@ -10929,6 +10986,7 @@ def create_app(
                 _mock_req.state.user_info, _required_perm
             )
             if _perm_resp:
+
                 return _perm_resp
 
         if normalized_method == "GET" and normalized_path == "/directories":
@@ -10982,6 +11040,8 @@ def create_app(
             result = await _handle_git_file_content_request(payload)
         elif normalized_method == "POST" and normalized_path == "/git/patch":
             result = await _handle_git_patch_request(payload)
+        elif normalized_method == "POST" and normalized_path == "/git/commit":
+            result = await _handle_git_commit_request(payload)
         elif normalized_method == "POST" and normalized_path == "/upload":
             # 权限校验：file:upload
             # 节点访问校验：仅在 master 上执行。
@@ -11880,6 +11940,24 @@ def create_app(
         if forwarded is not None:
             return forwarded
         return await _handle_git_patch_request(payload)
+    @app.post("/api/git/commit", dependencies=[Depends(verify_token)])
+    async def git_commit(request: Request, body: Dict[str, Any]) -> Dict[str, Any]:
+        """在指定 git 仓库目录执行 commit 工具（写操作）。
+
+        压缩 CheckPoint 临时提交并生成正式提交；需要 file:write 权限。
+        """
+        from fastapi import HTTPException
+
+        if _check_file_permission(request.state.user_info, "file:write"):
+            raise HTTPException(status_code=403, detail="Permission denied: file:write")
+        payload = dict(body or {})
+        node_id = str(payload.get("node_id") or "")
+        forwarded = await _forward_git_request_to_node(
+            node_id, "/api/git/commit", payload
+        )
+        if forwarded is not None:
+            return forwarded
+        return await _handle_git_commit_request(payload)
 
     # HTTP API：创建终端会话
     @app.post("/api/terminals", dependencies=[Depends(verify_token)])

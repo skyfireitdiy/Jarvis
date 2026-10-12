@@ -242,7 +242,7 @@ describe('useGitView', () => {
       'isNarrowGitDiffViewport', 'getGitTargetAgent', 'getGitTargetNodeId', 'getGitWorkingDir',
       'callGitApi', 'fetchGitLog', 'fetchGitBranches', 'refreshGitView', 'toggleGitCommitDetail',
       'enterGitRangeSelect', 'exitGitRangeSelect', 'toggleGitRangeSelect', 'downloadGitPatch',
-      'viewGitTargetDiff', 'onDiffTitleClick', 'onOpenDiffFileFromMessage', 'viewGitFileDiff',
+      'viewGitTargetDiff', 'commitGitChanges', 'onDiffTitleClick', 'onOpenDiffFileFromMessage', 'viewGitFileDiff',
       'ensureGitDiffFullText', 'layoutGitDiffEditor', 'disposeDiffEditorForPane',
       'disposeAllDiffEditors', 'ensureDiffEditorForPane', 'renderDiffForPane', 'loadDiffForPane',
       'togglePaneDiffSideBySide', 'togglePaneDiffShowFull', 'navigatePaneDiff', 'closePaneDiff',
@@ -659,6 +659,42 @@ describe('useGitView', () => {
       effectiveGitAgentId.value = 'a1'
       api.viewGitTargetDiff()
       expect(viewDiff).toHaveBeenCalledWith(makeAgent('a1', '/work/a'))
+    })
+  })
+
+  describe('commitGitChanges', () => {
+    it('无工作目录时 toast 提示且不调用后端', async () => {
+      const { api, showToast, fetchWithAuth } = makeHarness()
+      await api.commitGitChanges()
+      expect(showToast).toHaveBeenCalledWith('请先选择 Git 目标目录', 'error')
+      expect(fetchWithAuth).not.toHaveBeenCalled()
+    })
+    it('成功提交：调用 git/commit 并刷新视图', async () => {
+      const { api, effectiveGitAgentId, agentList, fetchWithAuth, showToast } = makeHarness()
+      agentList.value = [makeAgent('a1', '/work/a')]
+      effectiveGitAgentId.value = 'a1'
+      // 第一次调用（git/commit）成功，第二次（refreshGitView 内的 git/log）也成功
+      fetchWithAuth
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, data: { path: '/work/a' } }) })
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, data: { commits: [], has_more: false } }) })
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, data: { branches: [], tags: [], current: 'main' } }) })
+      await api.commitGitChanges()
+      // git/commit 请求体带 path
+      const [url, opts] = fetchWithAuth.mock.calls[0]
+      expect(url).toContain('/git/commit')
+      expect(JSON.parse(opts.body)).toMatchObject({ path: '/work/a' })
+      expect(showToast).toHaveBeenCalledWith('提交成功')
+    })
+    it('提交失败：toast 错误', async () => {
+      const { api, effectiveGitAgentId, agentList, fetchWithAuth, showToast } = makeHarness()
+      agentList.value = [makeAgent('a1', '/work/a')]
+      effectiveGitAgentId.value = 'a1'
+      fetchWithAuth.mockResolvedValue({
+        ok: false,
+        json: async () => ({ success: false, error: { message: '提交失败：无变更' } }),
+      })
+      await api.commitGitChanges()
+      expect(showToast).toHaveBeenCalledWith('提交失败：无变更', 'error')
     })
   })
 
