@@ -1399,6 +1399,7 @@ def run_cli(
                         timestamp,
                         session_name,
                         commit_status,
+                        auto_save,
                     ) in sessions:
                         session_list.append(
                             {
@@ -1406,6 +1407,7 @@ def run_cli(
                                 "timestamp": timestamp,
                                 "name": session_name,
                                 "commit_status": commit_status,
+                                "auto_save": auto_save,
                             }
                         )
 

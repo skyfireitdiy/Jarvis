@@ -915,7 +915,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 PrettyOutput.auto_print("📋 未找到已保存的会话文件。")
             else:
                 PrettyOutput.auto_print(f"📋 找到 {len(sessions)} 个会话文件：")
-                for idx, (file_path, timestamp, session_name, _) in enumerate(
+                for idx, (file_path, timestamp, session_name, _, auto_save) in enumerate(
                     sessions, 1
                 ):
                     # 获取文件大小
@@ -936,7 +936,8 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                     else:
                         time_str = "(无时间戳)"
 
-                    PrettyOutput.auto_print(f"  {idx}. {os.path.basename(file_path)}")
+                    auto_str = " [自动保存]" if auto_save else ""
+                    PrettyOutput.auto_print(f"  {idx}. {os.path.basename(file_path)}{auto_str}")
                     PrettyOutput.auto_print(f"     时间: {time_str}  大小: {size_str}")
             return "", True
         elif tag == "Quiet":

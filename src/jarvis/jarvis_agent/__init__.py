@@ -662,7 +662,7 @@ class Agent:
         try:
             from jarvis.jarvis_agent.session_daemon import build_snapshot_files
 
-            snapshot = self.session.build_session_snapshot()
+            snapshot = self.session.build_session_snapshot(auto_save=True)
             if not snapshot:
                 return
             session_file, files = snapshot
