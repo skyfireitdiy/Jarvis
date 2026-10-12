@@ -24,7 +24,6 @@ from jarvis.jarvis_mcp.streamable_mcp_client import StreamableMcpClient
 from jarvis.jarvis_platform.openai import PARSE_ERROR_KEY
 from jarvis.jarvis_tools.base import Tool
 from jarvis.jarvis_tools.plugin_registry import PluginRegistry
-from jarvis.jarvis_utils.config import calculate_token_limit
 from jarvis.jarvis_utils.exception_utils import save_exception
 from jarvis.jarvis_utils.config import read_text_file
 from jarvis.jarvis_utils.config import get_data_dir
@@ -2167,9 +2166,9 @@ class ToolRegistry(OutputHandlerProtocol):
                     + f"\n\n<execution_time>\n工具名称: {name}\n执行耗时: {elapsed_time:.2f}秒\n</execution_time>"
                 )
 
-            # 内容过大时用 cheap 模型提取关键信息
+            # 内容过大时落盘完整输出并返回文件信息
             if is_context_overflow(output, platform):
-                return self._summarize_with_cheap_model(output, name)
+                return self._handle_oversized_output(output, name)
             return output
         except Exception as e:
             PrettyOutput.auto_print(f"❌ 执行工具调用 {name} 失败：{str(e)}")
@@ -2183,57 +2182,11 @@ class ToolRegistry(OutputHandlerProtocol):
         Args:
             stdout: 标准输出
             stderr: 标准错误
-            platform: 平台实例，用于获取剩余token数
+            platform: 平台实例（保留参数，不再用于截断）
 
         Returns:
             str: 格式化后的输出
         """
-        # 根据剩余token数截断输出
-        if platform is not None:
-            try:
-                remaining_tokens = platform.get_remaining_token_count()
-                if remaining_tokens > 0:
-                    # 计算允许的最大字符数（与c2rust保持一致：使用calculate_token_limit并乘以4）
-                    max_allowed_tokens = calculate_token_limit(remaining_tokens)
-                    max_allowed_chars = int(max_allowed_tokens * 4)
-
-                    # 计算stdout和stderr的字符数
-                    stdout_len = len(stdout) if stdout else 0
-                    stderr_len = len(stderr) if stderr else 0
-                    total_len = stdout_len + stderr_len
-
-                    # 如果总字符数超过限制，则截断
-                    if total_len > max_allowed_chars:
-                        # 计算分配给stdout和stderr的字符数（按比例）
-                        if stdout_len > 0 and stderr_len > 0:
-                            stdout_ratio = stdout_len / total_len
-                            stderr_ratio = stderr_len / total_len
-                            max_stdout_chars = int(max_allowed_chars * stdout_ratio)
-                            max_stderr_chars = int(max_allowed_chars * stderr_ratio)
-                        elif stdout_len > 0:
-                            max_stdout_chars = max_allowed_chars
-                            max_stderr_chars = 0
-                        else:
-                            max_stdout_chars = 0
-                            max_stderr_chars = max_allowed_chars
-
-                        # 截断stdout和stderr（只保留前面部分，与c2rust保持一致）
-                        if stdout and max_stdout_chars > 0:
-                            stdout = stdout[:max_stdout_chars]
-                            if len(stdout) < stdout_len:
-                                stdout += "\n... (输出过长，已截断)"
-                        if stderr and max_stderr_chars > 0:
-                            stderr = stderr[:max_stderr_chars]
-                            if len(stderr) < stderr_len:
-                                stderr += "\n... (输出过长，已截断)"
-
-                        PrettyOutput.auto_print(
-                            f"⚠️ 工具输出过长（{total_len}字符），已根据剩余token数（{remaining_tokens}）截断"
-                        )
-            except Exception:
-                # 如果获取剩余token数失败，不截断
-                pass
-
         output_parts = []
         if stdout:
             output_parts.append(f"<stdout>\n{stdout}\n</stdout>")
@@ -2242,22 +2195,44 @@ class ToolRegistry(OutputHandlerProtocol):
         output = "\n\n".join(output_parts)
         return "<无输出和错误>" if not output else output
 
-    def _truncate_output(self, output: str) -> str:
-        """截断过长的输出内容
+    def _handle_oversized_output(self, output: str, tool_name: str = "") -> str:
+        """处理超长工具输出：完整落盘并返回文件信息反馈。
+
+        不截断、不总结：完整内容写入 <工作目录>/.jarvis/tool_results/，
+        返回文件大小、行数与路径，提示模型用 read_code 过滤读取。
 
         参数:
-            output: 要截断的输出内容
+            output: 要处理的完整输出内容
+            tool_name: 工具名称（用于落盘文件命名）
 
         返回:
-            截断后的内容，如果内容不超过60行则返回原内容
+            str: 反馈文本（含文件信息与读取建议）；落盘失败时返回截断提示
         """
-        if len(output.splitlines()) > 60:
+        size_bytes = len(output.encode("utf-8", errors="replace"))
+        line_count = len(output.splitlines())
+        disk_path = self._dump_tool_output(output, tool_name)
+        if not disk_path:
+            # 落盘失败时兜底：保留首尾各 30 行，避免上下文被撑爆
             lines = output.splitlines()
-            PrettyOutput.auto_print("⚠️ 输出太长，截取前后30行")
-            return "\n".join(
-                lines[:30] + ["\n...内容太长，已截取前后30行...\n"] + lines[-30:]
-            )
-        return output
+            if len(lines) > 60:
+                PrettyOutput.auto_print("⚠️ 输出太长且落盘失败，截取前后30行")
+                output = "\n".join(
+                    lines[:30] + ["\n...内容太长，已截取前后30行...\n"] + lines[-30:]
+                )
+            return output
+        PrettyOutput.auto_print(
+            f"⚠️ 工具输出过大（{size_bytes} 字节 / {line_count} 行），已完整写入文件"
+        )
+        return (
+            f"<tool_output_oversized>\n"
+            f"（工具 {tool_name or 'unknown'} 输出过大，未直接返回内容）\n"
+            f"文件大小: {size_bytes} 字节（{size_bytes / 1024:.1f} KB）\n"
+            f"行数: {line_count}\n"
+            f"完整结果文件: {disk_path}\n"
+            f"建议：请用 read_code 读取该文件，并配合 start_line/end_line 参数按需过滤读取，"
+            f"避免一次性载入全部内容。\n"
+            f"</tool_output_oversized>"
+        )
 
     def _compress_output(self, output: str) -> str:
         """对工具输出进行多层次无损/高保真压缩。
@@ -2399,100 +2374,6 @@ class ToolRegistry(OutputHandlerProtocol):
                 e, module="jarvis_tools.registry", function="_dump_tool_output"
             )
             return None
-
-    def _truncate_for_summary(self, output: str, max_chars: int = 120000) -> str:
-        """为cheap模型总结而截断超长内容，保留首尾。
-
-        参数:
-            output: 原始输出
-            max_chars: 允许送入cheap模型的最大字符数
-
-        返回:
-            str: 截断后的内容（保留首尾），未超限则返回原文
-        """
-        if len(output) <= max_chars:
-            return output
-        head_chars = max_chars // 2
-        tail_chars = max_chars - head_chars
-        truncated = (
-            output[:head_chars]
-            + f"\n\n...（中间 {len(output) - head_chars - tail_chars} 字符已省略，原始总长度 {len(output)} 字符）\n\n"
-            + output[-tail_chars:]
-        )
-        return truncated
-
-    def _summarize_with_cheap_model(self, output: str, tool_name: str = "") -> str:
-        """使用cheap模型提取超长工具输出的关键信息。
-
-        当工具输出超过上下文限制时，用cheap模型总结关键信息，
-        避免超长内容持续占用后续对话上下文。
-        内容过长时先截断（保留首尾）再总结，防止超过cheap模型上下文。
-        失败时回退到截断处理。
-
-        截断/摘要会丢弃完整内容，故先落盘完整输出，返回结果附文件路径，
-        模型需要时可用 read_code 读取完整内容。
-
-        参数:
-            output: 要总结的输出内容
-            tool_name: 工具名称（用于落盘文件命名）
-
-        返回:
-            str: 总结后的内容
-        """
-        # 先落盘完整输出，供模型按需读取（截断/摘要会丢弃完整内容）
-        disk_path = self._dump_tool_output(output, tool_name)
-        disk_hint = ""
-        if disk_path:
-            disk_hint = (
-                f"\n\n<tool_output_disk>\n"
-                f"（原始输出过长{len(output)}字符，完整内容已保存至文件）\n"
-                f"完整结果文件: {disk_path}\n"
-                f"如需完整内容，请用 read_code 读取该文件。\n"
-                f"</tool_output_disk>"
-            )
-        try:
-            from jarvis.jarvis_platform.registry import PlatformRegistry
-
-            # 获取cheap平台实例
-            platform = (
-                PlatformRegistry.get_global_platform_registry().get_cheap_platform()
-            )
-
-            # 内容过长时先截断保留首尾，避免超过cheap模型上下文
-            summary_input = self._truncate_for_summary(output)
-
-            summary_prompt = (
-                "请提取以下工具输出中之关键信息，用于替代原始输出返回给Agent。要求：\n"
-                "1. 保留对后续决策有用的关键数据、错误信息、文件路径、函数名、返回值等\n"
-                "2. 压缩冗余内容（如重复日志、无关细节）\n"
-                "3. 用简洁的结构化文本输出（如列表）\n"
-                "4. 如果输出包含错误，必须明确指出错误原因\n"
-                "5. 控制在较短篇幅内，突出最有价值的信息\n\n"
-                f"原始输出内容（{len(output)}字符）：\n\n{summary_input}"
-            )
-
-            # 使用无状态补全，不影响主对话历史
-            result = platform.complete(summary_prompt)
-
-            if result and result != "<输出被用户中断>":
-                return (
-                    f"<tool_output_summary>\n"
-                    f"（原始输出过长{len(output)}字符，已由cheap模型总结关键信息）\n\n"
-                    f"{result}\n"
-                    f"</tool_output_summary>" + disk_hint
-                )
-        except Exception as e:
-            save_exception(
-                e,
-                module="jarvis_tools.registry",
-                function="_summarize_with_cheap_model",
-            )
-            PrettyOutput.auto_print(
-                f"⚠ 使用cheap模型总结输出失败，回退到截断: {str(e)}"
-            )
-
-        # 失败回退到截断
-        return self._truncate_output(output) + disk_hint
 
     def handle_tool_calls(self, tool_call: Dict[str, Any], agent: Any) -> str:
         try:
@@ -2696,8 +2577,8 @@ class ToolRegistry(OutputHandlerProtocol):
             is_large_content = is_context_overflow(output, platform)
 
             if is_large_content:
-                # 使用cheap模型提取关键信息，避免超长上下文持续占用后续对话
-                return self._summarize_with_cheap_model(output, name)
+                # 落盘完整输出并返回文件信息，避免超长上下文持续占用后续对话
+                return self._handle_oversized_output(output, name)
 
             return output
 
