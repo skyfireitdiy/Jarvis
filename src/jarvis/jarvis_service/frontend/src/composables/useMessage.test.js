@@ -408,6 +408,38 @@ describe('useMessage', () => {
       expect(notifyInputRequest).toHaveBeenCalled()
     })
 
+    it('confirm：用户刚响应过输入时不再重复播放提示音（中断场景，合计 1 次）', () => {
+      const { api, notifyInputRequest } = makeHarness()
+      // 后端请求补充信息 → 播一次
+      api.handleMessage({ type: 'input_request', payload: { tip: 'a', mode: 'multi', request_id: 'r1' }, seq: 1 }, 'agent-1')
+      expect(notifyInputRequest).toHaveBeenCalledTimes(1)
+      // 用户提交补充信息
+      api.sendInputResult('补充信息', 'r1', 'agent-1', 'multi')
+      // 后端紧接着请求确认是否执行工具调用 → 同一轮交互，不再播
+      api.handleMessage({ type: 'confirm', payload: { message: '是否继续执行工具调用？' }, seq: 2 }, 'agent-1')
+      expect(notifyInputRequest).toHaveBeenCalledTimes(1)
+    })
+
+    it('confirm：独立到达（无前置输入响应）仍播放提示音', () => {
+      const { api, notifyInputRequest } = makeHarness()
+      api.handleMessage({ type: 'confirm', payload: { message: '确认?' }, seq: 1 }, 'agent-1')
+      expect(notifyInputRequest).toHaveBeenCalledTimes(1)
+    })
+
+    it('confirm：用户响应输入后超出时间窗仍播放提示音（合计 2 次）', () => {
+      const { api, notifyInputRequest } = makeHarness()
+      api.handleMessage({ type: 'input_request', payload: { tip: 'a', mode: 'multi', request_id: 'r1' }, seq: 1 }, 'agent-1')
+      api.sendInputResult('补充信息', 'r1', 'agent-1', 'multi')
+      const realNow = Date.now
+      Date.now = () => realNow() + 6000
+      try {
+        api.handleMessage({ type: 'confirm', payload: { message: '确认?' }, seq: 2 }, 'agent-1')
+      } finally {
+        Date.now = realNow
+      }
+      expect(notifyInputRequest).toHaveBeenCalledTimes(2)
+    })
+
     it('execution：调用 appendExecution 并创建输出项', () => {
       const { api, appendExecution, allOutputs } = makeHarness()
       allOutputs.value.set('agent-1', [])

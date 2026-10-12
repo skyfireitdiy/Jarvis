@@ -96,6 +96,14 @@ export function useMessage({
   ensureAgentEditorPane,
   editorModels,
 }) {
+// 记录各 Agent 最近一次响应用户输入的时间戳（agentId -> Date.now()）。
+// 用于抑制"同一轮交互"里紧随 input_request 之后的 confirm 提示音：
+// 中断场景下后端会先请求补充信息（input_request，已响 3 声），
+// 用户提交后紧接着请求确认是否执行工具（confirm），此时不应再响一次。
+const inputRespondedAt = new Map()
+// 视为"同一轮交互"的时间窗（毫秒），超出则认为 confirm 是独立请求，照常播放提示音
+const INPUT_RESPONSE_CONFIRM_WINDOW_MS = 5000
+
 function syncAgentInputMode(targetAgentId, payload) {
   if (!targetAgentId) return
   inputTip.value = payload.tip || ''
@@ -417,8 +425,17 @@ function handleMessage(message, agentId = null) {
       }
     })
   } else if (type === 'confirm') {
-    // 确认请求同样视为需要输入，无条件播放提示音
-    notifyInputRequest()
+    // 确认请求通常视为需要输入，播放提示音。
+    // 但若该 Agent 刚刚响应过输入（如中断后先请求补充信息、紧接着请求确认工具调用），
+    // 说明这是"同一轮交互"里的第二次询问，提示音已播放过，不再重复播放，
+    // 避免一次"进入等待输入"响两声（3+3=6 声）。
+    const respondedAt = inputRespondedAt.get(targetAgentId)
+    const isSameInteraction =
+      respondedAt !== undefined && Date.now() - respondedAt < INPUT_RESPONSE_CONFIRM_WINDOW_MS
+    inputRespondedAt.delete(targetAgentId)
+    if (!isSameInteraction) {
+      notifyInputRequest()
+    }
 
     pendingConfirmAgentId.value = targetAgentId
     // 更新 Agent 状态为 waiting_confirm
@@ -1109,6 +1126,8 @@ function sendInputDirectly(text, inputMode = 'multi', agentId = null) {
   // 从Map中删除该Agent的输入请求
   if (targetAgentId) {
     inputRequests.value.delete(targetAgentId)
+    // 记录响应时间，用于抑制同一轮交互里紧随其后的 confirm 提示音
+    inputRespondedAt.set(targetAgentId, Date.now())
   }
 }
 
@@ -1139,6 +1158,8 @@ function sendInputResult(text, requestId, agentId = null, inputMode = 'multi') {
   // 从Map中删除该Agent的输入请求（表示已响应）
   if (targetAgentId) {
     inputRequests.value.delete(targetAgentId)
+    // 记录响应时间，用于抑制同一轮交互里紧随其后的 confirm 提示音
+    inputRespondedAt.set(targetAgentId, Date.now())
   }
   pendingInputAgentId.value = null
 }
