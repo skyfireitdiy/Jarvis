@@ -302,6 +302,56 @@ def test_concurrent_tasks_independent(api, workdir):
     assert res["data"]["status"] == "pending"
 
 
+def test_soft_delete_and_restore(api, workdir):
+    """软删除：标记 deleted、列表默认隐藏、数据保留、可恢复。"""
+    api.create_task(workdir=workdir, title="待删除任务")
+    api.create_task(workdir=workdir, title="保留任务")
+    tf = Path(workdir) / "T001_待删除任务" / ".jarvis" / "autoworker" / "task.json"
+    assert tf.is_file()
+
+    # 删除 T001（软删除）
+    res = api.delete_task(workdir=workdir, task_id="T001")
+    assert res["success"] is True
+    assert res["data"]["deleted"] is True
+    assert res["data"]["deleted_at"]
+    # 数据仍在磁盘
+    assert tf.is_file()
+    raw = json.loads(tf.read_text(encoding="utf-8"))
+    assert raw["deleted"] is True
+
+    # 列表默认隐藏已删除
+    res = api.list_tasks(workdir=workdir)
+    assert [t["id"] for t in res["data"]] == ["T002"]
+    # include_deleted=True 时可见
+    res = api.list_tasks(workdir=workdir, include_deleted=True)
+    assert [t["id"] for t in res["data"]] == ["T001", "T002"]
+    # get_task 默认也能找到已删除任务
+    res = api.get_task(workdir=workdir, task_id="T001")
+    assert res["success"] is True
+
+    # 重复删除报错
+    res = api.delete_task(workdir=workdir, task_id="T001")
+    assert res["success"] is False
+
+    # 恢复
+    res = api.restore_task(workdir=workdir, task_id="T001")
+    assert res["success"] is True
+    assert "deleted" not in res["data"]
+    raw = json.loads(tf.read_text(encoding="utf-8"))
+    assert "deleted" not in raw
+    # 恢复后列表重新出现
+    res = api.list_tasks(workdir=workdir)
+    assert [t["id"] for t in res["data"]] == ["T001", "T002"]
+
+    # 未删除的任务无需恢复
+    res = api.restore_task(workdir=workdir, task_id="T002")
+    assert res["success"] is False
+
+    # 不存在的任务
+    assert api.delete_task(workdir=workdir, task_id="T999")["success"] is False
+    assert api.restore_task(workdir=workdir, task_id="T999")["success"] is False
+
+
 def test_public_functions_whitelist(api):
     """PUBLIC_FUNCTIONS 白名单包含全部对外函数。"""
     whitelist = set(api.PUBLIC_FUNCTIONS)
@@ -312,4 +362,6 @@ def test_public_functions_whitelist(api):
         "add_note",
         "list_tasks",
         "get_task",
+        "delete_task",
+        "restore_task",
     } == whitelist

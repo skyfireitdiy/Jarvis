@@ -71,8 +71,11 @@ def _load_task(task_dir: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def _scan_tasks(workdir: str) -> List[Dict[str, Any]]:
-    """扫描 <workdir>/*/.jarvis/autoworker/task.json，返回任务列表（按 id 数值升序）。"""
+def _scan_tasks(workdir: str, include_deleted: bool = False) -> List[Dict[str, Any]]:
+    """扫描 <workdir>/*/.jarvis/autoworker/task.json，返回任务列表（按 id 数值升序）。
+
+    include_deleted=False（默认）时过滤掉已软删除（deleted=True）的任务。
+    """
     tasks: List[Dict[str, Any]] = []
     if not os.path.isdir(workdir):
         return tasks
@@ -85,8 +88,11 @@ def _scan_tasks(workdir: str) -> List[Dict[str, Any]]:
         if not os.path.isdir(task_dir):
             continue
         task = _load_task(task_dir)
-        if task:
-            tasks.append(task)
+        if not task:
+            continue
+        if not include_deleted and task.get("deleted"):
+            continue
+        tasks.append(task)
 
     def _sort_key(t: Dict[str, Any]) -> int:
         m = re.match(r"^T(\d+)$", str(t.get("id", "")))
@@ -106,9 +112,14 @@ def _next_task_id(workdir: str) -> str:
     return f"T{max_num + 1:03d}"
 
 
-def _find_task(workdir: str, task_id: str) -> Optional[Dict[str, Any]]:
-    """按任务 ID 查找任务；未找到返回 None。"""
-    for t in _scan_tasks(workdir):
+def _find_task(
+    workdir: str, task_id: str, include_deleted: bool = True
+) -> Optional[Dict[str, Any]]:
+    """按任务 ID 查找任务；未找到返回 None。
+
+    include_deleted=True（默认）时也查找已软删除的任务，供 delete/restore 定位。
+    """
+    for t in _scan_tasks(workdir, include_deleted=include_deleted):
         if str(t.get("id", "")) == task_id:
             return t
     return None
@@ -301,6 +312,69 @@ def set_status(
     }
 
 
+def delete_task(
+    workdir: Optional[str] = None, task_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """软删除任务：只写 deleted 标记，不删除任务文件/目录。
+
+    删除后任务默认从列表消失（list_tasks 过滤），数据仍保留在磁盘。
+    """
+    workdir, err = _require_workdir(workdir)
+    if err:
+        return {"success": False, "error": err}
+    task_id, err = _require_task_id(task_id)
+    if err:
+        return {"success": False, "error": err}
+    task = _find_task(workdir, task_id, include_deleted=True)
+    if not task:
+        return {"success": False, "error": f"任务不存在: {task_id}"}
+    if task.get("deleted"):
+        return {"success": False, "error": f"任务 {task_id} 已删除"}
+    task["deleted"] = True
+    task["deleted_at"] = _now()
+    task["updated_at"] = _now()
+    result = _write_task(task)
+    if not result["success"]:
+        return result
+    data = dict(result["data"])
+    data["task_dir"] = task["task_dir"]
+    return {
+        "success": True,
+        "data": data,
+        "message": f"任务 {task_id} 已删除（数据保留，可恢复）",
+    }
+
+
+def restore_task(
+    workdir: Optional[str] = None, task_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """恢复已软删除的任务：清除 deleted 标记。"""
+    workdir, err = _require_workdir(workdir)
+    if err:
+        return {"success": False, "error": err}
+    task_id, err = _require_task_id(task_id)
+    if err:
+        return {"success": False, "error": err}
+    task = _find_task(workdir, task_id, include_deleted=True)
+    if not task:
+        return {"success": False, "error": f"任务不存在: {task_id}"}
+    if not task.get("deleted"):
+        return {"success": False, "error": f"任务 {task_id} 未删除，无需恢复"}
+    task.pop("deleted", None)
+    task.pop("deleted_at", None)
+    task["updated_at"] = _now()
+    result = _write_task(task)
+    if not result["success"]:
+        return result
+    data = dict(result["data"])
+    data["task_dir"] = task["task_dir"]
+    return {
+        "success": True,
+        "data": data,
+        "message": f"任务 {task_id} 已恢复",
+    }
+
+
 def add_note(
     workdir: Optional[str] = None,
     task_id: Optional[str] = None,
@@ -385,6 +459,7 @@ def list_tasks(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
     include_notes: bool = True,
+    include_deleted: bool = False,
 ) -> Dict[str, Any]:
     """列出后端工作目录下的任务（按 id 升序），支持过滤与分页。
 
@@ -394,6 +469,7 @@ def list_tasks(
     - limit/offset: 分页；limit 为 None 时不分页（返回全部，向后兼容）。
     - include_notes: 列表项是否保留 notes 全文，默认 True（保持前端面板旧行为）；
       Agent 侧工具默认置 False，只返回 note_count 以节省上下文。
+    - include_deleted: 是否包含已软删除任务，默认 False（列表默认隐藏已删除）。
 
     返回 data 为任务列表，并附带 total/offset/limit/has_more。
     """
@@ -409,7 +485,7 @@ def list_tasks(
 
     matched = [
         t
-        for t in _scan_tasks(workdir)
+        for t in _scan_tasks(workdir, include_deleted=include_deleted)
         if _task_matches(t, query, tag_list, status)
     ]
     total = len(matched)
@@ -467,4 +543,6 @@ PUBLIC_FUNCTIONS: List[str] = [
     "add_note",
     "list_tasks",
     "get_task",
+    "delete_task",
+    "restore_task",
 ]
