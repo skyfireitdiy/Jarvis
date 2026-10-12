@@ -20,7 +20,15 @@ from jarvis.jarvis_agent.utils import scaffold_plugin
 
 @pytest.fixture
 def plugin_dir(tmp_path):
-    """生成一个测试插件脚手架，返回其目录路径。"""
+    """生成一个测试插件脚手架（不初始化 git），返回其目录路径。"""
+    result = scaffold_plugin("my-demo-plugin", output_dir=str(tmp_path), init_git=False)
+    assert result is not None, "脚手架生成失败"
+    return result
+
+
+@pytest.fixture
+def git_plugin_dir(tmp_path):
+    """生成一个初始化了 git 的插件脚手架，返回其目录路径。"""
     result = scaffold_plugin("my-demo-plugin", output_dir=str(tmp_path))
     assert result is not None, "脚手架生成失败"
     return result
@@ -92,3 +100,59 @@ def test_readme_mentions_plugin_private(plugin_dir):
         content = f.read()
     assert "插件私有功能" in content
     assert "PUBLIC_FUNCTIONS" in content
+
+
+def test_gitignore_generated(plugin_dir):
+    """应生成 .gitignore 且包含标准 Python 忽略项。"""
+    gitignore_path = os.path.join(plugin_dir, ".gitignore")
+    assert os.path.isfile(gitignore_path)
+    with open(gitignore_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    assert "__pycache__/" in content
+    assert ".venv/" in content
+
+
+def test_license_generated(plugin_dir):
+    """应生成 LICENSE 且为 MIT 协议。"""
+    license_path = os.path.join(plugin_dir, "LICENSE")
+    assert os.path.isfile(license_path)
+    with open(license_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    assert "MIT License" in content
+
+
+def test_git_init_creates_repo(git_plugin_dir):
+    """init_git=True 时应初始化 git 仓库并创建初始提交（分支 main）。"""
+    git_dir = os.path.join(git_plugin_dir, ".git")
+    assert os.path.isdir(git_dir), "应创建 .git 目录"
+
+    import subprocess
+
+    # 分支名应为 main
+    branch = subprocess.run(
+        ["git", "-C", git_plugin_dir, "branch", "--show-current"],
+        capture_output=True,
+        text=True,
+    )
+    assert branch.stdout.strip() == "main"
+
+    # 应有初始提交，且工作区干净
+    log = subprocess.run(
+        ["git", "-C", git_plugin_dir, "log", "--oneline"],
+        capture_output=True,
+        text=True,
+    )
+    assert log.returncode == 0
+    assert "Initial commit" in log.stdout
+
+    status = subprocess.run(
+        ["git", "-C", git_plugin_dir, "status", "--porcelain"],
+        capture_output=True,
+        text=True,
+    )
+    assert status.stdout.strip() == "", f"工作区应干净，实际: {status.stdout!r}"
+
+
+def test_git_init_false_no_repo(plugin_dir):
+    """init_git=False 时不应创建 .git 目录。"""
+    assert not os.path.isdir(os.path.join(plugin_dir, ".git"))
