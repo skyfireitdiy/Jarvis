@@ -337,17 +337,109 @@ def add_note(
     }
 
 
-def list_tasks(workdir: Optional[str] = None) -> Dict[str, Any]:
-    """列出后端工作目录下的全部任务（按 id 升序）。"""
+def _task_matches(
+    task: Dict[str, Any],
+    query: str,
+    tags: Optional[List[str]],
+    status: Optional[str],
+) -> bool:
+    """判断任务是否命中过滤条件（各条件为「与」关系，均为空则命中）。"""
+    if status and str(task.get("status", "")) != status:
+        return False
+    if tags:
+        task_tags = {str(t) for t in (task.get("tags") or [])}
+        if not all(str(t) in task_tags for t in tags):
+            return False
+    if query:
+        q = query.lower()
+        haystack = [str(task.get("title", "")), str(task.get("description", ""))]
+        for note in task.get("notes") or []:
+            if isinstance(note, dict):
+                haystack.append(str(note.get("content", "")))
+        if not any(q in h.lower() for h in haystack):
+            return False
+    return True
+
+
+def _task_summary(task: Dict[str, Any], include_notes: bool) -> Dict[str, Any]:
+    """生成列表用的任务摘要。
+
+    默认剥离 notes 全文（只保留 note_count），避免任务多/备注长时列表体积过大；
+    include_notes=True 时保留完整 notes。
+    """
+    item = dict(task)
+    notes = item.get("notes") or []
+    if not isinstance(notes, list):
+        notes = []
+    item["note_count"] = len(notes)
+    if not include_notes:
+        item.pop("notes", None)
+    return item
+
+
+def list_tasks(
+    workdir: Optional[str] = None,
+    query: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+    status: Optional[str] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
+    include_notes: bool = True,
+) -> Dict[str, Any]:
+    """列出后端工作目录下的任务（按 id 升序），支持过滤与分页。
+
+    - query: 关键词，大小写不敏感，匹配 title/description/notes 内容（任一命中即可）。
+    - tags: 标签列表，需全部命中任务的 tags。
+    - status: 精确匹配任务状态（pending/running/completed/abandoned）。
+    - limit/offset: 分页；limit 为 None 时不分页（返回全部，向后兼容）。
+    - include_notes: 列表项是否保留 notes 全文，默认 True（保持前端面板旧行为）；
+      Agent 侧工具默认置 False，只返回 note_count 以节省上下文。
+
+    返回 data 为任务列表，并附带 total/offset/limit/has_more。
+    """
     workdir, err = _require_workdir(workdir)
     if err:
         return {"success": False, "error": err}
-    tasks = _scan_tasks(workdir)
+
+    query = (query or "").strip()
+    status = (status or "").strip() or None
+    if status is not None and status not in VALID_STATUS:
+        return {"success": False, "error": f"无效状态: {status}"}
+    tag_list = [str(t).strip() for t in (tags or []) if str(t).strip()]
+
+    matched = [
+        t
+        for t in _scan_tasks(workdir)
+        if _task_matches(t, query, tag_list, status)
+    ]
+    total = len(matched)
+
+    # 分页：limit 为 None 时不分页（保持旧行为）
+    if limit is None:
+        page_items = matched
+        eff_offset = 0
+        eff_limit = total
+    else:
+        try:
+            eff_limit = int(limit)
+            eff_offset = int(offset or 0)
+        except (TypeError, ValueError):
+            return {"success": False, "error": "limit/offset 必须为整数"}
+        if eff_limit < 0 or eff_offset < 0:
+            return {"success": False, "error": "limit/offset 不能为负数"}
+        page_items = matched[eff_offset : eff_offset + eff_limit]
+
+    data = [_task_summary(t, include_notes) for t in page_items]
+    has_more = (eff_offset + len(page_items)) < total
     return {
         "success": True,
-        "data": tasks,
+        "data": data,
         "workdir": workdir,
-        "count": len(tasks),
+        "count": len(data),
+        "total": total,
+        "offset": eff_offset,
+        "limit": eff_limit,
+        "has_more": has_more,
     }
 
 

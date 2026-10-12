@@ -39,6 +39,9 @@ from typing import Optional
 
 _TASK_REL_PATH = os.path.join(".jarvis", "autoworker", "task.json")
 
+# list_tasks 默认分页条数（Agent 侧），避免任务多时列表过大撑爆上下文
+_DEFAULT_LIST_LIMIT = 20
+
 # 支持的 action 集合（与 parameters.enum 保持一致）
 _KNOWN_ACTIONS = {
     "create_task",
@@ -157,6 +160,36 @@ class TaskManagerTool:
                 "type": "string",
                 "description": "关键信息内容（add_note）",
             },
+            "query": {
+                "type": "string",
+                "description": (
+                    "list_tasks 过滤：关键词，大小写不敏感，匹配任务标题/描述/备注内容。"
+                ),
+            },
+            "filter_tags": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "list_tasks 过滤：需全部命中的任务标签。",
+            },
+            "filter_status": {
+                "type": "string",
+                "enum": ["pending", "running", "completed", "abandoned"],
+                "description": "list_tasks 过滤：按任务状态精确筛选。",
+            },
+            "limit": {
+                "type": "integer",
+                "description": "list_tasks 分页：本页最多返回条数，默认 20。",
+            },
+            "offset": {
+                "type": "integer",
+                "description": "list_tasks 分页：跳过条数，默认 0。",
+            },
+            "include_notes": {
+                "type": "boolean",
+                "description": (
+                    "list_tasks 是否在列表项中返回备注全文，默认 false（只返回 note_count）。"
+                ),
+            },
         },
         "required": ["action"],
     }
@@ -214,7 +247,20 @@ class TaskManagerTool:
                     if ctx["error"]:
                         return self._err(ctx["error"])
                     workdir = ctx["workdir"]
-                result = api.list_tasks(workdir=workdir)
+                # Agent 侧默认分页，避免任务多时列表过大撑爆上下文
+                limit = args.get("limit")
+                if limit is None:
+                    limit = _DEFAULT_LIST_LIMIT
+                result = api.list_tasks(
+                    workdir=workdir,
+                    query=args.get("query"),
+                    tags=args.get("filter_tags"),
+                    status=args.get("filter_status"),
+                    limit=limit,
+                    offset=args.get("offset"),
+                    # Agent 侧默认不返回备注全文（只给 note_count），节省上下文
+                    include_notes=bool(args.get("include_notes")),
+                )
                 return self._ok(result)
 
             if action == "create_task":
