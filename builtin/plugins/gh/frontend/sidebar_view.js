@@ -700,6 +700,61 @@ export default {
         this.busy = false;
       }
     },
+    // 创建独立 git worktree 的 CodeAgent 处理该 issue/PR，支持多个 Issue/PR 并行互不干扰。
+    // worktree 仅在 code_agent 类型下生效，故此处固定以 code_agent + worktree=true 创建。
+    async handleItemWorktreeAgent(item) {
+      this.closeItemMenu();
+      if (!item) return;
+      const isIssue = this.tab === "issues";
+      const kind = isIssue ? "Issue" : "Pull Request";
+      const number = item.number;
+      // 优先使用「打开创建 Agent 弹窗（带预填）」通道，让用户确认/编辑后再创建；
+      // 宿主未提供新通道时回退到直接创建通道（向后兼容）。
+      const openModal =
+        typeof window !== "undefined" && window.__jarvisOpenCreateAgentModal;
+      const create =
+        typeof window !== "undefined" && window.__jarvisCreateAgentForTask;
+      if (typeof openModal !== "function" && typeof create !== "function") {
+        this.message = "宿主未提供创建通道，无法创建 Agent";
+        return;
+      }
+      const workingDir = (this.workingDir || "").trim();
+      if (!workingDir) {
+        this.message = "失败: 未解析到工作目录";
+        return;
+      }
+      this.busy = true;
+      this.message = `正在创建 Worktree Agent 处理 ${kind} #${number}…`;
+      try {
+        const prefill = {
+          workingDir: workingDir,
+          task: this.buildItemPrompt(item),
+          name: `${kind} #${number}`,
+          nodeId: this.nodeId,
+          agentType: "code_agent",
+          worktree: true,
+        };
+        if (typeof openModal === "function") {
+          const res = await openModal(prefill);
+          if (res && res.confirmed) {
+            this.message = `已创建 Worktree Agent 处理 ${kind} #${number}`;
+          } else {
+            this.message = "已取消";
+          }
+        } else {
+          const res = await create(prefill);
+          if (res && res.success) {
+            this.message = `已创建 Worktree Agent 处理 ${kind} #${number}`;
+          } else {
+            this.message = "失败: " + ((res && res.error) || "创建失败");
+          }
+        }
+      } catch (e) {
+        this.message = "失败: " + String((e && e.message) || e);
+      } finally {
+        this.busy = false;
+      }
+    },
     // 自定义仓库 Issue：Fork 原仓库并 clone 到所选目录，再在该目录创建 CodeAgent 处理。
     // 流程：选目录（含节点）→ 在所选节点 fork（已存在复用）→ clone → 创建 CodeAgent。
     async handleItemForkCloneAgent(item) {
@@ -1038,6 +1093,8 @@ export default {
         style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">在当前 Agent 中处理{{ agentName ? '（' + agentName + '）' : '' }}</div>
       <div v-if="!isManualRepo" @click="handleItemNewAgent(menuItem)"
         style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">创建新 Agent 处理</div>
+      <div v-if="!isManualRepo" @click="handleItemWorktreeAgent(menuItem)"
+        style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">开启 Worktree 处理</div>
       <div v-if="isManualRepo" @click="handleItemForkCloneAgent(menuItem)"
         style="padding:6px 10px;font-size:12px;color:#ddd;cursor:pointer;border-radius:4px;white-space:nowrap;">Fork 并创建 CodeAgent 处理</div>
     </div>
