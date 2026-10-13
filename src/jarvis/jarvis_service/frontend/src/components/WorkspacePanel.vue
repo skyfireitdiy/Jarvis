@@ -20,241 +20,84 @@
     <div class="workspace-main">
       <div class="workspace-activity-bar">
         <button
+          v-for="icon in mainIcons"
+          :key="icon.id"
           class="workspace-activity-button"
-          :class="{ active: showSidebar && sidebarView === 'agents' }"
+          :class="{ active: isActive(icon, { showSidebar, sidebarView, mainView }) }"
           tabindex="-1"
+          :title="icon.title"
           @mousedown.prevent
-          @click="$emit('setSidebarView', 'agents')"
-          title="Agent 列表 (Space v a)"
+          @click="handleIconClick(icon)"
         >
-          <img class="workspace-activity-icon" src="/icons/jarvis-pet.svg" alt="Agent" />
+          <span v-if="icon.isPlugin" class="workspace-activity-plugin-icon" v-html="icon.icon"></span>
+          <span v-else class="workspace-activity-inline-icon" v-html="icon.icon"></span>
         </button>
         <button
-          class="workspace-activity-button"
-          :class="{ active: showSidebar && sidebarView === 'files' }"
+          v-if="moreIcons.length > 0"
+          class="workspace-activity-button workspace-activity-more"
+          :class="{ active: showMoreMenu }"
           tabindex="-1"
+          title="更多"
           @mousedown.prevent
-          @click="$emit('setSidebarView', 'files')"
-          title="目录树"
+          @click.stop="showMoreMenu = !showMoreMenu"
         >
           <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M1.5 4.5A1.5 1.5 0 0 1 3 3h2.4l1.6 1.6H13A1.5 1.5 0 0 1 14.5 6v5.5A1.5 1.5 0 0 1 13 13H3a1.5 1.5 0 0 1-1.5-1.5v-7Z"/>
-          </svg>
-        </button>
-        <button
-          class="workspace-activity-button"
-          :class="{ active: showSidebar && sidebarView === 'search' }"
-          tabindex="-1"
-          @mousedown.prevent
-          @click="$emit('setSidebarView', 'search')"
-          title="全局搜索"
-        >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
-            <circle cx="7" cy="7" r="4.5"/>
-            <path d="M10.5 10.5 14 14"/>
-          </svg>
-        </button>
-        <button
-          class="workspace-activity-button"
-          :class="{ active: showSidebar && sidebarView === 'git' }"
-          tabindex="-1"
-          @mousedown.prevent
-          @click="$emit('setSidebarView', 'git')"
-          title="Git (Space v g)"
-        >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="5" cy="4" r="1.5"/>
-            <circle cx="5" cy="12" r="1.5"/>
-            <circle cx="11" cy="8" r="1.5"/>
-            <path d="M5 5.5v5"/>
-            <path d="M6.5 12H9.5a1.5 1.5 0 0 0 1.5-1.5V9"/>
-          </svg>
-        </button>
-        <button
-          class="workspace-activity-button"
-          :class="{ active: mainView === 'chat' }"
-          tabindex="-1"
-          @mousedown.prevent
-          @click="$emit('setMainView', 'chat')"
-          title="聊天室"
-        >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v6a1.5 1.5 0 0 1-1.5 1.5H6.5L3.5 14v-3H3.5A1.5 1.5 0 0 1 2 9.5v-6Z"/>
-          </svg>
-        </button>
-        <button
-          class="workspace-activity-button"
-          :class="{ active: mainView === 'terminal' }"
-          tabindex="-1"
-          @mousedown.prevent
-          @click="$emit('setMainView', 'terminal')"
-          title="终端"
-        >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 12.5v-9Z"/>
-            <path d="M5 6l2 2-2 2"/>
-            <path d="M8.5 10H11"/>
-          </svg>
-        </button>
-        <button
-          class="workspace-activity-button"
-          tabindex="-1"
-          @mousedown.prevent
-          @click="$emit('openSettings')"
-          title="设置 (Space v s)"
-        >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="8" cy="4" r="1.5"/>
             <circle cx="8" cy="8" r="1.5"/>
-            <circle cx="8" cy="8" r="4.2"/>
-            <g stroke-width="2.4">
-              <path d="M8 3.8v-2M10.97 5.03l1.41-1.41M12.2 8h2M10.97 10.97l1.41 1.41M8 12.2v2M5.03 10.97l-1.41 1.41M3.8 8h-2M5.03 5.03l-1.41-1.41"/>
-            </g>
-          </svg>
-        </button>
-        <button
-          v-if="isAdmin"
-          class="workspace-activity-button"
-          tabindex="-1"
-          @mousedown.prevent
-          @click="$emit('openAdmin')"
-          title="管理 (Space m a)"
-        >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M8 1.5 13 3.5v4c0 3-2 5.5-5 7-3-1.5-5-4-5-7v-4L8 1.5Z"/>
-            <path d="M5.5 8l1.7 1.7L10.5 6"/>
-          </svg>
-        </button>
-        <button
-          v-if="isAdmin"
-          class="workspace-activity-button"
-          :class="{ active: showSidebar && sidebarView === 'plugins' }"
-          tabindex="-1"
-          @mousedown.prevent
-          @click="$emit('setSidebarView', 'plugins')"
-          title="插件管理"
-        >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M9.5 2.5h3a1 1 0 0 1 1 1v3h-1.2a1.3 1.3 0 0 0 0 2.6H13.5v3a1 1 0 0 1-1 1h-3v-1.2a1.3 1.3 0 0 0-2.6 0V13h-3a1 1 0 0 1-1-1V9.5h1.2a1.3 1.3 0 0 0 0-2.6H2.5v-3a1 1 0 0 1 1-1h3v1.2a1.3 1.3 0 0 0 2.6 0V2.5Z"/>
-          </svg>
-        </button>
-        <button
-          class="workspace-activity-button"
-          :class="{ active: showSidebar && sidebarView === 'manage' }"
-          tabindex="-1"
-          @mousedown.prevent
-          @click="$emit('setSidebarView', 'manage')"
-          title="增强能力清单"
-        >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1"/>
-            <rect x="9" y="2.5" width="4.5" height="4.5" rx="1"/>
-            <rect x="2.5" y="9" width="4.5" height="4.5" rx="1"/>
-            <rect x="9" y="9" width="4.5" height="4.5" rx="1"/>
-          </svg>
-        </button>
-        <button
-          class="workspace-activity-button"
-          :class="{ active: showSidebar && sidebarView === 'timers' }"
-          tabindex="-1"
-          @mousedown.prevent
-          @click="$emit('setSidebarView', 'timers')"
-          title="定时任务"
-        >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="8" cy="8" r="5.5"/>
-            <path d="M8 4.5V8l2.5 1.5"/>
-          </svg>
-        </button>
-        <button
-          class="workspace-activity-button"
-          :class="{ active: showSidebar && sidebarView === 'orchestration' }"
-          tabindex="-1"
-          @mousedown.prevent
-          @click="$emit('setSidebarView', 'orchestration')"
-          title="编排查看"
-        >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <rect x="1.5" y="2" width="4" height="3.5" rx="1"/>
-            <rect x="1.5" y="10.5" width="4" height="3.5" rx="1"/>
-            <rect x="10.5" y="6.25" width="4" height="3.5" rx="1"/>
-            <path d="M5.5 3.75h2.5v4.25h2.5"/>
-            <path d="M5.5 12.25h2.5V8h2.5"/>
-          </svg>
-        </button>
-        <!-- 插件扩展的侧边栏视图入口（方案2：插件 config.yaml 的 frontend.sidebar_views） -->
-        <button
-          v-for="ext in pluginSidebarViews"
-          :key="'plugin-view-' + ext.id"
-          class="workspace-activity-button"
-          :class="{ active: showSidebar && sidebarView === ('plugin:' + ext.id) }"
-          tabindex="-1"
-          :title="ext.title"
-          @mousedown.prevent
-          @click="$emit('setSidebarView', 'plugin:' + ext.id)"
-        >
-          <span v-if="ext.iconSvg" class="workspace-activity-plugin-icon" v-html="ext.iconSvg"></span>
-          <svg v-else viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M6.5 2.5a1.5 1.5 0 0 1 3 0V3h2.5a1 1 0 0 1 1 1v2.5h.5a1.5 1.5 0 0 1 0 3H13V12a1 1 0 0 1-1 1H9.5v.5a1.5 1.5 0 0 1-3 0V13H4a1 1 0 0 1-1-1V9.5h-.5a1.5 1.5 0 0 1 0-3H3V4a1 1 0 0 1 1-1h2.5v-.5Z"/>
-          </svg>
-        </button>
-        <!-- 插件扩展的 tool_panel 入口（插件 config.yaml 的 frontend.tool_panels） -->
-        <button
-          v-for="ext in pluginToolPanels"
-          :key="'plugin-tool-' + ext.id"
-          class="workspace-activity-button"
-          :class="{ active: showSidebar && sidebarView === ('plugin-tool:' + ext.id) }"
-          tabindex="-1"
-          :title="ext.title"
-          @mousedown.prevent
-          @click="$emit('setSidebarView', 'plugin-tool:' + ext.id)"
-        >
-          <span v-if="ext.iconSvg" class="workspace-activity-plugin-icon" v-html="ext.iconSvg"></span>
-          <svg v-else viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M6.5 2.5a1.5 1.5 0 0 1 3 0V3h2.5a1 1 0 0 1 1 1v2.5h.5a1.5 1.5 0 0 1 0 3H13V12a1 1 0 0 1-1 1H9.5v.5a1.5 1.5 0 0 1-3 0V13H4a1 1 0 0 1-1-1V9.5h-.5a1.5 1.5 0 0 1 0-3H3V4a1 1 0 0 1 1-1h2.5v-.5Z"/>
-          </svg>
-        </button>
-        <button
-          class="workspace-activity-button"
-          tabindex="-1"
-          @mousedown.prevent
-          @click="$emit('openTopology')"
-          title="网络拓扑"
-        >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="4" cy="4" r="1.5"/>
-            <circle cx="12" cy="4" r="1.5"/>
             <circle cx="8" cy="12" r="1.5"/>
-            <path d="M5.5 4H10.5"/>
-            <path d="M5 5.5 6.8 10.5"/>
-            <path d="M11 5.5 9.2 10.5"/>
           </svg>
         </button>
+      </div>
+      <!-- 更多菜单：收纳图标 + 自定义入口 -->
+      <div v-if="showMoreMenu" class="workspace-activity-menu" @click.stop>
         <button
-          class="workspace-activity-button"
-          tabindex="-1"
-          @mousedown.prevent
-          @click="$emit('openDocs')"
-          title="使用文档 (Space m h)"
+          v-for="icon in moreIcons"
+          :key="icon.id"
+          class="workspace-activity-menu-item"
+          :class="{ active: isActive(icon, { showSidebar, sidebarView, mainView }) }"
+          @click="handleIconClick(icon)"
         >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="8" cy="8" r="6"/>
-            <path d="M6.3 6.4a1.7 1.7 0 1 1 2.8 1.3c-.8.6-1.1 1-1.1 1.8"/>
-            <circle cx="8" cy="11.6" r="0.4" fill="currentColor" stroke="none"/>
-          </svg>
+          <span v-if="icon.isPlugin" class="workspace-activity-plugin-icon" v-html="icon.icon"></span>
+          <span v-else class="workspace-activity-inline-icon" v-html="icon.icon"></span>
+          <span class="workspace-activity-menu-label">{{ icon.title }}</span>
         </button>
-        <button
-          class="workspace-activity-button"
-          tabindex="-1"
-          @mousedown.prevent
-          @click="$emit('openAbout')"
-          title="关于"
-        >
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="8" cy="8" r="6"/>
-            <path d="M8 7.2V11"/>
-            <circle cx="8" cy="5.2" r="0.4" fill="currentColor" stroke="none"/>
-          </svg>
+        <div class="workspace-activity-menu-divider"></div>
+        <button class="workspace-activity-menu-item" @click="showCustomize = true">
+          <span class="workspace-activity-inline-icon">
+            <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="8" cy="8" r="1.5"/><circle cx="8" cy="8" r="4.2"/><g stroke-width="2.4"><path d="M8 3.8v-2M10.97 5.03l1.41-1.41M12.2 8h2M10.97 10.97l1.41 1.41M8 12.2v2M5.03 10.97l-1.41 1.41M3.8 8h-2M5.03 5.03l-1.41-1.41"/></g>
+            </svg>
+          </span>
+          <span class="workspace-activity-menu-label">自定义活动栏...</span>
         </button>
+      </div>
+      <!-- 自定义面板：排序 + 显示/隐藏 -->
+      <div v-if="showCustomize" class="workspace-activity-customize" @click.stop>
+        <div class="workspace-activity-customize-header">
+          <span>自定义活动栏</span>
+          <button class="workspace-activity-customize-close" tabindex="-1" @click="showCustomize = false">✕</button>
+        </div>
+        <div class="workspace-activity-customize-list">
+          <div v-for="(icon, idx) in orderedIcons" :key="icon.id" class="workspace-activity-customize-row">
+            <span v-if="icon.isPlugin" class="workspace-activity-plugin-icon" v-html="icon.icon"></span>
+            <span v-else class="workspace-activity-inline-icon" v-html="icon.icon"></span>
+            <span class="workspace-activity-customize-name">{{ icon.title }}</span>
+            <div class="workspace-activity-customize-actions">
+              <button class="workspace-activity-customize-btn" tabindex="-1" :disabled="idx === 0" @click="move(icon.id, -1)" title="上移">↑</button>
+              <button class="workspace-activity-customize-btn" tabindex="-1" :disabled="idx === orderedIcons.length - 1" @click="move(icon.id, 1)" title="下移">↓</button>
+              <button
+                class="workspace-activity-customize-btn"
+                tabindex="-1"
+                :class="{ 'is-hidden': hiddenIds.has(icon.id) }"
+                @click="toggleHidden(icon.id)"
+                :title="hiddenIds.has(icon.id) ? '显示' : '隐藏'"
+              >{{ hiddenIds.has(icon.id) ? '显示' : '隐藏' }}</button>
+            </div>
+          </div>
+        </div>
+        <div class="workspace-activity-customize-footer">
+          <button class="workspace-activity-customize-reset" @click="resetLayout">恢复默认</button>
+        </div>
       </div>
       <slot name="sidebar"></slot>
       <div class="workspace-panel-content workspace-panel-content-main">
@@ -325,7 +168,8 @@
 </template>
 
 <script setup>
-import { ref, defineProps, defineEmits } from 'vue'
+import { ref, computed, defineProps, defineEmits } from 'vue'
+import { useActivityBarLayout } from '../composables/useActivityBarLayout'
 
 // 自绘 16x16 stroke 线性 SVG 图标（currentColor 继承主题色），与全局风格一致
 const WORKSPACE_ICONS = {
@@ -379,6 +223,33 @@ const emit = defineEmits([
 ])
 
 const editorContainerRef = ref(null)
+
+// 活动栏数据驱动渲染 + 用户偏好排序/隐藏/收纳（Issue #222）
+const activityLayout = useActivityBarLayout({
+  pluginSidebarViews: computed(() => props.pluginSidebarViews),
+  pluginToolPanels: computed(() => props.pluginToolPanels),
+  isAdmin: computed(() => props.isAdmin),
+})
+const { mainIcons, moreIcons, orderedIcons, hiddenIds, isActive, dispatch, move, reset } = activityLayout
+
+// 「更多」菜单与自定义面板开关
+const showMoreMenu = ref(false)
+const showCustomize = ref(false)
+
+// 分发图标 action 到 emit（composable 的 dispatch 需传入 emit）
+function handleIconClick(icon) {
+  dispatch(icon, emit)
+}
+
+// 切换某图标的显示/隐藏
+function toggleHidden(id) {
+  activityLayout.setHidden(id, !hiddenIds.value.has(id))
+}
+
+// 恢复默认布局
+function resetLayout() {
+  reset()
+}
 
 defineExpose({
   editorContainerRef
@@ -619,6 +490,176 @@ defineExpose({
 .workspace-activity-plugin-icon svg {
   width: 16px;
   height: 16px;
+}
+
+/* 内置图标（内联 SVG/img），缩放到与插件图标视觉一致 */
+.workspace-activity-inline-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+.workspace-activity-inline-icon svg,
+.workspace-activity-inline-icon img {
+  width: 16px;
+  height: 16px;
+}
+
+/* 活动栏溢出收纳「更多」按钮 */
+.workspace-activity-more {
+  margin-top: auto;
+}
+
+/* 「更多」下拉菜单 */
+.workspace-activity-menu {
+  position: absolute;
+  top: 52px;
+  left: 48px;
+  z-index: 60;
+  min-width: 200px;
+  max-height: 70vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-active);
+  border-radius: var(--tile-radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+.workspace-activity-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  text-align: left;
+  border-radius: var(--tile-radius);
+  cursor: pointer;
+}
+.workspace-activity-menu-item:hover,
+.workspace-activity-menu-item.active {
+  background: var(--color-accent-subtle);
+  color: var(--color-text-primary);
+}
+.workspace-activity-menu-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.workspace-activity-menu-divider {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--color-border-subtle);
+}
+
+/* 自定义活动栏面板 */
+.workspace-activity-customize {
+  position: absolute;
+  top: 52px;
+  left: 48px;
+  z-index: 60;
+  width: 300px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-active);
+  border-radius: var(--tile-radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+.workspace-activity-customize-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--color-text-primary);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.workspace-activity-customize-close {
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 4px;
+}
+.workspace-activity-customize-close:hover {
+  color: var(--color-text-primary);
+}
+.workspace-activity-customize-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px;
+}
+.workspace-activity-customize-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: var(--tile-radius);
+}
+.workspace-activity-customize-row:hover {
+  background: var(--color-accent-subtle);
+}
+.workspace-activity-customize-name {
+  flex: 1;
+  font-size: 13px;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.workspace-activity-customize-actions {
+  display: flex;
+  gap: 4px;
+}
+.workspace-activity-customize-btn {
+  min-width: 26px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--tile-radius);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+.workspace-activity-customize-btn:hover:not(:disabled) {
+  color: var(--color-text-primary);
+  border-color: var(--color-border-active);
+}
+.workspace-activity-customize-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.workspace-activity-customize-btn.is-hidden {
+  color: var(--color-text-tertiary);
+}
+.workspace-activity-customize-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 10px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+.workspace-activity-customize-reset {
+  border: none;
+  background: transparent;
+  color: var(--color-accent);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.workspace-activity-customize-reset:hover {
+  text-decoration: underline;
 }
 
 .workspace-panel-content {
