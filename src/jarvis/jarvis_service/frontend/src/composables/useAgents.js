@@ -665,8 +665,12 @@ export function useAgents({
     dirDialogContext.value = 'create-agent'
   }
 
-  // 打开创建 Agent 弹窗（可指定初始节点，如从大厅双击某节点进入）
-  async function openCreateAgentModal(initialNodeId = '') {
+  // 打开创建 Agent 弹窗（可指定初始节点，如从大厅双击某节点进入）。
+  // prefill 支持预填表单参数（供插件等调用方把预设参数带进弹窗让用户确认/编辑）：
+  //   { nodeId, agentType, agentName, workDir, taskDescription, modelGroup, proxyNode,
+  //     quickMode, restoreSession, noInteractionMode, accessAclRead, accessAclInteract, worktree }
+  // 填充顺序遵循 copyAgent：先设 nodeId（会触发 watch 重置目录），再设其余字段（含 workDir）。
+  async function openCreateAgentModal(initialNodeId = '', prefill = {}) {
     // 先刷新模型组列表，确保获取最新的配置
     await Promise.all([
       fetchModelGroups(),
@@ -676,14 +680,37 @@ export function useAgents({
     ])
     // 加载最近使用的工作目录
     loadRecentWorkDirs()
-    const target = typeof initialNodeId === 'string' ? initialNodeId.trim() : ''
+    // 目标节点：显式 prefill.nodeId 优先，其次 initialNodeId，否则默认
+    const target = typeof (prefill.nodeId || initialNodeId) === 'string'
+      ? String(prefill.nodeId || initialNodeId).trim()
+      : ''
     // 校验目标节点在可创建范围内，否则回退到默认节点（master）
     const allowed = filteredNodeOptionsForCreateAgent.value.some(n => n.node_id === target)
     newAgentNodeId.value = allowed ? target : getDefaultCreateAgentNodeId()
-    // 默认代理节点：优先配置文件中的 default_proxy_node（若在可选节点列表中），否则无代理
+    // 默认代理节点：优先 prefill 显式指定，其次配置文件中的 default_proxy_node（若在可选节点列表中），否则无代理
     const configuredProxy = String(defaultProxyNode.value || '').trim()
-    newAgentProxyNode.value = configuredProxy && availableNodeOptions.value.some(n => n.node_id === configuredProxy) ? configuredProxy : ''
-    newAgentDir.value = '~'
+    newAgentProxyNode.value = String(prefill.proxyNode || '').trim()
+      || (configuredProxy && availableNodeOptions.value.some(n => n.node_id === configuredProxy) ? configuredProxy : '')
+    // 先设 nodeId（触发 watch 重置目录），再设 workDir 等其余字段
+    newAgentDir.value = typeof prefill.workDir === 'string' && prefill.workDir.trim()
+      ? prefill.workDir.trim() : '~'
+    // 其余可预填字段：未提供的保持默认
+    newAgentType.value = String(prefill.agentType || 'agent').trim() || 'agent'
+    if (typeof prefill.agentName === 'string' && prefill.agentName.trim()) {
+      newAgentName.value = prefill.agentName.trim()
+    }
+    if (typeof prefill.taskDescription === 'string') {
+      newAgentTaskDescription.value = prefill.taskDescription
+    }
+    if (typeof prefill.modelGroup === 'string' && prefill.modelGroup.trim()) {
+      newAgentModelGroup.value = prefill.modelGroup.trim()
+    }
+    if (typeof prefill.quickMode === 'boolean') newAgentQuickMode.value = prefill.quickMode
+    if (typeof prefill.restoreSession === 'boolean') newAgentRestoreSession.value = prefill.restoreSession
+    if (typeof prefill.noInteractionMode === 'boolean') newAgentNoInteractionMode.value = prefill.noInteractionMode
+    if (typeof prefill.worktree === 'boolean') newCodeAgentWorktree.value = prefill.worktree
+    if (Array.isArray(prefill.accessAclRead)) newAgentAccessAclRead.value = [...prefill.accessAclRead]
+    if (Array.isArray(prefill.accessAclInteract)) newAgentAccessAclInteract.value = [...prefill.accessAclInteract]
     newAgentCreateError.value = ''
     resetDirectorySelectionState()
     showCreateAgentModal.value = true
@@ -1083,6 +1110,8 @@ export function useAgents({
     // 重置为默认名称（根据当前选中的 agent 类型）
     newAgentName.value = generateAgentName(newAgentType.value)
     await afterAgentCreated(result.agent)
+    // 返回创建的 agent（供调用方感知成功，如插件请求创建弹窗）
+    return result.agent
   }
   // 打开「一句话创建 Agent」弹窗（除任务外全部使用默认参数）
   function openQuickCreateAgent() {

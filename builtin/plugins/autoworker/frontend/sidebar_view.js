@@ -653,9 +653,13 @@ export default {
     async createAgentForTask(task) {
       this.closeItemMenu();
       if (!task) return;
+      // 优先使用「打开创建 Agent 弹窗（带预填）」通道，让用户确认/编辑后再创建；
+      // 宿主未提供新通道时回退到直接创建通道（向后兼容）。
+      const openModal =
+        typeof window !== "undefined" && window.__jarvisOpenCreateAgentModal;
       const create =
         typeof window !== "undefined" && window.__jarvisCreateAgentForTask;
-      if (typeof create !== "function") {
+      if (typeof openModal !== "function" && typeof create !== "function") {
         this.error = "宿主未提供创建通道，无法创建 Agent";
         return;
       }
@@ -668,13 +672,29 @@ export default {
       this.error = "";
       this.message = `正在为任务 ${task.id} 创建 Agent…`;
       try {
-        const res = await create({
+        const prefill = {
           workingDir: taskDir,
           task: this.buildTaskPrompt(task),
           name: `${task.id} ${task.title || ""}`.trim(),
           nodeId: this.nodeId,
-        });
-        if (res && res.success) {
+        };
+        let created = false;
+        if (typeof openModal === "function") {
+          const res = await openModal(prefill);
+          created = !!(res && res.confirmed);
+          if (!created) {
+            this.message = "已取消";
+            return;
+          }
+        } else {
+          const res = await create(prefill);
+          created = !!(res && res.success);
+          if (!created) {
+            this.error = "失败: " + ((res && res.error) || "创建失败");
+            return;
+          }
+        }
+        if (created) {
           // 标记为执行中
           try {
             await callFunction("set_status", {
@@ -687,8 +707,6 @@ export default {
           }
           this.message = `已创建 Agent 执行任务 ${task.id}`;
           await this.refresh(true);
-        } else {
-          this.error = "失败: " + ((res && res.error) || "创建失败");
         }
       } catch (e) {
         this.error = "失败: " + String((e && e.message) || e);
@@ -700,9 +718,13 @@ export default {
     // 不写入任务提示词、只创建不运行：创建空闲 Agent，运行留给用户自行触发。
     async createAgentInWorkdir(task) {
       this.closeItemMenu();
+      // 优先使用「打开创建 Agent 弹窗（带预填）」通道，让用户确认/编辑后再创建；
+      // 宿主未提供新通道时回退到直接创建通道（向后兼容）。
+      const openModal =
+        typeof window !== "undefined" && window.__jarvisOpenCreateAgentModal;
       const create =
         typeof window !== "undefined" && window.__jarvisCreateAgentForTask;
-      if (typeof create !== "function") {
+      if (typeof openModal !== "function" && typeof create !== "function") {
         this.error = "宿主未提供创建通道，无法创建 Agent";
         return;
       }
@@ -715,17 +737,26 @@ export default {
       this.error = "";
       this.message = "正在在工作目录下创建 Agent…";
       try {
-        const res = await create({
+        const prefill = {
           workingDir: workdir,
           task: "",
-          runTask: false,
           name: task ? `${task.id} ${task.title || ""}`.trim() : "",
           nodeId: this.nodeId,
-        });
-        if (res && res.success) {
-          this.message = "已在工作目录下创建 Agent（未运行，请自行触发）";
+        };
+        if (typeof openModal === "function") {
+          const res = await openModal(prefill);
+          if (res && res.confirmed) {
+            this.message = "已在工作目录下创建 Agent（未运行，请自行触发）";
+          } else {
+            this.message = "已取消";
+          }
         } else {
-          this.error = "失败: " + ((res && res.error) || "创建失败");
+          const res = await create({ ...prefill, runTask: false });
+          if (res && res.success) {
+            this.message = "已在工作目录下创建 Agent（未运行，请自行触发）";
+          } else {
+            this.error = "失败: " + ((res && res.error) || "创建失败");
+          }
         }
       } catch (e) {
         this.error = "失败: " + String((e && e.message) || e);
