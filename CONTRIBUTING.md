@@ -70,7 +70,9 @@ Jarvis 支持插件包扩展，插件开发请参考：
 
 ## 联系我们
 
-- 代码仓库：https://gitee.com/skyfireitdiy/Jarvis
+- 代码仓库：<https://gitee.com/skyfireitdiy/Jarvis>
+- GitHub 仓库：<https://github.com/skyfireitdiy/Jarvis>
+- GitHub Discussions 讨论区：<https://github.com/skyfireitdiy/Jarvis/discussions>（交流使用经验、提问与分享）
 - 开发者微信群：欢迎加入交流
 
 再次感谢您的贡献！

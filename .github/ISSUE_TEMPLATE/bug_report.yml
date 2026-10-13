@@ -1,0 +1,83 @@
+---
+name: 🐛 Bug 报告
+description: 提交 Bug 反馈，帮助我们定位与修复问题
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢你帮助改进 Jarvis！请尽量完整填写以下信息，这能帮助我们更快定位问题。
+        提交前请先在 [Issues](https://github.com/skyfireitdiy/Jarvis/issues)
+        中搜索是否已有相同问题。
+  - type: input
+    id: version
+    attributes:
+      label: Jarvis 版本
+      description: 你使用的 Jarvis 版本号（可在设置/关于中查看）
+      placeholder: "例如 7.0.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: 操作系统
+      description: 运行 Jarvis 的操作系统
+      options:
+        - Linux
+        - macOS
+        - Windows
+        - Docker
+        - 其他
+    validations:
+      required: true
+  - type: input
+    id: python_version
+    attributes:
+      label: Python 版本
+      description: 如适用，请填写 Python 版本
+      placeholder: "例如 3.11"
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 清晰描述遇到的问题
+      placeholder: "发生了什么？"
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤
+      description: 如何复现该问题？请逐步描述
+      placeholder: |
+        1. 打开...
+        2. 点击...
+        3. 看到错误...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期行为
+      description: 你期望的正确行为是什么
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+      description: 实际发生的行为是什么
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 错误信息
+      description: 粘贴相关日志、堆栈或错误截图（请脱敏，勿泄露敏感信息）
+      render: shell
+  - type: textarea
+    id: additional
+    attributes:
+      label: 补充信息
+      description: 其他有助于定位问题的信息（如配置文件、插件列表等）
