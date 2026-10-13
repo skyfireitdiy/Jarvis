@@ -235,6 +235,7 @@ describe('usePanel', () => {
     expect(api).toHaveProperty('clearBufferFromPanel')
     expect(api).toHaveProperty('setupHistoryScrollListener')
     expect(api).toHaveProperty('setPanelOutputList')
+    expect(api).toHaveProperty('savePanelScrollTop')
     expect(api).toHaveProperty('setPanelTerminalRef')
     expect(api).toHaveProperty('workspaceHostsChat')
     expect(api).toHaveProperty('workspaceHostsTerminal')
@@ -247,7 +248,7 @@ describe('usePanel', () => {
     expect(api).toHaveProperty('hasNoPanel')
     expect(api).toHaveProperty('agentListLoaded')
     expect(api).toHaveProperty('panelGridStyle')
-    expect(Object.keys(api)).toHaveLength(30)
+    expect(Object.keys(api)).toHaveLength(31)
   })
 
   describe('查询类', () => {

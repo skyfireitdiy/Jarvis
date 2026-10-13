@@ -234,7 +234,7 @@ const emit = defineEmits([
   'send', 'complete', 'open-completions',
   'input-change', 'keydown', 'paste',
   'show-buffer', 'clear-buffer',
-  'set-output-list', 'set-terminal-ref',
+  'set-output-list', 'set-terminal-ref', 'save-scroll-top',
   'show-toast',
   'confirm', 'cancel-confirm',
   'startMove', 'startResize',
@@ -517,6 +517,11 @@ onBeforeUnmount(() => {
     window.removeEventListener('resize', handleAsrResize)
   }
   stopRecord()
+  // 保存当前滚动位置，供布局重建后恢复（Issue #191）
+  const el = outputListRef.value
+  if (el) {
+    emit('save-scroll-top', el.scrollTop)
+  }
 })
 
 // ---- 语音输入（Web Speech API，仅 Chromium 系 + 安全上下文可用） ----
