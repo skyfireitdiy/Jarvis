@@ -1,0 +1,9 @@
+---
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 GitHub Discussions 讨论区
+    url: https://github.com/skyfireitdiy/Jarvis/discussions
+    about: 交流使用经验、提问与分享，请优先使用讨论区
+  - name: 📖 文档
+    url: https://skyfireitdiy.github.io/Jarvis/
+    about: 查阅 Jarvis 使用文档
