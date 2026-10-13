@@ -2383,6 +2383,7 @@ try {
       task,
       noInteractionMode: false,
       nodeId,
+      worktree: options.worktree === true,
     })
     if (!result.ok) return { success: false, error: result.error }
     await afterAgentCreated(result.agent)
