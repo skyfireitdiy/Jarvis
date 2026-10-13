@@ -638,7 +638,7 @@
                   <span v-else>{{ gitLogTotal !== null ? gitLogTotal : gitLog.length }} 个提交<span v-if="gitBranches.length"> · {{ gitBranches.length }} 分支</span><span v-if="gitTags.length"> · {{ gitTags.length }} 标签</span></span>
                 </div>
                 <div class="workspace-git-commit-list">
-                  <template v-for="(commit, index) in gitLog" :key="commit.hash">
+                  <template v-for="commit in gitLog" :key="commit.hash">
                     <div
                       class="workspace-git-commit"
                       :class="{ selected: gitSelectedCommit === commit.hash, 'range-selected': gitRangeSelectMode && gitSelectedCommits.has(commit.hash) }"
@@ -719,7 +719,7 @@
             @maximize="toggleMaximizeWorkspacePane"
             @startResize="startWorkspacePaneResize"
           >
-            <template #pane-content="{ pane, active }">
+            <template #pane-content="{ pane }">
               <div class="workspace-pane-content-slot">
                 <template v-if="pane.view === 'empty'">
                   <!-- 空 pane：新分割出来的区域不带任何属性（既非文件也非会话），
@@ -4418,10 +4418,6 @@ async function loadHistoryMessages(prepend = false, agentId = null) {
     historyMessages.length = 0
     historyMessages.push(...mergedHistoryMessages)
 
-    // 处理每条历史消息
-    const executionMessages = historyMessages.filter(msg => msg.output_type === 'execution')
-    if (executionMessages.length > 0) {
-    }
     // 不再过滤 execution 类型，因为它现在带有 is_finished 标记，可以显示历史内容
     // 修复execution消息的is_finished标记：终端执行是串行的，同一agent同一时间只有一个execution在运行
     // 从后往前扫描：最后一条execution信任历史中的is_finished值；前面所有execution强制is_finished=true
@@ -4443,8 +4439,6 @@ async function loadHistoryMessages(prepend = false, agentId = null) {
           // 对于最后一条execution：不强制标记为已完成，保留原始状态
           // 只有在收到后端的tool_stream_end事件时才会标记为已完成
           // 这样切换回Agent时，如果执行还在进行中，xterm可以正常渲染
-          if (isLast && !msg.is_finished) {
-          }
         }
         const html = renderMessageHtml(msg)
         // 生成稳定ID，避免v-for使用index作为key导致DOM重建
@@ -4933,7 +4927,7 @@ async function removePipelineWithAgents(id, agentIds) {
 function onOrchestrationJumpAgent(payload) {
   const agentId = payload && payload.agentId
   if (!agentId) return
-  const target = agents.value.find(a => a.agent_id === agentId)
+  const target = agentList.value.find(a => a.agent_id === agentId)
   if (target) {
     openAgentInPanel(target)
   } else {
@@ -7816,11 +7810,9 @@ onMounted(() => {
       } else if (windowWidth.value <= 768 && !hasNoPanel.value) {
         // 移动端：关闭当前可见的 Panel，回到宠物大厅
         closeVisiblePanelsOnMobile()
-      } else {
       }
-    } else {
-      // 没有推送的历史状态，允许默认后退行为
     }
+    // 没有推送的历史状态，允许默认后退行为
   }
   window.addEventListener('popstate', handlePopState)
 
