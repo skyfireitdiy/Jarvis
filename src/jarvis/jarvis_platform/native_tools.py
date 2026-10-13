@@ -358,10 +358,57 @@ def ensure_object_schema(schema: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(schema, dict):
         return {"type": "object", "properties": {}}
     out = dict(schema)
-    if not out.get("type"):
+    # type 必须是字符串（"object" 等）；若为 $ref 等非字符串结构则视为缺失，
+    # 强制归一为 object，避免把 {"$ref": ...} 当作 type 透传给平台。
+    if not isinstance(out.get("type"), str) or not out.get("type"):
         out["type"] = "object"
     if not isinstance(out.get("properties"), dict):
         out["properties"] = {}
+    return out
+
+
+def _resolve_schema_refs(schema: Any, root: Optional[Dict[str, Any]] = None) -> Any:
+    """就地解析 JSON Schema 中的本地 $ref（#/$defs/xxx、#/definitions/xxx）。
+
+    MCP 服务器常返回带 $defs/$ref 的 schema，而 OpenAI/Anthropic 不接受
+    悬空或跨定义的 $ref。这里把本地引用内联展开，得到自包含的 schema。
+    引用无法解析时返回空 dict（等价于"任意类型"），避免残留非法 $ref。
+    """
+    if not isinstance(schema, dict):
+        return schema
+    if root is None:
+        root = schema
+
+    ref = schema.get("$ref")
+    if isinstance(ref, str):
+        target: Any = None
+        if ref.startswith("#/"):
+            target = root
+            for part in ref[2:].split("/"):
+                part = part.replace("~1", "/").replace("~0", "~")
+                if isinstance(target, dict) and part in target:
+                    target = target[part]
+                else:
+                    target = None
+                    break
+        if target is None:
+            # 无法解析的引用：退化为无约束的 object，避免非法 $ref 透传
+            resolved: Any = {}
+        else:
+            resolved = _resolve_schema_refs(target, root)
+        # 保留 $ref 同级附加的 description 等字段
+        merged = dict(resolved) if isinstance(resolved, dict) else {}
+        for k, v in schema.items():
+            if k != "$ref":
+                merged[k] = _resolve_schema_refs(v, root)
+        return merged
+
+    out: Dict[str, Any] = {}
+    for k, v in schema.items():
+        if k in ("$defs", "definitions"):
+            # 定义已被内联展开，无需保留
+            continue
+        out[k] = _resolve_schema_refs(v, root)
     return out
 
 
@@ -412,6 +459,7 @@ def build_openai_tools(registry: Any) -> List[Dict[str, Any]]:
     tools = []
     for tool in registry.tools.values():
         parameters = getattr(tool, "parameters", None) or {}
+        parameters = _resolve_schema_refs(parameters)
         parameters = with_timer_params(ensure_object_schema(parameters))
         parameters = _compact_tool_schema(parameters)
         tools.append(
@@ -432,6 +480,7 @@ def build_anthropic_tools(registry: Any) -> List[Dict[str, Any]]:
     tools = []
     for tool in registry.tools.values():
         parameters = getattr(tool, "parameters", None) or {}
+        parameters = _resolve_schema_refs(parameters)
         parameters = with_timer_params(ensure_object_schema(parameters))
         parameters = _compact_tool_schema(parameters)
         tools.append(

@@ -271,6 +271,73 @@ class TestSchema:
         atools = build_anthropic_tools(reg)
         assert "want" not in atools[0]["input_schema"]["properties"]
 
+    def test_local_ref_inlined_from_defs(self):
+        # 复现 MCP 工具 schema 带 $defs/$ref 的场景：$ref 必须被内联展开，
+        # 不能把悬空的 $ref 透传给平台（否则 OpenAI 返回 400）。
+        reg = _FakeRegistry(
+            [
+                _FakeTool(
+                    "rea_tool_call_inspect_native_data_type",
+                    "检查数据类型",
+                    {
+                        "type": "object",
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "properties": {
+                            "type": {"$ref": "#/$defs/__schema0"},
+                            "document": {
+                                "$ref": "#/$defs/__schema2",
+                                "description": "文档标识",
+                            },
+                        },
+                        "$defs": {
+                            "__schema0": {"type": "string", "minLength": 1},
+                            "__schema2": {"type": "string"},
+                        },
+                    },
+                )
+            ]
+        )
+        otools = build_openai_tools(reg)
+        params = otools[0]["function"]["parameters"]
+        assert params["type"] == "object"
+        assert params["properties"]["type"]["type"] == "string"
+        assert params["properties"]["document"]["type"] == "string"
+        assert params["properties"]["document"]["description"] == "文档标识"
+        dumped = json.dumps(params)
+        assert "$ref" not in dumped
+        assert "$defs" not in dumped
+
+    def test_unresolvable_ref_degrades_to_empty_schema(self):
+        reg = _FakeRegistry(
+            [
+                _FakeTool(
+                    "broken",
+                    "坏 schema",
+                    {
+                        "type": "object",
+                        "properties": {"x": {"$ref": "#/$defs/missing"}},
+                    },
+                )
+            ]
+        )
+        params = build_openai_tools(reg)[0]["function"]["parameters"]
+        assert params["properties"]["x"] == {}
+        assert "$ref" not in json.dumps(params)
+
+    def test_non_string_type_normalized_to_object(self):
+        # type 为 $ref 等非字符串结构时，应归一为 object 而非原样透传。
+        reg = _FakeRegistry(
+            [
+                _FakeTool(
+                    "weird",
+                    "怪 type",
+                    {"type": {"$ref": "#/$defs/x"}, "properties": {}},
+                )
+            ]
+        )
+        params = build_openai_tools(reg)[0]["function"]["parameters"]
+        assert params["type"] == "object"
+
 
 class TestSurrogateSanitization:
     """孤立 UTF-16 代理字符清理：防止 UTF-8 编码抛 UnicodeEncodeError。

@@ -420,11 +420,10 @@ class SSEMcpClient(McpClient):
                 # 将MCP协议字段转换为内部格式
                 formatted_tools = []
                 for tool in tools:
-                    # 从inputSchema中提取参数定义
+                    # 直接使用完整的 inputSchema（合法 JSON Schema），
+                    # 保留 $defs/$ref 等结构，避免只取 properties 导致 $ref 悬空。
                     input_schema = tool.get("inputSchema", {})
-                    parameters = {}
-                    if "properties" in input_schema:
-                        parameters = input_schema["properties"]
+                    parameters = input_schema if isinstance(input_schema, dict) else {}
 
                     formatted_tools.append(
                         {
