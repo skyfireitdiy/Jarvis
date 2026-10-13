@@ -1388,6 +1388,39 @@ describe('useAgents', () => {
     expect(showCreateAgentModal.value).toBe(true)
     expect(newAgentNodeId.value).toBe('master')
   })
+  it('openCreateAgentModal：兼容插件契约字段（workingDir/task/name）预填', async () => {
+    const { api, fetchWithAuth, newAgentDir, newAgentName, newAgentTaskDescription, showCreateAgentModal } = makeHarness()
+    fetchWithAuth.mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: [] }),
+    })
+    await api.openCreateAgentModal('', {
+      workingDir: '/tasks/t1',
+      task: '处理任务 t1',
+      name: '任务 t1',
+      nodeId: 'master',
+    })
+    expect(newAgentDir.value).toBe('/tasks/t1')
+    expect(newAgentTaskDescription.value).toBe('处理任务 t1')
+    expect(newAgentName.value).toBe('任务 t1')
+    expect(showCreateAgentModal.value).toBe(true)
+  })
+  it('openCreateAgentModal：宿主内部契约字段（workDir/taskDescription/agentName）仍生效', async () => {
+    const { api, fetchWithAuth, newAgentDir, newAgentName, newAgentTaskDescription } = makeHarness()
+    fetchWithAuth.mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: [] }),
+    })
+    await api.openCreateAgentModal('', {
+      workDir: '/w2',
+      taskDescription: '内部任务',
+      agentName: '内部Agent',
+      nodeId: 'master',
+    })
+    expect(newAgentDir.value).toBe('/w2')
+    expect(newAgentTaskDescription.value).toBe('内部任务')
+    expect(newAgentName.value).toBe('内部Agent')
+  })
   it('openDirDialog：创建场景打开目录弹窗', async () => {
     const { api, fetchWithAuth, showDirDialog, newAgentDir, selectedDir } = makeHarness()
     newAgentDir.value = '/w'

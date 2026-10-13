@@ -2394,9 +2394,15 @@ try {
 }
 
 // 暴露「打开创建 Agent 弹窗（带预填参数）」的钩子给插件前端扩展（如 gh/autoworker 插件）。
-// 复用宿主已有的 CreateAgentModal 弹窗，把 prefill（workingDir/task/name/nodeId/agentType 等）
-// 预填进去，让用户确认/编辑后再提交。返回 Promise<{ confirmed: boolean, agent?: object }>：
+// 复用宿主已有的 CreateAgentModal 弹窗，把 prefill 预填进去，让用户确认/编辑后再提交。
+// 返回 Promise<{ confirmed: boolean, agent?: object }>：
 // 用户点「创建」成功 → { confirmed: true, agent }；取消/关闭 → { confirmed: false }。
+// prefill 字段契约（宿主 openCreateAgentModal 均兼容以下两组字段名）：
+//   工作目录   workDir / workingDir
+//   任务描述   taskDescription / task
+//   Agent 名称 agentName / name
+//   其余       nodeId / agentType / modelGroup / proxyNode / quickMode / restoreSession /
+//              noInteractionMode / worktree / accessAclRead / accessAclInteract
 try {
   window.__jarvisOpenCreateAgentModal = (prefill = {}) => {
     return new Promise((resolve) => {
