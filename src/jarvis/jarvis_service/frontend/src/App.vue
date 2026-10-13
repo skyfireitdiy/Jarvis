@@ -5296,7 +5296,7 @@ const commandPaletteCtx = computed(() => ({
     return !!a && a.owner_id === (auth.value.userInfo?.user_id || '')
   })(),
   // 命令面板「切换 Agent」（a> / A> 前缀）所需
-  // Enter（不带 openMode / 'current'）：在当前 Panel 中打开；Tab（'new'）：在新的 Panel 中打开
+  // Enter（不带 openMode / 'current'）：在当前 Panel 中打开
   switchToAgent: (agent, openMode) => {
     if (!agent) return
     if (openMode === 'new') {

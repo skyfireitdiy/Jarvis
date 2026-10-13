@@ -48,8 +48,7 @@
 
         <div class="cmd-footer">
           <span><b>↑↓</b> 选择</span>
-          <span><b>Enter</b> {{ isAgentMode ? '当前面板打开' : isFileMode ? '打开文件' : '执行' }}</span>
-          <span v-if="isAgentMode"><b>Tab</b> 新面板打开</span>
+          <span><b>Enter</b> {{ isAgentMode ? '打开' : isFileMode ? '打开文件' : '执行' }}</span>
           <span v-if="isFileMode"><b>⌫</b> 返回命令</span>
           <span v-else-if="!isAgentMode"><b>a&gt;</b> 切换 Agent　<b>f&gt;</b> 搜索文件</span>
           <span v-else><b>⌫</b> 返回命令</span>
@@ -357,11 +356,6 @@ function onInputKeydown(event) {
     event.preventDefault()
     const entry = flatEntries.value[activeIndex.value]
     if (entry && !entry.disabled) run(entry.action, 'current')
-  } else if (event.key === 'Tab' && isAgentMode.value) {
-    // Agent 模式：Tab 在新的 Panel 中打开
-    event.preventDefault()
-    const entry = flatEntries.value[activeIndex.value]
-    if (entry && !entry.disabled) run(entry.action, 'new')
   } else if (event.key === 'Escape') {
     event.preventDefault()
     close()
