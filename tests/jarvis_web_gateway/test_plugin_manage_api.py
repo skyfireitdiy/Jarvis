@@ -63,6 +63,29 @@ def _make_plugin(plugin_dir: Path, name: str, version: str = "1.0.0") -> None:
     )
 
 
+def _make_git_plugin_repo(plugin_dir: Path, name: str, version: str = "1.0.0") -> Path:
+    """创建一个本地 git 仓库插件源，返回仓库目录路径（用于 git 安装）。"""
+    import subprocess
+
+    _make_plugin(plugin_dir, name, version)
+
+    def _git(*args):
+        return subprocess.run(
+            ["git", *args],
+            cwd=str(plugin_dir),
+            capture_output=True,
+            text=True,
+            env={**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+                 "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"},
+        )
+
+    _git("init", "-q")
+    _git("checkout", "-q", "-b", "main")
+    _git("add", "-A")
+    _git("commit", "-q", "-m", "init")
+    return plugin_dir
+
+
 def test_list_plugins_empty(client):
     """无外部插件时 list 只返回内置插件（builtin 均为 True）。"""
     resp = client.get("/api/plugins", headers=_auth_headers())
@@ -106,13 +129,15 @@ def test_list_plugins_node_id_query(client, isolated_data_dir):
 
 
 def test_install_plugin(client, isolated_data_dir):
-    """install 从本地目录安装插件。"""
-    source = Path(isolated_data_dir) / "src-plugin"
-    _make_plugin(source, "installed-plugin", "1.0.0")
+    """install 从 git 仓库安装插件。"""
+    source = _make_git_plugin_repo(
+        Path(isolated_data_dir) / "src-plugin", "installed-plugin", "1.0.0"
+    )
+    source_url = f"file://{source}"
 
     resp = client.post(
         "/api/plugins/install",
-        json={"node_id": "master", "source": str(source)},
+        json={"node_id": "master", "source": source_url},
         headers=_auth_headers(),
     )
     assert resp.status_code == 200
@@ -122,6 +147,7 @@ def test_install_plugin(client, isolated_data_dir):
     installed = Path(isolated_data_dir) / "plugins" / "installed-plugin"
     assert installed.exists()
     assert (installed / "config.yaml").exists()
+    assert (installed / ".git").exists()
 
 
 def test_install_plugin_missing_source(client):
