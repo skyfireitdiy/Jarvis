@@ -28,7 +28,7 @@
         <input
           v-model="installSource"
           class="plugin-install-input"
-          placeholder="git 仓库地址，如 https://github.com/owner/repo"
+          placeholder="插件来源：git 仓库地址、本地目录或压缩文件"
           @keyup.enter="installPlugin"
         />
         <div class="plugin-install-row">

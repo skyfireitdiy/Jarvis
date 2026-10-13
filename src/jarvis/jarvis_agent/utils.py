@@ -1195,32 +1195,35 @@ def install_plugin(
     source_url: Optional[str] = None,
     _installing_deps: Optional[set] = None,
 ) -> bool:
-    """安装插件到 Jarvis 数据目录（仅支持 git 来源，Issue #213）。
+    """安装插件到 Jarvis 数据目录。
 
     参数:
-        source_path: 插件 git 仓库地址，如 `https://github.com/owner/repo` 或
-            `git@github.com:owner/repo.git`；可用 `url#branch` 指定安装分支
-            （默认 main）。
+        source_path: 插件来源，支持三种类型：
+            - git 仓库地址（https://github.com/owner/repo、git@host:owner/repo.git、
+              file://...、本地目录含 .git），可用 `url#branch` 指定分支（默认 main）。
+              安装后保留 .git 元数据，支持自动检测更新 / 升级。
+            - 本地目录（不含 .git）：建立软链接，本地代码更新后立即生效，不支持更新检测。
+            - 压缩文件（.zip/.tar/.tar.gz/.tgz）：解压安装，不支持更新检测。
+            链接（http(s) URL）仅支持 git 仓库地址；非 git 的 http(s) 下载链接会被拒绝。
         force: 是否强制覆盖已安装的插件（忽略版本比较），默认 False
-        source_url: 来源 URL（可选），安装成功后记录到插件目录，供升级使用
+        source_url: 来源 URL（可选），git 安装成功后记录到插件目录，供升级使用
         _installing_deps: 内部参数，记录正在自动安装的依赖插件名集合，用于防止依赖递归死循环
 
     返回:
         bool: 安装成功返回 True，失败返回 False
 
     功能:
-        1. 仅接受 git 仓库地址，通过 `git clone` 安装并保留 .git 元数据
-           （供后续自动检测更新 / 升级使用）；不再支持 http(s) 下载、
-           本地目录、压缩文件等来源。
-        2. 校验插件是否包含 config.yaml
-        3. 复制到 ~/.jarvis/plugins/插件名/ 下
-        4. 插件名从 config.yaml 的 name 字段获取，若无则使用仓库目录名
-        5. 版本控制：高版本插件可覆盖低版本，低版本不能覆盖高版本
-        6. force=True 时忽略版本比较，强制覆盖
-        7. 记录 git 来源元数据（.source 仓库地址 + .git-branch 分支）
+        1. 校验插件是否包含 config.yaml
+        2. 按来源类型安装：git 克隆（保留 .git）、本地目录软链接、压缩文件解压
+        3. 插件名从 config.yaml 的 name 字段获取，若无则使用目录名/文件名
+        4. 版本控制：高版本插件可覆盖低版本，低版本不能覆盖高版本
+        5. force=True 时忽略版本比较，强制覆盖
+        6. git 来源记录来源元数据（.source 仓库地址 + .git-branch 分支），供更新检测/升级
     """
     import os
     import shutil
+    import tarfile
+    import zipfile
     import tempfile
     import yaml
     from pathlib import Path
@@ -1231,15 +1234,27 @@ def install_plugin(
 
     temp_dir = None  # 预初始化，确保 except 分支可访问（ty 推断局限）
 
-    # 仅支持 git 仓库来源
-    if not _is_git_repo_url(source_path):
-        PrettyOutput.auto_print(
-            "❌ 插件安装仅支持 git 仓库地址（如 https://github.com/owner/repo），"
-            "不再支持本地目录/压缩文件/http 下载来源"
-        )
-        return False
-
-    url, branch = _parse_git_source(source_path)
+    # 判断来源类型：git 仓库 / 本地目录 / 压缩文件
+    is_git = _is_git_repo_url(source_path)
+    url: str = ""
+    branch: str = ""
+    source = None
+    if is_git:
+        # git 仓库来源：解析 url + branch，准备 git clone
+        url, branch = _parse_git_source(source_path)
+    else:
+        # 非 git 来源：http(s) 链接仅支持 git 仓库，直接拒绝；否则按本地路径处理
+        stripped = (source_path or "").strip()
+        if stripped.startswith(("http://", "https://")):
+            PrettyOutput.auto_print(
+                "❌ 链接来源仅支持 git 仓库地址（如 https://github.com/owner/repo），"
+                "不支持 http 下载链接"
+            )
+            return False
+        source = Path(source_path).resolve()
+        if not source.exists():
+            PrettyOutput.auto_print(f"❌ 插件源路径不存在: {source_path}")
+            return False
 
     try:
         # 获取 Jarvis 数据目录下的 plugins 目录
@@ -1247,16 +1262,61 @@ def install_plugin(
         plugins_dir = data_dir / "plugins"
         plugins_dir.mkdir(parents=True, exist_ok=True)
 
-        # git clone 到临时目录（保留 .git 元数据）
-        temp_dir = tempfile.mkdtemp(prefix="jarvis_plugin_")
-        clone_dest = Path(temp_dir) / "repo"
-        try:
-            _git_clone_plugin(url, branch, clone_dest)
-        except RuntimeError as e:
-            PrettyOutput.auto_print(f"❌ {str(e)}")
-            return False
-
-        plugin_source_dir = clone_dest
+        # 准备插件源目录与安装方式
+        plugin_source_dir = None
+        install_mode = None  # 'git' | 'symlink' | 'copy'
+        if is_git:
+            # git 来源：clone 到临时目录（保留 .git 元数据）
+            temp_dir = tempfile.mkdtemp(prefix="jarvis_plugin_")
+            clone_dest = Path(temp_dir) / "repo"
+            try:
+                _git_clone_plugin(url, branch, clone_dest)
+            except RuntimeError as e:
+                PrettyOutput.auto_print(f"❌ {str(e)}")
+                return False
+            plugin_source_dir = clone_dest
+            install_mode = "git"
+        else:
+            assert source is not None  # 非 git 来源已在 try 外解析
+            if source.is_dir():
+                # 本地目录：软链接安装（本地代码更新后立即生效）
+                plugin_source_dir = source
+                install_mode = "symlink"
+            elif source.is_file():
+                # 压缩文件：解压安装
+                suffixes = [s.lower() for s in source.suffixes]
+                is_zip = ".zip" in suffixes
+                is_tar = ".tar" in suffixes or ".tgz" in suffixes
+                if not is_zip and not is_tar:
+                    PrettyOutput.auto_print(
+                        "❌ 不支持的文件格式，仅支持 .tar/.tar.gz/.tgz/.zip"
+                    )
+                    return False
+                temp_dir = tempfile.mkdtemp(prefix="jarvis_plugin_")
+                if is_zip:
+                    with zipfile.ZipFile(source, "r") as zf:
+                        # 校验成员，防止 zip slip 路径穿越（成员名含 ../ 或绝对路径）
+                        for member in zf.infolist():
+                            member_path = os.path.normpath(member.filename)
+                            if member_path.startswith(("..", "/")) or ".." in member_path.split("/"):
+                                raise ValueError(
+                                    f"zip member escapes dest dir: {member.filename}"
+                                )
+                        zf.extractall(temp_dir)  # nosec B202 - 上方已校验成员
+                else:  # tar formats (including .tar.gz, .tgz)
+                    with tarfile.open(source, "r:*") as tf:
+                        # 使用 filter='data' 防止路径遍历攻击 (CVE-2007-4559)
+                        tf.extractall(temp_dir, filter="data")  # nosec B202
+                # 解压后，查找包含 config.yaml 的目录
+                extracted_items = list(Path(temp_dir).iterdir())
+                if len(extracted_items) == 1 and extracted_items[0].is_dir():
+                    plugin_source_dir = extracted_items[0]
+                else:
+                    plugin_source_dir = Path(temp_dir)
+                install_mode = "copy"
+            else:
+                PrettyOutput.auto_print("❌ 无效的源路径类型")
+                return False
 
         # 校验是否包含 config.yaml
         config_file = plugin_source_dir / "config.yaml"
@@ -1279,9 +1339,18 @@ def install_plugin(
         except Exception:
             plugin_name = None
 
-        # 如果没有 name 字段，使用仓库目录名
+        # 如果没有 name 字段，使用源目录名/文件名
         if not plugin_name:
-            plugin_name = plugin_source_dir.name
+            if install_mode == "git":
+                plugin_name = plugin_source_dir.name
+            else:
+                assert source is not None  # symlink/copy 均为本地来源
+                if install_mode == "symlink":
+                    plugin_name = source.name
+                else:  # copy（压缩文件）
+                    plugin_name = source.stem
+                    if plugin_name.endswith(".tar"):
+                        plugin_name = plugin_name[:-4]
 
         # 安全处理：只保留文件名部分，防止路径遍历攻击
         plugin_name = Path(plugin_name).name
@@ -1398,11 +1467,18 @@ def install_plugin(
                 PrettyOutput.auto_print(f"⚠️  插件目录已存在，将覆盖: {target_dir}")
                 _remove_plugin_dir(target_dir)
 
-        # git 来源安装：把克隆产物（含 .git）移动到目标目录
-        shutil.move(str(plugin_source_dir), str(target_dir))
-
-        # 记录 git 来源元数据（.source 仓库地址 + .git-branch 分支）
-        _write_plugin_source(target_dir, url, branch)
+        # - git：把克隆产物（含 .git）移动到目标目录，并记录来源元数据
+        # - symlink：本地目录建立软链接（本地代码更新后立即生效），不写 .source
+        # - copy：压缩文件解压产物复制（无本地持续更新需求）
+        assert plugin_source_dir is not None  # 来源准备阶段已赋值
+        if install_mode == "git":
+            shutil.move(str(plugin_source_dir), str(target_dir))
+            _write_plugin_source(target_dir, url, branch)
+        elif install_mode == "symlink":
+            assert source is not None  # symlink 仅本地目录来源
+            os.symlink(source, target_dir)
+        else:  # copy
+            shutil.copytree(plugin_source_dir, target_dir)
 
         # 清理临时目录
         if temp_dir and os.path.exists(temp_dir):
