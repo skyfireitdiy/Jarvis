@@ -66,6 +66,7 @@ description: 插件描述。     # 必填：功能说明
 version: 0.1.0             # 版本号（安装时做版本比较）
 license: MIT               # 开源协议
 builtin: true              # 内置插件标记（外部插件不写）
+# api_version: "1.0"        # 可选：插件依赖的接口协议版本（默认 "1.0"，向后兼容；见「接口版本」章节）
 # --- 扩展点（路径用 {{plugin_dir}} 占位，运行时由 jinja2 自动渲染为插件绝对路径）---
 rules_load_dirs:
   - "{{plugin_dir}}/rules"
@@ -118,6 +119,16 @@ orchestration:
 - `{{plugin_dir}}` 是 jinja2 模板变量，运行时渲染为插件目录绝对路径（见 `render_plugin_config_template`），**勿**写死绝对路径。
 - 扩展点字段（`rules_load_dirs`/`tool_load_dirs`/`agent_definition_dirs`/`orchestration`/`roles_dirs`/`mcpserver` 等）会被合并进全局配置供 getter 消费；其中 `mcpserver` 声明的 MCP server 列表会被合并进全局 `mcp` 配置，插件安装后自动注册为 MCP 工具，无需用户在全局 `~/.jarvis/config.yaml` 重复配置。
 - 除扩展点字段外的其余字段（`name`/`description`/`version`/`builtin`/`license`/`dependencies`/`capabilities`/`frontend`/自定义业务字段）会被隔离到全局配置的 `plugin_configs.<plugin_name>`，**不污染全局配置顶层、多个插件同名私有字段互不覆盖**。插件可通过 `get_plugin_config(plugin_name)` 读取自己的私有配置。
+
+### 接口版本与向后兼容
+
+插件接口（config.yaml 扩展点、plugin/api.py 私有功能、前端扩展、工具协议）随 Jarvis 演进。为保持**向后兼容**（新 Jarvis 能加载旧插件），引入统一的接口版本声明机制：
+
+- **`api_version` 字段**（可选）：在 config.yaml 顶层声明插件依赖的接口协议版本，**默认 `"1.0"`**。未声明的旧插件按 `"1.0"` 处理，无需改动即可在新 Jarvis 上运行。
+- **与插件自身 `version` 区分**：`version` 是插件版本（安装时做版本比较），`api_version` 是接口协议版本（决定插件与 Jarvis 接口的兼容性）。
+- **兼容策略**：以主版本号（major）判断。插件声明的 major 不大于当前 Jarvis 支持的接口版本即兼容；声明更高 major 时 Jarvis **降级警告**（不拒绝加载），提示插件可能依赖未来接口能力。
+- **废弃流程**：废弃某扩展点字段时，Jarvis 在加载插件时打印 deprecation 警告，通知开发者迁移；字段本身仍保留（旧插件仍可加载），仅提示尽快迁移。
+- **覆盖范围**：config.yaml 扩展点（`tool_load_dirs`/`rules_load_dirs`/`orchestration`/`mcpserver`/`frontend` 等）、plugin/api.py 私有功能（`PUBLIC_FUNCTIONS` 白名单）、工具协议（`protocol_version`，见「工具（tools/）」）。
 
 ## 四、扩展点开发规范
 

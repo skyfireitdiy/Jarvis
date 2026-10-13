@@ -1490,6 +1490,57 @@ _PLUGIN_EXTENSION_FIELDS = frozenset(
 # 全局配置中存放插件私有配置的单独配置项键名
 PLUGIN_CONFIGS_KEY = "plugin_configs"
 
+# Jarvis 当前支持的插件接口版本（向后兼容机制）。
+# 插件 config.yaml 可声明 api_version 表示其依赖的接口协议版本；
+# 未声明时按 "1.0" 处理（旧插件无需改动，天然向后兼容）。
+# 接口演进策略：新增扩展点字段可选、旧字段保留、废弃字段标记（见
+# _DEPRECATED_PLUGIN_FIELDS），不兼容时降级警告而非拒绝加载。
+PLUGIN_API_VERSION = "1.0"
+
+# 已废弃的插件扩展点字段：加载时打印 deprecation 警告，通知插件开发者迁移。
+# 未来废弃某字段时将其加入此集合，字段本身仍保留在 _PLUGIN_EXTENSION_FIELDS
+# 以维持向后兼容（旧插件仍可加载），仅提示开发者尽快迁移。
+_DEPRECATED_PLUGIN_FIELDS = frozenset()
+
+# 插件扩展点字段引入的接口版本映射（字段 -> 首次引入的 api_version）。
+# 用于兼容性诊断与废弃流程追踪；新增扩展点字段时在此登记。
+_PLUGIN_EXTENSION_FIELD_API_VERSION = {
+    "tool_load_dirs": "1.0",
+    "rules_load_dirs": "1.0",
+    "agent_definition_dirs": "1.0",
+    "orchestration": "1.0",
+    "roles_dirs": "1.0",
+    "after_tool_call_cb_dirs": "1.0",
+    "builtin_input_handler_dirs": "1.0",
+    "before_tool_call_cb_dirs": "1.0",
+    "before_model_call_cb_dirs": "1.0",
+    "summary_cb_dirs": "1.0",
+    "replace_map": "1.0",
+    "mcpserver": "1.0",
+}
+
+
+def _is_api_version_compatible(plugin_api_version: str) -> bool:
+    """判断插件声明的接口版本与当前 Jarvis 支持的接口版本是否兼容。
+
+    兼容策略：以主版本号（major）判断。插件声明的 major 不大于当前支持的
+    major 即视为兼容（向后兼容：旧插件在新 Jarvis 上可运行）；插件声明更高
+    major 视为不兼容（可能依赖未来接口能力），降级警告而非拒绝加载。
+
+    参数:
+        plugin_api_version: 插件 config.yaml 声明的 api_version（如 "1.0"/"2.1"）
+
+    返回:
+        bool: 是否兼容
+    """
+    try:
+        plugin_major = int(str(plugin_api_version).split(".")[0])
+    except (ValueError, IndexError):
+        # 无法解析的版本号视为兼容（不阻断加载），仅提示
+        return True
+    current_major = int(str(PLUGIN_API_VERSION).split(".")[0])
+    return plugin_major <= current_major
+
 
 def _load_plugin_configs(
     merged_config: Dict[str, Any], config_file_dir: Optional[str] = None
@@ -1598,6 +1649,22 @@ def _load_plugin_configs(
             plugin_config = yaml.safe_load(rendered_content)
 
             if isinstance(plugin_config, dict):
+                # 兼容性检查：读取插件声明的接口版本 api_version（默认 "1.0"）
+                plugin_api_version = str(plugin_config.get("api_version", "1.0"))
+                if not _is_api_version_compatible(plugin_api_version):
+                    PrettyOutput.auto_print(
+                        f"⚠️  插件 {plugin_path.name} 声明接口版本 {plugin_api_version}，"
+                        f"当前 Jarvis 支持 {PLUGIN_API_VERSION}，可能无法完全兼容，已降级加载"
+                    )
+                # 废弃字段警告：通知插件开发者迁移
+                deprecated_used = [
+                    k for k in plugin_config if k in _DEPRECATED_PLUGIN_FIELDS
+                ]
+                if deprecated_used:
+                    PrettyOutput.auto_print(
+                        f"⚠️  插件 {plugin_path.name} 使用了已废弃字段: "
+                        f"{', '.join(sorted(deprecated_used))}，请尽快迁移"
+                    )
                 # 若插件声明了应用于 code_agent，登记到 PluginRegistry（供 code_agent 构建工具列表）
                 if plugin_config.get("code_agent_tools"):
                     from jarvis.jarvis_tools.plugin_registry import PluginRegistry
