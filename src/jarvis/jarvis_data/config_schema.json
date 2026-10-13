@@ -305,7 +305,7 @@
       "properties": {
         "enabled": {
           "type": "boolean",
-          "description": "是否启用任务验证流程。关闭时所有类型任务标记 completed 时直接通过，跳过验证 Agent 创建与运行；开启时保留现有验证逻辑",
+          "description": "是否启用任务验证流程。关闭时所有类型任务标记 completed 时直接通过，跳过验证 Agent 创建与运行，且不强制要求 verification_method 验证方法说明；开启时保留现有验证逻辑，并强制要求提供 verification_method",
           "default": false
         }
       },
