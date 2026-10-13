@@ -160,6 +160,8 @@ coverage.xml
 .jarvis/rag
 .jarvis/task_lists
 .jarvis/knowledge_graph
+# 超长工具输出落盘目录（worktree 下为软链接），运行时数据不入库
+.jarvis/tool_results
 # 记忆文件可能包含真实凭据/密钥，禁止入库
 .jarvis/memory
 goals
