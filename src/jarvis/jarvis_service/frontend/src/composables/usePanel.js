@@ -88,6 +88,7 @@ export function usePanel({
   handlePanelCancelConfirmGetter,
   isCursorAtFirstLineGetter,
   isCursorAtLastLineGetter,
+  getPanelAutoScrollGetter,
 }) {
   // 获取 Panel 的终端列表
   function getPanelTerminals(panel) {
@@ -736,6 +737,13 @@ export function usePanel({
     historyScrollState.handler = handler
     el.addEventListener('scroll', handler)
   }
+  // 各 Panel 在布局重建（销毁/挂载）时保存/恢复的滚动位置（panelId -> scrollTop）
+  const panelScrollTops = new Map()
+  // 保存 Panel 输出列表的滚动位置（SessionPanel 卸载前调用）
+  function savePanelScrollTop(panel, scrollTop) {
+    if (!panel || !panel.id || typeof scrollTop !== 'number') return
+    panelScrollTops.set(panel.id, scrollTop)
+  }
   // 设置 Panel 的输出列表引用
   function setPanelOutputList(panel, el) {
     if (!panel || !panel.agentId) return
@@ -743,6 +751,24 @@ export function usePanel({
     outputList.value = el
     if (panel.agentId === currentAgentIdGetter().value) {
       setupHistoryScrollListener(el)
+    }
+    // 组件挂载（el 非 null）时恢复布局重建前的滚动位置；无记录且开启自动滚动则滚到底
+    if (el) {
+      const savedScrollTop = panelScrollTops.get(panel.id)
+      if (savedScrollTop !== undefined) {
+        panelScrollTops.delete(panel.id)
+        nextTick(() => {
+          if (panelOutputLists.get(panel.id) === el) {
+            el.scrollTop = savedScrollTop
+          }
+        })
+      } else if (getPanelAutoScrollGetter && getPanelAutoScrollGetter()(panel)) {
+        nextTick(() => {
+          if (panelOutputLists.get(panel.id) === el) {
+            el.scrollTop = el.scrollHeight
+          }
+        })
+      }
     }
   }
 
@@ -774,6 +800,7 @@ export function usePanel({
     clearBufferFromPanel,
     setupHistoryScrollListener,
     setPanelOutputList,
+    savePanelScrollTop,
     setPanelTerminalRef,
     workspaceHostsChat,
     workspaceHostsTerminal,

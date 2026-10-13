@@ -916,6 +916,7 @@
                       @show-buffer="openBufferPanel(getPanePanel(pane))"
                       @clear-buffer="clearBufferFromPanel(getPanePanel(pane))"
                       @set-output-list="setPanelOutputList(getPanePanel(pane), $event)"
+                      @save-scroll-top="savePanelScrollTop(getPanePanel(pane), $event)"
                       @set-terminal-ref="(executionId, el, agentId) => setPanelTerminalRef(getPanePanel(pane), executionId, el, agentId)"
                       @show-toast="showToast"
                       @context-menu="onPanelContextMenu(getPanePanel(pane), $event)"
@@ -4225,6 +4226,7 @@ const {
   clearBufferFromPanel,
   setupHistoryScrollListener,
   setPanelOutputList,
+  savePanelScrollTop,
   setPanelTerminalRef,
   workspaceHostsChat,
   workspaceHostsTerminal,
@@ -4301,6 +4303,7 @@ const {
   handlePanelCancelConfirmGetter: () => handlePanelCancelConfirm,
   isCursorAtFirstLineGetter: () => isCursorAtFirstLine,
   isCursorAtLastLineGetter: () => isCursorAtLastLine,
+  getPanelAutoScrollGetter: () => getPanelAutoScroll,
 })
 
 // 发送消息到指定 Agent
