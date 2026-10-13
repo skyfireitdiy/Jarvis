@@ -89,7 +89,7 @@ mcp:
 
 - `base_url` 填 Parallel 的主机地址，`endpoint_path` 填 `mcp`，这样实际请求的是 `https://search.parallel.ai/mcp`（不要带尾斜杠，Parallel 端点不接受尾斜杠）。
 - `headers.User-Agent` 用于标识请求来源为 Jarvis，可按需调整。
-- 接入成功后，会注册 `parallel-search.tool_call.web_search` 与 `parallel-search.tool_call.web_fetch` 两个工具。
+- 接入成功后，会注册 `parallel-search_tool_call_web_search` 与 `parallel-search_tool_call_web_fetch` 两个工具（工具名中的 `.` 会被替换为 `_`，以满足平台对工具名字符集的要求）。
 - 如需更高速率限制，可申请 Parallel API key 并通过 `headers.Authorization` 传入（如 `Authorization: Bearer <你的key>`）。
 
 ## 注意事项

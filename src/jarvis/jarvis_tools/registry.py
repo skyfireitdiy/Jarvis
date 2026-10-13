@@ -42,6 +42,20 @@ from jarvis.jarvis_utils.utils import is_context_overflow
 # test_tool_parsing 等频繁创建 ToolRegistry 的场景）。
 _BUILTIN_TOOLS_CACHE: Optional[Dict[str, Tool]] = None
 
+# OpenAI 等平台要求 function.name 匹配 ^[a-zA-Z0-9_-]+$。
+# MCP 工具名形如 "{server}.tool_call.{tool}"，其中的 '.' 会导致 400 错误，
+# 因此注册时统一把非法字符替换为 '_'。
+_TOOL_NAME_INVALID_CHARS = re.compile(r"[^a-zA-Z0-9_-]")
+
+
+def sanitize_tool_name(name: str) -> str:
+    """将工具名规范化为平台允许的字符集（^[a-zA-Z0-9_-]+$）。
+
+    非法字符（如 MCP 工具名中的 '.'）统一替换为 '_'，避免 OpenAI 等平台
+    因 function.name 不匹配而返回 400 错误。
+    """
+    return _TOOL_NAME_INVALID_CHARS.sub("_", name)
+
 
 tool_call_help = """
 ## 工具调用指南（Markdown）
@@ -1928,6 +1942,9 @@ class ToolRegistry(OutputHandlerProtocol):
             protocol_version: 工具协议版本
             interactive: 是否可交互/独占（True 时原生并行调用降级为串行）
         """
+        # 规范化工具名，确保满足平台对 function.name 的字符集要求
+        # （^[a-zA-Z0-9_-]+$），避免 MCP 工具名中的 '.' 触发 400 错误。
+        name = sanitize_tool_name(name)
         if name in self.tools:
             PrettyOutput.auto_print(f"⚠️ 警告: 工具 '{name}' 已存在，将被覆盖")
         tool = Tool(name, description, parameters, func, protocol_version, interactive)

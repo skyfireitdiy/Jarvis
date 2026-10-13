@@ -204,10 +204,10 @@ mcp:
 
 **工具命名规则：**
 
-- **必须**：MCP工具会以`{name}.tool_call.{tool_name}`的形式注册
-- **必须**：资源相关工具会以`{name}.resource.get_resource_list`与`{name}.resource.get_resource`的形式注册
+- **必须**：MCP工具会以`{name}.tool_call.{tool_name}`的形式注册，其中`.`会被替换为`_`（即`{name}_tool_call_{tool_name}`），以满足平台对工具名字符集（`^[a-zA-Z0-9_-]+$`）的要求
+- **必须**：资源相关工具会以`{name}.resource.get_resource_list`与`{name}.resource.get_resource`的形式注册，其中`.`会被替换为`_`
 
-例如，配置`name: "filesystem"`，服务器提供工具`read_file`，则注册的工具名为`filesystem.tool_call.read_file`
+例如，配置`name: "filesystem"`，服务器提供工具`read_file`，则注册的工具名为`filesystem_tool_call_read_file`
 
 ## 实践指导
 
