@@ -26,11 +26,19 @@
               </span>
             </div>
             <div class="manage-timer-id" :title="task.task_id">{{ shortTaskId(task.task_id) }}</div>
+            <div class="manage-timer-node">节点：{{ getNodeDisplayName(task.node_id) }}</div>
             <div class="manage-timer-schedule">{{ formatSchedule(task) }}</div>
             <div v-if="actionSummary(task)" class="manage-timer-content" :title="actionDetail(task)">
               {{ actionSummary(task) }}
             </div>
             <div v-if="!task.cancelled" class="manage-timer-next">下次触发：{{ formatRunAt(task.run_at) }}</div>
+            <div class="manage-timer-actions">
+              <button
+                class="manage-timer-delete"
+                title="删除此定时任务"
+                @click="confirmDeleteTimer(task)"
+              >删除</button>
+            </div>
           </div>
         </div>
       </div>
@@ -200,10 +208,12 @@ const props = defineProps({
   // 浏览器扩展已安装脚本：[{session_id, name, scripts:[{id,name,description,match,version,enabled}]}]
   installedScripts: { type: Array, default: () => [] },
   // 网关保存的脚本：[{name, size, updated_at}]
-  gatewayScripts: { type: Array, default: () => [] }
+  gatewayScripts: { type: Array, default: () => [] },
+  // 节点展示名解析函数：传入 node_id 返回展示名（默认回退 node_id / 'master'）
+  getNodeDisplayName: { type: Function, default: (nodeId) => String(nodeId || '').trim() || 'master' }
 })
 
-defineEmits(['refresh'])
+const emit = defineEmits(['refresh', 'delete-timer'])
 
 // 展开的会话 key 集合（daemon 用 session_id，浏览器扩展/脚本用前缀区分）
 const expandedSessions = ref(new Set())
@@ -285,6 +295,12 @@ function formatSchedule(task) {
     return `定时 ${formatRunAt(task.run_at)}`
   }
   return '未知调度'
+}
+
+// 删除定时任务：交给父组件处理（父组件负责确认弹窗与 master / 子节点删除路径）
+function confirmDeleteTimer(task) {
+  if (!task || !task.task_id) return
+  emit('delete-timer', task)
 }
 
 function formatParams(parameters) {
@@ -480,6 +496,32 @@ function isCapabilityExpanded(sessionId, capName) {
   font-size: 11px;
   color: var(--color-text-secondary);
   margin-bottom: 2px;
+}
+
+.manage-timer-node {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin-bottom: 2px;
+}
+
+.manage-timer-actions {
+  margin-top: 6px;
+  text-align: right;
+}
+
+.manage-timer-delete {
+  font-size: 11px;
+  padding: 2px 10px;
+  border: 1px solid var(--color-danger, #f56c6c);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--color-danger, #f56c6c);
+  cursor: pointer;
+}
+
+.manage-timer-delete:hover {
+  background: var(--color-danger, #f56c6c);
+  color: #fff;
 }
 
 .manage-timer-schedule {

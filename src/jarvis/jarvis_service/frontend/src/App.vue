@@ -536,6 +536,8 @@
               <ManageSidebar
                 view="timers"
                 :timers="manageTimers"
+                :getNodeDisplayName="getNodeDisplayName"
+                @delete-timer="deleteTimer"
               />
             </div>
             <div v-else-if="workspaceSidebarView === 'plugins'" class="workspace-sidebar-content">
@@ -2800,13 +2802,19 @@ async function fetchDaemonSessions() {
 }
 
 // 查询定时任务列表（只读展示，任务由 Agent 直接控制）。
-// GET /api/timers 返回 {success, data:[{task_id, run_at, interval_seconds,
+// 优先调 GET /api/timers/all 汇总各节点（master + 子节点）任务，每项含 node_id；
+// 旧版网关无该接口时回退 GET /api/timers（仅本节点）。
+// 返回 {success, data:[{task_id, run_at, interval_seconds, node_id,
 //   is_recurring, cancelled, metadata:{action:{type,params}, schedule}}]}
 async function fetchTimers() {
   try {
     const { host, port } = getGatewayAddress()
-    const url = `${getHttpProtocol()}://${host}:${port}/api/timers`
-    const response = await fetchWithAuth(url)
+    const baseUrl = `${getHttpProtocol()}://${host}:${port}`
+    let response = await fetchWithAuth(`${baseUrl}/api/timers/all`)
+    if (!response.ok) {
+      // 汇总接口不可用时回退本节点接口
+      response = await fetchWithAuth(`${baseUrl}/api/timers`)
+    }
     if (!response.ok) return []
     const result = await response.json()
     if (!result || !result.success) return []
@@ -2820,6 +2828,38 @@ async function fetchTimers() {
 async function refreshManageTimers() {
   manageTimers.value = await fetchTimers()
 }
+
+// 删除定时任务：master 任务走 /api/timers/{id}，子节点任务走 /api/node/{node_id}/timers/{id}
+async function deleteTimer(task) {
+  if (!task || !task.task_id) return
+  const nodeId = String(task.node_id || '').trim() || 'master'
+  const displayName = getNodeDisplayName(nodeId)
+  showConfirm(
+    `确定要删除节点「${displayName}」上的定时任务「${task.task_id}」吗？此操作不可撤销。`,
+    async () => {
+      try {
+        const { host, port } = getGatewayAddress()
+        const baseUrl = `${getHttpProtocol()}://${host}:${port}`
+        const url = nodeId === 'master'
+          ? `${baseUrl}/api/timers/${encodeURIComponent(task.task_id)}`
+          : `${baseUrl}/api/node/${encodeURIComponent(nodeId)}/timers/${encodeURIComponent(task.task_id)}`
+        const response = await fetchWithAuth(url, { method: 'DELETE' })
+        const result = await response.json()
+        if (!response.ok || !result || !result.success) {
+          const message = result?.error?.message || result?.error || '删除失败'
+          showToast(`删除定时任务失败：${message}`, 'error')
+          return
+        }
+        showToast('定时任务已删除', 'success')
+        await refreshManageTimers()
+      } catch (e) {
+        console.error('[TIMERS] Failed to delete timer:', e)
+        showToast(`删除定时任务失败：${e.message || e}`, 'error')
+      }
+    }
+  )
+}
+
 // 供拓扑图为每个接入的扩展渲染一个节点并显示名称。
 // 注意：/api/browser-ext/version 的 sessions 只含 session_id/extension_version，
 // 不含 name，故这里单独调 /api/browser-ext/sessions。

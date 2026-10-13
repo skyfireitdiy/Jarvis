@@ -8212,6 +8212,87 @@ def create_app(
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
+    @app.get("/api/timers/all", dependencies=[Depends(verify_token)])
+    async def list_all_timers(request: Request) -> Dict[str, Any]:
+        """汇总所有节点（master + 子节点）的定时任务，每项注入 node_id。"""
+        try:
+            user_info = getattr(request.state, "user_info", None)
+            if _check_permission(user_info, "timer:read"):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "PERMISSION_DENIED",
+                        "message": "Permission denied: timer:read",
+                    },
+                }
+            # master 自身
+            all_timers = []
+            for timer in timer_manager.list_tasks():
+                item = dict(timer)
+                item["node_id"] = "master"
+                all_timers.append(item)
+            # 子节点
+            errors = []
+            for node in node_runtime.node_registry.list_all():
+                node_id = node.get("node_id") or ""
+                if not node_id or node_id == "master":
+                    continue
+                try:
+                    response = await node_connection_manager.send_request_to_node(
+                        node_id,
+                        NODE_HTTP_PROXY_REQUEST,
+                        {
+                            "method": "GET",
+                            "path": "timers",
+                            "query": "",
+                            "headers": {},
+                            "body": "",
+                            "user_info": user_info,
+                        },
+                    )
+                    payload = response.get("payload") or {}
+                    if payload.get("success"):
+                        body = payload.get("body") or "{}"
+                        try:
+                            body_data = json.loads(body)
+                        except (json.JSONDecodeError, TypeError):
+                            body_data = {}
+                        # 子节点 _dispatch_node_http_request 返回的 body 即
+                        # {"success":..., "data":[...]}（无 result 包装层），直接使用。
+                        result = body_data
+                        if result.get("success"):
+                            for timer in result.get("data", []):
+                                item = dict(timer)
+                                item["node_id"] = node_id
+                                all_timers.append(item)
+                        else:
+                            error_info = result.get("error") or {}
+                            error_msg = (
+                                error_info.get("message", "unknown error")
+                                if isinstance(error_info, dict)
+                                else str(error_info)
+                            )
+                            errors.append(f"node {node_id}: {error_msg}")
+                    else:
+                        error_info = payload.get("error") or {}
+                        error_msg = (
+                            error_info.get("message", "unknown error")
+                            if isinstance(error_info, dict)
+                            else str(error_info)
+                        )
+                        errors.append(f"node {node_id}: {error_msg}")
+                except Exception as e:
+                    errors.append(f"node {node_id}: {e}")
+            output: Dict[str, Any] = {"success": True, "data": all_timers}
+            if errors:
+                output["errors"] = errors
+            return output
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
     @app.get("/api/timers/{timer_id}", dependencies=[Depends(verify_token)])
     async def get_timer(timer_id: str, request: Request) -> Dict[str, Any]:
         """查询单个定时器。"""
@@ -11240,6 +11321,28 @@ def create_app(
             result = await regenerate_agent(
                 agent_id, _mock_req, str(payload.get("node_id") or "")
             )
+        elif normalized_path == "/timers" or normalized_path.startswith("/timers/"):
+            # 定时任务：支持跨节点 list/create/get/delete（子节点复用本节点接口）
+            if normalized_method == "GET" and normalized_path == "/timers":
+                result = await list_timers(_mock_req)
+            elif normalized_method == "POST" and normalized_path == "/timers":
+                result = await create_timer(payload, _mock_req)
+            elif normalized_method == "GET" and normalized_path.startswith("/timers/"):
+                timer_id = normalized_path[len("/timers/") :].strip("/")
+                result = await get_timer(timer_id, _mock_req)
+            elif normalized_method == "DELETE" and normalized_path.startswith(
+                "/timers/"
+            ):
+                timer_id = normalized_path[len("/timers/") :].strip("/")
+                result = await delete_timer(timer_id, _mock_req)
+            else:
+                result = {
+                    "success": False,
+                    "error": {
+                        "code": "METHOD_NOT_ALLOWED",
+                        "message": "Unsupported method",
+                    },
+                }
         elif normalized_path.startswith("/http_proxy/"):
             # 远程节点 HTTP 代理：转发请求到外部 API
             # 路径格式：/http_proxy/{target_url}
