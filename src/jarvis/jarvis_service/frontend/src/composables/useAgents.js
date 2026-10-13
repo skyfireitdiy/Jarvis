@@ -692,15 +692,19 @@ export function useAgents({
     newAgentProxyNode.value = String(prefill.proxyNode || '').trim()
       || (configuredProxy && availableNodeOptions.value.some(n => n.node_id === configuredProxy) ? configuredProxy : '')
     // 先设 nodeId（触发 watch 重置目录），再设 workDir 等其余字段
-    newAgentDir.value = typeof prefill.workDir === 'string' && prefill.workDir.trim()
-      ? prefill.workDir.trim() : '~'
+    // 工作目录：兼容宿主内部契约（workDir）与插件契约（workingDir）
+    const prefillDir = String(prefill.workDir || prefill.workingDir || '').trim()
+    newAgentDir.value = prefillDir || '~'
     // 其余可预填字段：未提供的保持默认
     newAgentType.value = String(prefill.agentType || 'agent').trim() || 'agent'
-    if (typeof prefill.agentName === 'string' && prefill.agentName.trim()) {
-      newAgentName.value = prefill.agentName.trim()
+    // Agent 名称：兼容宿主内部契约（agentName）与插件契约（name）
+    const prefillName = String(prefill.agentName || prefill.name || '').trim()
+    if (prefillName) {
+      newAgentName.value = prefillName
     }
-    if (typeof prefill.taskDescription === 'string') {
-      newAgentTaskDescription.value = prefill.taskDescription
+    // 任务描述：兼容宿主内部契约（taskDescription）与插件契约（task）
+    if (typeof (prefill.taskDescription ?? prefill.task) === 'string') {
+      newAgentTaskDescription.value = String(prefill.taskDescription ?? prefill.task)
     }
     if (typeof prefill.modelGroup === 'string' && prefill.modelGroup.trim()) {
       newAgentModelGroup.value = prefill.modelGroup.trim()
