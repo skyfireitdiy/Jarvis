@@ -655,9 +655,13 @@ export default {
       const isIssue = this.tab === "issues";
       const kind = isIssue ? "Issue" : "Pull Request";
       const number = item.number;
+      // 优先使用「打开创建 Agent 弹窗（带预填）」通道，让用户确认/编辑后再创建；
+      // 宿主未提供新通道时回退到直接创建通道（向后兼容）。
+      const openModal =
+        typeof window !== "undefined" && window.__jarvisOpenCreateAgentModal;
       const create =
         typeof window !== "undefined" && window.__jarvisCreateAgentForTask;
-      if (typeof create !== "function") {
+      if (typeof openModal !== "function" && typeof create !== "function") {
         this.message = "宿主未提供创建通道，无法创建 Agent";
         return;
       }
@@ -669,16 +673,26 @@ export default {
       this.busy = true;
       this.message = `正在创建新 Agent 处理 ${kind} #${number}…`;
       try {
-        const res = await create({
+        const prefill = {
           workingDir: workingDir,
           task: this.buildItemPrompt(item),
           name: `${kind} #${number}`,
           nodeId: this.nodeId,
-        });
-        if (res && res.success) {
-          this.message = `已创建新 Agent 处理 ${kind} #${number}`;
+        };
+        if (typeof openModal === "function") {
+          const res = await openModal(prefill);
+          if (res && res.confirmed) {
+            this.message = `已创建新 Agent 处理 ${kind} #${number}`;
+          } else {
+            this.message = "已取消";
+          }
         } else {
-          this.message = "失败: " + ((res && res.error) || "创建失败");
+          const res = await create(prefill);
+          if (res && res.success) {
+            this.message = `已创建新 Agent 处理 ${kind} #${number}`;
+          } else {
+            this.message = "失败: " + ((res && res.error) || "创建失败");
+          }
         }
       } catch (e) {
         this.message = "失败: " + String((e && e.message) || e);
@@ -699,13 +713,16 @@ export default {
       const number = item.number;
       const pick =
         typeof window !== "undefined" && window.__jarvisPickDirectoryWithNode;
+      // 优先使用「打开创建 Agent 弹窗（带预填）」通道；宿主未提供时回退到直接创建通道。
+      const openModal =
+        typeof window !== "undefined" && window.__jarvisOpenCreateAgentModal;
       const create =
         typeof window !== "undefined" && window.__jarvisCreateAgentForTask;
       if (typeof pick !== "function") {
         this.message = "宿主未提供目录选择通道，无法选择目录";
         return;
       }
-      if (typeof create !== "function") {
+      if (typeof openModal !== "function" && typeof create !== "function") {
         this.message = "宿主未提供创建通道，无法创建 Agent";
         return;
       }
@@ -731,17 +748,27 @@ export default {
           return;
         }
         this.message = `正在创建 CodeAgent（${localDir}）…`;
-        const res = await create({
+        const prefill = {
           agentType: "code_agent",
           workingDir: localDir,
           task: this.buildItemPrompt(item, true),
           name: `Issue #${number}`,
           nodeId: targetNode,
-        });
-        if (res && res.success) {
-          this.message = `已创建 CodeAgent 处理 Issue #${number}（${localDir}）`;
+        };
+        if (typeof openModal === "function") {
+          const res = await openModal(prefill);
+          if (res && res.confirmed) {
+            this.message = `已创建 CodeAgent 处理 Issue #${number}（${localDir}）`;
+          } else {
+            this.message = "已取消";
+          }
         } else {
-          this.message = "失败: " + ((res && res.error) || "创建失败");
+          const res = await create(prefill);
+          if (res && res.success) {
+            this.message = `已创建 CodeAgent 处理 Issue #${number}（${localDir}）`;
+          } else {
+            this.message = "失败: " + ((res && res.error) || "创建失败");
+          }
         }
       } catch (e) {
         this.message = "失败: " + String((e && e.message) || e);

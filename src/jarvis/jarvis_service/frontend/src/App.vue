@@ -1053,8 +1053,8 @@
       :recentWorkDirs="recentWorkDirs"
       :currentNodeId="newAgentNodeId"
       :dirDialogOpen="showDirDialog"
-      @cancel="showCreateAgentModal = false"
-      @create="createAgent"
+      @cancel="closeCreateAgentModal"
+      @create="createAgentFromModal"
       @selectDir="openDirDialog"
     />
 
@@ -2391,6 +2391,27 @@ try {
   /* ignore */
 }
 
+// 暴露「打开创建 Agent 弹窗（带预填参数）」的钩子给插件前端扩展（如 gh/autoworker 插件）。
+// 复用宿主已有的 CreateAgentModal 弹窗，把 prefill（workingDir/task/name/nodeId/agentType 等）
+// 预填进去，让用户确认/编辑后再提交。返回 Promise<{ confirmed: boolean, agent?: object }>：
+// 用户点「创建」成功 → { confirmed: true, agent }；取消/关闭 → { confirmed: false }。
+try {
+  window.__jarvisOpenCreateAgentModal = (prefill = {}) => {
+    return new Promise((resolve) => {
+      // 已有未结束的请求时，先以 { confirmed: false } 结束上一个，避免 Promise 悬挂
+      if (pluginCreateAgentResolver) {
+        const prev = pluginCreateAgentResolver
+        pluginCreateAgentResolver = null
+        prev({ confirmed: false })
+      }
+      pluginCreateAgentResolver = resolve
+      openCreateAgentModal('', prefill)
+    })
+  }
+} catch (e) {
+  /* ignore */
+}
+
 // 暴露「选择目录」的钩子给插件前端扩展（如 gh 插件的「Fork 并创建 CodeAgent 处理」需先选目录）。
 // 复用宿主已有的「打开目录」弹窗（含节点选择 + 目录浏览）；用户确认后返回选中的绝对路径，
 // 取消则返回 null。返回 Promise<string|null>。
@@ -3059,6 +3080,9 @@ const openDirSource = ref('workspace')
 let pluginPickDirResolver = null
 // 插件请求选择目录时是否返回 { path, nodeId }（true）还是纯路径字符串（false，兼容旧插件）
 let pluginPickDirWithNode = false
+// 插件请求「打开创建 Agent 弹窗并预填参数」时的 Promise resolver：
+// 用户确认创建时 resolve({ confirmed: true, agent })，取消/关闭时 resolve({ confirmed: false })
+let pluginCreateAgentResolver = null
 // Git 面板自定义 Git 管理目录（用户指定，优先于 Agent 根目录）：{ nodeId, path }
 const gitCustomDir = ref(null)
 // 自定义 Git 目录的持久化 key：刷新后自动恢复
@@ -6419,6 +6443,27 @@ const {
   restoreWaitingConfirmUI: () => restoreWaitingConfirmUI,
   pushOverlayState: () => pushOverlayState,
 })
+// 包装 createAgent：创建成功时结束插件请求的 Promise（resolve { confirmed: true, agent }）。
+// 供 CreateAgentModal 的 @create 绑定使用；非插件请求场景下行为与 createAgent 完全一致。
+async function createAgentFromModal() {
+  const agent = await createAgent()
+  if (agent && pluginCreateAgentResolver) {
+    const resolve = pluginCreateAgentResolver
+    pluginCreateAgentResolver = null
+    resolve({ confirmed: true, agent })
+  }
+  return agent
+}
+// 关闭创建 Agent 弹窗：若存在插件请求（__jarvisOpenCreateAgentModal），以 { confirmed: false } 结束 Promise。
+// 供 @cancel、ESC、移动端返回键等所有关闭路径统一调用。
+function closeCreateAgentModal() {
+  showCreateAgentModal.value = false
+  if (pluginCreateAgentResolver) {
+    const resolve = pluginCreateAgentResolver
+    pluginCreateAgentResolver = null
+    resolve({ confirmed: false })
+  }
+}
 // Diff 浮动窗口（状态 + 获取/渲染/文件导航），从 App.vue 拆出到 composables/useDiff.js
 // 依赖 getGatewayAddress/getCurrentAgentNodeId/fetchWithAuth/buildNodeHttpUrl/windowWidth，须在其定义之后调用
 const {
@@ -7475,7 +7520,7 @@ function handleGlobalKeydown(event) {
     if (showSettingsModal.value) {
       showSettingsModal.value = false
     } else if (showCreateAgentModal.value) {
-      showCreateAgentModal.value = false
+      closeCreateAgentModal()
     } else if (showQuickCreateAgentModal.value) {
       showQuickCreateAgentModal.value = false
     } else if (showSessionDialog.value) {
@@ -7748,7 +7793,7 @@ onMounted(() => {
       if (showSettingsModal.value) {
         showSettingsModal.value = false
       } else if (showCreateAgentModal.value) {
-        showCreateAgentModal.value = false
+        closeCreateAgentModal()
       } else if (showSessionDialog.value) {
         cancelSessionDialog()
       } else if (showDirDialog.value) {
