@@ -510,18 +510,18 @@ defineExpose({ focus: () => inputEl.value?.focus() })
   flex: none;
 }
 
-/* Agent 运行状态的整体颜色区分：运行中暗绿、非运行暗红（作用于整个列表项文字，
+/* Agent 运行状态的整体颜色区分：运行中亮绿、非运行亮红（作用于整个列表项文字，
    含标题与 meta/en 副文本，避免被 .cmd-item-meta/.cmd-item-en 的次级颜色覆盖） */
 .cmd-item.agent-running,
 .cmd-item.agent-running .cmd-item-meta,
 .cmd-item.agent-running .cmd-item-en {
-  color: #4a9a6a;
+  color: #4ade80;
 }
 
 .cmd-item.agent-stopped,
 .cmd-item.agent-stopped .cmd-item-meta,
 .cmd-item.agent-stopped .cmd-item-en {
-  color: #b0574f;
+  color: #f87171;
 }
 
 .cmd-item-label {
