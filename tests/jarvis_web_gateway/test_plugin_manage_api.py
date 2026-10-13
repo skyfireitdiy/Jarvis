@@ -36,8 +36,8 @@ def _auth_headers(token: str = TEST_AUTH_TOKEN):
     return {"Authorization": f"Bearer {token}"}
 
 
-def _make_plugin(plugin_dir: Path, name: str, version: str = "1.0.0") -> None:
-    """构造一个最小插件目录（含 config.yaml + 前端资源）。"""
+def _make_plugin(plugin_dir: Path, name: str, version: str = "1.0.0") -> Path:
+    """构造一个最小插件目录（含 config.yaml + 前端资源），返回目录路径。"""
     plugin_dir.mkdir(parents=True, exist_ok=True)
     (plugin_dir / "config.yaml").write_text(
         json.dumps(
@@ -61,6 +61,7 @@ def _make_plugin(plugin_dir: Path, name: str, version: str = "1.0.0") -> None:
     (plugin_dir / "admin.js").write_text(
         "window.__pluginTest__ = true;", encoding="utf-8"
     )
+    return plugin_dir
 
 
 def _make_git_plugin_repo(plugin_dir: Path, name: str, version: str = "1.0.0") -> Path:
@@ -148,6 +149,54 @@ def test_install_plugin(client, isolated_data_dir):
     assert installed.exists()
     assert (installed / "config.yaml").exists()
     assert (installed / ".git").exists()
+
+
+def test_install_plugin_from_local_directory(client, isolated_data_dir):
+    """install 从本地目录安装插件（软链接，Issue #213）。"""
+    source = _make_plugin(
+        Path(isolated_data_dir) / "local-src", "local-installed", "1.0.0"
+    )
+
+    resp = client.post(
+        "/api/plugins/install",
+        json={"node_id": "master", "source": str(source)},
+        headers=_auth_headers(),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is True
+
+    installed = Path(isolated_data_dir) / "plugins" / "local-installed"
+    assert installed.exists()
+    assert installed.is_symlink()
+    assert (installed / "config.yaml").exists()
+
+
+def test_install_plugin_from_zip(client, isolated_data_dir):
+    """install 从压缩文件安装插件（解压复制，Issue #213）。"""
+    import zipfile
+
+    source = _make_plugin(
+        Path(isolated_data_dir) / "zip-src", "zip-installed", "1.0.0"
+    )
+    zip_file = Path(isolated_data_dir) / "plugin.zip"
+    with zipfile.ZipFile(zip_file, "w") as zf:
+        zf.write(source / "config.yaml", "config.yaml")
+        zf.write(source / "admin.js", "admin.js")
+
+    resp = client.post(
+        "/api/plugins/install",
+        json={"node_id": "master", "source": str(zip_file)},
+        headers=_auth_headers(),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is True
+
+    installed = Path(isolated_data_dir) / "plugins" / "zip-installed"
+    assert installed.exists()
+    assert not installed.is_symlink()
+    assert (installed / "config.yaml").exists()
 
 
 def test_install_plugin_missing_source(client):
