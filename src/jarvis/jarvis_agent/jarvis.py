@@ -22,6 +22,7 @@ import yaml  # type: ignore[import-untyped]
 
 import jarvis.jarvis_utils.utils as jutils
 from jarvis.jarvis_agent.agent_manager import AgentManager
+from jarvis.jarvis_agent.builtin_input_handler import _report_agent_config_change
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
 from jarvis.jarvis_agent.config_editor import ConfigEditor
 from jarvis.jarvis_agent.rule_share_manager import RuleShareManager
@@ -29,6 +30,7 @@ from jarvis.jarvis_agent.tool_share_manager import ToolShareManager
 from jarvis.jarvis_utils.config import get_agent_definition_dirs
 from jarvis.jarvis_utils.exception_utils import save_exception
 from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_llm_group
 from jarvis.jarvis_utils.config import get_roles_dirs
 from jarvis.jarvis_utils.config import is_auto_resume_session
 from jarvis.jarvis_utils.config import is_non_interactive
@@ -1250,6 +1252,17 @@ def run_cli(
         config_file=config_file,
         llm_group=llm_group,
     )
+
+    # 若网关记录的模型组为 default，上报一次真实生效模型组，使前端展示与实际一致
+    try:
+        recorded_llm_group = os.environ.get("JARVIS_LLM_GROUP")
+        if recorded_llm_group == "default":
+            real_llm_group = get_llm_group()
+            if real_llm_group and real_llm_group != "default":
+                _report_agent_config_change({"llm_group": real_llm_group})
+    except Exception:
+        # 静默忽略上报异常，不影响主流程
+        pass
 
     # 在 init_env 之后检测是否自动恢复会话（配置已加载）
     try:
