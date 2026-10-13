@@ -888,6 +888,7 @@
                       :ref="el => setSessionPanelRef(getPanePanel(pane)?.id, el)"
                       :embedded="true"
                       :agent="getPanelAgent(getPanePanel(pane))"
+                      :get-node-display-name="getNodeDisplayName"
                       :messages="getPanelMessages(getPanePanel(pane))"
                       :input-text="getPanelInputText(getPanePanel(pane))"
                       :input-mode="getPanelInputMode(getPanePanel(pane))"

@@ -12,6 +12,18 @@
       <!-- 会话头部 -->
       <div class="session-panel-header" @mousedown="!embedded && $emit('startMove', $event)">
         <span class="session-agent-name">{{ agent.name || agent.agent_id }}</span>
+        <!-- 运行配置汇总：节点 / 模型组 / 代理节点（Issue #200） -->
+        <span class="session-meta-tags" v-if="hasMetaInfo">
+          <span class="session-meta-tag" v-if="agent.node_id" title="运行节点">
+            <span class="session-meta-label">节点</span>{{ getNodeDisplayName ? getNodeDisplayName(agent.node_id) : (agent.node_id || '') }}
+          </span>
+          <span class="session-meta-tag" v-if="agent.llm_group" title="模型组">
+            <span class="session-meta-label">模型</span>{{ agent.llm_group }}
+          </span>
+          <span class="session-meta-tag session-meta-tag-proxy" v-if="agent.proxy_node" title="代理节点">
+            <span class="session-meta-label">代理</span>{{ getNodeDisplayName ? getNodeDisplayName(agent.proxy_node) : agent.proxy_node }}
+          </span>
+        </span>
         <span class="session-agent-status" :class="getStatusClass(agent)">{{ getStatusLabel(agent) }}</span>
         <!-- 操作图标已迁移至 Ctrl+P 命令面板「当前 Agent」组 -->
         <div class="session-header-actions">
@@ -196,7 +208,7 @@
 </template>
 
 <script setup>
-import { ref, onBeforeUnmount } from 'vue'
+import { ref, computed, onBeforeUnmount } from 'vue'
 import { exportElementAsImage } from '../utils/exportImage.js'
 // 自绘 16x16 stroke 线性 SVG 图标（currentColor 继承主题色），与全局风格一致
 const SESSION_ICONS = {
@@ -224,9 +236,18 @@ const props = defineProps({
   interaction: { type: Object, default: null },
   resizeDirections: { type: Array, default: () => [] },
   panelStyle: { type: Object, default: null },
+  // 把 node_id / proxy_node 转可读节点名的辅助函数（来自 App.vue，Issue #200）
+  getNodeDisplayName: { type: Function, default: null },
   // 该 panel 已被编辑器主区域承载时置为 true：不渲染内嵌 xterm host，
   // 避免与编辑器内的同一 execution 终端争抢 host 元素
   suppressTerminal: { type: Boolean, default: false },
+})
+
+// 是否有可展示的运行配置汇总信息（节点 / 模型组 / 代理节点，Issue #200）
+const hasMetaInfo = computed(() => {
+  const a = props.agent
+  if (!a) return false
+  return Boolean(a.node_id || a.llm_group || a.proxy_node)
 })
 
 const emit = defineEmits([
@@ -932,6 +953,41 @@ function getTerminalStyle(terminalContent) {
   white-space: nowrap;
   flex: 1;
   min-width: 0;
+}
+
+/* 运行配置汇总标签（节点 / 模型组 / 代理节点，Issue #200） */
+.session-meta-tags {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  min-width: 0;
+  max-width: 50%;
+  overflow: hidden;
+}
+
+.session-meta-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  max-width: 12ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-meta-tag .session-meta-label {
+  opacity: 0.65;
+}
+
+.session-meta-tag-proxy {
+  color: var(--color-warning);
 }
 
 .session-agent-status {
