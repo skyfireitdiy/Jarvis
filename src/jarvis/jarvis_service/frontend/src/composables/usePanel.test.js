@@ -3,7 +3,7 @@
 // 注意：getter 注入的符号（xxxGetter）测试时需传 vi.fn(() => value) 形式；
 //       ref 型 getter 内部以 xxxGetter().value 二次求值。
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ref } from 'vue'
+import { ref, nextTick } from 'vue'
 import { usePanel } from './usePanel.js'
 
 // 构造测试 harness，注入全部依赖
@@ -820,6 +820,40 @@ describe('usePanel', () => {
       expect(h.panelOutputLists.get('panel-1')).toStrictEqual(el)
       expect(h.outputList.value).toStrictEqual(el)
       expect(el.addEventListener).not.toHaveBeenCalled()
+    })
+
+    it('setPanelOutputList：普通 re-render（元素未变）不重复滚到底部', async () => {
+      const autoScroll = vi.fn(() => true)
+      const h = makeHarness({ getPanelAutoScrollGetter: () => autoScroll })
+      const el = { scrollTop: 0, scrollHeight: 1000, addEventListener: vi.fn(), removeEventListener: vi.fn() }
+      // 首次挂载：无记录 + 开启自动滚动 → 滚到底部
+      h.api.setPanelOutputList(makePanel(), el)
+      await nextTick()
+      expect(el.scrollTop).toBe(1000)
+      // 用户向上滑动
+      el.scrollTop = 300
+      // 普通 re-render：同一元素再次触发 ref 回调 → 不应拉回底部
+      h.api.setPanelOutputList(makePanel(), el)
+      await nextTick()
+      expect(el.scrollTop).toBe(300)
+    })
+
+    it('setPanelOutputList：真正重建（元素变化）时恢复滚动位置', async () => {
+      const autoScroll = vi.fn(() => true)
+      const h = makeHarness({ getPanelAutoScrollGetter: () => autoScroll })
+      const panel = makePanel()
+      const el1 = { scrollTop: 0, scrollHeight: 1000, addEventListener: vi.fn(), removeEventListener: vi.fn() }
+      h.api.setPanelOutputList(panel, el1)
+      await nextTick()
+      expect(el1.scrollTop).toBe(1000)
+      // 卸载：ref 回调传 null，onBeforeUnmount 保存滚动位置到 panelScrollTops
+      h.api.setPanelOutputList(panel, null)
+      h.api.savePanelScrollTop(panel, 500)
+      // 重新挂载：新元素 → 恢复之前保存的滚动位置
+      const el2 = { scrollTop: 0, scrollHeight: 1000, addEventListener: vi.fn(), removeEventListener: vi.fn() }
+      h.api.setPanelOutputList(panel, el2)
+      await nextTick()
+      expect(el2.scrollTop).toBe(500)
     })
 
     it('setPanelTerminalRef：委托 setTerminalRef', () => {

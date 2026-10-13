@@ -747,13 +747,16 @@ export function usePanel({
   // 设置 Panel 的输出列表引用
   function setPanelOutputList(panel, el) {
     if (!panel || !panel.agentId) return
+    const prevEl = panelOutputLists.get(panel.id)
     panelOutputLists.set(panel.id, el)
     outputList.value = el
     if (panel.agentId === currentAgentIdGetter().value) {
       setupHistoryScrollListener(el)
     }
-    // 组件挂载（el 非 null）时恢复布局重建前的滚动位置；无记录且开启自动滚动则滚到底
-    if (el) {
+    // 仅在真正挂载/重建（el 由 null/无 变为非 null 元素）时恢复布局重建前的滚动位置，
+    // 或开启自动滚动时滚到底。普通 re-render 时 ref 回调会重复触发但元素未变（prevEl === el），
+    // 跳过以免周期性把滚动位置拉回底部。
+    if (el && prevEl !== el) {
       const savedScrollTop = panelScrollTops.get(panel.id)
       if (savedScrollTop !== undefined) {
         panelScrollTops.delete(panel.id)
