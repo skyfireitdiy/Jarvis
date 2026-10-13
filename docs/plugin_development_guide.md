@@ -73,6 +73,15 @@ tool_load_dirs:
   - "{{plugin_dir}}/tools"
 # agent_definition_dirs:
 #   - "{{plugin_dir}}/agents"
+# --- MCP server 扩展点（可选，声明插件自带的 MCP 服务）---
+# mcpserver:
+#   - type: "stdio"
+#     name: "my-mcp"
+#     command: "npx"
+#     args:
+#       - "-y"
+#       - "@modelcontextprotocol/server-filesystem"
+#       - "/path/to/dir"
 # --- 编排流水线声明 ---
 orchestration:
   - name: "my-pipeline"
@@ -107,6 +116,7 @@ orchestration:
 **要点：**
 
 - `{{plugin_dir}}` 是 jinja2 模板变量，运行时渲染为插件目录绝对路径（见 `render_plugin_config_template`），**勿**写死绝对路径。
+- 扩展点字段（`rules_load_dirs`/`tool_load_dirs`/`agent_definition_dirs`/`orchestration`/`roles_dirs`/`mcpserver` 等）会被合并进全局配置供 getter 消费；其中 `mcpserver` 声明的 MCP server 列表会被合并进全局 `mcp` 配置，插件安装后自动注册为 MCP 工具，无需用户在全局 `~/.jarvis/config.yaml` 重复配置。
 - 除扩展点字段外的其余字段（`name`/`description`/`version`/`builtin`/`license`/`dependencies`/`capabilities`/`frontend`/自定义业务字段）会被隔离到全局配置的 `plugin_configs.<plugin_name>`，**不污染全局配置顶层、多个插件同名私有字段互不覆盖**。插件可通过 `get_plugin_config(plugin_name)` 读取自己的私有配置。
 
 ## 四、扩展点开发规范

@@ -327,6 +327,62 @@ class TestConfigPriority:
             "/plugin/methods"
         ]
 
+    def test_plugin_mcpserver_merged_into_global_mcp(self, tmp_path):
+        """测试插件 mcpserver 扩展点被合并进全局 mcp 列表"""
+        # 创建插件，声明 mcpserver 扩展点
+        plugin_dir = tmp_path / "plugin"
+        plugin_dir.mkdir()
+        plugin_config = {
+            "mcpserver": [
+                {
+                    "type": "stdio",
+                    "name": "plugin-mcp",
+                    "command": "npx",
+                    "args": ["-y", "@modelcontextprotocol/server-filesystem"],
+                }
+            ]
+        }
+        with open(plugin_dir / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump(plugin_config, f)
+
+        # 项目配置本身有 mcp 列表
+        base_config = {
+            "mcp": [{"type": "sse", "name": "project-mcp", "base_url": "http://x"}],
+            "plugin_dirs": [str(plugin_dir)],
+        }
+        result = _load_plugin_configs(base_config)
+
+        # 插件 mcpserver 合并进全局 mcp（项目列表在前、插件列表在后）
+        mcp_names = [item["name"] for item in result["mcp"]]
+        assert mcp_names == ["project-mcp", "plugin-mcp"]
+        # mcpserver 不应作为独立键残留
+        assert "mcpserver" not in result
+
+    def test_multiple_plugins_mcpserver_merge(self, tmp_path):
+        """测试多个插件各自声明 mcpserver 互不冲突、全部合并"""
+        plugin_dir1 = tmp_path / "plugin1"
+        plugin_dir1.mkdir()
+        with open(plugin_dir1 / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump(
+                {"mcpserver": [{"type": "stdio", "name": "mcp1", "command": "cmd1"}]},
+                f,
+            )
+
+        plugin_dir2 = tmp_path / "plugin2"
+        plugin_dir2.mkdir()
+        with open(plugin_dir2 / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump(
+                {"mcpserver": [{"type": "stdio", "name": "mcp2", "command": "cmd2"}]},
+                f,
+            )
+
+        base_config = {"plugin_dirs": [str(plugin_dir1), str(plugin_dir2)]}
+        result = _load_plugin_configs(base_config)
+
+        # 后加载的插件列表在前（与 _deep_merge 列表追加语义一致）
+        mcp_names = [item["name"] for item in result["mcp"]]
+        assert mcp_names == ["mcp2", "mcp1"]
+
     def test_deep_mixed_types(self, tmp_path):
         """测试混合类型：扩展点合并 + 私有字段隔离"""
         # 创建插件
