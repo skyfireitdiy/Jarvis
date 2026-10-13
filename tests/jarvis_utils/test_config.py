@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """jarvis_utils.config 模块插件功能单元测试"""
 
+import os
+import pathlib
+
 import yaml
 import pytest
 
@@ -595,104 +598,132 @@ path3: {{plugin_dir}}/path3
             == f"{expected_path}/path3"
         )
 
+def _make_git_repo(path, config_content: str, branch: str = "main"):
+    """在 path 下创建一个本地 git 仓库，写入 config.yaml 并提交。
+
+    返回仓库目录路径。用于测试 install_plugin 的 git 安装路径。
+    """
+    import subprocess
+
+    path = pathlib.Path(path)
+    path.mkdir(parents=True, exist_ok=True)
+    (path / "config.yaml").write_text(config_content, encoding="utf-8")
+
+    def _git(*args):
+        return subprocess.run(
+            ["git", *args],
+            cwd=str(path),
+            capture_output=True,
+            text=True,
+            env={**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+                 "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"},
+        )
+
+    _git("init", "-q")
+    _git("checkout", "-q", "-b", branch)
+    _git("add", "-A")
+    _git("commit", "-q", "-m", "init")
+    return path
+
+
+def _git_repo_url(repo_path) -> str:
+    """返回本地 git 仓库的 file:// 克隆地址。"""
+    return f"file://{repo_path}"
+
 
 class TestInstallPlugin:
-    """测试 install_plugin 函数"""
+    """测试 install_plugin 函数（git 来源，Issue #213）"""
 
-    def test_install_from_directory(self, tmp_path, monkeypatch):
-        """测试从目录安装插件"""
+    def test_install_from_git_repo(self, tmp_path, monkeypatch):
+        """测试从 git 仓库安装插件，保留 .git 元数据并记录来源"""
         from jarvis.jarvis_agent.utils import install_plugin
 
-        # 创建临时插件目录
-        plugin_source = tmp_path / "my_plugin"
-        plugin_source.mkdir()
-
-        # 创建插件配置文件
+        # 创建本地 git 仓库插件源
         config_content = """name: test-plugin
 model: plugin-model
 tool_load_dirs:
   - '{{plugin_dir}}/tools'
 """
-        with open(plugin_source / "config.yaml", "w", encoding="utf-8") as f:
-            f.write(config_content)
+        repo = _make_git_repo(tmp_path / "my_plugin", config_content)
 
         # Mock 数据目录到临时目录
         test_data_dir = tmp_path / ".jarvis"
         monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
 
-        # 安装插件
-        result = install_plugin(str(plugin_source))
+        # 安装插件（git 来源）
+        result = install_plugin(_git_repo_url(repo))
 
         # 验证安装成功
         assert result is True
-        # 插件名从 config.yaml 的 name 字段读取
-        assert (test_data_dir / "plugins" / "test-plugin").exists()
-        assert (test_data_dir / "plugins" / "test-plugin" / "config.yaml").exists()
+        target_dir = test_data_dir / "plugins" / "test-plugin"
+        assert target_dir.exists()
+        assert (target_dir / "config.yaml").exists()
+        # 保留 .git 元数据（供更新检测/升级）
+        assert (target_dir / ".git").exists()
+        # 记录来源与分支
+        assert (target_dir / ".source").exists()
+        assert (target_dir / ".git-branch").read_text(encoding="utf-8") == "main"
 
-    def test_install_from_zip(self, tmp_path, monkeypatch):
-        """测试从 zip 文件安装插件"""
-        import zipfile
+    def test_install_reject_non_git_source(self, tmp_path, monkeypatch):
+        """非 git 来源（本地目录无 .git）被拒绝"""
         from jarvis.jarvis_agent.utils import install_plugin
 
-        # 创建临时插件目录
-        plugin_source = tmp_path / "zip_plugin"
+        plugin_source = tmp_path / "plain_dir"
         plugin_source.mkdir()
+        (plugin_source / "config.yaml").write_text(
+            "name: plain\nversion: 1.0\n", encoding="utf-8"
+        )
 
-        config_content = "name: zip-plugin\nmodel: zip-model\n"
-        with open(plugin_source / "config.yaml", "w", encoding="utf-8") as f:
-            f.write(config_content)
-
-        # 创建 zip 文件
-        zip_file = tmp_path / "plugin.zip"
-        with zipfile.ZipFile(zip_file, "w") as zf:
-            zf.write(plugin_source / "config.yaml", "config.yaml")
-
-        # Mock 数据目录
         test_data_dir = tmp_path / ".jarvis"
         monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
 
-        # 安装插件
-        result = install_plugin(str(zip_file))
-
-        # 验证安装成功
-        assert result is True
-        assert (test_data_dir / "plugins" / "zip-plugin").exists()
+        result = install_plugin(str(plugin_source))
+        assert result is False
+        assert not (test_data_dir / "plugins" / "plain").exists()
 
     def test_install_missing_config_yaml(self, tmp_path, monkeypatch):
         """测试安装缺少 config.yaml 的插件"""
         from jarvis.jarvis_agent.utils import install_plugin
 
-        # 创建临时插件目录（无 config.yaml）
-        plugin_source = tmp_path / "invalid_plugin"
-        plugin_source.mkdir()
-        with open(plugin_source / "readme.txt", "w") as f:
-            f.write("This is not a valid plugin")
+        # 创建 git 仓库（无 config.yaml）
+        repo = _make_git_repo(
+            tmp_path / "invalid_plugin", "# not a plugin\n"
+        )
+        # 删除 config.yaml，只留 readme
+        (repo / "config.yaml").unlink()
+        (repo / "readme.txt").write_text("not a plugin", encoding="utf-8")
+        # 重新提交
+        import subprocess
+        subprocess.run(["git", "add", "-A"], cwd=str(repo), capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "no config"],
+            cwd=str(repo),
+            capture_output=True,
+            env={**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+                 "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"},
+        )
 
-        # Mock 数据目录
         test_data_dir = tmp_path / ".jarvis"
         monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
 
         # 安装插件应失败
-        result = install_plugin(str(plugin_source))
+        result = install_plugin(_git_repo_url(repo))
         assert result is False
 
     def test_install_auto_install_plugin_dep_with_url(self, tmp_path, monkeypatch):
-        """测试依赖插件缺失但带 url 时自动安装"""
+        """测试依赖插件缺失但带 url 时自动安装（git 来源）"""
         from jarvis.jarvis_agent import utils
 
-        # 主插件依赖 depA（带 url + tag）
-        plugin_source = tmp_path / "main_plugin"
-        plugin_source.mkdir()
+        # 主插件依赖 depA（带 url + branch）
         config_content = """name: main-plugin
 model: plugin-model
 dependencies:
   plugins:
     depA:
       url: https://github.com/owner/repoA
-      tag: v1.0
+      branch: main
 """
-        with open(plugin_source / "config.yaml", "w", encoding="utf-8") as f:
-            f.write(config_content)
+        repo = _make_git_repo(tmp_path / "main_plugin", config_content)
 
         test_data_dir = tmp_path / ".jarvis"
         monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
@@ -706,19 +737,18 @@ dependencies:
             # 模拟依赖安装成功：创建 depA 目录
             dep_dir = test_data_dir / "plugins" / "depA"
             dep_dir.mkdir(parents=True, exist_ok=True)
-            with open(dep_dir / "config.yaml", "w", encoding="utf-8") as f:
-                f.write("name: depA\nversion: 1.0\n")
+            (dep_dir / "config.yaml").write_text(
+                "name: depA\nversion: 1.0\n", encoding="utf-8"
+            )
             return True
 
         monkeypatch.setattr(utils, "install_plugin", fake_install)
 
-        result = orig_install(str(plugin_source))
+        result = orig_install(_git_repo_url(repo))
 
-        # 自动安装触发，且 URL 按 tag 解析为 archive 地址
+        # 自动安装触发，且 URL 按 branch 解析为 git 克隆地址（url#branch）
         assert result is True
-        assert calls["src"] == (
-            "https://github.com/owner/repoA/archive/refs/tags/v1.0.tar.gz"
-        )
+        assert calls["src"] == "https://github.com/owner/repoA#main"
         assert calls["source_url"] == calls["src"]
         assert (test_data_dir / "plugins" / "main-plugin").exists()
 
@@ -726,21 +756,18 @@ dependencies:
         """测试依赖插件缺失且无 url 时拒绝安装"""
         from jarvis.jarvis_agent import utils
 
-        plugin_source = tmp_path / "p2"
-        plugin_source.mkdir()
         config_content = """name: p2
 model: plugin-model
 dependencies:
   plugins:
     depB: ">=1.0"
 """
-        with open(plugin_source / "config.yaml", "w", encoding="utf-8") as f:
-            f.write(config_content)
+        repo = _make_git_repo(tmp_path / "p2", config_content)
 
         test_data_dir = tmp_path / ".jarvis"
         monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
 
-        result = utils.install_plugin(str(plugin_source))
+        result = utils.install_plugin(_git_repo_url(repo))
         assert result is False
         assert not (test_data_dir / "plugins" / "p2").exists()
 
@@ -748,8 +775,6 @@ dependencies:
         """测试循环依赖时终止，避免死循环"""
         from jarvis.jarvis_agent import utils
 
-        plugin_source = tmp_path / "p3"
-        plugin_source.mkdir()
         config_content = """name: p3
 model: plugin-model
 dependencies:
@@ -757,8 +782,7 @@ dependencies:
     depC:
       url: https://github.com/c/d
 """
-        with open(plugin_source / "config.yaml", "w", encoding="utf-8") as f:
-            f.write(config_content)
+        repo = _make_git_repo(tmp_path / "p3", config_content)
 
         test_data_dir = tmp_path / ".jarvis"
         monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
@@ -770,38 +794,38 @@ dependencies:
             if _installing_deps is None:
                 _installing_deps = set()
             _installing_deps.add("depC")
-            return orig_install(str(plugin_source), _installing_deps=_installing_deps)
+            return orig_install(_git_repo_url(repo), _installing_deps=_installing_deps)
 
         monkeypatch.setattr(utils, "install_plugin", fake_install)
 
-        result = orig_install(str(plugin_source))
+        result = orig_install(_git_repo_url(repo))
         assert result is False
 
     def test_resolve_plugin_dep_url(self):
-        """测试 _resolve_plugin_dep_url 的 URL 解析"""
+        """测试 _resolve_plugin_dep_url 的 git 地址解析"""
         from jarvis.jarvis_agent.utils import _resolve_plugin_dep_url
 
-        # GitHub 仓库 + tag
-        assert (
-            _resolve_plugin_dep_url("https://github.com/owner/repo", "v1.0", None)
-            == "https://github.com/owner/repo/archive/refs/tags/v1.0.tar.gz"
-        )
-        # GitHub 仓库 + branch
+        # GitHub 仓库 + branch -> url#branch
         assert (
             _resolve_plugin_dep_url("https://github.com/owner/repo", None, "main")
-            == "https://github.com/owner/repo/archive/refs/heads/main.tar.gz"
+            == "https://github.com/owner/repo#main"
         )
-        # GitHub 仓库 + .git 后缀 + tag
+        # GitHub 仓库 + tag -> url#tag
         assert (
-            _resolve_plugin_dep_url("https://github.com/owner/repo.git", "v2", None)
-            == "https://github.com/owner/repo/archive/refs/tags/v2.tar.gz"
+            _resolve_plugin_dep_url("https://github.com/owner/repo", "v1.0", None)
+            == "https://github.com/owner/repo#v1.0"
+        )
+        # .git 后缀 + branch
+        assert (
+            _resolve_plugin_dep_url("https://github.com/owner/repo.git", None, "dev")
+            == "https://github.com/owner/repo.git#dev"
         )
         # 无 tag/branch 原样返回
         assert (
             _resolve_plugin_dep_url("https://github.com/owner/repo", None, None)
             == "https://github.com/owner/repo"
         )
-        # 非 GitHub 地址原样返回
+        # 非 git 地址（http 下载链接）原样返回（由安装逻辑拒绝）
         assert (
             _resolve_plugin_dep_url("https://example.com/x.tar.gz", "v1", None)
             == "https://example.com/x.tar.gz"
@@ -809,114 +833,149 @@ dependencies:
         # 空 url 原样返回
         assert _resolve_plugin_dep_url("", "v1", None) == ""
 
-    def test_install_from_directory_creates_symlink(self, tmp_path, monkeypatch):
-        """本地目录安装建立软链接而非复制（Issue #95）"""
-        import os
-        from jarvis.jarvis_agent.utils import install_plugin
+    def test_check_plugin_update_no_update(self, tmp_path, monkeypatch):
+        """git 插件本地与远端一致时无更新"""
+        from jarvis.jarvis_agent.utils import (
+            check_plugin_update,
+            install_plugin,
+        )
 
-        plugin_source = tmp_path / "linked_plugin"
-        plugin_source.mkdir()
-        with open(plugin_source / "config.yaml", "w", encoding="utf-8") as f:
-            f.write("name: linked-plugin\nversion: 1.0\n")
+        repo = _make_git_repo(
+            tmp_path / "upd_plugin", "name: upd-plugin\nversion: 1.0\n"
+        )
+        test_data_dir = tmp_path / ".jarvis"
+        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
+
+        assert install_plugin(_git_repo_url(repo)) is True
+        # 本地与远端（同一仓库）一致，无更新
+        assert check_plugin_update("upd-plugin") is False
+
+    def test_check_plugin_update_has_update(self, tmp_path, monkeypatch):
+        """远端有新提交时检测到更新"""
+        import subprocess
+        from jarvis.jarvis_agent.utils import (
+            check_plugin_update,
+            install_plugin,
+        )
+
+        repo = _make_git_repo(
+            tmp_path / "upd2_plugin", "name: upd2-plugin\nversion: 1.0\n"
+        )
+        test_data_dir = tmp_path / ".jarvis"
+        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
+
+        assert install_plugin(_git_repo_url(repo)) is True
+
+        # 在源仓库新增提交（远端领先本地）
+        (repo / "config.yaml").write_text(
+            "name: upd2-plugin\nversion: 2.0\n", encoding="utf-8"
+        )
+        subprocess.run(["git", "add", "-A"], cwd=str(repo), capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "bump"],
+            cwd=str(repo),
+            capture_output=True,
+            env={**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+                 "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"},
+        )
+
+        # 检测到更新
+        assert check_plugin_update("upd2-plugin") is True
+
+    def test_check_plugin_update_non_git(self, tmp_path, monkeypatch):
+        """非 git 插件（无 .git 元数据）无更新"""
+        from jarvis.jarvis_agent.utils import check_plugin_update
 
         test_data_dir = tmp_path / ".jarvis"
         monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
 
-        result = install_plugin(str(plugin_source))
-        assert result is True
+        plugin_dir = test_data_dir / "plugins" / "non-git"
+        plugin_dir.mkdir(parents=True)
+        (plugin_dir / "config.yaml").write_text(
+            "name: non-git\nversion: 1.0\n", encoding="utf-8"
+        )
 
-        target_dir = test_data_dir / "plugins" / "linked-plugin"
-        assert target_dir.is_symlink()
-        assert os.path.realpath(target_dir) == str(plugin_source)
-        # 软链接安装不写 .source（避免跟随链接污染源码目录）
-        assert not (target_dir / ".source").exists()
+        assert check_plugin_update("non-git") is False
 
-    def test_install_from_directory_updates_take_effect(self, tmp_path, monkeypatch):
-        """本地源码更新后经软链接立即生效（Issue #95）"""
-        from jarvis.jarvis_agent.utils import install_plugin
+    def test_upgrade_plugin_git(self, tmp_path, monkeypatch):
+        """git 插件升级到远端最新"""
+        import subprocess
+        from jarvis.jarvis_agent.utils import (
+            install_plugin,
+            upgrade_plugin,
+        )
 
-        plugin_source = tmp_path / "live_plugin"
-        plugin_source.mkdir()
-        config_path = plugin_source / "config.yaml"
-        config_path.write_text("name: live-plugin\nversion: 1.0\n", encoding="utf-8")
-
+        repo = _make_git_repo(
+            tmp_path / "upg_plugin", "name: upg-plugin\nversion: 1.0\n"
+        )
         test_data_dir = tmp_path / ".jarvis"
         monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
 
-        assert install_plugin(str(plugin_source)) is True
-        target_dir = test_data_dir / "plugins" / "live-plugin"
+        assert install_plugin(_git_repo_url(repo)) is True
+        target_dir = test_data_dir / "plugins" / "upg-plugin"
 
-        # 修改本地源码，经软链接应读到新内容（无需重装）
-        config_path.write_text("name: live-plugin\nversion: 2.0\n", encoding="utf-8")
+        # 源仓库更新版本
+        (repo / "config.yaml").write_text(
+            "name: upg-plugin\nversion: 2.0\n", encoding="utf-8"
+        )
+        subprocess.run(["git", "add", "-A"], cwd=str(repo), capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "bump"],
+            cwd=str(repo),
+            capture_output=True,
+            env={**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+                 "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"},
+        )
+
+        assert upgrade_plugin("upg-plugin") is True
+        # 升级后 config.yaml 版本更新
         content = (target_dir / "config.yaml").read_text(encoding="utf-8")
         assert "version: 2.0" in content
 
-    def test_install_overwrite_symlink_preserves_source(self, tmp_path, monkeypatch):
-        """覆盖软链接安装时不报错且不删本地源码（Issue #95）"""
-        from jarvis.jarvis_agent.utils import install_plugin
+    def test_check_all_plugins_update_cache(self, tmp_path, monkeypatch):
+        """check_all_plugins_update 写入更新缓存，list_plugins_info 读取 has_update"""
+        import json
+        import subprocess
+        from jarvis.jarvis_agent.utils import (
+            check_all_plugins_update,
+            install_plugin,
+            list_plugins_info,
+        )
 
-        plugin_source = tmp_path / "ow_plugin"
-        plugin_source.mkdir()
-        with open(plugin_source / "config.yaml", "w", encoding="utf-8") as f:
-            f.write("name: ow-plugin\nversion: 1.0\n")
-
+        repo = _make_git_repo(
+            tmp_path / "cache_plugin", "name: cache-plugin\nversion: 1.0\n"
+        )
         test_data_dir = tmp_path / ".jarvis"
         monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
 
-        assert install_plugin(str(plugin_source)) is True
-        target_dir = test_data_dir / "plugins" / "ow-plugin"
-        assert target_dir.is_symlink()
+        assert install_plugin(_git_repo_url(repo)) is True
 
-        # 强制覆盖安装：不报错，软链接被替换，本地源码仍在
-        assert install_plugin(str(plugin_source), force=True) is True
-        assert target_dir.is_symlink()
-        assert plugin_source.exists()
-        assert (plugin_source / "config.yaml").exists()
+        # 源仓库新增提交（远端领先）
+        (repo / "config.yaml").write_text(
+            "name: cache-plugin\nversion: 2.0\n", encoding="utf-8"
+        )
+        subprocess.run(["git", "add", "-A"], cwd=str(repo), capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-q", "-m", "bump"],
+            cwd=str(repo),
+            capture_output=True,
+            env={**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+                 "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"},
+        )
 
-    def test_uninstall_symlink_preserves_source(self, tmp_path, monkeypatch):
-        """卸载软链接安装的插件只删链接不删本地源码（Issue #95）"""
-        from jarvis.jarvis_agent.utils import install_plugin, uninstall_plugin
+        updates = check_all_plugins_update()
+        assert updates.get("cache-plugin") is True
 
-        plugin_source = tmp_path / "unlink_plugin"
-        plugin_source.mkdir()
-        with open(plugin_source / "config.yaml", "w", encoding="utf-8") as f:
-            f.write("name: unlink-plugin\nversion: 1.0\n")
+        # 缓存文件已写入
+        cache_file = test_data_dir / "plugin_updates.json"
+        assert cache_file.exists()
+        data = json.loads(cache_file.read_text(encoding="utf-8"))
+        assert data.get("cache-plugin") is True
 
-        test_data_dir = tmp_path / ".jarvis"
-        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
-
-        assert install_plugin(str(plugin_source)) is True
-        target_dir = test_data_dir / "plugins" / "unlink-plugin"
-        assert target_dir.is_symlink()
-
-        assert uninstall_plugin("unlink-plugin") is True
-        # 软链接已删除，本地源码目录仍完整存在
-        assert not target_dir.exists()
-        assert plugin_source.exists()
-        assert (plugin_source / "config.yaml").exists()
-
-    def test_install_from_zip_is_copy(self, tmp_path, monkeypatch):
-        """压缩包安装仍是真实目录复制（非软链接）"""
-        import zipfile
-        from jarvis.jarvis_agent.utils import install_plugin
-
-        plugin_source = tmp_path / "zip_plugin_copy"
-        plugin_source.mkdir()
-        with open(plugin_source / "config.yaml", "w", encoding="utf-8") as f:
-            f.write("name: zip-plugin-copy\nversion: 1.0\n")
-
-        zip_file = tmp_path / "plugin_copy.zip"
-        with zipfile.ZipFile(zip_file, "w") as zf:
-            zf.write(plugin_source / "config.yaml", "config.yaml")
-
-        test_data_dir = tmp_path / ".jarvis"
-        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
-
-        assert install_plugin(str(zip_file)) is True
-        target_dir = test_data_dir / "plugins" / "zip-plugin-copy"
-        assert target_dir.exists()
-        assert not target_dir.is_symlink()
-        assert (target_dir / "config.yaml").exists()
+        # list_plugins_info 读取缓存标记 hasUpdate
+        infos = list_plugins_info()
+        cache_info = next(i for i in infos if i["name"] == "cache-plugin")
+        assert cache_info["hasUpdate"] is True
 
 
 class TestAutoDiscoverPlugins:

@@ -151,7 +151,7 @@ describe("PluginSidebar", () => {
     const fetchWithAuth = makeFetch({
       "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
         success: true,
-        data: { node_id: "master", plugins: [plugin()] },
+        data: { node_id: "master", plugins: [plugin({ hasUpdate: true })] },
       }),
       "POST http://127.0.0.1:8000/api/node/master/plugins/demo-plugin/upgrade": () => ({
         success: true,

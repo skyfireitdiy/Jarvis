@@ -28,7 +28,7 @@
         <input
           v-model="installSource"
           class="plugin-install-input"
-          placeholder="来源：本地路径或 http(s):// URL"
+          placeholder="git 仓库地址，如 https://github.com/owner/repo"
           @keyup.enter="installPlugin"
         />
         <div class="plugin-install-row">
@@ -75,7 +75,12 @@
               <span class="plugin-item-meta-label">前端扩展</span> {{ plugin.frontend ? '是' : '否' }}
             </div>
             <div v-if="!plugin.builtin" class="plugin-item-actions">
-              <button class="plugin-btn plugin-btn-sm" :disabled="pluginBusy[plugin.name]" @click="upgradePlugin(plugin)">升级</button>
+              <button
+                v-if="plugin.hasUpdate"
+                class="plugin-btn plugin-btn-sm"
+                :disabled="pluginBusy[plugin.name]"
+                @click="upgradePlugin(plugin)"
+              >更新</button>
               <button class="plugin-btn plugin-btn-sm plugin-btn-danger" :disabled="pluginBusy[plugin.name]" @click="uninstallPlugin(plugin)">卸载</button>
             </div>
           </div>
