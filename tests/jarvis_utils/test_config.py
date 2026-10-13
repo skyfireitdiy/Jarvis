@@ -13,6 +13,7 @@ from jarvis.jarvis_utils.config import (
     GLOBAL_CONFIG_DATA,
 )
 from jarvis.jarvis_utils.utils import _load_plugin_configs
+from jarvis.jarvis_utils.utils import _is_api_version_compatible
 
 
 @pytest.fixture
@@ -382,6 +383,49 @@ class TestConfigPriority:
         # 后加载的插件列表在前（与 _deep_merge 列表追加语义一致）
         mcp_names = [item["name"] for item in result["mcp"]]
         assert mcp_names == ["mcp2", "mcp1"]
+
+    def test_is_api_version_compatible(self):
+        """测试接口版本兼容性判断"""
+        # 兼容：声明版本 <= 当前支持版本
+        assert _is_api_version_compatible("1.0") is True
+        assert _is_api_version_compatible("1.5") is True
+        # 不兼容：声明更高 major
+        assert _is_api_version_compatible("2.0") is False
+        assert _is_api_version_compatible("3.1") is False
+        # 无法解析的版本号视为兼容（不阻断加载）
+        assert _is_api_version_compatible("abc") is True
+        assert _is_api_version_compatible("") is True
+
+    def test_plugin_api_version_compatible_loads(self, tmp_path, capsys):
+        """测试插件声明兼容的 api_version 时正常加载、无警告"""
+        plugin_dir = tmp_path / "plugin"
+        plugin_dir.mkdir()
+        with open(plugin_dir / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump(
+                {"api_version": "1.0", "tool_load_dirs": ["/plugin/tools"]}, f
+            )
+
+        result = _load_plugin_configs({"plugin_dirs": [str(plugin_dir)]})
+        assert result["tool_load_dirs"] == ["/plugin/tools"]
+        # 不兼容警告不应出现
+        out = capsys.readouterr().out
+        assert "接口版本" not in out
+
+    def test_plugin_api_version_incompatible_warns(self, tmp_path, capsys):
+        """测试插件声明更高 api_version 时降级警告但仍加载"""
+        plugin_dir = tmp_path / "plugin"
+        plugin_dir.mkdir()
+        with open(plugin_dir / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump(
+                {"api_version": "2.0", "tool_load_dirs": ["/plugin/tools"]}, f
+            )
+
+        result = _load_plugin_configs({"plugin_dirs": [str(plugin_dir)]})
+        # 仍正常加载（降级而非拒绝）
+        assert result["tool_load_dirs"] == ["/plugin/tools"]
+        out = capsys.readouterr().out
+        assert "接口版本" in out
+        assert "2.0" in out
 
     def test_deep_mixed_types(self, tmp_path):
         """测试混合类型：扩展点合并 + 私有字段隔离"""
