@@ -18,6 +18,7 @@ patches*
 build
 uv.lock
 *.pdf
+.pr-body-*.md
 plantuml-images
 package-lock.json
 package.json

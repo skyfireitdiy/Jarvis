@@ -17,7 +17,7 @@
           <span class="session-meta-tag" v-if="agent.node_id" title="运行节点">
             <span class="session-meta-label">节点</span>{{ getNodeDisplayName ? getNodeDisplayName(agent.node_id) : (agent.node_id || '') }}
           </span>
-          <span class="session-meta-tag" v-if="agent.llm_group" title="模型组">
+          <span class="session-meta-tag session-meta-tag-model" v-if="agent.llm_group" title="模型组">
             <span class="session-meta-label">模型</span>{{ agent.llm_group }}
           </span>
           <span class="session-meta-tag session-meta-tag-proxy" v-if="agent.proxy_node" title="代理节点">
@@ -977,13 +977,18 @@ function getTerminalStyle(terminalContent) {
   background: var(--color-bg-secondary);
   color: var(--color-text-secondary);
   white-space: nowrap;
-  max-width: 12ch;
+  max-width: 24ch;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .session-meta-tag .session-meta-label {
   opacity: 0.65;
+}
+
+/* 模型组标签：优先完整显示模型组名，不设过窄截断；空间不足时由容器收缩兜底 */
+.session-meta-tag-model {
+  max-width: none;
 }
 
 .session-meta-tag-proxy {

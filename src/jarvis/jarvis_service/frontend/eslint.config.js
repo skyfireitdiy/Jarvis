@@ -17,6 +17,8 @@ export default [
       // 前端为浏览器环境，提供 window/navigator/console/Blob/URL 等全局
       globals: {
         ...globals.browser,
+        // vite.config.js 通过 define 注入的构建时全局（前端版本号），eslint 需显式声明
+        __APP_VERSION__: "readonly",
       },
     },
     rules: {
