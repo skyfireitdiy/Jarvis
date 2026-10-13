@@ -299,6 +299,18 @@
       },
       "additionalProperties": false
     },
+    "task_verification": {
+      "type": "object",
+      "description": "任务验证流程配置。任务验证会创建独立的验证 Agent 核验任务是否真正完成，默认关闭以降低任务完成阶段的开销",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "是否启用任务验证流程。关闭时所有类型任务标记 completed 时直接通过，跳过验证 Agent 创建与运行；开启时保留现有验证逻辑",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
     "enable_autonomous": {
       "type": "boolean",
       "description": "是否启用智能增强功能（情绪识别、歧义检测、对话管理、主动交互）",

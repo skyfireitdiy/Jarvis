@@ -287,3 +287,53 @@ class TestDependencyValidationIntegration:
         # 验证依赖验证失败，任务不能执行
         assert result["success"] is False
         assert "依赖任务 'failed_dep' 执行失败" in result["stderr"]
+
+
+class TestTaskVerificationConfig:
+    """测试任务验证配置项（task_verification.enabled）"""
+
+    def setup_method(self):
+        """设置测试环境"""
+        self.tool = task_list_manager()
+        self.mock_agent = Mock()
+        self.mock_agent.name = "test_agent"
+
+    def test_verification_disabled_by_default(self, monkeypatch):
+        """测试默认情况下任务验证关闭"""
+        monkeypatch.setattr(
+            "jarvis.jarvis_utils.config.GLOBAL_CONFIG_DATA",
+            {},
+        )
+        assert self.tool._is_task_verification_enabled() is False
+
+    def test_verification_enabled_when_configured(self, monkeypatch):
+        """测试配置开启时任务验证启用"""
+        monkeypatch.setattr(
+            "jarvis.jarvis_utils.config.GLOBAL_CONFIG_DATA",
+            {"task_verification": {"enabled": True}},
+        )
+        assert self.tool._is_task_verification_enabled() is True
+
+    def test_verification_disabled_when_explicitly_false(self, monkeypatch):
+        """测试配置显式关闭时任务验证关闭"""
+        monkeypatch.setattr(
+            "jarvis.jarvis_utils.config.GLOBAL_CONFIG_DATA",
+            {"task_verification": {"enabled": False}},
+        )
+        assert self.tool._is_task_verification_enabled() is False
+
+    def test_verification_disabled_when_config_not_dict(self, monkeypatch):
+        """测试配置项非 dict 时按默认关闭处理"""
+        monkeypatch.setattr(
+            "jarvis.jarvis_utils.config.GLOBAL_CONFIG_DATA",
+            {"task_verification": "invalid"},
+        )
+        assert self.tool._is_task_verification_enabled() is False
+
+    def test_verification_disabled_when_missing_enabled(self, monkeypatch):
+        """测试配置项缺少 enabled 字段时按默认关闭处理"""
+        monkeypatch.setattr(
+            "jarvis.jarvis_utils.config.GLOBAL_CONFIG_DATA",
+            {"task_verification": {}},
+        )
+        assert self.tool._is_task_verification_enabled() is False
