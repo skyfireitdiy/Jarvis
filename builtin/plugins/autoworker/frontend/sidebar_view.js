@@ -163,6 +163,8 @@ export default {
       // 详情/编辑
       selected: null,
       editForm: { title: "", description: "", tags: "", due_date: todayStr() },
+      // 手动添加关键信息（note）输入
+      noteInput: "",
       // 新建任务表单
       creating: false,
       createForm: { title: "", description: "", tags: "", due_date: todayStr() },
@@ -604,6 +606,33 @@ export default {
         this.busy = false;
       }
     },
+    // ---- 手动添加关键信息（note）----
+    async addNote(task) {
+      this.closeItemMenu();
+      if (!task) return;
+      const content = (this.noteInput || "").trim();
+      if (!content) {
+        this.error = "请填写关键信息内容";
+        return;
+      }
+      this.busy = true;
+      this.error = "";
+      this.message = "";
+      try {
+        await callFunction("add_note", {
+          workdir: this.workdir,
+          task_id: task.id,
+          content: content,
+        }, this.nodeId);
+        this.message = `已为任务 ${task.id} 保存关键信息`;
+        this.noteInput = "";
+        await this.refresh(true);
+      } catch (e) {
+        this.error = String((e && e.message) || e);
+      } finally {
+        this.busy = false;
+      }
+    },
     // ---- 右键菜单 ----
     openItemMenu(task, event) {
       this.menuItem = task;
@@ -953,6 +982,13 @@ export default {
 
       <!-- notes -->
       <div style="font-size:12px;font-weight:600;margin:12px 0 6px;">关键信息 ({{ (selected.notes || []).length }})</div>
+      <div style="display:flex;gap:6px;margin-bottom:8px;align-items:flex-start;">
+        <textarea v-model="noteInput" @keydown.ctrl.enter="addNote(selected)" :disabled="busy"
+          rows="3" placeholder="输入关键信息（支持多行，Ctrl+Enter 或点击添加）…"
+          style="flex:1;min-width:0;background:#1e1e1e;border:1px solid #333;border-radius:4px;padding:5px 8px;color:#ddd;font-size:12px;outline:none;resize:vertical;line-height:1.5;"></textarea>
+        <button @click="addNote(selected)" :disabled="busy || !(noteInput || '').trim()"
+          style="padding:5px 10px;background:#238636;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;white-space:nowrap;">添加</button>
+      </div>
       <div v-for="(n, i) in (selected.notes || [])" :key="i" style="background:#1e1e1e;padding:6px;border-radius:6px;margin-bottom:6px;">
         <div style="font-size:11px;color:#888;">{{ fmtDate(n.time) }}</div>
         <div style="white-space:pre-wrap;font-size:12px;margin-top:2px;">{{ n.content }}</div>
