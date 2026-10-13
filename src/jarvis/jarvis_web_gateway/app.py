@@ -2182,7 +2182,15 @@ def create_app(
             raise ValueError("Persisted timer metadata.action must be an object")
         return _build_timer_action({"action": action_metadata})[0]
 
-    timer_manager = TimerManager(task_factory=_build_callback_from_metadata)
+    # Agent 进程（custom_app 模式）与主网关共享同一持久化文件 .jarvis_timers.json。
+    # 若 Agent 进程也加载/写回该文件，会与主网关的 TimerManager 互相覆盖：
+    # 主网关删除的任务会被 Agent 进程触发时写回（任务复活），
+    # 主网关新建的任务会被 Agent 进程用旧任务集覆盖（任务丢失）。
+    # 因此 Agent 进程的 TimerManager 仅作内存态使用，禁用持久化。
+    timer_manager = TimerManager(
+        task_factory=_build_callback_from_metadata,
+        persist_enabled=custom_app is None,
+    )
 
     # 保存 router 到全局，用于状态更新时推送消息
     global _router, _terminal_session_manager, _node_connection_manager, _node_runtime

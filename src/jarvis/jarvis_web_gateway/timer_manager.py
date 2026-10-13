@@ -79,7 +79,11 @@ class TimerManager:
 
     PERSISTENCE_FILE = Path(get_data_dir()) / "gateway" / ".jarvis_timers.json"
 
-    def __init__(self, task_factory: Optional[TaskFactory] = None) -> None:
+    def __init__(
+        self,
+        task_factory: Optional[TaskFactory] = None,
+        persist_enabled: bool = True,
+    ) -> None:
         self._lock = threading.RLock()
         self._condition = threading.Condition(self._lock)
         self._tasks: Dict[str, TimerTask] = {}
@@ -87,6 +91,10 @@ class TimerManager:
         self._sequence = 0
         self._shutdown = False
         self._task_factory = task_factory
+        # 持久化开关：Agent 进程（custom_app 模式）共享同一持久化文件，
+        # 若各自加载/写回会导致任务互相覆盖（删除的任务复活、新建的任务丢失）。
+        # 因此 Agent 进程的 TimerManager 仅作内存态使用，不读不写持久化文件。
+        self._persist_enabled = persist_enabled
         self._worker = threading.Thread(
             target=self._run_loop,
             daemon=True,
@@ -207,6 +215,8 @@ class TimerManager:
 
     def load_persisted_tasks(self) -> None:
         """显式加载已持久化的定时任务。"""
+        if not self._persist_enabled:
+            return
         self._load_tasks()
 
     def restore_task(self, task_data: Dict[str, Any]) -> str:
@@ -381,6 +391,8 @@ class TimerManager:
 
     def _persist_tasks_locked(self) -> None:
         """将当前任务集合写入持久化文件。调用方需持有锁。"""
+        if not self._persist_enabled:
+            return
         try:
             self.PERSISTENCE_FILE.parent.mkdir(parents=True, exist_ok=True)
             data = [

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import threading
 import time
 from datetime import datetime
@@ -168,5 +169,77 @@ def test_restore_cron_task() -> None:
         assert (
             abs(datetime.fromisoformat(info["run_at"]).timestamp() - expected_ts) < 1.0
         )
+    finally:
+        manager.shutdown()
+
+
+def test_persist_disabled_does_not_load_or_write_file(
+    tmp_path, monkeypatch
+) -> None:
+    """persist_enabled=False 时：不加载持久化文件、不写回文件。
+
+    对应 Agent 进程（custom_app 模式）场景：多个 TimerManager 共享同一
+    持久化文件会互相覆盖，导致主网关删除的任务被写回（复活）、新建任务被
+    覆盖（丢失）。禁用持久化后 Agent 进程的 TimerManager 仅作内存态使用。
+    """
+    persist_file = tmp_path / ".jarvis_timers.json"
+    # 预置一个已持久化的任务，验证 persist_enabled=False 时不会被加载
+    persist_file.write_text(
+        json.dumps(
+            [
+                {
+                    "task_id": "ghost-task",
+                    "run_at": "2026-10-13T16:00:00",
+                    "interval_seconds": 300.0,
+                    "cron_expr": None,
+                    "is_recurring": True,
+                    "cancelled": False,
+                    "metadata": {
+                        "action": {
+                            "type": "run_shell_command",
+                            "params": {
+                                "command": "echo hi",
+                                "working_dir": "/tmp",
+                                "interpreter": "bash",
+                            },
+                        },
+                        "schedule": {"type": "interval", "interval_seconds": 300.0},
+                    },
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    manager = TimerManager(persist_enabled=False)
+    monkeypatch.setattr(
+        type(manager), "PERSISTENCE_FILE", persist_file
+    )
+    try:
+        # 1) 不加载持久化文件中的任务
+        manager.load_persisted_tasks()
+        assert manager.list_tasks() == []
+
+        # 2) 调度任务后不写回文件
+        manager.schedule_after(3600, lambda: None)
+        assert persist_file.read_text(encoding="utf-8").strip() != "[]"
+        # 文件内容应保持为预置的 ghost-task，未被本实例覆盖
+        loaded = json.loads(persist_file.read_text(encoding="utf-8"))
+        assert [t["task_id"] for t in loaded] == ["ghost-task"]
+    finally:
+        manager.shutdown()
+
+
+def test_persist_enabled_still_loads_and_writes(tmp_path, monkeypatch) -> None:
+    """persist_enabled=True（默认，主网关模式）行为不变：加载并写回文件。"""
+    persist_file = tmp_path / ".jarvis_timers.json"
+    persist_file.write_text("[]", encoding="utf-8")
+
+    manager = TimerManager(persist_enabled=True)
+    monkeypatch.setattr(type(manager), "PERSISTENCE_FILE", persist_file)
+    try:
+        manager.schedule_after(3600, lambda: None)
+        loaded = json.loads(persist_file.read_text(encoding="utf-8"))
+        assert len(loaded) == 1
     finally:
         manager.shutdown()
