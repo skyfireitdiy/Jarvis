@@ -633,6 +633,39 @@ export default {
         this.busy = false;
       }
     },
+    // ---- 复制文本（关键信息等）----
+    async copyText(text, label) {
+      if (!text) return;
+      const done = () => {
+        this.message = `${label || "内容"}已复制`;
+        setTimeout(() => {
+          if (this.message === `${label || "内容"}已复制`) this.message = "";
+        }, 2000);
+      };
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          done();
+          return;
+        }
+        // 降级：textarea + execCommand
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        if (ok) {
+          done();
+        } else {
+          this.error = "复制失败，请手动选中复制";
+        }
+      } catch (e) {
+        this.error = String((e && e.message) || e);
+      }
+    },
     // ---- 右键菜单 ----
     openItemMenu(task, event) {
       this.menuItem = task;
@@ -990,8 +1023,12 @@ export default {
           style="padding:5px 10px;background:#238636;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;white-space:nowrap;">添加</button>
       </div>
       <div v-for="(n, i) in (selected.notes || [])" :key="i" style="background:#1e1e1e;padding:6px;border-radius:6px;margin-bottom:6px;">
-        <div style="font-size:11px;color:#888;">{{ fmtDate(n.time) }}</div>
-        <div style="white-space:pre-wrap;font-size:12px;margin-top:2px;">{{ n.content }}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+          <div style="font-size:11px;color:#888;">{{ fmtDate(n.time) }}</div>
+          <button @click="copyText(n.content, '关键信息')"
+            style="padding:1px 6px;background:transparent;color:#58a6ff;border:1px solid #58a6ff55;border-radius:3px;cursor:pointer;font-size:10px;white-space:nowrap;">复制</button>
+        </div>
+        <div style="white-space:pre-wrap;font-size:12px;margin-top:2px;user-select:text;-webkit-user-select:text;">{{ n.content }}</div>
       </div>
       <div v-if="!(selected.notes || []).length" style="font-size:11px;color:#888;">暂无</div>
 
