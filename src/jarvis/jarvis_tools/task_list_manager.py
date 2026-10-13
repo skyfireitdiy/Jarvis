@@ -1144,7 +1144,7 @@ class task_list_manager:
                         },
                         "verification_method": {
                             "type": "string",
-                            "description": "验证方法说明（当 status 更新为 completed 时必填），将传给验证 Agent 作为指导。需包含：1)需检查的文件/代码位置（路径、函数名、行号）；2)验证的具体步骤（命令/工具/检查内容）；3)预期验证结果（通过/失败各应看到什么）；4)判断标准（明确通过/失败条件）。描述应详尽具体。",
+                            "description": "验证方法说明（当 status 更新为 completed 且启用任务验证流程 task_verification.enabled 时必填），将传给验证 Agent 作为指导。需包含：1)需检查的文件/代码位置（路径、函数名、行号）；2)验证的具体步骤（命令/工具/检查内容）；3)预期验证结果（通过/失败各应看到什么）；4)判断标准（明确通过/失败条件）。描述应详尽具体。",
                         },
                     },
                 },
@@ -2342,7 +2342,13 @@ class task_list_manager:
 
             if status is not None:
                 # 当状态更新为 completed 时，验证 verification_method 必须存在
-                if status == "completed" and task.status.value != "completed":
+                # （仅在启用任务验证流程 task_verification.enabled 时才强制要求；
+                #   配置关闭时不强制，任务直接完成）
+                if (
+                    status == "completed"
+                    and task.status.value != "completed"
+                    and self._is_task_verification_enabled()
+                ):
                     if not verification_method or not str(verification_method).strip():
                         return {
                             "success": False,
