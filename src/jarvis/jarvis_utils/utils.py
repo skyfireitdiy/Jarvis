@@ -1294,6 +1294,8 @@ def load_config() -> None:
                 _ensure_schema_declaration(
                     main_config_dir, main_config_file, content, merged_config
                 )
+                # 缓存不含插件扩展点的基础配置（供插件变更后免重启重载）
+                cache_base_config(merged_config, main_config_dir)
                 # 加载并合并插件配置，传入配置文件所在目录用于解析相对路径
                 merged_config = _load_plugin_configs(merged_config, main_config_dir)
                 set_global_config_data(merged_config)
@@ -1542,6 +1544,62 @@ def _is_api_version_compatible(plugin_api_version: str) -> bool:
     return plugin_major <= current_major
 
 
+# 基础配置缓存（不含插件扩展点），供插件安装/升级/卸载后免重启重载配置使用。
+# 由 cache_base_config 在 load_config 时写入；reload_plugin_configs 基于它
+# 重新合并插件扩展点并更新全局配置，使新插件立即生效（Issue #234）。
+_base_config_cache: Dict[str, Any] = {}
+_base_config_dir: Optional[str] = None
+# 保护基础配置缓存与全局配置更新的并发安全（clear+update 非原子）
+_plugin_reload_lock = threading.Lock()
+
+
+def cache_base_config(
+    config_data: Dict[str, Any], config_file_dir: Optional[str] = None
+) -> None:
+    """缓存不含插件扩展点的基础配置（供插件变更后免重启重载）。
+
+    在 load_config 合并插件扩展点之前调用，保存基础配置副本与配置文件目录，
+    供 reload_plugin_configs 重载时使用。
+
+    参数:
+        config_data: 合并插件扩展点之前的基础配置字典
+        config_file_dir: 配置文件所在目录（用于重载时解析相对路径）
+    """
+    import copy
+
+    global _base_config_cache, _base_config_dir
+    with _plugin_reload_lock:
+        _base_config_cache = copy.deepcopy(config_data)
+        _base_config_dir = config_file_dir
+
+
+def reload_plugin_configs() -> bool:
+    """插件变更后免重启重载配置（Issue #234）。
+
+    重新扫描 plugins 目录（含内置与外部插件），把各插件扩展点重新合并进
+    全局配置并更新 GLOBAL_CONFIG_DATA，使新安装/升级的插件配置声明立即生效，
+    无需重启网关进程。
+
+    返回:
+        bool: 重载成功返回 True；尚未加载过配置（无基础配置缓存）时返回 False。
+    """
+    import copy
+
+    global _base_config_cache, _base_config_dir
+    with _plugin_reload_lock:
+        if not _base_config_cache:
+            return False
+        try:
+            merged = _load_plugin_configs(
+                copy.deepcopy(_base_config_cache), _base_config_dir
+            )
+            set_global_config_data(merged)
+            return True
+        except Exception as e:
+            PrettyOutput.auto_print(f"❌ 重载插件配置失败: {e}")
+            return False
+
+
 def _load_plugin_configs(
     merged_config: Dict[str, Any], config_file_dir: Optional[str] = None
 ) -> Dict[str, Any]:
@@ -1729,8 +1787,10 @@ def _load_and_process_config(jarvis_dir: str, config_file: str) -> None:
     try:
         content, config_data = _load_config_file(config_file)
         _ensure_schema_declaration(jarvis_dir, config_file, content, config_data)
-        # 加载并合并插件配置，传入配置文件所在目录用于解析相对路径
+        # 缓存不含插件扩展点的基础配置（供插件变更后免重启重载）
         config_file_dir = str(Path(config_file).parent)
+        cache_base_config(config_data, config_file_dir)
+        # 加载并合并插件配置，传入配置文件所在目录用于解析相对路径
         config_data = _load_plugin_configs(config_data, config_file_dir)
         set_global_config_data(config_data)
         _process_env_variables(config_data)

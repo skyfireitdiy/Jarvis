@@ -1623,6 +1623,15 @@ def install_plugin(
         # 失败仅警告，不阻断安装（主体文件已就位）。
         _run_plugin_hooks(target_dir, "post-install", phase="post")
 
+        # 免重启重载配置：重新扫描 plugins 目录并合并扩展点，使新插件配置
+        # 声明立即生效（Issue #234）。失败仅警告，不阻断安装。
+        try:
+            from jarvis.jarvis_utils.utils import reload_plugin_configs
+
+            reload_plugin_configs()
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 重载插件配置失败（可稍后重启生效）: {e}")
+
         PrettyOutput.auto_print(f"✅ 插件安装成功: {plugin_name} -> {target_dir}")
         return True
 
@@ -2381,6 +2390,14 @@ def uninstall_plugin(plugin_name: str) -> bool:
                 "post-uninstall",
                 phase="post",
             )
+        # 免重启重载配置：重新扫描 plugins 目录并合并扩展点，使卸载后的
+        # 插件配置声明立即移除（Issue #234）。失败仅警告，不阻断卸载。
+        try:
+            from jarvis.jarvis_utils.utils import reload_plugin_configs
+
+            reload_plugin_configs()
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 重载插件配置失败（可稍后重启生效）: {e}")
         return True
     except Exception as e:
         PrettyOutput.auto_print(f"❌ 卸载插件失败: {str(e)}")
@@ -2590,6 +2607,15 @@ def upgrade_plugin(plugin_name: str) -> bool:
         # 执行 post-update 钩子（从更新后的插件目录 config.yaml 读取）。
         # 失败仅警告，不阻断升级（代码已更新）。
         _run_plugin_hooks(plugin_dir, "post-update", phase="post")
+
+        # 免重启重载配置：重新扫描 plugins 目录并合并扩展点，使升级后的
+        # 插件配置声明立即生效（Issue #234）。失败仅警告，不阻断升级。
+        try:
+            from jarvis.jarvis_utils.utils import reload_plugin_configs
+
+            reload_plugin_configs()
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 重载插件配置失败（可稍后重启生效）: {e}")
 
         PrettyOutput.auto_print(f"✅ 插件升级成功: {plugin_name}")
         return True
