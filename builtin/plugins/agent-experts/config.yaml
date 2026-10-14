@@ -4,5 +4,6 @@ description: 内置专家 Agent 定义集——提供 6 个专家角色，供内
 version: 0.1.0
 builtin: true
 license: MIT
+logo: frontend/icon.svg
 agent_definition_dirs:
   - "{{plugin_dir}}/agents"

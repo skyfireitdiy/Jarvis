@@ -8849,6 +8849,33 @@ def create_app(
                 "error": {"code": "INTERNAL_ERROR", "message": str(e)},
             }
 
+    @app.get("/api/plugins/market", dependencies=[Depends(verify_token)])
+    async def list_market_plugins_api(request: Request) -> Dict[str, Any]:
+        """列出插件市场中的可用插件（需要 admin:plugins 权限）。
+
+        从配置的插件市场仓库（plugin_market_repos）拉取并解析市场清单，
+        返回可浏览/安装的社区插件列表。
+        """
+        try:
+            user_info = getattr(request.state, "user_info", None)
+            if node_config.is_master and _check_permission(user_info, "admin:plugins"):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "PERMISSION_DENIED",
+                        "message": "Permission denied: admin:plugins",
+                    },
+                }
+            from jarvis.jarvis_agent.utils import list_market_plugins
+
+            plugins = list_market_plugins()
+            return {"success": True, "data": {"plugins": plugins}}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
     @app.post("/api/plugins/install", dependencies=[Depends(verify_token)])
     async def install_plugin_api(
         request_body: Dict[str, Any], request: Request

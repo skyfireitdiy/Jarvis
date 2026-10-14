@@ -4,6 +4,7 @@ description: GitHub/Gitee 助手——自动处理当前仓库的 PR 和 Issue�
 version: 0.1.0
 builtin: true
 license: MIT
+logo: frontend/icon.svg
 rules_load_dirs:
   - "{{plugin_dir}}/rules"
 frontend:

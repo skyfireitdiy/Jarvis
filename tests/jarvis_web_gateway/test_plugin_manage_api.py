@@ -438,3 +438,35 @@ def test_call_plugin_function_plugin_not_found(client, isolated_data_dir):
     body = resp.json()
     assert body["success"] is False
     assert body["error"]["code"] == "FUNCTION_API_NOT_FOUND"
+
+
+def test_list_market_plugins_api(client, monkeypatch):
+    """市场浏览 API 返回解析后的市场插件列表。"""
+    import jarvis.jarvis_agent.utils as agent_utils
+
+    fake_plugins = [
+        {
+            "id": "market-p",
+            "name": "市场插件",
+            "description": "来自市场的插件",
+            "repo": "https://github.com/owner/market-p",
+            "branch": "main",
+            "author": "作者甲",
+            "license": "MIT",
+            "logo": "",
+            "categories": ["工具"],
+            "market_repo": "https://github.com/skyfireitdiy/plugin-market",
+        }
+    ]
+    monkeypatch.setattr(agent_utils, "list_market_plugins", lambda: fake_plugins)
+
+    resp = client.get("/api/plugins/market", headers=_auth_headers())
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is True
+    plugins = body["data"]["plugins"]
+    assert len(plugins) == 1
+    assert plugins[0]["id"] == "market-p"
+    assert plugins[0]["name"] == "市场插件"
+    assert plugins[0]["repo"] == "https://github.com/owner/market-p"
+    assert plugins[0]["branch"] == "main"
