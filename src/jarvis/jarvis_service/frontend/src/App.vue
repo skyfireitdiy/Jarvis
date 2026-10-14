@@ -1880,6 +1880,8 @@
         </div>
       </div>
     </div>
+    <!-- 用户协议弹窗（首次打开页面时展示；不同意则不能使用软件） -->
+    <UserAgreementModal :visible="showAgreement" @agree="onAgreementAgree" />
     <!-- Toast 提示 -->
     <transition name="toast-fade">
       <div v-if="toast.show" class="toast" :class="`toast-${toast.type}`">
@@ -1979,6 +1981,8 @@ import { useMessage } from './composables/useMessage.js'
 import { usePanel } from './composables/usePanel.js'
 import { useSessionPanel } from './composables/useSessionPanel.js'
 import { useFocus } from './composables/useFocus.js'
+import { useUserAgreement } from './composables/useUserAgreement.js'
+import UserAgreementModal from './components/UserAgreementModal.vue'
 
 // 图表渲染（plantuml/mermaid/dot），拆自独立 composable
 const {
@@ -3006,6 +3010,20 @@ const showConnectModal = ref(true)  // 首次打开显示欢迎界面
 const showSettingsModal = ref(false) // 设置弹窗
 const showAdminPanel = ref(false) // 管理面板
 const showAboutModal = ref(false) // 关于弹窗
+// 用户协议（首次打开页面时弹出；不同意则不能使用软件）
+const {
+  showAgreement,
+  hasAccepted: agreementAccepted,
+  agree: agreeAgreement,
+} = useUserAgreement()
+// 用户同意协议：放行界面（关闭协议弹窗并进入正常流程）
+function onAgreementAgree() {
+  agreeAgreement()
+  // 未登录时恢复欢迎/登录界面（已登录场景 onMounted 已自动连接，无需恢复）
+  if (!hasAuthToken()) {
+    showConnectModal.value = true
+  }
+}
 // 「关于」面板数据：后端版本 / 节点 / daemon / 浏览器扩展
 const aboutBackendVersion = ref('')
 const aboutNodes = ref([])
@@ -5662,6 +5680,7 @@ function isAutoFocusSuppressed() {
 
 function isAnyModalOpen() {
   return Boolean(
+    showAgreement.value ||
     showConnectModal.value ||
     showSettingsModal.value ||
     showDiffModal.value ||
@@ -7753,6 +7772,12 @@ watch(
 )
 
 onMounted(() => {
+  // 阶段0：用户协议检查——首次打开且未同意时，弹出协议并锁死界面（不同意则不能使用软件）
+  if (!agreementAccepted()) {
+    showAgreement.value = true
+    // 锁死欢迎/登录界面，避免在协议弹窗背后出现可操作界面
+    showConnectModal.value = false
+  }
   // 阶段4：恢复上次的编辑器分割布局（非法数据自动回退默认单 leaf）
   restoreWorkspacePaneLayout()
   // 终端名称：用户从未配置过时，用本机 daemon 上报的计算机名作为默认值
