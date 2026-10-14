@@ -153,6 +153,10 @@ export function useWorkspaceEditor({
   topologyExtensionSessions: topologyExtensionSessionsGetter,
   getWorkspaceTargetNodeId: getWorkspaceTargetNodeIdGetter,
 }) {
+  // 侧边栏布局常量：活动栏固定 44px；侧边栏最小宽度与 App.vue 的 EDITOR_SIDEBAR_MIN_WIDTH 保持一致。
+  const WORKSPACE_ACTIVITY_BAR_WIDTH = 44
+  const EDITOR_SIDEBAR_MIN_WIDTH = 200
+
   // —— getter 化依赖的安全包装（内部以 xxx() 二次求值）——
   const fileTreeState = () => fileTreeStateGetter()
   const initFileTree = (...args) => { const fn = initFileTreeGetter(); if (fn) return fn(...args) }
@@ -235,7 +239,21 @@ function onWorkspaceSidebarResize(event) {
 
   const deltaX = event.clientX - workspaceSidebarResizeState.value.startX
   const nextWidth = workspaceSidebarResizeState.value.startWidth + deltaX
-  workspaceSidebarWidth.value = normalizeWorkspaceSidebarWidth(nextWidth)
+  // 取消固定 560px 上限：侧边栏可拉得很宽，上限为「窗口宽度 - 活动栏(44)」，
+  // 主编辑区可被压缩（不额外保护，用户可再拖回来）。
+  const maxSidebarWidth = Math.max(
+    windowWidth.value - WORKSPACE_ACTIVITY_BAR_WIDTH,
+    EDITOR_SIDEBAR_MIN_WIDTH
+  )
+  const clampedWidth = normalizeWorkspaceSidebarWidth(nextWidth, maxSidebarWidth)
+  workspaceSidebarWidth.value = clampedWidth
+
+  // 面板跟随侧边栏变宽：保证面板能容纳「侧边栏 + 活动栏」，避免侧边栏拖宽后被
+  // CSS max-width 挡住而拉不动；主编辑区可被压缩到 0（不额外保护，用户可拖回）。
+  const minPanelWidth = clampedWidth + WORKSPACE_ACTIVITY_BAR_WIDTH
+  if (workspacePanelRect.value.width < minPanelWidth) {
+    workspacePanelRect.value.width = Math.min(minPanelWidth, windowWidth.value)
+  }
 }
 
 function stopWorkspaceSidebarResize() {
