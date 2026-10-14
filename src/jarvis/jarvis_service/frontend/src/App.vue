@@ -546,6 +546,7 @@
                 :gatewayUrl="gatewayUrl"
                 :getHttpProtocol="getHttpProtocol"
                 :showToast="showToast"
+                :showConfirm="showConfirm"
                 :availableNodeOptions="availableNodeOptions"
               />
             </div>
