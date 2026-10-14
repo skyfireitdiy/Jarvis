@@ -1969,6 +1969,103 @@ def list_market_plugins() -> List[dict]:
     return plugins
 
 
+def filter_market_plugins(
+    plugins: List[dict],
+    keyword: str = "",
+    category: str = "",
+    market_repo: str = "",
+    installed_names: Optional[set] = None,
+    installed: Optional[bool] = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> dict:
+    """对市场插件列表做搜索、过滤与分页（纯函数，便于测试）。
+
+    参数:
+        plugins: ``list_market_plugins()`` 返回的原始市场插件列表
+        keyword: 搜索关键字，匹配插件 name/description/author（大小写不敏感）
+        category: 按分类过滤（插件的 categories 列表包含该分类即命中）
+        market_repo: 按来源市场仓库过滤（精确匹配）
+        installed_names: 已安装插件名集合（用于 installed 过滤判断）
+        installed: True 只显示已安装；False 只显示未安装；None 不过滤
+        page: 页码（从 1 开始），越界时钳制到有效范围
+        page_size: 每页数量（1~100，默认 20）
+
+    返回:
+        dict: 分页与过滤结果，字段：
+            - plugins: 当前页插件列表
+            - total: 过滤后插件总数
+            - page: 当前页码（已钳制）
+            - page_size: 每页数量
+            - total_pages: 总页数
+            - filters: 全量过滤选项（基于原始列表，不受当前过滤影响）：
+                - categories: 去重排序后的全量分类列表
+                - market_repos: 去重排序后的全量来源市场仓库列表
+    """
+    kw = (keyword or "").strip().lower()
+    cat = (category or "").strip()
+    repo = (market_repo or "").strip()
+    installed_set = installed_names or set()
+
+    # 搜索 + 过滤
+    filtered: List[dict] = []
+    for p in plugins:
+        if kw:
+            haystack = " ".join(
+                [
+                    str(p.get("name") or ""),
+                    str(p.get("description") or ""),
+                    str(p.get("author") or ""),
+                ]
+            ).lower()
+            if kw not in haystack:
+                continue
+        if cat and cat not in (p.get("categories") or []):
+            continue
+        if repo and p.get("market_repo") != repo:
+            continue
+        if installed is not None:
+            name = str(p.get("name") or p.get("id") or "")
+            is_installed = name in installed_set
+            if installed and not is_installed:
+                continue
+            if not installed and is_installed:
+                continue
+        filtered.append(p)
+
+    # 全量过滤选项（基于原始列表，不受当前过滤影响）
+    categories = sorted(
+        {c for p in plugins for c in (p.get("categories") or []) if c}
+    )
+    market_repos = sorted(
+        {str(p.get("market_repo") or "") for p in plugins if p.get("market_repo")}
+    )
+
+    # 分页（钳制 page/page_size 到有效范围）
+    total = len(filtered)
+    try:
+        page = max(1, int(page or 1))
+    except (TypeError, ValueError):
+        page = 1
+    try:
+        page_size = max(1, min(int(page_size or 20), 100))
+    except (TypeError, ValueError):
+        page_size = 20
+    total_pages = max(1, (total + page_size - 1) // page_size) if total else 1
+    page = min(page, total_pages)
+    start = (page - 1) * page_size
+    page_plugins = filtered[start : start + page_size]
+
+    return {
+        "plugins": page_plugins,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+        "filters": {"categories": categories, "market_repos": market_repos},
+    }
+
+
 def _resolve_plugin_dir(plugin_dir) -> "pathlib.Path | None":
     """将插件目录参数归一化为 Path；无效时返回 None。"""
     from pathlib import Path
@@ -2693,4 +2790,5 @@ __all__ = [
     "uninstall_plugin",
     "upgrade_plugin",
     "list_market_plugins",
+    "filter_market_plugins",
 ]

@@ -118,6 +118,35 @@
             @click="loadMarket"
           >⟳</button>
         </div>
+        <!-- 搜索 + 过滤 -->
+        <div class="plugin-market-toolbar">
+          <input
+            v-model="marketKeyword"
+            class="plugin-market-search"
+            placeholder="搜索插件名称/描述/作者"
+            @input="onMarketQueryChange"
+          />
+          <select
+            v-model="marketCategory"
+            class="plugin-market-filter"
+            @change="onMarketQueryChange"
+          >
+            <option value="">全部分类</option>
+            <option v-for="c in marketCategories" :key="c" :value="c">{{ c }}</option>
+          </select>
+          <select
+            v-model="marketRepoFilter"
+            class="plugin-market-filter"
+            @change="onMarketQueryChange"
+          >
+            <option value="">全部来源</option>
+            <option v-for="r in marketRepos" :key="r" :value="r">{{ r }}</option>
+          </select>
+          <label class="plugin-market-installed-label">
+            <input type="checkbox" v-model="marketInstalledOnly" @change="onMarketQueryChange" />
+            <span>只看已安装</span>
+          </label>
+        </div>
         <div v-if="loadingMarket" class="plugin-empty">加载中...</div>
         <div v-else-if="marketPlugins.length === 0" class="plugin-empty">市场暂无可用插件</div>
         <div v-else class="plugin-list-inner">
@@ -147,6 +176,20 @@
               </span>
             </div>
           </div>
+        </div>
+        <!-- 分页 -->
+        <div v-if="marketTotalPages > 1" class="plugin-market-pagination">
+          <button
+            class="plugin-btn plugin-btn-sm"
+            :disabled="marketPage <= 1 || loadingMarket"
+            @click="goMarketPage(marketPage - 1)"
+          >上一页</button>
+          <span class="plugin-market-pageinfo">第 {{ marketPage }} / {{ marketTotalPages }} 页 · 共 {{ marketTotal }} 个</span>
+          <button
+            class="plugin-btn plugin-btn-sm"
+            :disabled="marketPage >= marketTotalPages || loadingMarket"
+            @click="goMarketPage(marketPage + 1)"
+          >下一页</button>
         </div>
       </div>
     </div>
@@ -221,6 +264,17 @@ const activeTab = ref('installed')
 const marketPlugins = ref([])
 const loadingMarket = ref(false)
 const marketBusy = ref({})
+// 市场搜索 / 过滤 / 分页
+const marketKeyword = ref('')
+const marketCategory = ref('')
+const marketRepoFilter = ref('')
+const marketInstalledOnly = ref(false)
+const marketCategories = ref([])
+const marketRepos = ref([])
+const marketPage = ref(1)
+const marketTotal = ref(0)
+const marketTotalPages = ref(1)
+const marketPageSize = ref(20)
 
 // 能力详情：右键菜单 + 弹窗
 const capMenuVisible = ref(false)
@@ -363,13 +417,43 @@ function onNodeChange() {
   if (activeTab.value === 'installed') loadPlugins()
 }
 
+// 市场查询参数变化：重置到第一页并重新加载
+function onMarketQueryChange() {
+  marketPage.value = 1
+  loadMarket()
+}
+
+function goMarketPage(page) {
+  if (page < 1 || page > marketTotalPages.value) return
+  marketPage.value = page
+  loadMarket()
+}
+
 async function loadMarket() {
   loadingMarket.value = true
   try {
-    const resp = await props.fetchWithAuth(buildApiUrl('/api/plugins/market'))
+    const params = new URLSearchParams()
+    if (marketKeyword.value.trim()) params.set('keyword', marketKeyword.value.trim())
+    if (marketCategory.value) params.set('category', marketCategory.value)
+    if (marketRepoFilter.value) params.set('market_repo', marketRepoFilter.value)
+    if (marketInstalledOnly.value) {
+      params.set('installed', 'true')
+      // 已安装插件名集合：以当前节点已安装插件为准
+      const installedNames = plugins.value.map(p => p.name).filter(Boolean)
+      if (installedNames.length) params.set('installed_names', installedNames.join(','))
+    }
+    params.set('page', String(marketPage.value))
+    params.set('page_size', String(marketPageSize.value))
+    const qs = params.toString()
+    const resp = await props.fetchWithAuth(buildApiUrl(`/api/plugins/market${qs ? '?' + qs : ''}`))
     const result = await resp.json()
-    if (result.success) marketPlugins.value = result.data?.plugins || []
-    else props.showToast(result.error?.message || '加载插件市场失败', 'error')
+    if (result.success) {
+      marketPlugins.value = result.data?.plugins || []
+      marketTotal.value = result.data?.total ?? marketPlugins.value.length
+      marketTotalPages.value = result.data?.total_pages ?? 1
+      marketCategories.value = result.data?.filters?.categories || []
+      marketRepos.value = result.data?.filters?.market_repos || []
+    } else props.showToast(result.error?.message || '加载插件市场失败', 'error')
   } catch (e) { props.showToast('加载插件市场失败: ' + e.message, 'error') }
   finally { loadingMarket.value = false }
 }
@@ -849,6 +933,63 @@ defineExpose({ loadPlugins })
 .plugin-market-title {
   font-size: 12px;
   font-weight: 600;
+  color: var(--text-secondary, #8ba3b8);
+}
+.plugin-market-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.plugin-market-search {
+  width: 100%;
+  padding: 6px 10px;
+  background: var(--bg-secondary, #0b1424);
+  border: 1px solid var(--border-color, #1a2a3a);
+  border-radius: 6px;
+  color: var(--text-primary, #d6e4f0);
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+.plugin-market-search:focus {
+  border-color: var(--accent, #20c8ff);
+}
+.plugin-market-filter {
+  width: 100%;
+  padding: 6px 10px;
+  background: var(--bg-secondary, #0b1424);
+  border: 1px solid var(--border-color, #1a2a3a);
+  border-radius: 6px;
+  color: var(--text-primary, #d6e4f0);
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+}
+.plugin-market-installed-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary, #8ba3b8);
+  cursor: pointer;
+}
+.plugin-market-installed-label input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: var(--accent, #20c8ff);
+}
+.plugin-market-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+.plugin-market-pageinfo {
+  font-size: 12px;
   color: var(--text-secondary, #8ba3b8);
 }
 .plugin-market-cats {

@@ -8854,7 +8854,8 @@ def create_app(
         """列出插件市场中的可用插件（需要 admin:plugins 权限）。
 
         从配置的插件市场仓库（plugin_market_repos）拉取并解析市场清单，
-        返回可浏览/安装的社区插件列表。
+        支持分页（page/page_size）与搜索过滤（keyword/category/market_repo/
+        installed/installed_names），返回可浏览/安装的社区插件列表。
         """
         try:
             user_info = getattr(request.state, "user_info", None)
@@ -8867,9 +8868,48 @@ def create_app(
                     },
                 }
             from jarvis.jarvis_agent.utils import list_market_plugins
+            from jarvis.jarvis_agent.utils import filter_market_plugins
 
+            qp = request.query_params
             plugins = list_market_plugins()
-            return {"success": True, "data": {"plugins": plugins}}
+
+            def _to_int(value, default):
+                try:
+                    return int(value)
+                except (TypeError, ValueError):
+                    return default
+
+            def _to_bool(value):
+                if value is None:
+                    return None
+                return str(value).strip().lower() in ("1", "true", "yes", "on")
+
+            installed_names_raw = qp.get("installed_names", "")
+            result = filter_market_plugins(
+                plugins,
+                keyword=qp.get("keyword", ""),
+                category=qp.get("category", ""),
+                market_repo=qp.get("market_repo", ""),
+                installed_names=set(
+                    n.strip() for n in installed_names_raw.split(",") if n.strip()
+                )
+                if installed_names_raw
+                else None,
+                installed=_to_bool(qp.get("installed")),
+                page=_to_int(qp.get("page"), 1),
+                page_size=_to_int(qp.get("page_size"), 20),
+            )
+            return {
+                "success": True,
+                "data": {
+                    "plugins": result["plugins"],
+                    "total": result["total"],
+                    "page": result["page"],
+                    "page_size": result["page_size"],
+                    "total_pages": result["total_pages"],
+                    "filters": result["filters"],
+                },
+            }
         except Exception as e:
             return {
                 "success": False,

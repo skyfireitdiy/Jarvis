@@ -185,3 +185,146 @@ def test_list_market_plugins_same_name_different_owner_uses_distinct_cache(
 def test_market_cache_dir_name(url, expected):
     """缓存目录名唯一化：owner/repo 拼接，兼容多种 URL 形态。"""
     assert agent_utils._market_cache_dir_name(url) == expected
+
+
+# ---------------------------------------------------------------------------
+# filter_market_plugins：搜索 / 过滤 / 分页
+# ---------------------------------------------------------------------------
+
+
+def _mk_market_plugins():
+    """构造一组市场插件（覆盖多分类、多来源、多作者）。"""
+    return [
+        {
+            "id": "p1",
+            "name": "Alpha 工具",
+            "description": "文件处理工具",
+            "author": "张三",
+            "categories": ["工具", "效率"],
+            "market_repo": "https://github.com/orgA/market",
+        },
+        {
+            "id": "p2",
+            "name": "Beta 集成",
+            "description": "数据库集成插件",
+            "author": "李四",
+            "categories": ["集成"],
+            "market_repo": "https://github.com/orgA/market",
+        },
+        {
+            "id": "p3",
+            "name": "Gamma 前端",
+            "description": "前端脚手架",
+            "author": "王五",
+            "categories": ["前端", "效率"],
+            "market_repo": "https://github.com/orgB/market",
+        },
+        {
+            "id": "p4",
+            "name": "Delta 工具",
+            "description": "日志分析工具",
+            "author": "张三",
+            "categories": ["工具"],
+            "market_repo": "https://github.com/orgB/market",
+        },
+    ]
+
+
+def test_filter_market_plugins_default_returns_all_paged():
+    """无过滤参数时返回全量（默认每页 20，1 页）。"""
+    plugins = _mk_market_plugins()
+    result = agent_utils.filter_market_plugins(plugins)
+    assert result["total"] == 4
+    assert result["page"] == 1
+    assert result["page_size"] == 20
+    assert result["total_pages"] == 1
+    assert len(result["plugins"]) == 4
+    assert result["filters"]["categories"] == ["前端", "工具", "效率", "集成"]
+    assert result["filters"]["market_repos"] == [
+        "https://github.com/orgA/market",
+        "https://github.com/orgB/market",
+    ]
+
+
+def test_filter_market_plugins_keyword_matches_name_desc_author():
+    """关键字匹配 name/description/author（大小写不敏感）。"""
+    plugins = _mk_market_plugins()
+    # 匹配 name
+    r = agent_utils.filter_market_plugins(plugins, keyword="alpha")
+    assert [p["id"] for p in r["plugins"]] == ["p1"]
+    # 匹配 description
+    r = agent_utils.filter_market_plugins(plugins, keyword="数据库")
+    assert [p["id"] for p in r["plugins"]] == ["p2"]
+    # 匹配 author
+    r = agent_utils.filter_market_plugins(plugins, keyword="张三")
+    assert {p["id"] for p in r["plugins"]} == {"p1", "p4"}
+    # 无命中
+    r = agent_utils.filter_market_plugins(plugins, keyword="不存在")
+    assert r["plugins"] == []
+    assert r["total"] == 0
+
+
+def test_filter_market_plugins_category_and_market_repo():
+    """按分类与来源市场仓库过滤。"""
+    plugins = _mk_market_plugins()
+    r = agent_utils.filter_market_plugins(plugins, category="工具")
+    assert {p["id"] for p in r["plugins"]} == {"p1", "p4"}
+    r = agent_utils.filter_market_plugins(plugins, market_repo="https://github.com/orgB/market")
+    assert {p["id"] for p in r["plugins"]} == {"p3", "p4"}
+    # 组合过滤
+    r = agent_utils.filter_market_plugins(
+        plugins,
+        category="工具",
+        market_repo="https://github.com/orgB/market",
+    )
+    assert [p["id"] for p in r["plugins"]] == ["p4"]
+
+
+def test_filter_market_plugins_installed_filter():
+    """按是否已安装过滤（installed_names 集合判断）。"""
+    plugins = _mk_market_plugins()
+    installed = {"Alpha 工具", "Beta 集成"}
+    r = agent_utils.filter_market_plugins(
+        plugins, installed_names=installed, installed=True
+    )
+    assert {p["id"] for p in r["plugins"]} == {"p1", "p2"}
+    r = agent_utils.filter_market_plugins(
+        plugins, installed_names=installed, installed=False
+    )
+    assert {p["id"] for p in r["plugins"]} == {"p3", "p4"}
+    # installed=None 不过滤
+    r = agent_utils.filter_market_plugins(
+        plugins, installed_names=installed, installed=None
+    )
+    assert len(r["plugins"]) == 4
+
+
+def test_filter_market_plugins_pagination():
+    """分页：page_size 截断、页码钳制、total_pages 计算。"""
+    plugins = _mk_market_plugins()
+    r = agent_utils.filter_market_plugins(plugins, page=1, page_size=2)
+    assert [p["id"] for p in r["plugins"]] == ["p1", "p2"]
+    assert r["total"] == 4
+    assert r["total_pages"] == 2
+    r = agent_utils.filter_market_plugins(plugins, page=2, page_size=2)
+    assert [p["id"] for p in r["plugins"]] == ["p3", "p4"]
+    # 越界页码钳制到最后一页
+    r = agent_utils.filter_market_plugins(plugins, page=99, page_size=2)
+    assert r["page"] == 2
+    assert [p["id"] for p in r["plugins"]] == ["p3", "p4"]
+    # page_size 越界钳制（<=100）
+    r = agent_utils.filter_market_plugins(plugins, page=1, page_size=999)
+    assert r["page_size"] == 100
+    # 非法 page/page_size 回退默认
+    r = agent_utils.filter_market_plugins(
+        plugins, page="abc", page_size="xyz"  # type: ignore
+    )
+    assert r["page"] == 1
+    assert r["page_size"] == 20
+    # 空列表
+    r = agent_utils.filter_market_plugins([], page=1, page_size=20)
+    assert r["total"] == 0
+    assert r["plugins"] == []
+    assert r["total_pages"] == 1
+    assert r["filters"]["categories"] == []
+    assert r["filters"]["market_repos"] == []
