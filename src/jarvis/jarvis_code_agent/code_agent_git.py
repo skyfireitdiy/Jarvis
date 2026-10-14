@@ -358,14 +358,22 @@ class GitManager:
         post_process_func: Any,
         skip_confirm: bool = False,
     ) -> None:
-        """处理提交确认和可能的重置"""
-        if commits and (skip_confirm or user_confirm("是否接受以上提交记录？", True)):
-            subprocess.run(
-                ["git", "reset", "--mixed", str(start_commit)],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                check=True,
-            )
+        """处理提交确认和可能的重置
+
+        提交条件：存在 CheckPoint 临时提交，或工作区有未暂存/未提交的变更
+        （含未跟踪文件）。避免用户手动修改文件（未产生 CheckPoint）时
+        工作区变更被静默跳过、未纳入提交。
+        """
+        if (commits or has_uncommitted_changes()) and (
+            skip_confirm or user_confirm("是否接受以上提交记录？", True)
+        ):
+            if start_commit:
+                subprocess.run(
+                    ["git", "reset", "--mixed", str(start_commit)],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=True,
+                )
 
             # 检测变更文件并格式化
             from jarvis.jarvis_utils.git_utils import get_diff_file_list
