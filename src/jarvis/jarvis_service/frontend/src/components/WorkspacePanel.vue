@@ -168,7 +168,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, defineProps, defineEmits } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount, defineProps, defineEmits } from 'vue'
 import { useActivityBarLayout } from '../composables/useActivityBarLayout'
 
 // 自绘 16x16 stroke 线性 SVG 图标（currentColor 继承主题色），与全局风格一致
@@ -292,6 +292,15 @@ onMounted(() => {
   activityBarObserver = new ResizeObserver(updateMaxVisible)
   if (activityBarRef.value) activityBarObserver.observe(activityBarRef.value)
   updateMaxVisible()
+  // 初始布局可能未完全稳定（父容器高度/异步插件图标未就绪），延迟再算一次
+  // 纠正「有空间却误收纳」的初始值（Issue #245）。
+  requestAnimationFrame(() => {
+    nextTick(updateMaxVisible)
+  })
+  // 插件图标异步到达导致 visibleIcons 变化时重算，确保 total 与最终图标数一致
+  watch(visibleIcons, updateMaxVisible)
+  // 窗口 load 兜底：图片/字体等资源加载完成后布局可能变化，强制重算一次
+  window.addEventListener('load', updateMaxVisible)
   document.addEventListener('click', onDocumentClick)
 })
 
@@ -300,6 +309,7 @@ onBeforeUnmount(() => {
     activityBarObserver.disconnect()
     activityBarObserver = null
   }
+  window.removeEventListener('load', updateMaxVisible)
   document.removeEventListener('click', onDocumentClick)
 })
 
