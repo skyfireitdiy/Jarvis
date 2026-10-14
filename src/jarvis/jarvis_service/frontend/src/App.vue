@@ -1289,6 +1289,7 @@
       :nodes="aboutNodes"
       :daemonSessions="aboutDaemonSessions"
       :browserExtSessions="aboutBrowserExtSessions"
+      :getNodeDisplayName="getNodeDisplayName"
       @update:visible="showAboutModal = $event"
     />
 
@@ -1308,6 +1309,7 @@
       :getToken="getAuthToken"
       :pluginAdminTabs="pluginAdminTabs"
       :pluginExtensions="pluginExtensions"
+      :getNodeDisplayName="getNodeDisplayName"
       @update:visible="showAdminPanel = $event"
       @confirmRestartGateway="handleRestartGateway"
       @confirmRestartAllNodes="confirmRestartAllNodes"
@@ -2481,9 +2483,12 @@ try {
 }
 
 // 获取节点列表（availableNodeOptions，含 node_id/status 等字段；master 恒在列）。
-// 返回数组副本，避免插件直接改动宿主响应式状态。
+// 返回数组副本，避免插件直接改动宿主响应式状态；并为每个节点附加 display_name
+// （宿主设置的节点别名，未设置时回退 node_id），供插件 nodeLabel 直接取用。
 try {
-  window.__jarvisGetNodes = () => (Array.isArray(availableNodeOptions.value) ? [...availableNodeOptions.value] : [])
+  window.__jarvisGetNodes = () => (Array.isArray(availableNodeOptions.value)
+    ? availableNodeOptions.value.map(node => ({ ...node, display_name: getNodeDisplayName(node.node_id) }))
+    : [])
 } catch (e) {
   /* ignore */
 }

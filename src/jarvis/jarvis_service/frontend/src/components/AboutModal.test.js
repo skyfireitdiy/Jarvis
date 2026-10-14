@@ -67,6 +67,30 @@ describe("AboutModal 渲染", () => {
     expect(item.text()).toContain("6.0.7");
   });
 
+  test("传 getNodeDisplayName 时节点列表显示别名", () => {
+    const getNodeDisplayName = (nodeId) => (nodeId === "node-1" ? "生产节点" : nodeId);
+    const wrapper = mountAbout({
+      nodes: [
+        { node_id: "node-1", status: "online", version: "6.0.7" },
+        { node_id: "node-2", status: "online", version: "6.0.7" },
+      ],
+      daemonSessions: [],
+      browserExtSessions: [],
+      getNodeDisplayName,
+    });
+    const names = wrapper.findAll(".about-item-name").map((n) => n.text());
+    expect(names).toEqual(["生产节点", "node-2"]);
+  });
+
+  test("不传 getNodeDisplayName 时回退 node_id", () => {
+    const wrapper = mountAbout({
+      nodes: [{ node_id: "node-1", status: "online", version: "6.0.7" }],
+      daemonSessions: [],
+      browserExtSessions: [],
+    });
+    expect(wrapper.find(".about-item-name").text()).toBe("node-1");
+  });
+
   test("展示 daemon 版本", () => {
     const wrapper = mountAbout();
     const text = wrapper.text();
