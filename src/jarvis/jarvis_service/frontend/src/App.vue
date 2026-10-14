@@ -3047,14 +3047,17 @@ const ACTIVE_Z_INDEX = 1100
 
 const EDITOR_SIDEBAR_DEFAULT_WIDTH = 360
 const EDITOR_SIDEBAR_MIN_WIDTH = 200
-const EDITOR_SIDEBAR_MAX_WIDTH = 560
+// 侧边栏最大宽度的「兜底」上限（用于恢复持久化宽度时 clamp）。
+// 拖拽时的真实上限由 useWorkspaceEditor 按「面板宽度 - 活动栏 - 主编辑区最小宽度」动态计算，
+// 这里仅作为加载时的宽松上限，避免把之前拖宽后的值钳回 560。
+const EDITOR_SIDEBAR_MAX_WIDTH = 1600
 const EDITOR_SIDEBAR_STORAGE_KEY = 'jarvis_workspace_sidebar_width'
 
-function normalizeWorkspaceSidebarWidth(width) {
+function normalizeWorkspaceSidebarWidth(width, maxWidth = EDITOR_SIDEBAR_MAX_WIDTH) {
   // 内联 clamp（不依赖 useWorkspaceEditor 返回的 clamp，避免 setup 顶层 TDZ：
   // 本函数在 useWorkspaceEditor 调用点之前定义，且 loadWorkspaceSidebarWidth 在顶层立即执行）
   const min = EDITOR_SIDEBAR_MIN_WIDTH
-  const max = EDITOR_SIDEBAR_MAX_WIDTH
+  const max = maxWidth
   if (max < min) return min
   return Math.min(Math.max(width, min), max)
 }

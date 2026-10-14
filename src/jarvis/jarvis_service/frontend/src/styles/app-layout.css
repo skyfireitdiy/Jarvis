@@ -260,7 +260,9 @@
 .workspace-sidebar {
   position: relative;
   min-width: 200px;
-  max-width: 560px;
+  /* 取消固定 560px 上限：侧边栏可拉得很宽，上限 = 面板宽度 - 活动栏(44)，
+     主编辑区可被压缩（不额外保护，用户可再拖回来）。 */
+  max-width: calc(100% - 44px);
   display: flex;
   flex-direction: column;
   min-height: 0;
