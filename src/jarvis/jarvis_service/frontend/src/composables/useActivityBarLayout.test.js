@@ -64,13 +64,31 @@ describe('useActivityBarLayout', () => {
     expect(ids).toContain('agents')
   })
 
-  it('主栏最多显示 MAX_VISIBLE 个，超出收纳到 moreIcons', () => {
+  it('主栏默认最多显示 DEFAULT_MAX_VISIBLE 个，超出收纳到 moreIcons', () => {
     const { api } = makeHarness({
       sidebarViews: [makeExt({ id: 'p1' }), makeExt({ id: 'p2' }), makeExt({ id: 'p3' }), makeExt({ id: 'p4' })],
     })
     // 15 内置 + 4 插件 = 19
-    expect(api.mainIcons.value.length).toBe(api.MAX_VISIBLE)
-    expect(api.moreIcons.value.length).toBe(19 - api.MAX_VISIBLE)
+    expect(api.mainIcons.value.length).toBe(api.maxVisible.value)
+    expect(api.moreIcons.value.length).toBe(19 - api.maxVisible.value)
+  })
+
+  it('maxVisible 动态调整时主栏/收纳随之变化', () => {
+    const { api } = makeHarness({
+      sidebarViews: [makeExt({ id: 'p1' }), makeExt({ id: 'p2' }), makeExt({ id: 'p3' }), makeExt({ id: 'p4' })],
+    })
+    // 默认 10
+    expect(api.maxVisible.value).toBe(10)
+    expect(api.mainIcons.value.length).toBe(10)
+    expect(api.moreIcons.value.length).toBe(9)
+    // 调大到 19：全部显示，无收纳
+    api.maxVisible.value = 19
+    expect(api.mainIcons.value.length).toBe(19)
+    expect(api.moreIcons.value.length).toBe(0)
+    // 调小到 3：主栏 3 个，其余收纳
+    api.maxVisible.value = 3
+    expect(api.mainIcons.value.length).toBe(3)
+    expect(api.moreIcons.value.length).toBe(16)
   })
 
   it('隐藏图标后从主栏移除', () => {

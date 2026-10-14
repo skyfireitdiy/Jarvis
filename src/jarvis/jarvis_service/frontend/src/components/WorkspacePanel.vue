@@ -18,7 +18,7 @@
       </div>
     </div>
     <div class="workspace-main">
-      <div class="workspace-activity-bar">
+      <div ref="activityBarRef" class="workspace-activity-bar">
         <button
           v-for="icon in mainIcons"
           :key="icon.id"
@@ -62,7 +62,7 @@
           <span class="workspace-activity-menu-label">{{ icon.title }}</span>
         </button>
         <div class="workspace-activity-menu-divider"></div>
-        <button class="workspace-activity-menu-item" @click="showCustomize = true">
+        <button class="workspace-activity-menu-item" @click="showCustomize = true; showMoreMenu = false">
           <span class="workspace-activity-inline-icon">
             <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <circle cx="8" cy="8" r="1.5"/><circle cx="8" cy="8" r="4.2"/><g stroke-width="2.4"><path d="M8 3.8v-2M10.97 5.03l1.41-1.41M12.2 8h2M10.97 10.97l1.41 1.41M8 12.2v2M5.03 10.97l-1.41 1.41M3.8 8h-2M5.03 5.03l-1.41-1.41"/></g>
@@ -168,7 +168,7 @@
 </template>
 
 <script setup>
-import { ref, computed, defineProps, defineEmits } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, defineProps, defineEmits } from 'vue'
 import { useActivityBarLayout } from '../composables/useActivityBarLayout'
 
 // 自绘 16x16 stroke 线性 SVG 图标（currentColor 继承主题色），与全局风格一致
@@ -230,7 +230,7 @@ const activityLayout = useActivityBarLayout({
   pluginToolPanels: computed(() => props.pluginToolPanels),
   isAdmin: computed(() => props.isAdmin),
 })
-const { mainIcons, moreIcons, orderedIcons, hiddenIds, isActive, dispatch, move, reset } = activityLayout
+const { mainIcons, moreIcons, orderedIcons, hiddenIds, isActive, dispatch, move, reset, maxVisible, visibleIcons } = activityLayout
 
 // 「更多」菜单与自定义面板开关
 const showMoreMenu = ref(false)
@@ -239,6 +239,8 @@ const showCustomize = ref(false)
 // 分发图标 action 到 emit（composable 的 dispatch 需传入 emit）
 function handleIconClick(icon) {
   dispatch(icon, emit)
+  // 点击菜单内图标执行跳转后自动关闭「更多」菜单（Issue #225）
+  showMoreMenu.value = false
 }
 
 // 切换某图标的显示/隐藏
@@ -250,6 +252,56 @@ function toggleHidden(id) {
 function resetLayout() {
   reset()
 }
+
+// ---- 活动栏动态收纳（Issue #225）----
+// 依据侧边栏实际可用高度动态计算主栏可容纳图标数，而非硬编码 10 个。
+// 活动栏容器高度变化（窗口/侧边栏尺寸变化）时实时调整 maxVisible。
+const activityBarRef = ref(null)
+let activityBarObserver = null
+
+// 活动栏按钮尺寸常量（与 CSS 保持一致）：
+// button 高 32px、纵向 gap 8px、容器 padding 上下各 8px
+const BUTTON_HEIGHT = 32
+const BUTTON_GAP = 8
+const BAR_V_PADDING = 8
+
+function updateMaxVisible() {
+  const el = activityBarRef.value
+  if (!el) return
+  const height = el.clientHeight
+  if (height <= 0) return
+  // 可容纳的按钮总数（含「更多」按钮）
+  const maxButtons = Math.max(1, Math.floor((height - BAR_V_PADDING * 2 + BUTTON_GAP) / (BUTTON_HEIGHT + BUTTON_GAP)))
+  const total = visibleIcons.value.length
+  if (total <= maxButtons) {
+    // 全部图标都能放下：不显示「更多」，主栏显示全部
+    maxVisible.value = total
+  } else {
+    // 放不下：留一个位置给「更多」按钮，其余收纳
+    maxVisible.value = maxButtons - 1
+  }
+}
+
+// 点击菜单外部空白区域时关闭「更多」菜单与自定义面板（Issue #225）
+function onDocumentClick() {
+  showMoreMenu.value = false
+  showCustomize.value = false
+}
+
+onMounted(() => {
+  activityBarObserver = new ResizeObserver(updateMaxVisible)
+  if (activityBarRef.value) activityBarObserver.observe(activityBarRef.value)
+  updateMaxVisible()
+  document.addEventListener('click', onDocumentClick)
+})
+
+onBeforeUnmount(() => {
+  if (activityBarObserver) {
+    activityBarObserver.disconnect()
+    activityBarObserver = null
+  }
+  document.removeEventListener('click', onDocumentClick)
+})
 
 defineExpose({
   editorContainerRef
