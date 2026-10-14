@@ -75,7 +75,7 @@
                 ></span>
                 <span class="plugin-item-text">
                   <span class="plugin-item-name" :title="plugin.name">{{ plugin.name }}</span>
-                  <span v-if="plugin.description" class="plugin-item-desc">{{ plugin.description }}</span>
+                  <span v-if="plugin.description" class="plugin-item-desc" :title="plugin.description">{{ plugin.description }}</span>
                 </span>
               </span>
               <span class="plugin-item-head-right">
@@ -134,7 +134,7 @@
                 <span v-if="mp.logo" class="plugin-item-logo" v-html="mp.logo"></span>
                 <span class="plugin-item-text">
                   <span class="plugin-item-name" :title="mp.name">{{ mp.name }}</span>
-                  <span v-if="mp.description" class="plugin-item-desc">{{ mp.description }}</span>
+                  <span v-if="mp.description" class="plugin-item-desc" :title="mp.description">{{ mp.description }}</span>
                 </span>
               </span>
               <button
@@ -789,6 +789,11 @@ defineExpose({ loadPlugins })
   color: var(--text-secondary, #8ba3b8);
   line-height: 1.4;
   word-break: break-word;
+  /* 多行截断：最多显示 2 行，超出省略，悬停通过 title 查看完整内容 */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .plugin-item-meta {
   margin-top: 4px;
