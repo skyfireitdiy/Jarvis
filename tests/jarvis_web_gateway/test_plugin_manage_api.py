@@ -470,3 +470,95 @@ def test_list_market_plugins_api(client, monkeypatch):
     assert plugins[0]["name"] == "市场插件"
     assert plugins[0]["repo"] == "https://github.com/owner/market-p"
     assert plugins[0]["branch"] == "main"
+
+
+def test_list_market_plugins_api_pagination_and_filters(client, monkeypatch):
+    """市场浏览 API 支持分页与搜索过滤参数（Issue #247）。"""
+    import jarvis.jarvis_agent.utils as agent_utils
+
+    fake_plugins = [
+        {
+            "id": f"p{i}",
+            "name": f"插件{i}",
+            "description": f"第{i}个插件",
+            "repo": f"https://github.com/owner/p{i}",
+            "branch": "main",
+            "author": "作者甲" if i % 2 == 0 else "作者乙",
+            "license": "MIT",
+            "logo": "",
+            "categories": ["工具"] if i % 2 == 0 else ["集成"],
+            "market_repo": "https://github.com/skyfireitdiy/plugin-market",
+        }
+        for i in range(5)
+    ]
+    monkeypatch.setattr(agent_utils, "list_market_plugins", lambda: fake_plugins)
+
+    # 默认返回全部（无分页参数时 page_size=20 一页装下）
+    resp = client.get("/api/plugins/market", headers=_auth_headers())
+    body = resp.json()
+    assert body["success"] is True
+    data = body["data"]
+    assert data["total"] == 5
+    assert len(data["plugins"]) == 5
+    assert data["page"] == 1
+    assert data["page_size"] == 20
+    assert data["total_pages"] == 1
+    assert data["filters"]["categories"] == ["工具", "集成"]
+
+    # 分页：page_size=2 取第一页
+    resp = client.get(
+        "/api/plugins/market?page=1&page_size=2", headers=_auth_headers()
+    )
+    data = resp.json()["data"]
+    assert data["total"] == 5
+    assert data["total_pages"] == 3
+    assert [p["id"] for p in data["plugins"]] == ["p0", "p1"]
+
+    # 分页第二页
+    resp = client.get(
+        "/api/plugins/market?page=2&page_size=2", headers=_auth_headers()
+    )
+    data = resp.json()["data"]
+    assert [p["id"] for p in data["plugins"]] == ["p2", "p3"]
+
+    # 搜索关键字（匹配 name/description/author）
+    resp = client.get(
+        "/api/plugins/market?keyword=作者乙", headers=_auth_headers()
+    )
+    data = resp.json()["data"]
+    assert data["total"] == 2
+    assert {p["id"] for p in data["plugins"]} == {"p1", "p3"}
+
+    # 按分类过滤
+    resp = client.get(
+        "/api/plugins/market?category=工具", headers=_auth_headers()
+    )
+    data = resp.json()["data"]
+    assert data["total"] == 3
+    assert {p["id"] for p in data["plugins"]} == {"p0", "p2", "p4"}
+
+    # 按来源市场仓库过滤（不匹配返回空）
+    resp = client.get(
+        "/api/plugins/market?market_repo=https://github.com/other/market",
+        headers=_auth_headers(),
+    )
+    data = resp.json()["data"]
+    assert data["total"] == 0
+    assert data["plugins"] == []
+
+    # 按已安装过滤：installed_names + installed=true
+    resp = client.get(
+        "/api/plugins/market?installed=true&installed_names=插件0,插件2",
+        headers=_auth_headers(),
+    )
+    data = resp.json()["data"]
+    assert data["total"] == 2
+    assert {p["id"] for p in data["plugins"]} == {"p0", "p2"}
+
+    # 非法分页参数回退默认
+    resp = client.get(
+        "/api/plugins/market?page=abc&page_size=xyz", headers=_auth_headers()
+    )
+    data = resp.json()["data"]
+    assert data["page"] == 1
+    assert data["page_size"] == 20

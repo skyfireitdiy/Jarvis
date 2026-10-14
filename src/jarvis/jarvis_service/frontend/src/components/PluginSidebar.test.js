@@ -11,10 +11,12 @@ import { mount, flushPromises } from "@vue/test-utils";
 import PluginSidebar from "./PluginSidebar.vue";
 
 // 构造一个模拟的 fetchWithAuth：按 URL 返回预设响应
+// handler key 用 "METHOD path"（不含 query 部分），query 参数单独匹配
 function makeFetch(handlers) {
   return vi.fn(async (url, options = {}) => {
     const method = options.method || "GET";
-    const key = `${method} ${url}`;
+    const [path] = url.split("?");
+    const key = `${method} ${path}`;
     const handler = handlers[key] || handlers["default"];
     if (!handler) throw new Error(`No handler for ${key}`);
     return { json: async () => handler() };
@@ -412,5 +414,193 @@ describe("PluginSidebar", () => {
         opt?.method === "POST" && url.includes("/api/node/child-1/plugins/install"),
     );
     expect(installCall).toBeTruthy();
+  });
+
+  test("市场 tab：加载时带分页参数并渲染总数/分页信息", async () => {
+    const fetchWithAuth = makeFetch({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
+        success: true,
+        data: { node_id: "master", plugins: [] },
+      }),
+      "GET http://127.0.0.1:8000/api/plugins/market": () => ({
+        success: true,
+        data: {
+          plugins: [
+            {
+              id: "p1",
+              name: "插件1",
+              repo: "https://github.com/owner/p1",
+              branch: "main",
+            },
+            {
+              id: "p2",
+              name: "插件2",
+              repo: "https://github.com/owner/p2",
+              branch: "main",
+            },
+          ],
+          total: 25,
+          page: 1,
+          page_size: 20,
+          total_pages: 2,
+          filters: {
+            categories: ["工具", "集成"],
+            market_repos: ["https://github.com/orgA/market"],
+          },
+        },
+      }),
+    });
+    const wrapper = mount(PluginSidebar, {
+      props: { ...baseProps, fetchWithAuth },
+    });
+    await flushPromises();
+    await wrapper.findAll(".plugin-sidebar-tab")[1].trigger("click");
+    await flushPromises();
+    // 请求 URL 带分页参数
+    const marketCall = fetchWithAuth.mock.calls.find(
+      ([url]) => url.includes("/api/plugins/market"),
+    );
+    expect(marketCall).toBeTruthy();
+    expect(marketCall[0]).toContain("page=1");
+    expect(marketCall[0]).toContain("page_size=20");
+    // 渲染分页信息
+    expect(wrapper.text()).toContain("第 1 / 2 页");
+    expect(wrapper.text()).toContain("共 25 个");
+    // 分类下拉选项渲染
+    expect(wrapper.find(".plugin-market-filter").exists()).toBe(true);
+  });
+
+  test("市场 tab：搜索关键字触发带 keyword 的请求", async () => {
+    const fetchWithAuth = makeFetch({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
+        success: true,
+        data: { node_id: "master", plugins: [] },
+      }),
+      "GET http://127.0.0.1:8000/api/plugins/market": () => ({
+        success: true,
+        data: {
+          plugins: [],
+          total: 0,
+          page: 1,
+          page_size: 20,
+          total_pages: 1,
+          filters: { categories: [], market_repos: [] },
+        },
+      }),
+    });
+    const wrapper = mount(PluginSidebar, {
+      props: { ...baseProps, fetchWithAuth },
+    });
+    await flushPromises();
+    await wrapper.findAll(".plugin-sidebar-tab")[1].trigger("click");
+    await flushPromises();
+    // 输入关键字触发重新加载
+    await wrapper.find(".plugin-market-search").setValue("数据库");
+    await flushPromises();
+    const marketCalls = fetchWithAuth.mock.calls.filter(
+      ([url]) => url.includes("/api/plugins/market"),
+    );
+    const lastCall = marketCalls[marketCalls.length - 1];
+    const decoded = decodeURIComponent(lastCall[0]);
+    expect(decoded).toContain("keyword=数据库");
+    expect(decoded).toContain("page=1");
+  });
+
+  test("市场 tab：点击下一页加载 page=2", async () => {
+    let page = 1;
+    const fetchWithAuth = makeFetch({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
+        success: true,
+        data: { node_id: "master", plugins: [] },
+      }),
+      "GET http://127.0.0.1:8000/api/plugins/market": () => ({
+        success: true,
+        data: {
+          plugins:
+            page === 1
+              ? [
+                  {
+                    id: "p1",
+                    name: "插件1",
+                    repo: "https://github.com/owner/p1",
+                    branch: "main",
+                  },
+                ]
+              : [
+                  {
+                    id: "p21",
+                    name: "插件21",
+                    repo: "https://github.com/owner/p21",
+                    branch: "main",
+                  },
+                ],
+          total: 25,
+          page,
+          page_size: 20,
+          total_pages: 2,
+          filters: { categories: [], market_repos: [] },
+        },
+      }),
+    });
+    const wrapper = mount(PluginSidebar, {
+      props: { ...baseProps, fetchWithAuth },
+    });
+    await flushPromises();
+    await wrapper.findAll(".plugin-sidebar-tab")[1].trigger("click");
+    await flushPromises();
+    expect(wrapper.text()).toContain("插件1");
+    // 点击下一页
+    page = 2;
+    const nextBtn = wrapper.findAll(".plugin-market-pagination button").find(
+      (b) => b.text() === "下一页",
+    );
+    await nextBtn.trigger("click");
+    await flushPromises();
+    const marketCalls = fetchWithAuth.mock.calls.filter(
+      ([url]) => url.includes("/api/plugins/market"),
+    );
+    expect(marketCalls[marketCalls.length - 1][0]).toContain("page=2");
+    expect(wrapper.text()).toContain("插件21");
+  });
+
+  test("市场 tab：勾选只看已安装时带 installed 参数", async () => {
+    const fetchWithAuth = makeFetch({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
+        success: true,
+        data: {
+          node_id: "master",
+          plugins: [{ name: "插件1" }, { name: "插件2" }],
+        },
+      }),
+      "GET http://127.0.0.1:8000/api/plugins/market": () => ({
+        success: true,
+        data: {
+          plugins: [],
+          total: 0,
+          page: 1,
+          page_size: 20,
+          total_pages: 1,
+          filters: { categories: [], market_repos: [] },
+        },
+      }),
+    });
+    const wrapper = mount(PluginSidebar, {
+      props: { ...baseProps, fetchWithAuth },
+    });
+    await flushPromises();
+    await wrapper.findAll(".plugin-sidebar-tab")[1].trigger("click");
+    await flushPromises();
+    // 勾选"只看已安装"
+    await wrapper
+      .find(".plugin-market-installed-label input[type='checkbox']")
+      .setValue(true);
+    await flushPromises();
+    const marketCalls = fetchWithAuth.mock.calls.filter(
+      ([url]) => url.includes("/api/plugins/market"),
+    );
+    const lastCall = marketCalls[marketCalls.length - 1];
+    const decoded = decodeURIComponent(lastCall[0]);
+    expect(decoded).toContain("installed=true");
+    expect(decoded).toContain("installed_names=插件1,插件2");
   });
 });
