@@ -87,6 +87,12 @@
                 <span class="plugin-item-version">
                   {{ plugin.version || '-' }}
                   <span v-if="plugin.builtin" class="plugin-item-badge">内置</span>
+                  <button
+                    v-if="!plugin.builtin && plugin.hasUpdate"
+                    class="plugin-btn plugin-btn-sm plugin-update-btn"
+                    :disabled="pluginBusy[plugin.name]"
+                    @click.stop="upgradePlugin(plugin)"
+                  >更新</button>
                 </span>
               </span>
             </div>
@@ -95,15 +101,6 @@
             </div>
             <div class="plugin-item-meta">
               <span class="plugin-item-meta-label">前端扩展</span> {{ plugin.frontend ? '是' : '否' }}
-            </div>
-            <div v-if="!plugin.builtin" class="plugin-item-actions">
-              <button
-                v-if="plugin.hasUpdate"
-                class="plugin-btn plugin-btn-sm"
-                :disabled="pluginBusy[plugin.name]"
-                @click="upgradePlugin(plugin)"
-              >更新</button>
-              <button class="plugin-btn plugin-btn-sm plugin-btn-danger" :disabled="pluginBusy[plugin.name]" @click="uninstallPlugin(plugin)">卸载</button>
             </div>
           </div>
         </div>
@@ -162,9 +159,15 @@
       @click.stop
     >
       <button
+        v-if="capMenuPlugin && capMenuPlugin.capabilities && capMenuPlugin.capabilities.length"
         class="plugin-cap-menu-item"
         @click="openCapModal(capMenuPlugin)"
       >能力详情</button>
+      <button
+        v-if="capMenuPlugin && !capMenuPlugin.builtin"
+        class="plugin-cap-menu-item plugin-cap-menu-item-danger"
+        @click="uninstallPluginFromMenu(capMenuPlugin)"
+      >卸载</button>
     </div>
 
     <!-- 能力详情弹窗 -->
@@ -226,7 +229,6 @@ const capMenuPlugin = ref(null)
 const capModalPlugin = ref(null)
 
 function openCapMenu(plugin, event) {
-  if (!plugin.capabilities || !plugin.capabilities.length) return
   capMenuPlugin.value = plugin
   const menuWidth = 140
   const menuHeight = 36
@@ -422,6 +424,12 @@ async function uninstallPlugin(plugin) {
     pluginBusy.value = { ...pluginBusy.value, [plugin.name]: true }
     doUninstallPlugin(plugin)
   })
+}
+
+// 右键菜单卸载：先关闭菜单再执行卸载（避免 capMenuPlugin 被清空后取不到插件）
+function uninstallPluginFromMenu(plugin) {
+  closeCapMenu()
+  uninstallPlugin(plugin)
 }
 
 async function doUninstallPlugin(plugin) {
@@ -690,8 +698,14 @@ defineExpose({ loadPlugins })
   color: var(--text-secondary, #8ba3b8);
   flex-shrink: 0;
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.plugin-update-btn {
+  padding: 2px 8px;
+  font-size: 11px;
+  line-height: 1.4;
 }
 .plugin-item-badge {
   font-size: 10px;
@@ -728,6 +742,12 @@ defineExpose({ loadPlugins })
 }
 .plugin-cap-menu-item:hover {
   background: rgba(32, 200, 255, 0.1);
+}
+.plugin-cap-menu-item-danger {
+  color: var(--color-error, #ff3c48);
+}
+.plugin-cap-menu-item-danger:hover {
+  background: rgba(255, 60, 72, 0.1);
 }
 /* 能力详情弹窗 */
 .cap-modal-overlay {
@@ -819,11 +839,6 @@ defineExpose({ loadPlugins })
 }
 .plugin-item-meta-label {
   color: var(--text-tertiary, #5a6b7d);
-}
-.plugin-item-actions {
-  display: flex;
-  gap: 6px;
-  margin-top: 8px;
 }
 .plugin-market-header {
   display: flex;

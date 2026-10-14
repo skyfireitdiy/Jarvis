@@ -141,7 +141,7 @@ describe("PluginSidebar", () => {
     expect(body.force).toBe(false);
   });
 
-  test("卸载插件：确认后调用 uninstall API", async () => {
+  test("卸载插件：右键菜单中点击卸载，确认后调用 uninstall API", async () => {
     const fetchWithAuth = makeFetch({
       "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
         success: true,
@@ -156,8 +156,14 @@ describe("PluginSidebar", () => {
       props: { ...baseProps, fetchWithAuth },
     });
     await flushPromises();
-    await wrapper.findAll(".plugin-btn-danger")[0].trigger("click");
+    // 列表项上不再直接显示卸载按钮
+    expect(wrapper.find(".plugin-btn-danger").exists()).toBe(false);
+    // 右键打开菜单，点击「卸载」菜单项
+    await wrapper.find(".plugin-item").trigger("contextmenu");
+    await wrapper.find(".plugin-cap-menu-item-danger").trigger("click");
     await flushPromises();
+    // 点击卸载后菜单关闭
+    expect(wrapper.find(".plugin-cap-menu").exists()).toBe(false);
     const uninstallCall = fetchWithAuth.mock.calls.find(
       ([url, opt]) => opt?.method === "POST" && url.includes("/uninstall"),
     );
@@ -181,7 +187,7 @@ describe("PluginSidebar", () => {
     });
     await flushPromises();
     await wrapper
-      .find(".plugin-btn-sm:not(.plugin-btn-danger)")
+      .find(".plugin-update-btn")
       .trigger("click");
     await flushPromises();
     const upgradeCall = fetchWithAuth.mock.calls.find(
@@ -191,13 +197,13 @@ describe("PluginSidebar", () => {
     expect(upgradeCall[0]).toContain("/api/node/master/plugins/demo-plugin/upgrade");
   });
 
-  test("内置插件不显示升级/卸载按钮，并显示内置标记", async () => {
+  test("内置插件不显示升级按钮，右键菜单无卸载项，并显示内置标记", async () => {
     const fetchWithAuth = makeFetch({
       "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
         success: true,
         data: {
           node_id: "master",
-          plugins: [plugin({ name: "builtin-p", builtin: true })],
+          plugins: [plugin({ name: "builtin-p", builtin: true, hasUpdate: true })],
         },
       }),
     });
@@ -206,8 +212,12 @@ describe("PluginSidebar", () => {
     });
     await flushPromises();
     expect(wrapper.text()).toContain("内置");
-    expect(wrapper.find(".plugin-item-actions").exists()).toBe(false);
-    expect(wrapper.text()).not.toContain("升级");
+    // 内置插件不显示更新按钮
+    expect(wrapper.find(".plugin-update-btn").exists()).toBe(false);
+    // 右键菜单对内置插件仍可用，但无「卸载」项
+    await wrapper.find(".plugin-item").trigger("contextmenu");
+    expect(wrapper.find(".plugin-cap-menu").exists()).toBe(true);
+    expect(wrapper.find(".plugin-cap-menu-item-danger").exists()).toBe(false);
     expect(wrapper.text()).not.toContain("卸载");
   });
 
@@ -242,6 +252,8 @@ describe("PluginSidebar", () => {
     await wrapper.find(".plugin-item").trigger("contextmenu");
     expect(wrapper.find(".plugin-cap-menu").exists()).toBe(true);
     expect(wrapper.text()).toContain("能力详情");
+    // 非内置插件右键菜单同时提供「卸载」项
+    expect(wrapper.find(".plugin-cap-menu-item-danger").exists()).toBe(true);
     // 点击“能力详情”弹出弹窗，展示全部能力
     await wrapper.find(".plugin-cap-menu-item").trigger("click");
     expect(wrapper.find(".cap-modal").exists()).toBe(true);
@@ -249,6 +261,25 @@ describe("PluginSidebar", () => {
     expect(wrapper.text()).toContain("任务开始触发");
     expect(wrapper.text()).toContain("@mycmd");
     expect(wrapper.text()).toContain("内置命令");
+  });
+
+  test("无能力的插件右键菜单仍可用，仅提供卸载项", async () => {
+    const fetchWithAuth = makeFetch({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
+        success: true,
+        data: { node_id: "master", plugins: [plugin()] },
+      }),
+    });
+    const wrapper = mount(PluginSidebar, {
+      props: { ...baseProps, fetchWithAuth },
+    });
+    await flushPromises();
+    // 无 capabilities 的插件右键仍能弹出菜单
+    await wrapper.find(".plugin-item").trigger("contextmenu");
+    expect(wrapper.find(".plugin-cap-menu").exists()).toBe(true);
+    // 无能力详情项，但有卸载项
+    expect(wrapper.text()).not.toContain("能力详情");
+    expect(wrapper.find(".plugin-cap-menu-item-danger").exists()).toBe(true);
   });
 
   test("市场 tab：切换后加载市场插件并渲染", async () => {
