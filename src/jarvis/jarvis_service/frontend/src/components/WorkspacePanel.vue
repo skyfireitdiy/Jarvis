@@ -33,7 +33,6 @@
           <span v-else class="workspace-activity-inline-icon" v-html="icon.icon"></span>
         </button>
         <button
-          v-if="moreIcons.length > 0"
           class="workspace-activity-button workspace-activity-more"
           :class="{ active: showMoreMenu }"
           tabindex="-1"
@@ -61,7 +60,7 @@
           <span v-else class="workspace-activity-inline-icon" v-html="icon.icon"></span>
           <span class="workspace-activity-menu-label">{{ icon.title }}</span>
         </button>
-        <div class="workspace-activity-menu-divider"></div>
+        <div v-if="moreIcons.length > 0" class="workspace-activity-menu-divider"></div>
         <button class="workspace-activity-menu-item" @click="showCustomize = true; showMoreMenu = false">
           <span class="workspace-activity-inline-icon">
             <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -273,13 +272,9 @@ function updateMaxVisible() {
   // 可容纳的按钮总数（含「更多」按钮）
   const maxButtons = Math.max(1, Math.floor((height - BAR_V_PADDING * 2 + BUTTON_GAP) / (BUTTON_HEIGHT + BUTTON_GAP)))
   const total = visibleIcons.value.length
-  if (total <= maxButtons) {
-    // 全部图标都能放下：不显示「更多」，主栏显示全部
-    maxVisible.value = total
-  } else {
-    // 放不下：留一个位置给「更多」按钮，其余收纳
-    maxVisible.value = maxButtons - 1
-  }
+  // 「更多」按钮常驻（含「自定义活动栏」入口，Issue #246），始终预留 1 个位置；
+  // 图标较少时主栏显示全部，较多时留位给「更多」，其余收纳
+  maxVisible.value = Math.min(total, maxButtons - 1)
 }
 
 // 点击菜单外部空白区域时关闭「更多」菜单与自定义面板（Issue #225）
