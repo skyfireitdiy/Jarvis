@@ -328,3 +328,42 @@ def test_filter_market_plugins_pagination():
     assert r["total_pages"] == 1
     assert r["filters"]["categories"] == []
     assert r["filters"]["market_repos"] == []
+
+
+def test_filter_market_plugins_marks_installed():
+    """返回的插件附带 installed 标记（按 name 或 id 匹配 installed_names）。
+
+    该标记供前端区分已安装/未安装，未传 installed_names 时全部为 False。
+    """
+    plugins = _mk_market_plugins()
+    # 按 name 匹配 + 按 id 匹配混合
+    installed = {"Alpha 工具", "p3"}
+    r = agent_utils.filter_market_plugins(plugins, installed_names=installed)
+    by_id = {p["id"]: p for p in r["plugins"]}
+    assert by_id["p1"]["installed"] is True
+    assert by_id["p2"]["installed"] is False
+    assert by_id["p3"]["installed"] is True
+    assert by_id["p4"]["installed"] is False
+
+    # 未传 installed_names：全部标记为未安装
+    r = agent_utils.filter_market_plugins(plugins)
+    assert all(p["installed"] is False for p in r["plugins"])
+
+    # 不污染原始列表
+    assert "installed" not in plugins[0]
+
+
+def test_filter_market_plugins_installed_marker_with_installed_filter():
+    """installed=True/False 过滤时 installed 标记仍正确。"""
+    plugins = _mk_market_plugins()
+    installed = {"Alpha 工具", "Beta 集成"}
+    r = agent_utils.filter_market_plugins(
+        plugins, installed_names=installed, installed=True
+    )
+    assert all(p["installed"] is True for p in r["plugins"])
+    assert {p["id"] for p in r["plugins"]} == {"p1", "p2"}
+    r = agent_utils.filter_market_plugins(
+        plugins, installed_names=installed, installed=False
+    )
+    assert all(p["installed"] is False for p in r["plugins"])
+    assert {p["id"] for p in r["plugins"]} == {"p3", "p4"}
