@@ -32,7 +32,7 @@
 // - showToast：函数（提示）
 // - availableUserOptions：ref(Array)（可选用户列表）
 // - historyStorage：模块（历史记录存储）
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, markRaw, nextTick, ref, watch } from 'vue'
 import { Terminal } from 'xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { createTerminalCreationTracker } from '../terminalCreationTracker.js'
@@ -481,18 +481,22 @@ export function useTerminal({
     if (termInfo?.resizeObserver) {
       termInfo.resizeObserver.disconnect()
     }
-    if (termInfo?.fitAddon) {
-      try {
-        termInfo.fitAddon.dispose()
-      } catch (error) {
-        console.warn('[terminal] Failed to dispose fitAddon', error)
-      }
-    }
+    // 先 dispose terminal：xterm 的 terminal.dispose() 会连带 dispose 所有已加载的 addon
+    // （AddonManager.dispose 遍历 _addons），因此正常场景无需单独 dispose fitAddon。
     if (termInfo?.terminal) {
       try {
         termInfo.terminal.dispose()
       } catch (error) {
         console.warn('[terminal] Failed to dispose terminal', error)
+      }
+    }
+    // 仅当 terminal 为 null 而 fitAddon 残留（异常残留）时才单独 dispose fitAddon，
+    // 避免对已被 terminal.dispose() 连带移除的 addon 重复 dispose。
+    if (termInfo?.fitAddon && !termInfo.terminal) {
+      try {
+        termInfo.fitAddon.dispose()
+      } catch (error) {
+        console.warn('[terminal] Failed to dispose fitAddon', error)
       }
     }
 
@@ -508,7 +512,12 @@ export function useTerminal({
   function initExecutionTerminal(executionId, termInfo, el, agentId = null) {
     const targetAgentId = agentId || termInfo?.agentId || currentAgentId.value
     termInfo.hostEl = el
-    termInfo.terminal = new Terminal({
+    // markRaw：避免 Vue reactive 深度代理 Terminal 实例。
+    // xterm 的 loadAddon 会把 addon.dispose 包装为 _wrappedAddonDispose，
+    // 其内部用 _addons[i] === loadedAddon 做引用比较；若 Terminal 被深度代理，
+    // 数组内元素是 Proxy 而闭包捕获的是原始对象，比较恒 false，
+    // 导致任何一次 dispose 都抛 "Could not dispose an addon that has not been loaded"。
+    termInfo.terminal = markRaw(new Terminal({
       theme: {
         background: '#0b1424',
       },
@@ -516,7 +525,7 @@ export function useTerminal({
       fontFamily: "'Consolas', 'Microsoft YaHei', monospace",
       allowProposedApi: true,
       focusOnClick: false,
-    })
+    }))
 
     // 拦截快捷键，防止浏览器默认行为覆盖终端快捷键
     termInfo.terminal.attachCustomKeyEventHandler((event) => {
@@ -538,7 +547,8 @@ export function useTerminal({
     })
     termInfo.terminal.open(el)
 
-    termInfo.fitAddon = new FitAddon()
+    // markRaw：与 terminal 同理，避免 FitAddon 被深度代理导致 dispose 引用比较失效
+    termInfo.fitAddon = markRaw(new FitAddon())
     termInfo.terminal.loadAddon(termInfo.fitAddon)
     termInfo.fitAddon.fit()
 
@@ -757,7 +767,8 @@ export function useTerminal({
     // 创建终端实例
     // 注意：这里不调用 fitAddon.fit()，因为初始时元素可能不可见（v-show）
     // 会在 ResizeObserver 回调中自动调整尺寸
-    session.terminal = new Terminal({
+    // markRaw：与 execution 终端同理，避免 Vue 深度代理导致 xterm dispose 引用比较失效
+    session.terminal = markRaw(new Terminal({
       theme: {
         background: '#0b1424',
       },
@@ -766,7 +777,7 @@ export function useTerminal({
       cols: 80,
       rows: 24,
       allowProposedApi: true,
-    })
+    }))
 
     // 拦截快捷键，防止浏览器默认行为覆盖终端快捷键
     session.terminal.attachCustomKeyEventHandler((event) => {
@@ -789,7 +800,8 @@ export function useTerminal({
     session.terminal.open(el)
   
     // 创建并加载 FitAddon
-    session.fitAddon = new FitAddon()
+    // markRaw：与 terminal 同理，避免 FitAddon 被深度代理导致 dispose 引用比较失效
+    session.fitAddon = markRaw(new FitAddon())
     session.terminal.loadAddon(session.fitAddon)
   
     // 使用 FitAddon 适配终端尺寸（仅当元素可见时）

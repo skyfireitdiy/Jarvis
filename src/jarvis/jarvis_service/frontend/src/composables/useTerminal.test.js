@@ -27,10 +27,42 @@ const { MockTerminal, MockFitAddon } = vi.hoisted(() => {
       this._written = []
     }
     open() { this.opened = true }
-    loadAddon(addon) { this._addons.push(addon) }
+    // 模拟真实 xterm AddonManager 的 loadAddon：
+    // 1) 把 addon 加入 _addons 数组
+    // 2) 把 addon.dispose 替换为 _wrappedAddonDispose（闭包捕获原始 addon）
+    // 3) _wrappedAddonDispose 用 _addons[i] === loadedAddon 引用比较，找不到则抛错
+    // 这样能真实复现 Vue reactive 深度代理导致的 "Could not dispose an addon that has not been loaded"
+    loadAddon(addon) {
+      this._addons.push(addon)
+      const loadedAddon = addon
+      addon.dispose = () => {
+        // 模拟 xterm 的 isDisposed 保护：已 dispose 的 addon 直接返回
+        if (addon.disposed) return
+        // 引用比较：在 _addons 中查找原始 loadedAddon
+        // 若 addon 被 Vue 深度代理（Proxy !== 原始对象），永远找不到 → 抛错
+        const found = this._addons.some(item => item === loadedAddon)
+        if (!found) {
+          throw new Error('Could not dispose an addon that has not been loaded')
+        }
+        addon.disposed = true
+        const idx = this._addons.indexOf(loadedAddon)
+        if (idx !== -1) this._addons.splice(idx, 1)
+      }
+    }
     write(data) { this._written.push(data) }
     writeln(data) { this._written.push(data + '\r\n') }
-    dispose() { this.disposed = true }
+    // 模拟 xterm AddonManager：terminal.dispose() 连带 dispose 已加载的 addon 并从 _addons 移除，
+    // 已 dispose 的 addon 再次 dispose 会抛 "Could not dispose an addon that has not been loaded"
+    dispose() {
+      this.disposed = true
+      this._addons.forEach((addon) => {
+        addon.disposed = true
+        addon.dispose = () => {
+          throw new Error('Could not dispose an addon that has not been loaded')
+        }
+      })
+      this._addons = []
+    }
     focus() { this.focused = true }
     onData(handler) { this._handlers.onData = handler }
     attachCustomKeyEventHandler(handler) { this._keyHandler = handler }
@@ -321,6 +353,119 @@ describe('useTerminal', () => {
       api.terminals.value = [{ agentId: 'agent-1' }]
       api.clearTerminalCache('')
       expect(api.terminals.value).toHaveLength(1)
+    })
+  })
+
+  describe('disposeExecutionTerminal', () => {
+    it('先 dispose terminal（连带处理已加载的 fitAddon），不单独 dispose fitAddon', () => {
+      const { api } = makeHarness()
+      const terminal = new MockTerminal()
+      const fitAddon = new MockFitAddon()
+      terminal.loadAddon(fitAddon)
+      const termInfo = {
+        terminal,
+        fitAddon,
+        resizeObserver: { disconnect: vi.fn() },
+        hostEl: {},
+      }
+      api.disposeExecutionTerminal(termInfo)
+      expect(terminal.disposed).toBe(true)
+      expect(fitAddon.disposed).toBe(true)
+      expect(termInfo.terminal).toBeNull()
+      expect(termInfo.fitAddon).toBeNull()
+      expect(termInfo.hostEl).toBeNull()
+    })
+
+    it('重复 dispose（组件重建后 tool_stream_end 再次触发）不抛错', () => {
+      const { api } = makeHarness()
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const terminal = new MockTerminal()
+      const fitAddon = new MockFitAddon()
+      terminal.loadAddon(fitAddon)
+      const termInfo = {
+        terminal,
+        fitAddon,
+        resizeObserver: { disconnect: vi.fn() },
+        hostEl: {},
+      }
+      // 第一次 dispose：terminal.dispose() 连带移除已加载的 fitAddon
+      api.disposeExecutionTerminal(termInfo)
+      // 第二次 dispose：termInfo.fitAddon 引用指向已被移除的 addon，
+      // 修复前会抛 "Could not dispose an addon that has not been loaded"
+      expect(() => api.disposeExecutionTerminal(termInfo)).not.toThrow()
+      warnSpy.mockRestore()
+    })
+
+    it('terminal 为 null 但 fitAddon 残留（异常残留）时单独 dispose fitAddon', () => {
+      const { api } = makeHarness()
+      const fitAddon = new MockFitAddon()
+      const termInfo = {
+        terminal: null,
+        fitAddon,
+        resizeObserver: { disconnect: vi.fn() },
+        hostEl: {},
+      }
+      api.disposeExecutionTerminal(termInfo)
+      expect(fitAddon.disposed).toBe(true)
+      expect(termInfo.fitAddon).toBeNull()
+    })
+
+    it('resizeObserver 断开连接并置空', () => {
+      const { api } = makeHarness()
+      const resizeObserver = { disconnect: vi.fn() }
+      const termInfo = {
+        terminal: null,
+        fitAddon: null,
+        resizeObserver,
+        hostEl: {},
+      }
+      api.disposeExecutionTerminal(termInfo)
+      expect(resizeObserver.disconnect).toHaveBeenCalled()
+      expect(termInfo.resizeObserver).toBeNull()
+    })
+
+    // Issue #251 回归测试：Vue reactive 深度代理会破坏 xterm 内部
+    // _addons[i] === loadedAddon 引用比较，导致任何一次 dispose 都抛
+    // "Could not dispose an addon that has not been loaded"。
+    // 修复：initExecutionTerminal 用 markRaw 包裹 Terminal/FitAddon，避免被深度代理。
+    // 本测试走真实 setTerminalRef → initExecutionTerminal 链路，若去掉 markRaw 会红。
+    it('真实链路（terminals ref 深度代理场景）dispose 不抛错', () => {
+      const { api, allOutputs } = makeHarness()
+      allOutputs.value.set('agent-1', [])
+      const el = { parentElement: null, isConnected: true, offsetParent: {} }
+      api.setTerminalRef('exec-1', el, 'agent-1')
+      const termInfo = api.terminals.value[0]
+      // termInfo 来自 reactive 数组（深度代理），但 terminal/fitAddon 应被 markRaw 保护
+      expect(termInfo.terminal).toBeInstanceOf(MockTerminal)
+      expect(termInfo.fitAddon).toBeInstanceOf(MockFitAddon)
+      // dispose 不抛错（markRaw 保证引用比较正常）
+      expect(() => api.disposeExecutionTerminal(termInfo)).not.toThrow()
+      expect(termInfo.terminal).toBeNull()
+      expect(termInfo.fitAddon).toBeNull()
+    })
+
+    // Issue #251 回归测试：独立终端（terminalSessions）同样用 markRaw 保护
+    it('独立终端真实链路 dispose 不抛错', () => {
+      const { api } = makeHarness()
+      api.terminalSessions.value.push({
+        terminal_id: 't1',
+        node_id: 'node-1',
+        interpreter: 'bash',
+        working_dir: '/tmp',
+        terminal: null,
+        hostEl: null,
+        fitAddon: null,
+        resizeObserver: null,
+        history: [],
+      })
+      // 通过 setTerminalHostRef 触发 initIndependentTerminal
+      const el = { parentElement: null, isConnected: true, offsetParent: null }
+      api.setTerminalHostRef('t1', el)
+      const updated = api.terminalSessions.value[0]
+      expect(updated.terminal).toBeInstanceOf(MockTerminal)
+      // closeTerminal 内部 dispose，不应抛错
+      expect(() => api.closeTerminal('t1')).not.toThrow()
+      expect(api.terminalSessions.value).toHaveLength(0)
     })
   })
 
