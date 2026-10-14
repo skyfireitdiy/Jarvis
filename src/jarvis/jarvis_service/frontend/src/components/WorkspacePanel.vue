@@ -472,8 +472,10 @@ defineExpose({
   border-color: var(--color-border-active);
 }
 
-/* Agent 图标：使用主图标（Jarvis 吉祥物），需缩放到与 emoji 图标视觉一致 */
-.workspace-activity-icon {
+/* Agent 图标：使用主图标（Jarvis 吉祥物），需缩放到与 emoji 图标视觉一致。
+   agent 图标通过 v-html 注入（无 data-v 属性），scoped 的 [data-v] 选择器匹配不到，
+   必须用 :deep() 穿透 scoped，否则 img 会以固有尺寸 64x64 + fill 显示并被容器裁切。 */
+.workspace-activity-inline-icon :deep(.workspace-activity-icon) {
   width: 20px;
   height: 20px;
   display: block;
