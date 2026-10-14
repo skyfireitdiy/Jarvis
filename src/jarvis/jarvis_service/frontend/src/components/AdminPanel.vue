@@ -244,7 +244,7 @@
           <div class="config-backup-row">
             <select v-model="backupNodeId" class="node-select">
               <option value="" disabled>选择节点</option>
-              <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">{{ node.node_id }}</option>
+              <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">{{ displayNodeName(node.node_id) }}</option>
             </select>
             <div class="config-backup-actions">
               <button class="ghost-btn" @click="exportConfig" :disabled="!backupNodeId || exporting">
@@ -326,9 +326,19 @@ const props = defineProps({
   getToken: { type: Function, default: null },
   pluginAdminTabs: { type: Array, default: () => [] },
   pluginExtensions: { type: Array, default: () => [] },
+  getNodeDisplayName: { type: Function, default: null },
 })
 
 const emit = defineEmits(['update:visible', 'confirmRestartGateway', 'confirmRestartAllNodes', 'syncConfig', 'updateCodeToMain', 'confirmUpdateCodeToMain'])
+
+// 节点展示名：优先宿主传入的 getNodeDisplayName（别名），否则回退 node_id
+function displayNodeName(nodeId) {
+  const normalized = String(nodeId || '').trim() || 'master'
+  if (typeof props.getNodeDisplayName === 'function') {
+    return props.getNodeDisplayName(normalized) || normalized
+  }
+  return normalized
+}
 
 // 状态
 const activeTab = ref('users')

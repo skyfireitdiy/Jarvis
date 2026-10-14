@@ -25,7 +25,7 @@
         <label>节点版本</label>
         <div v-if="nodes.length" class="about-list">
           <div v-for="node in nodes" :key="node.node_id" class="about-item">
-            <span class="about-item-name">{{ node.node_id }}</span>
+            <span class="about-item-name">{{ displayNodeName(node.node_id) }}</span>
             <span class="about-item-value">{{ node.version || '-' }}</span>
             <span class="about-item-status" :class="{ online: node.status === 'online' || node.status === 'running' }">{{ node.status || '-' }}</span>
           </div>
@@ -74,9 +74,19 @@ const props = defineProps({
   nodes: { type: Array, default: () => [] },
   daemonSessions: { type: Array, default: () => [] },
   browserExtSessions: { type: Array, default: () => [] },
+  getNodeDisplayName: { type: Function, default: null },
 })
 
 const emit = defineEmits(['update:visible'])
+
+// 节点展示名：优先宿主传入的 getNodeDisplayName（别名），否则回退 node_id
+function displayNodeName(nodeId) {
+  const normalized = String(nodeId || '').trim() || 'master'
+  if (typeof props.getNodeDisplayName === 'function') {
+    return props.getNodeDisplayName(normalized) || normalized
+  }
+  return normalized
+}
 
 function close() {
   emit('update:visible', false)
