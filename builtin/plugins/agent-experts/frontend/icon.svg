@@ -1,6 +1,6 @@
-<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="#4da3ff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
   <!-- 专家 Agent：人形 + 星标 -->
-  <circle cx="8" cy="4.5" r="2.5"/>
+  <circle cx="8" cy="4.5" r="2.5" fill="#4da3ff" fill-opacity="0.25"/>
   <path d="M3 13.5c0-2.8 2.2-5 5-5s5 2.2 5 5"/>
-  <path d="M13 2l.6 1.4L15 4l-1.4.6L13 6l-.6-1.4L11 4l1.4-.6z"/>
+  <path d="M13 2l.6 1.4L15 4l-1.4.6L13 6l-.6-1.4L11 4l1.4-.6z" fill="#ffd166"/>
 </svg>
