@@ -7,6 +7,7 @@
 - 仓库不可达时跳过该源，不阻断整体返回
 - 单个 yaml 解析失败时跳过该条目，不阻断其他条目
 """
+
 import shutil
 
 import pytest
@@ -65,7 +66,9 @@ def market_repo(tmp_path):
     return repo
 
 
-def test_list_market_plugins_parses_and_skips_template(tmp_path, monkeypatch, market_repo):
+def test_list_market_plugins_parses_and_skips_template(
+    tmp_path, monkeypatch, market_repo
+):
     data_dir = tmp_path / "data"
     _patch_market(monkeypatch, market_repo, data_dir)
 
@@ -99,17 +102,86 @@ def test_list_market_plugins_skips_bad_yaml(tmp_path, monkeypatch, market_repo):
     assert "bad" not in ids
 
 
-def test_list_market_plugins_unreachable_repo_skipped(tmp_path, monkeypatch, market_repo):
+def test_list_market_plugins_unreachable_repo_skipped(
+    tmp_path, monkeypatch, market_repo
+):
     """仓库不可达时跳过该源，不阻断整体返回（返回空列表而非抛异常）。"""
     data_dir = tmp_path / "data"
 
     def fake_clone_fail(url, branch, dest):
         raise RuntimeError("repo unreachable")
 
-    monkeypatch.setattr(config, "get_plugin_market_repos", lambda: ["https://x.invalid/repo"])
+    monkeypatch.setattr(
+        config, "get_plugin_market_repos", lambda: ["https://x.invalid/repo"]
+    )
     monkeypatch.setattr(config, "get_data_dir", lambda: str(data_dir))
     monkeypatch.setattr(agent_utils, "_git_clone_plugin", fake_clone_fail)
     monkeypatch.setattr(agent_utils, "_git_run", lambda *a, **k: None)
 
     plugins = agent_utils.list_market_plugins()
     assert plugins == []
+
+
+def test_list_market_plugins_same_name_different_owner_uses_distinct_cache(
+    tmp_path, monkeypatch, market_repo
+):
+    """不同组织的同名市场仓库使用互不冲突的缓存目录（Issue #243）。
+
+    两个 URL 最后一段都是 ``market``，但属于不同组织，应各自 clone 到独立
+    缓存目录，而不是互相覆盖。
+    """
+    data_dir = tmp_path / "data"
+    clone_dests = []
+
+    def fake_clone(url, branch, dest):
+        clone_dests.append(str(dest))
+        shutil.copytree(str(market_repo), str(dest))
+
+    class FakeProc:
+        returncode = 0
+
+    monkeypatch.setattr(
+        config,
+        "get_plugin_market_repos",
+        lambda: [
+            "https://github.com/orgA/market",
+            "https://github.com/orgB/market",
+        ],
+    )
+    monkeypatch.setattr(config, "get_data_dir", lambda: str(data_dir))
+    monkeypatch.setattr(agent_utils, "_git_clone_plugin", fake_clone)
+    monkeypatch.setattr(agent_utils, "_git_run", lambda *a, **k: FakeProc())
+
+    plugins = agent_utils.list_market_plugins()
+
+    # 两个源都被 clone 到不同缓存目录
+    assert len(clone_dests) == 2
+    assert len(set(clone_dests)) == 2
+    assert (data_dir / "plugin_market" / "orgA__market").exists()
+    assert (data_dir / "plugin_market" / "orgB__market").exists()
+    # 两个源的插件都被解析（market_repo 来源标记正确区分）
+    assert len(plugins) == 2
+    assert {p["market_repo"] for p in plugins} == {
+        "https://github.com/orgA/market",
+        "https://github.com/orgB/market",
+    }
+
+
+@pytest.mark.parametrize(
+    ("url", "expected"),
+    [
+        ("https://github.com/orgA/market", "orgA__market"),
+        ("https://github.com/orgB/market", "orgB__market"),
+        ("https://github.com/orgA/market.git", "orgA__market"),
+        ("git@github.com:orgA/market.git", "orgA__market"),
+        ("ssh://git@host:2222/orgA/market", "orgA__market"),
+        ("https://github.com/orgA/market#dev", "orgA__market"),
+        ("https://github.com/orgA/market/", "orgA__market"),
+        ("https://github.com/plugin-market", "plugin-market"),
+        ("market", "market"),
+        ("", "market"),
+    ],
+)
+def test_market_cache_dir_name(url, expected):
+    """缓存目录名唯一化：owner/repo 拼接，兼容多种 URL 形态。"""
+    assert agent_utils._market_cache_dir_name(url) == expected

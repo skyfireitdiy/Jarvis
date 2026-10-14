@@ -1830,6 +1830,49 @@ def _read_plugin_logo(config: dict, plugin_dir) -> str:
     return ""
 
 
+def _market_cache_dir_name(repo_url: str) -> str:
+    """为市场仓库 URL 生成唯一且可读的本地缓存目录名（Issue #243）。
+
+    基于仓库路径（owner/repo）拼接，避免不同组织的同名仓库
+    （如 ``https://github.com/orgA/market`` 与 ``orgB/market``）共用同一
+    缓存目录互相覆盖。兼容多种 URL 形态：
+
+    - ``https://github.com/orgA/market`` / ``.../market.git``
+    - ``git@github.com:orgA/market.git``（scp-like）
+    - ``ssh://git@host:port/orgA/market``
+
+    无法解析出 owner/repo 时回退为 URL 最后一段（去 .git），仍为空则用
+    ``market``。
+    """
+    import re
+
+    url = (repo_url or "").strip().rstrip("/")
+    # 去掉 #branch 片段
+    url = url.split("#", 1)[0].rstrip("/")
+    # 提取路径部分：scp-like（git@host:path）与 URL（scheme://host/path）
+    path = ""
+    if "://" in url:
+        # https://host/org/repo(.git)
+        path = url.split("://", 1)[1]
+        # 去掉 host[:port] 前缀
+        path = re.sub(r"^[^/]+", "", path)
+    elif ":" in url and "@" in url:
+        # git@host:org/repo(.git)
+        path = url.split(":", 1)[1]
+    else:
+        path = url
+    path = path.strip("/").removesuffix(".git")
+    parts = [p for p in path.split("/") if p]
+    if len(parts) >= 2:
+        # 取最后两段（owner/repo），用 __ 拼接避免歧义
+        return "__".join(parts[-2:])
+    if parts:
+        return parts[-1]
+    # 回退：URL 最后一段
+    last = url.rsplit("/", 1)[-1].removesuffix(".git")
+    return last or "market"
+
+
 def list_market_plugins() -> List[dict]:
     """从插件市场仓库拉取并解析市场插件清单。
 
@@ -1871,9 +1914,9 @@ def list_market_plugins() -> List[dict]:
         repo_url = (repo_url or "").strip().rstrip("/")
         if not repo_url:
             continue
-        # 用仓库名作为缓存目录名（取 URL 最后一段，去掉 .git）
-        repo_name = repo_url.rsplit("/", 1)[-1].removesuffix(".git") or "market"
-        cache_dir = market_root / repo_name
+        # 缓存目录名基于仓库路径（owner/repo）唯一化，避免不同组织的同名
+        # 仓库（如 orgA/market 与 orgB/market）互相覆盖缓存（Issue #243）。
+        cache_dir = market_root / _market_cache_dir_name(repo_url)
         try:
             if not cache_dir.exists():
                 _git_clone_plugin(repo_url, "main", cache_dir)
