@@ -110,7 +110,7 @@ export class CommandRouter {
       "debugger.send_command": (p) => this.debugExecutor.sendCommand(p),
       "network.get_requests": (p) => this.debugExecutor.getRequests(p),
       // 捕获类
-      "capture.screenshot": (p) => this.captureExecutor.screenshot(p, ctx),
+      "capture.screenshot": (p, ctx) => this.captureExecutor.screenshot(p, ctx),
       // 书签类
       "bookmark.list": (p) => this.bookmarksExecutor.list(p),
       "bookmark.search": (p) => this.bookmarksExecutor.search(p),
@@ -240,7 +240,7 @@ export class CommandRouter {
     }
 
     try {
-      const data = await handler(params);
+      const data = await handler(params, ctx);
       return {
         id,
         type: "result",
