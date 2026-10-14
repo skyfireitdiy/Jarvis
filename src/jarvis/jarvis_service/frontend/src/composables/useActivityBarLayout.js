@@ -16,8 +16,9 @@ import { ref, computed, watch } from 'vue'
 // localStorage 持久化 key
 const STORAGE_KEY = 'jarvis_activity_bar_layout'
 
-// 主栏最多直接显示的图标数；超出部分收纳到「更多」菜单
-const MAX_VISIBLE = 10
+// 主栏默认最多直接显示的图标数；超出部分收纳到「更多」菜单。
+// 实际值由 WorkspacePanel 依据侧边栏可用高度动态调整（Issue #225）。
+const DEFAULT_MAX_VISIBLE = 10
 
 // 内置活动栏图标（含 SVG 图标与 action 描述符）。
 // isPlugin=false；defaultHidden 仅对插件图标有意义（内置默认显示）。
@@ -198,9 +199,12 @@ export function useActivityBarLayout({ pluginSidebarViews, pluginToolPanels, isA
     orderedIcons.value.filter((ic) => !hiddenIds.value.has(ic.id))
   )
 
-  // 主栏图标（前 MAX_VISIBLE 个）与收纳图标（其余）
-  const mainIcons = computed(() => visibleIcons.value.slice(0, MAX_VISIBLE))
-  const moreIcons = computed(() => visibleIcons.value.slice(MAX_VISIBLE))
+  // 主栏最多直接显示的图标数（动态，由 WorkspacePanel 按侧边栏可用高度设置）
+  const maxVisible = ref(DEFAULT_MAX_VISIBLE)
+
+  // 主栏图标（前 maxVisible 个）与收纳图标（其余）
+  const mainIcons = computed(() => visibleIcons.value.slice(0, maxVisible.value))
+  const moreIcons = computed(() => visibleIcons.value.slice(maxVisible.value))
 
   // 判断某图标是否处于激活态
   function isActive(icon, { showSidebar, sidebarView, mainView }) {
@@ -266,14 +270,15 @@ export function useActivityBarLayout({ pluginSidebarViews, pluginToolPanels, isA
   return {
     allIcons,
     orderedIcons,
+    visibleIcons,
     mainIcons,
     moreIcons,
     hiddenIds,
+    maxVisible,
     isActive,
     dispatch,
     setHidden,
     move,
     reset,
-    MAX_VISIBLE,
   }
 }
