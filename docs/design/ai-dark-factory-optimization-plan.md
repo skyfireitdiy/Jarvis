@@ -1,7 +1,7 @@
 # AI 黑灯工厂插件优化方案：对齐最新编排引擎 + 补全研发流程
 
 > 状态：**已评审，实施中**
-> 目标：让黑灯工厂插件（`builtin/plugins/ai-dark-factory/`）充分利用最新 `pipeline_runner` 编排引擎能力，并补全研发流程的薄弱环节。
+> 目标：让黑灯工厂插件（独立仓库 `skyfireitdiy/jarvis-plugin-ai-dark-factory`，市场安装到 `~/.jarvis/plugins/ai-dark-factory/`）充分利用最新 `pipeline_runner` 编排引擎能力，并补全研发流程的薄弱环节。
 > 依据：对插件现状（规则/工具/编排模板/config）与 `pipeline_runner` 最新能力的交叉分析。
 > 相关：`docs/design/ai-dark-factory-orchestration-engine.md`（编排引擎设计）、`docs/design/orchestration-python-dsl.md`（.flow DSL）。
 
