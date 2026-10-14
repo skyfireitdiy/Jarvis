@@ -247,6 +247,24 @@ export function useActivityBarLayout({ pluginSidebarViews, pluginToolPanels, isA
     persist()
   }
 
+  // 把某图标移动到有序列表的任意位置（HTML5 拖拽排序，Issue #260）。
+  // targetIndex 为「插入后该图标所在的下标」：0 表示移到最前，末尾表示移到最后。
+  function moveTo(id, targetIndex) {
+    const ids = orderedIcons.value.map((ic) => ic.id)
+    const idx = ids.indexOf(id)
+    if (idx < 0) return
+    let target = Number(targetIndex)
+    if (!Number.isFinite(target)) return
+    // 目标位置钳制到有效范围
+    target = Math.max(0, Math.min(ids.length - 1, target))
+    if (target === idx) return
+    const [moved] = ids.splice(idx, 1)
+    // 移除后原下标之后的位置整体前移一位，需按移除后的列表重新定位
+    ids.splice(target, 0, moved)
+    layout.value = { ...layout.value, order: ids }
+    persist()
+  }
+
   function reset() {
     layout.value = { order: [], hidden: [] }
     persist()
@@ -279,6 +297,7 @@ export function useActivityBarLayout({ pluginSidebarViews, pluginToolPanels, isA
     dispatch,
     setHidden,
     move,
+    moveTo,
     reset,
   }
 }

@@ -126,6 +126,57 @@ describe('useActivityBarLayout', () => {
     expect(api.orderedIcons.value.map((i) => i.id)).toEqual(before)
   })
 
+  it('moveTo 把图标移动到任意位置并持久化（向前移）', () => {
+    const { api } = makeHarness()
+    const ids = () => api.orderedIcons.value.map((i) => i.id)
+    const before = ids()
+    // 把下标 3 的图标移到最前（下标 0）
+    api.moveTo(before[3], 0)
+    const after = ids()
+    expect(after[0]).toBe(before[3])
+    expect(after.slice(1)).toEqual(before.slice(0, 3).concat(before.slice(4)))
+    const saved = JSON.parse(store['jarvis_activity_bar_layout'])
+    expect(saved.order).toEqual(after)
+  })
+
+  it('moveTo 把图标移动到任意位置（向后移）', () => {
+    const { api } = makeHarness()
+    const ids = () => api.orderedIcons.value.map((i) => i.id)
+    const before = ids()
+    // 把下标 0 的图标移到下标 2
+    api.moveTo(before[0], 2)
+    const after = ids()
+    expect(after[2]).toBe(before[0])
+    expect(after[0]).toBe(before[1])
+    expect(after[1]).toBe(before[2])
+  })
+
+  it('moveTo 目标下标越界时钳制到边界', () => {
+    const { api } = makeHarness()
+    const ids = () => api.orderedIcons.value.map((i) => i.id)
+    const before = ids()
+    // 负下标钳制到 0
+    api.moveTo(before[before.length - 1], -5)
+    expect(ids()[0]).toBe(before[before.length - 1])
+    // 超长下标钳制到末尾
+    api.moveTo(ids()[0], 999)
+    expect(ids()[ids().length - 1]).toBe(before[before.length - 1])
+  })
+
+  it('moveTo 目标为当前位置或非法 id 时不改变顺序', () => {
+    const { api } = makeHarness()
+    const before = api.orderedIcons.value.map((i) => i.id)
+    // 移到当前位置
+    api.moveTo(before[2], 2)
+    expect(api.orderedIcons.value.map((i) => i.id)).toEqual(before)
+    // 非法 id
+    api.moveTo('no-such-icon', 0)
+    expect(api.orderedIcons.value.map((i) => i.id)).toEqual(before)
+    // 非法目标下标
+    api.moveTo(before[0], 'abc')
+    expect(api.orderedIcons.value.map((i) => i.id)).toEqual(before)
+  })
+
   it('reset 清空顺序与隐藏并持久化', () => {
     const { api } = makeHarness()
     api.setHidden('about', true)

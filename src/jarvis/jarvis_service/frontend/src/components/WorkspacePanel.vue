@@ -77,7 +77,19 @@
           <button class="workspace-activity-customize-close" tabindex="-1" @click="showCustomize = false">✕</button>
         </div>
         <div class="workspace-activity-customize-list">
-          <div v-for="(icon, idx) in orderedIcons" :key="icon.id" class="workspace-activity-customize-row">
+          <div
+            v-for="(icon, idx) in orderedIcons"
+            :key="icon.id"
+            class="workspace-activity-customize-row"
+            :class="{ 'drag-over': dragOverIndex === idx }"
+            draggable="true"
+            @dragstart="onDragStart(icon.id, $event)"
+            @dragend="onDragEnd"
+            @dragover.prevent="onDragOver(idx)"
+            @dragleave="onDragLeave(idx)"
+            @drop.prevent="onDrop(idx)"
+          >
+            <span class="workspace-activity-customize-grip" title="拖拽排序">⠿</span>
             <span v-if="icon.isPlugin" class="workspace-activity-plugin-icon" v-html="icon.icon"></span>
             <span v-else class="workspace-activity-inline-icon" v-html="icon.icon"></span>
             <span class="workspace-activity-customize-name">{{ icon.title }}</span>
@@ -229,7 +241,7 @@ const activityLayout = useActivityBarLayout({
   pluginToolPanels: computed(() => props.pluginToolPanels),
   isAdmin: computed(() => props.isAdmin),
 })
-const { mainIcons, moreIcons, orderedIcons, hiddenIds, isActive, dispatch, move, reset, maxVisible, visibleIcons } = activityLayout
+const { mainIcons, moreIcons, orderedIcons, hiddenIds, isActive, dispatch, move, moveTo, reset, maxVisible, visibleIcons } = activityLayout
 
 // 「更多」菜单与自定义面板开关
 const showMoreMenu = ref(false)
@@ -250,6 +262,43 @@ function toggleHidden(id) {
 // 恢复默认布局
 function resetLayout() {
   reset()
+}
+
+// ---- 自定义面板拖拽排序（Issue #260）----
+// 用 HTML5 拖拽替代逐次 ↑/↓ 按钮：dragStartId 记录被拖图标，dragOverIndex
+// 记录当前悬停行下标（用于高亮），drop 时调用 moveTo 移到目标下标。
+const dragStartId = ref(null)
+const dragOverIndex = ref(-1)
+
+function onDragStart(id, event) {
+  dragStartId.value = id
+  dragOverIndex.value = -1
+  if (event.dataTransfer) {
+    // 部分浏览器要求设置数据才会触发 drop
+    event.dataTransfer.effectAllowed = 'move'
+    try { event.dataTransfer.setData('text/plain', id) } catch (e) { /* 忽略 */ }
+  }
+}
+
+function onDragOver(idx) {
+  if (dragStartId.value === null) return
+  dragOverIndex.value = idx
+}
+
+function onDragLeave(idx) {
+  if (dragOverIndex.value === idx) dragOverIndex.value = -1
+}
+
+function onDrop(idx) {
+  const id = dragStartId.value
+  dragOverIndex.value = -1
+  if (id === null) return
+  moveTo(id, idx)
+}
+
+function onDragEnd() {
+  dragStartId.value = null
+  dragOverIndex.value = -1
 }
 
 // ---- 活动栏动态收纳（Issue #225）----
@@ -665,9 +714,25 @@ defineExpose({
   gap: 8px;
   padding: 4px 6px;
   border-radius: var(--tile-radius);
+  cursor: grab;
 }
 .workspace-activity-customize-row:hover {
   background: var(--color-accent-subtle);
+}
+.workspace-activity-customize-row:active {
+  cursor: grabbing;
+}
+.workspace-activity-customize-row.drag-over {
+  outline: 1px dashed var(--color-accent);
+  outline-offset: -1px;
+  background: var(--color-accent-subtle);
+}
+.workspace-activity-customize-grip {
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+  line-height: 1;
+  user-select: none;
+  cursor: grab;
 }
 .workspace-activity-customize-name {
   flex: 1;
