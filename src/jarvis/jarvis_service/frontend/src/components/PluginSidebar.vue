@@ -26,8 +26,8 @@
 
     <div class="plugin-sidebar-content">
       <!-- 节点选择 -->
-      <div v-if="activeTab === 'installed'" class="plugin-node-select">
-        <select v-model="pluginNodeId" class="plugin-node-select-input" @change="loadPlugins">
+      <div v-if="activeTab === 'installed' || activeTab === 'market'" class="plugin-node-select">
+        <select v-model="pluginNodeId" class="plugin-node-select-input" @change="onNodeChange">
           <option value="master">本节点 (master)</option>
           <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">
             {{ formatNodeOptionLabel(node) }}
@@ -353,6 +353,11 @@ function switchTab(tab) {
   if (tab === 'market' && marketPlugins.value.length === 0 && !loadingMarket.value) {
     loadMarket()
   }
+}
+
+function onNodeChange() {
+  // 已安装页切换节点需重新加载该节点插件；市场页市场列表是全局的，无需重载
+  if (activeTab.value === 'installed') loadPlugins()
 }
 
 async function loadMarket() {
