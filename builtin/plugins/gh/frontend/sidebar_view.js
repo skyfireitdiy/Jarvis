@@ -900,37 +900,34 @@ export default {
     toggleHelp() {
       this.helpVisible = !this.helpVisible;
       if (this.helpVisible) {
-        // 打开时同步认证表单的节点/平台选择，并查询当前认证状态
+        // 打开时同步认证表单的节点，并查询 github+gitee 双平台认证状态
         this.authNodeId = this.nodeId;
-        this.authPlatform =
-          this.platform === "gitee" ? "gitee" : "github";
         this.refreshAuthStatus();
       }
     },
-    // 认证表单切换节点/平台：重新查询该节点+平台的认证状态
+    // 认证表单切换节点：重新查询该节点 github+gitee 双平台的认证状态
     onAuthNodeChange() {
       this.authStatus = null;
       this.authToken = "";
       this.refreshAuthStatus();
     },
+    // 认证表单切换平台：双平台状态已同时显示，无需重查，仅清空 token
     onAuthPlatformChange() {
-      this.authStatus = null;
       this.authToken = "";
-      this.refreshAuthStatus();
     },
-    // 查询所选节点+平台的认证状态（仅用于展示「已登录/未认证」，不泄露 token）
+    // 查询所选节点上 github+gitee 双平台的认证状态
+    // （仅用于展示「已登录/未认证」，不泄露 token）
     async refreshAuthStatus() {
       this.authLoading = true;
       this.authStatus = null;
       try {
-        const payload = await callFunction(
-          "auth_status",
-          { platform: this.authPlatform },
-          this.authNodeId,
-        );
-        this.authStatus = payload || {};
+        const [github, gitee] = await Promise.all([
+          callFunction("auth_status", { platform: "github" }, this.authNodeId),
+          callFunction("auth_status", { platform: "gitee" }, this.authNodeId),
+        ]);
+        this.authStatus = { github: github || {}, gitee: gitee || {} };
       } catch (e) {
-        this.authStatus = { authenticated: false, error: String((e && e.message) || e) };
+        this.authStatus = { error: String((e && e.message) || e) };
       } finally {
         this.authLoading = false;
       }
@@ -1121,16 +1118,32 @@ export default {
 · 写操作（评论/关闭/合并）需对应平台已登录
 · 认证在所选节点本地执行，不跨节点共享
 
-<!-- 认证表单：选择节点+平台+token，仅未认证时显示 -->
+<!-- 认证表单：选择节点+平台+token；顶部同时展示 github+gitee 双平台认证状态 -->
 <div style="margin:10px 0;padding:10px;background:#252526;border-radius:6px;">
   <div style="font-size:12px;font-weight:600;margin-bottom:8px;">🔐 认证</div>
   <div v-if="authLoading" style="font-size:12px;color:#888;">查询认证状态…</div>
-  <template v-else-if="authStatus && authStatus.authenticated">
-    <div style="font-size:12px;color:#3fb950;">
-      ✓ 已登录 {{ authStatus.platform === 'gitee' ? 'Gitee' : 'GitHub' }}（{{ authStatus.login || '已认证' }}）
+  <template v-else-if="authStatus && !authStatus.error">
+    <div style="font-size:12px;margin-bottom:6px;">
+      <span style="display:inline-block;width:60px;color:#888;">GitHub</span>
+      <span v-if="authStatus.github && authStatus.github.authenticated" style="color:#3fb950;">
+        ✓ 已登录（{{ authStatus.github.login || '已认证' }}）
+      </span>
+      <span v-else style="color:#f85149;">
+        ✗ 未认证<template v-if="authStatus.github && authStatus.github.installed === false">（gh 未安装）</template>
+      </span>
+    </div>
+    <div style="font-size:12px;margin-bottom:6px;">
+      <span style="display:inline-block;width:60px;color:#888;">Gitee</span>
+      <span v-if="authStatus.gitee && authStatus.gitee.authenticated" style="color:#3fb950;">
+        ✓ 已登录（{{ authStatus.gitee.login || '已认证' }}）
+      </span>
+      <span v-else style="color:#f85149;">
+        ✗ 未认证<template v-if="authStatus.gitee && authStatus.gitee.installed === false">（gitee 未安装）</template>
+      </span>
     </div>
   </template>
   <template v-else>
+    <div v-if="authStatus && authStatus.error" style="font-size:11px;color:#f85149;margin-bottom:6px;">{{ authStatus.error }}</div>
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
       <span style="font-size:11px;color:#888;width:28px;">节点</span>
       <select v-model="authNodeId" @change="onAuthNodeChange"
@@ -1152,7 +1165,6 @@ export default {
         @keydown.enter.prevent="doAuth"
         style="flex:1;min-width:0;padding:5px 8px;background:#1e1e1e;color:#ddd;border:1px solid #444;border-radius:4px;font-size:12px;">
     </div>
-    <div v-if="authStatus && authStatus.error" style="font-size:11px;color:#f85149;margin-bottom:6px;">{{ authStatus.error }}</div>
     <button @click="doAuth" :disabled="authBusy || !authToken.trim()"
       style="padding:6px 14px;background:#1f6feb;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;">
       {{ authBusy ? '认证中…' : '认证' }}
