@@ -317,4 +317,57 @@ describe("PluginSidebar", () => {
     expect(body.source).toBe("https://github.com/owner/market-p#main");
     confirmSpy.mockRestore();
   });
+
+  test("市场 tab：显示节点选择器，可安装到指定子节点", async () => {
+    const fetchWithAuth = makeFetch({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
+        success: true,
+        data: { node_id: "master", plugins: [] },
+      }),
+      "GET http://127.0.0.1:8000/api/plugins/market": () => ({
+        success: true,
+        data: {
+          plugins: [
+            {
+              id: "market-p",
+              name: "市场插件",
+              repo: "https://github.com/owner/market-p",
+              branch: "main",
+            },
+          ],
+        },
+      }),
+      "POST http://127.0.0.1:8000/api/node/child-1/plugins/install": () => ({
+        success: true,
+        data: { node_id: "child-1", output: [] },
+      }),
+    });
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const wrapper = mount(PluginSidebar, {
+      props: {
+        ...baseProps,
+        fetchWithAuth,
+        availableNodeOptions: [
+          { node_id: "child-1", status: "running", label: "子节点1" },
+        ],
+      },
+    });
+    await flushPromises();
+    // 切到市场 tab
+    await wrapper.findAll(".plugin-sidebar-tab")[1].trigger("click");
+    await flushPromises();
+    // 市场页也应显示节点选择器
+    expect(wrapper.find(".plugin-node-select").exists()).toBe(true);
+    // 选择子节点
+    await wrapper.find(".plugin-node-select-input").setValue("child-1");
+    // 点击市场插件的安装按钮
+    await wrapper.find(".plugin-market-item .plugin-btn-primary").trigger("click");
+    await flushPromises();
+    const installCall = fetchWithAuth.mock.calls.find(
+      ([url, opt]) =>
+        opt?.method === "POST" && url.includes("/api/node/child-1/plugins/install"),
+    );
+    expect(installCall).toBeTruthy();
+    confirmSpy.mockRestore();
+  });
 });
