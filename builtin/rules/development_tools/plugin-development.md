@@ -192,6 +192,57 @@ YAML 编排流水线，配合 `OrganizeAgents` 与 `jca -n --task-file` 消费�
 5. **查看**：`jarvis --list-plugins` 列出已安装插件。
 6. **卸载**：`jarvis --uninstall-plugin <name>`（内置插件不可卸载，会拒绝）。
 
+## 上架插件市场
+
+插件开发完成后，可上架到**插件市场**供全体用户发现与一键安装。市场机制见 #217（建立 Jarvis 插件市场仓库）与 `docs/plugin_development_guide.md`「七·五、插件市场」章节，本规则与之保持一致。
+
+### 1. 市场清单格式
+
+市场仓库含 `plugins/` 目录，**每个插件一个 YAML 文件**（文件名为 `<id>.yaml`），`_` 开头的文件会被客户端当作模板/占位文件跳过（如 `_example.yaml`）：
+
+```text
+plugin-market/
+├── README.md
+└── plugins/
+    ├── _example.yaml      # 模板（被跳过）
+    ├── my-plugin.yaml     # 真实插件清单
+    └── ...
+```
+
+清单字段规范（与 `list_market_plugins` 解析一致）：
+
+```yaml
+# plugins/my-plugin.yaml
+id: my-plugin          # 唯一标识（必填，缺省用文件名）
+name: 我的插件          # 展示名（可选，缺省用 id）
+description: 插件功能说明
+repo: https://github.com/<owner>/my-plugin   # 插件源码仓库（git 来源，必填）
+branch: main            # 发布分支（可选，默认 main）
+author: 作者名
+license: MIT
+logo: ""                # 图标（可选，URL 或内联 SVG）
+categories:             # 分类标签（可选）
+  - 工具
+  - 效率
+```
+
+> **设计原则**：市场清单**不记录版本号**。客户端从插件仓库的 git HEAD 获取最新版本（与升级检测机制自洽），避免清单与仓库版本不同步。
+>
+### 2. 上架流程
+
+1. 在官方市场仓库（`skyfireitdiy/plugin-market`）`plugins/` 目录下新增 `<id>.yaml`；
+2. 通过 PR 提交，经审核合并后即对全体用户可见；
+3. 客户端每次打开「市场」页签会拉取市场仓库最新清单（有本地缓存，离线可用）。
+
+### 3. 上架前检查清单
+
+- [ ] 清单字段完整：`id`/`repo` 必填，`name`/`description`/`author`/`license` 建议齐全
+- [ ] `repo`/`branch` 指向正确的插件源码仓库与发布分支
+- [ ] 插件 README 完善，含安装与使用说明
+- [ ] 插件可正常安装（`jarvis --install-plugin <repo>` 验证通过）
+- [ ] 清单**不记录版本号**（客户端从 git HEAD 获取）
+- [ ] 文件名 `<id>.yaml` 与 `id` 字段一致，且不以 `_` 开头
+
 ## 依赖规范
 
 config.yaml 的 `dependencies` 字段支持三类（见 `_check_dependencies`）：
