@@ -612,22 +612,27 @@ defineExpose({ loadPlugins })
   min-width: 0;
 }
 .plugin-item-logo {
-  width: 20px;
-  height: 20px;
+  width: 60px;
+  height: 60px;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  background: var(--bg-secondary, #0b1424);
+  border: 1px solid var(--border-color, #1a2a3a);
+  border-radius: 8px;
+  padding: 6px;
+  box-sizing: border-box;
 }
 .plugin-item-logo :deep(svg) {
-  width: 20px;
-  height: 20px;
+  width: 100%;
+  height: 100%;
   display: block;
 }
 .plugin-item-logo :deep(img) {
-  width: 20px;
-  height: 20px;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   display: block;
 }
