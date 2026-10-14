@@ -73,7 +73,10 @@
                   class="plugin-item-logo"
                   v-html="plugin.logo"
                 ></span>
-                <span class="plugin-item-name" :title="plugin.name">{{ plugin.name }}</span>
+                <span class="plugin-item-text">
+                  <span class="plugin-item-name" :title="plugin.name">{{ plugin.name }}</span>
+                  <span v-if="plugin.description" class="plugin-item-desc">{{ plugin.description }}</span>
+                </span>
               </span>
               <span class="plugin-item-head-right">
                 <button
@@ -87,7 +90,6 @@
                 </span>
               </span>
             </div>
-            <div v-if="plugin.description" class="plugin-item-desc">{{ plugin.description }}</div>
             <div v-if="formatDependencies(plugin.dependencies) !== '-'" class="plugin-item-meta">
               <span class="plugin-item-meta-label">依赖</span> {{ formatDependencies(plugin.dependencies) }}
             </div>
@@ -130,7 +132,10 @@
             <div class="plugin-item-head">
               <span class="plugin-item-head-left">
                 <span v-if="mp.logo" class="plugin-item-logo" v-html="mp.logo"></span>
-                <span class="plugin-item-name" :title="mp.name">{{ mp.name }}</span>
+                <span class="plugin-item-text">
+                  <span class="plugin-item-name" :title="mp.name">{{ mp.name }}</span>
+                  <span v-if="mp.description" class="plugin-item-desc">{{ mp.description }}</span>
+                </span>
               </span>
               <button
                 class="plugin-btn plugin-btn-sm plugin-btn-primary"
@@ -138,7 +143,6 @@
                 @click="installFromMarket(mp)"
               >{{ marketBusy[mp.id || mp.repo] ? '安装中...' : '安装' }}</button>
             </div>
-            <div v-if="mp.description" class="plugin-item-desc">{{ mp.description }}</div>
             <div class="plugin-item-meta">
               <span class="plugin-item-meta-label">作者</span> {{ mp.author || '-' }}
               <span v-if="mp.categories && mp.categories.length" class="plugin-market-cats">
@@ -607,9 +611,16 @@ defineExpose({ loadPlugins })
 }
 .plugin-item-head-left {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 10px;
   min-width: 0;
+}
+.plugin-item-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  flex: 1;
 }
 .plugin-item-logo {
   width: 60px;
