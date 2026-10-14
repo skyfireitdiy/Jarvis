@@ -134,6 +134,7 @@ orchestration:
 - 扩展点字段（`rules_load_dirs`/`tool_load_dirs`/`agent_definition_dirs`/`orchestration`/`roles_dirs`/`mcpserver` 等）会被合并进全局配置供 getter 消费；其中 `mcpserver` 声明的 MCP server 列表会被合并进全局 `mcp` 配置，插件安装后自动注册为 MCP 工具，无需用户在全局 `~/.jarvis/config.yaml` 重复配置。
 - 除扩展点字段外的其余字段（`name`/`description`/`version`/`builtin`/`license`/`dependencies`/`capabilities`/`frontend`/自定义业务字段）会被隔离到全局配置的 `plugin_configs.<plugin_name>`，**不污染全局配置顶层、多个插件同名私有字段互不覆盖**。插件可通过 `get_plugin_config(plugin_name)` 读取自己的私有配置。
 - **`hooks` 生命周期钩子**：可选，声明插件在安装/升级/卸载前后要执行的 shell 命令（见上方示例）。支持 6 个时机：`pre-install` / `post-install` / `pre-update` / `post-update` / `pre-uninstall` / `post-uninstall`，每个时机是命令字符串列表，命令以**插件目录为工作目录**、经 shell 执行（超时 300s）。**`pre-*` 钩子失败会中止对应操作**（安装/升级/卸载不执行，避免半成品状态）；**`post-*` 钩子失败仅警告**，不影响主体操作结果。注意 `post-uninstall` 执行时插件目录已删除，命令工作目录为插件根目录（即 `plugins/`）。
+- **安装后免重启生效**：插件安装 / 升级 / 卸载完成后，网关会自动重新扫描 `plugins` 目录并把各插件的扩展点合并进全局配置（`reload_plugin_configs`），因此**无需重启网关进程**，`get_tool_load_dirs` / `get_rules_load_dirs` 等 getter 立即返回最新配置。若因环境异常导致重载失败，仅打印警告，可稍后重启生效。
 
 ### 接口版本与向后兼容
 
