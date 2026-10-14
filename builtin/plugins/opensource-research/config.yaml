@@ -4,5 +4,6 @@ description: 系统性研究开源项目——提供开源软件研究的九阶�
 version: 0.1.0
 builtin: true
 license: MIT
+logo: frontend/icon.svg
 rules_load_dirs:
   - "{{plugin_dir}}/rules"

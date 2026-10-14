@@ -257,6 +257,14 @@
       "description": "中心规则仓库路径或Git仓库地址。支持本地目录（含git子路径）：若为本地目录将直接加入规则加载路径；若为Git URL则会克隆到数据目录并加载。",
       "default": ""
     },
+    "plugin_market_repos": {
+      "type": "array",
+      "description": "插件市场Git仓库地址列表（支持多源）。每个仓库内含 plugins/ 目录，每插件一个 YAML 文件描述插件元数据（id/name/description/repo/branch/author/license/categories），供 Jarvis 客户端浏览与安装社区插件。未配置时默认只使用 Jarvis 官方插件市场仓库。",
+      "items": {
+        "type": "string"
+      },
+      "default": ["https://github.com/skyfireitdiy/plugin-market"]
+    },
     "default_rule_names": {
       "type": "array",
       "description": "默认加载的规则名称列表。这些规则会与命令行参数 --rule-names 合并使用（去重后合并）。支持在配置文件中预定义常用规则，同时保留命令行覆盖的灵活性。",

@@ -1,0 +1,7 @@
+<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+  <!-- 技术图谱：节点连接 -->
+  <circle cx="4" cy="4" r="1.6"/>
+  <circle cx="12" cy="4" r="1.6"/>
+  <circle cx="8" cy="12" r="1.6"/>
+  <path d="M5.3 5.3l2 4.6M10.7 5.3l-2 4.6M5.6 4h4.8"/>
+</svg>

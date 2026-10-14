@@ -1575,6 +1575,7 @@ def list_plugins_info() -> List[dict]:
             - builtin: 是否内置插件
             - capabilities: 能力清单
             - installed: 是否可用（目录存在且 config 可读）
+            - logo: 插件图标（SVG 内容，可选）
     """
     import yaml
     from pathlib import Path
@@ -1624,6 +1625,7 @@ def list_plugins_info() -> List[dict]:
             "capabilities": [],
             "installed": False,
             "hasUpdate": False,
+            "logo": "",
         }
         if config_file.exists():
             try:
@@ -1637,6 +1639,7 @@ def list_plugins_info() -> List[dict]:
                     info["frontend"] = config.get("frontend", None)
                     info["builtin"] = is_builtin or bool(config.get("builtin", False))
                     info["capabilities"] = _build_plugin_capabilities(config, plugin_dir)
+                    info["logo"] = _read_plugin_logo(config, plugin_dir)
                     info["installed"] = True
                     # 非内置插件且检测到更新时标记 hasUpdate（与前端字段一致）
                     if not info["builtin"] and updates_cache.get(info["name"]):
@@ -1645,6 +1648,132 @@ def list_plugins_info() -> List[dict]:
                 info["installed"] = False
         result.append(info)
     return result
+
+
+def _read_plugin_logo(config: dict, plugin_dir) -> str:
+    """读取插件的 logo 图标（SVG 内容）。
+
+    config.yaml 的 `logo` 字段支持两种形式：
+    - 内联 SVG 字符串（以 `<svg` 开头），直接返回；
+    - 相对路径（如 `frontend/icon.svg`），读取该文件内容返回。
+    无 logo 或读取失败时返回空字符串。
+    """
+    from pathlib import Path
+
+    logo = config.get("logo")
+    if not logo:
+        return ""
+    logo = str(logo).strip()
+    if not logo:
+        return ""
+    if logo.startswith("<svg"):
+        return logo
+    # 相对路径：相对插件目录解析
+    try:
+        icon_file = Path(plugin_dir) / logo
+        if icon_file.is_file():
+            content = icon_file.read_text(encoding="utf-8").strip()
+            if content.startswith("<svg"):
+                return content
+    except Exception:
+        pass
+    return ""
+
+
+def list_market_plugins() -> List[dict]:
+    """从插件市场仓库拉取并解析市场插件清单。
+
+    市场仓库内含 `plugins/` 目录，每插件一个 YAML 文件描述插件元数据
+    （id/name/description/repo/branch/author/license/categories）。
+    本函数对每个配置的市场仓库（`get_plugin_market_repos`）克隆到数据目录缓存，
+    扫描 `plugins/*.yaml` 解析为结构化插件列表。仓库不可达或清单解析失败时
+    跳过该仓库/该条目，不阻断整体返回。
+
+    返回:
+        list[dict]: 每个元素为市场插件信息字典，字段：
+            - id: 插件唯一标识
+            - name: 展示名
+            - description: 功能说明
+            - repo: 插件源码仓库地址
+            - branch: 发布分支
+            - author: 作者
+            - license: 开源协议
+            - logo: 插件图标（URL，可选）
+            - categories: 分类标签
+            - market_repo: 来源市场仓库地址
+    """
+    import yaml
+    from pathlib import Path
+
+    from jarvis.jarvis_utils.config import get_data_dir, get_plugin_market_repos
+    from jarvis.jarvis_utils.exception_utils import save_exception
+
+    market_repos = get_plugin_market_repos()
+    if not market_repos:
+        return []
+
+    data_dir = Path(get_data_dir())
+    market_root = data_dir / "plugin_market"
+    market_root.mkdir(parents=True, exist_ok=True)
+
+    plugins: List[dict] = []
+    for repo_url in market_repos:
+        repo_url = (repo_url or "").strip().rstrip("/")
+        if not repo_url:
+            continue
+        # 用仓库名作为缓存目录名（取 URL 最后一段，去掉 .git）
+        repo_name = repo_url.rsplit("/", 1)[-1].removesuffix(".git") or "market"
+        cache_dir = market_root / repo_name
+        try:
+            if not cache_dir.exists():
+                _git_clone_plugin(repo_url, "main", cache_dir)
+            else:
+                # 已有缓存：尝试 git pull 更新，失败则用缓存（离线可用）
+                pull = _git_run(cache_dir, "pull", "--quiet")
+                if pull.returncode != 0:
+                    pass  # 保留缓存
+        except Exception as e:
+            # 仓库不可达：跳过该市场源，不影响其他源
+            save_exception(
+                e, module="jarvis_agent.utils", function="list_market_plugins"
+            )
+            continue
+
+        plugins_dir = cache_dir / "plugins"
+        if not plugins_dir.is_dir():
+            continue
+        for yaml_file in sorted(plugins_dir.glob("*.yaml")):
+            if yaml_file.name.startswith("_"):
+                # 跳过模板/占位文件（如 _example.yaml）
+                continue
+            try:
+                with open(yaml_file, "r", encoding="utf-8") as f:
+                    cfg = yaml.safe_load(f)
+                if not isinstance(cfg, dict):
+                    continue
+                pid = str(cfg.get("id") or yaml_file.stem)
+                plugins.append(
+                    {
+                        "id": pid,
+                        "name": str(cfg.get("name") or pid),
+                        "description": str(cfg.get("description") or ""),
+                        "repo": str(cfg.get("repo") or ""),
+                        "branch": str(cfg.get("branch") or "main"),
+                        "author": str(cfg.get("author") or ""),
+                        "license": str(cfg.get("license") or ""),
+                        "logo": str(cfg.get("logo") or ""),
+                        "categories": cfg.get("categories") or [],
+                        "market_repo": repo_url,
+                    }
+                )
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_agent.utils",
+                    function="list_market_plugins",
+                )
+                continue
+    return plugins
 
 
 def _resolve_plugin_dir(plugin_dir) -> "pathlib.Path | None":
@@ -2306,4 +2435,5 @@ __all__ = [
     "install_plugin",
     "uninstall_plugin",
     "upgrade_plugin",
+    "list_market_plugins",
 ]

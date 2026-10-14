@@ -354,6 +354,57 @@ jarvis --upgrade-plugin my-plugin
 
 > **提示**：若希望升级生效，发布新版本时应更新同一来源 URL 指向的内容（或让 URL 始终指向 latest）。
 
+## 七·五、插件市场
+
+Jarvis 内置「插件市场」浏览功能：客户端从配置的市场仓库拉取结构化插件清单，在插件管理面板的「市场」页签中展示，用户可一键安装社区插件。
+
+### 1. 市场仓库结构
+
+市场仓库含 `plugins/` 目录，**每个插件一个 YAML 文件**（文件名为 `<id>.yaml`），`_` 开头的文件会被客户端当作模板/占位文件跳过（如 `_example.yaml`）：
+
+```text
+plugin-market/
+├── README.md
+└── plugins/
+    ├── _example.yaml      # 模板（被跳过）
+    ├── my-plugin.yaml     # 真实插件清单
+    └── ...
+```
+
+### 2. 清单字段规范
+
+```yaml
+# plugins/my-plugin.yaml
+id: my-plugin          # 唯一标识（必填）
+name: 我的插件          # 展示名（可选，缺省用 id）
+description: 插件功能说明
+repo: https://github.com/<owner>/my-plugin   # 插件源码仓库（git 来源）
+branch: main            # 发布分支（可选，默认 main）
+author: 作者名
+license: MIT
+logo: ""                # 图标（可选，URL 或内联 SVG）
+categories:             # 分类标签（可选）
+  - 工具
+  - 效率
+```
+
+> **设计原则**：市场清单**不记录版本号**。客户端从插件仓库的 git HEAD 获取最新版本（与升级检测机制自洽），避免清单与仓库版本不同步。
+
+### 3. 提交插件到市场
+
+1. 在官方市场仓库（`skyfireitdiy/plugin-market`）`plugins/` 目录下新增 `<id>.yaml`；
+2. 通过 PR 提交，经审核合并后即对全体用户可见；
+3. 客户端每次打开「市场」页签会拉取市场仓库最新清单（有本地缓存，离线可用）。
+
+### 4. 配置多市场源
+
+`config.yaml` 的 `plugin_market_repos` 支持配置多个市场仓库（默认仅官方市场）：
+
+```yaml
+plugin_market_repos:
+  - https://github.com/skyfireitdiy/plugin-market
+```
+
 ## 八、安装与卸载（用户视角）
 
 | 命令 | 说明 |

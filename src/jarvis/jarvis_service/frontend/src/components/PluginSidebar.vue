@@ -11,9 +11,22 @@
       >⟳</button>
     </div>
 
+    <div class="plugin-sidebar-tabs">
+      <button
+        class="plugin-sidebar-tab"
+        :class="{ active: activeTab === 'installed' }"
+        @click="switchTab('installed')"
+      >已安装</button>
+      <button
+        class="plugin-sidebar-tab"
+        :class="{ active: activeTab === 'market' }"
+        @click="switchTab('market')"
+      >市场</button>
+    </div>
+
     <div class="plugin-sidebar-content">
       <!-- 节点选择 -->
-      <div class="plugin-node-select">
+      <div v-if="activeTab === 'installed'" class="plugin-node-select">
         <select v-model="pluginNodeId" class="plugin-node-select-input" @change="loadPlugins">
           <option value="master">本节点 (master)</option>
           <option v-for="node in availableNodeOptions" :key="node.node_id" :value="node.node_id">
@@ -23,7 +36,7 @@
       </div>
 
       <!-- 安装插件 -->
-      <div class="plugin-install">
+      <div v-if="activeTab === 'installed'" class="plugin-install">
         <div class="plugin-install-title">安装插件</div>
         <input
           v-model="installSource"
@@ -43,7 +56,7 @@
       </div>
 
       <!-- 插件列表 -->
-      <div class="plugin-list">
+      <div v-if="activeTab === 'installed'" class="plugin-list">
         <div v-if="loadingPlugins" class="plugin-empty">加载中...</div>
         <div v-else-if="plugins.length === 0" class="plugin-empty">该节点暂无已安装插件</div>
         <div v-else class="plugin-list-inner">
@@ -54,7 +67,14 @@
             @contextmenu.prevent="openCapMenu(plugin, $event)"
           >
             <div class="plugin-item-head">
-              <span class="plugin-item-name" :title="plugin.name">{{ plugin.name }}</span>
+              <span class="plugin-item-head-left">
+                <span
+                  v-if="plugin.logo"
+                  class="plugin-item-logo"
+                  v-html="plugin.logo"
+                ></span>
+                <span class="plugin-item-name" :title="plugin.name">{{ plugin.name }}</span>
+              </span>
               <span class="plugin-item-head-right">
                 <button
                   v-if="plugin.capabilities && plugin.capabilities.length"
@@ -82,6 +102,48 @@
                 @click="upgradePlugin(plugin)"
               >更新</button>
               <button class="plugin-btn plugin-btn-sm plugin-btn-danger" :disabled="pluginBusy[plugin.name]" @click="uninstallPlugin(plugin)">卸载</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 市场浏览 -->
+      <div v-if="activeTab === 'market'" class="plugin-market">
+        <div class="plugin-market-header">
+          <span class="plugin-market-title">插件市场</span>
+          <button
+            class="plugin-sidebar-refresh"
+            tabindex="-1"
+            title="刷新市场"
+            :disabled="loadingMarket"
+            @click="loadMarket"
+          >⟳</button>
+        </div>
+        <div v-if="loadingMarket" class="plugin-empty">加载中...</div>
+        <div v-else-if="marketPlugins.length === 0" class="plugin-empty">市场暂无可用插件</div>
+        <div v-else class="plugin-list-inner">
+          <div
+            v-for="mp in marketPlugins"
+            :key="mp.id || mp.repo"
+            class="plugin-item plugin-market-item"
+          >
+            <div class="plugin-item-head">
+              <span class="plugin-item-head-left">
+                <span v-if="mp.logo" class="plugin-item-logo" v-html="mp.logo"></span>
+                <span class="plugin-item-name" :title="mp.name">{{ mp.name }}</span>
+              </span>
+              <button
+                class="plugin-btn plugin-btn-sm plugin-btn-primary"
+                :disabled="marketBusy[mp.id || mp.repo]"
+                @click="installFromMarket(mp)"
+              >{{ marketBusy[mp.id || mp.repo] ? '安装中...' : '安装' }}</button>
+            </div>
+            <div v-if="mp.description" class="plugin-item-desc">{{ mp.description }}</div>
+            <div class="plugin-item-meta">
+              <span class="plugin-item-meta-label">作者</span> {{ mp.author || '-' }}
+              <span v-if="mp.categories && mp.categories.length" class="plugin-market-cats">
+                <span class="plugin-item-meta-label">分类</span> {{ mp.categories.join(', ') }}
+              </span>
             </div>
           </div>
         </div>
@@ -145,6 +207,12 @@ const installingPlugin = ref(false)
 const installSource = ref('')
 const installForce = ref(false)
 const pluginBusy = ref({})
+
+// 市场浏览
+const activeTab = ref('installed')
+const marketPlugins = ref([])
+const loadingMarket = ref(false)
+const marketBusy = ref({})
 
 // 能力详情：右键菜单 + 弹窗
 const capMenuVisible = ref(false)
@@ -276,6 +344,44 @@ async function installPlugin() {
   finally { installingPlugin.value = false }
 }
 
+function switchTab(tab) {
+  activeTab.value = tab
+  if (tab === 'market' && marketPlugins.value.length === 0 && !loadingMarket.value) {
+    loadMarket()
+  }
+}
+
+async function loadMarket() {
+  loadingMarket.value = true
+  try {
+    const resp = await props.fetchWithAuth(buildApiUrl('/api/plugins/market'))
+    const result = await resp.json()
+    if (result.success) marketPlugins.value = result.data?.plugins || []
+    else props.showToast(result.error?.message || '加载插件市场失败', 'error')
+  } catch (e) { props.showToast('加载插件市场失败: ' + e.message, 'error') }
+  finally { loadingMarket.value = false }
+}
+
+async function installFromMarket(mp) {
+  const key = mp.id || mp.repo
+  if (!confirm(`确定从市场安装插件 ${mp.name}？\n来源：${mp.repo}${mp.branch ? '#' + mp.branch : ''}`)) return
+  marketBusy.value = { ...marketBusy.value, [key]: true }
+  try {
+    const source = `${mp.repo}${mp.branch ? '#' + mp.branch : ''}`
+    const resp = await props.fetchWithAuth(buildApiUrl(`/api/node/${encodeURIComponent(pluginNodeId.value)}/plugins/install`), {
+      method: 'POST',
+      body: JSON.stringify({ source, force: false }),
+    })
+    const result = await resp.json()
+    if (result.success) {
+      props.showToast(`插件 ${mp.name} 安装成功`, 'success')
+      activeTab.value = 'installed'
+      loadPlugins()
+    } else props.showToast(result.error?.message || '插件安装失败', 'error')
+  } catch (e) { props.showToast('插件安装失败: ' + e.message, 'error') }
+  finally { marketBusy.value = { ...marketBusy.value, [key]: false } }
+}
+
 async function upgradePlugin(plugin) {
   if (!confirm(`确定升级插件 ${plugin.name}？`)) return
   pluginBusy.value = { ...pluginBusy.value, [plugin.name]: true }
@@ -368,6 +474,32 @@ defineExpose({ loadPlugins })
 .plugin-sidebar-refresh:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+.plugin-sidebar-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border-color, #1a2a3a);
+  flex-shrink: 0;
+}
+.plugin-sidebar-tab {
+  padding: 5px 14px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-secondary, #8ba3b8);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.plugin-sidebar-tab:hover {
+  color: var(--accent, #20c8ff);
+  background: rgba(32, 200, 255, 0.08);
+}
+.plugin-sidebar-tab.active {
+  color: var(--accent, #20c8ff);
+  background: rgba(32, 200, 255, 0.12);
+  border-color: rgba(32, 200, 255, 0.3);
 }
 .plugin-sidebar-content {
   flex: 1;
@@ -472,6 +604,32 @@ defineExpose({ loadPlugins })
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+.plugin-item-head-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.plugin-item-logo {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.plugin-item-logo :deep(svg) {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+.plugin-item-logo :deep(img) {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  display: block;
 }
 .plugin-item-name {
   font-weight: 600;
@@ -624,6 +782,24 @@ defineExpose({ loadPlugins })
   display: flex;
   gap: 6px;
   margin-top: 8px;
+}
+.plugin-market-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.plugin-market-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #8ba3b8);
+}
+.plugin-market-cats {
+  margin-left: 12px;
+}
+.plugin-market-item .plugin-item-name {
+  white-space: normal;
+  word-break: break-word;
 }
 .plugin-btn {
   padding: 4px 10px;

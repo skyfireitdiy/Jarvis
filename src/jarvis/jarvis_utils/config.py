@@ -1225,6 +1225,32 @@ def get_central_rules_repo() -> str:
     return cast(str, GLOBAL_CONFIG_DATA.get("central_rules_repo", ""))
 
 
+# Jarvis 官方插件市场仓库地址（未配置 plugin_market_repos 时的默认市场源）
+_DEFAULT_PLUGIN_MARKET_REPOS = ["https://github.com/skyfireitdiy/plugin-market"]
+
+
+def get_plugin_market_repos() -> List[str]:
+    """
+    获取插件市场Git仓库地址列表（支持多源）。
+
+    每个插件市场仓库内含 `plugins/` 目录，每插件一个 YAML 文件描述插件元数据
+    （id/name/description/repo/branch/author/license/categories），供 Jarvis
+    客户端浏览与安装社区插件。未配置时默认只使用 Jarvis 官方插件市场仓库。
+
+    返回:
+        List[str]: 插件市场Git仓库地址列表
+    """
+    value = GLOBAL_CONFIG_DATA.get("plugin_market_repos")
+    if not value:
+        return list(_DEFAULT_PLUGIN_MARKET_REPOS)
+    if isinstance(value, str):
+        # 兼容单字符串配置，归一化为单元素列表
+        return [value] if value.strip() else list(_DEFAULT_PLUGIN_MARKET_REPOS)
+    return [str(v) for v in value if str(v).strip()] or list(
+        _DEFAULT_PLUGIN_MARKET_REPOS
+    )
+
+
 def get_default_rule_names() -> List[str]:
     """
     获取默认规则名称列表。

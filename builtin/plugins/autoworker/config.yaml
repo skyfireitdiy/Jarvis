@@ -7,6 +7,7 @@ description: >-
 version: 0.1.0
 builtin: true
 license: MIT
+logo: frontend/icon.svg
 tool_load_dirs:
   - "{{plugin_dir}}/tools"
 # 声明本插件工具应用于 code_agent：Code Agent 构建工具列表时会自动
