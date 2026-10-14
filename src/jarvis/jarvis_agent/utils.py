@@ -1077,9 +1077,7 @@ def _remove_plugin_dir(path) -> None:
         shutil.rmtree(path)
 
 
-def _git_run(
-    cwd, *args: str, check: bool = False, timeout: int = 120
-) -> "Any":
+def _git_run(cwd, *args: str, check: bool = False, timeout: int = 120) -> "Any":
     """执行 git 命令，返回 CompletedProcess。
 
     cwd 为 None 时不指定工作目录。check=True 时失败抛 CalledProcessError。
@@ -1133,9 +1131,7 @@ def _git_clone_plugin(url: str, branch: str, dest: "pathlib.Path") -> None:
     if branch:
         args += ["--branch", branch]
     # 浅克隆（--depth 1）不支持本地仓库（file:// 或本地路径），仅对远程 URL 使用
-    is_local = url.startswith("file://") or os.path.isdir(
-        url.split("#", 1)[0]
-    )
+    is_local = url.startswith("file://") or os.path.isdir(url.split("#", 1)[0])
     if not is_local:
         args += ["--depth", "1"]
     args += [url, str(dest)]
@@ -1174,6 +1170,139 @@ def _read_plugin_branch(plugin_dir) -> str:
     return "main"
 
 
+# 插件生命周期钩子时机（config.yaml 的 hooks 字段键名）。
+# 每个时机对应一个命令列表，在插件安装/升级/卸载的对应阶段执行。
+PLUGIN_HOOK_STAGES = frozenset(
+    {
+        "pre-install",
+        "post-install",
+        "pre-update",
+        "post-update",
+        "pre-uninstall",
+        "post-uninstall",
+    }
+)
+
+
+def _read_plugin_hooks(plugin_dir) -> dict:
+    """读取插件 config.yaml 的 hooks 私有配置字段。
+
+    返回:
+        dict: {时机: [命令, ...]}；无 hooks 字段或解析失败时返回空 dict。
+    """
+    from pathlib import Path
+
+    config_file = Path(plugin_dir) / "config.yaml"
+    if not config_file.exists():
+        return {}
+    try:
+        import yaml
+
+        with open(config_file, "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+        if not isinstance(config, dict):
+            return {}
+        hooks = config.get("hooks")
+        if not isinstance(hooks, dict):
+            return {}
+        result: dict = {}
+        for stage, commands in hooks.items():
+            if stage not in PLUGIN_HOOK_STAGES:
+                continue
+            if isinstance(commands, str):
+                commands = [commands]
+            if isinstance(commands, list):
+                cleaned = [c for c in commands if isinstance(c, str) and c.strip()]
+                if cleaned:
+                    result[stage] = cleaned
+        return result
+    except Exception:
+        return {}
+
+
+def _run_plugin_hooks(plugin_dir, stage: str, phase: str = "pre") -> bool:
+    """执行插件生命周期钩子命令。
+
+    在插件安装/升级/卸载的对应时机执行 config.yaml 的 hooks 字段声明的命令。
+    命令以插件目录为工作目录、经 shell 执行（等同信任插件代码本身）。
+
+    参数:
+        plugin_dir: 插件目录（Path 或 str）
+        stage: 钩子时机，如 "pre-install" / "post-update"
+        phase: 阶段，决定失败处理：
+            - "pre"：前置钩子失败返回 False（调用方应中止操作，避免半成品状态）
+            - "post"：后置钩子失败仅警告并返回 True（主体操作已完成）
+
+    返回:
+        bool: 钩子全部执行成功返回 True；pre 阶段失败返回 False；
+            无钩子声明或执行出错时按对应阶段规则返回。
+    """
+    from pathlib import Path
+
+    hooks = _read_plugin_hooks(plugin_dir)
+    commands = hooks.get(stage)
+    if not commands:
+        return True
+    return _run_plugin_hook_commands(commands, Path(plugin_dir), stage, phase=phase)
+
+
+def _run_plugin_hook_commands(
+    commands, plugin_dir, stage: str, phase: str = "pre"
+) -> bool:
+    """执行一组插件生命周期钩子命令（命令已从 config.yaml 预读）。
+
+    供 post-uninstall 等场景使用：插件目录已删除，无法再读取 config.yaml，
+    需在删除前预读命令后传入执行。
+
+    参数:
+        commands: 命令字符串列表
+        plugin_dir: 工作目录（Path 或 str）
+        stage: 钩子时机，用于日志展示
+        phase: 阶段，决定失败处理（同 _run_plugin_hooks）
+
+    返回:
+        bool: 全部成功返回 True；pre 阶段失败返回 False
+    """
+    import subprocess
+
+    from pathlib import Path
+
+    if not commands:
+        return True
+
+    plugin_dir = Path(plugin_dir)
+    stage_label = stage.replace("-", " ")
+    for cmd in commands:
+        PrettyOutput.auto_print(
+            f"⚙️  执行插件{stage_label}钩子: {cmd}（目录: {plugin_dir}）"
+        )
+        try:
+            proc = subprocess.run(
+                cmd,
+                cwd=str(plugin_dir),
+                shell=True,  # nosec B602 - 钩子由插件作者声明，等同信任插件代码
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 插件{stage_label}钩子执行异常: {e}")
+            if phase == "pre":
+                return False
+            continue
+        if proc.returncode != 0:
+            detail = (proc.stderr or proc.stdout or "").strip()
+            PrettyOutput.auto_print(
+                f"❌ 插件{stage_label}钩子执行失败（退出码 {proc.returncode}）: "
+                f"{detail or '无输出'}"
+            )
+            if phase == "pre":
+                return False
+        elif proc.stdout.strip():
+            PrettyOutput.auto_print(f"📋 钩子输出: {proc.stdout.strip()}")
+    return True
+
+
 def _write_plugin_source(plugin_dir, url: str, branch: str) -> None:
     """记录 git 来源元数据（.source + .git-branch）。"""
     from pathlib import Path
@@ -1184,9 +1313,7 @@ def _write_plugin_source(plugin_dir, url: str, branch: str) -> None:
     except Exception as e:
         from jarvis.jarvis_utils.exception_utils import save_exception
 
-        save_exception(
-            e, module="jarvis_agent.utils", function="_write_plugin_source"
-        )
+        save_exception(e, module="jarvis_agent.utils", function="_write_plugin_source")
 
 
 def install_plugin(
@@ -1298,7 +1425,9 @@ def install_plugin(
                         # 校验成员，防止 zip slip 路径穿越（成员名含 ../ 或绝对路径）
                         for member in zf.infolist():
                             member_path = os.path.normpath(member.filename)
-                            if member_path.startswith(("..", "/")) or ".." in member_path.split("/"):
+                            if member_path.startswith(
+                                ("..", "/")
+                            ) or ".." in member_path.split("/"):
                                 raise ValueError(
                                     f"zip member escapes dest dir: {member.filename}"
                                 )
@@ -1425,6 +1554,12 @@ def install_plugin(
                     )
                 return False
 
+        # 执行 pre-install 钩子（从源目录 config.yaml 读取）。
+        # 失败则中止安装，避免产生半成品安装状态。
+        if not _run_plugin_hooks(plugin_source_dir, "pre-install", phase="pre"):
+            PrettyOutput.auto_print(f"❌ pre-install 钩子失败，中止安装: {plugin_name}")
+            return False
+
         # 如果目标目录已存在，进行版本控制：高版本可覆盖低版本，低版本不能覆盖高版本
         if target_dir.exists():
             installed_version = None
@@ -1483,6 +1618,10 @@ def install_plugin(
         # 清理临时目录
         if temp_dir and os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
+
+        # 执行 post-install 钩子（从已安装的 target 目录 config.yaml 读取）。
+        # 失败仅警告，不阻断安装（主体文件已就位）。
+        _run_plugin_hooks(target_dir, "post-install", phase="post")
 
         PrettyOutput.auto_print(f"✅ 插件安装成功: {plugin_name} -> {target_dir}")
         return True
@@ -1638,7 +1777,9 @@ def list_plugins_info() -> List[dict]:
                     info["dependencies"] = config.get("dependencies", None)
                     info["frontend"] = config.get("frontend", None)
                     info["builtin"] = is_builtin or bool(config.get("builtin", False))
-                    info["capabilities"] = _build_plugin_capabilities(config, plugin_dir)
+                    info["capabilities"] = _build_plugin_capabilities(
+                        config, plugin_dir
+                    )
                     info["logo"] = _read_plugin_logo(config, plugin_dir)
                     info["installed"] = True
                     # 非内置插件且检测到更新时标记 hasUpdate（与前端字段一致）
@@ -1871,7 +2012,9 @@ def _read_tool_meta(tool_file):
                     continue
                 if target.id == "name" and isinstance(stmt.value, ast.Constant):
                     name = stmt.value.value
-                elif target.id == "description" and isinstance(stmt.value, ast.Constant):
+                elif target.id == "description" and isinstance(
+                    stmt.value, ast.Constant
+                ):
                     desc = stmt.value.value
         if name:
             return name, desc
@@ -1967,7 +2110,8 @@ def _build_plugin_capabilities(config: dict, plugin_dir=None) -> List[dict]:
                     _append(
                         "agents",
                         f"Agent：{name}",
-                        desc or f"Agent 定义文件 {agent_file.name}，供内置配置选择器选用",
+                        desc
+                        or f"Agent 定义文件 {agent_file.name}，供内置配置选择器选用",
                     )
         else:
             _append(
@@ -2198,6 +2342,15 @@ def uninstall_plugin(plugin_name: str) -> bool:
         PrettyOutput.auto_print(f"⛔ 内置插件不可卸载: {plugin_name}")
         return False
 
+    # 卸载前预读 post-uninstall 钩子命令（目录删除后无法再读取 config.yaml）
+    post_uninstall_commands = _read_plugin_hooks(plugin_dir).get("post-uninstall", [])
+
+    # 执行 pre-uninstall 钩子（从插件目录 config.yaml 读取）。
+    # 失败则中止卸载，避免资源未清理就删除目录。
+    if not _run_plugin_hooks(plugin_dir, "pre-uninstall", phase="pre"):
+        PrettyOutput.auto_print(f"❌ pre-uninstall 钩子失败，中止卸载: {plugin_name}")
+        return False
+
     # 可逆效应：卸载前撤销该插件注册的工具/规则（若当前进程有已加载的
     # ToolRegistry / RulesManager 实例，则实际移除；否则仅清理登记，目录
     # 删除后下次启动自然不再加载）。
@@ -2219,6 +2372,15 @@ def uninstall_plugin(plugin_name: str) -> bool:
         # 软链接只删链接本身，不误删其指向的本地源码
         _remove_plugin_dir(plugin_dir)
         PrettyOutput.auto_print(f"✅ 插件已卸载: {plugin_name}")
+        # 执行 post-uninstall 钩子（命令已在删除前预读）。
+        # 失败仅警告，不阻断卸载（目录已删除）。
+        if post_uninstall_commands:
+            _run_plugin_hook_commands(
+                post_uninstall_commands,
+                plugins_dir,
+                "post-uninstall",
+                phase="post",
+            )
         return True
     except Exception as e:
         PrettyOutput.auto_print(f"❌ 卸载插件失败: {str(e)}")
@@ -2262,9 +2424,7 @@ def check_plugin_update(plugin_name: str) -> bool:
         remote_head = _git_run(
             plugin_dir, "rev-parse", f"origin/{branch}"
         ).stdout.strip()
-        return bool(
-            local_head and remote_head and local_head != remote_head
-        )
+        return bool(local_head and remote_head and local_head != remote_head)
     except Exception:
         return False
 
@@ -2406,6 +2566,12 @@ def upgrade_plugin(plugin_name: str) -> bool:
     )
 
     try:
+        # 执行 pre-update 钩子（从当前插件目录 config.yaml 读取）。
+        # 失败则中止升级，避免更新到半成品状态。
+        if not _run_plugin_hooks(plugin_dir, "pre-update", phase="pre"):
+            PrettyOutput.auto_print(f"❌ pre-update 钩子失败，中止升级: {plugin_name}")
+            return False
+
         fetch = _git_run(plugin_dir, "fetch", "origin", branch)
         if fetch.returncode != 0:
             PrettyOutput.auto_print(
@@ -2420,6 +2586,11 @@ def upgrade_plugin(plugin_name: str) -> bool:
                 f"{reset.stderr.strip() or reset.stdout.strip()}"
             )
             return False
+
+        # 执行 post-update 钩子（从更新后的插件目录 config.yaml 读取）。
+        # 失败仅警告，不阻断升级（代码已更新）。
+        _run_plugin_hooks(plugin_dir, "post-update", phase="post")
+
         PrettyOutput.auto_print(f"✅ 插件升级成功: {plugin_name}")
         return True
     except Exception as e:
