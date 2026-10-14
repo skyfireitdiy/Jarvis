@@ -198,6 +198,7 @@ const props = defineProps({
   fetchWithAuth: { type: Function, required: true },
   gatewayUrl: { type: String, default: '127.0.0.1:8000' },
   showToast: { type: Function, default: () => {} },
+  showConfirm: { type: Function, default: () => {} },
   getHttpProtocol: { type: Function, default: () => 'http' },
   availableNodeOptions: { type: Array, default: () => [] },
 })
@@ -373,10 +374,15 @@ async function loadMarket() {
 
 async function installFromMarket(mp) {
   const key = mp.id || mp.repo
-  if (!confirm(`确定从市场安装插件 ${mp.name}？\n来源：${mp.repo}${mp.branch ? '#' + mp.branch : ''}`)) return
-  marketBusy.value = { ...marketBusy.value, [key]: true }
+  const source = `${mp.repo}${mp.branch ? '#' + mp.branch : ''}`
+  props.showConfirm(`确定从市场安装插件 ${mp.name}？\n来源：${source}`, () => {
+    marketBusy.value = { ...marketBusy.value, [key]: true }
+    doInstallFromMarket(mp, key, source)
+  })
+}
+
+async function doInstallFromMarket(mp, key, source) {
   try {
-    const source = `${mp.repo}${mp.branch ? '#' + mp.branch : ''}`
     const resp = await props.fetchWithAuth(buildApiUrl(`/api/node/${encodeURIComponent(pluginNodeId.value)}/plugins/install`), {
       method: 'POST',
       body: JSON.stringify({ source, force: false }),
@@ -392,8 +398,13 @@ async function installFromMarket(mp) {
 }
 
 async function upgradePlugin(plugin) {
-  if (!confirm(`确定升级插件 ${plugin.name}？`)) return
-  pluginBusy.value = { ...pluginBusy.value, [plugin.name]: true }
+  props.showConfirm(`确定升级插件 ${plugin.name}？`, () => {
+    pluginBusy.value = { ...pluginBusy.value, [plugin.name]: true }
+    doUpgradePlugin(plugin)
+  })
+}
+
+async function doUpgradePlugin(plugin) {
   try {
     const resp = await props.fetchWithAuth(buildApiUrl(`/api/node/${encodeURIComponent(pluginNodeId.value)}/plugins/${encodeURIComponent(plugin.name)}/upgrade`), {
       method: 'POST',
@@ -407,8 +418,13 @@ async function upgradePlugin(plugin) {
 }
 
 async function uninstallPlugin(plugin) {
-  if (!confirm(`确定卸载插件 ${plugin.name}？此操作不可恢复。`)) return
-  pluginBusy.value = { ...pluginBusy.value, [plugin.name]: true }
+  props.showConfirm(`确定卸载插件 ${plugin.name}？\n此操作不可恢复，插件目录将被删除。`, () => {
+    pluginBusy.value = { ...pluginBusy.value, [plugin.name]: true }
+    doUninstallPlugin(plugin)
+  })
+}
+
+async function doUninstallPlugin(plugin) {
   try {
     const resp = await props.fetchWithAuth(buildApiUrl(`/api/node/${encodeURIComponent(pluginNodeId.value)}/plugins/${encodeURIComponent(plugin.name)}/uninstall`), {
       method: 'POST',

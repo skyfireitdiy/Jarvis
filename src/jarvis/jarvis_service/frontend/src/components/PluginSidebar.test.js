@@ -38,6 +38,8 @@ const baseProps = {
   fetchWithAuth: vi.fn(),
   gatewayUrl: "127.0.0.1:8000",
   showToast: vi.fn(),
+  // 复用全局确认弹窗：测试中自动执行确认回调，模拟用户点「确认」
+  showConfirm: (_message, confirmCallback) => confirmCallback(),
   getHttpProtocol: () => "http",
   availableNodeOptions: [],
 };
@@ -150,7 +152,6 @@ describe("PluginSidebar", () => {
         data: { node_id: "master", output: [] },
       }),
     });
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     const wrapper = mount(PluginSidebar, {
       props: { ...baseProps, fetchWithAuth },
     });
@@ -162,7 +163,6 @@ describe("PluginSidebar", () => {
     );
     expect(uninstallCall).toBeTruthy();
     expect(uninstallCall[0]).toContain("/api/node/master/plugins/demo-plugin/uninstall");
-    confirmSpy.mockRestore();
   });
 
   test("升级插件：确认后调用 upgrade API", async () => {
@@ -176,7 +176,6 @@ describe("PluginSidebar", () => {
         data: { node_id: "master", output: [] },
       }),
     });
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     const wrapper = mount(PluginSidebar, {
       props: { ...baseProps, fetchWithAuth },
     });
@@ -190,7 +189,6 @@ describe("PluginSidebar", () => {
     );
     expect(upgradeCall).toBeTruthy();
     expect(upgradeCall[0]).toContain("/api/node/master/plugins/demo-plugin/upgrade");
-    confirmSpy.mockRestore();
   });
 
   test("内置插件不显示升级/卸载按钮，并显示内置标记", async () => {
@@ -316,7 +314,6 @@ describe("PluginSidebar", () => {
         data: { node_id: "master", output: [] },
       }),
     });
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     const wrapper = mount(PluginSidebar, {
       props: { ...baseProps, fetchWithAuth },
     });
@@ -333,7 +330,6 @@ describe("PluginSidebar", () => {
     expect(installCall).toBeTruthy();
     const body = JSON.parse(installCall[1].body);
     expect(body.source).toBe("https://github.com/owner/market-p#main");
-    confirmSpy.mockRestore();
   });
 
   test("市场 tab：显示节点选择器，可安装到指定子节点", async () => {
@@ -360,7 +356,6 @@ describe("PluginSidebar", () => {
         data: { node_id: "child-1", output: [] },
       }),
     });
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     const wrapper = mount(PluginSidebar, {
       props: {
         ...baseProps,
@@ -386,6 +381,5 @@ describe("PluginSidebar", () => {
         opt?.method === "POST" && url.includes("/api/node/child-1/plugins/install"),
     );
     expect(installCall).toBeTruthy();
-    confirmSpy.mockRestore();
   });
 });
