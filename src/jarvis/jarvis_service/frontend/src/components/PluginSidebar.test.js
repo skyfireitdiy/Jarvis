@@ -63,6 +63,24 @@ describe("PluginSidebar", () => {
     expect(wrapper.text()).toContain("演示插件");
   });
 
+  test("插件描述渲染带 title 属性以支持悬停查看完整内容", async () => {
+    const longDesc = "这是一个非常长的插件描述，用于验证描述被截断后仍可通过悬停查看完整内容。".repeat(3);
+    const fetchWithAuth = makeFetch({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
+        success: true,
+        data: { node_id: "master", plugins: [plugin({ description: longDesc })] },
+      }),
+    });
+    const wrapper = mount(PluginSidebar, {
+      props: { ...baseProps, fetchWithAuth },
+    });
+    await flushPromises();
+    const desc = wrapper.find(".plugin-item-desc");
+    expect(desc.exists()).toBe(true);
+    // title 属性携带完整描述，悬停可查看完整内容
+    expect(desc.attributes("title")).toBe(longDesc);
+  });
+
   test("空插件列表显示占位提示", async () => {
     const fetchWithAuth = makeFetch({
       "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
