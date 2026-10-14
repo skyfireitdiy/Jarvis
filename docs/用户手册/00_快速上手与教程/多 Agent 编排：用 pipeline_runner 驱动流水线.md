@@ -179,9 +179,9 @@ p.agent("demo_planner", working_dir=".", task="你是规划器……")
 - `depends_on` 缺省是"上一个 stage"（线性）；要并行必须显式声明依赖。
 - 有环的 `flow` 会被拓扑排序直接拒绝报错。
 - 阶段 Agent 是常驻 `jvs` Agent，创建后引擎会等其网关就绪再派发任务；就绪超时（约 60 秒）会报错。
-- 编排文件示例均可运行，路径以仓库实际文件为准（`builtin/agent_orchestration/`、`builtin/plugins/ai-dark-factory/orchestration/`）。
+- 编排文件示例均可运行，路径以仓库实际文件为准（`builtin/agent_orchestration/`、ai-dark-factory 独立仓库 `skyfireitdiy/jarvis-plugin-ai-dark-factory` 的 `orchestration/`）。
 
 ## 下一步
 
-- 想看一个真实的多阶段流水线（含门禁）？参考 `builtin/plugins/ai-dark-factory/orchestration/dark_factory_pipeline.yaml`。
+- 想看一个真实的多阶段流水线（含门禁）？参考 ai-dark-factory 独立仓库（`skyfireitdiy/jarvis-plugin-ai-dark-factory`）的 `orchestration/dark_factory_pipeline.yaml`。
 - 想让多个 Agent 互相发消息协作（而非按 DAG 编排）？见 [协作模式最佳实践](协作模式最佳实践.md)。

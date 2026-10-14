@@ -15,7 +15,7 @@
 ## 2. 插件目录结构
 
 ```text
-builtin/plugins/ai-dark-factory/
+skyfireitdiy/jarvis-plugin-ai-dark-factory/（独立插件仓库，市场安装到 ~/.jarvis/plugins/ai-dark-factory/）
 ├── config.yaml                     # 插件元数据 + 加载目录（{{plugin_dir}} 模板变量）
 ├── rules/                          # 方法论规则（.md，带 YAML front matter）
 │   ├── spec_writing.md             # NLSpec 编写规范
@@ -108,11 +108,11 @@ planner（规划器）—— 读 spec，拆解任务、生成实现计划
 
 ## 9. 实施步骤
 
-1. 创建 `builtin/plugins/ai-dark-factory/` 目录结构与 `config.yaml`（yamllint 校验）
+1. 在独立仓库 `skyfireitdiy/jarvis-plugin-ai-dark-factory` 创建目录结构与 `config.yaml`（yamllint 校验）
 2. 编写 4 个规则文件（markdownlint 校验）
 3. 编写 4 个工具文件（实测通过）
 4. 编写编排模板 `dark_factory_pipeline.yaml`（yamllint 校验）
-5. 验证：`jarvis --install-plugin builtin/plugins/ai-dark-factory` 安装成功 + `jarvis --list-plugins` 识别
+5. 验证：`jarvis --install-plugin https://github.com/skyfireitdiy/jarvis-plugin-ai-dark-factory` 安装成功 + `jarvis --list-plugins` 识别
 6. git 提交插件源码
 
 ## 10. 验证方式

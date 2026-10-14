@@ -438,7 +438,7 @@ execute(args):
 | `src/jarvis/jarvis_tools/pipeline_runner.py` | 核心：图构建/拓扑排序/常驻 Agent 创建与调度/条件/失败策略/重试。约 +250~350 行 |
 | `src/jarvis/jarvis_tools/gateway_manager.py` | `send_to_agent` 增加同步等待能力（`wait` 参数或新增 `send_to_agent_sync` 操作） |
 | `src/jarvis/jarvis_agent/jarvis.py` / `code_agent.py` | 如需：`/message` 或 `/status` 补充"任务完成 + 结果回传"语义 |
-| `builtin/plugins/ai-dark-factory/orchestration/dark_factory_pipeline.yaml` | 注释补充 DAG 用法（可选，模板加并行示例） |
+| `skyfireitdiy/jarvis-plugin-ai-dark-factory` 的 `orchestration/dark_factory_pipeline.yaml` | 注释补充 DAG 用法（可选，模板加并行示例） |
 | `docs/design/ai-dark-factory-orchestration-engine.md` | 本文档（本附录） |
 | `tests/jarvis_tools/test_pipeline_runner.py` | 新增 DAG 测试：拓扑排序、并行、多输入、条件、失败策略、环检测、锁处理 |
 
