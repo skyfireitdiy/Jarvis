@@ -365,6 +365,101 @@ describe("PluginSidebar", () => {
     expect(body.source).toBe("https://github.com/owner/market-p#main");
   });
 
+  test("市场 tab：已安装插件显示「已安装」徽章，不显示安装按钮", async () => {
+    const fetchWithAuth = makeFetch({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
+        success: true,
+        data: {
+          node_id: "master",
+          plugins: [
+            plugin({ name: "market-p", version: "0.1.0" }),
+            plugin({ name: "other-plugin", version: "0.1.0" }),
+          ],
+        },
+      }),
+      "GET http://127.0.0.1:8000/api/plugins/market": () => ({
+        success: true,
+        data: {
+          plugins: [
+            {
+              id: "market-p",
+              name: "market-p",
+              repo: "https://github.com/owner/market-p",
+              branch: "main",
+              installed: true,
+            },
+            {
+              id: "not-installed",
+              name: "未安装插件",
+              repo: "https://github.com/owner/not-installed",
+              branch: "main",
+              installed: false,
+            },
+          ],
+        },
+      }),
+    });
+    const wrapper = mount(PluginSidebar, {
+      props: { ...baseProps, fetchWithAuth },
+    });
+    await flushPromises();
+    await wrapper.findAll(".plugin-sidebar-tab")[1].trigger("click");
+    await flushPromises();
+    const items = wrapper.findAll(".plugin-market-item");
+    expect(items).toHaveLength(2);
+    // 已安装插件：显示「已安装」徽章，无安装按钮
+    expect(items[0].text()).toContain("已安装");
+    expect(items[0].find(".plugin-btn-primary").exists()).toBe(false);
+    // 未安装插件：显示安装按钮，无「已安装」徽章
+    expect(items[1].text()).not.toContain("已安装");
+    expect(items[1].find(".plugin-btn-primary").exists()).toBe(true);
+  });
+
+  test("市场 tab：未勾选「只看已安装」也始终传 installed_names 供后端打标记", async () => {
+    const fetchWithAuth = makeFetch({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
+        success: true,
+        data: {
+          node_id: "master",
+          plugins: [plugin({ name: "market-p", version: "0.1.0" })],
+        },
+      }),
+      "GET http://127.0.0.1:8000/api/plugins/market": () => ({
+        success: true,
+        data: {
+          plugins: [
+            {
+              id: "market-p",
+              name: "market-p",
+              repo: "https://github.com/owner/market-p",
+              branch: "main",
+              installed: true,
+            },
+          ],
+          total: 1,
+          page: 1,
+          page_size: 20,
+          total_pages: 1,
+          filters: { categories: [], market_repos: [] },
+        },
+      }),
+    });
+    const wrapper = mount(PluginSidebar, {
+      props: { ...baseProps, fetchWithAuth },
+    });
+    await flushPromises();
+    await wrapper.findAll(".plugin-sidebar-tab")[1].trigger("click");
+    await flushPromises();
+    const marketCall = fetchWithAuth.mock.calls.find(
+      ([url]) => url.includes("/api/plugins/market"),
+    );
+    expect(marketCall).toBeTruthy();
+    // 未勾选「只看已安装」：不应带 installed=true
+    expect(marketCall[0]).not.toContain("installed=true");
+    // 但始终带 installed_names
+    expect(marketCall[0]).toContain("installed_names=market-p");
+  });
+
   test("市场 tab：显示节点选择器，可安装到指定子节点", async () => {
     const fetchWithAuth = makeFetch({
       "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({

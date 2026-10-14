@@ -1993,7 +1993,7 @@ def filter_market_plugins(
 
     返回:
         dict: 分页与过滤结果，字段：
-            - plugins: 当前页插件列表
+            - plugins: 当前页插件列表（每项附带 installed: 是否已安装标记）
             - total: 过滤后插件总数
             - page: 当前页码（已钳制）
             - page_size: 每页数量
@@ -2006,6 +2006,12 @@ def filter_market_plugins(
     cat = (category or "").strip()
     repo = (market_repo or "").strip()
     installed_set = installed_names or set()
+
+    def _is_installed(p: dict) -> bool:
+        """判断市场插件是否已安装（按 name 或 id 匹配已安装插件名集合）。"""
+        name = str(p.get("name") or "")
+        pid = str(p.get("id") or "")
+        return name in installed_set or pid in installed_set
 
     # 搜索 + 过滤
     filtered: List[dict] = []
@@ -2025,11 +2031,9 @@ def filter_market_plugins(
         if repo and p.get("market_repo") != repo:
             continue
         if installed is not None:
-            name = str(p.get("name") or p.get("id") or "")
-            is_installed = name in installed_set
-            if installed and not is_installed:
+            if installed and not _is_installed(p):
                 continue
-            if not installed and is_installed:
+            if not installed and _is_installed(p):
                 continue
         filtered.append(p)
 
@@ -2055,6 +2059,11 @@ def filter_market_plugins(
     page = min(page, total_pages)
     start = (page - 1) * page_size
     page_plugins = filtered[start : start + page_size]
+
+    # 为当前页插件附加 installed 标记（不污染原始列表）
+    page_plugins = [
+        {**p, "installed": _is_installed(p)} for p in page_plugins
+    ]
 
     return {
         "plugins": page_plugins,

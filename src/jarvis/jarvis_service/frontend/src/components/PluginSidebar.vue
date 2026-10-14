@@ -164,10 +164,12 @@
                 </span>
               </span>
               <button
+                v-if="!mp.installed"
                 class="plugin-btn plugin-btn-sm plugin-btn-primary"
                 :disabled="marketBusy[mp.id || mp.repo]"
                 @click="installFromMarket(mp)"
               >{{ marketBusy[mp.id || mp.repo] ? '安装中...' : '安装' }}</button>
+              <span v-else class="plugin-item-installed-badge">已安装</span>
             </div>
             <div class="plugin-item-meta">
               <span class="plugin-item-meta-label">作者</span> {{ mp.author || '-' }}
@@ -413,8 +415,9 @@ function switchTab(tab) {
 }
 
 function onNodeChange() {
-  // 已安装页切换节点需重新加载该节点插件；市场页市场列表是全局的，无需重载
+  // 已安装页切换节点需重新加载该节点插件；市场页的 installed 标记也依赖当前节点已安装插件
   if (activeTab.value === 'installed') loadPlugins()
+  else if (activeTab.value === 'market') loadMarket()
 }
 
 // 市场查询参数变化：重置到第一页并重新加载
@@ -436,12 +439,10 @@ async function loadMarket() {
     if (marketKeyword.value.trim()) params.set('keyword', marketKeyword.value.trim())
     if (marketCategory.value) params.set('category', marketCategory.value)
     if (marketRepoFilter.value) params.set('market_repo', marketRepoFilter.value)
-    if (marketInstalledOnly.value) {
-      params.set('installed', 'true')
-      // 已安装插件名集合：以当前节点已安装插件为准
-      const installedNames = plugins.value.map(p => p.name).filter(Boolean)
-      if (installedNames.length) params.set('installed_names', installedNames.join(','))
-    }
+    // 已安装插件名集合：以当前节点已安装插件为准（后端据此为市场插件打 installed 标记）
+    const installedNames = plugins.value.map(p => p.name).filter(Boolean)
+    if (installedNames.length) params.set('installed_names', installedNames.join(','))
+    if (marketInstalledOnly.value) params.set('installed', 'true')
     params.set('page', String(marketPage.value))
     params.set('page_size', String(marketPageSize.value))
     const qs = params.toString()
@@ -798,6 +799,16 @@ defineExpose({ loadPlugins })
   background: rgba(32, 200, 255, 0.12);
   color: var(--accent, #20c8ff);
   border: 1px solid rgba(32, 200, 255, 0.3);
+  flex-shrink: 0;
+}
+/* 市场列表「已安装」徽章：替代安装按钮 */
+.plugin-item-installed-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(74, 222, 128, 0.1);
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.3);
   flex-shrink: 0;
 }
 /* 右键菜单：能力详情入口 */
