@@ -2435,6 +2435,14 @@ class ChildNodeClient:
                     )
                     await self._ws.send(json.dumps(response))
                     continue
+                if message_type == PLUGIN_MANAGE_REQUEST:
+                    response = (
+                        self._node_connection_manager._handle_plugin_manage_request(
+                            next_message
+                        )
+                    )
+                    await self._ws.send(json.dumps(response))
+                    continue
                 logger.warning(
                     "[NODE] child unhandled message type=%s request_id=%s",
                     message_type,
