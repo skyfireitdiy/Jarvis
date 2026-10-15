@@ -6920,6 +6920,7 @@ const {
   getAgentLastSeq,
   showToast,
   showConfirm,
+  loadPluginExtensionsForUi,
 })
 function sendInterrupt() {
   const message = {

@@ -92,6 +92,7 @@ function makeHarness() {
   const getAgentLastSeq = vi.fn(() => 0)
   const showToast = vi.fn()
   const showConfirm = vi.fn()
+  const loadPluginExtensionsForUi = vi.fn(async () => {})
 
   const api = useGatewayConnection({
     socket,
@@ -136,6 +137,7 @@ function makeHarness() {
     getAgentLastSeq,
     showToast,
     showConfirm,
+    loadPluginExtensionsForUi,
   })
 
   return {
@@ -155,6 +157,7 @@ function makeHarness() {
     refreshUserInfo, fetchUserPermissions, fetchModelGroups, fetchNodeStatus, fetchUserAccessibleNodes,
     restoreTerminalSessions, getOrCreateClientId, sendChatMessageToServer, loadHistoryMessages,
     closeTerminal, handleMessage, getAgentLastSeq, showToast, showConfirm,
+    loadPluginExtensionsForUi,
   }
 }
 
@@ -265,7 +268,7 @@ describe('useGatewayConnection', () => {
         restoreVirtualWorkspaceDirs, loadGitCustomDir, refreshUserInfo, fetchUserPermissions,
         fetchModelGroups, fetchNodeStatus, fetchUserAccessibleNodes,
         restoreTerminalSessions, myClientId, getOrCreateClientId, sendChatMessageToServer,
-        loadHistoryMessages } = makeHarness()
+        loadHistoryMessages, loadPluginExtensionsForUi } = makeHarness()
       await api.connect()
       // 触发 onopen 建立连接
       const ws = globalThis.WebSocket.instances[0]
@@ -279,6 +282,7 @@ describe('useGatewayConnection', () => {
       expect(api.connectionStatus.value).toBe('online')
       expect(startAgentListRefresh).toHaveBeenCalled()
       expect(startNodeStatusRefresh).toHaveBeenCalled()
+      expect(loadPluginExtensionsForUi).toHaveBeenCalled()
       expect(restoreVirtualWorkspaceDirs).toHaveBeenCalled()
       expect(loadGitCustomDir).toHaveBeenCalled()
       expect(refreshUserInfo).toHaveBeenCalled()

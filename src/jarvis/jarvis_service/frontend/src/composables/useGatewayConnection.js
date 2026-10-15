@@ -66,6 +66,7 @@ export function useGatewayConnection({
   getAgentLastSeq,
   showToast,
   showConfirm,
+  loadPluginExtensionsForUi,
 }) {
 // 默认网关地址：协议跟随当前页面（https → wss），域名为当前前端域名，端口固定 8000
 function buildDefaultGatewayUrl() {
@@ -162,6 +163,8 @@ async function connect() {
     localStorage.setItem('jarvis_gateway_url', gatewayUrl.value)
     startAgentListRefresh()
     startNodeStatusRefresh()
+    // 加载插件扩展清单（手动登录路径 onMounted 不会触发，须在连接成功后加载）
+    loadPluginExtensionsForUi()
     // 恢复上次「打开目录」的虚拟目录记录（鉴权已可用）
     restoreVirtualWorkspaceDirs()
     // 恢复 Git 面板上次指定的自定义 Git 管理目录
