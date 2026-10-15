@@ -62,7 +62,7 @@
         <div v-else class="plugin-list-inner">
           <div
             v-for="plugin in plugins"
-            :key="plugin.name"
+            :key="plugin.id || plugin.name"
             class="plugin-item"
             @contextmenu.prevent="openCapMenu(plugin, $event)"
           >
@@ -90,7 +90,7 @@
                   <button
                     v-if="!plugin.builtin && plugin.hasUpdate"
                     class="plugin-btn plugin-btn-sm plugin-update-btn"
-                    :disabled="pluginBusy[plugin.name]"
+                    :disabled="pluginBusy[plugin.id || plugin.name]"
                     @click.stop="upgradePlugin(plugin)"
                   >更新</button>
                 </span>
@@ -439,8 +439,8 @@ async function loadMarket() {
     if (marketKeyword.value.trim()) params.set('keyword', marketKeyword.value.trim())
     if (marketCategory.value) params.set('category', marketCategory.value)
     if (marketRepoFilter.value) params.set('market_repo', marketRepoFilter.value)
-    // 已安装插件名集合：以当前节点已安装插件为准（后端据此为市场插件打 installed 标记）
-    const installedNames = plugins.value.map(p => p.name).filter(Boolean)
+    // 已安装插件 id 集合：以当前节点已安装插件为准（后端据此为市场插件打 installed 标记）
+    const installedNames = plugins.value.map(p => p.id || p.name).filter(Boolean)
     if (installedNames.length) params.set('installed_names', installedNames.join(','))
     if (marketInstalledOnly.value) params.set('installed', 'true')
     params.set('page', String(marketPage.value))
@@ -486,14 +486,14 @@ async function doInstallFromMarket(mp, key, source) {
 
 async function upgradePlugin(plugin) {
   props.showConfirm(`确定升级插件 ${plugin.name}？`, () => {
-    pluginBusy.value = { ...pluginBusy.value, [plugin.name]: true }
+    pluginBusy.value = { ...pluginBusy.value, [plugin.id || plugin.name]: true }
     doUpgradePlugin(plugin)
   })
 }
 
 async function doUpgradePlugin(plugin) {
   try {
-    const resp = await props.fetchWithAuth(buildApiUrl(`/api/node/${encodeURIComponent(pluginNodeId.value)}/plugins/${encodeURIComponent(plugin.name)}/upgrade`), {
+    const resp = await props.fetchWithAuth(buildApiUrl(`/api/node/${encodeURIComponent(pluginNodeId.value)}/plugins/${encodeURIComponent(plugin.id || plugin.name)}/upgrade`), {
       method: 'POST',
       body: JSON.stringify({}),
     })
@@ -501,12 +501,12 @@ async function doUpgradePlugin(plugin) {
     if (result.success) { props.showToast(`插件 ${plugin.name} 已升级`, 'success'); loadPlugins() }
     else props.showToast(result.error?.message || '插件升级失败', 'error')
   } catch (e) { props.showToast('插件升级失败: ' + e.message, 'error') }
-  finally { pluginBusy.value = { ...pluginBusy.value, [plugin.name]: false } }
+  finally { pluginBusy.value = { ...pluginBusy.value, [plugin.id || plugin.name]: false } }
 }
 
 async function uninstallPlugin(plugin) {
   props.showConfirm(`确定卸载插件 ${plugin.name}？\n此操作不可恢复，插件目录将被删除。`, () => {
-    pluginBusy.value = { ...pluginBusy.value, [plugin.name]: true }
+    pluginBusy.value = { ...pluginBusy.value, [plugin.id || plugin.name]: true }
     doUninstallPlugin(plugin)
   })
 }
@@ -519,7 +519,7 @@ function uninstallPluginFromMenu(plugin) {
 
 async function doUninstallPlugin(plugin) {
   try {
-    const resp = await props.fetchWithAuth(buildApiUrl(`/api/node/${encodeURIComponent(pluginNodeId.value)}/plugins/${encodeURIComponent(plugin.name)}/uninstall`), {
+    const resp = await props.fetchWithAuth(buildApiUrl(`/api/node/${encodeURIComponent(pluginNodeId.value)}/plugins/${encodeURIComponent(plugin.id || plugin.name)}/uninstall`), {
       method: 'POST',
       body: JSON.stringify({}),
     })
@@ -527,7 +527,7 @@ async function doUninstallPlugin(plugin) {
     if (result.success) { props.showToast(`插件 ${plugin.name} 已卸载`, 'success'); loadPlugins() }
     else props.showToast(result.error?.message || '插件卸载失败', 'error')
   } catch (e) { props.showToast('插件卸载失败: ' + e.message, 'error') }
-  finally { pluginBusy.value = { ...pluginBusy.value, [plugin.name]: false } }
+  finally { pluginBusy.value = { ...pluginBusy.value, [plugin.id || plugin.name]: false } }
 }
 
 onMounted(() => {

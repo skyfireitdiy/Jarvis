@@ -698,4 +698,85 @@ describe("PluginSidebar", () => {
     expect(decoded).toContain("installed=true");
     expect(decoded).toContain("installed_names=插件1,插件2");
   });
+
+  // ---- 方案 B：插件标识从 name 统一改为 id（name 只做展示名） ----
+
+  test("方案B：带 id 的插件，卸载/升级 URL 用 id 定位，显示名用 name", async () => {
+    const fetchWithAuth = makeFetch({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
+        success: true,
+        data: {
+          node_id: "master",
+          plugins: [
+            plugin({ id: "rea", name: "REA 逆向工程", hasUpdate: true }),
+          ],
+        },
+      }),
+      "POST http://127.0.0.1:8000/api/node/master/plugins/rea/upgrade": () => ({
+        success: true,
+        data: { node_id: "master", output: [] },
+      }),
+      "POST http://127.0.0.1:8000/api/node/master/plugins/rea/uninstall": () => ({
+        success: true,
+        data: { node_id: "master", output: [] },
+      }),
+    });
+    const wrapper = mount(PluginSidebar, {
+      props: { ...baseProps, fetchWithAuth },
+    });
+    await flushPromises();
+    // 显示名用 name（展示名），而非 id
+    expect(wrapper.text()).toContain("REA 逆向工程");
+    // 升级：URL 用 id
+    await wrapper.find(".plugin-update-btn").trigger("click");
+    await flushPromises();
+    const upgradeCall = fetchWithAuth.mock.calls.find(
+      ([url, opt]) => opt?.method === "POST" && url.includes("/upgrade"),
+    );
+    expect(upgradeCall[0]).toContain("/api/node/master/plugins/rea/upgrade");
+    // 卸载：URL 用 id
+    await wrapper.find(".plugin-item").trigger("contextmenu");
+    await wrapper.find(".plugin-cap-menu-item-danger").trigger("click");
+    await flushPromises();
+    const uninstallCall = fetchWithAuth.mock.calls.find(
+      ([url, opt]) => opt?.method === "POST" && url.includes("/uninstall"),
+    );
+    expect(uninstallCall[0]).toContain("/api/node/master/plugins/rea/uninstall");
+  });
+
+  test("方案B：市场 installed_names 传插件 id（而非展示名）", async () => {
+    const fetchWithAuth = makeFetch({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
+        success: true,
+        data: {
+          node_id: "master",
+          plugins: [plugin({ id: "rea", name: "REA 逆向工程" })],
+        },
+      }),
+      "GET http://127.0.0.1:8000/api/plugins/market": () => ({
+        success: true,
+        data: {
+          plugins: [],
+          total: 0,
+          page: 1,
+          page_size: 20,
+          total_pages: 1,
+          filters: { categories: [], market_repos: [] },
+        },
+      }),
+    });
+    const wrapper = mount(PluginSidebar, {
+      props: { ...baseProps, fetchWithAuth },
+    });
+    await flushPromises();
+    await wrapper.findAll(".plugin-sidebar-tab")[1].trigger("click");
+    await flushPromises();
+    const marketCall = fetchWithAuth.mock.calls.find(
+      ([url]) => url.includes("/api/plugins/market"),
+    );
+    expect(marketCall).toBeTruthy();
+    // 传 id（rea）而非展示名（REA 逆向工程）
+    expect(marketCall[0]).toContain("installed_names=rea");
+    expect(marketCall[0]).not.toContain(encodeURIComponent("REA 逆向工程"));
+  });
 });

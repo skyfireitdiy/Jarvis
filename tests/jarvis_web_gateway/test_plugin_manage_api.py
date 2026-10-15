@@ -546,9 +546,9 @@ def test_list_market_plugins_api_pagination_and_filters(client, monkeypatch):
     assert data["total"] == 0
     assert data["plugins"] == []
 
-    # 按已安装过滤：installed_names + installed=true
+    # 按已安装过滤：installed_names + installed=true（installed_names 传插件 id）
     resp = client.get(
-        "/api/plugins/market?installed=true&installed_names=插件0,插件2",
+        "/api/plugins/market?installed=true&installed_names=p0,p2",
         headers=_auth_headers(),
     )
     data = resp.json()["data"]

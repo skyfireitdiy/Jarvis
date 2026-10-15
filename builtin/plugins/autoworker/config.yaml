@@ -1,4 +1,5 @@
 ---
+id: autoworker
 name: autoworker
 description: >-
   AutoWorker——把一批任务组织在后端工作目录下，通过前端任务面板管理，

@@ -1460,7 +1460,10 @@ def install_plugin(
             with open(config_file, "r", encoding="utf-8") as f:
                 config_content = yaml.safe_load(f)
                 if isinstance(config_content, dict):
-                    plugin_name = config_content.get("name", None)
+                    # 插件唯一标识优先取 id（目录名/API 定位用），回退 name（兼容旧插件）
+                    plugin_name = config_content.get("id") or config_content.get(
+                        "name", None
+                    )
                     plugin_version = config_content.get("version", None)
                     plugin_dependencies = config_content.get("dependencies", None)
                 else:
@@ -1468,7 +1471,7 @@ def install_plugin(
         except Exception:
             plugin_name = None
 
-        # 如果没有 name 字段，使用源目录名/文件名
+        # 如果没有 id/name 字段，使用源目录名/文件名
         if not plugin_name:
             if install_mode == "git":
                 plugin_name = plugin_source_dir.name
@@ -1764,6 +1767,7 @@ def list_plugins_info() -> List[dict]:
         config_file = plugin_dir / "config.yaml"
         is_builtin = plugin_dir in builtin_dirs
         info: dict = {
+            "id": plugin_dir.name,
             "name": plugin_dir.name,
             "description": "",
             "version": None,
@@ -1780,7 +1784,10 @@ def list_plugins_info() -> List[dict]:
                 with open(config_file, "r", encoding="utf-8") as f:
                     config = yaml.safe_load(f)
                 if isinstance(config, dict):
-                    info["name"] = config.get("name", plugin_dir.name)
+                    # id 为插件唯一标识（= 目录名，卸载/升级/依赖定位用）；
+                    # name 为展示名（前端展示用）
+                    info["id"] = str(config.get("id") or plugin_dir.name)
+                    info["name"] = str(config.get("name") or info["id"])
                     info["description"] = config.get("description", "")
                     info["version"] = config.get("version", None)
                     info["dependencies"] = config.get("dependencies", None)
@@ -1792,7 +1799,7 @@ def list_plugins_info() -> List[dict]:
                     info["logo"] = _read_plugin_logo(config, plugin_dir)
                     info["installed"] = True
                     # 非内置插件且检测到更新时标记 hasUpdate（与前端字段一致）
-                    if not info["builtin"] and updates_cache.get(info["name"]):
+                    if not info["builtin"] and updates_cache.get(info["id"]):
                         info["hasUpdate"] = True
             except Exception:
                 info["installed"] = False
@@ -1986,7 +1993,7 @@ def filter_market_plugins(
         keyword: 搜索关键字，匹配插件 name/description/author（大小写不敏感）
         category: 按分类过滤（插件的 categories 列表包含该分类即命中）
         market_repo: 按来源市场仓库过滤（精确匹配）
-        installed_names: 已安装插件名集合（用于 installed 过滤判断）
+        installed_names: 已安装插件 id 集合（插件唯一标识，用于 installed 过滤判断）
         installed: True 只显示已安装；False 只显示未安装；None 不过滤
         page: 页码（从 1 开始），越界时钳制到有效范围
         page_size: 每页数量（1~100，默认 20）
@@ -2008,10 +2015,9 @@ def filter_market_plugins(
     installed_set = installed_names or set()
 
     def _is_installed(p: dict) -> bool:
-        """判断市场插件是否已安装（按 name 或 id 匹配已安装插件名集合）。"""
-        name = str(p.get("name") or "")
+        """判断市场插件是否已安装（按 id 匹配已安装插件 id 集合）。"""
         pid = str(p.get("id") or "")
-        return name in installed_set or pid in installed_set
+        return pid in installed_set
 
     # 搜索 + 过滤
     filtered: List[dict] = []
@@ -2460,7 +2466,7 @@ def list_plugin_orchestrations() -> List[dict]:
             entries = config.get("orchestration")
             if not isinstance(entries, list):
                 continue
-            plugin_name = str(config.get("name") or plugin_dir.name)
+            plugin_name = str(config.get("id") or config.get("name") or plugin_dir.name)
             for entry in entries:
                 if not isinstance(entry, dict):
                     continue
@@ -2481,12 +2487,12 @@ def list_plugin_orchestrations() -> List[dict]:
     return result
 
 
-def uninstall_plugin(plugin_name: str) -> bool:
+def uninstall_plugin(plugin_id: str) -> bool:
     """
     卸载插件
 
     Args:
-        plugin_name: 插件名称
+        plugin_id: 插件唯一标识（id，等于插件目录名）
 
     Returns:
         bool: 卸载成功返回 True，失败返回 False
@@ -2497,7 +2503,7 @@ def uninstall_plugin(plugin_name: str) -> bool:
     from jarvis.jarvis_utils.output import PrettyOutput
 
     # 安全处理：只保留文件名部分，防止路径遍历攻击
-    plugin_name = Path(plugin_name).name
+    plugin_name = Path(plugin_id).name
 
     plugins_dir = Path(get_data_dir()) / "plugins"
     plugin_dir = plugins_dir / plugin_name
@@ -2570,14 +2576,14 @@ def uninstall_plugin(plugin_name: str) -> bool:
         return False
 
 
-def check_plugin_update(plugin_name: str) -> bool:
+def check_plugin_update(plugin_id: str) -> bool:
     """检查 git 来源插件是否有新版本（Issue #213）。
 
     对保留 .git 元数据的 git 插件，执行 `git fetch` 后比较本地 HEAD 与
     远端分支 HEAD；不一致即视为有新版本。
 
     Args:
-        plugin_name: 插件名称
+        plugin_id: 插件唯一标识（id，等于插件目录名）
 
     Returns:
         bool: 有新版本返回 True，否则返回 False。
@@ -2587,7 +2593,7 @@ def check_plugin_update(plugin_name: str) -> bool:
     from jarvis.jarvis_utils.config import get_data_dir
 
     # 安全处理：只保留文件名部分，防止路径遍历攻击
-    plugin_name = Path(plugin_name).name
+    plugin_name = Path(plugin_id).name
 
     plugins_dir = Path(get_data_dir()) / "plugins"
     plugin_dir = plugins_dir / plugin_name
@@ -2690,7 +2696,7 @@ def check_all_plugins_update() -> dict:
     return updates
 
 
-def upgrade_plugin(plugin_name: str) -> bool:
+def upgrade_plugin(plugin_id: str) -> bool:
     """
     升级插件（git 来源，Issue #213）。
 
@@ -2699,7 +2705,7 @@ def upgrade_plugin(plugin_name: str) -> bool:
     更新到远端最新提交。非 git 插件无法升级。
 
     Args:
-        plugin_name: 插件名称
+        plugin_id: 插件唯一标识（id，等于插件目录名）
 
     Returns:
         bool: 升级成功返回 True，失败返回 False
@@ -2710,7 +2716,7 @@ def upgrade_plugin(plugin_name: str) -> bool:
     from jarvis.jarvis_utils.output import PrettyOutput
 
     # 安全处理：只保留文件名部分，防止路径遍历攻击
-    plugin_name = Path(plugin_name).name
+    plugin_name = Path(plugin_id).name
 
     plugins_dir = Path(get_data_dir()) / "plugins"
     plugin_dir = plugins_dir / plugin_name

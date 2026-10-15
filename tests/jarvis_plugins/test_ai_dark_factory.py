@@ -334,7 +334,9 @@ class TestPluginConfig:
 
     def test_metadata_complete(self, plugin_dir):
         cfg = self._load(plugin_dir)
-        assert cfg.get("name") == "ai-dark-factory"
+        # 方案 B：id 为唯一标识（=目录名），name 为展示名
+        assert cfg.get("id") == "ai-dark-factory"
+        assert cfg.get("name") == "AI Agent 黑灯工厂"
         assert cfg.get("description")
         assert cfg.get("version")
         # 独立仓库插件不再声明 builtin（内置标记已随迁移移除）

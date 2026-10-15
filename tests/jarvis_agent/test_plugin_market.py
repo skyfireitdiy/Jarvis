@@ -281,9 +281,9 @@ def test_filter_market_plugins_category_and_market_repo():
 
 
 def test_filter_market_plugins_installed_filter():
-    """按是否已安装过滤（installed_names 集合判断）。"""
+    """按是否已安装过滤（installed_names 集合判断，按 id 匹配）。"""
     plugins = _mk_market_plugins()
-    installed = {"Alpha 工具", "Beta 集成"}
+    installed = {"p1", "p2"}
     r = agent_utils.filter_market_plugins(
         plugins, installed_names=installed, installed=True
     )
@@ -331,13 +331,13 @@ def test_filter_market_plugins_pagination():
 
 
 def test_filter_market_plugins_marks_installed():
-    """返回的插件附带 installed 标记（按 name 或 id 匹配 installed_names）。
+    """返回的插件附带 installed 标记（按 id 匹配 installed_names）。
 
     该标记供前端区分已安装/未安装，未传 installed_names 时全部为 False。
     """
     plugins = _mk_market_plugins()
-    # 按 name 匹配 + 按 id 匹配混合
-    installed = {"Alpha 工具", "p3"}
+    # 按 id 匹配
+    installed = {"p1", "p3"}
     r = agent_utils.filter_market_plugins(plugins, installed_names=installed)
     by_id = {p["id"]: p for p in r["plugins"]}
     assert by_id["p1"]["installed"] is True
@@ -356,7 +356,7 @@ def test_filter_market_plugins_marks_installed():
 def test_filter_market_plugins_installed_marker_with_installed_filter():
     """installed=True/False 过滤时 installed 标记仍正确。"""
     plugins = _mk_market_plugins()
-    installed = {"Alpha 工具", "Beta 集成"}
+    installed = {"p1", "p2"}
     r = agent_utils.filter_market_plugins(
         plugins, installed_names=installed, installed=True
     )

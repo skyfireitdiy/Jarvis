@@ -51,7 +51,7 @@ export async function fetchPluginExtensions({
           if (!ext || !ext.id || !ext.entry) continue;
           extensions.push({
             nodeId,
-            plugin: plugin.name,
+            plugin: plugin.id || plugin.name,
             pluginVersion: plugin.version,
             extType,
             id: ext.id,
@@ -61,7 +61,7 @@ export async function fetchPluginExtensions({
             iconSvg: null,
             url: buildExtensionUrl({
               nodeId,
-              plugin: plugin.name,
+              plugin: plugin.id || plugin.name,
               entry: ext.entry,
               baseUrl,
               getHttpProtocol,
