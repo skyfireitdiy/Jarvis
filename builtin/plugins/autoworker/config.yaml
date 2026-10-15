@@ -1,6 +1,6 @@
 ---
 id: autoworker
-name: autoworker
+name: AutoWorker 任务管理
 description: >-
   AutoWorker——把一批任务组织在后端工作目录下，通过前端任务面板管理，
   支持「创建 Agent 执行任务」+「Agent 调用任务管理工具」双通道，任务状态

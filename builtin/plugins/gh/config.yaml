@@ -1,6 +1,6 @@
 ---
 id: gh
-name: gh
+name: GitHub/Gitee 助手
 description: GitHub/Gitee 助手——自动处理当前仓库的 PR 和 Issue，复用官方 CLI 登录态，按仓库 remote 识别平台。
 version: 0.1.0
 builtin: true
