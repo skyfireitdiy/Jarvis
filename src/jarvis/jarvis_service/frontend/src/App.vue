@@ -3056,15 +3056,48 @@ async function changePasswordForced({ new_password }) {
       forcePasswordChangeError.value = result.error?.message || '密码设置失败，请重试'
       return
     }
-    // 改密成功：清除强制改密标记，关闭弹窗并同步本地用户信息
-    auth.value.userInfo = { ...auth.value.userInfo, must_change_password: false }
-    localStorage.setItem('jarvis_user_info', JSON.stringify(auth.value.userInfo))
-    showToast('密码设置成功', 'success')
+    // 改密成功：强制登出并要求用新密码重新登录。
+    // 原因：当前 JWT 是改密前（空密码登录时）签发的，且 WS 连接早于改密完成，
+    // 连接阶段发起的权限/可访问节点请求已被后端 403 拦截并置空；改密后即使旧 token
+    // 仍有效，前端也残留着空权限状态（管理界面为空、创建 Agent 提示无权限）。
+    // 重新登录会走完整 connect 流程，按新密码签发干净 token 并重新加载全部数据。
+    showToast('密码设置成功，请使用新密码重新登录', 'success')
+    logoutAndPromptRelogin()
   } catch (error) {
     forcePasswordChangeError.value = error.message || '密码设置失败，请重试'
   } finally {
     forcePasswordChangeLoading.value = false
   }
+}
+// 强制改密后登出：清除认证信息与本地缓存，回到登录界面要求重新登录。
+// 不调用 disconnectAll（其含 confirm 弹窗且会清空免登录开关），这里静默清理并刷新。
+function logoutAndPromptRelogin() {
+  try {
+    if (socket.value) {
+      socket.value.close()
+      socket.value = null
+    }
+    sockets.value.forEach((ws) => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.close()
+      }
+    })
+    sockets.value.clear()
+  } catch (e) {
+    // 连接清理失败不应阻断登出流程
+  }
+  localStorage.removeItem('jarvis_auth_token')
+  localStorage.removeItem('jarvis_user_info')
+  auth.value.token = ''
+  auth.value.userInfo = null
+  // 通过 sessionStorage 把提示带到刷新后的登录界面（reload 后组件状态会重置）
+  try {
+    sessionStorage.setItem('jarvis_login_notice', '密码设置成功，请使用新密码重新登录')
+  } catch (e) {
+    // sessionStorage 不可用时静默降级
+  }
+  // 刷新页面：无 token 时 onMounted 会停留在登录界面
+  window.location.reload()
 }
 // 「关于」面板数据：后端版本 / 节点 / daemon / 浏览器扩展
 const aboutBackendVersion = ref('')
@@ -7835,6 +7868,19 @@ onMounted(() => {
 
   // 尝试从 localStorage 加载已保存的 token（免登录功能）
   loadSavedToken()
+
+  // 消费「强制改密后登出」留下的登录提示（sessionStorage，仅本次会话有效）
+  try {
+    const loginNotice = sessionStorage.getItem('jarvis_login_notice')
+    if (loginNotice) {
+      sessionStorage.removeItem('jarvis_login_notice')
+      if (!hasAuthToken()) {
+        connectErrorMessage.value = loginNotice
+      }
+    }
+  } catch (e) {
+    // sessionStorage 不可用时忽略
+  }
 
   // 如果 token 加载成功，隐藏登录框并自动连接
   if (hasAuthToken()) {
