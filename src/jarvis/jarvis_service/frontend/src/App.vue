@@ -1882,6 +1882,13 @@
     </div>
     <!-- 用户协议弹窗（首次打开页面时展示；不同意则不能使用软件） -->
     <UserAgreementModal :visible="showAgreement" @agree="onAgreementAgree" />
+    <!-- 强制改密弹窗：初始 admin 无密码，首次登录后必须设置密码 -->
+    <ForcePasswordChangeModal
+      :visible="showForcePasswordChange"
+      :loading="forcePasswordChangeLoading"
+      :errorMessage="forcePasswordChangeError"
+      @submit="changePasswordForced"
+    />
     <!-- Toast 提示 -->
     <transition name="toast-fade">
       <div v-if="toast.show" class="toast" :class="`toast-${toast.type}`">
@@ -1983,6 +1990,7 @@ import { useSessionPanel } from './composables/useSessionPanel.js'
 import { useFocus } from './composables/useFocus.js'
 import { useUserAgreement } from './composables/useUserAgreement.js'
 import UserAgreementModal from './components/UserAgreementModal.vue'
+import ForcePasswordChangeModal from './components/ForcePasswordChangeModal.vue'
 
 // 图表渲染（plantuml/mermaid/dot），拆自独立 composable
 const {
@@ -3022,6 +3030,40 @@ function onAgreementAgree() {
   // 未登录时恢复欢迎/登录界面（已登录场景 onMounted 已自动连接，无需恢复）
   if (!hasAuthToken()) {
     showConnectModal.value = true
+  }
+}
+// 强制改密：初始 admin 为无密码状态，登录后必须设置密码才能使用（后端会拦截其它请求）
+const showForcePasswordChange = computed(() => Boolean(auth.value.userInfo?.must_change_password))
+const forcePasswordChangeLoading = ref(false)
+const forcePasswordChangeError = ref('')
+// 提交强制改密：初始无密码用户无需旧密码，old_password 传空字符串
+async function changePasswordForced({ new_password }) {
+  const userId = auth.value.userInfo?.user_id
+  if (!userId) {
+    forcePasswordChangeError.value = '用户信息缺失，请重新登录'
+    return
+  }
+  forcePasswordChangeLoading.value = true
+  forcePasswordChangeError.value = ''
+  try {
+    const { host, port } = getGatewayAddress()
+    const response = await fetchWithAuth(
+      `${getHttpProtocol()}://${host}:${port}/api/users/${encodeURIComponent(userId)}/change-password`,
+      { method: 'POST', body: JSON.stringify({ old_password: '', new_password }) }
+    )
+    const result = await response.json().catch(() => ({}))
+    if (!response.ok || !result.success) {
+      forcePasswordChangeError.value = result.error?.message || '密码设置失败，请重试'
+      return
+    }
+    // 改密成功：清除强制改密标记，关闭弹窗并同步本地用户信息
+    auth.value.userInfo = { ...auth.value.userInfo, must_change_password: false }
+    localStorage.setItem('jarvis_user_info', JSON.stringify(auth.value.userInfo))
+    showToast('密码设置成功', 'success')
+  } catch (error) {
+    forcePasswordChangeError.value = error.message || '密码设置失败，请重试'
+  } finally {
+    forcePasswordChangeLoading.value = false
   }
 }
 // 「关于」面板数据：后端版本 / 节点 / daemon / 浏览器扩展
@@ -5681,6 +5723,7 @@ function isAutoFocusSuppressed() {
 function isAnyModalOpen() {
   return Boolean(
     showAgreement.value ||
+    showForcePasswordChange.value ||
     showConnectModal.value ||
     showSettingsModal.value ||
     showDiffModal.value ||
