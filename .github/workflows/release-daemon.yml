@@ -27,11 +27,17 @@ jobs:
           - goos: linux
             goarch: arm
             ext: ""
+          - goos: linux
+            goarch: "386"
+            ext: ""
           - goos: windows
             goarch: amd64
             ext: ".exe"
           - goos: windows
             goarch: arm64
+            ext: ".exe"
+          - goos: windows
+            goarch: "386"
             ext: ".exe"
 
     steps:

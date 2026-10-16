@@ -390,29 +390,41 @@ type windowsKeybdInput struct {
 	DwExtraInfo uintptr
 }
 
-// inputKeyboard 是 INPUT 结构 type 字段的取值 INPUT_KEYBOARD。
-const inputKeyboard = 1
-
 // windowsInputSize 是 Win32 INPUT 结构的大小。
 //
 // INPUT 是「DWORD type + 联合体」，联合体最大成员是 MOUSEINPUT：
-//   - 64 位：MOUSEINPUT 32 字节，加上 type 4 字节与 4 字节对齐 = 40 字节；
-//   - 32 位：MOUSEINPUT 24 字节，加上 type 4 字节 = 28 字节。
+//   - 64 位：type 4 字节 + 4 字节对齐 + MOUSEINPUT 32 字节 = 40 字节；
+//   - 32 位：type 4 字节 + MOUSEINPUT 24 字节 = 28 字节。
 //
-// 这里按 64 位取值 40。SendInput 会按 cbSize 校验，传错大小会直接失败
-// （返回 0 并置 LastError），不会静默出错。
-//
-// 注意：本值仅对 64 位 Windows 正确。当前构建矩阵的 Windows 目标为
-// amd64/arm64（均为 64 位），故安全；若将来需要支持 386，需改为按
-// unsafe.Sizeof(uintptr(0)) 动态计算（32 位取 28）。下方编译期断言会在
-// 32 位构建时直接失败，避免静默出错。
-const windowsInputSize = 40
+// 这里按指针宽度动态计算：64 位为 40，32 位为 28。SendInput 会按 cbSize 校验，
+// 传错大小会直接失败（返回 0 并置 LastError），不会静默出错。
+const (
+	// inputKeyboard 是 INPUT 结构 type 字段的取值 INPUT_KEYBOARD。
+	inputKeyboard = 1
 
-// 编译期断言：windowsInputSize 只在 64 位下正确。
-//
-// 若在 32 位（GOARCH=386/arm）下构建，数组长度会变成负数，直接编译失败，
-// 提示需要调整 windowsInputSize 与联合体偏移，而不是运行时静默出错。
-var _ [unsafe.Sizeof(uintptr(0)) - 8]struct{}
+	// ptrSize 是指针宽度：64 位为 8，32 位为 4。
+	ptrSize = int(unsafe.Sizeof(uintptr(0)))
+
+	// mouseInputSize 是 MOUSEINPUT 结构大小（20 字节 + 指针宽度，按指针宽度对齐）：
+	//   - 64 位：28 字节对齐到 8 = 32；
+	//   - 32 位：24 字节对齐到 4 = 24。
+	mouseInputSize = (20 + ptrSize + ptrSize - 1) &^ (ptrSize - 1)
+
+	// windowsInputSize 是 INPUT 结构大小：type(4) 对齐到指针宽度 + MOUSEINPUT。
+	//   - 64 位：8 + 32 = 40；
+	//   - 32 位：4 + 24 = 28。
+	windowsInputSize = ptrSize + mouseInputSize
+
+	// windowsInputUnionOffset 是 INPUT 中联合体的起始偏移：
+	//   - 64 位：type 4 字节后需 4 字节填充，从偏移 8 开始；
+	//   - 32 位：type 4 字节后无需填充，从偏移 4 开始。
+	windowsInputUnionOffset = ptrSize
+)
+
+// 编译期断言：指针宽度必须是 32 位（4）或 64 位（8），
+// 保证上方 INPUT 布局推算成立；否则直接编译失败而非运行时静默出错。
+var _ [ptrSize - 4]struct{}
+var _ [8 - ptrSize]struct{}
 
 // sendInputKeyboard 用 SendInput 发送一个键盘事件。
 //
@@ -427,15 +439,15 @@ var _ [unsafe.Sizeof(uintptr(0)) - 8]struct{}
 //	偏移 4  : 4 字节对齐填充
 //	偏移 8  : 联合体（KEYBDINPUT 从这里开始）
 //
-// 因此 KEYBDINPUT 应写入偏移 8 处。
+// 32 位下无对齐填充，联合体从偏移 4 开始（见 windowsInputUnionOffset）。
 func sendInputKeyboard(kb windowsKeybdInput) {
 	var buf [windowsInputSize]byte
 
 	// 写入 type 字段（偏移 0）。
 	*(*uint32)(unsafe.Pointer(&buf[0])) = inputKeyboard
 
-	// 写入联合体中的 KEYBDINPUT（偏移 8）。
-	*(*windowsKeybdInput)(unsafe.Pointer(&buf[8])) = kb
+	// 写入联合体中的 KEYBDINPUT（偏移 windowsInputUnionOffset）。
+	*(*windowsKeybdInput)(unsafe.Pointer(&buf[windowsInputUnionOffset])) = kb
 
 	procSendInput.Call(
 		1,
