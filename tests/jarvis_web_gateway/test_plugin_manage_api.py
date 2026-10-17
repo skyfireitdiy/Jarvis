@@ -88,13 +88,16 @@ def _make_git_plugin_repo(plugin_dir: Path, name: str, version: str = "1.0.0") -
 
 
 def test_list_plugins_empty(client):
-    """无外部插件时 list 只返回内置插件（builtin 均为 True）。"""
+    """无外部插件时 list 只返回内置插件（builtin 均为 True）。
+
+    内置插件可能为 0（如 gh 已迁移为外部插件后），因此不假设数量下限，
+    只校验返回的插件均为内置。
+    """
     resp = client.get("/api/plugins", headers=_auth_headers())
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
     plugins = body["data"]["plugins"]
-    assert len(plugins) >= 1
     assert all(p["builtin"] is True for p in plugins)
 
 
