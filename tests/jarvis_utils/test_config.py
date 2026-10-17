@@ -331,13 +331,13 @@ class TestConfigPriority:
             "/plugin/methods"
         ]
 
-    def test_plugin_mcpserver_merged_into_global_mcp(self, tmp_path):
-        """测试插件 mcpserver 扩展点被合并进全局 mcp 列表"""
-        # 创建插件，声明 mcpserver 扩展点
+    def test_plugin_mcp_merged_into_global_mcp(self, tmp_path):
+        """测试插件 mcp 扩展点被合并进全局 mcp 列表"""
+        # 创建插件，声明 mcp 扩展点
         plugin_dir = tmp_path / "plugin"
         plugin_dir.mkdir()
         plugin_config = {
-            "mcpserver": [
+            "mcp": [
                 {
                     "type": "stdio",
                     "name": "plugin-mcp",
@@ -356,19 +356,17 @@ class TestConfigPriority:
         }
         result = _load_plugin_configs(base_config)
 
-        # 插件 mcpserver 合并进全局 mcp（项目列表在前、插件列表在后）
+        # 插件 mcp 合并进全局 mcp（项目列表在前、插件列表在后）
         mcp_names = [item["name"] for item in result["mcp"]]
         assert mcp_names == ["project-mcp", "plugin-mcp"]
-        # mcpserver 不应作为独立键残留
-        assert "mcpserver" not in result
 
-    def test_multiple_plugins_mcpserver_merge(self, tmp_path):
-        """测试多个插件各自声明 mcpserver 互不冲突、全部合并"""
+    def test_multiple_plugins_mcp_merge(self, tmp_path):
+        """测试多个插件各自声明 mcp 互不冲突、全部合并"""
         plugin_dir1 = tmp_path / "plugin1"
         plugin_dir1.mkdir()
         with open(plugin_dir1 / "config.yaml", "w", encoding="utf-8") as f:
             yaml.dump(
-                {"mcpserver": [{"type": "stdio", "name": "mcp1", "command": "cmd1"}]},
+                {"mcp": [{"type": "stdio", "name": "mcp1", "command": "cmd1"}]},
                 f,
             )
 
@@ -376,7 +374,7 @@ class TestConfigPriority:
         plugin_dir2.mkdir()
         with open(plugin_dir2 / "config.yaml", "w", encoding="utf-8") as f:
             yaml.dump(
-                {"mcpserver": [{"type": "stdio", "name": "mcp2", "command": "cmd2"}]},
+                {"mcp": [{"type": "stdio", "name": "mcp2", "command": "cmd2"}]},
                 f,
             )
 

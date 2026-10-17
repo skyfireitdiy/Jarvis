@@ -1485,7 +1485,7 @@ _PLUGIN_EXTENSION_FIELDS = frozenset(
         "before_model_call_cb_dirs",
         "summary_cb_dirs",
         "replace_map",
-        "mcpserver",
+        "mcp",
         "lsp",
     }
 )
@@ -1519,7 +1519,7 @@ _PLUGIN_EXTENSION_FIELD_API_VERSION = {
     "before_model_call_cb_dirs": "1.0",
     "summary_cb_dirs": "1.0",
     "replace_map": "1.0",
-    "mcpserver": "1.0",
+    "mcp": "1.0",
     "lsp": "1.1",
 }
 
@@ -1740,9 +1740,8 @@ def _load_plugin_configs(
                 private_config: Dict[str, Any] = {}
                 for key, value in plugin_config.items():
                     if key in _PLUGIN_EXTENSION_FIELDS:
-                        # 插件扩展点 mcpserver 映射到全局 mcp 列表（get_mcp_config 消费 mcp 键）
-                        extension_key = "mcp" if key == "mcpserver" else key
-                        extension_config[extension_key] = value
+                        # 插件扩展点字段（含 mcp）直接合并进全局配置，供 getter 消费
+                        extension_config[key] = value
                     else:
                         private_config[key] = value
                 # 合并扩展点配置：后加载的插件覆盖前面的
