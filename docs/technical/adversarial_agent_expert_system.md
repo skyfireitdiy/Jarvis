@@ -398,6 +398,8 @@ agents:
 
 #### 5.6.2 对抗式Agent编排示例
 
+> **说明**：`jarvis-sec` 已从主仓库拆分为独立 PyPI 包，编排配置随代码迁移至独立仓库 `skyfireitdiy/jarvis-sec` 的 `orchestration/jsec_adversarial.yaml`，需先 `pip install jarvis-sec` 后使用。
+
 `jarvis_sec/orchestration.yaml`定义了一个完整的对抗式Agent编排配置，包含两个Agent：
 
 | Agent名称             | 类型       | 角色          | 工作模式                   |

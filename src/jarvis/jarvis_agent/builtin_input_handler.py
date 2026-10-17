@@ -1765,7 +1765,13 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             return "", True
         elif tag == "SecConfig":
             # 处理SecConfig命令，管理安全扫描配置
-            from jarvis.jarvis_sec.cli import config as sec_config
+            try:
+                from jarvis.jarvis_sec.cli import config as sec_config  # ty: ignore[unresolved-import]
+            except ImportError:
+                PrettyOutput.auto_print(
+                    "❌ 未安装 jarvis-sec，请先执行: pip install jarvis-sec"
+                )
+                return "", True
             from jarvis.jarvis_utils.input import user_confirm
 
             PrettyOutput.auto_print("🔒 安全扫描配置管理")
@@ -1852,7 +1858,13 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 return "", True
         elif tag == "SecAnalyze":
             # 处理SecAnalyze命令，从JSON分析安全问题
-            from jarvis.jarvis_sec.cli import analyze as sec_analyze
+            try:
+                from jarvis.jarvis_sec.cli import analyze as sec_analyze  # ty: ignore[unresolved-import]
+            except ImportError:
+                PrettyOutput.auto_print(
+                    "❌ 未安装 jarvis-sec，请先执行: pip install jarvis-sec"
+                )
+                return "", True
             from jarvis.jarvis_utils.input import user_confirm
 
             PrettyOutput.auto_print("📊 从JSON分析安全问题")
@@ -1895,7 +1907,13 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             return "", True
         elif tag == "SecHeuristic":
             # 处理SecHeuristic命令，启发式安全扫描
-            from jarvis.jarvis_sec.cli import heuristic as sec_heuristic
+            try:
+                from jarvis.jarvis_sec.cli import heuristic as sec_heuristic  # ty: ignore[unresolved-import]
+            except ImportError:
+                PrettyOutput.auto_print(
+                    "❌ 未安装 jarvis-sec，请先执行: pip install jarvis-sec"
+                )
+                return "", True
 
             PrettyOutput.auto_print("🔍 启发式安全扫描")
 
@@ -1933,7 +1951,13 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             return "", True
         elif tag == "SecScan":
             # 处理SecScan命令，执行安全扫描
-            from jarvis.jarvis_sec.cli import scan as sec_scan
+            try:
+                from jarvis.jarvis_sec.cli import scan as sec_scan  # ty: ignore[unresolved-import]
+            except ImportError:
+                PrettyOutput.auto_print(
+                    "❌ 未安装 jarvis-sec，请先执行: pip install jarvis-sec"
+                )
+                return "", True
 
             PrettyOutput.auto_print("🔒 执行安全扫描")
             PrettyOutput.auto_print("从配置文件读取配置，如需修改请使用 SecConfig 命令")
