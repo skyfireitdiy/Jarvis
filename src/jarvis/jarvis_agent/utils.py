@@ -2218,7 +2218,7 @@ def _build_plugin_capabilities(config: dict, plugin_dir=None) -> List[dict]:
 
     返回:
         list[dict]: 每个元素为 {type, name, description}，type 取值：
-            rules / tools / agents / orchestration / frontend / replace_map / custom / mcp
+            rules / tools / agents / orchestration / frontend / replace_map / custom / mcp / lsp
     """
     capabilities: List[dict] = []
 
@@ -2352,6 +2352,24 @@ def _build_plugin_capabilities(config: dict, plugin_dir=None) -> List[dict]:
             if desc:
                 parts.append(desc)
             _append("mcp", f"MCP：{name}", "；".join(parts))
+    # LSP 语言服务（lsp 扩展点）：插件声明的 LSP 服务器按语言注册
+    # 到全局 lsp.languages，command 会在本机启动外部语言服务器进程
+    lsp_languages = config.get("lsp", {}).get("languages")
+    if isinstance(lsp_languages, dict):
+        for lang, entry in lsp_languages.items():
+            if not isinstance(entry, dict):
+                continue
+            if not entry.get("enable", True):
+                continue
+            command = str(entry.get("command", "") or "").strip()
+            parts = [f"LSP 语言服务（{lang}）"]
+            desc = str(entry.get("description", "") or "").strip()
+            if desc:
+                parts.append(desc)
+            if command:
+                parts.append(f"命令：{command}")
+            parts.append("注意：command 会在本机执行外部程序，请确认来源可信")
+            _append("lsp", f"LSP：{lang}", "；".join(parts))
 
     return capabilities
 

@@ -1486,6 +1486,7 @@ _PLUGIN_EXTENSION_FIELDS = frozenset(
         "summary_cb_dirs",
         "replace_map",
         "mcpserver",
+        "lsp",
     }
 )
 
@@ -1519,6 +1520,7 @@ _PLUGIN_EXTENSION_FIELD_API_VERSION = {
     "summary_cb_dirs": "1.0",
     "replace_map": "1.0",
     "mcpserver": "1.0",
+    "lsp": "1.1",
 }
 
 
