@@ -2335,10 +2335,10 @@ def _build_plugin_capabilities(config: dict, plugin_dir=None) -> List[dict]:
                 f"指令 <{tag}>",
                 desc or f"输入 <{tag}> 触发对应指令模板",
             )
-    # MCP 服务（mcpserver 扩展点）：插件声明的 MCP server 注册为 MCP 工具/资源
-    mcpservers = config.get("mcpserver")
-    if isinstance(mcpservers, list):
-        for entry in mcpservers:
+    # MCP 服务（mcp 扩展点）：插件声明的 MCP server 注册为 MCP 工具/资源
+    mcp_servers = config.get("mcp")
+    if isinstance(mcp_servers, list):
+        for entry in mcp_servers:
             if not isinstance(entry, dict):
                 continue
             name = entry.get("name")

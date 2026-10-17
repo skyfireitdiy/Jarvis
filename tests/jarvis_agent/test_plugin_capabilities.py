@@ -3,7 +3,7 @@
 
 覆盖：
 - 既有字段（rules/tools/agents/orchestration/frontend/replace_map/custom）不受影响
-- Issue #257：mcpserver 扩展点声明的 MCP 服务应纳入能力清单（type=mcp）
+- Issue #257：mcp 扩展点声明的 MCP 服务应纳入能力清单（type=mcp）
 """
 
 from jarvis.jarvis_agent.utils import _build_plugin_capabilities
@@ -19,11 +19,11 @@ def test_empty_config_returns_empty_list():
     assert _build({}) == []
 
 
-def test_mcpserver_append_mcp_capability():
-    """插件声明 mcpserver 时，能力清单包含 type=mcp 的能力项。"""
+def test_mcp_append_mcp_capability():
+    """插件声明 mcp 时，能力清单包含 type=mcp 的能力项。"""
     caps = _build(
         {
-            "mcpserver": [
+            "mcp": [
                 {
                     "type": "stdio",
                     "name": "filesystem",
@@ -39,11 +39,11 @@ def test_mcpserver_append_mcp_capability():
     assert "stdio" in mcp_caps[0]["description"]
 
 
-def test_mcpserver_multiple_and_description():
+def test_mcp_multiple_and_description():
     """多个 MCP server 各自生成能力项，description 透传插件声明。"""
     caps = _build(
         {
-            "mcpserver": [
+            "mcp": [
                 {
                     "type": "sse",
                     "name": "mcp-a",
@@ -60,11 +60,11 @@ def test_mcpserver_multiple_and_description():
     assert "streamable" in mcp_caps[1]["description"]
 
 
-def test_mcpserver_disabled_skipped():
+def test_mcp_disabled_skipped():
     """enable=false 的 MCP server 不进入能力清单。"""
     caps = _build(
         {
-            "mcpserver": [
+            "mcp": [
                 {"type": "stdio", "name": "enabled", "command": "cmd"},
                 {
                     "type": "stdio",
@@ -79,9 +79,9 @@ def test_mcpserver_disabled_skipped():
     assert [c["name"] for c in mcp_caps] == ["MCP：enabled"]
 
 
-def test_mcpserver_missing_name_skipped():
+def test_mcp_missing_name_skipped():
     """缺少 name 的 MCP server 项被跳过，不崩溃。"""
-    caps = _build({"mcpserver": [{"type": "stdio", "command": "cmd"}, "not-a-dict"]})
+    caps = _build({"mcp": [{"type": "stdio", "command": "cmd"}, "not-a-dict"]})
     assert all(c["type"] != "mcp" for c in caps)
 
 
@@ -94,7 +94,7 @@ def test_existing_fields_still_work():
             "frontend": {"sidebar_views": [{"id": "s1"}]},
             "replace_map": {"greet": {"description": "打招呼"}},
             "capabilities": [{"name": "事件钩子", "description": "监听事件"}],
-            "mcpserver": [{"type": "stdio", "name": "mcp-x", "command": "cmd"}],
+            "mcp": [{"type": "stdio", "name": "mcp-x", "command": "cmd"}],
         }
     )
     types = [c["type"] for c in caps]
@@ -104,7 +104,7 @@ def test_existing_fields_still_work():
     assert "replace_map" in types
     assert "custom" in types
     assert "mcp" in types
-    # mcpserver 能力项存在
+    # mcp 能力项存在
     mcp_caps = [c for c in caps if c["type"] == "mcp"]
     assert mcp_caps[0]["name"] == "MCP：mcp-x"
 
