@@ -1615,7 +1615,13 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             return "", True
         elif tag == "C2RustConfig":
             # 处理C2RustConfig命令，管理转译配置
-            from jarvis.jarvis_c2rust.cli import config as c2rust_config
+            try:
+                from jarvis.jarvis_c2rust.cli import config as c2rust_config  # ty: ignore[unresolved-import]
+            except ImportError:
+                PrettyOutput.auto_print(
+                    "❌ 未安装 jarvis-c2rust，请先执行: pip install jarvis-c2rust"
+                )
+                return "", True
             from pathlib import Path
             from jarvis.jarvis_utils.input import user_confirm, get_multiline_input
 
@@ -1679,7 +1685,13 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 return "", True
         elif tag == "C2RustRun":
             # 处理C2RustRun命令，执行转译流水线
-            from jarvis.jarvis_c2rust.cli import run as c2rust_run
+            try:
+                from jarvis.jarvis_c2rust.cli import run as c2rust_run  # ty: ignore[unresolved-import]
+            except ImportError:
+                PrettyOutput.auto_print(
+                    "❌ 未安装 jarvis-c2rust，请先执行: pip install jarvis-c2rust"
+                )
+                return "", True
             from jarvis.jarvis_utils.input import user_confirm
 
             PrettyOutput.auto_print("🚀 C2Rust转译流水线")
@@ -1716,7 +1728,13 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             return "", True
         elif tag == "C2RustVerify":
             # 处理C2RustVerify命令，验证功能对齐
-            from jarvis.jarvis_c2rust.cli import verify as c2rust_verify
+            try:
+                from jarvis.jarvis_c2rust.cli import verify as c2rust_verify  # ty: ignore[unresolved-import]
+            except ImportError:
+                PrettyOutput.auto_print(
+                    "❌ 未安装 jarvis-c2rust，请先执行: pip install jarvis-c2rust"
+                )
+                return "", True
             from jarvis.jarvis_utils.input import user_confirm
 
             PrettyOutput.auto_print("🔍 C2Rust功能验证")

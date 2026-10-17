@@ -22,7 +22,7 @@
 | 模块                    | 文件数 | 代码行数 | 职责              |
 | ----------------------- | ------ | -------- | ----------------- |
 | jarvis_agent            | 51     | 19,131   | 主 Agent 核心逻辑 |
-| jarvis_c2rust           | 52     | 18,658   | C→Rust 迁移流水线 |
+| jarvis_c2rust           | 52     | 18,658   | C→Rust 迁移流水线（已拆分为独立包 `jarvis-c2rust`） |
 | jarvis_code_agent       | 59     | 16,868   | 代码 Agent        |
 | jarvis_tools            | 27     | 15,652   | 工具集            |
 | jarvis_utils            | 23     | 15,292   | 通用工具库        |
@@ -157,7 +157,7 @@ jarvis_web_gateway → jarvis_service（反向依赖）
 | ----------------- | ------------- | --------------------- |
 | jarvis_agent      | 主 Agent 核心 | 拆分 `__init__.py`    |
 | jarvis_code_agent | 代码 Agent    | 保持独立              |
-| jarvis_c2rust     | C→Rust 迁移   | 保持独立              |
+| jarvis_c2rust     | C→Rust 迁移   | 已拆分为独立包 `jarvis-c2rust` |
 | jarvis_sec        | 安全扫描      | 拆分超大 checker 文件 |
 | jarvis_lsp        | LSP 语言服务  | 保持独立              |
 | jarvis_browser    | 浏览器自动化  | 保持独立              |
@@ -317,7 +317,7 @@ git reset --hard 5c366bc7d2423597fdc85c214a962260120179df
 jarvis_agent ←→ jarvis_tools
 jarvis_agent ←→ jarvis_code_agent
 jarvis_agent ←→ jarvis_sec
-jarvis_agent ←→ jarvis_c2rust
+jarvis_agent ←→ jarvis_c2rust（已拆分为独立包 `jarvis-c2rust`）
 jarvis_utils ←→ jarvis_platform
 jarvis_web_gateway → jarvis_service
 jarvis_web_gateway → jarvis_gateway
@@ -336,7 +336,7 @@ jarvis_tools → jarvis_code_agent
 应用层：
   jarvis_agent → jarvis_tools → jarvis_core
   jarvis_code_agent → jarvis_tools → jarvis_core
-  jarvis_c2rust → jarvis_agent → jarvis_tools → jarvis_core
+  jarvis_c2rust → jarvis_agent → jarvis_tools → jarvis_core（已拆分为独立包 `jarvis-c2rust`）
   jarvis_sec → jarvis_tools → jarvis_core
   jarvis_lsp → jarvis_core
   jarvis_browser → jarvis_core
