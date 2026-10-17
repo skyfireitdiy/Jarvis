@@ -67,6 +67,14 @@ orchestration:
 #     - id: my-tool
 #       title: "我的工具"
 #       entry: tool.js
+# --- LSP 语言服务扩展点（可选，按语言合并进全局 lsp.languages）---
+# lsp:
+#   languages:
+#     python:
+#       command: "pyright-langserver"
+#       args: ["--stdio"]
+#       file_extensions: [".py"]
+#       root_markers: ["pyproject.toml", "setup.py"]
 # --- 依赖声明（可选，三类：plugins/python/commands）---
 # dependencies:
 #   plugins:
@@ -88,8 +96,8 @@ orchestration:
 - `{% raw %}{{plugin_dir}}{% endraw %}` 是 jinja2 模板变量，运行时被渲染为插件目录绝对路径（见 `render_plugin_config_template`），**勿**写死绝对路径。
 - `orchestration` 每项含 `name`/`description`/`file`，file 路径含 `plugins/<name>/` 时自动反推来源插件名。
 - `capabilities` 顶层字段用于声明事件钩子、@内置命令等自定义能力，与自动推导的能力（rules/tools/agents/orchestration/frontend）合并展示。
-- 插件 config 会被 `_load_plugin_configs` 读取、渲染并 `_deep_merge` 进全局配置，因此 `rules_load_dirs`/`tool_load_dirs`/`replace_map` 等字段会被 `get_rules_load_dirs()`/`get_tool_load_dirs()`/`get_replace_map()` 等消费。
-- **私有配置隔离**：插件 config.yaml 中**除扩展点字段**（`tool_load_dirs`/`rules_load_dirs`/`agent_definition_dirs`/`orchestration`/`roles_dirs`/`before_tool_call_cb_dirs`/`after_tool_call_cb_dirs`/`before_model_call_cb_dirs`/`summary_cb_dirs`/`builtin_input_handler_dirs`/`replace_map`）外的其余字段（`name`/`description`/`version`/`builtin`/`license`/`dependencies`/`capabilities`/`frontend`/自定义业务字段）会被隔离到全局配置的 `plugin_configs.<plugin_name>` 单独配置项，**不污染全局配置顶层、多个插件同名私有字段互不覆盖**。插件可通过 `get_plugin_config(plugin_name)` / `get_all_plugin_configs()`（`jarvis.jarvis_utils.config`）读取自己的私有配置。
+- 插件 config 会被 `_load_plugin_configs` 读取、渲染并 `_deep_merge` 进全局配置，因此 `rules_load_dirs`/`tool_load_dirs`/`replace_map`/`lsp` 等字段会被 `get_rules_load_dirs()`/`get_tool_load_dirs()`/`get_replace_map()`/`get_lsp_config()` 等消费。
+- **私有配置隔离**：插件 config.yaml 中**除扩展点字段**（`tool_load_dirs`/`rules_load_dirs`/`agent_definition_dirs`/`orchestration`/`roles_dirs`/`before_tool_call_cb_dirs`/`after_tool_call_cb_dirs`/`before_model_call_cb_dirs`/`summary_cb_dirs`/`builtin_input_handler_dirs`/`replace_map`/`mcpserver`/`lsp`）外的其余字段（`name`/`description`/`version`/`builtin`/`license`/`dependencies`/`capabilities`/`frontend`/自定义业务字段）会被隔离到全局配置的 `plugin_configs.<plugin_name>` 单独配置项，**不污染全局配置顶层、多个插件同名私有字段互不覆盖**。插件可通过 `get_plugin_config(plugin_name)` / `get_all_plugin_configs()`（`jarvis.jarvis_utils.config`）读取自己的私有配置。
 
 ## 扩展点开发规范
 
@@ -179,6 +187,24 @@ YAML 编排流水线，配合 `OrganizeAgents` 与 `jca -n --task-file` 消费�
 
 前端通过 `GET /api/plugins/{node_id}/{name}/frontend/{path}` 动态加载插件 JS（后端返回 JSON 包裹的 content），用 Blob URL `import()` 加载为 Vue 组件。插件 JS 应**单文件自包含**（不引用相对路径资源），否则 Blob module 无法解析。
 
+### 7. LSP 语言服务（lsp/，可选）
+
+插件可在 config.yaml 声明 `lsp.languages`，为指定语言注册 LSP 服务器。声明会按语言名**深度合并**进全局 `lsp.languages`（与用户手动写全局 `~/.jarvis/config.yaml` 等效），插件安装后免重启生效、卸载后自动撤销。
+
+```yaml
+lsp:
+  languages:
+    python:
+      command: "pyright-langserver"
+      args: ["--stdio"]
+      file_extensions: [".py"]
+      root_markers: ["pyproject.toml", "setup.py"]
+```
+
+- `command` 必填，其余字段可选；`enable: false` 可禁用该语言服务。
+- **合并语义**：多插件声明同一语言时按语言名深度合并（`file_extensions`/`args`/`root_markers` 等列表字段追加合并），不同语言互不覆盖；优先级为「项目配置 > 后加载插件 > 前加载插件 > 内置默认」。
+- **⚠️ 安全提示**：`command` 会在本机启动外部语言服务器进程（与 `mcpserver` 的 `command` 同级别）。安装插件前请确认插件来源可信、`command` 指向预期程序。
+
 ## 开发流程
 
 1. **生成脚手架**：`jarvis --new-plugin <name>`（可加 `--plugin-output-dir <dir>`），生成符合加载约定的完整骨架（config.yaml/README/rules/tools/agents/orchestration/frontend）。
@@ -266,6 +292,7 @@ config.yaml 的 `dependencies` 字段支持三类（见 `_check_dependencies`）
 - [ ] 工具类 `name` 等于文件名 stem，实现 `check()` 与 `execute()`
 - [ ] 规则文件带 YAML front matter（name/description）
 - [ ] 前端 JS 用 `window.Vue`，未 `import 'vue'`，单文件自包含
+- [ ] LSP 声明 `command` 必填，确认来源可信（command 会执行外部程序）
 - [ ] 依赖声明格式正确（plugins/python/commands）
 - [ ] `py_compile` 通过，config.yaml 可解析
 - [ ] 安装成功：`jarvis --install-plugin <path>`
@@ -279,5 +306,6 @@ config.yaml 的 `dependencies` 字段支持三类（见 `_check_dependencies`）
 - 插件 config 合并：`src/jarvis/jarvis_utils/utils.py`（`_load_plugin_configs`）
 - 模板渲染：`src/jarvis/jarvis_utils/template_utils.py`（`render_plugin_config_template`）
 - 扩展点目录读取：`src/jarvis/jarvis_utils/config.py`（`get_tool_load_dirs`/`get_rules_load_dirs`/`get_agent_definition_dirs`/`get_plugin_orchestrations`）
+- LSP 配置读取：`src/jarvis/jarvis_lsp/config.py`（`LSPConfigReader`，读取全局 `lsp.languages`）
 - 前端扩展加载：`src/jarvis/jarvis_service/frontend/src/pluginExtensions.js`
 - CLI 命令：`src/jarvis/jarvis_agent/jarvis.py`

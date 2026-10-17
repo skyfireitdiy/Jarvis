@@ -269,3 +269,99 @@ def test_reload_no_duplicate_accumulation(client, isolated_data_dir, loaded_conf
     assert reload_plugin_configs() is True
     second = [p for p in get_tool_load_dirs() if "dup-plugin" in p]
     assert len(second) == 1, f"重复重载导致累积: {second}"
+
+
+def test_install_plugin_lsp_takes_effect_without_restart(
+    client, isolated_data_dir, loaded_config
+):
+    """安装声明 lsp 扩展点的插件后，全局 lsp.languages 立即生效（免重启）。"""
+    from jarvis.jarvis_utils.config import get_global_config_data
+
+    data_dir = Path(isolated_data_dir)
+    source = _make_git_plugin_repo(
+        data_dir / "src-lsp", "lsp-plugin", "1.0.0", tool_dirs=None
+    )
+    # 给插件 config.yaml 加 lsp 扩展点
+    import yaml
+
+    cfg_path = source / "config.yaml"
+    cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    cfg["lsp"] = {
+        "languages": {
+            "python": {
+                "command": "pyright-langserver",
+                "args": ["--stdio"],
+                "file_extensions": [".py"],
+            }
+        }
+    }
+    cfg_path.write_text(yaml.safe_dump(cfg), encoding="utf-8")
+    git_env = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "t",
+        "GIT_AUTHOR_EMAIL": "t@t",
+        "GIT_COMMITTER_NAME": "t",
+        "GIT_COMMITTER_EMAIL": "t@t",
+    }
+    import subprocess
+
+    subprocess.run(
+        ["git", "add", "-A"], cwd=str(source), capture_output=True, text=True, env=git_env
+    )
+    subprocess.run(
+        ["git", "commit", "-q", "-m", "add lsp"],
+        cwd=str(source),
+        capture_output=True,
+        text=True,
+        env=git_env,
+    )
+
+    # 安装前全局 lsp.languages 不含该插件语言
+    assert "python" not in (get_global_config_data().get("lsp") or {}).get(
+        "languages", {}
+    )
+
+    resp = _install(client, f"file://{source}")
+    assert resp.status_code == 200
+    assert resp.json()["success"] is True
+
+    # 免重启：全局 lsp.languages 立即包含插件声明的语言
+    languages = (get_global_config_data().get("lsp") or {}).get("languages", {})
+    assert "python" in languages
+    assert languages["python"]["command"] == "pyright-langserver"
+
+
+def test_uninstall_plugin_lsp_reversible_without_restart(
+    client, isolated_data_dir, loaded_config
+):
+    """卸载声明 lsp 扩展点的插件后，其语言项自动撤销（可逆效应，免重启）。"""
+    from jarvis.jarvis_utils.config import get_global_config_data
+    from jarvis.jarvis_utils.utils import reload_plugin_configs
+
+    data_dir = Path(isolated_data_dir)
+    plugins_dir = data_dir / "plugins"
+    plugin_dir = plugins_dir / "lsp-remove"
+    _make_plugin(plugin_dir, "lsp-remove", "1.0.0", tool_dirs=None)
+    import yaml
+
+    cfg_path = plugin_dir / "config.yaml"
+    cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    cfg["lsp"] = {
+        "languages": {
+            "go": {"command": "gopls", "file_extensions": [".go"]}
+        }
+    }
+    cfg_path.write_text(yaml.safe_dump(cfg), encoding="utf-8")
+
+    # 手动重载一次，模拟该插件已生效
+    assert reload_plugin_configs() is True
+    languages = (get_global_config_data().get("lsp") or {}).get("languages", {})
+    assert "go" in languages
+
+    resp = _uninstall(client, "lsp-remove")
+    assert resp.status_code == 200
+    assert resp.json()["success"] is True
+
+    # 免重启：插件声明的语言项被撤销
+    languages = (get_global_config_data().get("lsp") or {}).get("languages", {})
+    assert "go" not in languages

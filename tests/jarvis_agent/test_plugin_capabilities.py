@@ -107,3 +107,71 @@ def test_existing_fields_still_work():
     # mcpserver 能力项存在
     mcp_caps = [c for c in caps if c["type"] == "mcp"]
     assert mcp_caps[0]["name"] == "MCP：mcp-x"
+
+
+def test_lsp_append_lsp_capability():
+    """插件声明 lsp.languages 时，能力清单包含 type=lsp 的能力项。"""
+    caps = _build(
+        {
+            "lsp": {
+                "languages": {
+                    "python": {
+                        "command": "pyright-langserver",
+                        "args": ["--stdio"],
+                        "file_extensions": [".py"],
+                    }
+                }
+            }
+        }
+    )
+    lsp_caps = [c for c in caps if c["type"] == "lsp"]
+    assert len(lsp_caps) == 1
+    assert lsp_caps[0]["name"] == "LSP：python"
+    assert "pyright-langserver" in lsp_caps[0]["description"]
+    # 安全提示：command 会执行外部程序
+    assert "外部程序" in lsp_caps[0]["description"]
+
+
+def test_lsp_multiple_languages_and_description():
+    """多个语言各自生成能力项，description 透传插件声明。"""
+    caps = _build(
+        {
+            "lsp": {
+                "languages": {
+                    "python": {
+                        "command": "pyright-langserver",
+                        "description": "Python 语言服务",
+                    },
+                    "rust": {"command": "rust-analyzer"},
+                }
+            }
+        }
+    )
+    lsp_caps = [c for c in caps if c["type"] == "lsp"]
+    assert [c["name"] for c in lsp_caps] == ["LSP：python", "LSP：rust"]
+    assert "Python 语言服务" in lsp_caps[0]["description"]
+
+
+def test_lsp_disabled_skipped():
+    """enable=false 的语言服务不进入能力清单。"""
+    caps = _build(
+        {
+            "lsp": {
+                "languages": {
+                    "python": {"command": "pyright-langserver"},
+                    "rust": {"command": "rust-analyzer", "enable": False},
+                }
+            }
+        }
+    )
+    lsp_caps = [c for c in caps if c["type"] == "lsp"]
+    assert [c["name"] for c in lsp_caps] == ["LSP：python"]
+
+
+def test_lsp_missing_command_still_shown():
+    """缺少 command 的语言项仍展示（含安全提示），不崩溃。"""
+    caps = _build({"lsp": {"languages": {"python": {"description": "无命令"}}}})
+    lsp_caps = [c for c in caps if c["type"] == "lsp"]
+    assert len(lsp_caps) == 1
+    assert "无命令" in lsp_caps[0]["description"]
+    assert "外部程序" in lsp_caps[0]["description"]

@@ -387,6 +387,126 @@ class TestConfigPriority:
         mcp_names = [item["name"] for item in result["mcp"]]
         assert mcp_names == ["mcp2", "mcp1"]
 
+    def test_plugin_lsp_merged_into_global_languages(self, tmp_path):
+        """测试插件 lsp 扩展点按语言深度合并进全局 lsp.languages"""
+        plugin_dir = tmp_path / "plugin"
+        plugin_dir.mkdir()
+        plugin_config = {
+            "lsp": {
+                "languages": {
+                    "python": {
+                        "command": "pyright-langserver",
+                        "args": ["--stdio"],
+                        "file_extensions": [".py"],
+                    }
+                }
+            }
+        }
+        with open(plugin_dir / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump(plugin_config, f)
+
+        # 项目配置本身有 lsp.languages（含另一语言）
+        base_config = {
+            "lsp": {
+                "languages": {
+                    "go": {"command": "gopls", "file_extensions": [".go"]}
+                }
+            },
+            "plugin_dirs": [str(plugin_dir)],
+        }
+        result = _load_plugin_configs(base_config)
+
+        # 插件 python 语言合并进全局，项目 go 语言保留
+        assert result["lsp"]["languages"]["go"]["command"] == "gopls"
+        assert (
+            result["lsp"]["languages"]["python"]["command"]
+            == "pyright-langserver"
+        )
+        assert result["lsp"]["languages"]["python"]["args"] == ["--stdio"]
+        assert result["lsp"]["languages"]["python"]["file_extensions"] == [".py"]
+
+    def test_multiple_plugins_lsp_different_languages(self, tmp_path):
+        """测试多个插件声明不同语言互不覆盖、全部合并"""
+        plugin_dir1 = tmp_path / "plugin1"
+        plugin_dir1.mkdir()
+        with open(plugin_dir1 / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump(
+                {
+                    "lsp": {
+                        "languages": {
+                            "python": {"command": "pyright-langserver"}
+                        }
+                    }
+                },
+                f,
+            )
+
+        plugin_dir2 = tmp_path / "plugin2"
+        plugin_dir2.mkdir()
+        with open(plugin_dir2 / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump(
+                {
+                    "lsp": {
+                        "languages": {
+                            "rust": {"command": "rust-analyzer"}
+                        }
+                    }
+                },
+                f,
+            )
+
+        base_config = {"plugin_dirs": [str(plugin_dir1), str(plugin_dir2)]}
+        result = _load_plugin_configs(base_config)
+
+        languages = result["lsp"]["languages"]
+        assert languages["python"]["command"] == "pyright-langserver"
+        assert languages["rust"]["command"] == "rust-analyzer"
+
+    def test_multiple_plugins_lsp_same_language_merge(self, tmp_path):
+        """测试多个插件声明同一语言时按语言深度合并、列表字段追加"""
+        plugin_dir1 = tmp_path / "plugin1"
+        plugin_dir1.mkdir()
+        with open(plugin_dir1 / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump(
+                {
+                    "lsp": {
+                        "languages": {
+                            "python": {
+                                "command": "pyright-langserver",
+                                "file_extensions": [".py"],
+                            }
+                        }
+                    }
+                },
+                f,
+            )
+
+        plugin_dir2 = tmp_path / "plugin2"
+        plugin_dir2.mkdir()
+        with open(plugin_dir2 / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump(
+                {
+                    "lsp": {
+                        "languages": {
+                            "python": {
+                                "command": "pylsp",
+                                "root_markers": ["pyproject.toml"],
+                            }
+                        }
+                    }
+                },
+                f,
+            )
+
+        base_config = {"plugin_dirs": [str(plugin_dir1), str(plugin_dir2)]}
+        result = _load_plugin_configs(base_config)
+
+        # 后加载插件（plugin2）的 command 覆盖前者；列表字段追加合并
+        python_lang = result["lsp"]["languages"]["python"]
+        assert python_lang["command"] == "pylsp"
+        assert python_lang["file_extensions"] == [".py"]
+        assert python_lang["root_markers"] == ["pyproject.toml"]
+
     def test_is_api_version_compatible(self):
         """测试接口版本兼容性判断"""
         # 兼容：声明版本 <= 当前支持版本
