@@ -80,12 +80,6 @@ setup(
         "psutil>=5.9.0",
     ],
     extras_require={
-        "clang16": ["clang==16.*"],
-        "clang17": ["clang==17.*"],
-        "clang18": ["clang==18.*"],
-        "clang19": ["clang==19.*"],
-        "clang20": ["clang==20.*"],
-        "clang21": ["clang==21.*"],
         "tree-sitter-python": [
             "tree-sitter==0.25.2; platform_machine != 'armv6l' and platform_machine != 'armv7l' and platform_machine != 'armv8l' and platform_machine != 'armhf'",
             "tree-sitter-python==0.25.0; platform_machine != 'armv6l' and platform_machine != 'armv7l' and platform_machine != 'armv8l' and platform_machine != 'armhf'",
@@ -203,8 +197,6 @@ setup(
             "jm=jarvis.jarvis_methodology.main:main",
             "jarvis-sec=jarvis.jarvis_sec.cli:main",
             "jsec=jarvis.jarvis_sec.cli:main",
-            "jarvis-c2rust=jarvis.jarvis_c2rust.cli:main",
-            "jc2r=jarvis.jarvis_c2rust.cli:main",
             "jarvis-config=jarvis.jarvis_config.cli:app",
             "jcfg=jarvis.jarvis_config.cli:app",
             "jarvis-lsp=jarvis.jarvis_lsp.cli:app",

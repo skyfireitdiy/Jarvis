@@ -90,12 +90,6 @@ dependencies = [
 
     [project.optional-dependencies]
     browser = ["playwright==1.48.0; platform_machine != 'armv6l' and platform_machine != 'armv7l' and platform_machine != 'armv8l' and platform_machine != 'armhf'"]
-    clang16 = ["clang==16.*"]
-    clang17 = ["clang==17.*"]
-    clang18 = ["clang==18.*"]
-    clang19 = ["clang==19.*"]
-    clang20 = ["clang==20.*"]
-    clang21 = ["clang==21.*"]
     tree-sitter-python = ["tree-sitter", "tree-sitter-python"]
     # OCR 重型后端（可选）：默认不装，按需选择
     # rapidocr 为纯 Python 实现（会拉入 opencv，约 70MB），无需系统依赖，推荐
@@ -197,8 +191,6 @@ dependencies = [
     jm = "jarvis.jarvis_methodology.main:main"
     jarvis-sec = "jarvis.jarvis_sec.cli:main"
     jsec = "jarvis.jarvis_sec.cli:main"
-    jarvis-c2rust = "jarvis.jarvis_c2rust.cli:main"
-    jc2r = "jarvis.jarvis_c2rust.cli:main"
     jarvis-config = "jarvis.jarvis_config.cli:app"
     jcfg = "jarvis.jarvis_config.cli:app"
     jarvis-lsp = "jarvis.jarvis_lsp.cli:app"
