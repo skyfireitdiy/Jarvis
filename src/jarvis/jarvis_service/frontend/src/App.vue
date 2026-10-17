@@ -2411,7 +2411,7 @@ try {
   /* ignore */
 }
 
-// 暴露「打开创建 Agent 弹窗（带预填参数）」的钩子给插件前端扩展（如 gh/autoworker 插件）。
+// 暴露「打开创建 Agent 弹窗（带预填参数）」的钩子给插件前端扩展（如 gh 插件）。
 // 复用宿主已有的 CreateAgentModal 弹窗，把 prefill 预填进去，让用户确认/编辑后再提交。
 // 返回 Promise<{ confirmed: boolean, agent?: object }>：
 // 用户点「创建」成功 → { confirmed: true, agent }；取消/关闭 → { confirmed: false }。
@@ -2460,7 +2460,7 @@ try {
   /* ignore */
 }
 
-// 暴露「选择目录（含节点）」的钩子给插件前端扩展（如 autoworker 需同时拿到节点与目录）。
+// 暴露「选择目录（含节点）」的钩子给插件前端扩展（需同时拿到节点与目录）。
 // 复用宿主「打开目录」弹窗；用户确认后返回 { path, nodeId }，取消则返回 null。
 // 返回 Promise<{ path: string, nodeId: string } | null>。
 try {
