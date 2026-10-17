@@ -27,7 +27,7 @@
 | jarvis_tools            | 27     | 15,652   | 工具集            |
 | jarvis_utils            | 23     | 15,292   | 通用工具库        |
 | jarvis_web_gateway      | 21     | 14,313   | Web 网关          |
-| jarvis_sec              | 23     | 27,734   | 安全扫描          |
+| jarvis_sec              | 23     | 27,734   | 安全扫描（已拆分为独立包 `jarvis-sec`） |
 | jarvis_lsp              | 8      | 6,302    | LSP 语言服务      |
 | jarvis_browser          | 2      | 3,855    | 浏览器自动化      |
 | jarvis_platform         | 7      | 2,515    | AI 平台适配       |
@@ -70,9 +70,9 @@ jarvis_web_gateway → jarvis_service（反向依赖）
 
 | 文件                                | 行数  | 问题                             |
 | ----------------------------------- | ----- | -------------------------------- |
-| jarvis_sec/checkers/c_checker.py    | 9,453 | 单文件承担全部 C 安全检查逻辑    |
+| jarvis_sec/checkers/c_checker.py    | 9,453 | 单文件承担全部 C 安全检查逻辑（已拆分为独立包 `jarvis-sec`）    |
 | jarvis_web_gateway/app.py           | 7,357 | 所有路由集中在一个文件           |
-| jarvis_sec/checkers/rust_checker.py | 3,908 | 单文件承担全部 Rust 安全检查逻辑 |
+| jarvis_sec/checkers/rust_checker.py | 3,908 | 单文件承担全部 Rust 安全检查逻辑（已拆分为独立包 `jarvis-sec`） |
 | jarvis_browser/cli.py               | 3,850 | CLI 入口与业务逻辑混合           |
 | jarvis_agent/`__init__.py`          | 3,444 | 模块初始化文件承担过多职责       |
 
@@ -158,7 +158,7 @@ jarvis_web_gateway → jarvis_service（反向依赖）
 | jarvis_agent      | 主 Agent 核心 | 拆分 `__init__.py`    |
 | jarvis_code_agent | 代码 Agent    | 保持独立              |
 | jarvis_c2rust     | C→Rust 迁移   | 已拆分为独立包 `jarvis-c2rust` |
-| jarvis_sec        | 安全扫描      | 拆分超大 checker 文件 |
+| jarvis_sec        | 安全扫描      | 已拆分为独立包 `jarvis-sec` |
 | jarvis_lsp        | LSP 语言服务  | 保持独立              |
 | jarvis_browser    | 浏览器自动化  | 保持独立              |
 
@@ -259,7 +259,7 @@ jarvis_web_gateway → jarvis_service（反向依赖）
 
 1. 为 jarvis_tools 补充单元测试
 2. 为 jarvis_web_gateway 补充集成测试
-3. 为 jarvis_sec 补充安全检查器测试
+3. 为 jarvis_sec 补充安全检查器测试（已拆分为独立包 `jarvis-sec`，测试随独立仓库迁移）
 4. 建立 CI 覆盖率门槛（核心模块 ≥ 80%）
 
 **验收标准**：
@@ -316,7 +316,7 @@ git reset --hard 5c366bc7d2423597fdc85c214a962260120179df
 ```text
 jarvis_agent ←→ jarvis_tools
 jarvis_agent ←→ jarvis_code_agent
-jarvis_agent ←→ jarvis_sec
+jarvis_agent ←→ jarvis_sec（已拆分为独立包 `jarvis-sec`）
 jarvis_agent ←→ jarvis_c2rust（已拆分为独立包 `jarvis-c2rust`）
 jarvis_utils ←→ jarvis_platform
 jarvis_web_gateway → jarvis_service
@@ -337,7 +337,7 @@ jarvis_tools → jarvis_code_agent
   jarvis_agent → jarvis_tools → jarvis_core
   jarvis_code_agent → jarvis_tools → jarvis_core
   jarvis_c2rust → jarvis_agent → jarvis_tools → jarvis_core（已拆分为独立包 `jarvis-c2rust`）
-  jarvis_sec → jarvis_tools → jarvis_core
+  jarvis_sec → jarvis_tools → jarvis_core（已拆分为独立包 `jarvis-sec`）
   jarvis_lsp → jarvis_core
   jarvis_browser → jarvis_core
 
@@ -358,9 +358,9 @@ jarvis_tools → jarvis_code_agent
 
 | 文件                                | 当前行数 | 目标行数    | 拆分方案           |
 | ----------------------------------- | -------- | ----------- | ------------------ |
-| jarvis_sec/checkers/c_checker.py    | 9,453    | < 1,500 × 7 | 按检查类型拆分     |
+| jarvis_sec/checkers/c_checker.py    | 9,453    | < 1,500 × 7 | 按检查类型拆分（已拆分为独立包 `jarvis-sec`）     |
 | jarvis_web_gateway/app.py           | 7,357    | < 1,500 × 5 | 按路由类型拆分     |
-| jarvis_sec/checkers/rust_checker.py | 3,908    | < 1,500 × 3 | 按检查类型拆分     |
+| jarvis_sec/checkers/rust_checker.py | 3,908    | < 1,500 × 3 | 按检查类型拆分（已拆分为独立包 `jarvis-sec`）     |
 | jarvis_browser/cli.py               | 3,850    | < 1,500 × 3 | CLI 与业务逻辑分离 |
 | jarvis_agent/`__init__.py`          | 3,444    | < 1,500 × 3 | 按职责拆分         |
 | jarvis_tools/task_list_manager.py   | 2,671    | < 1,500 × 2 | 按功能拆分         |

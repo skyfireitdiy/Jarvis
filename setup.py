@@ -195,8 +195,6 @@ setup(
             "jmo=jarvis.jarvis_memory_organizer.memory_organizer:main",
             "jarvis-methodology=jarvis.jarvis_methodology.main:main",
             "jm=jarvis.jarvis_methodology.main:main",
-            "jarvis-sec=jarvis.jarvis_sec.cli:main",
-            "jsec=jarvis.jarvis_sec.cli:main",
             "jarvis-config=jarvis.jarvis_config.cli:app",
             "jcfg=jarvis.jarvis_config.cli:app",
             "jarvis-lsp=jarvis.jarvis_lsp.cli:app",
