@@ -50,8 +50,10 @@ gh 插件的功能逻辑（列 PR、列 Issue、查看、合并、评论、关�
 - **私有功能层**（`plugin/`）：纯函数实现，运行在 gateway，供前端侧边栏代理调用（不暴露给 Agent）。
 - **Agent 侧**：不再提供 `tools/` 工具类。因为 code_agent 的工具白名单自带 `execute_script`，可直接调用 GitHub 官方 `gh` CLI 完成全部 GitHub 操作，无需额外工具。
 
+> gh 插件已从核心内置插件迁移为独立第三方插件（[skyfireitdiy/jarvis-plugin-gh](https://github.com/skyfireitdiy/jarvis-plugin-gh)），按需从插件市场安装。以下目录结构为迁移前内置形态的示意，迁移后结构不变、仅 `builtin: true` 移除。
+
 ```text
-builtin/plugins/gh/
+jarvis-plugin-gh/
 ├── config.yaml          # 声明 rules_load_dirs + frontend（无 tool_load_dirs）
 ├── plugin/              # 插件私有功能（不暴露给 Agent，gateway 前端代理调用）
 │   ├── api.py           # 纯函数：list_issues / list_prs / get_issue / get_pr
