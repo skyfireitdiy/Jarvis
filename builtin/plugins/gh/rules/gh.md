@@ -104,6 +104,7 @@ gh 插件默认处理**当前工作目录对应的仓库**（读取 git remote o
 
 - **评论前**：向用户确认评论内容与措辞，确认发布到正确的 issue 编号后再 `gh issue comment <number> --body "..."` / `gitee issue comment <number> -R owner/repo -b "..."`。评论末尾**必须**附加「评论标识」章节定义的固定"自动处理"标识。
 - **关闭前**：关闭是**不可逆**操作。必须向用户确认"是否关闭 issue #N"，得到明确同意后再 `gh issue close <number>` / `gitee issue close <number> -R owner/repo`。不要因 issue 看起来已解决就擅自关闭。
+- **涉及代码修改的 issue，必须通过 PR 关闭**：若处理该 issue 涉及代码/文档改动，**不得直接向 `main` 提交后手动关闭 issue**，而应走「代码改动走 PR」流程（见下），在 PR 描述中用 `Closes #<编号>` 关联该 issue，**合并 PR 后由 GitHub/Gitee 自动关闭 issue**。仅在改动不涉及代码（纯读操作、评论、答疑等）时，才允许手动 `gh issue close`。
 
 ### 4. 收尾
 
