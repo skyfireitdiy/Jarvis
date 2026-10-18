@@ -215,6 +215,14 @@
       },
       "default": []
     },
+    "platforms": {
+      "type": "array",
+      "description": "插件模型供应商扩展点：插件声明的平台实现目录（目录内为 BasePlatform 子类），安装后自动注册到 PlatformRegistry",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
     "after_tool_call_cb_dirs": {
       "type": "array",
       "description": "工具调用后回调函数实现目录",

@@ -34,8 +34,10 @@ class PluginRegistry:
         self._plugin_rules: Dict[str, Set[str]] = {}
         # 插件名 -> 是否应用于 code_agent（由插件 config 的 code_agent_tools 字段声明）
         self._plugin_code_agent_tools: Dict[str, bool] = {}
+        self._plugin_platforms: Dict[str, Set[str]] = {}
         self._tool_revoker: Optional[Callable[[str], int]] = None
         self._rules_revoker: Optional[Callable[[str], int]] = None
+        self._platform_revoker: Optional[Callable[[str], int]] = None
 
     @classmethod
     def instance(cls) -> "PluginRegistry":
@@ -61,6 +63,13 @@ class PluginRegistry:
         """
         self._rules_revoker = revoker
 
+    def set_platform_revoker(self, revoker: Optional[Callable[[str], int]]) -> None:
+        """注册/清除全局平台撤销器（由 PlatformRegistry 实例注册）。
+
+        撤销器签名：revoker(plugin_name) -> 被撤销的平台数量。
+        """
+        self._platform_revoker = revoker
+
     # ------------------------------------------------------------------
     # 登记
     # ------------------------------------------------------------------
@@ -84,6 +93,16 @@ class PluginRegistry:
             return
         self._plugin_rules.setdefault(plugin_name, set()).update(rule_names)
 
+    def register_platform(self, plugin_name: str, platform_name: str) -> None:
+        """登记插件注册的单个平台。"""
+        self._plugin_platforms.setdefault(plugin_name, set()).add(platform_name)
+
+    def register_platforms(self, plugin_name: str, platform_names: List[str]) -> None:
+        """登记插件注册的一批平台。"""
+        if not platform_names:
+            return
+        self._plugin_platforms.setdefault(plugin_name, set()).update(platform_names)
+
     # ------------------------------------------------------------------
     # 查询
     # ------------------------------------------------------------------
@@ -95,9 +114,17 @@ class PluginRegistry:
         """返回插件注册的规则名列表。"""
         return sorted(self._plugin_rules.get(plugin_name, set()))
 
+    def get_plugin_platforms(self, plugin_name: str) -> List[str]:
+        """返回插件注册的平台名列表。"""
+        return sorted(self._plugin_platforms.get(plugin_name, set()))
+
     def registered_plugins(self) -> List[str]:
         """返回已登记资源的插件名列表。"""
-        return sorted(set(self._plugin_tools.keys()) | set(self._plugin_rules.keys()))
+        return sorted(
+            set(self._plugin_tools.keys())
+            | set(self._plugin_rules.keys())
+            | set(self._plugin_platforms.keys())
+        )
 
     # ------------------------------------------------------------------
     # code_agent 适用性登记
@@ -126,12 +153,14 @@ class PluginRegistry:
         """撤销指定插件注册的全部资源，并返回被撤销的内容。
 
         返回:
-            {"tools": [...], "rules": [...]}：该插件登记的工具名与规则名。
-            调用方需据此实际执行卸载（从 ToolRegistry / RulesManager 移除）。
+            {"tools": [...], "rules": [...], "platforms": [...]}：该插件登记的
+            工具名、规则名与平台名。调用方需据此实际执行卸载（从 ToolRegistry /
+            RulesManager / PlatformRegistry 移除）。
         """
         tools = list(self._plugin_tools.pop(plugin_name, set()))
         rules = list(self._plugin_rules.pop(plugin_name, set()))
-        return {"tools": tools, "rules": rules}
+        platforms = list(self._plugin_platforms.pop(plugin_name, set()))
+        return {"tools": tools, "rules": rules, "platforms": platforms}
 
     def clear_tools(self, plugin_name: str) -> None:
         """仅清理指定插件的工具登记（不影响规则登记）。"""
@@ -141,19 +170,26 @@ class PluginRegistry:
         """仅清理指定插件的规则登记（不影响工具登记）。"""
         self._plugin_rules.pop(plugin_name, None)
 
+    def clear_platforms(self, plugin_name: str) -> None:
+        """仅清理指定插件的平台登记（不影响工具/规则登记）。"""
+        self._plugin_platforms.pop(plugin_name, None)
+
     def revoke_plugin(self, plugin_name: str) -> Dict[str, int]:
         """撤销指定插件注册的全部资源并实际执行卸载。
 
-        通过已注册的全局撤销器（ToolRegistry / RulesManager 实例）实际移除
-        该插件注册的工具与规则，并清理登记。
+        通过已注册的全局撤销器（ToolRegistry / RulesManager / PlatformRegistry
+        实例）实际移除该插件注册的工具、规则与平台，并清理登记。
 
         返回:
-            {"tools": int, "rules": int}：被撤销的工具数与规则数。
+            {"tools": int, "rules": int, "platforms": int}：被撤销的工具数、
+            规则数与平台数。
         """
         tools = self.get_plugin_tools(plugin_name)
         rules = self.get_plugin_rules(plugin_name)
+        platforms = self.get_plugin_platforms(plugin_name)
         revoked_tools = 0
         revoked_rules = 0
+        revoked_platforms = 0
         if tools and self._tool_revoker is not None:
             try:
                 revoked_tools = int(self._tool_revoker(plugin_name))
@@ -164,21 +200,36 @@ class PluginRegistry:
                 revoked_rules = int(self._rules_revoker(plugin_name))
             except Exception:
                 revoked_rules = 0
+        if platforms and self._platform_revoker is not None:
+            try:
+                revoked_platforms = int(self._platform_revoker(plugin_name))
+            except Exception:
+                revoked_platforms = 0
         # 清理登记（撤销器内部也会清理，这里兜底）
         self.unregister_plugin(plugin_name)
-        return {"tools": revoked_tools, "rules": revoked_rules}
+        return {
+            "tools": revoked_tools,
+            "rules": revoked_rules,
+            "platforms": revoked_platforms,
+        }
 
     def has_plugin(self, plugin_name: str) -> bool:
         """判断插件是否已登记资源。"""
-        return plugin_name in self._plugin_tools or plugin_name in self._plugin_rules
+        return (
+            plugin_name in self._plugin_tools
+            or plugin_name in self._plugin_rules
+            or plugin_name in self._plugin_platforms
+        )
 
     def clear(self) -> None:
         """清空全部登记与撤销器（主要用于测试隔离）。"""
         self._plugin_tools.clear()
         self._plugin_rules.clear()
         self._plugin_code_agent_tools.clear()
+        self._plugin_platforms.clear()
         self._tool_revoker = None
         self._rules_revoker = None
+        self._platform_revoker = None
 
 
 __all__ = ["PluginRegistry"]

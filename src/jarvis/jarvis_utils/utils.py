@@ -1488,6 +1488,7 @@ _PLUGIN_EXTENSION_FIELDS = frozenset(
         "replace_map",
         "mcp",
         "lsp",
+        "platforms",
     }
 )
 
@@ -1523,6 +1524,7 @@ _PLUGIN_EXTENSION_FIELD_API_VERSION = {
     "replace_map": "1.0",
     "mcp": "1.0",
     "lsp": "1.1",
+    "platforms": "1.1",
 }
 
 
