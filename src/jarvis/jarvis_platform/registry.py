@@ -165,6 +165,8 @@ class PlatformRegistry:
     def __init__(self) -> None:
         """Initialize platform registry"""
         self.platforms: Dict[str, Type[BasePlatform]] = {}
+        # 插件平台来源追踪：平台名 -> 来源插件名（可逆效应，供卸载撤销）
+        self._plugin_platform_sources: Dict[str, str] = {}
         # 从用户平台目录加载额外平台
         platform_dir = PlatformRegistry.get_platform_dir()
         if platform_dir and os.path.exists(platform_dir):
@@ -180,6 +182,106 @@ class PlatformRegistry:
                 platform_class,
             ) in PlatformRegistry.load_platform_from_dir(platform_dir).items():
                 self.register_platform(platform_name, platform_class)
+        # 从插件声明的平台目录加载插件平台（platforms 扩展点）
+        self._load_plugin_platforms()
+        # 注册为全局平台撤销器（可逆效应），供 PluginRegistry.revoke_plugin 调用
+        from jarvis.jarvis_tools.plugin_registry import PluginRegistry
+
+        PluginRegistry.instance().set_platform_revoker(self.unregister_platforms_by_plugin)
+
+    def _load_plugin_platforms(self) -> None:
+        """从插件声明的平台目录加载平台（platforms 扩展点）。
+
+        插件 config.yaml 通过 ``platforms`` 字段声明自带的平台实现目录，目录内为
+        ``BasePlatform`` 子类。加载成功后登记到 PluginRegistry（可逆效应），
+        供卸载时精确撤销。
+        """
+        from jarvis.jarvis_utils.config import get_plugin_platform_dirs
+        from jarvis.jarvis_tools.plugin_registry import PluginRegistry
+
+        registry = PluginRegistry.instance()
+        for directory in get_plugin_platform_dirs():
+            if not directory or not os.path.exists(directory):
+                continue
+            # 从路径反推来源插件名（路径含 plugins/<name>/ 时）
+            source_plugin = self._infer_source_plugin(directory)
+            loaded = PlatformRegistry.load_platform_from_dir(directory)
+            for platform_name, platform_class in loaded.items():
+                # 命名冲突：插件平台覆盖内置/用户平台时告警，但允许注册
+                if platform_name in self.platforms:
+                    PrettyOutput.auto_print(
+                        f"⚠️ 平台 '{platform_name}' 已存在，插件平台将覆盖它"
+                    )
+                self.register_platform(platform_name, platform_class)
+                if source_plugin:
+                    self._plugin_platform_sources[platform_name] = source_plugin
+                    registry.register_platform(source_plugin, platform_name)
+
+    @staticmethod
+    def _infer_source_plugin(directory: str) -> Optional[str]:
+        """从平台目录路径反推来源插件名（可逆效应来源追踪）。
+
+        当目录路径形如 <...>/plugins/<plugin_name>/platforms 时返回插件名，
+        否则返回 None（表示非插件来源的平台目录）。
+        """
+        try:
+            normalized = directory.replace("\\", "/")
+            marker = "/plugins/"
+            if marker in normalized:
+                return normalized.split(marker, 1)[1].split("/", 1)[0]
+        except Exception:
+            pass
+        return None
+
+    def unregister_platforms_by_plugin(self, plugin_name: str) -> int:
+        """撤销指定插件注册的全部平台（可逆效应）。
+
+        从 PluginRegistry 读取该插件登记的平台名并逐个撤销，同时清理
+        PluginRegistry 中该插件的平台登记。
+
+        参数:
+            plugin_name: 插件名
+
+        返回:
+            int: 被撤销的平台数量
+        """
+        from jarvis.jarvis_tools.plugin_registry import PluginRegistry
+
+        registry = PluginRegistry.instance()
+        platform_names = registry.get_plugin_platforms(plugin_name)
+        count = 0
+        for name in platform_names:
+            if name in self.platforms:
+                del self.platforms[name]
+                self._plugin_platform_sources.pop(name, None)
+                count += 1
+        # 仅清理 PluginRegistry 中该插件的平台登记（不影响工具/规则登记）
+        registry.clear_platforms(plugin_name)
+        return count
+
+    def reload_plugin_platforms(self) -> None:
+        """插件变更后免重启重载插件平台（platforms 扩展点）。
+
+        先撤销当前已注册的全部插件平台，再按最新配置重新加载，使插件安装/
+        卸载/升级后的平台声明立即生效。失败仅告警，不阻断调用方。
+        """
+        from jarvis.jarvis_tools.plugin_registry import PluginRegistry
+
+        registry = PluginRegistry.instance()
+        # 撤销当前已注册的全部插件平台（按来源插件名逐个撤销）
+        for plugin_name in list(registry.registered_plugins()):
+            if registry.get_plugin_platforms(plugin_name):
+                try:
+                    self.unregister_platforms_by_plugin(plugin_name)
+                except Exception as e:
+                    PrettyOutput.auto_print(
+                        f"⚠️ 撤销插件 '{plugin_name}' 平台失败: {e}"
+                    )
+        # 重新加载插件平台
+        try:
+            self._load_plugin_platforms()
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 重载插件平台失败: {e}")
 
     def get_normal_platform(self) -> BasePlatform:
         """获取正常操作的平台实例"""

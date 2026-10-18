@@ -1653,6 +1653,25 @@ def get_mcp_config() -> List[Dict[str, Any]]:
     return cast(List[Dict[str, Any]], GLOBAL_CONFIG_DATA.get("mcp", []))
 
 
+def get_plugin_platform_dirs() -> List[str]:
+    """获取插件声明的平台实现目录（platforms 扩展点）。
+
+    插件 config.yaml 通过 ``platforms`` 字段声明自带的平台实现目录（目录内为
+    ``BasePlatform`` 子类，复用 ``PlatformRegistry.load_platform_from_dir`` 加载）：
+
+        platforms:
+          - "{{plugin_dir}}/platforms"
+
+    返回:
+        List[str]: 插件平台目录绝对路径列表（已展开 ~ 与环境变量）
+    """
+    return [
+        os.path.expanduser(os.path.expandvars(str(p)))
+        for p in GLOBAL_CONFIG_DATA.get("platforms", [])
+        if p
+    ]
+
+
 def get_gateway_auth_config() -> Dict[str, Any]:
     """
     获取 Gateway 认证配置。
