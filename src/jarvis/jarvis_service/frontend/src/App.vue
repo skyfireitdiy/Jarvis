@@ -716,11 +716,15 @@
             :canSplit="windowWidth > 768"
             :getTitle="getWorkspacePaneTitle"
             :getStatus="getWorkspacePaneStatus"
+            :getSessionTabs="getPaneSessionTabs"
             @activate="activateWorkspacePane"
             @split="splitWorkspacePane"
             @close="closeWorkspacePane"
             @maximize="toggleMaximizeWorkspacePane"
             @startResize="startWorkspacePaneResize"
+            @activate-session-tab="onActivateSessionTab"
+            @close-session-tab="onCloseSessionTab"
+            @add-session-tab="onAddSessionTab"
           >
             <template #pane-content="{ pane }">
               <div class="workspace-pane-content-slot">
@@ -3450,7 +3454,9 @@ const {
   findWorkspacePaneBySessionPanelId, findWorkspacePaneByView, ensureAgentEditorPane,
   ensureEditorPaneForFileOpen, setMainViewOnLeaf, ensurePaneForView, setActivePaneView,
   setActivePaneViewForPane, getWorkspacePaneTitle, getWorkspacePaneStatus, getPanePanel,
-  isPaneActive, startWorkspacePaneResize, persistWorkspacePaneLayout,
+  isPaneActive, paneSessionPanelIds, paneActiveSessionPanelId,
+  addSessionTabToPane, activateSessionTabInPane, closeSessionTabInPane,
+  startWorkspacePaneResize, persistWorkspacePaneLayout,
   restoreWorkspacePaneLayout, restoreWorkspacePaneContents,
   // 插件扩展（usePlugins 返回透传）
   pluginExtensions, pluginAdminTabs, pluginSidebarViews, pluginToolPanels,
@@ -3488,7 +3494,6 @@ const {
   // getter 注入（定义在调用点之后，useWorkspacePane 内部以 xxx() 二次求值）
   panels: () => panels,
   activePanelId: () => activePanelId,
-  closePanel: () => closePanel,
   getPanelAgent: () => getPanelAgent,
   workspaceSessionPanelId: () => workspaceSessionPanelId,
   agentList: () => agentList,
@@ -3982,17 +3987,27 @@ function closePanel(panelId) {
   panelOutputLists.delete(panelId)
   sessionPanelRefs.delete(panelId)
   // 若被关闭的 Panel 正被编辑器承载，需清理悬空引用，否则编辑器会指向一个已不存在的
-  // Panel（会话视图空白）。已统一为 pane 树：找到承载它的 pane 清空为 empty；
+  // Panel（会话视图空白）。已统一为 pane 树：找到承载它的 pane，从多 tab 中移除该 tab；
   // 找不到（未分割且主区域是 session 的兜底）则回退到文件视图。
+  // 注意：无论该 panel 是否为当前激活 tab，只要它被某个 pane 承载，都要从多 tab 中移除，
+  // 否则会残留悬空 tab（关闭非激活 tab 时尤其明显）。
+  const hostingPane = findWorkspacePaneBySessionPanelId(panelId)
+  if (hostingPane) {
+    // 多 tab：关闭的是该 pane 的一个 tab，从 sessionPanelIds 中移除；
+    // 若该 pane 还有其他 tab 则切到相邻 tab，否则清空为 empty。
+    closeSessionTabInPane(hostingPane, panelId)
+  }
   if (workspaceSessionPanelId.value === panelId) {
-    workspaceSessionPanelId.value = null
-    const hostingPane = findWorkspacePaneBySessionPanelId(panelId)
-    if (hostingPane) {
-      hostingPane.view = 'empty'
-      hostingPane.sessionPanelId = null
-      persistWorkspacePaneLayout()
-    } else if (workspaceMainView.value === 'session') {
-      setMainViewOnLeaf('file')
+    // 若承载 pane 还有其他 tab（已切到相邻 tab），workspaceSessionPanelId 跟随新激活 tab；
+    // 否则置 null（未承载时回退文件视图）。
+    const nextPanelId = hostingPane ? paneActiveSessionPanelId(hostingPane) : null
+    if (nextPanelId) {
+      workspaceSessionPanelId.value = nextPanelId
+    } else {
+      workspaceSessionPanelId.value = null
+      if (!hostingPane && workspaceMainView.value === 'session') {
+        setMainViewOnLeaf('file')
+      }
     }
   }
   // 如果关闭的是当前激活的 Panel，激活相邻 Panel
@@ -4060,25 +4075,52 @@ function activatePanel(panelId) {
 }
 
 // 已分割时把 Agent 打开到「激活 pane」中（需求：新建 Panel 落在激活区域；
-// 若该区域已有 Panel，则关闭旧的、新的覆盖）。返回 true 表示已处理。
+// 多 tab：若该区域已是 session 视图，则追加新 tab，不破坏布局）。
+// 返回 true 表示已处理。
 // 说明：只操作激活 pane，绝不动其他 pane 承载的 Panel（否则会把别的区域的会话清掉）。
-// 注意：激活 pane 已承载 Agent 会话时不再覆盖，而是开新面板（新 pane）保留当前会话，
+// 注意：激活 pane 已承载 Agent 会话时不再覆盖，而是追加 tab（多 tab 语义），
 // 避免命令面板/侧边栏切换 Agent 时把当前会话覆盖掉。
 function openAgentInActivePane(agent) {
   const activePaneLeaf = activePane.value
   if (!activePaneLeaf) return false
   // 激活 pane 已承载的 Panel
-  const hostedPanel = activePaneLeaf.view === 'session' && activePaneLeaf.sessionPanelId
-    ? panels.value.find(p => p.id === activePaneLeaf.sessionPanelId)
+  const hostedPanel = activePaneLeaf.view === 'session' && paneActiveSessionPanelId(activePaneLeaf)
+    ? panels.value.find(p => p.id === paneActiveSessionPanelId(activePaneLeaf))
     : null
   // 激活 pane 已承载 Agent 会话：不覆盖。承载的正是该 Agent 则无需操作（已显示）；
-  // 否则开新面板（新 pane）承载，保留当前会话。
+  // 否则追加新 tab（多 tab 语义），保留当前会话。
   if (hostedPanel) {
     if (hostedPanel.agentId === agent.agent_id) {
       activateWorkspacePane(activePaneLeaf.id)
       return true
     }
-    openAgentInNewPane(agent)
+    // 追加 tab：新建 Panel 并作为 tab 加入激活 pane
+    const targetPanel = {
+      id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      agentId: agent.agent_id
+    }
+    panels.value.push(targetPanel)
+    activePanelId.value = targetPanel.id
+    workspaceSessionPanelId.value = targetPanel.id
+    addSessionTabToPane(activePaneLeaf, targetPanel.id)
+    activateSessionTabInPane(activePaneLeaf, targetPanel.id)
+    switchAgent(agent)
+    nextTick(() => maybeStartTour('panel'))
+    return true
+  }
+  // 激活 pane 已是 session 视图（如空 tab / 空 session pane）：直接追加 tab，不分割
+  if (activePaneLeaf.view === 'session') {
+    const targetPanel = {
+      id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      agentId: agent.agent_id
+    }
+    panels.value.push(targetPanel)
+    activePanelId.value = targetPanel.id
+    workspaceSessionPanelId.value = targetPanel.id
+    addSessionTabToPane(activePaneLeaf, targetPanel.id)
+    activateSessionTabInPane(activePaneLeaf, targetPanel.id)
+    switchAgent(agent)
+    nextTick(() => maybeStartTour('panel'))
     return true
   }
   // 激活 pane 是文件/空区域：新建 Panel 落在激活 pane（覆盖文件视图是合理的）
@@ -4203,13 +4245,32 @@ function openAgentInCurrentPanel(agent) {
     switchAgent(agent)
     return
   }
-  // 已统一为 pane 树：把 Agent 放进「激活 pane」（该 pane 已有 Panel 则就地覆盖）
+  // 已统一为 pane 树：把 Agent 放进「激活 pane」。
+  // 多 tab 语义：命令面板 Enter = 在当前 tab 覆盖打开（保持现状），
+  // 即替换激活 pane 的「激活 tab」承载的 Agent，tab 数量不变、其他 tab 不受影响。
+  const activePaneLeaf = activePane.value
+  if (activePaneLeaf && activePaneLeaf.view === 'session') {
+    const activeTabPanelId = paneActiveSessionPanelId(activePaneLeaf)
+    if (activeTabPanelId) {
+      const activeTabPanel = panels.value.find(p => p.id === activeTabPanelId)
+      if (activeTabPanel) {
+        // 覆盖激活 tab：替换其 agentId（会话容器复用，Agent 会话本身仍在后台）
+        activeTabPanel.agentId = agent.agent_id
+        activePanelId.value = activeTabPanelId
+        workspaceSessionPanelId.value = activeTabPanelId
+        activateWorkspacePane(activePaneLeaf.id)
+        switchAgent(agent)
+        return
+      }
+    }
+  }
+  // 激活 pane 是文件/空区域：新建 Panel 落在激活 pane（覆盖文件视图是合理的）
   openAgentInActivePane(agent)
 }
 
-// 「在新的 Panel 中打开 Agent」：命令面板按 Tab 时使用
+// 「在新的 Panel 中打开 Agent」：命令面板按 Tab 时使用（显式分屏入口）
 // - Agent 已在某个 Panel 中：激活它（避免重复打开同一 Agent）
-// - 否则始终新建 Panel
+// - 否则新建 Panel 并分割新 pane 承载（分屏，不破坏当前布局）
 function openAgentInNewPanel(agent) {
   if (!agent) return
   if (windowWidth.value <= 768) {
@@ -4222,17 +4283,85 @@ function openAgentInNewPanel(agent) {
     switchAgent(agent)
     return
   }
-  const targetPanel = { id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, agentId: null }
-  panels.value.push(targetPanel)
-  targetPanel.agentId = agent.agent_id
-  activePanelId.value = targetPanel.id
-  switchAgent(agent)
+  openAgentInNewPane(agent)
 }
 
 // 获取 Panel 中的 Agent
 function getPanelAgent(panel) {
   if (!panel || !panel.agentId) return null
   return agentList.value.find(a => a.agent_id === panel.agentId) || null
+}
+
+// ===== session 多 tab：tab 栏数据与事件 =====
+// 生成某 pane 的 session tab 列表（[{ panelId, label }]），供 WorkspacePaneHeader 渲染。
+function getPaneSessionTabs(pane) {
+  if (!pane || pane.view !== 'session') return null
+  return paneSessionPanelIds(pane)
+    .map(panelId => {
+      const panel = panels.value.find(p => p.id === panelId)
+      const agent = panel ? getPanelAgent(panel) : null
+      return { panelId, label: agent ? (agent.name || agent.agent_id) : '会话' }
+    })
+    .filter(tab => tab.panelId)
+}
+
+// 点击 tab：激活该 pane 的对应 tab，并同步 activePanelId / switchAgent
+function onActivateSessionTab(paneId, panelId) {
+  const pane = findWorkspacePaneById(workspacePaneTree, paneId)
+  if (!pane) return
+  activateSessionTabInPane(pane, panelId)
+  activateWorkspacePane(paneId)
+  const panel = panels.value.find(p => p.id === panelId)
+  if (panel) {
+    activePanelId.value = panelId
+    workspaceSessionPanelId.value = panelId
+    if (panel.agentId) {
+      const agent = agentList.value.find(a => a.agent_id === panel.agentId)
+      if (agent) switchAgent(agent)
+    }
+  }
+}
+
+// 关闭 tab：关闭该 pane 的对应 tab（Agent 会话仍在后台，可从侧边栏重新打开）
+function onCloseSessionTab(paneId, panelId) {
+  const pane = findWorkspacePaneById(workspacePaneTree, paneId)
+  if (!pane) return
+  // 若关闭的是激活 tab，closeSessionTabInPane 会自动切到相邻 tab
+  const wasActive = paneActiveSessionPanelId(pane) === panelId
+  closeSessionTabInPane(pane, panelId)
+  if (wasActive) {
+    // 关闭激活 tab 后，切到新激活 tab 对应的 Agent
+    const nextPanelId = paneActiveSessionPanelId(pane)
+    if (nextPanelId) {
+      activePanelId.value = nextPanelId
+      workspaceSessionPanelId.value = nextPanelId
+      const nextPanel = panels.value.find(p => p.id === nextPanelId)
+      if (nextPanel && nextPanel.agentId) {
+        const nextAgent = agentList.value.find(a => a.agent_id === nextPanel.agentId)
+        if (nextAgent) switchAgent(nextAgent)
+      }
+    } else {
+      // 该 pane 已无任何 tab：清空激活状态
+      activePanelId.value = null
+      workspaceSessionPanelId.value = null
+    }
+  }
+}
+
+// 追加空 tab：在当前 pane 创建一个空 panel 并作为新 tab（可从侧边栏选 Agent 放入）
+function onAddSessionTab(paneId) {
+  const pane = findWorkspacePaneById(workspacePaneTree, paneId)
+  if (!pane) return
+  const targetPanel = {
+    id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    agentId: null
+  }
+  panels.value.push(targetPanel)
+  activePanelId.value = targetPanel.id
+  workspaceSessionPanelId.value = targetPanel.id
+  addSessionTabToPane(pane, targetPanel.id)
+  activateSessionTabInPane(pane, targetPanel.id)
+  activateWorkspacePane(paneId)
 }
 
 // 获取 Panel 的消息列表

@@ -392,6 +392,8 @@ async function viewGitFileDiff(commitHash, filePath) {
     disposeDiffEditorForPane(pane.id)
     pane.view = 'diff'
     pane.sessionPanelId = null
+    pane.sessionPanelIds = []
+    pane.activeSessionPanelId = null
     persistWorkspacePaneLayout()
     gitDiffLoading.value = false
     await loadDiffForPane(pane.id, commitHash, filePath)
@@ -404,6 +406,8 @@ async function viewGitFileDiff(commitHash, filePath) {
     disposeDiffEditorForPane(root.id)
     root.view = 'diff'
     root.sessionPanelId = null
+    root.sessionPanelIds = []
+    root.activeSessionPanelId = null
     persistWorkspacePaneLayout()
     gitDiffLoading.value = false
     await loadDiffForPane(root.id, commitHash, filePath)

@@ -21,7 +21,7 @@
 //   scheduleWorkspaceLayout / layoutMonacoEditor / activateWorkspaceTab / openWorkspaceFile /
 //   layoutGitDiffEditor / disposeDiffEditorForPane / disposeAllDiffEditors / loadDiffForPane（getter 注入）
 // - getter 注入（定义在调用点之后，内部通过 xxx() 二次求值）：panels / activePanelId /
-//   closePanel / getPanelAgent / workspaceSessionPanelId / agentList / gitAgentId / switchAgent /
+//   getPanelAgent / workspaceSessionPanelId / agentList / gitAgentId / switchAgent /
 //   activeTerminalId / terminalSessions / restoreTerminalSessions / focusFirstIn
 import { computed, nextTick, ref, triggerRef, watch } from 'vue'
 import { usePlugins } from './usePlugins.js'
@@ -54,7 +54,6 @@ export function useWorkspacePane({
   loadDiffForPane,
   panels,
   activePanelId,
-  closePanel,
   getPanelAgent,
   workspaceSessionPanelId,
   agentList,
@@ -263,7 +262,14 @@ const EDITOR_PANE_MAX_RATIO = 0.85
 let workspacePaneSeq = 0
 function createWorkspacePaneLeaf(view = 'file', sessionPanelId = null, agentId = null) {
   workspacePaneSeq += 1
-  return { type: 'leaf', id: `pane-${workspacePaneSeq}`, view, sessionPanelId, agentId }
+  // session leaf 支持多 tab：sessionPanelIds 记录该 pane 承载的所有 panel id，
+  // activeSessionPanelId 记录当前激活的 tab；sessionPanelId 为兼容字段（单 tab 时同步）。
+  const leaf = { type: 'leaf', id: `pane-${workspacePaneSeq}`, view, sessionPanelId, agentId }
+  if (view === 'session') {
+    leaf.sessionPanelIds = sessionPanelId ? [sessionPanelId] : []
+    leaf.activeSessionPanelId = sessionPanelId || null
+  }
+  return leaf
 }
 // 根默认单 leaf：未分割时行为与改动前完全一致
 const workspacePaneTree = ref(createWorkspacePaneLeaf('file'))
@@ -321,9 +327,11 @@ function activateWorkspacePane(paneId, { moveFocus = false } = {}) {
   // 使 getCurrentPanel()/命令面板「当前 Agent」组能定位到当前聚焦的面板，
   // 而不是回退到列表最后一个 Agent（Issue #160：Space a 操作作用到错误 Agent）。
   // 放在早退之前：即使 activePaneId 已指向该 pane（经其它路径设置），也须保证 activePanelId 一致。
-  if (pane && pane.view === 'session' && pane.sessionPanelId) {
-    activePanelId().value = pane.sessionPanelId
-    const panel = panels().value.find(p => p.id === pane.sessionPanelId)
+  // 多 tab：同步的是当前激活的 tab（activeSessionPanelId）。
+  if (pane && pane.view === 'session' && paneActiveSessionPanelId(pane)) {
+    const activePanelIdValue = paneActiveSessionPanelId(pane)
+    activePanelId().value = activePanelIdValue
+    const panel = panels().value.find(p => p.id === activePanelIdValue)
     const agent = panel?.agentId ? agentList().value.find(a => a.agent_id === panel.agentId) : null
     if (agent) switchAgent()(agent)
   }
@@ -594,14 +602,15 @@ function collapseWorkspacePanes() {
 // 约束：同一个 sessionPanelId 不允许同时出现在两个 pane 中（终端 host 单例，会争抢），
 // 因此路由到 session 时会先把其他 pane 上相同的 sessionPanelId 清空。
 
-// 找出除 exceptPaneId 之外、正在承载指定 sessionPanelId 的 leaf（用于去重）
+// 找出除 exceptPaneId 之外、正在承载指定 sessionPanelId 的 leaf（用于去重）。
+// 兼容多 tab：session leaf 的 sessionPanelIds 列表中包含该 panel id 即视为承载。
 function findWorkspacePaneBySessionPanelId(sessionPanelId, exceptPaneId = null) {
   if (!sessionPanelId) return null
   let found = null
   const walk = (node) => {
     if (!node || found) return
     if (node.type === 'leaf') {
-      if (node.id !== exceptPaneId && node.view === 'session' && node.sessionPanelId === sessionPanelId) {
+      if (node.id !== exceptPaneId && node.view === 'session' && paneSessionPanelIds(node).includes(sessionPanelId)) {
         found = node
       }
       return
@@ -610,6 +619,74 @@ function findWorkspacePaneBySessionPanelId(sessionPanelId, exceptPaneId = null) 
   }
   walk(workspacePaneTree.value)
   return found
+}
+
+// ===== session 多 tab 辅助函数 =====
+// 获取 session leaf 承载的所有 panel id 列表（兼容单 tab 的 sessionPanelId 字段）。
+function paneSessionPanelIds(pane) {
+  if (!pane || pane.view !== 'session') return []
+  if (Array.isArray(pane.sessionPanelIds)) return pane.sessionPanelIds
+  return pane.sessionPanelId ? [pane.sessionPanelId] : []
+}
+// 获取 session leaf 当前激活的 panel id（兼容单 tab：回退到 sessionPanelId）。
+function paneActiveSessionPanelId(pane) {
+  if (!pane || pane.view !== 'session') return null
+  if (pane.activeSessionPanelId && paneSessionPanelIds(pane).includes(pane.activeSessionPanelId)) {
+    return pane.activeSessionPanelId
+  }
+  return paneSessionPanelIds(pane)[0] || null
+}
+// 同步兼容字段：sessionPanelId 始终指向当前激活的 tab（单 tab 语义下与旧代码一致）。
+function syncPaneSessionPanelId(pane) {
+  if (!pane || pane.view !== 'session') return
+  pane.sessionPanelId = paneActiveSessionPanelId(pane)
+}
+// 在 session leaf 中追加一个 tab（panel id）。返回是否成功。
+function addSessionTabToPane(pane, sessionPanelId) {
+  if (!pane || pane.view !== 'session' || !sessionPanelId) return false
+  if (!Array.isArray(pane.sessionPanelIds)) {
+    pane.sessionPanelIds = pane.sessionPanelId ? [pane.sessionPanelId] : []
+  }
+  if (!pane.sessionPanelIds.includes(sessionPanelId)) {
+    pane.sessionPanelIds.push(sessionPanelId)
+  }
+  pane.activeSessionPanelId = sessionPanelId
+  syncPaneSessionPanelId(pane)
+  persistWorkspacePaneLayout()
+  return true
+}
+// 激活 session leaf 中的某个 tab（panel id）。返回是否成功。
+function activateSessionTabInPane(pane, sessionPanelId) {
+  if (!pane || pane.view !== 'session' || !sessionPanelId) return false
+  if (!paneSessionPanelIds(pane).includes(sessionPanelId)) return false
+  pane.activeSessionPanelId = sessionPanelId
+  syncPaneSessionPanelId(pane)
+  persistWorkspacePaneLayout()
+  return true
+}
+// 关闭 session leaf 中的某个 tab（panel id）。若关闭的是激活 tab，自动切换到相邻 tab；
+// 全部关闭后把 pane 清成 empty。返回是否成功。
+function closeSessionTabInPane(pane, sessionPanelId) {
+  if (!pane || pane.view !== 'session' || !sessionPanelId) return false
+  const ids = paneSessionPanelIds(pane)
+  const idx = ids.indexOf(sessionPanelId)
+  if (idx < 0) return false
+  ids.splice(idx, 1)
+  if (pane.activeSessionPanelId === sessionPanelId) {
+    pane.activeSessionPanelId = ids.length > 0 ? ids[Math.min(idx, ids.length - 1)] : null
+  }
+  if (ids.length === 0) {
+    // 全部 tab 关闭：pane 清成 empty
+    pane.view = 'empty'
+    pane.sessionPanelIds = []
+    pane.activeSessionPanelId = null
+    pane.sessionPanelId = null
+    pane.agentId = null
+  } else {
+    syncPaneSessionPanelId(pane)
+  }
+  persistWorkspacePaneLayout()
+  return true
 }
 
 // 找出除 exceptPaneId 之外、正在承载指定 view（chat / terminal）的 leaf。
@@ -742,6 +819,13 @@ function setMainViewOnLeaf(view, sessionPanelId = null) {
   if (root && root.type === 'leaf') {
     root.view = view
     root.sessionPanelId = view === 'session' ? sessionPanelId : null
+    if (view === 'session') {
+      root.sessionPanelIds = sessionPanelId ? [sessionPanelId] : []
+      root.activeSessionPanelId = sessionPanelId || null
+    } else {
+      root.sessionPanelIds = []
+      root.activeSessionPanelId = null
+    }
   }
 }
 
@@ -808,20 +892,36 @@ function setActivePaneViewForPane(pane, view, sessionPanelId = null) {
     if (duplicated) {
       duplicated.view = 'empty'
       duplicated.sessionPanelId = null
+      duplicated.sessionPanelIds = []
+      duplicated.activeSessionPanelId = null
+      duplicated.agentId = null
     }
     // 需求：Panel 一律落在「激活 pane」里（不再重定向到其他空闲 file pane）。
-    // 若激活 pane 已承载另一个 session panel，则关闭旧 panel，让新 panel 覆盖它。
-    if (pane.view === 'session' && pane.sessionPanelId && pane.sessionPanelId !== sessionPanelId) {
-      const oldPanelId = pane.sessionPanelId
-      const oldPanel = panels().value.find(p => p.id === oldPanelId)
-      if (oldPanel) closePanel()(oldPanelId)
+    // 多 tab：若 pane 已是 session 视图，则把新 panel 作为 tab 追加（不关闭旧 panel）；
+    // 否则把 pane 切换为 session 视图并承载该 panel。
+    if (pane.view === 'session') {
+      addSessionTabToPane(pane, sessionPanelId)
+      // 追加 tab 后同步激活状态（activePanelId / switchAgent）
+      activateSessionTabInPane(pane, sessionPanelId)
+      return true
     }
+    // 非 session pane：切换为 session 视图，初始化多 tab 字段
+    pane.view = 'session'
+    pane.sessionPanelIds = [sessionPanelId]
+    pane.activeSessionPanelId = sessionPanelId
+    pane.sessionPanelId = sessionPanelId
+    pane.agentId = null
+    persistWorkspacePaneLayout()
+    return true
   } else if (view === 'chat' || view === 'terminal') {
     // host 单例：先卸载其他 pane 上同类型的承载，再交给激活 pane
     const duplicated = findWorkspacePaneByView(view, pane.id)
     if (duplicated) {
       duplicated.view = 'empty'
       duplicated.sessionPanelId = null
+      duplicated.sessionPanelIds = []
+      duplicated.activeSessionPanelId = null
+      duplicated.agentId = null
     }
   }
   // 从 diff 切走时释放该 pane 的 diff 实例（diff 数据一并清空）
@@ -831,6 +931,11 @@ function setActivePaneViewForPane(pane, view, sessionPanelId = null) {
   }
   pane.view = view
   pane.sessionPanelId = view === 'session' ? sessionPanelId : null
+  // 非 session 视图：清空多 tab 字段，避免残留脏数据（sessionPanelIds 只在 session 视图有效）
+  if (view !== 'session') {
+    pane.sessionPanelIds = []
+    pane.activeSessionPanelId = null
+  }
   persistWorkspacePaneLayout()
   // 切换激活 pane 的内容类型后，Monaco 容器可能被替换/移除，需要重建视图
   nextTick(() => {
@@ -852,7 +957,7 @@ function getWorkspacePaneTitle(pane) {
     return path ? `diff: ${path.split('/').pop() || path}` : 'diff'
   }
   if (pane.view === 'session') {
-    const panel = panels().value.find(p => p.id === pane.sessionPanelId)
+    const panel = panels().value.find(p => p.id === paneActiveSessionPanelId(pane))
     const agent = panel ? getPanelAgent()(panel) : null
     return agent ? (agent.name || agent.agent_id) : '会话'
   }
@@ -889,10 +994,12 @@ function getWorkspacePreviewText() {
   return `${content.slice(0, EDITOR_PANE_PREVIEW_MAX_CHARS)}\n\n…（预览已截断，激活后可查看完整内容）`
 }
 
-// pane 承载的 Panel 对象（session leaf 用）
+// pane 承载的 Panel 对象（session leaf 用；多 tab 时取当前激活的 tab）
 function getPanePanel(pane) {
-  if (!pane || pane.view !== 'session' || !pane.sessionPanelId) return null
-  return panels().value.find(p => p.id === pane.sessionPanelId) || null
+  if (!pane || pane.view !== 'session') return null
+  const activeId = paneActiveSessionPanelId(pane)
+  if (!activeId) return null
+  return panels().value.find(p => p.id === activeId) || null
 }
 
 // pane 是否应被视为「激活」（用于 SessionPanel 的 active 态）
@@ -984,11 +1091,15 @@ function sanitizeWorkspacePaneNode(raw) {
       return { type: 'leaf', id: raw.id, view: 'empty', sessionPanelId: null, agentId: null, content: null }
     }
     if (raw.view === 'session') {
-      // 只校验持久化的 agentId（用于刷新后重建 panel）；sessionPanelId 是刷新前的
+      // 校验持久化的 agentId 列表（用于刷新后重建 panel）；sessionPanelId 是刷新前的
       // panel id，刷新后 panels 重建必然失效，故不再据此校验（由 restoreWorkspacePaneContents
       // 按 agentId 重建 panel 后回填）。无 agentId 时回退为 file leaf（保持旧行为）。
-      if (content && typeof content.agentId === 'string' && content.agentId) {
-        return { type: 'leaf', id: raw.id, view: 'session', sessionPanelId: null, agentId: content.agentId, content: { agentId: content.agentId } }
+      // 多 tab（version 3）：content.agentIds 记录该 pane 的所有 Agent 会话。
+      const agentIds = Array.isArray(content?.agentIds)
+        ? content.agentIds.filter(a => typeof a === 'string' && a)
+        : (content && typeof content.agentId === 'string' && content.agentId ? [content.agentId] : [])
+      if (agentIds.length > 0) {
+        return { type: 'leaf', id: raw.id, view: 'session', sessionPanelId: null, agentId: agentIds[0], content: { agentIds } }
       }
       return { type: 'leaf', id: raw.id, view: 'file', sessionPanelId: null, agentId: null, content: null }
     }
@@ -1055,13 +1166,18 @@ function syncWorkspacePaneSeq(tree) {
 function persistWorkspacePaneLayout() {
   try {
     const tree = workspacePaneTree.value
-    // 未分割时不写（等价于清空），避免把默认态持久化成「已分割」的错觉
-    if (!tree || workspacePaneCount.value <= 1) {
+    // 未分割时默认不写（等价于清空），避免把默认态持久化成「已分割」的错觉；
+    // 例外：唯一 leaf 是 session 且承载了会话（多 tab 或单 tab）时仍写入，
+    // 否则刷新后会话 tab 会丢失（Issue #287 多 tab 需在刷新后恢复）。
+    if (!tree) return
+    const singleSessionLeaf = workspacePaneCount.value <= 1 && tree.type === 'leaf' && tree.view === 'session'
+    if (workspacePaneCount.value <= 1 && !singleSessionLeaf) {
       localStorage.removeItem(EDITOR_PANE_LAYOUT_KEY)
       return
     }
-    // version 2：除布局外，每个 leaf 额外携带 content（各视图的内容恢复信息）
-    const payload = { version: 2, activePaneId: activePaneId.value, tree: serializeWorkspacePaneTree(tree) }
+    // version 3：除布局外，每个 leaf 额外携带 content（各视图的内容恢复信息）；
+    // session leaf 的 content 记录多 tab 的 agentIds 列表（旧版单 agentId 兼容迁移）。
+    const payload = { version: 3, activePaneId: activePaneId.value, tree: serializeWorkspacePaneTree(tree) }
     localStorage.setItem(EDITOR_PANE_LAYOUT_KEY, JSON.stringify(payload))
   } catch (e) {
     // 忽略：localStorage 不可用（隐私模式 / 配额满）时静默降级
@@ -1078,7 +1194,11 @@ function serializeWorkspacePaneTree(tree) {
     // leaf：按视图提取内容恢复信息（不序列化运行时状态如 diff 文本、Monaco 实例）
     let content = null
     if (node.view === 'session') {
-      content = { agentId: node.agentId || null }
+      // 多 tab：记录该 pane 承载的所有 Agent 会话（agentIds），供刷新后重建
+      const agentIds = paneSessionPanelIds(node)
+        .map(id => panels().value.find(p => p.id === id)?.agentId)
+        .filter(a => typeof a === 'string' && a)
+      content = { agentIds }
     } else if (node.view === 'file') {
       content = {
         tabs: workspacePaneTabs().get(node.id) || [],
@@ -1149,25 +1269,49 @@ async function restoreWorkspacePaneContents() {
     const content = leaf.content
     if (!content) continue
     try {
-      if (leaf.view === 'session' && content.agentId) {
-        const agent = agentList().value.find(a => a.agent_id === content.agentId)
-        if (!agent) {
-          // Agent 已不存在：降级为空 pane
-          leaf.view = 'empty'
-          leaf.sessionPanelId = null
-          leaf.agentId = null
-        } else {
+      if (leaf.view === 'session' && (content.agentIds || content.agentId)) {
+        // 多 tab：恢复该 pane 的所有 Agent 会话（agentIds）；旧版单 agentId 兼容迁移。
+        const agentIds = Array.isArray(content.agentIds) ? content.agentIds : (content.agentId ? [content.agentId] : [])
+        const restoredPanelIds = []
+        let anyFailed = false
+        for (const agentId of agentIds) {
+          const agent = agentList().value.find(a => a.agent_id === agentId)
+          if (!agent) {
+            // Agent 已不存在：跳过该 tab
+            anyFailed = true
+            continue
+          }
           // 复用已有 Panel（同一 Agent 只允许一个 Panel），否则新建
           let panel = panels().value.find(p => p.agentId === agent.agent_id)
           if (!panel) {
             panel = { id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, agentId: agent.agent_id }
             panels().value.push(panel)
           }
-          leaf.sessionPanelId = panel.id
-          leaf.agentId = agent.agent_id
-          activePanelId().value = panel.id
-          workspaceSessionPanelId().value = panel.id
-          await switchAgent()(agent)
+          restoredPanelIds.push(panel.id)
+          if (!leaf.sessionPanelIds) leaf.sessionPanelIds = []
+          if (!leaf.sessionPanelIds.includes(panel.id)) leaf.sessionPanelIds.push(panel.id)
+          if (leaf.agentId === agent.agent_id) {
+            // 第一个 agentId 视为激活 tab
+            leaf.activeSessionPanelId = panel.id
+            leaf.sessionPanelId = panel.id
+          }
+        }
+        if (restoredPanelIds.length === 0) {
+          // 所有 Agent 均已不存在：降级为空 pane
+          leaf.view = 'empty'
+          leaf.sessionPanelId = null
+          leaf.sessionPanelIds = []
+          leaf.activeSessionPanelId = null
+          leaf.agentId = null
+        } else {
+          leaf.agentId = agentIds[0] || null
+          // 激活第一个恢复的 tab（与持久化时 agentIds 顺序一致）
+          leaf.activeSessionPanelId = restoredPanelIds[0]
+          leaf.sessionPanelId = restoredPanelIds[0]
+          activePanelId().value = restoredPanelIds[0]
+          workspaceSessionPanelId().value = restoredPanelIds[0]
+          const firstAgent = agentList().value.find(a => a.agent_id === agentIds[0])
+          if (firstAgent) await switchAgent()(firstAgent)
         }
       } else if (leaf.view === 'file') {
         const tabs = content.tabs || []
@@ -1319,6 +1463,11 @@ watch(
     getWorkspacePaneStatus,
     getPanePanel,
     isPaneActive,
+    paneSessionPanelIds,
+    paneActiveSessionPanelId,
+    addSessionTabToPane,
+    activateSessionTabInPane,
+    closeSessionTabInPane,
     startWorkspacePaneResize,
     persistWorkspacePaneLayout,
     restoreWorkspacePaneLayout,
