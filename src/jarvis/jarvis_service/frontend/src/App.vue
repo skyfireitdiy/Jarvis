@@ -5109,14 +5109,46 @@ function onWorkspaceSidebarAgentClick(agent) {
       activateSessionTabInPane(hostingPane, existingPanel.id)
       activateWorkspacePane(hostingPane.id)
     } else {
-      // 空则原地、否则分割（不覆盖当前区域）
-      ensurePaneForView('session', existingPanel.id)
+      // 该 Panel 未被任何 pane 承载（如承载它的 pane 已被关闭但 Panel 残留）：
+      // 优先复用已打开的 session 面板（把该 Panel 追加为 tab），找不到才分割。
+      const sessionPane = findWorkspacePaneByView('session')
+      if (sessionPane) {
+        addSessionTabToPane(sessionPane, existingPanel.id)
+        activateSessionTabInPane(sessionPane, existingPanel.id)
+        activateWorkspacePane(sessionPane.id)
+      } else {
+        // 空则原地、否则分割（不覆盖当前区域）
+        ensurePaneForView('session', existingPanel.id)
+      }
     }
     activePanelId.value = existingPanel.id
     switchAgent(agent)
     workspaceSessionPanelId.value = existingPanel.id
     setWorkspaceMainView('session')
     return
+  }
+  // agent 不在任何既有 Panel 中：优先复用已打开的 session 面板（追加 tab），
+  // 找不到才交给 openAgentInActivePane 分割。用户反馈：多次点击 agent 不应每次都拆分新区域，
+  // 应先找已打开的 session 面板复用；激活 pane 是 file/empty 时尤其如此（即使视觉上
+  // 有 session 区域，activePaneId 也可能指向 file pane）。
+  const activePaneLeaf = activePane.value
+  if (activePaneLeaf && activePaneLeaf.view !== 'session') {
+    const sessionPane = findWorkspacePaneByView('session')
+    if (sessionPane) {
+      const targetPanel = {
+        id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        agentId: agent.agent_id
+      }
+      panels.value.push(targetPanel)
+      activePanelId.value = targetPanel.id
+      workspaceSessionPanelId.value = targetPanel.id
+      addSessionTabToPane(sessionPane, targetPanel.id)
+      activateSessionTabInPane(sessionPane, targetPanel.id)
+      activateWorkspacePane(sessionPane.id)
+      switchAgent(agent)
+      nextTick(() => maybeStartTour('panel'))
+      return
+    }
   }
   // 已统一为 pane 树：把 Agent 打开到「激活 pane」中（若该区域已有 Panel 则覆盖），
   // 绝不复用其他 pane 承载的 Panel，否则会把那个区域的会话清掉。
