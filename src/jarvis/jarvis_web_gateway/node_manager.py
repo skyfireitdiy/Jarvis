@@ -328,6 +328,11 @@ class NodeConnectionManager:
                         request_id,
                     )
                     continue
+                # 插件自定义消息类型分发（message_types 扩展点）
+                plugin_response = self._dispatch_plugin_message(next_message)
+                if plugin_response is not None:
+                    await websocket.send_json(plugin_response)
+                    continue
                 logger.warning(
                     "[NODE] unhandled message node_id=%s type=%s request_id=%s",
                     node_id,
@@ -725,6 +730,48 @@ class NodeConnectionManager:
                         "message": str(exc),
                     },
                 },
+                request_id=request_id,
+            )
+
+    def _dispatch_plugin_message(
+        self, message: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """分发插件注册的自定义消息类型（message_types 扩展点）。
+
+        若消息类型命中 MessageTypeRegistry 中插件注册的自定义消息类型，则调用
+        插件处理函数 ``message_handler(message)`` 并返回其响应；未命中返回 None，
+        由调用方按未处理消息处理。
+
+        处理函数运行在 gateway 进程内，异常被捕获并返回错误响应，不阻断连接。
+        """
+        from jarvis.jarvis_web_gateway.message_types import MessageTypeRegistry
+        from jarvis.jarvis_utils.output import PrettyOutput
+
+        message_type = message.get("type")
+        if not message_type:
+            return None
+        registry = MessageTypeRegistry.instance()
+        message_type_def = registry.get(message_type)
+        if message_type_def is None:
+            return None
+        request_id = message.get("request_id")
+        try:
+            result = message_type_def.function(message)
+            if result is None:
+                return None
+            if isinstance(result, dict) and "type" in result:
+                return result
+            # 插件返回裸 payload，包装为标准响应消息
+            return build_node_message(
+                message_type, result, request_id=request_id
+            )
+        except Exception as e:
+            PrettyOutput.auto_print(
+                f"⚠️ 插件消息类型 {message_type} 处理失败: {e}"
+            )
+            return build_error_message(
+                "PLUGIN_MESSAGE_HANDLER_FAILED",
+                f"插件消息类型 {message_type} 处理失败: {e}",
                 request_id=request_id,
             )
 
@@ -2442,6 +2489,13 @@ class ChildNodeClient:
                         )
                     )
                     await self._ws.send(json.dumps(response))
+                    continue
+                # 插件自定义消息类型分发（message_types 扩展点）
+                plugin_response = self._node_connection_manager._dispatch_plugin_message(
+                    next_message
+                )
+                if plugin_response is not None:
+                    await self._ws.send(json.dumps(plugin_response))
                     continue
                 logger.warning(
                     "[NODE] child unhandled message type=%s request_id=%s",

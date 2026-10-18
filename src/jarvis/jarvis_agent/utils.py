@@ -1662,6 +1662,15 @@ def install_plugin(
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 重载插件审计扩展失败（可稍后重启生效）: {e}")
 
+        # 免重启重载插件消息类型：使插件声明的自定义消息类型立即注册到
+        # MessageTypeRegistry。失败仅警告，不阻断安装。
+        try:
+            from jarvis.jarvis_web_gateway.message_types import MessageTypeRegistry
+
+            MessageTypeRegistry.instance().reload_plugin_message_types()
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 重载插件消息类型失败（可稍后重启生效）: {e}")
+
         PrettyOutput.auto_print(f"✅ 插件安装成功: {plugin_name} -> {target_dir}")
         return True
 
@@ -2593,6 +2602,7 @@ def uninstall_plugin(plugin_id: str) -> bool:
                 or result.get("timer_actions")
                 or result.get("audit_sinks")
                 or result.get("audit_event_types")
+                or result.get("message_types")
             ):
                 PrettyOutput.auto_print(
                     f"↩️  已撤销插件 '{plugin_name}' 注册的资源"
@@ -2600,7 +2610,8 @@ def uninstall_plugin(plugin_id: str) -> bool:
                     f"平台 {result.get('platforms', 0)} 个，"
                     f"定时动作 {result.get('timer_actions', 0)} 个，"
                     f"审计扩展 {result.get('audit_sinks', 0)} 个 sink、"
-                    f"{result.get('audit_event_types', 0)} 个事件类型）"
+                    f"{result.get('audit_event_types', 0)} 个事件类型，"
+                    f"消息类型 {result.get('message_types', 0)} 个）"
                 )
     except Exception as e:
         PrettyOutput.auto_print(f"⚠️ 撤销插件资源失败（继续卸载）: {str(e)}")
@@ -2653,6 +2664,15 @@ def uninstall_plugin(plugin_id: str) -> bool:
             AuditSinkRegistry.instance().reload_plugin_sinks()
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 重载插件审计扩展失败（可稍后重启生效）: {e}")
+
+        # 免重启重载插件消息类型：使卸载插件的自定义消息类型从
+        # MessageTypeRegistry 移除。失败仅警告，不阻断卸载。
+        try:
+            from jarvis.jarvis_web_gateway.message_types import MessageTypeRegistry
+
+            MessageTypeRegistry.instance().reload_plugin_message_types()
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 重载插件消息类型失败（可稍后重启生效）: {e}")
         return True
     except Exception as e:
         PrettyOutput.auto_print(f"❌ 卸载插件失败: {str(e)}")

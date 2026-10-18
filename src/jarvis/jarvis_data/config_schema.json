@@ -231,6 +231,14 @@
       },
       "default": []
     },
+    "message_types": {
+      "type": "array",
+      "description": "插件消息类型扩展点：插件声明的自定义网关消息类型实现目录（目录内 .py 导出 message_handler(message) 函数），安装后自动注册到 MessageTypeRegistry，网关收到该类型消息时分发到插件处理",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
     "audit": {
       "type": "object",
       "description": "插件审计事件扩展点：event_types 为插件自定义审计事件类型列表；sinks 为插件声明的审计 sink 实现目录（目录内 .py 导出 audit_sink(event_type, data) 函数），安装后自动注册到 AuditSinkRegistry",

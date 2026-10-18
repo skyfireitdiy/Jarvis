@@ -109,6 +109,9 @@ tool_load_dirs:
 #     - "plugin_sync"
 #   sinks:                             # 插件审计 sink 实现目录（目录内 .py 导出 audit_sink(event_type, data)）
 #     - "{{plugin_dir}}/audit_sinks"
+# --- 消息类型扩展点（可选，声明插件自定义网关消息类型实现目录，见「四.12 消息类型扩展（message_types/）」）---
+# message_types:
+#   - "{{plugin_dir}}/message_types"
 # --- 编排流水线声明 ---
 orchestration:
   - name: "my-pipeline"
@@ -156,7 +159,7 @@ orchestration:
 
 **要点：**
 
-- 扩展点字段（`rules_load_dirs`/`tool_load_dirs`/`agent_definition_dirs`/`orchestration`/`roles_dirs`/`mcp`/`lsp`/`event_callbacks`/`platforms`/`timer_actions`/`audit` 等）会被合并进全局配置供 getter 消费；其中 `mcp` 声明的 MCP server 列表会被合并进全局 `mcp` 配置，插件安装后自动注册为 MCP 工具，无需用户在全局 `~/.jarvis/config.yaml` 重复配置；`lsp` 声明的语言服务会按语言名深度合并进全局 `lsp.languages`，插件安装后自动生效，无需重启；`platforms` 声明的平台实现目录会在插件安装后自动注册到 `PlatformRegistry`（见「四.9 模型供应商」）；`timer_actions` 声明的定时动作实现目录会在插件安装后自动注册到 `TimerActionRegistry`（见「四.10 定时任务动作」）；`audit` 声明的自定义审计事件类型与审计 sink 目录会在插件安装后自动注册到 `AuditSinkRegistry`（见「四.11 审计扩展」）。
+- 扩展点字段（`rules_load_dirs`/`tool_load_dirs`/`agent_definition_dirs`/`orchestration`/`roles_dirs`/`mcp`/`lsp`/`event_callbacks`/`platforms`/`timer_actions`/`audit`/`message_types` 等）会被合并进全局配置供 getter 消费；其中 `mcp` 声明的 MCP server 列表会被合并进全局 `mcp` 配置，插件安装后自动注册为 MCP 工具，无需用户在全局 `~/.jarvis/config.yaml` 重复配置；`lsp` 声明的语言服务会按语言名深度合并进全局 `lsp.languages`，插件安装后自动生效，无需重启；`platforms` 声明的平台实现目录会在插件安装后自动注册到 `PlatformRegistry`（见「四.9 模型供应商」）；`timer_actions` 声明的定时动作实现目录会在插件安装后自动注册到 `TimerActionRegistry`（见「四.10 定时任务动作」）；`audit` 声明的自定义审计事件类型与审计 sink 目录会在插件安装后自动注册到 `AuditSinkRegistry`（见「四.11 审计扩展」）；`message_types` 声明的消息类型实现目录会在插件安装后自动注册到 `MessageTypeRegistry`（见「四.12 消息类型扩展」）。
 
 - `{{plugin_dir}}` 是 jinja2 模板变量，运行时渲染为插件目录绝对路径（见 `render_plugin_config_template`），**勿**写死绝对路径。
 - 除扩展点字段外的其余字段（`name`/`description`/`version`/`builtin`/`license`/`dependencies`/`capabilities`/`frontend`/自定义业务字段）会被隔离到全局配置的 `plugin_configs.<plugin_name>`，**不污染全局配置顶层、多个插件同名私有字段互不覆盖**。插件可通过 `get_plugin_config(plugin_name)` 读取自己的私有配置。
@@ -171,7 +174,7 @@ orchestration:
 - **与插件自身 `version` 区分**：`version` 是插件版本（安装时做版本比较），`api_version` 是接口协议版本（决定插件与 Jarvis 接口的兼容性）。
 - **兼容策略**：以主版本号（major）判断。插件声明的 major 不大于当前 Jarvis 支持的接口版本即兼容；声明更高 major 时 Jarvis **降级警告**（不拒绝加载），提示插件可能依赖未来接口能力。
 - **废弃流程**：废弃某扩展点字段时，Jarvis 在加载插件时打印 deprecation 警告，通知开发者迁移；字段本身仍保留（旧插件仍可加载），仅提示尽快迁移。
-- **覆盖范围**：config.yaml 扩展点（`tool_load_dirs`/`rules_load_dirs`/`orchestration`/`mcp`/`lsp`/`frontend` 等）、plugin/api.py 私有功能（`PUBLIC_FUNCTIONS` 白名单）、工具协议（`protocol_version`，见「工具（tools/）」）。`lsp` 扩展点由接口版本 `1.1` 引入（旧插件未声明 `api_version` 时按 `"1.0"` 处理，仍可正常加载，只是不识别 `lsp` 字段）。`event_callbacks` 扩展点同样由接口版本 `1.1` 引入。`platforms` 扩展点由接口版本 `1.1` 引入。`timer_actions` 扩展点同样由接口版本 `1.1` 引入。`audit` 扩展点同样由接口版本 `1.1` 引入。
+- **覆盖范围**：config.yaml 扩展点（`tool_load_dirs`/`rules_load_dirs`/`orchestration`/`mcp`/`lsp`/`frontend` 等）、plugin/api.py 私有功能（`PUBLIC_FUNCTIONS` 白名单）、工具协议（`protocol_version`，见「工具（tools/）」）。`lsp` 扩展点由接口版本 `1.1` 引入（旧插件未声明 `api_version` 时按 `"1.0"` 处理，仍可正常加载，只是不识别 `lsp` 字段）。`event_callbacks` 扩展点同样由接口版本 `1.1` 引入。`platforms` 扩展点由接口版本 `1.1` 引入。`timer_actions` 扩展点同样由接口版本 `1.1` 引入。`audit` 扩展点同样由接口版本 `1.1` 引入。`message_types` 扩展点同样由接口版本 `1.1` 引入。
 
 ## 四、扩展点开发规范
 
@@ -555,6 +558,49 @@ def register_audit_sinks():
 **与内置审计的关系**：`audit` 扩展点仅在审计功能开启时生效（`is_enable_audit()`）；插件注册的 sink 与事件类型不改变内置审计日志的写入行为，仅作为额外分发目标。
 
 **卸载撤销**：插件卸载时，其注册的审计 sink 与自定义事件类型会从 `AuditSinkRegistry` / `PluginRegistry` 精确移除（可逆效应，见 `PluginRegistry`），已注册的 sink 不再接收新的审计事件。
+
+### 12. 消息类型扩展（message_types/，可选）
+
+插件可在 `config.yaml` 声明 `message_types`，注册插件自带的**网关消息类型**，安装后自动加载到 `MessageTypeRegistry`。网关收到节点上报的、未被内置消息类型处理的 `type` 时，会分发到插件注册的处理函数执行，返回值作为响应回传给节点：
+
+```yaml
+message_types:
+  - "{{plugin_dir}}/message_types"
+```
+
+`message_types` 声明的是**目录列表**（路径用 `{{plugin_dir}}` 占位），目录内每个 `.py` 文件（跳过 `__init__.py`）按以下两种形式之一导出消息处理函数：
+
+**形式一：模块级 `message_handler(message)` 函数**（单个消息类型）
+
+```python
+# message_types/sync_handler.py
+MESSAGE_TYPE_NAME = "plugin_sync"          # 消息类型名（可选，缺省用文件名 stem）
+MESSAGE_TYPE_DESCRIPTION = "处理插件同步消息"  # 消息类型描述（可选）
+
+
+def message_handler(message):
+    """网关收到该类型消息后被调用，message 为节点上报的消息字典。"""
+    return {"result": "synced"}
+```
+
+**形式二：`register_message_types()` 工厂**（返回 `(name, function[, description])` 元组列表，可一次注册多个消息类型）
+
+```python
+# message_types/multi_handlers.py
+def register_message_types():
+    return [
+        ("plugin_sync2", lambda message: {"result": "ok"}, "第二个消息类型"),
+        ("plugin_sync3", lambda message: {"result": "ok"}),
+    ]
+```
+
+**处理函数签名**：`message_handler(message)`，`message` 为节点上报的完整消息字典。处理函数运行在 **gateway 进程内**，返回值作为响应回传给节点：返回裸 dict 时自动包装为节点消息（`type` 取消息类型名、`request_id` 沿用请求的 `request_id`）；返回 `None` 时按未处理走原逻辑。**处理函数异常会被捕获并返回错误响应（`PLUGIN_MESSAGE_HANDLER_FAILED`），不阻断连接**。
+
+**典型场景**：自定义节点与网关间的业务消息协议、插件私有消息类型、节点上报自定义事件等。
+
+**与内置消息类型的关系**：内置消息类型（如 `agent_update` / `node_status` / `tool_result` 等）仍由内置 if-chain 处理；插件注册的消息类型与内置类型重名时**内置类型优先**，插件类型不会覆盖内置处理。
+
+**卸载撤销**：插件卸载时，其注册的消息类型会从 `MessageTypeRegistry` 精确移除（可逆效应，见 `PluginRegistry`），已注册的消息类型不再被分发。
 
 ## 五、版本管理
 
