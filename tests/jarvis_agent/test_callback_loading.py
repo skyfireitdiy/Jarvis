@@ -495,3 +495,176 @@ class TestLoadAllEventCallbacks:
             "get_after_summary_cb",
             "register_after_summary_cb",
         ]
+
+
+class TestLoadPluginEventCallbacks:
+    """load_plugin_event_callbacks 加载插件 event_callbacks 扩展点"""
+
+    @pytest.fixture
+    def agent(self):
+        from jarvis.jarvis_agent.callback_loader import CallbackLoader
+
+        ag = _make_agent()
+        # load_plugin_event_callbacks 是 CallbackLoader 的方法：构造实例并把方法
+        # 绑定到 mock agent 上，使 ag.load_plugin_event_callbacks() 可调用，
+        # 且方法内部 self.agent._load_event_callbacks 委托到 ag 的真实方法。
+        loader = CallbackLoader(ag)
+        _bind(ag, "_load_event_callbacks")
+        ag.load_plugin_event_callbacks = CallbackLoader.load_plugin_event_callbacks.__get__(
+            loader, CallbackLoader
+        )
+        return ag
+
+    @pytest.fixture
+    def cb_decls(self, monkeypatch):
+        """把 get_event_callbacks 替换为可配置的 mock"""
+        import jarvis.jarvis_agent.callback_loader as mod
+
+        holder = Mock(return_value=[])
+        monkeypatch.setattr(mod, "get_event_callbacks", holder)
+        return holder
+
+    def test_empty_declarations_noop(self, agent, cb_decls):
+        """无声明时不做任何事"""
+        cb_decls.return_value = []
+        agent._load_event_callbacks = Mock()
+        agent.load_plugin_event_callbacks()
+        assert agent._load_event_callbacks.call_count == 0
+
+    def test_string_dir_probes_events(self, agent, cb_decls, tmp_path):
+        """字符串目录：自动探测事件短名并注册到 EventBus"""
+        _write_cb_file(
+            tmp_path,
+            "task_started_cb.py",
+            "def task_started_cb(agent):\n    return None\n",
+        )
+        cb_decls.return_value = [
+            {"dir": str(tmp_path), "events": None, "target": "event_bus"}
+        ]
+        agent.load_plugin_event_callbacks()
+        assert len(agent.event_bus._listeners["task_started"]) == 1
+
+    def test_explicit_events_loaded(self, agent, cb_decls, tmp_path):
+        """显式 events 列表：仅注册指定事件"""
+        _write_cb_file(
+            tmp_path,
+            "task_started_cb.py",
+            "def task_started_cb(agent):\n    return None\n",
+        )
+        _write_cb_file(
+            tmp_path,
+            "task_completed_cb.py",
+            "def task_completed_cb(agent):\n    return None\n",
+        )
+        cb_decls.return_value = [
+            {
+                "dir": str(tmp_path),
+                "events": ["task_started"],
+                "target": "event_bus",
+            }
+        ]
+        agent.load_plugin_event_callbacks()
+        assert len(agent.event_bus._listeners["task_started"]) == 1
+        assert "task_completed" not in agent.event_bus._listeners
+
+    def test_hook_target_registers_hook_and_event(self, agent, cb_decls, tmp_path):
+        """target=hook + before_tool_call：注册 hook 且订阅 EventBus"""
+        _write_cb_file(
+            tmp_path,
+            "before_tool_call_cb.py",
+            "def before_tool_call_cb(agent):\n    return True\n",
+        )
+        cb_decls.return_value = [
+            {"dir": str(tmp_path), "events": ["before_tool_call"], "target": "hook"}
+        ]
+        agent.load_plugin_event_callbacks()
+        assert len(agent._before_tool_call_hooks) == 1
+        assert len(agent.event_bus._listeners["before_tool_call"]) == 1
+
+    def test_modifier_target_registers_modifier(self, agent, cb_decls, tmp_path):
+        """target=modifier + before_model_call：注册 modifier"""
+        _write_cb_file(
+            tmp_path,
+            "before_model_call_cb.py",
+            "def before_model_call_cb(agent, message):\n    return message\n",
+        )
+        cb_decls.return_value = [
+            {
+                "dir": str(tmp_path),
+                "events": ["before_model_call"],
+                "target": "modifier",
+            }
+        ]
+        agent.load_plugin_event_callbacks()
+        assert len(agent._before_model_call_modifiers) == 1
+        assert agent.event_bus._listeners["before_model_call"] == []
+
+    def test_hook_invalid_event_warns_and_skips(self, agent, cb_decls, tmp_path, capsys):
+        """target=hook + 非 before_tool_call 事件：显式告警并跳过"""
+        _write_cb_file(
+            tmp_path,
+            "task_started_cb.py",
+            "def task_started_cb(agent):\n    return None\n",
+        )
+        cb_decls.return_value = [
+            {"dir": str(tmp_path), "events": ["task_started"], "target": "hook"}
+        ]
+        agent.load_plugin_event_callbacks()
+        assert agent.event_bus._listeners["task_started"] == []
+        captured = capsys.readouterr()
+        assert "hook" in (captured.out + captured.err)
+
+    def test_modifier_invalid_event_warns_and_skips(self, agent, cb_decls, tmp_path, capsys):
+        """target=modifier + 非 before_model_call/before_summary 事件：告警并跳过"""
+        _write_cb_file(
+            tmp_path,
+            "task_started_cb.py",
+            "def task_started_cb(agent):\n    return None\n",
+        )
+        cb_decls.return_value = [
+            {"dir": str(tmp_path), "events": ["task_started"], "target": "modifier"}
+        ]
+        agent.load_plugin_event_callbacks()
+        assert agent.event_bus._listeners["task_started"] == []
+        captured = capsys.readouterr()
+        assert "modifier" in (captured.out + captured.err)
+
+    def test_unknown_event_name_warns_and_skips(self, agent, cb_decls, tmp_path, capsys):
+        """未知事件短名：告警并跳过"""
+        _write_cb_file(
+            tmp_path,
+            "bogus_event_cb.py",
+            "def bogus_event_cb(agent):\n    return None\n",
+        )
+        cb_decls.return_value = [
+            {"dir": str(tmp_path), "events": ["bogus_event"], "target": "event_bus"}
+        ]
+        agent.load_plugin_event_callbacks()
+        assert "bogus_event" not in agent.event_bus._listeners
+        captured = capsys.readouterr()
+        assert "bogus_event" in (captured.out + captured.err)
+
+    def test_nonexistent_dir_skipped(self, agent, cb_decls):
+        """目录不存在时静默跳过"""
+        cb_decls.return_value = [
+            {"dir": "/nonexistent/path", "events": None, "target": "event_bus"}
+        ]
+        agent._load_event_callbacks = Mock()
+        agent.load_plugin_event_callbacks()
+        assert agent._load_event_callbacks.call_count == 0
+
+    def test_factory_callback_supported(self, agent, cb_decls, tmp_path):
+        """get_/register_ 前缀工厂方法同样支持"""
+        _write_cb_file(
+            tmp_path,
+            "task_started_cb.py",
+            "def get_task_started_cb():\n"
+            "    def _cb(agent):\n"
+            "        return None\n"
+            "    return _cb\n",
+        )
+        cb_decls.return_value = [
+            {"dir": str(tmp_path), "events": ["task_started"], "target": "event_bus"}
+        ]
+        agent.load_plugin_event_callbacks()
+        assert len(agent.event_bus._listeners["task_started"]) == 1

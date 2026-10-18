@@ -41,6 +41,25 @@ INTERRUPT_TRIGGERED = "interrupt_triggered"
 BEFORE_TOOL_FILTER = "before_tool_filter"
 TOOL_FILTERED = "tool_filtered"
 
+# 全部事件短名（值即短名，供插件 event_callbacks 扩展点探测/校验使用）
+EVENT_SHORT_NAMES: List[str] = [
+    BEFORE_TOOL_CALL,
+    AFTER_TOOL_CALL,
+    TASK_STARTED,
+    TASK_COMPLETED,
+    BEFORE_SUMMARY,
+    AFTER_SUMMARY,
+    BEFORE_ADDON_PROMPT,
+    AFTER_ADDON_PROMPT,
+    BEFORE_HISTORY_CLEAR,
+    AFTER_HISTORY_CLEAR,
+    BEFORE_MODEL_CALL,
+    AFTER_MODEL_CALL,
+    INTERRUPT_TRIGGERED,
+    BEFORE_TOOL_FILTER,
+    TOOL_FILTERED,
+]
+
 
 # 事件负载类型（仅用于类型提示）
 class BeforeToolCallEvent(TypedDict, total=False):
@@ -159,6 +178,7 @@ __all__ = [
     "INTERRUPT_TRIGGERED",
     "BEFORE_TOOL_FILTER",
     "TOOL_FILTERED",
+    "EVENT_SHORT_NAMES",
     "BeforeToolCallEvent",
     "AfterToolCallEvent",
     "TaskStartedEvent",

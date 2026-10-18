@@ -1191,6 +1191,73 @@ def get_summary_cb_dirs() -> List[str]:
     ]
 
 
+def get_event_callbacks() -> List[Dict[str, Any]]:
+    """获取插件事件回调声明（event_callbacks 扩展点）。
+
+    插件 config.yaml 通过 ``event_callbacks`` 字段声明回调目录，支持两种形式：
+
+    - 字符串目录：等价于 ``{"dir": <str>, "events": None, "target": "event_bus"}``，
+      回调目录内所有 .py 文件按文件名自动匹配事件（如 ``task_started_cb.py`` → ``task_started``）。
+    - 字典：``{"dir": <str>, "events": [<短名>...], "target": <event_bus|hook|modifier>}``，
+      ``events`` 缺省时自动探测目录内全部事件；``target`` 缺省为 ``event_bus``。
+
+    返回:
+        List[Dict[str, Any]]: 规范化后的声明列表，每项含 ``dir``（绝对路径）、
+        ``events``（事件短名列表或 None 表示自动探测）、``target``（event_bus/hook/modifier）。
+        非法配置项被跳过并告警。
+    """
+    from jarvis.jarvis_utils.output import PrettyOutput
+
+    result: List[Dict[str, Any]] = []
+    raw = GLOBAL_CONFIG_DATA.get("event_callbacks", [])
+    if not isinstance(raw, list):
+        PrettyOutput.auto_print(
+            f"⚠️  event_callbacks 配置格式错误：期望列表，实际 {type(raw).__name__}，已忽略"
+        )
+        return result
+    for entry in raw:
+        if isinstance(entry, str):
+            # 字符串目录：自动探测事件，默认 event_bus
+            result.append(
+                {
+                    "dir": os.path.expanduser(os.path.expandvars(entry)),
+                    "events": None,
+                    "target": "event_bus",
+                }
+            )
+        elif isinstance(entry, dict):
+            dir_val = entry.get("dir")
+            if not isinstance(dir_val, str) or not dir_val.strip():
+                PrettyOutput.auto_print(
+                    f"⚠️  event_callbacks 配置项缺少有效的 dir 字段，已忽略: {entry}"
+                )
+                continue
+            events = entry.get("events")
+            if events is not None and not isinstance(events, list):
+                PrettyOutput.auto_print(
+                    f"⚠️  event_callbacks 配置项 events 字段应为列表，已忽略: {entry}"
+                )
+                continue
+            target = entry.get("target", "event_bus")
+            if target not in ("event_bus", "hook", "modifier"):
+                PrettyOutput.auto_print(
+                    f"⚠️  event_callbacks 配置项 target 非法（应为 event_bus/hook/modifier），已忽略: {entry}"
+                )
+                continue
+            result.append(
+                {
+                    "dir": os.path.expanduser(os.path.expandvars(dir_val)),
+                    "events": events,
+                    "target": target,
+                }
+            )
+        else:
+            PrettyOutput.auto_print(
+                f"⚠️  event_callbacks 配置项类型非法（应为字符串或字典），已忽略: {entry}"
+            )
+    return result
+
+
 def get_central_tool_repo() -> str:
     """
     获取中心工具Git仓库地址。

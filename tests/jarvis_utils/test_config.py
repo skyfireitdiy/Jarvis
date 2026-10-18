@@ -1494,3 +1494,186 @@ class TestPluginConfigIsolation:
         get_replace_map.cache_clear()
         merged = get_replace_map()
         assert merged["MyTag"]["description"] == "自定义标记"
+
+
+class TestGetEventCallbacks:
+    """测试 get_event_callbacks 解析（event_callbacks 扩展点）"""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, disable_auto_discover):
+        """为所有测试禁用自动发现"""
+        pass
+
+    def _set(self, value):
+        """写入 event_callbacks 配置并返回原始值（供 finally 恢复）"""
+        original = GLOBAL_CONFIG_DATA.get("event_callbacks", None)
+        GLOBAL_CONFIG_DATA["event_callbacks"] = value
+        return original
+
+    def _restore(self, original):
+        if original is None:
+            GLOBAL_CONFIG_DATA.pop("event_callbacks", None)
+        else:
+            GLOBAL_CONFIG_DATA["event_callbacks"] = original
+
+    def test_default_empty(self):
+        """未配置 event_callbacks 时返回空列表"""
+        original = self._set([])
+        try:
+            from jarvis.jarvis_utils.config import get_event_callbacks
+
+            assert get_event_callbacks() == []
+        finally:
+            self._restore(original)
+
+    def test_string_entry_normalized(self, tmp_path):
+        """字符串目录：自动探测事件、默认 event_bus"""
+        from jarvis.jarvis_utils.config import get_event_callbacks
+
+        cb_dir = tmp_path / "callbacks"
+        cb_dir.mkdir()
+        original = self._set([str(cb_dir)])
+        try:
+            result = get_event_callbacks()
+            assert len(result) == 1
+            assert result[0]["dir"] == str(cb_dir)
+            assert result[0]["events"] is None
+            assert result[0]["target"] == "event_bus"
+        finally:
+            self._restore(original)
+
+    def test_dict_entry_normalized(self, tmp_path):
+        """dict 条目：dir/events/target 规范化"""
+        from jarvis.jarvis_utils.config import get_event_callbacks
+
+        cb_dir = tmp_path / "callbacks"
+        cb_dir.mkdir()
+        original = self._set(
+            [
+                {
+                    "dir": str(cb_dir),
+                    "events": ["task_started", "task_completed"],
+                    "target": "event_bus",
+                }
+            ]
+        )
+        try:
+            result = get_event_callbacks()
+            assert len(result) == 1
+            assert result[0]["dir"] == str(cb_dir)
+            assert result[0]["events"] == ["task_started", "task_completed"]
+            assert result[0]["target"] == "event_bus"
+        finally:
+            self._restore(original)
+
+    def test_dict_entry_defaults(self, tmp_path):
+        """dict 条目缺省 events/target：events=None、target=event_bus"""
+        from jarvis.jarvis_utils.config import get_event_callbacks
+
+        cb_dir = tmp_path / "callbacks"
+        cb_dir.mkdir()
+        original = self._set([{"dir": str(cb_dir)}])
+        try:
+            result = get_event_callbacks()
+            assert len(result) == 1
+            assert result[0]["events"] is None
+            assert result[0]["target"] == "event_bus"
+        finally:
+            self._restore(original)
+
+    def test_expanduser_expandvars(self, tmp_path, monkeypatch):
+        """dir 支持 ~ 与 $VAR 展开"""
+        from jarvis.jarvis_utils.config import get_event_callbacks
+
+        monkeypatch.setenv("JARVIS_TEST_CB_DIR", str(tmp_path))
+        original = self._set(["$JARVIS_TEST_CB_DIR/callbacks"])
+        try:
+            result = get_event_callbacks()
+            assert result[0]["dir"] == str(tmp_path / "callbacks")
+        finally:
+            self._restore(original)
+
+    def test_invalid_root_type_warns(self, capsys):
+        """event_callbacks 非列表时告警并返回空"""
+        from jarvis.jarvis_utils.config import get_event_callbacks
+
+        original = self._set("not-a-list")
+        try:
+            assert get_event_callbacks() == []
+            captured = capsys.readouterr()
+            assert "event_callbacks" in (captured.out + captured.err)
+        finally:
+            self._restore(original)
+
+    def test_invalid_entry_type_skipped(self, capsys):
+        """非法条目类型（非字符串/字典）被跳过并告警"""
+        from jarvis.jarvis_utils.config import get_event_callbacks
+
+        original = self._set([123])
+        try:
+            assert get_event_callbacks() == []
+            captured = capsys.readouterr()
+            assert "event_callbacks" in (captured.out + captured.err)
+        finally:
+            self._restore(original)
+
+    def test_dict_missing_dir_skipped(self, capsys):
+        """dict 缺 dir 或 dir 非字符串被跳过并告警"""
+        from jarvis.jarvis_utils.config import get_event_callbacks
+
+        original = self._set([{"events": ["task_started"]}, {"dir": 123}])
+        try:
+            assert get_event_callbacks() == []
+            captured = capsys.readouterr()
+            assert "event_callbacks" in (captured.out + captured.err)
+        finally:
+            self._restore(original)
+
+    def test_dict_invalid_events_skipped(self, capsys):
+        """dict 的 events 非列表被跳过并告警"""
+        from jarvis.jarvis_utils.config import get_event_callbacks
+
+        original = self._set([{"dir": "/tmp/x", "events": "task_started"}])
+        try:
+            assert get_event_callbacks() == []
+            captured = capsys.readouterr()
+            assert "event_callbacks" in (captured.out + captured.err)
+        finally:
+            self._restore(original)
+
+    def test_dict_invalid_target_skipped(self, capsys):
+        """dict 的 target 非法值被跳过并告警"""
+        from jarvis.jarvis_utils.config import get_event_callbacks
+
+        original = self._set([{"dir": "/tmp/x", "target": "bogus"}])
+        try:
+            assert get_event_callbacks() == []
+            captured = capsys.readouterr()
+            assert "event_callbacks" in (captured.out + captured.err)
+        finally:
+            self._restore(original)
+
+    def test_plugin_event_callbacks_merged_as_extension_field(self, tmp_path):
+        """插件 config.yaml 的 event_callbacks 作为扩展点合并进全局配置"""
+        plugin_dir = tmp_path / "plugin"
+        plugin_dir.mkdir()
+        cb_dir = plugin_dir / "callbacks"
+        cb_dir.mkdir()
+        plugin_config = {
+            "event_callbacks": [
+                {"dir": str(cb_dir), "events": ["task_started"], "target": "event_bus"}
+            ],
+            "private_key": "pv",
+        }
+        with open(plugin_dir / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump(plugin_config, f)
+
+        base_config = {"plugin_dirs": [str(plugin_dir)]}
+        result = _load_plugin_configs(base_config)
+
+        # event_callbacks 作为扩展点字段合并进全局顶层
+        assert "event_callbacks" in result
+        assert result["event_callbacks"][0]["dir"] == str(cb_dir)
+        assert result["event_callbacks"][0]["events"] == ["task_started"]
+        # 私有字段仍隔离
+        assert result["plugin_configs"]["plugin"]["private_key"] == "pv"
