@@ -2201,6 +2201,25 @@ def create_app(
         )
         pass
 
+    # 注册插件审计扩展撤销器（可逆效应），供 PluginRegistry.revoke_plugin 调用；
+    # 并加载插件声明的审计扩展（audit 扩展点）。
+    try:
+        from jarvis.jarvis_audit.audit_plugins import AuditSinkRegistry
+        from jarvis.jarvis_tools.plugin_registry import PluginRegistry
+
+        audit_sink_registry = AuditSinkRegistry.instance()
+        audit_sink_registry.load_plugin_sinks()
+        PluginRegistry.instance().set_audit_revoker(
+            audit_sink_registry.unregister_by_plugin
+        )
+    except Exception as e:
+        save_exception(
+            e,
+            module="jarvis_web_gateway.app",
+            function="_build_callback_from_metadata",
+        )
+        pass
+
     # Agent 进程（custom_app 模式）与主网关共享同一持久化文件 .jarvis_timers.json。
     # 若 Agent 进程也加载/写回该文件，会与主网关的 TimerManager 互相覆盖：
     # 主网关删除的任务会被 Agent 进程触发时写回（任务复活），

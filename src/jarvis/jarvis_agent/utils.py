@@ -1653,6 +1653,15 @@ def install_plugin(
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 重载插件定时动作失败（可稍后重启生效）: {e}")
 
+        # 免重启重载插件审计扩展：使插件声明的审计事件类型与 sink 立即注册到
+        # AuditSinkRegistry。失败仅警告，不阻断安装。
+        try:
+            from jarvis.jarvis_audit.audit_plugins import AuditSinkRegistry
+
+            AuditSinkRegistry.instance().reload_plugin_sinks()
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 重载插件审计扩展失败（可稍后重启生效）: {e}")
+
         PrettyOutput.auto_print(f"✅ 插件安装成功: {plugin_name} -> {target_dir}")
         return True
 
@@ -2582,12 +2591,16 @@ def uninstall_plugin(plugin_id: str) -> bool:
                 or result.get("rules")
                 or result.get("platforms")
                 or result.get("timer_actions")
+                or result.get("audit_sinks")
+                or result.get("audit_event_types")
             ):
                 PrettyOutput.auto_print(
                     f"↩️  已撤销插件 '{plugin_name}' 注册的资源"
                     f"（工具 {result.get('tools', 0)} 个，规则 {result.get('rules', 0)} 个，"
                     f"平台 {result.get('platforms', 0)} 个，"
-                    f"定时动作 {result.get('timer_actions', 0)} 个）"
+                    f"定时动作 {result.get('timer_actions', 0)} 个，"
+                    f"审计扩展 {result.get('audit_sinks', 0)} 个 sink、"
+                    f"{result.get('audit_event_types', 0)} 个事件类型）"
                 )
     except Exception as e:
         PrettyOutput.auto_print(f"⚠️ 撤销插件资源失败（继续卸载）: {str(e)}")
@@ -2631,6 +2644,15 @@ def uninstall_plugin(plugin_id: str) -> bool:
             TimerActionRegistry.instance().reload_plugin_actions()
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 重载插件定时动作失败（可稍后重启生效）: {e}")
+
+        # 免重启重载插件审计扩展：使卸载插件的审计事件类型与 sink 从
+        # AuditSinkRegistry 移除。失败仅警告，不阻断卸载。
+        try:
+            from jarvis.jarvis_audit.audit_plugins import AuditSinkRegistry
+
+            AuditSinkRegistry.instance().reload_plugin_sinks()
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 重载插件审计扩展失败（可稍后重启生效）: {e}")
         return True
     except Exception as e:
         PrettyOutput.auto_print(f"❌ 卸载插件失败: {str(e)}")

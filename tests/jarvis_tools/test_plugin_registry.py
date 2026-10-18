@@ -76,6 +76,8 @@ class TestPluginRegistry:
         pr.register_rule("p1", "rule_x")
         pr.register_platform("p1", "platform_x")
         pr.register_timer_action("p1", "action_x")
+        pr.register_audit_sink("p1", "sink_x")
+        pr.register_audit_event_type("p1", "event_x")
 
         result = pr.revoke_plugin("p1")
         assert result == {
@@ -83,6 +85,8 @@ class TestPluginRegistry:
             "rules": 0,
             "platforms": 0,
             "timer_actions": 0,
+            "audit_sinks": 0,
+            "audit_event_types": 0,
         }
         assert not pr.has_plugin("p1")
 
@@ -93,8 +97,16 @@ class TestPluginRegistry:
         pr.register_rule("p1", "rule_x")
         pr.register_platform("p1", "platform_x")
         pr.register_timer_action("p1", "action_x")
+        pr.register_audit_sink("p1", "sink_x")
+        pr.register_audit_event_type("p1", "event_x")
 
-        revoked = {"tools": [], "rules": [], "platforms": [], "timer_actions": []}
+        revoked = {
+            "tools": [],
+            "rules": [],
+            "platforms": [],
+            "timer_actions": [],
+            "audit_sinks": [],
+        }
 
         def tool_revoker(name):
             revoked["tools"].append(name)
@@ -112,10 +124,15 @@ class TestPluginRegistry:
             revoked["timer_actions"].append(name)
             return 1
 
+        def audit_revoker(name):
+            revoked["audit_sinks"].append(name)
+            return 2
+
         pr.set_tool_revoker(tool_revoker)
         pr.set_rules_revoker(rules_revoker)
         pr.set_platform_revoker(platform_revoker)
         pr.set_timer_action_revoker(timer_action_revoker)
+        pr.set_audit_revoker(audit_revoker)
 
         result = pr.revoke_plugin("p1")
         assert result == {
@@ -123,11 +140,14 @@ class TestPluginRegistry:
             "rules": 1,
             "platforms": 1,
             "timer_actions": 1,
+            "audit_sinks": 2,
+            "audit_event_types": 0,
         }
         assert revoked["tools"] == ["p1"]
         assert revoked["rules"] == ["p1"]
         assert revoked["platforms"] == ["p1"]
         assert revoked["timer_actions"] == ["p1"]
+        assert revoked["audit_sinks"] == ["p1"]
         assert not pr.has_plugin("p1")
 
     def test_register_and_get_platforms(self):
