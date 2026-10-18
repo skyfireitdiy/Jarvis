@@ -5064,6 +5064,34 @@ def create_app(
                     media_type="application/json",
                 )
 
+            # 插件管理接口的 admin:plugins 权限同样由 master 统一把关
+            # （子节点本地无 auth 数据，无法独立判定，会误判为无权限）。
+            _proxy_path = str(path or "").strip("/")
+            if (
+                (
+                    _proxy_path == "plugins"
+                    or _proxy_path == "plugins/install"
+                    or _proxy_path.startswith("plugins/")
+                )
+                and _proxy_user_id
+                and _proxy_user_id != "system"
+                and permission_manager
+                and not permission_manager.check_permission(
+                    _proxy_user_id, "admin:plugins"
+                )
+            ):
+                logger.warning(
+                    f"[NODE HTTP PROXY] 权限拒绝: user_id={_proxy_user_id}, permission=admin:plugins"
+                )
+                return Response(
+                    content=(
+                        '{"success": false, "error": {"code": "PERMISSION_DENIED", '
+                        '"message": "Permission denied: admin:plugins"}}'
+                    ),
+                    status_code=403,
+                    media_type="application/json",
+                )
+
             response = await node_connection_manager.send_request_to_node(
                 normalized_node_id,
                 NODE_HTTP_PROXY_REQUEST,
