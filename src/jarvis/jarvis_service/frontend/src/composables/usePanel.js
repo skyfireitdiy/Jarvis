@@ -188,12 +188,16 @@ export function usePanel({
   const visibleSessionAgentIds = computed(() => {
     const ids = new Set()
     // 已统一为 pane 树：遍历 pane 树收集所有承载会话的 pane（未分割时唯一 leaf 也会被遍历到）。
+    // 多 tab：session leaf 的 sessionPanelIds 列表中的所有 panel 都视为可见会话。
     const walk = (node) => {
       if (!node) return
       if (node.type === 'leaf') {
-        if (node.view === 'session' && node.sessionPanelId) {
-          const panel = panels.value.find(p => p.id === node.sessionPanelId)
-          if (panel && panel.agentId) ids.add(panel.agentId)
+        if (node.view === 'session') {
+          const panelIds = Array.isArray(node.sessionPanelIds) ? node.sessionPanelIds : (node.sessionPanelId ? [node.sessionPanelId] : [])
+          for (const panelId of panelIds) {
+            const panel = panels.value.find(p => p.id === panelId)
+            if (panel && panel.agentId) ids.add(panel.agentId)
+          }
         }
         return
       }

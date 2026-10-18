@@ -489,7 +489,7 @@ describe('useWorkspacePane', () => {
     const raw = localStorage.getItem('jarvis_workspace_pane_layout')
     expect(raw).toBeTruthy()
     const payload = JSON.parse(raw)
-    expect(payload.version).toBe(2)
+    expect(payload.version).toBe(3)
     expect(payload.tree.type).toBe('split')
     // 恢复到新 harness
     const { api: api2 } = makeHarness()
@@ -710,5 +710,242 @@ describe('useWorkspacePane', () => {
     // 拖拽结束后再 mousemove 不应再改 ratio（上下文已清空）
     document.dispatchEvent(new MouseEvent('mousemove', { clientX: 800 }))
     expect(splitNode.ratio).toBeCloseTo(0.6, 5)
+  })
+
+  // ===== session 多 tab（Issue #287）=====
+  it('addSessionTabToPane：非 session pane 返回 false', () => {
+    const { api } = makeHarness()
+    const root = api.workspacePaneTree.value
+    expect(api.addSessionTabToPane(root, 'panel-1')).toBe(false)
+  })
+
+  it('addSessionTabToPane：向 session pane 追加 tab，激活新 tab 并同步兼容字段', () => {
+    const { api, panels } = makeHarness()
+    const rootId = api.workspacePaneTree.value.id
+    panels.value = [{ id: 'panel-1', agentId: 'agent-1' }]
+    api.setActivePaneView('session', 'panel-1')
+    const pane = api.workspacePaneTree.value
+    expect(pane.sessionPanelIds).toEqual(['panel-1'])
+    // 追加第二个 tab
+    panels.value.push({ id: 'panel-2', agentId: 'agent-2' })
+    expect(api.addSessionTabToPane(pane, 'panel-2')).toBe(true)
+    expect(pane.sessionPanelIds).toEqual(['panel-1', 'panel-2'])
+    expect(pane.activeSessionPanelId).toBe('panel-2')
+    expect(pane.sessionPanelId).toBe('panel-2') // 兼容字段同步
+    // 重复追加不生效
+    expect(api.addSessionTabToPane(pane, 'panel-2')).toBe(true)
+    expect(pane.sessionPanelIds).toEqual(['panel-1', 'panel-2'])
+  })
+
+  it('activateSessionTabInPane：激活已有 tab，忽略不存在的 tab', () => {
+    const { api, panels } = makeHarness()
+    const rootId = api.workspacePaneTree.value.id
+    panels.value = [{ id: 'panel-1', agentId: 'agent-1' }, { id: 'panel-2', agentId: 'agent-2' }]
+    api.setActivePaneView('session', 'panel-1')
+    const pane = api.workspacePaneTree.value
+    api.addSessionTabToPane(pane, 'panel-2')
+    expect(api.activateSessionTabInPane(pane, 'panel-1')).toBe(true)
+    expect(pane.activeSessionPanelId).toBe('panel-1')
+    expect(pane.sessionPanelId).toBe('panel-1')
+    expect(api.activateSessionTabInPane(pane, 'panel-gone')).toBe(false)
+    expect(pane.activeSessionPanelId).toBe('panel-1')
+  })
+
+  it('closeSessionTabInPane：关闭非激活 tab 不影响激活 tab', () => {
+    const { api, panels } = makeHarness()
+    const rootId = api.workspacePaneTree.value.id
+    panels.value = [{ id: 'panel-1', agentId: 'agent-1' }, { id: 'panel-2', agentId: 'agent-2' }]
+    api.setActivePaneView('session', 'panel-1')
+    const pane = api.workspacePaneTree.value
+    api.addSessionTabToPane(pane, 'panel-2')
+    // 激活 panel-2，关闭 panel-1（非激活）
+    api.activateSessionTabInPane(pane, 'panel-2')
+    api.closeSessionTabInPane(pane, 'panel-1')
+    expect(pane.sessionPanelIds).toEqual(['panel-2'])
+    expect(pane.activeSessionPanelId).toBe('panel-2')
+    expect(pane.view).toBe('session')
+  })
+
+  it('closeSessionTabInPane：关闭激活 tab 自动切到相邻 tab', () => {
+    const { api, panels } = makeHarness()
+    const rootId = api.workspacePaneTree.value.id
+    panels.value = [{ id: 'panel-1', agentId: 'agent-1' }, { id: 'panel-2', agentId: 'agent-2' }]
+    api.setActivePaneView('session', 'panel-1')
+    const pane = api.workspacePaneTree.value
+    api.addSessionTabToPane(pane, 'panel-2')
+    // 激活 panel-1，关闭它 → 切到 panel-2
+    api.closeSessionTabInPane(pane, 'panel-1')
+    expect(pane.sessionPanelIds).toEqual(['panel-2'])
+    expect(pane.activeSessionPanelId).toBe('panel-2')
+    expect(pane.sessionPanelId).toBe('panel-2')
+  })
+
+  it('closeSessionTabInPane：全部关闭后 pane 清成 empty', () => {
+    const { api, panels } = makeHarness()
+    const rootId = api.workspacePaneTree.value.id
+    panels.value = [{ id: 'panel-1', agentId: 'agent-1' }]
+    api.setActivePaneView('session', 'panel-1')
+    const pane = api.workspacePaneTree.value
+    api.closeSessionTabInPane(pane, 'panel-1')
+    expect(pane.view).toBe('empty')
+    expect(pane.sessionPanelIds).toEqual([])
+    expect(pane.activeSessionPanelId).toBeNull()
+    expect(pane.sessionPanelId).toBeNull()
+    expect(pane.agentId).toBeNull()
+  })
+
+  it('setActivePaneViewForPane：session pane 上追加 tab（不关闭旧 panel）', () => {
+    const { api, panels } = makeHarness()
+    const rootId = api.workspacePaneTree.value.id
+    panels.value = [{ id: 'panel-1', agentId: 'agent-1' }, { id: 'panel-2', agentId: 'agent-2' }]
+    api.setActivePaneView('session', 'panel-1')
+    const pane = api.workspacePaneTree.value
+    // 在已是 session 的 pane 上再放 panel-2 → 追加 tab
+    expect(api.setActivePaneViewForPane(pane, 'session', 'panel-2')).toBe(true)
+    expect(pane.sessionPanelIds).toEqual(['panel-1', 'panel-2'])
+    expect(pane.activeSessionPanelId).toBe('panel-2')
+  })
+
+  it('setActivePaneViewForPane：从 session 切到 file 清空多 tab 字段', () => {
+    const { api, panels } = makeHarness()
+    const rootId = api.workspacePaneTree.value.id
+    panels.value = [{ id: 'panel-1', agentId: 'agent-1' }]
+    api.setActivePaneView('session', 'panel-1')
+    const pane = api.workspacePaneTree.value
+    api.setActivePaneViewForPane(pane, 'file')
+    expect(pane.view).toBe('file')
+    expect(pane.sessionPanelIds).toEqual([])
+    expect(pane.activeSessionPanelId).toBeNull()
+    expect(pane.sessionPanelId).toBeNull()
+  })
+
+  it('paneSessionPanelIds：兼容单 tab 的 sessionPanelId 字段', () => {
+    const { api, panels } = makeHarness()
+    const rootId = api.workspacePaneTree.value.id
+    panels.value = [{ id: 'panel-1', agentId: 'agent-1' }]
+    api.setActivePaneView('session', 'panel-1')
+    const pane = api.workspacePaneTree.value
+    // 模拟旧结构：只有 sessionPanelId，无 sessionPanelIds
+    delete pane.sessionPanelIds
+    delete pane.activeSessionPanelId
+    expect(api.paneSessionPanelIds(pane)).toEqual(['panel-1'])
+    expect(api.paneActiveSessionPanelId(pane)).toBe('panel-1')
+  })
+
+  it('persistWorkspacePaneLayout：version 3 序列化 session 多 tab agentIds', () => {
+    const { api, panels } = makeHarness()
+    const rootId = api.workspacePaneTree.value.id
+    panels.value = [{ id: 'panel-1', agentId: 'agent-1' }, { id: 'panel-2', agentId: 'agent-2' }]
+    api.splitWorkspacePane(rootId, 'row')
+    // 左 pane 承载两个 tab
+    api.setActivePaneViewForPane(api.workspacePaneTree.value.children[0], 'session', 'panel-1')
+    api.setActivePaneViewForPane(api.workspacePaneTree.value.children[0], 'session', 'panel-2')
+    api.persistWorkspacePaneLayout()
+    const raw = localStorage.getItem('jarvis_workspace_pane_layout')
+    expect(raw).toBeTruthy()
+    const parsed = JSON.parse(raw)
+    expect(parsed.version).toBe(3)
+    // 找到 session leaf 的 content.agentIds
+    const sessionLeaf = parsed.tree.children.find(c => c.view === 'session')
+    expect(sessionLeaf.content.agentIds).toEqual(['agent-1', 'agent-2'])
+  })
+
+  it('persistWorkspacePaneLayout：未分割但唯一 leaf 是 session 时也写入（多 tab 刷新恢复）', () => {
+    const { api, panels } = makeHarness()
+    panels.value = [{ id: 'panel-1', agentId: 'agent-1' }, { id: 'panel-2', agentId: 'agent-2' }]
+    // 未分割：唯一 leaf 直接承载两个 tab
+    api.setActivePaneView('session', 'panel-1')
+    const pane = api.workspacePaneTree.value
+    api.addSessionTabToPane(pane, 'panel-2')
+    api.persistWorkspacePaneLayout()
+    const raw = localStorage.getItem('jarvis_workspace_pane_layout')
+    expect(raw).toBeTruthy()
+    const parsed = JSON.parse(raw)
+    expect(parsed.version).toBe(3)
+    expect(parsed.tree.type).toBe('leaf')
+    expect(parsed.tree.view).toBe('session')
+    expect(parsed.tree.content.agentIds).toEqual(['agent-1', 'agent-2'])
+  })
+
+  it('persistWorkspacePaneLayout：未分割且非 session 时不写入', () => {
+    const { api } = makeHarness()
+    api.persistWorkspacePaneLayout()
+    expect(localStorage.getItem('jarvis_workspace_pane_layout')).toBeNull()
+  })
+
+  it('restoreWorkspacePaneLayout：恢复未分割单 leaf session 布局', async () => {
+    const { api, agentList, panels } = makeHarness()
+    const layout = {
+      version: 3,
+      activePaneId: 'pane-1',
+      tree: { type: 'leaf', id: 'pane-1', view: 'session', sessionPanelId: null, agentId: 'agent-1', content: { agentIds: ['agent-1', 'agent-2'] } },
+    }
+    localStorage.setItem('jarvis_workspace_pane_layout', JSON.stringify(layout))
+    api.restoreWorkspacePaneLayout()
+    expect(api.workspacePaneTree.value.type).toBe('leaf')
+    expect(api.workspacePaneTree.value.view).toBe('session')
+    agentList.value = [
+      { agent_id: 'agent-1', name: 'Agent 1' },
+      { agent_id: 'agent-2', name: 'Agent 2' },
+    ]
+    await api.restoreWorkspacePaneContents()
+    const pane = api.workspacePaneTree.value
+    expect(pane.sessionPanelIds.length).toBe(2)
+    expect(panels.value.length).toBe(2)
+  })
+
+  it('restoreWorkspacePaneLayout：旧版单 agentId 迁移到多 tab agentIds', async () => {
+    const { api, agentList, panels } = makeHarness()
+    // 写入 version 2 旧布局：session leaf 只有 content.agentId
+    const oldLayout = {
+      version: 2,
+      activePaneId: 'pane-2',
+      tree: {
+        type: 'split',
+        direction: 'row',
+        ratio: 0.5,
+        children: [
+          { type: 'leaf', id: 'pane-1', view: 'file', sessionPanelId: null, agentId: null, content: null },
+          { type: 'leaf', id: 'pane-2', view: 'session', sessionPanelId: null, agentId: 'agent-1', content: { agentId: 'agent-1' } },
+        ],
+      },
+    }
+    localStorage.setItem('jarvis_workspace_pane_layout', JSON.stringify(oldLayout))
+    api.restoreWorkspacePaneLayout()
+    agentList.value = [{ agent_id: 'agent-1', name: 'Agent 1' }]
+    await api.restoreWorkspacePaneContents()
+    const pane = api.findWorkspacePaneById(api.workspacePaneTree.value, 'pane-2')
+    expect(pane.view).toBe('session')
+    expect(pane.sessionPanelIds).toEqual([pane.sessionPanelId])
+    expect(panels.value.length).toBe(1)
+    expect(panels.value[0].agentId).toBe('agent-1')
+  })
+
+  it('restoreWorkspacePaneContents：恢复多 tab session pane（agentIds 列表）', async () => {
+    const { api, agentList, panels } = makeHarness()
+    const tree = {
+      type: 'split',
+      direction: 'row',
+      ratio: 0.5,
+      children: [
+        { type: 'leaf', id: 'pane-1', view: 'file', sessionPanelId: null, agentId: null, content: null },
+        { type: 'leaf', id: 'pane-2', view: 'session', sessionPanelId: null, agentId: 'agent-1', content: { agentIds: ['agent-1', 'agent-2'] } },
+      ],
+    }
+    api.workspacePaneTree.value = tree
+    api.activePaneId.value = 'pane-2'
+    agentList.value = [
+      { agent_id: 'agent-1', name: 'Agent 1' },
+      { agent_id: 'agent-2', name: 'Agent 2' },
+    ]
+    await api.restoreWorkspacePaneContents()
+    const pane = api.findWorkspacePaneById(tree, 'pane-2')
+    expect(pane.view).toBe('session')
+    expect(pane.sessionPanelIds.length).toBe(2)
+    expect(panels.value.length).toBe(2)
+    // 激活第一个 tab
+    expect(pane.activeSessionPanelId).toBe(pane.sessionPanelIds[0])
+    expect(pane.sessionPanelId).toBe(pane.sessionPanelIds[0])
+    expect(pane.content).toBeNull()
   })
 })

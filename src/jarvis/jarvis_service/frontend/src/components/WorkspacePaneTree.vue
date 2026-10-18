@@ -13,11 +13,15 @@
         :canClose="true"
         :getTitle="getTitle"
         :getStatus="getStatus"
+        :getSessionTabs="getSessionTabs"
         @activate="(id) => $emit('activate', id)"
         @split="(id, dir) => $emit('split', id, dir)"
         @close="(id) => $emit('close', id)"
         @maximize="(id) => $emit('maximize', id)"
         @startResize="(ev, n) => $emit('startResize', ev, n)"
+        @activate-session-tab="(id, panelId) => $emit('activate-session-tab', id, panelId)"
+        @close-session-tab="(id, panelId) => $emit('close-session-tab', id, panelId)"
+        @add-session-tab="(id) => $emit('add-session-tab', id)"
       >
         <template #pane-content="slotProps">
           <slot name="pane-content" v-bind="slotProps" />
@@ -37,11 +41,15 @@
         :canClose="true"
         :getTitle="getTitle"
         :getStatus="getStatus"
+        :getSessionTabs="getSessionTabs"
         @activate="(id) => $emit('activate', id)"
         @split="(id, dir) => $emit('split', id, dir)"
         @close="(id) => $emit('close', id)"
         @maximize="(id) => $emit('maximize', id)"
         @startResize="(ev, n) => $emit('startResize', ev, n)"
+        @activate-session-tab="(id, panelId) => $emit('activate-session-tab', id, panelId)"
+        @close-session-tab="(id, panelId) => $emit('close-session-tab', id, panelId)"
+        @add-session-tab="(id) => $emit('add-session-tab', id)"
       >
         <template #pane-content="slotProps">
           <slot name="pane-content" v-bind="slotProps" />
@@ -69,9 +77,14 @@
       :maximized="node.id === maximizedPaneId"
       :getTitle="getTitle"
       :getStatus="getStatus"
+      :sessionTabs="getSessionTabs ? getSessionTabs(node) : null"
+      :activeSessionPanelId="node.activeSessionPanelId || null"
       @split="(id, dir) => $emit('split', id, dir)"
       @close="(id) => $emit('close', id)"
       @maximize="(id) => $emit('maximize', id)"
+      @activate-session-tab="(id, panelId) => $emit('activate-session-tab', id, panelId)"
+      @close-session-tab="(id, panelId) => $emit('close-session-tab', id, panelId)"
+      @add-session-tab="(id) => $emit('add-session-tab', id)"
     />
     <div class="workspace-pane-leaf-body">
       <slot name="pane-content" :pane="node" :active="node.id === activePaneId" />
@@ -92,9 +105,10 @@ const props = defineProps({
   canMaximize: { type: Boolean, default: true },
   getTitle: { type: Function, default: null },
   getStatus: { type: Function, default: null },
+  getSessionTabs: { type: Function, default: null },
 })
 
-defineEmits(['activate', 'split', 'close', 'startResize', 'maximize'])
+defineEmits(['activate', 'split', 'close', 'startResize', 'maximize', 'activate-session-tab', 'close-session-tab', 'add-session-tab'])
 
 function childStyle(index) {
   const ratio = props.node.type === 'split' ? props.node.ratio : 0.5
