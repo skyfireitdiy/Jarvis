@@ -1692,6 +1692,49 @@ def get_plugin_timer_action_dirs() -> List[str]:
     ]
 
 
+def get_plugin_audit_sink_dirs() -> List[str]:
+    """获取插件声明的审计 sink 实现目录（audit 扩展点）。
+
+    插件 config.yaml 通过 ``audit.sinks`` 字段声明自带的审计目标实现目录
+    （目录内 .py 文件导出 ``audit_sink(event_type, data)`` 函数，见
+    ``AuditSinkRegistry.load_plugin_sinks``）：
+
+        audit:
+          sinks:
+            - "{{plugin_dir}}/audit_sinks"
+
+    返回:
+        List[str]: 插件审计 sink 目录绝对路径列表（已展开 ~ 与环境变量）
+    """
+    audit_config = GLOBAL_CONFIG_DATA.get("audit", {}) or {}
+    if not isinstance(audit_config, dict):
+        audit_config = {}
+    return [
+        os.path.expanduser(os.path.expandvars(str(p)))
+        for p in audit_config.get("sinks", [])
+        if p
+    ]
+
+
+def get_plugin_audit_event_types() -> List[str]:
+    """获取插件声明的自定义审计事件类型（audit 扩展点）。
+
+    插件 config.yaml 通过 ``audit.event_types`` 字段声明自定义审计事件类型
+    （字符串列表），写入审计日志时可用作事件类型：
+
+        audit:
+          event_types:
+            - "plugin_sync"
+
+    返回:
+        List[str]: 插件自定义审计事件类型列表
+    """
+    audit_config = GLOBAL_CONFIG_DATA.get("audit", {}) or {}
+    if not isinstance(audit_config, dict):
+        audit_config = {}
+    return [str(t) for t in audit_config.get("event_types", []) if t]
+
+
 def get_gateway_auth_config() -> Dict[str, Any]:
     """
     获取 Gateway 认证配置。

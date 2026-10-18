@@ -1490,6 +1490,7 @@ _PLUGIN_EXTENSION_FIELDS = frozenset(
         "lsp",
         "platforms",
         "timer_actions",
+        "audit",
     }
 )
 
@@ -1527,6 +1528,7 @@ _PLUGIN_EXTENSION_FIELD_API_VERSION = {
     "lsp": "1.1",
     "platforms": "1.1",
     "timer_actions": "1.1",
+    "audit": "1.1",
 }
 
 
@@ -1738,6 +1740,18 @@ def _load_plugin_configs(
                     PluginRegistry.instance().set_plugin_code_agent_tools(
                         plugin_path.name, True
                     )
+                # 若插件声明了自定义审计事件类型，登记到 PluginRegistry（供卸载时
+                # 精确撤销）。audit.event_types 会被合并进全局配置丢失来源，
+                # 因此必须在解析插件 config 时按插件名登记来源（可逆效应）。
+                _audit_config = plugin_config.get("audit") or {}
+                if isinstance(_audit_config, dict):
+                    _audit_event_types = _audit_config.get("event_types") or []
+                    if _audit_event_types:
+                        from jarvis.jarvis_tools.plugin_registry import PluginRegistry
+
+                        PluginRegistry.instance().register_audit_event_types(
+                            plugin_path.name, _audit_event_types
+                        )
                 # 拆分扩展点字段与私有字段：
                 # - 扩展点字段（白名单）合并进全局配置，供 getter 消费
                 # - 其余字段视为插件私有配置，按插件名隔离到 plugin_configs，

@@ -36,10 +36,13 @@ class PluginRegistry:
         self._plugin_code_agent_tools: Dict[str, bool] = {}
         self._plugin_platforms: Dict[str, Set[str]] = {}
         self._plugin_timer_actions: Dict[str, Set[str]] = {}
+        self._plugin_audit_sinks: Dict[str, Set[str]] = {}
+        self._plugin_audit_event_types: Dict[str, Set[str]] = {}
         self._tool_revoker: Optional[Callable[[str], int]] = None
         self._rules_revoker: Optional[Callable[[str], int]] = None
         self._platform_revoker: Optional[Callable[[str], int]] = None
         self._timer_action_revoker: Optional[Callable[[str], int]] = None
+        self._audit_revoker: Optional[Callable[[str], int]] = None
 
     @classmethod
     def instance(cls) -> "PluginRegistry":
@@ -80,6 +83,13 @@ class PluginRegistry:
         撤销器签名：revoker(plugin_name) -> 被撤销的定时动作数量。
         """
         self._timer_action_revoker = revoker
+
+    def set_audit_revoker(self, revoker: Optional[Callable[[str], int]]) -> None:
+        """注册/清除全局审计扩展撤销器（由 AuditSinkRegistry 实例注册）。
+
+        撤销器签名：revoker(plugin_name) -> 被撤销的审计 sink 数量。
+        """
+        self._audit_revoker = revoker
 
     # ------------------------------------------------------------------
     # 登记
@@ -126,6 +136,34 @@ class PluginRegistry:
             return
         self._plugin_timer_actions.setdefault(plugin_name, set()).update(action_names)
 
+    def register_audit_sink(self, plugin_name: str, sink_name: str) -> None:
+        """登记插件注册的单个审计 sink。"""
+        self._plugin_audit_sinks.setdefault(plugin_name, set()).add(sink_name)
+
+    def register_audit_sinks(
+        self, plugin_name: str, sink_names: List[str]
+    ) -> None:
+        """登记插件注册的一批审计 sink。"""
+        if not sink_names:
+            return
+        self._plugin_audit_sinks.setdefault(plugin_name, set()).update(sink_names)
+
+    def register_audit_event_type(
+        self, plugin_name: str, event_type: str
+    ) -> None:
+        """登记插件注册的单个自定义审计事件类型。"""
+        self._plugin_audit_event_types.setdefault(plugin_name, set()).add(event_type)
+
+    def register_audit_event_types(
+        self, plugin_name: str, event_types: List[str]
+    ) -> None:
+        """登记插件注册的一批自定义审计事件类型。"""
+        if not event_types:
+            return
+        self._plugin_audit_event_types.setdefault(plugin_name, set()).update(
+            event_types
+        )
+
     # ------------------------------------------------------------------
     # 查询
     # ------------------------------------------------------------------
@@ -145,6 +183,14 @@ class PluginRegistry:
         """返回插件注册的定时动作名列表。"""
         return sorted(self._plugin_timer_actions.get(plugin_name, set()))
 
+    def get_plugin_audit_sinks(self, plugin_name: str) -> List[str]:
+        """返回插件注册的审计 sink 名列表。"""
+        return sorted(self._plugin_audit_sinks.get(plugin_name, set()))
+
+    def get_plugin_audit_event_types(self, plugin_name: str) -> List[str]:
+        """返回插件登记的自定义审计事件类型列表。"""
+        return sorted(self._plugin_audit_event_types.get(plugin_name, set()))
+
     def registered_plugins(self) -> List[str]:
         """返回已登记资源的插件名列表。"""
         return sorted(
@@ -152,6 +198,8 @@ class PluginRegistry:
             | set(self._plugin_rules.keys())
             | set(self._plugin_platforms.keys())
             | set(self._plugin_timer_actions.keys())
+            | set(self._plugin_audit_sinks.keys())
+            | set(self._plugin_audit_event_types.keys())
         )
 
     # ------------------------------------------------------------------
@@ -182,19 +230,27 @@ class PluginRegistry:
 
         返回:
             {"tools": [...], "rules": [...], "platforms": [...],
-             "timer_actions": [...]}：该插件登记的工具名、规则名、平台名与
-            定时动作名。调用方需据此实际执行卸载（从 ToolRegistry /
-            RulesManager / PlatformRegistry / TimerActionRegistry 移除）。
+             "timer_actions": [...], "audit_sinks": [...],
+             "audit_event_types": [...]}：该插件登记的工具名、规则名、平台名、
+            定时动作名、审计 sink 名与自定义审计事件类型。调用方需据此实际
+            执行卸载（从 ToolRegistry / RulesManager / PlatformRegistry /
+            TimerActionRegistry / AuditSinkRegistry 移除）。
         """
         tools = list(self._plugin_tools.pop(plugin_name, set()))
         rules = list(self._plugin_rules.pop(plugin_name, set()))
         platforms = list(self._plugin_platforms.pop(plugin_name, set()))
         timer_actions = list(self._plugin_timer_actions.pop(plugin_name, set()))
+        audit_sinks = list(self._plugin_audit_sinks.pop(plugin_name, set()))
+        audit_event_types = list(
+            self._plugin_audit_event_types.pop(plugin_name, set())
+        )
         return {
             "tools": tools,
             "rules": rules,
             "platforms": platforms,
             "timer_actions": timer_actions,
+            "audit_sinks": audit_sinks,
+            "audit_event_types": audit_event_types,
         }
 
     def clear_tools(self, plugin_name: str) -> None:
@@ -213,6 +269,14 @@ class PluginRegistry:
         """仅清理指定插件的定时动作登记（不影响工具/规则/平台登记）。"""
         self._plugin_timer_actions.pop(plugin_name, None)
 
+    def clear_audit_sinks(self, plugin_name: str) -> None:
+        """仅清理指定插件的审计 sink 登记（不影响其它登记）。"""
+        self._plugin_audit_sinks.pop(plugin_name, None)
+
+    def clear_audit_event_types(self, plugin_name: str) -> None:
+        """仅清理指定插件的自定义审计事件类型登记（不影响其它登记）。"""
+        self._plugin_audit_event_types.pop(plugin_name, None)
+
     def revoke_plugin(self, plugin_name: str) -> Dict[str, int]:
         """撤销指定插件注册的全部资源并实际执行卸载。
 
@@ -222,16 +286,22 @@ class PluginRegistry:
 
         返回:
             {"tools": int, "rules": int, "platforms": int,
-             "timer_actions": int}：被撤销的工具数、规则数、平台数与定时动作数。
+             "timer_actions": int, "audit_sinks": int,
+             "audit_event_types": int}：被撤销的工具数、规则数、平台数、
+            定时动作数、审计 sink 数与自定义审计事件类型数。
         """
         tools = self.get_plugin_tools(plugin_name)
         rules = self.get_plugin_rules(plugin_name)
         platforms = self.get_plugin_platforms(plugin_name)
         timer_actions = self.get_plugin_timer_actions(plugin_name)
+        audit_sinks = self.get_plugin_audit_sinks(plugin_name)
+        audit_event_types = self.get_plugin_audit_event_types(plugin_name)
         revoked_tools = 0
         revoked_rules = 0
         revoked_platforms = 0
         revoked_timer_actions = 0
+        revoked_audit_sinks = 0
+        revoked_audit_event_types = 0
         if tools and self._tool_revoker is not None:
             try:
                 revoked_tools = int(self._tool_revoker(plugin_name))
@@ -252,6 +322,11 @@ class PluginRegistry:
                 revoked_timer_actions = int(self._timer_action_revoker(plugin_name))
             except Exception:
                 revoked_timer_actions = 0
+        if (audit_sinks or audit_event_types) and self._audit_revoker is not None:
+            try:
+                revoked_audit_sinks = int(self._audit_revoker(plugin_name))
+            except Exception:
+                revoked_audit_sinks = 0
         # 清理登记（撤销器内部也会清理，这里兜底）
         self.unregister_plugin(plugin_name)
         return {
@@ -259,6 +334,8 @@ class PluginRegistry:
             "rules": revoked_rules,
             "platforms": revoked_platforms,
             "timer_actions": revoked_timer_actions,
+            "audit_sinks": revoked_audit_sinks,
+            "audit_event_types": revoked_audit_event_types,
         }
 
     def has_plugin(self, plugin_name: str) -> bool:
@@ -268,6 +345,8 @@ class PluginRegistry:
             or plugin_name in self._plugin_rules
             or plugin_name in self._plugin_platforms
             or plugin_name in self._plugin_timer_actions
+            or plugin_name in self._plugin_audit_sinks
+            or plugin_name in self._plugin_audit_event_types
         )
 
     def clear(self) -> None:
@@ -277,10 +356,13 @@ class PluginRegistry:
         self._plugin_code_agent_tools.clear()
         self._plugin_platforms.clear()
         self._plugin_timer_actions.clear()
+        self._plugin_audit_sinks.clear()
+        self._plugin_audit_event_types.clear()
         self._tool_revoker = None
         self._rules_revoker = None
         self._platform_revoker = None
         self._timer_action_revoker = None
+        self._audit_revoker = None
 
 
 __all__ = ["PluginRegistry"]

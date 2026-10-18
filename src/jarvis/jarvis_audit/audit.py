@@ -79,6 +79,36 @@ class AuditLogger:
         except Exception as e:
             save_exception(e, module="jarvis_audit.audit", function="AuditLogger.log")
 
+        # 分发到插件注册的审计 sink（audit 扩展点）。sink 收到的是已脱敏的
+        # 事件数据；任一 sink 失败仅记录异常，不影响主审计链路（降级策略）。
+        self._dispatch_to_plugin_sinks(event_type, record["data"])
+
+    def _dispatch_to_plugin_sinks(self, event_type: str, data: Any) -> None:
+        """将脱敏后的事件数据分发到插件注册的审计 sink。
+
+        插件 sink 签名：``audit_sink(event_type, data)``，data 为已脱敏的
+        事件数据字典。sink 执行异常被捕获并记录，绝不抛出影响主流程。
+        """
+        try:
+            from jarvis.jarvis_audit.audit_plugins import AuditSinkRegistry
+
+            for sink in AuditSinkRegistry.instance().list_sinks():
+                sink_def = AuditSinkRegistry.instance().get(sink["name"])
+                if sink_def is None or not callable(sink_def.function):
+                    continue
+                try:
+                    sink_def.function(event_type, data)
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_audit.audit",
+                        function=f"AuditLogger._dispatch_to_plugin_sinks:{sink['name']}",
+                    )
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_audit.audit", function="AuditLogger._dispatch_to_plugin_sinks"
+            )
+
 
 def log_event(event_type: str, **data: Any) -> None:
     """记录一条审计事件（默认关闭时零开销直接返回）。

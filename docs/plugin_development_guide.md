@@ -103,6 +103,12 @@ tool_load_dirs:
 # --- 定时任务动作扩展点（可选，声明插件自带的定时动作实现目录，见「四.10 定时任务动作（timer_actions/）」）---
 # timer_actions:
 #   - "{{plugin_dir}}/timer_actions"
+# --- 审计扩展点（可选，声明插件自定义审计事件类型与审计 sink 目录，见「四.11 审计扩展（audit/）」）---
+# audit:
+#   event_types:                       # 插件自定义审计事件类型（字符串列表）
+#     - "plugin_sync"
+#   sinks:                             # 插件审计 sink 实现目录（目录内 .py 导出 audit_sink(event_type, data)）
+#     - "{{plugin_dir}}/audit_sinks"
 # --- 编排流水线声明 ---
 orchestration:
   - name: "my-pipeline"
@@ -150,7 +156,7 @@ orchestration:
 
 **要点：**
 
-- 扩展点字段（`rules_load_dirs`/`tool_load_dirs`/`agent_definition_dirs`/`orchestration`/`roles_dirs`/`mcp`/`lsp`/`event_callbacks`/`platforms`/`timer_actions` 等）会被合并进全局配置供 getter 消费；其中 `mcp` 声明的 MCP server 列表会被合并进全局 `mcp` 配置，插件安装后自动注册为 MCP 工具，无需用户在全局 `~/.jarvis/config.yaml` 重复配置；`lsp` 声明的语言服务会按语言名深度合并进全局 `lsp.languages`，插件安装后自动生效，无需重启；`platforms` 声明的平台实现目录会在插件安装后自动注册到 `PlatformRegistry`（见「四.9 模型供应商」）；`timer_actions` 声明的定时动作实现目录会在插件安装后自动注册到 `TimerActionRegistry`（见「四.10 定时任务动作」）。
+- 扩展点字段（`rules_load_dirs`/`tool_load_dirs`/`agent_definition_dirs`/`orchestration`/`roles_dirs`/`mcp`/`lsp`/`event_callbacks`/`platforms`/`timer_actions`/`audit` 等）会被合并进全局配置供 getter 消费；其中 `mcp` 声明的 MCP server 列表会被合并进全局 `mcp` 配置，插件安装后自动注册为 MCP 工具，无需用户在全局 `~/.jarvis/config.yaml` 重复配置；`lsp` 声明的语言服务会按语言名深度合并进全局 `lsp.languages`，插件安装后自动生效，无需重启；`platforms` 声明的平台实现目录会在插件安装后自动注册到 `PlatformRegistry`（见「四.9 模型供应商」）；`timer_actions` 声明的定时动作实现目录会在插件安装后自动注册到 `TimerActionRegistry`（见「四.10 定时任务动作」）；`audit` 声明的自定义审计事件类型与审计 sink 目录会在插件安装后自动注册到 `AuditSinkRegistry`（见「四.11 审计扩展」）。
 
 - `{{plugin_dir}}` 是 jinja2 模板变量，运行时渲染为插件目录绝对路径（见 `render_plugin_config_template`），**勿**写死绝对路径。
 - 除扩展点字段外的其余字段（`name`/`description`/`version`/`builtin`/`license`/`dependencies`/`capabilities`/`frontend`/自定义业务字段）会被隔离到全局配置的 `plugin_configs.<plugin_name>`，**不污染全局配置顶层、多个插件同名私有字段互不覆盖**。插件可通过 `get_plugin_config(plugin_name)` 读取自己的私有配置。
@@ -165,7 +171,7 @@ orchestration:
 - **与插件自身 `version` 区分**：`version` 是插件版本（安装时做版本比较），`api_version` 是接口协议版本（决定插件与 Jarvis 接口的兼容性）。
 - **兼容策略**：以主版本号（major）判断。插件声明的 major 不大于当前 Jarvis 支持的接口版本即兼容；声明更高 major 时 Jarvis **降级警告**（不拒绝加载），提示插件可能依赖未来接口能力。
 - **废弃流程**：废弃某扩展点字段时，Jarvis 在加载插件时打印 deprecation 警告，通知开发者迁移；字段本身仍保留（旧插件仍可加载），仅提示尽快迁移。
-- **覆盖范围**：config.yaml 扩展点（`tool_load_dirs`/`rules_load_dirs`/`orchestration`/`mcp`/`lsp`/`frontend` 等）、plugin/api.py 私有功能（`PUBLIC_FUNCTIONS` 白名单）、工具协议（`protocol_version`，见「工具（tools/）」）。`lsp` 扩展点由接口版本 `1.1` 引入（旧插件未声明 `api_version` 时按 `"1.0"` 处理，仍可正常加载，只是不识别 `lsp` 字段）。`event_callbacks` 扩展点同样由接口版本 `1.1` 引入。`platforms` 扩展点由接口版本 `1.1` 引入。`timer_actions` 扩展点同样由接口版本 `1.1` 引入。
+- **覆盖范围**：config.yaml 扩展点（`tool_load_dirs`/`rules_load_dirs`/`orchestration`/`mcp`/`lsp`/`frontend` 等）、plugin/api.py 私有功能（`PUBLIC_FUNCTIONS` 白名单）、工具协议（`protocol_version`，见「工具（tools/）」）。`lsp` 扩展点由接口版本 `1.1` 引入（旧插件未声明 `api_version` 时按 `"1.0"` 处理，仍可正常加载，只是不识别 `lsp` 字段）。`event_callbacks` 扩展点同样由接口版本 `1.1` 引入。`platforms` 扩展点由接口版本 `1.1` 引入。`timer_actions` 扩展点同样由接口版本 `1.1` 引入。`audit` 扩展点同样由接口版本 `1.1` 引入。
 
 ## 四、扩展点开发规范
 
@@ -501,6 +507,54 @@ def register_timer_actions():
 **与内置动作类型的关系**：内置 `create_agent` / `run_shell_command` / `capability_call` 仍可用；插件注册的动作类型与内置类型重名时插件动作**覆盖**（打印告警）。
 
 **卸载撤销**：插件卸载时，其注册的定时动作会从 `TimerActionRegistry` 精确移除（可逆效应，见 `PluginRegistry`），已创建的引用该动作的定时任务到点执行时会被安全忽略。
+
+### 11. 审计扩展（audit/，可选）
+
+插件可在 `config.yaml` 声明 `audit`，注册插件自带的**审计事件类型**与**审计 sink**，安装后自动加载到 `AuditSinkRegistry`。审计事件写入本地文件后，会同时把**脱敏后**的数据分发到插件注册的 sink（如推送到外部 SIEM / 数据库 / 消息队列）：
+
+```yaml
+audit:
+  event_types:                 # 插件自定义审计事件类型（字符串列表）
+    - "plugin_sync"
+  sinks:                       # 插件审计 sink 实现目录（目录列表）
+    - "{{plugin_dir}}/audit_sinks"
+```
+
+**`event_types`（自定义事件类型）**：字符串列表，声明插件自定义的审计事件类型。声明会按插件名登记到 `PluginRegistry`（来源追踪），插件卸载时精确撤销；插件在审计日志中即可用这些事件类型记录自己的业务动作。
+
+**`sinks`（审计 sink 目录）**：目录列表（路径用 `{{plugin_dir}}` 占位），目录内每个 `.py` 文件（跳过 `__init__.py`）按以下两种形式之一导出 sink：
+
+**形式一：模块级 `audit_sink(event_type, data)` 函数**（单个 sink）
+
+```python
+# audit_sinks/webhook_sink.py
+AUDIT_SINK_NAME = "webhook_sink"          # sink 名（可选，缺省用文件名 stem）
+AUDIT_SINK_DESCRIPTION = "推送审计事件到外部 webhook"  # sink 描述（可选）
+
+
+def audit_sink(event_type, data):
+    """审计事件写入本地文件后被调用，event_type 为事件类型、data 为脱敏后的字典。"""
+    return "pushed"
+```
+
+**形式二：`register_audit_sinks()` 工厂**（返回 `(name, function[, description])` 元组列表，可一次注册多个 sink）
+
+```python
+# audit_sinks/multi_sinks.py
+def register_audit_sinks():
+    return [
+        ("siem_sink", lambda event_type, data: "ok", "推送审计事件到 SIEM"),
+        ("mq_sink", lambda event_type, data: "ok"),
+    ]
+```
+
+**sink 函数签名**：`audit_sink(event_type, data)`，`event_type` 为审计事件类型、`data` 为**脱敏后**的审计数据字典（敏感字段如密码已被 `***` 替换，插件 sink 不应自行记录未脱敏数据）。sink 执行在审计写入链路内，**异常会被捕获并记录，不影响主审计链路**（降级策略）。
+
+**典型场景**：安全审计对接外部 SIEM、审计事件推送消息队列、审计数据入库、自定义告警通知。
+
+**与内置审计的关系**：`audit` 扩展点仅在审计功能开启时生效（`is_enable_audit()`）；插件注册的 sink 与事件类型不改变内置审计日志的写入行为，仅作为额外分发目标。
+
+**卸载撤销**：插件卸载时，其注册的审计 sink 与自定义事件类型会从 `AuditSinkRegistry` / `PluginRegistry` 精确移除（可逆效应，见 `PluginRegistry`），已注册的 sink 不再接收新的审计事件。
 
 ## 五、版本管理
 
