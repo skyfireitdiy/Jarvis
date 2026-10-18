@@ -75,6 +75,12 @@ orchestration:
 #       args: ["--stdio"]
 #       file_extensions: [".py"]
 #       root_markers: ["pyproject.toml", "setup.py"]
+# --- 事件回调扩展点（可选，声明插件自带的事件回调目录，见「8. 事件回调」）---
+# event_callbacks:
+#   - "{% raw %}{{plugin_dir}}{% endraw %}/callbacks"          # 字符串：目录内 .py 按文件名自动匹配事件，默认 event_bus
+#   - dir: "{% raw %}{{plugin_dir}}{% endraw %}/callbacks"     # 字典：显式声明事件与注册目标
+#     events: ["task_started", "task_completed"]
+#     target: "event_bus"                 # event_bus（默认）/ hook / modifier
 # --- 依赖声明（可选，三类：plugins/python/commands）---
 # dependencies:
 #   plugins:
@@ -97,7 +103,7 @@ orchestration:
 - `orchestration` 每项含 `name`/`description`/`file`，file 路径含 `plugins/<name>/` 时自动反推来源插件名。
 - `capabilities` 顶层字段用于声明事件钩子、@内置命令等自定义能力，与自动推导的能力（rules/tools/agents/orchestration/frontend）合并展示。
 - 插件 config 会被 `_load_plugin_configs` 读取、渲染并 `_deep_merge` 进全局配置，因此 `rules_load_dirs`/`tool_load_dirs`/`replace_map`/`lsp` 等字段会被 `get_rules_load_dirs()`/`get_tool_load_dirs()`/`get_replace_map()`/`get_lsp_config()` 等消费。
-- **私有配置隔离**：插件 config.yaml 中**除扩展点字段**（`tool_load_dirs`/`rules_load_dirs`/`agent_definition_dirs`/`orchestration`/`roles_dirs`/`before_tool_call_cb_dirs`/`after_tool_call_cb_dirs`/`before_model_call_cb_dirs`/`summary_cb_dirs`/`builtin_input_handler_dirs`/`replace_map`/`mcp`/`lsp`）外的其余字段（`name`/`description`/`version`/`builtin`/`license`/`dependencies`/`capabilities`/`frontend`/自定义业务字段）会被隔离到全局配置的 `plugin_configs.<plugin_name>` 单独配置项，**不污染全局配置顶层、多个插件同名私有字段互不覆盖**。插件可通过 `get_plugin_config(plugin_name)` / `get_all_plugin_configs()`（`jarvis.jarvis_utils.config`）读取自己的私有配置。
+- **私有配置隔离**：插件 config.yaml 中**除扩展点字段**（`tool_load_dirs`/`rules_load_dirs`/`agent_definition_dirs`/`orchestration`/`roles_dirs`/`before_tool_call_cb_dirs`/`after_tool_call_cb_dirs`/`before_model_call_cb_dirs`/`summary_cb_dirs`/`builtin_input_handler_dirs`/`replace_map`/`mcp`/`lsp`/`event_callbacks`）外的其余字段（`name`/`description`/`version`/`builtin`/`license`/`dependencies`/`capabilities`/`frontend`/自定义业务字段）会被隔离到全局配置的 `plugin_configs.<plugin_name>` 单独配置项，**不污染全局配置顶层、多个插件同名私有字段互不覆盖**。插件可通过 `get_plugin_config(plugin_name)` / `get_all_plugin_configs()`（`jarvis.jarvis_utils.config`）读取自己的私有配置。
 
 ## 扩展点开发规范
 
@@ -204,6 +210,40 @@ lsp:
 - `command` 必填，其余字段可选；`enable: false` 可禁用该语言服务。
 - **合并语义**：多插件声明同一语言时按语言名深度合并（`file_extensions`/`args`/`root_markers` 等列表字段追加合并），不同语言互不覆盖；优先级为「项目配置 > 后加载插件 > 前加载插件 > 内置默认」。
 - **⚠️ 安全提示**：`command` 会在本机启动外部语言服务器进程（与 `mcp` 的 `command` 同级别）。安装插件前请确认插件来源可信、`command` 指向预期程序。
+
+### 8. 事件回调（event_callbacks/，可选）
+
+插件可在 config.yaml 声明 `event_callbacks`，注册插件自带的事件回调，在 Agent 生命周期事件被触发时执行。声明合并进全局配置，插件安装后免重启生效、卸载后自动撤销。
+
+```yaml
+event_callbacks:
+  # 形式一：字符串目录（自动探测事件，默认 event_bus）
+  - "{% raw %}{{plugin_dir}}{% endraw %}/callbacks"
+  # 形式二：字典（显式声明事件与注册目标）
+  - dir: "{% raw %}{{plugin_dir}}{% endraw %}/callbacks"
+    events: ["task_started", "task_completed"]
+    target: "event_bus"
+```
+
+**回调文件约定**：目录内每个 `.py` 文件（跳过 `__init__.py`）按文件名前缀匹配事件短名，如 `task_started_cb.py` → `task_started`。文件内按优先级提供回调（任一命中即注册）：模块级可调用对象 `<event>_cb`；工厂方法 `get_<event>_cb()` / `register_<event>_cb()`。
+
+```python
+# callbacks/task_started_cb.py
+def task_started_cb(agent, **kwargs):
+    """任务开始时被调用（event_bus 通知型）。"""
+    print(f"任务开始: {kwargs.get('name', '')}")
+```
+
+**target 约束**：
+
+- `event_bus`（通知型，默认）：全部 14 个事件均支持，回调在事件触发时被调用，返回值不参与逻辑。
+- `hook`（拦截型）：仅支持 `before_tool_call`，回调返回 `False` 可拦截工具执行；同时订阅 EventBus 作为通知。
+- `modifier`（修改型）：仅支持 `before_model_call` / `before_summary`，回调返回修改后的值。
+- target 与事件不匹配时（如 `hook` + `task_started`）会**显式告警并跳过**，不会静默降级。
+
+**事件短名**：`before_tool_call` / `after_tool_call` / `task_started` / `task_completed` / `before_summary` / `after_summary` / `before_addon_prompt` / `after_addon_prompt` / `before_history_clear` / `after_history_clear` / `before_model_call` / `after_model_call` / `interrupt_triggered` / `before_tool_filter` / `tool_filtered`。
+
+> **与旧字段的关系**：`before_tool_call_cb_dirs` / `after_tool_call_cb_dirs` / `before_model_call_cb_dirs` / `summary_cb_dirs` 四个旧字段仍受支持（向后兼容），`event_callbacks` 是新增的统一入口，两者可共存。
 
 ## 开发流程
 

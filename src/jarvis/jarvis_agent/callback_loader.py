@@ -9,6 +9,7 @@
 - 循环依赖通过 TYPE_CHECKING 处理。
 """
 
+import os
 import subprocess
 import sys
 import traceback
@@ -23,9 +24,11 @@ from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
 from jarvis.jarvis_agent.events import BEFORE_MODEL_CALL
 from jarvis.jarvis_agent.events import BEFORE_SUMMARY
 from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL
+from jarvis.jarvis_agent.events import EVENT_SHORT_NAMES
 from jarvis.jarvis_utils.config import get_after_tool_call_cb_dirs
 from jarvis.jarvis_utils.config import get_before_model_call_cb_dirs
 from jarvis.jarvis_utils.config import get_before_tool_call_cb_dirs
+from jarvis.jarvis_utils.config import get_event_callbacks
 from jarvis.jarvis_utils.config import get_summary_cb_dirs
 from jarvis.jarvis_utils.exception_utils import save_exception
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -405,6 +408,95 @@ class CallbackLoader:
                 "get_after_summary_cb",
                 "register_after_summary_cb",
             ],
+        )
+
+        # 加载插件 event_callbacks 扩展点（统一入口，支持事件探测与 target 校验）
+        self.load_plugin_event_callbacks()
+
+    def load_plugin_event_callbacks(self) -> None:
+        """加载插件 ``event_callbacks`` 扩展点声明的事件回调。
+
+        每个声明项为 ``{"dir": <绝对路径>, "events": <短名列表|None>, "target": <str>}``
+        （由 :func:`jarvis.jarvis_utils.config.get_event_callbacks` 规范化返回）：
+
+        - ``events`` 为 None 时自动探测目录内 .py 文件（跳过 ``__init__.py``），
+          按文件名前缀匹配事件短名（如 ``task_started_cb.py`` → ``task_started``）。
+        - ``target`` 决定注册方式：``event_bus``（通知型，默认）、``hook``（拦截型，
+          仅 ``before_tool_call``）、``modifier``（修改型，仅 ``before_model_call``/
+          ``before_summary``）。target 与事件不匹配时显式告警并跳过，避免静默降级。
+        """
+        try:
+            declarations = get_event_callbacks()
+            if not declarations:
+                return
+            for decl in declarations:
+                dir_path = decl.get("dir")
+                if not dir_path or not os.path.isdir(dir_path):
+                    continue
+                events = decl.get("events")
+                target = decl.get("target", "event_bus")
+                if events is None:
+                    # 自动探测：目录内 .py 文件按文件名前缀匹配事件短名
+                    events = self._probe_event_names(dir_path)
+                for event_name in events:
+                    self._load_plugin_event_callback(
+                        dir_path, event_name, target
+                    )
+        except Exception as e:
+            PrettyOutput.auto_print(
+                f"⚠️ 加载插件 event_callbacks 失败: {e}\n{traceback.format_exc()}"
+            )
+
+    def _probe_event_names(self, dir_path: str) -> List[str]:
+        """探测目录内 .py 文件对应的事件短名列表（按文件名前缀匹配）。"""
+        event_names: List[str] = []
+        try:
+            for file_path in Path(dir_path).glob("*.py"):
+                if file_path.name == "__init__.py":
+                    continue
+                stem = file_path.stem
+                for short_name in EVENT_SHORT_NAMES:
+                    if stem == short_name or stem.startswith(short_name + "_"):
+                        event_names.append(short_name)
+                        break
+        except Exception as e:
+            PrettyOutput.auto_print(
+                f"⚠️ 探测事件回调目录失败 [{dir_path}]: {e}"
+            )
+        return event_names
+
+    def _load_plugin_event_callback(
+        self, dir_path: str, event_name: str, target: str
+    ) -> None:
+        """按事件短名加载单个目录的事件回调（含 target 合法性校验）。"""
+        if event_name not in EVENT_SHORT_NAMES:
+            PrettyOutput.auto_print(
+                f"⚠️ event_callbacks 事件短名非法（应为 {', '.join(EVENT_SHORT_NAMES)}），已跳过: {event_name}"
+            )
+            return
+        if target == "hook" and event_name != BEFORE_TOOL_CALL:
+            PrettyOutput.auto_print(
+                f"⚠️ event_callbacks target=hook 仅支持 before_tool_call，已跳过: {event_name} (dir={dir_path})"
+            )
+            return
+        if target == "modifier" and event_name not in (
+            BEFORE_MODEL_CALL,
+            BEFORE_SUMMARY,
+        ):
+            PrettyOutput.auto_print(
+                f"⚠️ event_callbacks target=modifier 仅支持 before_model_call/before_summary，已跳过: {event_name} (dir={dir_path})"
+            )
+            return
+        # 复用通用加载器：按事件短名约定加载并注册
+        self.agent._load_event_callbacks(
+            event_name=event_name,
+            config_getter=lambda: [dir_path],
+            callback_names=[
+                f"{event_name}_cb",
+                f"get_{event_name}_cb",
+                f"register_{event_name}_cb",
+            ],
+            target=target,
         )
 
     def fire_after_tool_call(self) -> None:

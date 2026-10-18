@@ -91,6 +91,12 @@ tool_load_dirs:
 #       args: ["--stdio"]
 #       file_extensions: [".py"]
 #       root_markers: ["pyproject.toml", "setup.py"]
+# --- 事件回调扩展点（可选，声明插件自带的事件回调目录，见「四.8 事件回调」）---
+# event_callbacks:
+#   - "{{plugin_dir}}/callbacks"          # 字符串：目录内 .py 按文件名自动匹配事件，默认 event_bus
+#   - dir: "{{plugin_dir}}/callbacks"     # 字典：显式声明事件与注册目标
+#     events: ["task_started", "task_completed"]
+#     target: "event_bus"                 # event_bus（默认）/ hook / modifier
 # --- 编排流水线声明 ---
 orchestration:
   - name: "my-pipeline"
@@ -139,7 +145,7 @@ orchestration:
 **要点：**
 
 - `{{plugin_dir}}` 是 jinja2 模板变量，运行时渲染为插件目录绝对路径（见 `render_plugin_config_template`），**勿**写死绝对路径。
-- 扩展点字段（`rules_load_dirs`/`tool_load_dirs`/`agent_definition_dirs`/`orchestration`/`roles_dirs`/`mcp`/`lsp` 等）会被合并进全局配置供 getter 消费；其中 `mcp` 声明的 MCP server 列表会被合并进全局 `mcp` 配置，插件安装后自动注册为 MCP 工具，无需用户在全局 `~/.jarvis/config.yaml` 重复配置；`lsp` 声明的语言服务会按语言名深度合并进全局 `lsp.languages`，插件安装后自动生效，无需重启。
+- 扩展点字段（`rules_load_dirs`/`tool_load_dirs`/`agent_definition_dirs`/`orchestration`/`roles_dirs`/`mcp`/`lsp`/`event_callbacks` 等）会被合并进全局配置供 getter 消费；其中 `mcp` 声明的 MCP server 列表会被合并进全局 `mcp` 配置，插件安装后自动注册为 MCP 工具，无需用户在全局 `~/.jarvis/config.yaml` 重复配置；`lsp` 声明的语言服务会按语言名深度合并进全局 `lsp.languages`，插件安装后自动生效，无需重启。
 - 除扩展点字段外的其余字段（`name`/`description`/`version`/`builtin`/`license`/`dependencies`/`capabilities`/`frontend`/自定义业务字段）会被隔离到全局配置的 `plugin_configs.<plugin_name>`，**不污染全局配置顶层、多个插件同名私有字段互不覆盖**。插件可通过 `get_plugin_config(plugin_name)` 读取自己的私有配置。
 - **`hooks` 生命周期钩子**：可选，声明插件在安装/升级/卸载前后要执行的 shell 命令（见上方示例）。支持 6 个时机：`pre-install` / `post-install` / `pre-update` / `post-update` / `pre-uninstall` / `post-uninstall`，每个时机是命令字符串列表，命令以**插件目录为工作目录**、经 shell 执行（超时 300s）。**`pre-*` 钩子失败会中止对应操作**（安装/升级/卸载不执行，避免半成品状态）；**`post-*` 钩子失败仅警告**，不影响主体操作结果。注意 `post-uninstall` 执行时插件目录已删除，命令工作目录为插件根目录（即 `plugins/`）。
 - **安装后免重启生效**：插件安装 / 升级 / 卸载完成后，网关会自动重新扫描 `plugins` 目录并把各插件的扩展点合并进全局配置（`reload_plugin_configs`），因此**无需重启网关进程**，`get_tool_load_dirs` / `get_rules_load_dirs` 等 getter 立即返回最新配置。若因环境异常导致重载失败，仅打印警告，可稍后重启生效。
@@ -152,7 +158,7 @@ orchestration:
 - **与插件自身 `version` 区分**：`version` 是插件版本（安装时做版本比较），`api_version` 是接口协议版本（决定插件与 Jarvis 接口的兼容性）。
 - **兼容策略**：以主版本号（major）判断。插件声明的 major 不大于当前 Jarvis 支持的接口版本即兼容；声明更高 major 时 Jarvis **降级警告**（不拒绝加载），提示插件可能依赖未来接口能力。
 - **废弃流程**：废弃某扩展点字段时，Jarvis 在加载插件时打印 deprecation 警告，通知开发者迁移；字段本身仍保留（旧插件仍可加载），仅提示尽快迁移。
-- **覆盖范围**：config.yaml 扩展点（`tool_load_dirs`/`rules_load_dirs`/`orchestration`/`mcp`/`lsp`/`frontend` 等）、plugin/api.py 私有功能（`PUBLIC_FUNCTIONS` 白名单）、工具协议（`protocol_version`，见「工具（tools/）」）。`lsp` 扩展点由接口版本 `1.1` 引入（旧插件未声明 `api_version` 时按 `"1.0"` 处理，仍可正常加载，只是不识别 `lsp` 字段）。
+- **覆盖范围**：config.yaml 扩展点（`tool_load_dirs`/`rules_load_dirs`/`orchestration`/`mcp`/`lsp`/`frontend` 等）、plugin/api.py 私有功能（`PUBLIC_FUNCTIONS` 白名单）、工具协议（`protocol_version`，见「工具（tools/）」）。`lsp` 扩展点由接口版本 `1.1` 引入（旧插件未声明 `api_version` 时按 `"1.0"` 处理，仍可正常加载，只是不识别 `lsp` 字段）。`event_callbacks` 扩展点同样由接口版本 `1.1` 引入。
 
 ## 四、扩展点开发规范
 
@@ -325,6 +331,109 @@ lsp:
 > **⚠️ 安全提示**：`command` 会在本机启动外部语言服务器进程（与 `mcp` 的 `command` 同级别）。安装插件前请确认插件来源可信、`command` 指向的是预期程序。插件能力展示中会明确标注该提示。
 >
 > **合并语义**：多插件声明同一语言时按语言名深度合并（`file_extensions`/`args`/`root_markers` 等列表字段追加合并），不同语言互不覆盖；优先级为「项目配置 > 后加载插件 > 前加载插件 > 内置默认」。
+
+### 8. 事件回调（event_callbacks/，可选）
+
+插件可在 `config.yaml` 声明 `event_callbacks`，注册插件自带的事件回调，在 Agent 生命周期事件（任务开始/完成、工具调用前后、模型调用前后、总结前后等）被触发时执行。声明会合并进全局配置，插件安装后免重启生效、卸载后自动撤销。
+
+```yaml
+event_callbacks:
+  # 形式一：字符串目录（自动探测事件，默认 event_bus）
+  - "{{plugin_dir}}/callbacks"
+  # 形式二：字典（显式声明事件与注册目标）
+  - dir: "{{plugin_dir}}/callbacks"
+    events: ["task_started", "task_completed"]
+    target: "event_bus"
+```
+
+字段说明：
+
+| 字段 | 说明 |
+|------|------|
+| `dir` | 回调目录绝对路径（必填，用 `{{plugin_dir}}` 占位） |
+| `events` | 事件短名列表（可选，缺省时自动探测目录内 .py 文件按文件名匹配） |
+| `target` | 注册目标（可选，默认 `event_bus`）：`event_bus` 通知型 / `hook` 拦截型 / `modifier` 修改型 |
+
+**回调文件约定**：目录内每个 `.py` 文件（跳过 `__init__.py`）按文件名前缀匹配事件短名，如 `task_started_cb.py` → `task_started`。文件内按优先级提供回调（任一命中即注册）：
+
+- 模块级可调用对象：`<event>_cb`
+- 工厂方法返回单个或多个可调用对象：`get_<event>_cb()` / `register_<event>_cb()`
+
+```python
+# callbacks/task_started_cb.py
+def task_started_cb(agent, **kwargs):
+    """任务开始时被调用（event_bus 通知型）。"""
+    print(f"任务开始: {kwargs.get('name', '')}")
+```
+
+**事件短名与 target 约束**：
+
+| 事件短名 | 触发时机 | 允许 target |
+|----------|----------|-------------|
+| `before_tool_call` | 工具调用前 | `event_bus` / `hook` |
+| `after_tool_call` | 工具调用后 | `event_bus` |
+| `task_started` | 任务开始 | `event_bus` |
+| `task_completed` | 任务完成 | `event_bus` |
+| `before_summary` | 总结前 | `event_bus` / `modifier` |
+| `after_summary` | 总结后 | `event_bus` |
+| `before_addon_prompt` | 附加提示前 | `event_bus` |
+| `after_addon_prompt` | 附加提示后 | `event_bus` |
+| `before_history_clear` | 历史清理前 | `event_bus` |
+| `after_history_clear` | 历史清理后 | `event_bus` |
+| `before_model_call` | 模型调用前 | `event_bus` / `modifier` |
+| `after_model_call` | 模型调用后 | `event_bus` |
+| `interrupt_triggered` | 中断触发 | `event_bus` |
+| `before_tool_filter` | 工具筛选前 | `event_bus` |
+| `tool_filtered` | 工具筛选后 | `event_bus` |
+
+- **`hook`（拦截型）**：仅支持 `before_tool_call`，回调返回 `False` 可拦截工具执行；同时订阅 EventBus 作为通知。
+- **`modifier`（修改型）**：仅支持 `before_model_call` / `before_summary`，回调返回修改后的值。
+- **`event_bus`（通知型）**：全部 14 个事件均支持，回调在事件触发时被调用，返回值不参与逻辑。
+- target 与事件不匹配时（如 `hook` + `task_started`）会**显式告警并跳过**，不会静默降级。
+
+> **与旧字段的关系**：`before_tool_call_cb_dirs` / `after_tool_call_cb_dirs` / `before_model_call_cb_dirs` / `summary_cb_dirs` 四个旧字段仍受支持（向后兼容），`event_callbacks` 是新增的统一入口，两者可共存。
+
+#### 示例：工具调用白名单门禁（拦截型 hook）
+
+下面是一个完整的示例插件，用 `hook` 目标实现**工具调用白名单门禁**：只允许 Agent 调用白名单内的工具，其余一律拦截。插件目录结构：
+
+```text
+tool-whitelist/
+├── config.yaml
+└── callbacks/
+    └── before_tool_call_cb.py
+```
+
+`config.yaml`（声明回调目录，`target: hook` 表示拦截型）：
+
+```yaml
+name: tool-whitelist
+description: 工具调用白名单门禁（event_callbacks hook 示例）
+version: 0.1.0
+license: MIT
+event_callbacks:
+  - dir: "{{plugin_dir}}/callbacks"
+    events: ["before_tool_call"]
+    target: "hook"
+```
+
+`callbacks/before_tool_call_cb.py`（hook 回调，返回 `False` 拦截工具执行）：
+
+```python
+# 工具调用白名单：仅允许这些工具被 Agent 调用
+ALLOWED_TOOLS = {"execute_command", "read_file", "write_file"}
+
+
+def before_tool_call_cb(agent, **kwargs):
+    """工具调用前被调用；返回 False 拦截工具执行。"""
+    tool_name = kwargs.get("tool_name", "")
+    if tool_name not in ALLOWED_TOOLS:
+        print(f"🚫 工具 {tool_name} 不在白名单，已拦截")
+        return False
+    return True
+```
+
+安装该插件后，Agent 调用白名单外的工具会被 `hook` 拦截（返回 `工具 xxx 被 hook 拦截`），实现强制权限门禁。回调文件支持 `# requirements:` 头声明额外依赖（如 `# requirements: requests`），加载时会自动安装。
 
 ## 五、版本管理
 
