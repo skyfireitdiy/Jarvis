@@ -345,6 +345,19 @@ export const ACTIONS = [
     run: (ctx) => ctx.deleteCurrentAgent && ctx.deleteCurrentAgent(),
   },
   {
+    // 在「新的区域」中打开 Agent：新建 Panel 并分割新 pane 承载（分屏，不破坏当前布局）。
+    // 命令面板 Agent 模式按 Tab 触发（openMode='new'）；侧边栏/Panel/宠物右键菜单也可触发。
+    id: "open-agent-in-new-pane",
+    label: "在新区域中打开",
+    condition: "需选中当前 Agent",
+    en: "Open in New Pane",
+    group: "当前 Agent",
+    icon: "🪟",
+    keywords: ["新区域", "新面板", "分屏", "打开", "open", "new", "pane", "split"],
+    enabled: (ctx) => !!ctx?.currentAgent,
+    run: (ctx) => ctx.openAgentInNewPanel && ctx.openAgentInNewPanel(ctx.currentAgent),
+  },
+  {
     id: "current-toggle-output",
     label: "隐藏输出",
     shortcut: "Space a o",
