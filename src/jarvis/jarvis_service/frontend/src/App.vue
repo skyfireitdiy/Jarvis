@@ -4190,6 +4190,8 @@ function openAgentInPanel(agent, panelId = null) {
   if (existingPanel) {
     const hostingPane = findWorkspacePaneBySessionPanelId(existingPanel.id)
     if (hostingPane) {
+      // 多 tab：先把目标 tab 设为该 pane 的激活 tab，再激活 pane
+      activateSessionTabInPane(hostingPane, existingPanel.id)
       activateWorkspacePane(hostingPane.id)
     } else {
       // 空则原地、否则分割（不覆盖当前区域）
@@ -4235,6 +4237,8 @@ function openAgentInCurrentPanel(agent) {
     // 已统一为 pane 树：把承载该 Panel 的 pane 设为激活；未承载则放进激活 pane。
     const hostingPane = findWorkspacePaneBySessionPanelId(existingPanel.id)
     if (hostingPane) {
+      // 多 tab：先把目标 tab 设为该 pane 的激活 tab，再激活 pane
+      activateSessionTabInPane(hostingPane, existingPanel.id)
       activateWorkspacePane(hostingPane.id)
     } else {
       // 空则原地、否则分割（不覆盖当前区域）
@@ -4307,7 +4311,7 @@ function getPaneSessionTabs(pane) {
 
 // 点击 tab：激活该 pane 的对应 tab，并同步 activePanelId / switchAgent
 function onActivateSessionTab(paneId, panelId) {
-  const pane = findWorkspacePaneById(workspacePaneTree, paneId)
+  const pane = findWorkspacePaneById(workspacePaneTree.value, paneId)
   if (!pane) return
   activateSessionTabInPane(pane, panelId)
   activateWorkspacePane(paneId)
@@ -4324,7 +4328,7 @@ function onActivateSessionTab(paneId, panelId) {
 
 // 关闭 tab：关闭该 pane 的对应 tab（Agent 会话仍在后台，可从侧边栏重新打开）
 function onCloseSessionTab(paneId, panelId) {
-  const pane = findWorkspacePaneById(workspacePaneTree, paneId)
+  const pane = findWorkspacePaneById(workspacePaneTree.value, paneId)
   if (!pane) return
   // 若关闭的是激活 tab，closeSessionTabInPane 会自动切到相邻 tab
   const wasActive = paneActiveSessionPanelId(pane) === panelId
@@ -4350,7 +4354,7 @@ function onCloseSessionTab(paneId, panelId) {
 
 // 追加空 tab：在当前 pane 创建一个空 panel 并作为新 tab（可从侧边栏选 Agent 放入）
 function onAddSessionTab(paneId) {
-  const pane = findWorkspacePaneById(workspacePaneTree, paneId)
+  const pane = findWorkspacePaneById(workspacePaneTree.value, paneId)
   if (!pane) return
   const targetPanel = {
     id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -5069,6 +5073,9 @@ function onWorkspaceSidebarAgentClick(agent) {
     // 则聚焦到那个 pane（避免同一 panel 出现在两个 pane 中）。
     const hostingPane = findWorkspacePaneBySessionPanelId(existingPanel.id)
     if (hostingPane) {
+      // 多 tab：先把目标 tab 设为该 pane 的激活 tab，再激活 pane，
+      // 使 activateWorkspacePane 内部同步到目标 tab（而非旧激活 tab）
+      activateSessionTabInPane(hostingPane, existingPanel.id)
       activateWorkspacePane(hostingPane.id)
     } else {
       // 空则原地、否则分割（不覆盖当前区域）
