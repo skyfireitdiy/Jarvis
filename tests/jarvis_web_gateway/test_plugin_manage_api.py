@@ -10,6 +10,7 @@ os.environ["JARVIS_SKIP_INTERACTIVE_CONFIG"] = "1"
 
 import pytest
 from fastapi.testclient import TestClient
+from unittest.mock import AsyncMock, patch
 
 from jarvis.jarvis_web_gateway.app import create_app
 
@@ -565,3 +566,158 @@ def test_list_market_plugins_api_pagination_and_filters(client, monkeypatch):
     data = resp.json()["data"]
     assert data["page"] == 1
     assert data["page_size"] == 20
+
+
+# ---------------------------------------------------------------------------
+# admin:plugins 权限路径（admin 放行 / 非 admin 拒绝）
+# ---------------------------------------------------------------------------
+def _make_plugin_client(data_dir, setup=None):
+    """先创建用户/权限，再 create_app，返回 (client, um, pm)。
+
+    必须在 create_app() 之前创建用户，否则 app 闭包内的
+    UserManager / PermissionManager 内存状态不会加载新数据。
+    """
+    from jarvis.jarvis_web_gateway.user_manager import UserManager
+    from jarvis.jarvis_web_gateway.permission_manager import PermissionManager
+
+    um = UserManager(data_dir)
+    pm = PermissionManager(data_dir)
+    pm.set_user_manager(um)
+    if setup:
+        setup(um, pm)
+    return TestClient(create_app()), um, pm
+
+
+def _login_user(client, username, password):
+    resp = client.post(
+        "/api/auth/login", json={"username": username, "password": password}
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["success"] is True, body
+    return {"Authorization": f"Bearer {body['data']['token']}"}
+
+
+def test_admin_can_access_plugin_apis(monkeypatch, isolated_data_dir):
+    """admin 用户（is_admin=true）访问插件管理 API 应放行（不返回 403）。"""
+    monkeypatch.setenv("JARVIS_ADMIN_PASSWORD", "AdminStrongPass1!")
+
+    client, _, _ = _make_plugin_client(isolated_data_dir)
+    headers = _login_user(client, "admin", "AdminStrongPass1!")
+
+    # 本地节点插件列表（/api/plugins 与 /api/node/master/plugins 两条路径）
+    resp = client.get("/api/plugins", headers=headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["success"] is True
+
+    resp = client.get("/api/node/master/plugins", headers=headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["success"] is True
+
+    # 插件市场
+    resp = client.get("/api/plugins/market", headers=headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["success"] is True
+
+
+def test_non_admin_user_denied_plugin_apis(monkeypatch, isolated_data_dir):
+    """非 admin 且无 admin:plugins 权限的用户访问插件管理 API 应被拒。"""
+    monkeypatch.setenv("JARVIS_ADMIN_PASSWORD", "AdminStrongPass1!")
+
+    def setup(um, pm):
+        um.create_user("noperm", "NoPermPass1!")
+
+    client, _, _ = _make_plugin_client(isolated_data_dir, setup)
+    headers = _login_user(client, "noperm", "NoPermPass1!")
+
+    resp = client.get("/api/plugins", headers=headers)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "PERMISSION_DENIED"
+    assert "admin:plugins" in body["error"]["message"]
+
+    # 节点级路径同样被拒（HTTP 403，body 为错误信息）
+    resp = client.get("/api/node/master/plugins", headers=headers)
+    assert resp.status_code == 403, resp.text
+    assert "Permission denied: admin:plugins" in resp.text
+
+
+def test_operator_with_admin_plugins_perm_can_access(monkeypatch, isolated_data_dir):
+    """拥有 admin:plugins 权限的非 admin 用户可访问插件管理 API。"""
+    monkeypatch.setenv("JARVIS_ADMIN_PASSWORD", "AdminStrongPass1!")
+
+    def setup(um, pm):
+        op = um.create_user("plugop", "PlugOpPass1!")
+        pm.set_user_overrides(op["user_id"], {"admin:plugins": "allow"})
+
+    client, _, _ = _make_plugin_client(isolated_data_dir, setup)
+    headers = _login_user(client, "plugop", "PlugOpPass1!")
+
+    resp = client.get("/api/plugins", headers=headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["success"] is True
+
+
+# ---------------------------------------------------------------------------
+# 跨节点插件管理：master 转发到子节点时同样把关 admin:plugins
+# ---------------------------------------------------------------------------
+def _register_online_node(client, node_id="worker-test"):
+    """向 node_runtime 注册一个在线子节点，使跨节点代理路径可达。"""
+    from jarvis.jarvis_web_gateway.node_runtime import NodeInfo
+
+    node_runtime = client.app.state.node_runtime
+    node_runtime.node_registry.upsert(NodeInfo(node_id=node_id, status="online"))
+
+
+def test_cross_node_plugin_denied_for_non_admin(monkeypatch, isolated_data_dir):
+    """非 admin 用户跨节点访问子节点插件管理应被 master 拒绝（403）。"""
+    monkeypatch.setenv("JARVIS_ADMIN_PASSWORD", "AdminStrongPass1!")
+
+    def setup(um, pm):
+        # 有节点访问权限、但无 admin:plugins 权限的用户
+        user = um.create_user("noperm", "NoPermPass1!")
+        group = pm.create_group(
+            "node-only", "Node Only", "node access without plugin admin"
+        )
+        pm.update_group(group["group_id"], accessible_nodes=["*"])
+        pm.set_user_groups(user["user_id"], [group["group_id"]])
+
+    client, _, _ = _make_plugin_client(isolated_data_dir, setup)
+    _register_online_node(client)
+    headers = _login_user(client, "noperm", "NoPermPass1!")
+
+    # 非 admin 用户访问子节点插件列表应被拒（不触发转发）
+    resp = client.get("/api/node/worker-test/plugins", headers=headers)
+    assert resp.status_code == 403, resp.text
+    assert "Permission denied: admin:plugins" in resp.text
+
+
+def test_cross_node_plugin_allowed_for_admin(monkeypatch, isolated_data_dir):
+    """admin 用户跨节点访问子节点插件管理应放行并转发到子节点。"""
+    monkeypatch.setenv("JARVIS_ADMIN_PASSWORD", "AdminStrongPass1!")
+
+    client, _, _ = _make_plugin_client(isolated_data_dir)
+    _register_online_node(client)
+    headers = _login_user(client, "admin", "AdminStrongPass1!")
+
+    # mock 转发，返回子节点成功响应
+    fake_payload = {
+        "success": True,
+        "payload": {
+            "body": json.dumps(
+                {"success": True, "data": {"node_id": "worker-test", "plugins": []}}
+            ),
+            "status_code": 200,
+        },
+    }
+    with patch.object(
+        client.app.state.node_connection_manager,
+        "send_request_to_node",
+        new_callable=AsyncMock,
+        return_value=fake_payload,
+    ) as mock_send:
+        resp = client.get("/api/node/worker-test/plugins", headers=headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["success"] is True
+    assert mock_send.called
