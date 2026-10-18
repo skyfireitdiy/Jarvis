@@ -211,7 +211,7 @@ class GatewayManagerTool:
             "timer_action_type": {
                 "type": "string",
                 "enum": ["create_agent", "run_shell_command", "capability_call"],
-                "description": "定时任务动作类型（create_timer 操作必填）：create_agent / run_shell_command / capability_call",
+                "description": "定时任务动作类型（create_timer 操作必填）：create_agent / run_shell_command / capability_call，或插件注册的自定义定时动作类型（timer_actions 扩展点，见插件开发指南）",
             },
             "timer_action_params": {
                 "type": "object",

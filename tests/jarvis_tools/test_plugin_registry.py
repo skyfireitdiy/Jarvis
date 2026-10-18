@@ -75,9 +75,15 @@ class TestPluginRegistry:
         pr.register_tool("p1", "tool_a")
         pr.register_rule("p1", "rule_x")
         pr.register_platform("p1", "platform_x")
+        pr.register_timer_action("p1", "action_x")
 
         result = pr.revoke_plugin("p1")
-        assert result == {"tools": 0, "rules": 0, "platforms": 0}
+        assert result == {
+            "tools": 0,
+            "rules": 0,
+            "platforms": 0,
+            "timer_actions": 0,
+        }
         assert not pr.has_plugin("p1")
 
     def test_revoke_plugin_with_revokers(self):
@@ -86,8 +92,9 @@ class TestPluginRegistry:
         pr.register_tool("p1", "tool_a")
         pr.register_rule("p1", "rule_x")
         pr.register_platform("p1", "platform_x")
+        pr.register_timer_action("p1", "action_x")
 
-        revoked = {"tools": [], "rules": [], "platforms": []}
+        revoked = {"tools": [], "rules": [], "platforms": [], "timer_actions": []}
 
         def tool_revoker(name):
             revoked["tools"].append(name)
@@ -101,15 +108,26 @@ class TestPluginRegistry:
             revoked["platforms"].append(name)
             return 1
 
+        def timer_action_revoker(name):
+            revoked["timer_actions"].append(name)
+            return 1
+
         pr.set_tool_revoker(tool_revoker)
         pr.set_rules_revoker(rules_revoker)
         pr.set_platform_revoker(platform_revoker)
+        pr.set_timer_action_revoker(timer_action_revoker)
 
         result = pr.revoke_plugin("p1")
-        assert result == {"tools": 1, "rules": 1, "platforms": 1}
+        assert result == {
+            "tools": 1,
+            "rules": 1,
+            "platforms": 1,
+            "timer_actions": 1,
+        }
         assert revoked["tools"] == ["p1"]
         assert revoked["rules"] == ["p1"]
         assert revoked["platforms"] == ["p1"]
+        assert revoked["timer_actions"] == ["p1"]
         assert not pr.has_plugin("p1")
 
     def test_register_and_get_platforms(self):
@@ -128,6 +146,24 @@ class TestPluginRegistry:
         pr.clear_platforms("p1")
         assert pr.get_plugin_platforms("p1") == []
         # clear_platforms 不影响工具/规则登记
+        assert pr.has_plugin("p2")
+
+    def test_register_and_get_timer_actions(self):
+        """登记/查询/清理插件定时动作。"""
+        pr = PluginRegistry.instance()
+        pr.register_timer_action("p1", "action_x")
+        pr.register_timer_actions("p1", ["action_y", "action_z"])
+        pr.register_timer_action("p2", "action_w")
+
+        assert pr.get_plugin_timer_actions("p1") == ["action_x", "action_y", "action_z"]
+        assert pr.get_plugin_timer_actions("p2") == ["action_w"]
+        assert pr.get_plugin_timer_actions("p3") == []
+        assert "p1" in pr.registered_plugins()
+        assert "p2" in pr.registered_plugins()
+
+        pr.clear_timer_actions("p1")
+        assert pr.get_plugin_timer_actions("p1") == []
+        # clear_timer_actions 不影响工具/规则/平台登记
         assert pr.has_plugin("p2")
 
     def test_singleton(self):

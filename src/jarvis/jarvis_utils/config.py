@@ -1672,6 +1672,26 @@ def get_plugin_platform_dirs() -> List[str]:
     ]
 
 
+def get_plugin_timer_action_dirs() -> List[str]:
+    """获取插件声明的定时任务动作实现目录（timer_actions 扩展点）。
+
+    插件 config.yaml 通过 ``timer_actions`` 字段声明自带的定时动作实现目录
+    （目录内 .py 文件导出 ``timer_action(name, params)`` 函数，见
+    ``TimerActionRegistry.load_plugin_actions``）：
+
+        timer_actions:
+          - "{{plugin_dir}}/timer_actions"
+
+    返回:
+        List[str]: 插件定时动作目录绝对路径列表（已展开 ~ 与环境变量）
+    """
+    return [
+        os.path.expanduser(os.path.expandvars(str(p)))
+        for p in GLOBAL_CONFIG_DATA.get("timer_actions", [])
+        if p
+    ]
+
+
 def get_gateway_auth_config() -> Dict[str, Any]:
     """
     获取 Gateway 认证配置。

@@ -223,6 +223,14 @@
       },
       "default": []
     },
+    "timer_actions": {
+      "type": "array",
+      "description": "插件定时任务动作扩展点：插件声明的定时动作实现目录（目录内 .py 导出 timer_action(name, params) 函数），安装后自动注册到 TimerActionRegistry",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
     "after_tool_call_cb_dirs": {
       "type": "array",
       "description": "工具调用后回调函数实现目录",
