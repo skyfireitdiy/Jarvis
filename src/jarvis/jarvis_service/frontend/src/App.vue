@@ -4283,7 +4283,19 @@ function openAgentInNewPanel(agent) {
   }
   const existingPanel = panels.value.find(p => p.agentId === agent.agent_id)
   if (existingPanel) {
+    // 已统一为 pane 树：把承载该 Panel 的 pane 设为激活；未承载（如该 pane 已被关闭、
+    // 但 Panel 仍残留在 panels 中）则重新分割/复用 pane 承载，避免「点了没反应」。
+    const hostingPane = findWorkspacePaneBySessionPanelId(existingPanel.id)
+    if (hostingPane) {
+      // 多 tab：先把目标 tab 设为该 pane 的激活 tab，再激活 pane
+      activateSessionTabInPane(hostingPane, existingPanel.id)
+      activateWorkspacePane(hostingPane.id)
+    } else {
+      // 空则原地、否则分割（不覆盖当前区域）
+      ensurePaneForView('session', existingPanel.id)
+    }
     activePanelId.value = existingPanel.id
+    workspaceSessionPanelId.value = existingPanel.id
     switchAgent(agent)
     return
   }
