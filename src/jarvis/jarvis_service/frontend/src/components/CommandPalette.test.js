@@ -177,6 +177,32 @@ describe("Agent 模式渲染与排序", () => {
     // 仅 a2 命中（name 含 a2）
     expect(titles).toEqual(["已停止a2"]);
   });
+
+  test("agentFilter='unopened' 时过滤掉已打开的 Agent", () => {
+    const wrapper = mountPalette({
+      initialQuery: "a>",
+      agentFilter: "unopened",
+      ctx: makeCtx({
+        agentList: agents,
+        openedAgentIds: new Set(["a1", "a3"]),
+      }),
+    });
+    const titles = wrapper.findAll(".cmd-item-title").map((n) => n.text());
+    // a1/a3 已打开被过滤，仅剩未打开的 a2
+    expect(titles).toEqual(["已停止a2"]);
+  });
+
+  test("agentFilter='all'（默认）时不过滤已打开的 Agent", () => {
+    const wrapper = mountPalette({
+      initialQuery: "a>",
+      ctx: makeCtx({
+        agentList: agents,
+        openedAgentIds: new Set(["a1", "a3"]),
+      }),
+    });
+    const titles = wrapper.findAll(".cmd-item-title").map((n) => n.text());
+    expect(titles).toHaveLength(3);
+  });
 });
 
 describe("最近使用", () => {
@@ -290,6 +316,49 @@ describe("交互与 emit", () => {
     // Agent 模式下条目来自 agentEntries，id 形如 agent-switch:<agent_id>
     expect(wrapper.emitted("run")[0][0].id).toBe("agent-switch:a1");
     expect(wrapper.emitted("run")[0][1]).toBe("new");
+  });
+
+  test("ctx 提供 onAgentPick 时，Agent 条目 run 优先调用它（放入「+」新建的空 tab）", async () => {
+    const onAgentPick = vi.fn();
+    const switchToAgent = vi.fn();
+    const ctx = makeCtx({
+      agentList: [{ agent_id: "a1", name: "运行中", status: "running" }],
+      onAgentPick,
+      switchToAgent,
+    });
+    const wrapper = mountPalette({
+      initialQuery: "a>",
+      actions: [action({ id: "cmd-1" })],
+      ctx,
+    });
+    await wrapper.find(".cmd-input").trigger("keydown", { key: "Enter" });
+    // 模拟 App.vue onCommandRun：拿到 emit 的 action 再调用其 run(ctx, openMode)
+    const emitted = wrapper.emitted("run");
+    expect(emitted).toBeTruthy();
+    emitted[0][0].run(ctx, emitted[0][1]);
+    // run 内部调用 onAgentPick(agent)，不再走 switchToAgent
+    expect(onAgentPick).toHaveBeenCalledTimes(1);
+    expect(onAgentPick.mock.calls[0][0].agent_id).toBe("a1");
+    expect(switchToAgent).not.toHaveBeenCalled();
+  });
+
+  test("ctx 无 onAgentPick 时，Agent 条目 run 回退到 switchToAgent", async () => {
+    const switchToAgent = vi.fn();
+    const ctx = makeCtx({
+      agentList: [{ agent_id: "a1", name: "运行中", status: "running" }],
+      switchToAgent,
+    });
+    const wrapper = mountPalette({
+      initialQuery: "a>",
+      actions: [action({ id: "cmd-1" })],
+      ctx,
+    });
+    await wrapper.find(".cmd-input").trigger("keydown", { key: "Enter" });
+    const emitted = wrapper.emitted("run");
+    expect(emitted).toBeTruthy();
+    emitted[0][0].run(ctx, emitted[0][1]);
+    expect(switchToAgent).toHaveBeenCalledTimes(1);
+    expect(switchToAgent.mock.calls[0][0].agent_id).toBe("a1");
   });
 
   test("非 Agent 模式 Tab 不触发 run（保持默认焦点行为）", async () => {

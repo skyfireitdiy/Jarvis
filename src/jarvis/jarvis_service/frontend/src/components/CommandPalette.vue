@@ -70,6 +70,8 @@ const props = defineProps({
   title: { type: String, default: '搜索命令…' },
   // 打开时的预输入内容（如 'a>' 直接进入 Agent 列表）
   initialQuery: { type: String, default: '' },
+  // Agent 模式过滤：'all' 显示全部；'unopened' 仅显示未打开的 Agent（「+」新建标签页时使用）
+  agentFilter: { type: String, default: 'all' },
 })
 
 const emit = defineEmits(['update:visible', 'run', 'close'])
@@ -172,6 +174,7 @@ const agentEntries = computed(() => {
   const isRunning = agent => !!agent && agent.status !== 'stopped'
   return list
     .filter(agent => {
+      if (props.agentFilter === 'unopened' && isOpened(agent)) return false
       if (!q) return true
       const nodeLabel = typeof ctx.getAgentNodeLabel === 'function' ? ctx.getAgentNodeLabel(agent) : ''
       const haystack = [agent?.name, agent?.agent_id, nodeLabel].filter(Boolean).join(' ').toLowerCase()
@@ -206,7 +209,11 @@ const agentEntries = computed(() => {
         // 因此不置灰——即使选中「当前 Agent 自身」也有意义（把焦点切回它的会话）。
         disabled: false,
         isAgentEntry: true,
-        run: (c, openMode) => c.switchToAgent && c.switchToAgent(agent, openMode),
+        // 优先走 ctx.onAgentPick（「+」新建标签页时把 Agent 放入目标 tab）；
+        // 否则走默认 switchToAgent（openMode 由 Enter/Tab 决定）
+        run: (c, openMode) => c.onAgentPick
+          ? c.onAgentPick(agent)
+          : c.switchToAgent && c.switchToAgent(agent, openMode),
       }
     })
 })
