@@ -78,6 +78,7 @@ class TestPluginRegistry:
         pr.register_timer_action("p1", "action_x")
         pr.register_audit_sink("p1", "sink_x")
         pr.register_audit_event_type("p1", "event_x")
+        pr.register_message_type("p1", "msg_x")
 
         result = pr.revoke_plugin("p1")
         assert result == {
@@ -87,6 +88,7 @@ class TestPluginRegistry:
             "timer_actions": 0,
             "audit_sinks": 0,
             "audit_event_types": 0,
+            "message_types": 0,
         }
         assert not pr.has_plugin("p1")
 
@@ -99,6 +101,7 @@ class TestPluginRegistry:
         pr.register_timer_action("p1", "action_x")
         pr.register_audit_sink("p1", "sink_x")
         pr.register_audit_event_type("p1", "event_x")
+        pr.register_message_type("p1", "msg_x")
 
         revoked = {
             "tools": [],
@@ -106,6 +109,7 @@ class TestPluginRegistry:
             "platforms": [],
             "timer_actions": [],
             "audit_sinks": [],
+            "message_types": [],
         }
 
         def tool_revoker(name):
@@ -128,11 +132,16 @@ class TestPluginRegistry:
             revoked["audit_sinks"].append(name)
             return 2
 
+        def message_type_revoker(name):
+            revoked["message_types"].append(name)
+            return 1
+
         pr.set_tool_revoker(tool_revoker)
         pr.set_rules_revoker(rules_revoker)
         pr.set_platform_revoker(platform_revoker)
         pr.set_timer_action_revoker(timer_action_revoker)
         pr.set_audit_revoker(audit_revoker)
+        pr.set_message_type_revoker(message_type_revoker)
 
         result = pr.revoke_plugin("p1")
         assert result == {
@@ -142,6 +151,7 @@ class TestPluginRegistry:
             "timer_actions": 1,
             "audit_sinks": 2,
             "audit_event_types": 0,
+            "message_types": 1,
         }
         assert revoked["tools"] == ["p1"]
         assert revoked["rules"] == ["p1"]

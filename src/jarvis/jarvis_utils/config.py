@@ -1735,6 +1735,26 @@ def get_plugin_audit_event_types() -> List[str]:
     return [str(t) for t in audit_config.get("event_types", []) if t]
 
 
+def get_plugin_message_type_dirs() -> List[str]:
+    """获取插件声明的自定义消息类型实现目录（message_types 扩展点）。
+
+    插件 config.yaml 通过 ``message_types`` 字段声明自带的自定义网关消息类型
+    实现目录（目录内 .py 文件导出 ``message_handler(message)`` 函数，见
+    ``MessageTypeRegistry.load_plugin_message_types``）：
+
+        message_types:
+          - "{{plugin_dir}}/message_types"
+
+    返回:
+        List[str]: 插件消息类型目录绝对路径列表（已展开 ~ 与环境变量）
+    """
+    return [
+        os.path.expanduser(os.path.expandvars(str(p)))
+        for p in GLOBAL_CONFIG_DATA.get("message_types", [])
+        if p
+    ]
+
+
 def get_gateway_auth_config() -> Dict[str, Any]:
     """
     获取 Gateway 认证配置。

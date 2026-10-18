@@ -1491,6 +1491,7 @@ _PLUGIN_EXTENSION_FIELDS = frozenset(
         "platforms",
         "timer_actions",
         "audit",
+        "message_types",
     }
 )
 
@@ -1529,6 +1530,7 @@ _PLUGIN_EXTENSION_FIELD_API_VERSION = {
     "platforms": "1.1",
     "timer_actions": "1.1",
     "audit": "1.1",
+    "message_types": "1.1",
 }
 
 

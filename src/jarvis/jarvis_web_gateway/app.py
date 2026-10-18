@@ -2220,6 +2220,25 @@ def create_app(
         )
         pass
 
+    # 注册插件消息类型撤销器（可逆效应），供 PluginRegistry.revoke_plugin 调用；
+    # 并加载插件声明的自定义消息类型（message_types 扩展点）。
+    try:
+        from jarvis.jarvis_web_gateway.message_types import MessageTypeRegistry
+        from jarvis.jarvis_tools.plugin_registry import PluginRegistry
+
+        message_type_registry = MessageTypeRegistry.instance()
+        message_type_registry.load_plugin_message_types()
+        PluginRegistry.instance().set_message_type_revoker(
+            message_type_registry.unregister_by_plugin
+        )
+    except Exception as e:
+        save_exception(
+            e,
+            module="jarvis_web_gateway.app",
+            function="_build_callback_from_metadata",
+        )
+        pass
+
     # Agent 进程（custom_app 模式）与主网关共享同一持久化文件 .jarvis_timers.json。
     # 若 Agent 进程也加载/写回该文件，会与主网关的 TimerManager 互相覆盖：
     # 主网关删除的任务会被 Agent 进程触发时写回（任务复活），
