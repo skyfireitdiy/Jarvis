@@ -51,7 +51,7 @@
           <span><b>Enter</b> {{ isAgentMode ? '打开' : isFileMode ? '打开文件' : '执行' }}</span>
           <span v-if="isFileMode"><b>⌫</b> 返回命令</span>
           <span v-else-if="!isAgentMode"><b>a&gt;</b> 切换 Agent　<b>f&gt;</b> 搜索文件</span>
-          <span v-else><b>⌫</b> 返回命令</span>
+          <span v-else><b>⌫</b> 返回命令 <b>Tab</b> 新区域打开</span>
           <span><b>Esc</b> 关闭</span>
         </div>
       </div>
@@ -356,6 +356,15 @@ function onInputKeydown(event) {
     event.preventDefault()
     const entry = flatEntries.value[activeIndex.value]
     if (entry && !entry.disabled) run(entry.action, 'current')
+  } else if (event.key === 'Tab') {
+    // Agent 模式：Tab 在「新的区域」中打开（openMode='new'，显式分屏入口）；
+    // 其他模式保持浏览器默认焦点行为（不拦截）。
+    if (isAgentMode.value) {
+      event.preventDefault()
+      event.stopPropagation()
+      const entry = flatEntries.value[activeIndex.value]
+      if (entry && !entry.disabled) run(entry.action, 'new')
+    }
   } else if (event.key === 'Escape') {
     event.preventDefault()
     close()

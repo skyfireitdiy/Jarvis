@@ -5583,6 +5583,8 @@ const commandPaletteCtx = computed(() => ({
       openAgentInCurrentPanel(agent)
     }
   },
+  // 在「新的区域」中打开 Agent（命令面板 Tab / 右键菜单「在新区域中打开」动作）
+  openAgentInNewPanel,
   getAgentNodeLabel,
   getStatusClass,
   isWaitingInput,

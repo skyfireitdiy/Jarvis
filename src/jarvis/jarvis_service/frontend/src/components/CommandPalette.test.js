@@ -279,6 +279,25 @@ describe("交互与 emit", () => {
     expect(active[0].find(".cmd-item-title").text()).toBe("一");
   });
 
+  test("Agent 模式 Tab 触发 emit('run', action, 'new')（新区域打开）", async () => {
+    const wrapper = mountPalette({
+      initialQuery: "a>",
+      actions: [action({ id: "cmd-1" })],
+      ctx: makeCtx({ agentList: [{ agent_id: "a1", name: "运行中", status: "running" }] }),
+    });
+    await wrapper.find(".cmd-input").trigger("keydown", { key: "Tab" });
+    expect(wrapper.emitted("run")).toBeTruthy();
+    // Agent 模式下条目来自 agentEntries，id 形如 agent-switch:<agent_id>
+    expect(wrapper.emitted("run")[0][0].id).toBe("agent-switch:a1");
+    expect(wrapper.emitted("run")[0][1]).toBe("new");
+  });
+
+  test("非 Agent 模式 Tab 不触发 run（保持默认焦点行为）", async () => {
+    const wrapper = mountPalette({ actions: [action({ id: "cmd-1" })] });
+    await wrapper.find(".cmd-input").trigger("keydown", { key: "Tab" });
+    expect(wrapper.emitted("run")).toBeFalsy();
+  });
+
   test("Escape emit('update:visible', false) 与 'close'", async () => {
     const wrapper = mountPalette();
     await wrapper.find(".cmd-input").trigger("keydown", { key: "Escape" });
