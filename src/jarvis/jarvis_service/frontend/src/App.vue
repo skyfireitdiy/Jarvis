@@ -1491,6 +1491,7 @@
       :actions="appActions"
       :ctx="commandPaletteCtx"
       :initial-query="commandPaletteInitialQuery"
+      :agent-filter="commandPaletteAgentFilter"
       @update:visible="showCommandPalette = $event"
       @run="onCommandRun"
       @close="showCommandPalette = false"
@@ -4094,6 +4095,17 @@ function openAgentInActivePane(agent) {
       activateWorkspacePane(activePaneLeaf.id)
       return true
     }
+    // 空 tab（agentId 为 null，如「+」新建的空标签页）：把 Agent 放入该 tab，而非追加新 tab
+    if (!hostedPanel.agentId) {
+      hostedPanel.agentId = agent.agent_id
+      activePanelId.value = hostedPanel.id
+      workspaceSessionPanelId.value = hostedPanel.id
+      activateSessionTabInPane(activePaneLeaf, hostedPanel.id)
+      activateWorkspacePane(activePaneLeaf.id)
+      switchAgent(agent)
+      nextTick(() => maybeStartTour('panel'))
+      return true
+    }
     // 追加 tab：新建 Panel 并作为 tab 加入激活 pane
     const targetPanel = {
       id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -4364,7 +4376,8 @@ function onCloseSessionTab(paneId, panelId) {
   }
 }
 
-// 追加空 tab：在当前 pane 创建一个空 panel 并作为新 tab（可从侧边栏选 Agent 放入）
+// 追加空 tab：在当前 pane 创建一个空 panel 并作为新 tab，然后打开命令面板
+// 列出「未打开的 Agent」供选择放入该 tab（一步到位，不再需要手动从侧边栏拖）。
 function onAddSessionTab(paneId) {
   const pane = findWorkspacePaneById(workspacePaneTree.value, paneId)
   if (!pane) return
@@ -4378,7 +4391,13 @@ function onAddSessionTab(paneId) {
   addSessionTabToPane(pane, targetPanel.id)
   activateSessionTabInPane(pane, targetPanel.id)
   activateWorkspacePane(paneId)
+  // 记录目标空 tab，命令面板选中 Agent 后放入它
+  pendingAddSessionPanelId = targetPanel.id
+  openCommandPalette('a>', 'unopened')
 }
+
+// 「+」新建空 tab 后，命令面板选中的 Agent 要放入的目标 tab（选中后清空）
+let pendingAddSessionPanelId = null
 
 // 获取 Panel 的消息列表
 function getPanelMessages(panel) {
@@ -5252,11 +5271,14 @@ function openDocs() {
 // 打开命令面板时，记录"打开前"焦点所在的面板区域
 // （命令面板会抢走焦点，导致执行关闭/分离时无法从活动元素推断目标）
 let commandPaletteFocusKey = null
-// 打开命令面板（双击宠物触发）；可传入预输入内容（如 'a>' 直接进入 Agent 列表）
-function openCommandPalette(initialQuery = '') {
+// 打开命令面板（双击宠物触发）；可传入预输入内容（如 'a>' 直接进入 Agent 列表）。
+// agentFilter：命令面板 Agent 模式的过滤方式（'all' 显示全部 / 'unopened' 仅显示未打开的 Agent，
+// 由「+」新建标签页时传入，选中后放入该空 tab）。
+function openCommandPalette(initialQuery = '', agentFilter = 'all') {
   if (showConnectModal.value) return
   commandPaletteFocusKey = getFocusedZoneKey()
   commandPaletteInitialQuery.value = initialQuery
+  commandPaletteAgentFilter.value = agentFilter
   showCommandPalette.value = true
 }
 
@@ -5597,6 +5619,27 @@ const commandPaletteCtx = computed(() => ({
   },
   // 在「新的区域」中打开 Agent（命令面板 Tab / 右键菜单「在新区域中打开」动作）
   openAgentInNewPanel,
+  // 「+」新建空 tab 后，命令面板选中的 Agent 放入该空 tab（选中后清空 pending）
+  onAgentPick: (agent) => {
+    if (!agent) return
+    const targetPanelId = pendingAddSessionPanelId
+    pendingAddSessionPanelId = null
+    if (targetPanelId) {
+      const targetPanel = panels.value.find(p => p.id === targetPanelId)
+      if (targetPanel) {
+        targetPanel.agentId = agent.agent_id
+        activePanelId.value = targetPanel.id
+        workspaceSessionPanelId.value = targetPanel.id
+        // 空则原地、已有承载该 Panel 的 pane 则复用、否则分割（不覆盖当前区域）
+        ensurePaneForView('session', targetPanel.id)
+        switchAgent(agent)
+        nextTick(() => maybeStartTour('panel'))
+        return
+      }
+    }
+    // 目标空 tab 已不存在（如被关闭）：回退到在当前面板打开
+    openAgentInCurrentPanel(agent)
+  },
   getAgentNodeLabel,
   getStatusClass,
   isWaitingInput,
@@ -6354,6 +6397,8 @@ const streamingMessages = ref(new Map()) // 按 agent_id 跟踪当前流式消�
 const showCommandPalette = ref(false)
 // 命令面板打开时的预输入内容（如 'a>' 直接展示 Agent 列表）
 const commandPaletteInitialQuery = ref('')
+// 命令面板 Agent 模式过滤：'all' 显示全部；'unopened' 仅显示未打开的 Agent（「+」新建标签页时使用）
+const commandPaletteAgentFilter = ref('all')
 // 命令面板 f> 文件搜索：结果 / 加载 / 错误（由 CommandPalette 的输入变化驱动）
 const commandPaletteFileResults = ref([])
 const commandPaletteFileSearching = ref(false)
