@@ -97,9 +97,12 @@ tool_load_dirs:
 #   - dir: "{{plugin_dir}}/callbacks"     # 字典：显式声明事件与注册目标
 #     events: ["task_started", "task_completed"]
 #     target: "event_bus"                 # event_bus（默认）/ hook / modifier
-# --- 模型供应商扩展点（可选，声明插件自带的平台实现目录，见「四.10 模型供应商（platforms/）」）---
+# --- 模型供应商扩展点（可选，声明插件自带的平台实现目录，见「四.9 模型供应商（platforms/）」）---
 # platforms:
 #   - "{{plugin_dir}}/platforms"
+# --- 定时任务动作扩展点（可选，声明插件自带的定时动作实现目录，见「四.10 定时任务动作（timer_actions/）」）---
+# timer_actions:
+#   - "{{plugin_dir}}/timer_actions"
 # --- 编排流水线声明 ---
 orchestration:
   - name: "my-pipeline"
@@ -147,8 +150,9 @@ orchestration:
 
 **要点：**
 
+- 扩展点字段（`rules_load_dirs`/`tool_load_dirs`/`agent_definition_dirs`/`orchestration`/`roles_dirs`/`mcp`/`lsp`/`event_callbacks`/`platforms`/`timer_actions` 等）会被合并进全局配置供 getter 消费；其中 `mcp` 声明的 MCP server 列表会被合并进全局 `mcp` 配置，插件安装后自动注册为 MCP 工具，无需用户在全局 `~/.jarvis/config.yaml` 重复配置；`lsp` 声明的语言服务会按语言名深度合并进全局 `lsp.languages`，插件安装后自动生效，无需重启；`platforms` 声明的平台实现目录会在插件安装后自动注册到 `PlatformRegistry`（见「四.9 模型供应商」）；`timer_actions` 声明的定时动作实现目录会在插件安装后自动注册到 `TimerActionRegistry`（见「四.10 定时任务动作」）。
+
 - `{{plugin_dir}}` 是 jinja2 模板变量，运行时渲染为插件目录绝对路径（见 `render_plugin_config_template`），**勿**写死绝对路径。
-- 扩展点字段（`rules_load_dirs`/`tool_load_dirs`/`agent_definition_dirs`/`orchestration`/`roles_dirs`/`mcp`/`lsp`/`event_callbacks`/`platforms` 等）会被合并进全局配置供 getter 消费；其中 `mcp` 声明的 MCP server 列表会被合并进全局 `mcp` 配置，插件安装后自动注册为 MCP 工具，无需用户在全局 `~/.jarvis/config.yaml` 重复配置；`lsp` 声明的语言服务会按语言名深度合并进全局 `lsp.languages`，插件安装后自动生效，无需重启；`platforms` 声明的平台实现目录会在插件安装后自动注册到 `PlatformRegistry`（见「四.9 模型供应商」）。
 - 除扩展点字段外的其余字段（`name`/`description`/`version`/`builtin`/`license`/`dependencies`/`capabilities`/`frontend`/自定义业务字段）会被隔离到全局配置的 `plugin_configs.<plugin_name>`，**不污染全局配置顶层、多个插件同名私有字段互不覆盖**。插件可通过 `get_plugin_config(plugin_name)` 读取自己的私有配置。
 - **`hooks` 生命周期钩子**：可选，声明插件在安装/升级/卸载前后要执行的 shell 命令（见上方示例）。支持 6 个时机：`pre-install` / `post-install` / `pre-update` / `post-update` / `pre-uninstall` / `post-uninstall`，每个时机是命令字符串列表，命令以**插件目录为工作目录**、经 shell 执行（超时 300s）。**`pre-*` 钩子失败会中止对应操作**（安装/升级/卸载不执行，避免半成品状态）；**`post-*` 钩子失败仅警告**，不影响主体操作结果。注意 `post-uninstall` 执行时插件目录已删除，命令工作目录为插件根目录（即 `plugins/`）。
 - **安装后免重启生效**：插件安装 / 升级 / 卸载完成后，网关会自动重新扫描 `plugins` 目录并把各插件的扩展点合并进全局配置（`reload_plugin_configs`），因此**无需重启网关进程**，`get_tool_load_dirs` / `get_rules_load_dirs` 等 getter 立即返回最新配置。若因环境异常导致重载失败，仅打印警告，可稍后重启生效。
@@ -161,7 +165,7 @@ orchestration:
 - **与插件自身 `version` 区分**：`version` 是插件版本（安装时做版本比较），`api_version` 是接口协议版本（决定插件与 Jarvis 接口的兼容性）。
 - **兼容策略**：以主版本号（major）判断。插件声明的 major 不大于当前 Jarvis 支持的接口版本即兼容；声明更高 major 时 Jarvis **降级警告**（不拒绝加载），提示插件可能依赖未来接口能力。
 - **废弃流程**：废弃某扩展点字段时，Jarvis 在加载插件时打印 deprecation 警告，通知开发者迁移；字段本身仍保留（旧插件仍可加载），仅提示尽快迁移。
-- **覆盖范围**：config.yaml 扩展点（`tool_load_dirs`/`rules_load_dirs`/`orchestration`/`mcp`/`lsp`/`frontend` 等）、plugin/api.py 私有功能（`PUBLIC_FUNCTIONS` 白名单）、工具协议（`protocol_version`，见「工具（tools/）」）。`lsp` 扩展点由接口版本 `1.1` 引入（旧插件未声明 `api_version` 时按 `"1.0"` 处理，仍可正常加载，只是不识别 `lsp` 字段）。`event_callbacks` 扩展点同样由接口版本 `1.1` 引入。`platforms` 扩展点由接口版本 `1.1` 引入。
+- **覆盖范围**：config.yaml 扩展点（`tool_load_dirs`/`rules_load_dirs`/`orchestration`/`mcp`/`lsp`/`frontend` 等）、plugin/api.py 私有功能（`PUBLIC_FUNCTIONS` 白名单）、工具协议（`protocol_version`，见「工具（tools/）」）。`lsp` 扩展点由接口版本 `1.1` 引入（旧插件未声明 `api_version` 时按 `"1.0"` 处理，仍可正常加载，只是不识别 `lsp` 字段）。`event_callbacks` 扩展点同样由接口版本 `1.1` 引入。`platforms` 扩展点由接口版本 `1.1` 引入。`timer_actions` 扩展点同样由接口版本 `1.1` 引入。
 
 ## 四、扩展点开发规范
 
@@ -454,6 +458,49 @@ platforms:
 **与全局平台目录的关系**：`platforms` 扩展点声明的目录会**追加**到 `PlatformRegistry` 扫描路径（用户全局 `~/.jarvis/models/` 目录与内置平台目录仍然生效），插件平台与内置/用户平台重名时插件平台**覆盖**（打印告警）。
 
 **卸载撤销**：插件卸载时，其注册的平台会从 `PlatformRegistry` 精确移除（可逆效应，见 `PluginRegistry`）。
+
+### 10. 定时任务动作（timer_actions/，可选）
+
+插件可在 `config.yaml` 声明 `timer_actions`，注册插件自带的**定时任务动作类型**，安装后自动加载到 `TimerActionRegistry`，创建定时任务时 `action.type` 即可选用插件注册的动作类型，到点后由插件的动作函数执行逻辑：
+
+```yaml
+timer_actions:
+  - "{{plugin_dir}}/timer_actions"
+```
+
+`timer_actions` 声明的是**目录列表**（路径用 `{{plugin_dir}}` 占位），目录内每个 `.py` 文件（跳过 `__init__.py`）按以下两种形式之一导出动作：
+
+**形式一：模块级 `timer_action(name, params)` 函数**（单个动作）
+
+```python
+# timer_actions/sync_action.py
+TIMER_ACTION_NAME = "plugin_sync"          # 动作名（可选，缺省用文件名 stem）
+TIMER_ACTION_DESCRIPTION = "定时执行插件同步"  # 动作描述（可选）
+
+
+def timer_action(name, params):
+    """到点后由 gateway 调用，name 为动作名、params 为创建定时任务时传入的参数。"""
+    return "synced"
+```
+
+**形式二：`register_timer_actions()` 工厂**（返回 `(name, function[, description])` 元组列表，可一次注册多个动作）
+
+```python
+# timer_actions/multi_actions.py
+def register_timer_actions():
+    return [
+        ("plugin_sync2", lambda name, params: "ok", "第二个动作"),
+        ("plugin_sync3", lambda name, params: "ok"),
+    ]
+```
+
+**动作函数签名**：`timer_action(name, params)`，`name` 为动作名、`params` 为创建定时任务时 `action.params` 传入的字典。动作执行在 gateway 进程内，由 `TimerManager` 到点触发；执行异常会被捕获并打印告警，不影响其它定时任务。
+
+**典型场景**：定时同步、定时清理、定时拉取数据、定时触发外部系统等自定义周期任务。
+
+**与内置动作类型的关系**：内置 `create_agent` / `run_shell_command` / `capability_call` 仍可用；插件注册的动作类型与内置类型重名时插件动作**覆盖**（打印告警）。
+
+**卸载撤销**：插件卸载时，其注册的定时动作会从 `TimerActionRegistry` 精确移除（可逆效应，见 `PluginRegistry`），已创建的引用该动作的定时任务到点执行时会被安全忽略。
 
 ## 五、版本管理
 

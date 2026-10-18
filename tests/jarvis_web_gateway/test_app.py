@@ -84,7 +84,7 @@ def test_web_gateway_emit_output_promotes_agent_id_to_payload():
     router = SessionOutputRouter()
     input_registry = Mock()
     terminal_input_registry = Mock()
-    auth_store = {"default": {"token": "test-token"}}
+    auth_store: dict[str, dict[str, str] | None] = {"default": {"token": "test-token"}}
     gateway = WebGateway(router, input_registry, auth_store, terminal_input_registry)
     gateway._check_auth = Mock(return_value=(True, None))
 
@@ -410,3 +410,131 @@ def test_create_timer_schedule_requires_exactly_one_field():
     assert body["error"]["code"] == "INVALID_ARGUMENT"
     assert "Exactly one" in body["error"]["message"]
     _cleanup_timer_persistence()
+
+
+def test_create_timer_with_plugin_action():
+    """插件注册的定时动作类型（timer_actions 扩展点）应能创建定时任务。"""
+    from jarvis.jarvis_web_gateway.timer_actions import TimerActionRegistry
+
+    _cleanup_timer_persistence()
+    timer_registry = TimerActionRegistry.instance()
+    timer_registry.clear()
+    executed = {}
+
+    def plugin_sync_action(name, params):
+        executed["name"] = name
+        executed["params"] = params
+
+    timer_registry.register(
+        "plugin_sync",
+        plugin_sync_action,
+        description="定时执行插件同步",
+        plugin="demo_plugin",
+    )
+
+    client = create_test_client()
+    headers = get_auth_headers()
+    try:
+        # delay 足够长避免测试期间触发
+        resp = client.post(
+            "/api/timers",
+            headers=headers,
+            json={
+                "schedule": {"delay_seconds": 3600},
+                "action": {
+                    "type": "plugin_sync",
+                    "params": {"target": "demo"},
+                },
+            },
+        )
+        body = resp.json()
+        assert body["success"] is True, body
+        timer_info = body["data"]
+        assert timer_info["metadata"]["action"]["type"] == "plugin_sync"
+        assert timer_info["metadata"]["action"]["params"] == {"target": "demo"}
+
+        timer_id = timer_info["task_id"]
+        resp_del = client.delete(f"/api/timers/{timer_id}", headers=headers)
+        assert resp_del.json()["success"] is True
+    finally:
+        timer_registry.clear()
+        _cleanup_timer_persistence()
+
+
+def test_create_timer_with_unregistered_plugin_action_rejected():
+    """未注册的插件定时动作类型应返回 INVALID_ARGUMENT。"""
+    from jarvis.jarvis_web_gateway.timer_actions import TimerActionRegistry
+
+    _cleanup_timer_persistence()
+    timer_registry = TimerActionRegistry.instance()
+    timer_registry.clear()
+    client = create_test_client()
+    headers = get_auth_headers()
+    try:
+        resp = client.post(
+            "/api/timers",
+            headers=headers,
+            json={
+                "schedule": {"delay_seconds": 0},
+                "action": {
+                    "type": "not_registered_action",
+                    "params": {},
+                },
+            },
+        )
+        body = resp.json()
+        assert body["success"] is False
+        assert body["error"]["code"] == "INVALID_ARGUMENT"
+        assert "is not registered" in body["error"]["message"]
+    finally:
+        timer_registry.clear()
+        _cleanup_timer_persistence()
+
+
+def test_plugin_timer_action_fires_on_schedule():
+    """到点后应调用插件注册的动作函数，并传入 (name, params)。"""
+    import time
+
+    from jarvis.jarvis_web_gateway.timer_actions import TimerActionRegistry
+
+    _cleanup_timer_persistence()
+    timer_registry = TimerActionRegistry.instance()
+    timer_registry.clear()
+    executed = {}
+
+    def plugin_sync_action(name, params):
+        executed["name"] = name
+        executed["params"] = params
+
+    timer_registry.register(
+        "plugin_sync",
+        plugin_sync_action,
+        description="定时执行插件同步",
+        plugin="demo_plugin",
+    )
+
+    client = create_test_client()
+    headers = get_auth_headers()
+    try:
+        resp = client.post(
+            "/api/timers",
+            headers=headers,
+            json={
+                "schedule": {"delay_seconds": 0},
+                "action": {
+                    "type": "plugin_sync",
+                    "params": {"target": "demo"},
+                },
+            },
+        )
+        body = resp.json()
+        assert body["success"] is True, body
+
+        # 轮询等待后台 worker 触发插件动作（最多 5 秒）
+        deadline = time.time() + 5
+        while not executed and time.time() < deadline:
+            time.sleep(0.05)
+        assert executed == {"name": "plugin_sync", "params": {"target": "demo"}}
+    finally:
+        timer_registry.clear()
+        _cleanup_timer_persistence()

@@ -2182,6 +2182,25 @@ def create_app(
             raise ValueError("Persisted timer metadata.action must be an object")
         return _build_timer_action({"action": action_metadata})[0]
 
+    # 注册插件定时动作撤销器（可逆效应），供 PluginRegistry.revoke_plugin 调用；
+    # 并加载插件声明的定时动作（timer_actions 扩展点）。
+    try:
+        from jarvis.jarvis_web_gateway.timer_actions import TimerActionRegistry
+        from jarvis.jarvis_tools.plugin_registry import PluginRegistry
+
+        timer_action_registry = TimerActionRegistry.instance()
+        timer_action_registry.load_plugin_actions()
+        PluginRegistry.instance().set_timer_action_revoker(
+            timer_action_registry.unregister_actions_by_plugin
+        )
+    except Exception as e:
+        save_exception(
+            e,
+            module="jarvis_web_gateway.app",
+            function="_build_callback_from_metadata",
+        )
+        pass
+
     # Agent 进程（custom_app 模式）与主网关共享同一持久化文件 .jarvis_timers.json。
     # 若 Agent 进程也加载/写回该文件，会与主网关的 TimerManager 互相覆盖：
     # 主网关删除的任务会被 Agent 进程触发时写回（任务复活），
@@ -8112,6 +8131,40 @@ def create_app(
 
         return _capability_call_callback, metadata
 
+    def _build_plugin_timer_action_callback(action_type: str, action_params: Dict[str, Any]):
+        """构建插件注册的定时动作 callback（timer_actions 扩展点）。
+
+        从 TimerActionRegistry 查询插件注册的动作，到点后调用插件的
+        ``timer_action(name, params)`` 函数。动作未注册时抛出 ValueError，
+        由调用方转为 INVALID_ARGUMENT。
+        """
+        from jarvis.jarvis_web_gateway.timer_actions import TimerActionRegistry
+
+        action = TimerActionRegistry.instance().get(action_type)
+        if action is None:
+            raise ValueError(
+                f"action.type '{action_type}' is not registered "
+                "(must be one of create_agent, run_shell_command, "
+                "capability_call or a plugin-registered timer action)"
+            )
+
+        metadata = {
+            "type": action_type,
+            "params": action_params,
+        }
+
+        def _plugin_timer_action_callback() -> None:
+            try:
+                action.function(action_type, action_params)
+            except Exception as e:
+                from jarvis.jarvis_utils.output import PrettyOutput
+
+                PrettyOutput.auto_print(
+                    f"⚠️ 插件定时动作 '{action_type}' 执行失败: {e}"
+                )
+
+        return _plugin_timer_action_callback, metadata
+
     def _build_timer_action(request: Dict[str, Any]):
         action = request.get("action")
         if not isinstance(action, dict):
@@ -8130,9 +8183,8 @@ def create_app(
             return _build_shell_command_callback(action_params)
         if action_type == "capability_call":
             return _build_capability_call_callback(action_params)
-        raise ValueError(
-            "action.type must be one of create_agent, run_shell_command or capability_call"
-        )
+        # 插件注册的定时动作（timer_actions 扩展点）
+        return _build_plugin_timer_action_callback(action_type, action_params)
 
     timer_manager.load_persisted_tasks()
 

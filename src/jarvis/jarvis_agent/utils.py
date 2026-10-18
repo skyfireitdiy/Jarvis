@@ -1644,6 +1644,15 @@ def install_plugin(
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 重载插件平台失败（可稍后重启生效）: {e}")
 
+        # 免重启重载插件定时动作：使插件声明的定时动作立即注册到 TimerActionRegistry。
+        # 失败仅警告，不阻断安装。
+        try:
+            from jarvis.jarvis_web_gateway.timer_actions import TimerActionRegistry
+
+            TimerActionRegistry.instance().reload_plugin_actions()
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 重载插件定时动作失败（可稍后重启生效）: {e}")
+
         PrettyOutput.auto_print(f"✅ 插件安装成功: {plugin_name} -> {target_dir}")
         return True
 
@@ -2568,11 +2577,17 @@ def uninstall_plugin(plugin_id: str) -> bool:
         registry = PluginRegistry.instance()
         if registry.has_plugin(plugin_name):
             result = registry.revoke_plugin(plugin_name)
-            if result.get("tools") or result.get("rules") or result.get("platforms"):
+            if (
+                result.get("tools")
+                or result.get("rules")
+                or result.get("platforms")
+                or result.get("timer_actions")
+            ):
                 PrettyOutput.auto_print(
                     f"↩️  已撤销插件 '{plugin_name}' 注册的资源"
                     f"（工具 {result.get('tools', 0)} 个，规则 {result.get('rules', 0)} 个，"
-                    f"平台 {result.get('platforms', 0)} 个）"
+                    f"平台 {result.get('platforms', 0)} 个，"
+                    f"定时动作 {result.get('timer_actions', 0)} 个）"
                 )
     except Exception as e:
         PrettyOutput.auto_print(f"⚠️ 撤销插件资源失败（继续卸载）: {str(e)}")
@@ -2607,6 +2622,15 @@ def uninstall_plugin(plugin_id: str) -> bool:
             PlatformRegistry.get_global_platform_registry().reload_plugin_platforms()
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 重载插件平台失败（可稍后重启生效）: {e}")
+
+        # 免重启重载插件定时动作：使卸载插件的定时动作从 TimerActionRegistry 移除。
+        # 失败仅警告，不阻断卸载。
+        try:
+            from jarvis.jarvis_web_gateway.timer_actions import TimerActionRegistry
+
+            TimerActionRegistry.instance().reload_plugin_actions()
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 重载插件定时动作失败（可稍后重启生效）: {e}")
         return True
     except Exception as e:
         PrettyOutput.auto_print(f"❌ 卸载插件失败: {str(e)}")

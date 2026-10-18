@@ -1489,6 +1489,7 @@ _PLUGIN_EXTENSION_FIELDS = frozenset(
         "mcp",
         "lsp",
         "platforms",
+        "timer_actions",
     }
 )
 
@@ -1525,6 +1526,7 @@ _PLUGIN_EXTENSION_FIELD_API_VERSION = {
     "mcp": "1.0",
     "lsp": "1.1",
     "platforms": "1.1",
+    "timer_actions": "1.1",
 }
 
 
