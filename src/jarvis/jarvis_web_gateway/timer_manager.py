@@ -40,6 +40,9 @@ class TimerTask:
     cron_expr: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
     cancelled: bool = False
+    # 内置系统任务标记：内置任务不出现在前端定时任务界面（list_tasks 过滤），
+    # 用户无法从界面删除，避免误删导致功能失效（如插件更新检测）。
+    builtin: bool = False
 
     @property
     def is_recurring(self) -> bool:
@@ -55,6 +58,7 @@ class TimerTask:
             "cron_expr": self.cron_expr,
             "is_recurring": self.is_recurring,
             "cancelled": self.cancelled,
+            "builtin": self.builtin,
             "metadata": dict(self.metadata or {}),
         }
 
@@ -108,6 +112,7 @@ class TimerManager:
         callback: TimerCallback,
         metadata: Optional[Dict[str, Any]] = None,
         persist: bool = True,
+        builtin: bool = False,
     ) -> str:
         """注册绝对时间一次任务。"""
         return self._schedule_task(
@@ -115,6 +120,7 @@ class TimerManager:
             callback=callback,
             metadata=metadata,
             persist=persist,
+            builtin=builtin,
         )
 
     def schedule_after(
@@ -123,6 +129,7 @@ class TimerManager:
         callback: TimerCallback,
         metadata: Optional[Dict[str, Any]] = None,
         persist: bool = True,
+        builtin: bool = False,
     ) -> str:
         """注册相对延迟一次任务。"""
         if delay_seconds < 0:
@@ -132,6 +139,7 @@ class TimerManager:
             callback=callback,
             metadata=metadata,
             persist=persist,
+            builtin=builtin,
         )
 
     def schedule_every(
@@ -140,6 +148,7 @@ class TimerManager:
         callback: TimerCallback,
         metadata: Optional[Dict[str, Any]] = None,
         persist: bool = True,
+        builtin: bool = False,
     ) -> str:
         """注册循环定时任务。
 
@@ -149,6 +158,8 @@ class TimerManager:
             metadata: 附加元数据
             persist: 是否持久化到磁盘（重启后恢复）。内置任务通常传
                 False，避免重启后因缺少可序列化的 action 元数据而恢复失败。
+            builtin: 是否为内置系统任务。内置任务不出现在前端定时任务
+                界面（list_tasks 过滤），用户无法从界面删除。
         """
         if interval_seconds <= 0:
             raise ValueError("interval_seconds must be > 0")
@@ -158,6 +169,7 @@ class TimerManager:
             interval_seconds=interval_seconds,
             metadata=metadata,
             persist=persist,
+            builtin=builtin,
         )
 
     def schedule_cron(
@@ -166,6 +178,7 @@ class TimerManager:
         callback: TimerCallback,
         metadata: Optional[Dict[str, Any]] = None,
         persist: bool = True,
+        builtin: bool = False,
     ) -> str:
         """注册 cron 表达式循环任务。
 
@@ -182,6 +195,7 @@ class TimerManager:
             cron_expr=cron_expr,
             metadata=metadata,
             persist=persist,
+            builtin=builtin,
         )
 
     def cancel(self, task_id: str) -> bool:
@@ -205,10 +219,12 @@ class TimerManager:
             return task.to_dict()
 
     def list_tasks(self) -> List[Dict[str, Any]]:
-        """列出所有未取消的任务。"""
+        """列出所有未取消的任务（内置系统任务不返回，避免暴露在前端界面）。"""
         with self._lock:
             tasks = [
-                task.to_dict() for task in self._tasks.values() if not task.cancelled
+                task.to_dict()
+                for task in self._tasks.values()
+                if not task.cancelled and not task.builtin
             ]
         tasks.sort(key=lambda task_info: task_info["run_at"])
         return tasks
@@ -268,6 +284,7 @@ class TimerManager:
         metadata: Optional[Dict[str, Any]] = None,
         task_id: Optional[str] = None,
         persist: bool = True,
+        builtin: bool = False,
     ) -> str:
         with self._condition:
             if self._shutdown:
@@ -281,6 +298,7 @@ class TimerManager:
                 interval_seconds=interval_seconds,
                 cron_expr=cron_expr,
                 metadata=metadata,
+                builtin=builtin,
             )
             self._tasks[task_id] = timer_task
             heapq.heappush(

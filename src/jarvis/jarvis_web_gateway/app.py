@@ -2296,10 +2296,10 @@ def create_app(
             finally:
                 # 首次执行完成后，注册每小时循环任务
                 timer_manager.schedule_every(
-                    3600, _run_plugin_update_check, persist=False
+                    3600, _run_plugin_update_check, persist=False, builtin=True
                 )
 
-        timer_manager.schedule_after(60, _first_plugin_update_check, persist=False)
+        timer_manager.schedule_after(60, _first_plugin_update_check, persist=False, builtin=True)
 
     # 保存 router 到全局，用于状态更新时推送消息
     global _router, _terminal_session_manager, _node_connection_manager, _node_runtime
