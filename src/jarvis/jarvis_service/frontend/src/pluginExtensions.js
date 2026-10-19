@@ -1,7 +1,7 @@
 // 插件前端扩展加载器（方案2：运行时动态加载）。
 //
 // 前端是 vite 构建的静态产物，插件无法参与构建。插件 config.yaml 声明
-// `frontend` 扩展点（admin_tabs / sidebar_views / tool_panels），后端按节点
+// `frontend` 扩展点（admin_tabs / sidebar_views / tool_panels / pane_views），后端按节点
 // serve 插件前端资源（GET /api/plugins/{node_id}/{name}/frontend/{path}，
 // 返回 JSON 包裹的 content）。本模块负责：
 //   - 拉取扩展清单（fetchPluginExtensions）
@@ -44,7 +44,12 @@ export async function fetchPluginExtensions({
     for (const plugin of plugins) {
       const frontend = plugin && plugin.frontend;
       if (!frontend || typeof frontend !== "object") continue;
-      for (const extType of ["admin_tabs", "sidebar_views", "tool_panels"]) {
+      for (const extType of [
+        "admin_tabs",
+        "sidebar_views",
+        "tool_panels",
+        "pane_views",
+      ]) {
         const list = frontend[extType];
         if (!Array.isArray(list)) continue;
         for (const ext of list) {

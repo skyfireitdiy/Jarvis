@@ -888,6 +888,23 @@
                     />
                   </div>
                 </template>
+                <template v-else-if="isPluginPaneView(pane.view)">
+                  <!-- 插件 pane leaf：用 <component :is> 渲染插件异步组件（复用 usePlugins 的
+                       Blob URL import 加载机制；resolvePluginPaneComp 按 pane.view 解析并缓存）。
+                       插件未安装/未找到时降级为空占位。 -->
+                  <div class="workspace-pane-plugin-wrap" @mousedown="activateWorkspacePane(pane.id)">
+                    <component
+                      :is="resolvePluginPaneComp(pane.view)"
+                      v-if="resolvePluginPaneComp(pane.view)"
+                      class="workspace-pane-plugin"
+                    />
+                    <div v-else class="workspace-pane-placeholder" @click="activateWorkspacePane(pane.id)">
+                      <div class="workspace-placeholder-icon">🧩</div>
+                      <div class="workspace-placeholder-title">插件面板不可用</div>
+                      <div class="workspace-placeholder-text">该插件未安装或已卸载，请到「插件管理」中安装后重试。</div>
+                    </div>
+                  </div>
+                </template>
                 <template v-else>
                   <!-- session leaf：渲染真实会话面板（复用与 #main-view 相同的接线） -->
                   <div v-if="getPanePanel(pane)" class="workspace-pane-session-wrap" @mousedown="activateWorkspacePane(pane.id)">
@@ -3460,10 +3477,11 @@ const {
   startWorkspacePaneResize, persistWorkspacePaneLayout,
   restoreWorkspacePaneLayout, restoreWorkspacePaneContents,
   // 插件扩展（usePlugins 返回透传）
-  pluginExtensions, pluginAdminTabs, pluginSidebarViews, pluginToolPanels,
-  pluginSidebarTitle, pluginToolPanelTitle, WORKSPACE_SIDEBAR_TITLES, workspaceSidebarTitle,
+  pluginExtensions, pluginAdminTabs, pluginSidebarViews, pluginToolPanels, pluginPaneViews,
+  pluginSidebarTitle, pluginToolPanelTitle, pluginPaneTitle, WORKSPACE_SIDEBAR_TITLES, workspaceSidebarTitle,
   loadPluginExtensionsForUi, resolvePluginExtensionComponent, isPluginSidebarView,
-  isPluginToolView, pluginSidebarCompCache, activePluginSidebarComp, activePluginToolPanelComp,
+  isPluginToolView, isPluginPaneView, pluginSidebarCompCache, activePluginSidebarComp,
+  activePluginToolPanelComp, resolvePluginPaneComp, activePluginPaneComp,
 } = useWorkspacePane({
   // 直传（定义在本调用点之前）
   fetchWithAuth,

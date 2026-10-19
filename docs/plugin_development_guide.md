@@ -145,6 +145,10 @@ orchestration:
 #     - id: my-tool
 #       title: "我的工具"
 #       entry: tool.js
+#   pane_views:
+#     - id: my-pane
+#       title: "我的面板"
+#       entry: pane.js
 # --- 依赖声明（可选，三类：plugins/python/commands）---
 # dependencies:
 #   plugins:
@@ -261,17 +265,18 @@ YAML 编排流水线，配合 `OrganizeAgents` 与 `jca -n --task-file` 消费�
 
 ### 6. 前端扩展（frontend/，可选）
 
-前端 JS 是**纯浏览器 ES module**：用 `window.Vue` 渲染，导出 default 组件，**不要 `import 'vue'`**。在 `config.yaml` 的 `frontend` 字段声明 `admin_tabs`/`sidebar_views`/`tool_panels`，每项含 `id`/`title`/`entry`（entry 为 JS 文件名，相对插件 frontend 目录）。
+前端 JS 是**纯浏览器 ES module**：用 `window.Vue` 渲染，导出 default 组件，**不要 `import 'vue'`**。在 `config.yaml` 的 `frontend` 字段声明 `admin_tabs`/`sidebar_views`/`tool_panels`/`pane_views`，每项含 `id`/`title`/`entry`（entry 为 JS 文件名，相对插件 frontend 目录）。
 
 前端通过 `GET /api/plugins/{node_id}/{name}/frontend/{path}` 动态加载插件 JS，用 Blob URL `import()` 加载为 Vue 组件。插件 JS 应**单文件自包含**（不引用相对路径资源），否则 Blob module 无法解析。
 
-#### 6.1 三个扩展点
+#### 6.1 四个扩展点
 
 | 扩展点 | 渲染位置 | 说明 |
 |--------|----------|------|
 | `admin_tabs` | 管理面板 tab | 在管理面板（AdminPanel）新增一个 tab |
 | `sidebar_views` | 工作区侧边栏 | 在活动栏新增入口，view 名为 `plugin:<id>` |
 | `tool_panels` | 工作区侧边栏 | 在活动栏新增入口，view 名为 `plugin-tool:<id>`，与 `sidebar_views` 独立 |
+| `pane_views` | 工作区 pane | 插件 UI 作为工作区自由分割 pane 承载，view 名为 `plugin-pane:<id>`（host 单例，同 id 至多一个 pane） |
 
 #### 6.2 统一 props（宿主自动注入）
 

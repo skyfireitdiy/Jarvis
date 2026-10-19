@@ -47,6 +47,7 @@ describe("fetchPluginExtensions", () => {
                   { id: "stats", title: "统计", entry: "side.js" },
                 ],
                 tool_panels: [{ id: "tool1", title: "工具", entry: "tool.js" }],
+                pane_views: [{ id: "pane1", title: "面板", entry: "pane.js" }],
               },
             },
           ],
@@ -55,7 +56,7 @@ describe("fetchPluginExtensions", () => {
     });
 
     const exts = await fetchPluginExtensions({ ...baseOpts, fetchWithAuth });
-    expect(exts).toHaveLength(3);
+    expect(exts).toHaveLength(4);
     const admin = exts.find((e) => e.extType === "admin_tabs");
     expect(admin).toMatchObject({
       nodeId: "master",
@@ -71,6 +72,19 @@ describe("fetchPluginExtensions", () => {
     );
     expect(exts.find((e) => e.extType === "sidebar_views").id).toBe("stats");
     expect(exts.find((e) => e.extType === "tool_panels").id).toBe("tool1");
+    const pane = exts.find((e) => e.extType === "pane_views");
+    expect(pane).toMatchObject({
+      nodeId: "master",
+      plugin: "demo",
+      pluginVersion: "0.1.0",
+      extType: "pane_views",
+      id: "pane1",
+      title: "面板",
+      entry: "pane.js",
+    });
+    expect(pane.url).toBe(
+      "http://127.0.0.1:8000/api/plugins/master/demo/frontend/pane.js",
+    );
   });
 
   test("无 frontend 声明或无效项时跳过", async () => {

@@ -118,6 +118,11 @@ frontend:
     - id: my-tool
       title: 我的工具
       entry: frontend/my-tool.js
+  # 4. 工作区 pane 扩展（插件 UI 作为自由分割 pane 承载，view 名为 plugin-pane:<id>）
+  pane_views:
+    - id: my-pane
+      title: 我的面板
+      entry: frontend/my-pane.js
 ```
 
 ### 插件前端 JS 格式

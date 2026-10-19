@@ -16,17 +16,22 @@ const { usePluginsMock, pluginStateShell } = vi.hoisted(() => {
     pluginAdminTabs: null,
     pluginSidebarViews: null,
     pluginToolPanels: null,
+    pluginPaneViews: null,
     pluginSidebarTitle: vi.fn((view) => ''),
     pluginToolPanelTitle: vi.fn((view) => ''),
+    pluginPaneTitle: vi.fn((view) => ''),
     WORKSPACE_SIDEBAR_TITLES: {},
     workspaceSidebarTitle: null,
     loadPluginExtensionsForUi: vi.fn(async () => {}),
     resolvePluginExtensionComponent: vi.fn(() => null),
     isPluginSidebarView: vi.fn(() => false),
     isPluginToolView: vi.fn(() => false),
+    isPluginPaneView: vi.fn(() => false),
     pluginSidebarCompCache: new Map(),
     activePluginSidebarComp: null,
     activePluginToolPanelComp: null,
+    resolvePluginPaneComp: vi.fn(() => null),
+    activePluginPaneComp: null,
   }
   const usePluginsMock = vi.fn(() => pluginStateShell)
   return { usePluginsMock, pluginStateShell }
@@ -63,9 +68,11 @@ function makeHarness(overrides = {}) {
     pluginAdminTabs: computed(() => pluginState.pluginExtensions.value.filter(e => e.extType === 'admin_tabs')),
     pluginSidebarViews: computed(() => pluginState.pluginExtensions.value.filter(e => e.extType === 'sidebar_views')),
     pluginToolPanels: computed(() => pluginState.pluginExtensions.value.filter(e => e.extType === 'tool_panels')),
+    pluginPaneViews: computed(() => pluginState.pluginExtensions.value.filter(e => e.extType === 'pane_views')),
     workspaceSidebarTitle: computed(() => ''),
     activePluginSidebarComp: computed(() => null),
     activePluginToolPanelComp: computed(() => null),
+    activePluginPaneComp: computed(() => null),
   }
   usePluginsMock.mockReturnValue(pluginState)
   // —— 直传依赖（定义在调用点之前）——
@@ -424,6 +431,34 @@ describe('useWorkspacePane', () => {
     expect(api.workspacePaneCount.value).toBe(1)
   })
 
+  it('ensurePaneForView：plugin-pane 视图 host 单例复用', () => {
+    const { api } = makeHarness()
+    // 模拟 isPluginPaneView 识别 plugin-pane: 前缀
+    pluginStateShell.isPluginPaneView.mockImplementation((view) => typeof view === 'string' && view.startsWith('plugin-pane:'))
+    const id1 = api.ensurePaneForView('plugin-pane:p1')
+    expect(id1).toBeTruthy()
+    // 再次打开同一插件 pane：复用同一 pane，不新增
+    const id2 = api.ensurePaneForView('plugin-pane:p1')
+    expect(id2).toBe(id1)
+    expect(api.workspacePaneCount.value).toBe(1)
+    // 不同 id 的插件 pane：分割新建
+    const id3 = api.ensurePaneForView('plugin-pane:p2')
+    expect(id3).toBeTruthy()
+    expect(id3).not.toBe(id1)
+    expect(api.workspacePaneCount.value).toBe(2)
+  })
+
+  it('getWorkspacePaneTitle：plugin-pane 视图标题', () => {
+    const { api } = makeHarness()
+    const pane = api.workspacePaneTree.value
+    pane.view = 'plugin-pane:p1'
+    // 未找到插件 → 回退通用文案
+    expect(api.getWorkspacePaneTitle(pane)).toBe('插件面板')
+    // 找到插件 → 返回声明的 title
+    pluginStateShell.pluginPaneTitle.mockReturnValue('我的插件面板')
+    expect(api.getWorkspacePaneTitle(pane)).toBe('我的插件面板')
+  })
+
   it('getWorkspacePaneTitle：各视图标题', () => {
     const { api } = makeHarness()
     const pane = api.workspacePaneTree.value
@@ -508,6 +543,46 @@ describe('useWorkspacePane', () => {
 
   it('restoreWorkspacePaneLayout：非法 JSON 回退默认', () => {
     localStorage.setItem('jarvis_workspace_pane_layout', '{invalid json')
+    const { api } = makeHarness()
+    api.restoreWorkspacePaneLayout()
+    expect(api.workspacePaneCount.value).toBe(1)
+  })
+
+  it('restoreWorkspacePaneLayout：plugin-pane 视图布局恢复', () => {
+    // 分割树：一个 file leaf + 一个 plugin-pane leaf
+    localStorage.setItem('jarvis_workspace_pane_layout', JSON.stringify({
+      version: 3,
+      activePaneId: 'pane-2',
+      tree: {
+        type: 'split', direction: 'row', ratio: 0.5,
+        children: [
+          { type: 'leaf', id: 'pane-1', view: 'file' },
+          { type: 'leaf', id: 'pane-2', view: 'plugin-pane:p1' },
+        ],
+      },
+    }))
+    const { api } = makeHarness()
+    api.restoreWorkspacePaneLayout()
+    expect(api.workspacePaneCount.value).toBe(2)
+    // 找到 plugin-pane leaf
+    const pluginPane = api.findWorkspacePaneByView('plugin-pane:p1')
+    expect(pluginPane).toBeTruthy()
+    expect(pluginPane.view).toBe('plugin-pane:p1')
+  })
+
+  it('restoreWorkspacePaneLayout：重复 plugin-pane 同 id 视为非法回退', () => {
+    // 两个 leaf 都是 plugin-pane:p1（违反 host 单例）→ 非法 → 回退默认
+    localStorage.setItem('jarvis_workspace_pane_layout', JSON.stringify({
+      version: 3,
+      activePaneId: 'pane-1',
+      tree: {
+        type: 'split', direction: 'row', ratio: 0.5,
+        children: [
+          { type: 'leaf', id: 'pane-1', view: 'plugin-pane:p1' },
+          { type: 'leaf', id: 'pane-2', view: 'plugin-pane:p1' },
+        ],
+      },
+    }))
     const { api } = makeHarness()
     api.restoreWorkspacePaneLayout()
     expect(api.workspacePaneCount.value).toBe(1)

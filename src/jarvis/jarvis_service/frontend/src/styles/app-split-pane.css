@@ -173,6 +173,22 @@
   overflow: hidden;
 }
 
+/* 自由分割：插件 pane leaf 内的容器（与 session/chat/terminal leaf 同型） */
+.workspace-pane-plugin-wrap {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.workspace-pane-plugin-wrap > * {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
 /* diff pane 内的 diff 视图（与 WorkspacePanel.vue 的 .workspace-diff-* 同款，此处为 App.vue 作用域副本） */
 .workspace-pane-diff-wrap .workspace-diff-view {
   flex: 1;
