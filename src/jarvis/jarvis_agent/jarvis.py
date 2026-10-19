@@ -1009,6 +1009,16 @@ def run_cli(
         "--uninstall-plugin",
         help="卸载插件：指定要卸载的插件名称",
     ),
+    disable_plugin: Optional[str] = typer.Option(
+        None,
+        "--disable-plugin",
+        help="禁用插件：指定要禁用的插件 ID（禁用后扩展点不再注册，可随时启用）",
+    ),
+    enable_plugin: Optional[str] = typer.Option(
+        None,
+        "--enable-plugin",
+        help="启用插件：指定要启用的插件 ID（重新注册该插件的扩展点）",
+    ),
     list_plugins_flag: bool = typer.Option(
         False,
         "--list-plugins",
@@ -1084,6 +1094,30 @@ def run_cli(
             raise typer.Exit(code=0)
         else:
             PrettyOutput.auto_print(f"❌ 插件 '{uninstall_plugin}' 卸载失败")
+            raise typer.Exit(code=1)
+
+    # 处理插件禁用参数
+    if disable_plugin:
+        from jarvis.jarvis_agent.utils import disable_plugin as do_disable_plugin
+
+        success = do_disable_plugin(disable_plugin)
+        if success:
+            PrettyOutput.auto_print(f"✅ 插件 '{disable_plugin}' 已禁用")
+            raise typer.Exit(code=0)
+        else:
+            PrettyOutput.auto_print(f"❌ 插件 '{disable_plugin}' 禁用失败")
+            raise typer.Exit(code=1)
+
+    # 处理插件启用参数
+    if enable_plugin:
+        from jarvis.jarvis_agent.utils import enable_plugin as do_enable_plugin
+
+        success = do_enable_plugin(enable_plugin)
+        if success:
+            PrettyOutput.auto_print(f"✅ 插件 '{enable_plugin}' 已启用")
+            raise typer.Exit(code=0)
+        else:
+            PrettyOutput.auto_print(f"❌ 插件 '{enable_plugin}' 启用失败")
             raise typer.Exit(code=1)
 
     # 处理列出插件参数

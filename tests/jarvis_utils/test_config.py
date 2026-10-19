@@ -1278,8 +1278,130 @@ dependencies:
         cache_info = next(i for i in infos if i["name"] == "cache-plugin")
         assert cache_info["hasUpdate"] is True
 
+    def test_install_reject_same_id_different_dirname(self, tmp_path, monkeypatch):
+        """同 ID 插件不允许安装：已安装插件目录名不同但 config id 相同则拒绝（Issue #311）"""
+        from jarvis.jarvis_agent.utils import install_plugin
+
+        test_data_dir = tmp_path / ".jarvis"
+        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
+
+        # 已安装插件：目录名 legacy-dir，id 为 shared-id-311（目录名与 id 不同）
+        plugins_dir = test_data_dir / "plugins"
+        plugins_dir.mkdir(parents=True)
+        legacy = plugins_dir / "legacy-dir"
+        legacy.mkdir()
+        (legacy / "config.yaml").write_text(
+            "id: shared-id-311\nname: Legacy\nversion: 1.0\n",
+            encoding="utf-8",
+        )
+
+        # 新插件：目录名 new-dir，id 相同 → 拒绝（目标目录与已安装目录不同）
+        src = tmp_path / "new-dir"
+        src.mkdir()
+        (src / "config.yaml").write_text(
+            "id: shared-id-311\nname: New\nversion: 1.0\n",
+            encoding="utf-8",
+        )
+        assert install_plugin(str(src)) is False
+        assert not (plugins_dir / "shared-id-311").exists()
+
+    def test_install_allow_different_id_same_dirname(self, tmp_path, monkeypatch):
+        """id 不同则允许安装：已安装插件目录名相同但 id 不同不冲突（id 才是唯一标识）"""
+        from jarvis.jarvis_agent.utils import install_plugin
+
+        test_data_dir = tmp_path / ".jarvis"
+        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
+
+        # 已安装插件：目录名 plugin-311，id 为 id-a-311
+        plugins_dir = test_data_dir / "plugins"
+        plugins_dir.mkdir(parents=True)
+        existing = plugins_dir / "plugin-311"
+        existing.mkdir()
+        (existing / "config.yaml").write_text(
+            "id: id-a-311\nname: Plugin A\nversion: 1.0\n",
+            encoding="utf-8",
+        )
+
+        # 新插件：源目录名也是 plugin-311，但 id 不同 → 允许安装
+        src = tmp_path / "plugin-311"
+        src.mkdir()
+        (src / "config.yaml").write_text(
+            "id: id-b-311\nname: Plugin B\nversion: 1.0\n",
+            encoding="utf-8",
+        )
+        assert install_plugin(str(src)) is True
+        assert (plugins_dir / "id-b-311").exists()
+
+    def test_disable_plugin_validates_existence(self, tmp_path, monkeypatch):
+        """disable_plugin 对不存在的插件 ID 返回 False（Issue #311）"""
+        from jarvis.jarvis_agent.utils import disable_plugin
+
+        test_data_dir = tmp_path / ".jarvis"
+        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
+
+        assert disable_plugin("no-such-plugin") is False
+
+    def test_disable_enable_plugin_roundtrip(self, tmp_path, monkeypatch):
+        """disable_plugin/enable_plugin 往返：禁用后写入文件，启用后清除（Issue #311）"""
+        from jarvis.jarvis_agent.utils import disable_plugin, enable_plugin
+        from jarvis.jarvis_utils.utils import get_disabled_plugins
+
+        test_data_dir = tmp_path / ".jarvis"
+        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
+
+        # 先安装一个插件（id 为 roundtrip-311）
+        plugins_dir = test_data_dir / "plugins"
+        plugins_dir.mkdir(parents=True)
+        plugin = plugins_dir / "roundtrip-dir"
+        plugin.mkdir()
+        (plugin / "config.yaml").write_text(
+            "id: roundtrip-311\nname: Roundtrip\nversion: 1.0\n",
+            encoding="utf-8",
+        )
+
+        assert disable_plugin("roundtrip-311") is True
+        assert "roundtrip-311" in get_disabled_plugins()
+
+        assert enable_plugin("roundtrip-311") is True
+        assert enable_plugin("roundtrip-311") is True
+        assert "roundtrip-311" not in get_disabled_plugins()
+
+    def test_list_plugins_info_disabled_field(self, tmp_path, monkeypatch):
+        """list_plugins_info 的 disabled 字段反映插件禁用状态（Issue #311）"""
+        from jarvis.jarvis_agent.utils import disable_plugin, list_plugins_info
+        from jarvis.jarvis_utils.utils import set_plugin_disabled
+
+        test_data_dir = tmp_path / ".jarvis"
+        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
+
+        plugins_dir = test_data_dir / "plugins"
+        plugins_dir.mkdir(parents=True)
+        plugin = plugins_dir / "info-dir"
+        plugin.mkdir()
+        (plugin / "config.yaml").write_text(
+            "id: info-311\nname: Info Plugin\nversion: 1.0\n",
+            encoding="utf-8",
+        )
+
+        # 未禁用时 disabled=False
+        infos = list_plugins_info()
+        info = next(i for i in infos if i["id"] == "info-311")
+        assert info["disabled"] is False
+
+        # 禁用后 disabled=True
+        assert disable_plugin("info-311") is True
+        infos2 = list_plugins_info()
+        info2 = next(i for i in infos2 if i["id"] == "info-311")
+        assert info2["disabled"] is True
+
+        # 重新启用后 disabled=False
+        assert set_plugin_disabled("info-311", False) is True
+        infos3 = list_plugins_info()
+        info3 = next(i for i in infos3 if i["id"] == "info-311")
+        assert info3["disabled"] is False
 
 class TestAutoDiscoverPlugins:
+
     """测试自动发现插件功能"""
 
     def test_auto_discover_plugins(self, tmp_path, monkeypatch):
@@ -1350,6 +1472,107 @@ class TestAutoDiscoverPlugins:
         assert result["plugin_configs"]["config_plugin"]["model"] == "config-model"
         assert result["plugin_configs"]["config_plugin"]["config_key"] == "config_value"
         assert result["plugin_configs"]["auto_plugin"]["auto_key"] == "auto_value"
+
+    def test_disabled_plugin_skips_extension_points(self, tmp_path, monkeypatch):
+        """禁用的插件不合并扩展点，但保留私有配置。"""
+        from jarvis.jarvis_utils.utils import (
+            _load_plugin_configs,
+            set_plugin_disabled,
+        )
+
+        test_data_dir = tmp_path / ".jarvis"
+        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
+
+        plugins_dir = test_data_dir / "plugins"
+        plugins_dir.mkdir(parents=True)
+        plugin = plugins_dir / "dis-plugin"
+        plugin.mkdir()
+        with open(plugin / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump(
+                {
+                    "id": "dis-plugin",
+                    "name": "Dis Plugin",
+                    "tool_load_dirs": ["{{plugin_dir}}/tools"],
+                    "private_key": "private-value",
+                },
+                f,
+            )
+
+        # 未禁用时扩展点合并（tool_load_dirs 渲染 {{plugin_dir}} 为实际路径）
+        result = _load_plugin_configs({})
+        assert result.get("tool_load_dirs") == [str(plugin / "tools")]
+        assert result["plugin_configs"]["dis-plugin"]["private_key"] == "private-value"
+
+        # 禁用后扩展点不合并，私有配置保留
+        assert set_plugin_disabled("dis-plugin", True) is True
+        result2 = _load_plugin_configs({})
+        assert "tool_load_dirs" not in result2
+        assert result2["plugin_configs"]["dis-plugin"]["private_key"] == "private-value"
+
+        # 重新启用后扩展点恢复
+        assert set_plugin_disabled("dis-plugin", False) is True
+        result3 = _load_plugin_configs({})
+        assert result3.get("tool_load_dirs") == [str(plugin / "tools")]
+
+    def test_disabled_plugin_by_id_not_dirname(self, tmp_path, monkeypatch):
+        """禁用按 config.yaml 的 id 字段判断，目录名不同也生效。"""
+        from jarvis.jarvis_utils.utils import (
+            _load_plugin_configs,
+            set_plugin_disabled,
+        )
+
+        test_data_dir = tmp_path / ".jarvis"
+        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
+
+        plugins_dir = test_data_dir / "plugins"
+        plugins_dir.mkdir(parents=True)
+        plugin = plugins_dir / "some-dir-name"
+        plugin.mkdir()
+        with open(plugin / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump(
+                {
+                    "id": "real-plugin-id",
+                    "name": "Real Name",
+                    "tool_load_dirs": ["{{plugin_dir}}/tools"],
+                },
+                f,
+            )
+
+        # 用 id（非目录名）禁用
+        assert set_plugin_disabled("real-plugin-id", True) is True
+        result = _load_plugin_configs({})
+        assert "tool_load_dirs" not in result
+
+        # 用目录名禁用不生效（id 才是唯一标识）
+        assert set_plugin_disabled("real-plugin-id", False) is True
+        assert set_plugin_disabled("some-dir-name", True) is True
+        result2 = _load_plugin_configs({})
+        assert result2.get("tool_load_dirs") == [str(plugin / "tools")]
+
+    def test_disabled_plugins_file_corrupt_fallback(self, tmp_path, monkeypatch):
+        """禁用状态文件损坏时降级为空集合，不阻断加载。"""
+        from jarvis.jarvis_utils.utils import (
+            _load_plugin_configs,
+            get_disabled_plugins,
+        )
+
+        test_data_dir = tmp_path / ".jarvis"
+        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
+
+        plugins_dir = test_data_dir / "plugins"
+        plugins_dir.mkdir(parents=True)
+        plugin = plugins_dir / "p1"
+        plugin.mkdir()
+        with open(plugin / "config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump({"id": "p1", "tool_load_dirs": ["{{plugin_dir}}/tools"]}, f)
+
+        # 写入损坏文件
+        disabled_file = test_data_dir / "disabled_plugins.json"
+        disabled_file.write_text("{not-valid-json", encoding="utf-8")
+
+        assert get_disabled_plugins() == set()
+        result = _load_plugin_configs({})
+        assert result.get("tool_load_dirs") == [str(plugin / "tools")]
 
 
 class TestPluginConfigIsolation:

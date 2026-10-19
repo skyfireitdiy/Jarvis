@@ -1490,6 +1490,19 @@ def install_plugin(
         # 目标安装目录
         target_dir = plugins_dir / plugin_name
 
+        # 同 ID 冲突检查（Issue #311）：插件唯一标识是 config.yaml 的 id 字段
+        # （回退 name，再回退目录名）。目录名可能重复，但 ID 必须唯一——
+        # 若已安装插件（内置或外部）中已有相同 ID 且不是同一目录，拒绝安装。
+        # 注意：plugin_name 本身可能是 id 或 name，此处以 config 解析出的
+        # plugin_name 为基准扫描已安装插件，避免同 ID 不同目录名重复安装。
+        conflicting_dir = _find_plugin_by_id(plugin_name, plugins_dir)
+        if conflicting_dir is not None and conflicting_dir != target_dir:
+            PrettyOutput.auto_print(
+                f"❌ 拒绝安装: 已存在同 ID 插件 '{plugin_name}'（{conflicting_dir}）。"
+                f"插件 ID 必须唯一，如需更新请先卸载或升级原插件"
+            )
+            return False
+
         # 依赖检查：插件声明的依赖必须已安装且版本兼容。
         # 对带 url 的 plugins 依赖，未安装时自动 git clone 安装；无 url 或安装失败的仍拒绝。
         if plugin_dependencies:
@@ -1782,11 +1795,13 @@ def list_plugins_info() -> List[dict]:
             - builtin: 是否内置插件
             - capabilities: 能力清单
             - installed: 是否可用（目录存在且 config 可读）
+            - disabled: 是否被禁用（按插件 ID 在禁用集合中）
             - logo: 插件图标（SVG 内容，可选）
     """
     import yaml
     from pathlib import Path
     from jarvis.jarvis_utils.config import get_data_dir
+    from jarvis.jarvis_utils.utils import get_disabled_plugins
 
     # 收集内置插件目录（builtin/plugins/）
     builtin_dirs: List[Path] = []
@@ -1819,6 +1834,7 @@ def list_plugins_info() -> List[dict]:
     result: List[dict] = []
     # 读取更新检测缓存（由独立定时任务每小时写入），避免列表请求触发网络 git fetch
     updates_cache = _load_plugin_updates_cache()
+    disabled_plugins = get_disabled_plugins()
     for plugin_dir in sorted(builtin_dirs + external_dirs):
         config_file = plugin_dir / "config.yaml"
         is_builtin = plugin_dir in builtin_dirs
@@ -1832,6 +1848,7 @@ def list_plugins_info() -> List[dict]:
             "builtin": is_builtin,
             "capabilities": [],
             "installed": False,
+            "disabled": False,
             "hasUpdate": False,
             "logo": "",
         }
@@ -1854,6 +1871,7 @@ def list_plugins_info() -> List[dict]:
                     )
                     info["logo"] = _read_plugin_logo(config, plugin_dir)
                     info["installed"] = True
+                    info["disabled"] = info["id"] in disabled_plugins
                     # 非内置插件且检测到更新时标记 hasUpdate（与前端字段一致）
                     if not info["builtin"] and updates_cache.get(info["id"]):
                         info["hasUpdate"] = True
@@ -2727,6 +2745,13 @@ def uninstall_plugin(plugin_id: str) -> bool:
         # 软链接只删链接本身，不误删其指向的本地源码
         _remove_plugin_dir(plugin_dir)
         PrettyOutput.auto_print(f"✅ 插件已卸载: {plugin_name}")
+        # 卸载后清理禁用记录：插件目录已删除，禁用标记无意义且会残留
+        try:
+            from jarvis.jarvis_utils.utils import set_plugin_disabled
+
+            set_plugin_disabled(plugin_name, False)
+        except Exception:
+            pass
         # 执行 post-uninstall 钩子（命令已在删除前预读）。
         # 失败仅警告，不阻断卸载（目录已删除）。
         if post_uninstall_commands:
@@ -2804,6 +2829,179 @@ def uninstall_plugin(plugin_id: str) -> bool:
     except Exception as e:
         PrettyOutput.auto_print(f"❌ 卸载插件失败: {str(e)}")
         return False
+
+
+def disable_plugin(plugin_id: str) -> bool:
+    """禁用插件（按插件 ID，Issue #311）。
+
+    禁用后该插件的扩展点不再注册（工具/规则/MCP/LSP/事件回调/平台/
+    定时动作/审计/消息类型/Agent 类型/网关路由中间件等），但插件目录与
+    私有配置保留，可随时重新启用。内置插件也可禁用。
+
+    参数:
+        plugin_id: 插件唯一标识（config.yaml 的 id 字段，回退 name，再回退目录名）
+
+    返回:
+        bool: 禁用成功返回 True，失败返回 False
+    """
+    from jarvis.jarvis_utils.utils import set_plugin_disabled
+
+    plugin_id = str(plugin_id).strip()
+    if not plugin_id:
+        PrettyOutput.auto_print("❌ 插件 ID 不能为空")
+        return False
+
+    # 校验插件确实存在（内置或外部），避免禁用不存在的 ID
+    if not _plugin_id_exists(plugin_id):
+        PrettyOutput.auto_print(f"⚠️ 插件不存在: {plugin_id}")
+        return False
+
+    if not set_plugin_disabled(plugin_id, True):
+        return False
+
+    PrettyOutput.auto_print(f"⏸️  插件已禁用: {plugin_id}")
+    _reload_plugin_runtime()
+    return True
+
+
+def enable_plugin(plugin_id: str) -> bool:
+    """启用插件（按插件 ID，Issue #311）。
+
+    从禁用集合中移除该插件 ID，重新加载其扩展点。
+
+    参数:
+        plugin_id: 插件唯一标识（config.yaml 的 id 字段，回退 name，再回退目录名）
+
+    返回:
+        bool: 启用成功返回 True，失败返回 False
+    """
+    from jarvis.jarvis_utils.utils import set_plugin_disabled
+
+    plugin_id = str(plugin_id).strip()
+    if not plugin_id:
+        PrettyOutput.auto_print("❌ 插件 ID 不能为空")
+        return False
+
+    if not set_plugin_disabled(plugin_id, False):
+        return False
+
+    PrettyOutput.auto_print(f"▶️  插件已启用: {plugin_id}")
+    _reload_plugin_runtime()
+    return True
+
+
+def _find_plugin_by_id(plugin_id: str, plugins_dir=None):
+    """在已安装插件中查找指定 ID 的插件目录（内置或外部）。
+
+    按 config.yaml 的 id 字段（回退 name，再回退目录名）匹配。
+    返回匹配的插件目录 Path；未找到返回 None。
+
+    参数:
+        plugin_id: 插件唯一标识
+        plugins_dir: 外部插件目录（可选，默认 <data_dir>/plugins）
+    """
+    import yaml
+    from pathlib import Path
+    from jarvis.jarvis_utils.config import get_data_dir
+
+    plugin_id = str(plugin_id).strip()
+    dirs: List[Path] = []
+    # 内置插件目录
+    try:
+        from jarvis.jarvis_utils.template_utils import _get_builtin_dir
+
+        builtin_dir = _get_builtin_dir()
+        if builtin_dir is not None:
+            builtin_plugins_dir = builtin_dir / "plugins"
+            if builtin_plugins_dir.exists() and builtin_plugins_dir.is_dir():
+                dirs.extend(
+                    d
+                    for d in builtin_plugins_dir.iterdir()
+                    if d.is_dir() and (d / "config.yaml").exists()
+                )
+    except Exception:
+        pass
+    # 外部插件目录
+    if plugins_dir is None:
+        plugins_dir = Path(get_data_dir()) / "plugins"
+    plugins_dir = Path(plugins_dir)
+    if plugins_dir.exists() and plugins_dir.is_dir():
+        dirs.extend(
+            d
+            for d in plugins_dir.iterdir()
+            if d.is_dir() and (d / "config.yaml").exists()
+        )
+
+    for plugin_dir in dirs:
+        try:
+            with open(plugin_dir / "config.yaml", "r", encoding="utf-8") as f:
+                config = yaml.safe_load(f)
+            if isinstance(config, dict):
+                pid = str(
+                    config.get("id") or config.get("name") or plugin_dir.name
+                ).strip()
+                if pid == plugin_id:
+                    return plugin_dir
+        except Exception:
+            continue
+    return None
+
+
+def _plugin_id_exists(plugin_id: str) -> bool:
+    """判断插件 ID 是否存在于已安装插件中（内置或外部）。
+
+    按 config.yaml 的 id 字段（回退 name，再回退目录名）匹配。
+    """
+    return _find_plugin_by_id(plugin_id) is not None
+
+
+def _reload_plugin_runtime() -> None:
+    """禁用/启用插件后免重启重载插件运行时（配置 + 平台 + 定时动作 +
+    审计 + 消息类型 + Agent 类型 + 网关扩展）。失败仅警告，不阻断操作。"""
+    try:
+        from jarvis.jarvis_utils.utils import reload_plugin_configs
+
+        reload_plugin_configs()
+    except Exception as e:
+        PrettyOutput.auto_print(f"⚠️ 重载插件配置失败（可稍后重启生效）: {e}")
+    try:
+        from jarvis.jarvis_platform.registry import PlatformRegistry
+
+        PlatformRegistry.get_global_platform_registry().reload_plugin_platforms()
+    except Exception as e:
+        PrettyOutput.auto_print(f"⚠️ 重载插件平台失败（可稍后重启生效）: {e}")
+    try:
+        from jarvis.jarvis_web_gateway.timer_actions import TimerActionRegistry
+
+        TimerActionRegistry.instance().reload_plugin_actions()
+    except Exception as e:
+        PrettyOutput.auto_print(f"⚠️ 重载插件定时动作失败（可稍后重启生效）: {e}")
+    try:
+        from jarvis.jarvis_audit.audit_plugins import AuditSinkRegistry
+
+        AuditSinkRegistry.instance().reload_plugin_sinks()
+    except Exception as e:
+        PrettyOutput.auto_print(f"⚠️ 重载插件审计扩展失败（可稍后重启生效）: {e}")
+    try:
+        from jarvis.jarvis_web_gateway.message_types import MessageTypeRegistry
+
+        MessageTypeRegistry.instance().reload_plugin_message_types()
+    except Exception as e:
+        PrettyOutput.auto_print(f"⚠️ 重载插件消息类型失败（可稍后重启生效）: {e}")
+    try:
+        from jarvis.jarvis_web_gateway.agent_types import AgentTypeRegistry
+
+        AgentTypeRegistry.instance().reload_plugin_agent_types()
+    except Exception as e:
+        PrettyOutput.auto_print(f"⚠️ 重载插件 Agent 类型失败（可稍后重启生效）: {e}")
+    try:
+        from jarvis.jarvis_web_gateway.gateway_extensions import (
+            GatewayExtensionRegistry,
+        )
+
+        GatewayExtensionRegistry.instance().reload_plugin_gateway()
+    except Exception as e:
+        PrettyOutput.auto_print(f"⚠️ 重载插件网关扩展失败（可稍后重启生效）: {e}")
 
 
 def check_plugin_update(plugin_id: str) -> bool:
@@ -3034,6 +3232,8 @@ __all__ = [
     "install_plugin",
     "uninstall_plugin",
     "upgrade_plugin",
+    "disable_plugin",
+    "enable_plugin",
     "list_market_plugins",
     "filter_market_plugins",
 ]

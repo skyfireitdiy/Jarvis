@@ -8547,6 +8547,8 @@ def create_app(
         if node_id in (node_runtime.local_node_id, "master"):
             from jarvis.jarvis_agent.utils import (
                 check_all_plugins_update,
+                disable_plugin,
+                enable_plugin,
                 install_plugin,
                 list_plugins_info,
                 uninstall_plugin,
@@ -8611,6 +8613,22 @@ def create_app(
                     ok = upgrade_plugin(name)
                     if ok:
                         _refresh_plugin_updates_cache()
+                    return {
+                        "success": ok,
+                        "action": action,
+                        "output": captured,
+                    }
+                if action == "disable":
+                    name = str(payload.get("name") or "")
+                    ok = disable_plugin(name)
+                    return {
+                        "success": ok,
+                        "action": action,
+                        "output": captured,
+                    }
+                if action == "enable":
+                    name = str(payload.get("name") or "")
+                    ok = enable_plugin(name)
                     return {
                         "success": ok,
                         "action": action,
@@ -9238,6 +9256,88 @@ def create_app(
             error = result.get("error") or {
                 "code": "UPGRADE_PLUGIN_FAILED",
                 "message": "Failed to upgrade plugin",
+            }
+            return {"success": False, "error": error}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    @app.post("/api/plugins/{name}/disable", dependencies=[Depends(verify_token)])
+    async def disable_plugin_api(
+        name: str, request_body: Dict[str, Any], request: Request
+    ) -> Dict[str, Any]:
+        """禁用指定节点的插件（需要 admin:plugins 权限，Issue #311）。
+
+        禁用后该插件的扩展点不再注册（工具/规则/MCP/LSP/事件回调/平台/
+        定时动作/审计/消息类型/Agent 类型/网关路由中间件等），但插件目录
+        与私有配置保留，可随时重新启用。内置插件也可禁用。
+        """
+        try:
+            user_info = getattr(request.state, "user_info", None)
+            if node_config.is_master and _check_permission(user_info, "admin:plugins"):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "PERMISSION_DENIED",
+                        "message": "Permission denied: admin:plugins",
+                    },
+                }
+            node_id = str(request_body.get("node_id") or "master")
+            result = await _run_plugin_manage(node_id, "disable", {"name": name})
+            if result.get("success"):
+                return {
+                    "success": True,
+                    "data": {
+                        "node_id": node_id,
+                        "disabled": True,
+                        "output": result.get("output", []),
+                    },
+                }
+            error = result.get("error") or {
+                "code": "DISABLE_PLUGIN_FAILED",
+                "message": "Failed to disable plugin",
+            }
+            return {"success": False, "error": error}
+        except Exception as e:
+            return {
+                "success": False,
+                "error": {"code": "INTERNAL_ERROR", "message": str(e)},
+            }
+
+    @app.post("/api/plugins/{name}/enable", dependencies=[Depends(verify_token)])
+    async def enable_plugin_api(
+        name: str, request_body: Dict[str, Any], request: Request
+    ) -> Dict[str, Any]:
+        """启用指定节点的插件（需要 admin:plugins 权限，Issue #311）。
+
+        从禁用集合中移除该插件 ID，重新加载其扩展点。
+        """
+        try:
+            user_info = getattr(request.state, "user_info", None)
+            if node_config.is_master and _check_permission(user_info, "admin:plugins"):
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "PERMISSION_DENIED",
+                        "message": "Permission denied: admin:plugins",
+                    },
+                }
+            node_id = str(request_body.get("node_id") or "master")
+            result = await _run_plugin_manage(node_id, "enable", {"name": name})
+            if result.get("success"):
+                return {
+                    "success": True,
+                    "data": {
+                        "node_id": node_id,
+                        "disabled": False,
+                        "output": result.get("output", []),
+                    },
+                }
+            error = result.get("error") or {
+                "code": "ENABLE_PLUGIN_FAILED",
+                "message": "Failed to enable plugin",
             }
             return {"success": False, "error": error}
         except Exception as e:

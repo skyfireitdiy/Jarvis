@@ -80,19 +80,32 @@
               </span>
               <span class="plugin-item-head-right">
                 <button
-                  v-if="plugin.capabilities && plugin.capabilities.length"
+                  v-if="!plugin.disabled && plugin.capabilities && plugin.capabilities.length"
                   class="plugin-btn plugin-btn-sm plugin-cap-btn"
                   @click.stop="openCapModal(plugin)"
                 >能力</button>
                 <span class="plugin-item-version">
                   {{ plugin.version || '-' }}
                   <span v-if="plugin.builtin" class="plugin-item-badge">内置</span>
+                  <span v-if="plugin.disabled" class="plugin-item-badge plugin-item-badge-disabled">已禁用</span>
                   <button
                     v-if="!plugin.builtin && plugin.hasUpdate"
                     class="plugin-btn plugin-btn-sm plugin-update-btn"
                     :disabled="pluginBusy[plugin.id || plugin.name]"
                     @click.stop="upgradePlugin(plugin)"
                   >更新</button>
+                  <button
+                    v-if="plugin.disabled"
+                    class="plugin-btn plugin-btn-sm plugin-enable-btn"
+                    :disabled="pluginBusy[plugin.id || plugin.name]"
+                    @click.stop="enablePlugin(plugin)"
+                  >启用</button>
+                  <button
+                    v-else
+                    class="plugin-btn plugin-btn-sm plugin-disable-btn"
+                    :disabled="pluginBusy[plugin.id || plugin.name]"
+                    @click.stop="disablePlugin(plugin)"
+                  >禁用</button>
                 </span>
               </span>
             </div>
@@ -211,6 +224,16 @@
         class="plugin-cap-menu-item"
         @click="openCapModal(capMenuPlugin)"
       >能力详情</button>
+      <button
+        v-if="capMenuPlugin && capMenuPlugin.disabled"
+        class="plugin-cap-menu-item"
+        @click="enablePluginFromMenu(capMenuPlugin)"
+      >启用</button>
+      <button
+        v-else-if="capMenuPlugin"
+        class="plugin-cap-menu-item"
+        @click="disablePluginFromMenu(capMenuPlugin)"
+      >禁用</button>
       <button
         v-if="capMenuPlugin && !capMenuPlugin.builtin"
         class="plugin-cap-menu-item plugin-cap-menu-item-danger"
@@ -514,10 +537,60 @@ async function uninstallPlugin(plugin) {
   })
 }
 
+async function disablePlugin(plugin) {
+  props.showConfirm(`确定禁用插件 ${plugin.name}？\n禁用后该插件的工具/规则/前端等扩展点将不再注册，可随时重新启用。`, () => {
+    pluginBusy.value = { ...pluginBusy.value, [plugin.id || plugin.name]: true }
+    doDisablePlugin(plugin)
+  })
+}
+
+async function enablePlugin(plugin) {
+  pluginBusy.value = { ...pluginBusy.value, [plugin.id || plugin.name]: true }
+  doEnablePlugin(plugin)
+}
+
+async function doDisablePlugin(plugin) {
+  try {
+    const resp = await props.fetchWithAuth(buildApiUrl(`/api/node/${encodeURIComponent(pluginNodeId.value)}/plugins/${encodeURIComponent(plugin.id || plugin.name)}/disable`), {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })
+    const result = await resp.json()
+    if (result.success) { props.showToast(`插件 ${plugin.name} 已禁用`, 'success'); loadPlugins() }
+    else props.showToast(result.error?.message || '插件禁用失败', 'error')
+  } catch (e) { props.showToast('插件禁用失败: ' + e.message, 'error') }
+  finally { pluginBusy.value = { ...pluginBusy.value, [plugin.id || plugin.name]: false } }
+}
+
+async function doEnablePlugin(plugin) {
+  try {
+    const resp = await props.fetchWithAuth(buildApiUrl(`/api/node/${encodeURIComponent(pluginNodeId.value)}/plugins/${encodeURIComponent(plugin.id || plugin.name)}/enable`), {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })
+    const result = await resp.json()
+    if (result.success) { props.showToast(`插件 ${plugin.name} 已启用`, 'success'); loadPlugins() }
+    else props.showToast(result.error?.message || '插件启用失败', 'error')
+  } catch (e) { props.showToast('插件启用失败: ' + e.message, 'error') }
+  finally { pluginBusy.value = { ...pluginBusy.value, [plugin.id || plugin.name]: false } }
+}
+
 // 右键菜单卸载：先关闭菜单再执行卸载（避免 capMenuPlugin 被清空后取不到插件）
 function uninstallPluginFromMenu(plugin) {
   closeCapMenu()
   uninstallPlugin(plugin)
+}
+
+// 右键菜单禁用：先关闭菜单再执行禁用
+function disablePluginFromMenu(plugin) {
+  closeCapMenu()
+  disablePlugin(plugin)
+}
+
+// 右键菜单启用：先关闭菜单再执行启用
+function enablePluginFromMenu(plugin) {
+  closeCapMenu()
+  enablePlugin(plugin)
 }
 
 async function doUninstallPlugin(plugin) {
@@ -795,6 +868,28 @@ defineExpose({ loadPlugins })
   font-size: 11px;
   line-height: 1.4;
 }
+.plugin-disable-btn,
+.plugin-enable-btn {
+  padding: 2px 8px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.plugin-disable-btn {
+  color: var(--text-secondary, #8ba3b8);
+  border-color: rgba(139, 163, 184, 0.3);
+}
+.plugin-disable-btn:hover:not(:disabled) {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.5);
+}
+.plugin-enable-btn {
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.4);
+}
+.plugin-enable-btn:hover:not(:disabled) {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.1);
+}
 .plugin-item-badge {
   font-size: 10px;
   padding: 1px 6px;
@@ -803,6 +898,11 @@ defineExpose({ loadPlugins })
   color: var(--accent, #20c8ff);
   border: 1px solid rgba(32, 200, 255, 0.3);
   flex-shrink: 0;
+}
+.plugin-item-badge-disabled {
+  background: rgba(248, 113, 113, 0.12);
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.3);
 }
 /* 市场列表「已安装」徽章：替代安装按钮 */
 .plugin-item-installed-badge {
