@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import importlib
 import os
-import sys
 from dataclasses import dataclass
 from typing import Any
 from typing import Callable
@@ -237,14 +236,21 @@ class GatewayExtensionRegistry:
             or not os.path.isdir(directory)
         ):
             return None
-        if directory not in sys.path:
-            sys.path.insert(0, directory)
         for filename in sorted(os.listdir(directory)):
             if not filename.endswith(".py") or filename.startswith("__"):
                 continue
+            module_path = os.path.join(directory, filename)
             module_name = filename[:-3]
             try:
-                module = importlib.import_module(module_name)
+                # 按文件路径加载，避免裸模块名与 sys.modules 缓存冲突
+                # （同名模块可能已被其它插件/测试加载，import_module 会返回缓存）。
+                spec = importlib.util.spec_from_file_location(
+                    f"jarvis_plugin_gateway_{module_name}", module_path
+                )
+                if spec is None or spec.loader is None:
+                    continue
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
                 function = getattr(module, expected_attr, None)
                 if callable(function):
                     return function
