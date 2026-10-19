@@ -1755,6 +1755,42 @@ def get_plugin_message_type_dirs() -> List[str]:
     ]
 
 
+def get_plugin_agent_types() -> List[Dict[str, Any]]:
+    """获取插件声明的自定义 Agent 类型（agent_types 扩展点）。
+
+    插件 config.yaml 通过 ``agent_types`` 字段声明自带的**全新 Agent 类型**
+    （对象数组，每项含 name/entry_point/description），创建 Agent 时
+    ``agent_type`` 即可选用插件注册的类型，由插件声明的 ``entry_point``
+    可执行入口启动：
+
+        agent_types:
+          - name: "chat_agent"
+            entry_point: "my_plugin_chat_agent"
+            description: "专用对话 Agent"
+
+    返回:
+        List[Dict[str, Any]]: 插件 Agent 类型声明列表（name/entry_point/description）
+    """
+    agent_types = GLOBAL_CONFIG_DATA.get("agent_types", [])
+    if not isinstance(agent_types, list):
+        return []
+    result = []
+    for entry in agent_types:
+        if not isinstance(entry, dict):
+            continue
+        name = entry.get("name")
+        if not name:
+            continue
+        result.append(
+            {
+                "name": str(name),
+                "entry_point": str(entry.get("entry_point") or ""),
+                "description": str(entry.get("description") or ""),
+            }
+        )
+    return result
+
+
 def get_gateway_auth_config() -> Dict[str, Any]:
     """
     获取 Gateway 认证配置。

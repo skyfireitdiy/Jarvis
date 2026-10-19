@@ -2239,6 +2239,25 @@ def create_app(
         )
         pass
 
+    # 注册插件 Agent 类型撤销器（可逆效应），供 PluginRegistry.revoke_plugin
+    # 调用；并加载插件声明的自定义 Agent 类型（agent_types 扩展点）。
+    try:
+        from jarvis.jarvis_web_gateway.agent_types import AgentTypeRegistry
+        from jarvis.jarvis_tools.plugin_registry import PluginRegistry
+
+        agent_type_registry = AgentTypeRegistry.instance()
+        agent_type_registry.load_plugin_agent_types()
+        PluginRegistry.instance().set_agent_type_revoker(
+            agent_type_registry.unregister_by_plugin
+        )
+    except Exception as e:
+        save_exception(
+            e,
+            module="jarvis_web_gateway.app",
+            function="_build_callback_from_metadata",
+        )
+        pass
+
     # Agent 进程（custom_app 模式）与主网关共享同一持久化文件 .jarvis_timers.json。
     # 若 Agent 进程也加载/写回该文件，会与主网关的 TimerManager 互相覆盖：
     # 主网关删除的任务会被 Agent 进程触发时写回（任务复活），

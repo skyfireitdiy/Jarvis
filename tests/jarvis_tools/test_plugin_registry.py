@@ -79,6 +79,7 @@ class TestPluginRegistry:
         pr.register_audit_sink("p1", "sink_x")
         pr.register_audit_event_type("p1", "event_x")
         pr.register_message_type("p1", "msg_x")
+        pr.register_agent_type("p1", "agent_x", entry_point="my_agent_x")
 
         result = pr.revoke_plugin("p1")
         assert result == {
@@ -89,6 +90,7 @@ class TestPluginRegistry:
             "audit_sinks": 0,
             "audit_event_types": 0,
             "message_types": 0,
+            "agent_types": 0,
         }
         assert not pr.has_plugin("p1")
 
@@ -102,6 +104,7 @@ class TestPluginRegistry:
         pr.register_audit_sink("p1", "sink_x")
         pr.register_audit_event_type("p1", "event_x")
         pr.register_message_type("p1", "msg_x")
+        pr.register_agent_type("p1", "agent_x", entry_point="my_agent_x")
 
         revoked = {
             "tools": [],
@@ -110,6 +113,7 @@ class TestPluginRegistry:
             "timer_actions": [],
             "audit_sinks": [],
             "message_types": [],
+            "agent_types": [],
         }
 
         def tool_revoker(name):
@@ -136,12 +140,17 @@ class TestPluginRegistry:
             revoked["message_types"].append(name)
             return 1
 
+        def agent_type_revoker(name):
+            revoked["agent_types"].append(name)
+            return 1
+
         pr.set_tool_revoker(tool_revoker)
         pr.set_rules_revoker(rules_revoker)
         pr.set_platform_revoker(platform_revoker)
         pr.set_timer_action_revoker(timer_action_revoker)
         pr.set_audit_revoker(audit_revoker)
         pr.set_message_type_revoker(message_type_revoker)
+        pr.set_agent_type_revoker(agent_type_revoker)
 
         result = pr.revoke_plugin("p1")
         assert result == {
@@ -152,12 +161,15 @@ class TestPluginRegistry:
             "audit_sinks": 2,
             "audit_event_types": 0,
             "message_types": 1,
+            "agent_types": 1,
         }
         assert revoked["tools"] == ["p1"]
         assert revoked["rules"] == ["p1"]
         assert revoked["platforms"] == ["p1"]
         assert revoked["timer_actions"] == ["p1"]
         assert revoked["audit_sinks"] == ["p1"]
+        assert revoked["message_types"] == ["p1"]
+        assert revoked["agent_types"] == ["p1"]
         assert not pr.has_plugin("p1")
 
     def test_register_and_get_platforms(self):
@@ -195,6 +207,50 @@ class TestPluginRegistry:
         assert pr.get_plugin_timer_actions("p1") == []
         # clear_timer_actions 不影响工具/规则/平台登记
         assert pr.has_plugin("p2")
+
+    def test_register_and_get_agent_types(self):
+        """登记/查询/清理插件 Agent 类型。"""
+        pr = PluginRegistry.instance()
+        pr.register_agent_type(
+            "p1", "agent_x", entry_point="my_agent_x", description="desc x"
+        )
+        pr.register_agent_types(
+            "p1",
+            [
+                {"name": "agent_y", "entry_point": "my_agent_y", "description": "desc y"},
+                {"name": "agent_z", "entry_point": "my_agent_z"},
+            ],
+        )
+        pr.register_agent_type("p2", "agent_w", entry_point="my_agent_w")
+
+        assert pr.get_plugin_agent_types("p1") == ["agent_x", "agent_y", "agent_z"]
+        assert pr.get_plugin_agent_types("p2") == ["agent_w"]
+        assert pr.get_plugin_agent_types("p3") == []
+        assert pr.get_plugin_agent_type_entry_point("p1", "agent_x") == "my_agent_x"
+        assert pr.get_plugin_agent_type_description("p1", "agent_x") == "desc x"
+        assert pr.get_plugin_agent_type_entry_point("p1", "agent_y") == "my_agent_y"
+        assert pr.get_plugin_agent_type_entry_point("p1", "agent_z") == "my_agent_z"
+        assert pr.get_plugin_agent_type_entry_point("p1", "nonexistent") == ""
+        assert "p1" in pr.registered_plugins()
+        assert "p2" in pr.registered_plugins()
+
+        pr.clear_agent_types("p1")
+        assert pr.get_plugin_agent_types("p1") == []
+        # clear_agent_types 不影响其它登记
+        assert pr.has_plugin("p2")
+
+    def test_register_agent_types_skips_invalid(self):
+        """register_agent_types 跳过缺 name 的条目。"""
+        pr = PluginRegistry.instance()
+        pr.register_agent_types(
+            "p1",
+            [
+                {"entry_point": "no_name"},
+                {"name": "ok", "entry_point": "my_ok"},
+            ],
+        )
+        assert pr.get_plugin_agent_types("p1") == ["ok"]
+        assert pr.get_plugin_agent_type_entry_point("p1", "ok") == "my_ok"
 
     def test_singleton(self):
         assert PluginRegistry.instance() is PluginRegistry.instance()
