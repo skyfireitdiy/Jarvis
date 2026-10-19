@@ -97,6 +97,13 @@ tool_load_dirs:
 #   - dir: "{{plugin_dir}}/callbacks"     # 字典：显式声明事件与注册目标
 #     events: ["task_started", "task_completed"]
 #     target: "event_bus"                 # event_bus（默认）/ hook / modifier
+# --- 模型调用脱敏扩展点（可选，见「四.15 secret-guard 内置插件」）---
+# before_model_call_cb_dirs:              # 模型调用前脱敏（modifier：修改 message）
+#   - "{{plugin_dir}}/callbacks"
+# after_model_call_cb_dirs:               # 模型调用后还原（modifier：修改 response）
+#   - "{{plugin_dir}}/callbacks"
+# tool_output_sanitizer_dirs:             # 工具输出二次脱敏（sanitizer：修改 output）
+#   - "{{plugin_dir}}/callbacks"
 # --- 模型供应商扩展点（可选，声明插件自带的平台实现目录，见「四.9 模型供应商（platforms/）」）---
 # platforms:
 #   - "{{plugin_dir}}/platforms"
@@ -416,13 +423,13 @@ def task_started_cb(agent, **kwargs):
 | `before_history_clear` | 历史清理前 | `event_bus` |
 | `after_history_clear` | 历史清理后 | `event_bus` |
 | `before_model_call` | 模型调用前 | `event_bus` / `modifier` |
-| `after_model_call` | 模型调用后 | `event_bus` |
+| `after_model_call` | 模型调用后 | `event_bus` / `modifier` |
 | `interrupt_triggered` | 中断触发 | `event_bus` |
 | `before_tool_filter` | 工具筛选前 | `event_bus` |
 | `tool_filtered` | 工具筛选后 | `event_bus` |
 
 - **`hook`（拦截型）**：仅支持 `before_tool_call`，回调返回 `False` 可拦截工具执行；同时订阅 EventBus 作为通知。
-- **`modifier`（修改型）**：仅支持 `before_model_call` / `before_summary`，回调返回修改后的值。
+- **`modifier`（修改型）**：仅支持 `before_model_call` / `after_model_call` / `before_summary`，回调返回修改后的值。
 - **`event_bus`（通知型）**：全部 14 个事件均支持，回调在事件触发时被调用，返回值不参与逻辑。
 - target 与事件不匹配时（如 `hook` + `task_started`）会**显式告警并跳过**，不会静默降级。
 
@@ -665,6 +672,23 @@ gateway:
 **典型场景**：插件提供自定义 HTTP 接口（如 webhook 接收、自定义 API 端点）或对网关请求做统一拦截/审计/改造（如请求日志、响应头注入）。
 
 **卸载撤销**：插件卸载时，其注册的网关路由/中间件会从 `GatewayExtensionRegistry` 精确移除并重挂载剩余扩展（可逆效应，见 `PluginRegistry`），已挂载的插件路由/中间件不再生效。
+
+### 15. secret-guard 内置插件（模型交互敏感信息脱敏）
+
+Jarvis 内置 `secret-guard` 插件（源码 `builtin/plugins/secret-guard/`），**默认开启、无需任何配置**，对 Agent 与模型之间的交互做敏感信息脱敏，防止 API 密钥、口令等凭据泄露给模型或写入会话历史：
+
+**脱敏链路**（发送前脱敏 → 返回后还原 → 工具输出二次脱敏）：
+
+1. **发送前脱敏**（`before_model_call_cb`，Modifier）：消息发送给模型前，扫描其中命中的敏感凭据（API key、私钥、口令等，规则见 `share_secret_scanner.py`），替换为占位符 `⟦SECRET_<hex>⟧`，同一敏感值复用同一占位符；映射（占位符→真实值）保存在 `agent.secret_guard_mapping`（进程内 dict，随会话保存/恢复）。
+2. **返回后还原**（`after_model_call_cb`，Modifier）：模型响应写回会话历史/打印给用户前，把占位符还原为真实值；占位符不在映射中（模型幻觉生成）时原样保留。
+3. **工具输出二次脱敏**（`tool_output_sanitizer_cb`，Sanitizer）：工具执行结果回填到会话历史前，把再次出现的真实敏感值替换为**已有占位符**（复用映射，不新建），防止工具输出把敏感信息二次泄露给模型。
+4. **会话持久化**：`secret_guard_mapping` 随会话状态保存/恢复（`_build_agent_state` / `_restore_agent_state`），跨会话还原仍可用。
+
+**多模态支持**：`before_model_call_cb` 对 `List[ContentBlock]` 消息只处理 `type == "text"` 的文本块，图片等其它块原样保留。
+
+**回调约定**（与「四.8 事件回调」一致）：`callbacks/` 目录内 `.py` 按文件名匹配——`before_model_call_cb.py` / `after_model_call_cb.py` 分别提供 `before_model_call_cb(agent, message)` / `after_model_call_cb(agent, response)`（Modifier，返回修改后的值）；`tool_output_sanitizer_cb.py` 提供 `tool_output_sanitizer_cb(agent, output)`（Sanitizer，返回脱敏后的字符串）。三个回调均可选，插件可只实现需要的环节。
+
+**第三方插件复用**：外部插件可在 `config.yaml` 声明 `before_model_call_cb_dirs` / `after_model_call_cb_dirs` / `tool_output_sanitizer_dirs` 指向自己的回调目录，实现自定义脱敏/还原逻辑（见「三、config.yaml 字段规范」）。内置 `secret-guard` 与外部声明可共存，按加载顺序依次生效。
 
 ## 五、版本管理
 

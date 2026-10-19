@@ -1,0 +1,20 @@
+# secret-guard 内置插件：模型交互敏感信息脱敏
+# 发送前脱敏 → 模型调用 → 返回后还原 → 工具输出二次脱敏，全程防泄露。
+id: secret-guard
+name: secret-guard
+version: 1.0.0
+description: 模型交互敏感信息脱敏（发送前脱敏、返回后还原、工具输出二次脱敏、会话持久化）
+api_version: "1.0"
+logo: frontend/icon.svg
+
+# 扩展点：模型调用前脱敏（Modifier：修改 message）
+before_model_call_cb_dirs:
+  - "{{plugin_dir}}/callbacks"
+
+# 扩展点：模型调用后还原（Modifier：修改 response）
+after_model_call_cb_dirs:
+  - "{{plugin_dir}}/callbacks"
+
+# 扩展点：工具输出二次脱敏（防泄露）
+tool_output_sanitizer_dirs:
+  - "{{plugin_dir}}/callbacks"

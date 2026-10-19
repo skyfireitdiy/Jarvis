@@ -616,6 +616,7 @@ class Agent:
 
         # 动态回调加载
         self._load_after_tool_callbacks()
+        self._load_tool_output_sanitizers()
         self._load_all_event_callbacks()
 
         # 会话实时保存守护进程（仅主 Agent 启用；被意外 kill 时落盘最新快照）
@@ -945,7 +946,10 @@ class Agent:
         self._before_tool_call_hooks: List[Callable] = []
         # Modifier：修改型，回调返回修改后的值
         self._before_model_call_modifiers: List[Callable] = []
+        self._after_model_call_modifiers: List[Callable] = []
         self._before_summary_modifiers: List[Callable] = []
+        # 工具输出脱敏器：修改型，回调返回脱敏后的工具输出（防二次泄露）
+        self._tool_output_sanitizers: List[Callable] = []
 
         # 初始化各个功能管理器
         self.memory_manager = MemoryManager(self)  # 记忆管理器：管理长期和短期记忆
@@ -1138,6 +1142,10 @@ class Agent:
         """扫描 after_tool_call_cb_dirs 并注册回调（委托至 CallbackLoader）"""
         return self._callback_loader.load_after_tool_callbacks()
 
+    def _load_tool_output_sanitizers(self) -> None:
+        """扫描 tool_output_sanitizer_dirs 并注册脱敏器（委托至 CallbackLoader）"""
+        return self._callback_loader.load_tool_output_sanitizers()
+
     def _load_event_callbacks(
         self,
         event_name: str,
@@ -1247,6 +1255,8 @@ class Agent:
             self._audit_log(
                 "tool_call", tool_name=name, arguments=call.get("arguments") or {}
             )
+            # 二次泄露防护：工具输出可能含真实敏感值，回填历史前脱敏
+            out = self._sanitize_tool_output(out)
             # 每个 tool_call_id 都要回包，否则 OpenAI/Anthropic 报 pairing 400
             if call_id:
                 model.append_native_tool_result(call_id, name, out)
@@ -1292,6 +1302,26 @@ class Agent:
         # 会话实时保存：每次工具调用后刷新守护进程内存中的快照
         self._send_session_snapshot()
         return self._callback_loader.fire_after_tool_call()
+
+    def _sanitize_tool_output(self, output: str) -> str:
+        """对工具输出做脱敏（防二次泄露）。
+
+        遍历 ``_tool_output_sanitizers`` 回调，每个回调接收 ``(agent, output)``
+        并返回脱敏后的字符串；回调异常时跳过该回调，不阻断主流程。
+        """
+        if not self._tool_output_sanitizers or not output:
+            return output
+        for sanitizer in self._tool_output_sanitizers:
+            try:
+                result = sanitizer(agent=self, output=output)
+                if result is not None:
+                    output = result
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_agent.__init__", function="_sanitize_tool_output"
+                )
+                pass
+        return output
 
     def _exec_native_one(self, call: Dict[str, Any]) -> str:
         """串行执行单个原生工具调用（含确认门控与拒绝处理）。"""
@@ -1635,6 +1665,19 @@ class Agent:
         except Exception as e:
             save_exception(e, module="jarvis_agent.__init__", function="_invoke_model")
             pass
+
+        # Modifier：调用 after_model_call modifiers（修改型）
+        # 回调返回修改后的 response（如还原脱敏占位符），在写入历史/打印给用户之前生效
+        for modifier in self._after_model_call_modifiers:
+            try:
+                result = modifier(agent=self, response=response)
+                if result is not None:
+                    response = result
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_agent.__init__", function="_invoke_model"
+                )
+                pass
 
         return response
 

@@ -559,6 +559,10 @@ class AgentRunLoop:
         # 将上一个提示和工具提示安全地拼接起来（仅当工具结果为字符串时）
         safe_tool_prompt = tool_prompt if isinstance(tool_prompt, str) else ""
 
+        # 二次泄露防护：工具输出可能含真实敏感值，回填历史前脱敏
+        if safe_tool_prompt:
+            safe_tool_prompt = ag._sanitize_tool_output(safe_tool_prompt)
+
         ag.session.prompt = join_prompts([ag.session.prompt, safe_tool_prompt])
 
         # 广播工具调用后的事件：emit 会按优先级调用所有订阅回调
