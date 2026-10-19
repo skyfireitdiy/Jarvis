@@ -794,3 +794,76 @@ def test_disable_plugin_requires_auth(client, isolated_data_dir):
     assert resp.status_code == 401
     resp = client.post("/api/plugins/foo/enable", json={"node_id": "master"})
     assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# 节点代理路径 /api/node/{node_id}/plugins/{name}/disable|enable
+# （前端 PluginSidebar 使用的路径，经 _handle_plugin_manage_dispatch 分发）
+# ---------------------------------------------------------------------------
+def test_node_proxy_disable_plugin_api(client, isolated_data_dir):
+    """节点代理路径禁用插件：/api/node/master/plugins/{name}/disable。"""
+    plugins_dir = Path(isolated_data_dir) / "plugins"
+    _make_plugin(plugins_dir / "dis-plugin", "dis-plugin", "1.0.0")
+
+    resp = client.post(
+        "/api/node/master/plugins/dis-plugin/disable",
+        headers=_auth_headers(),
+        json={"node_id": "master"},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["success"] is True
+    assert body["data"]["node_id"] == "master"
+
+    # 禁用状态文件已写入
+    disabled_file = Path(isolated_data_dir) / "disabled_plugins.json"
+    assert disabled_file.exists()
+    assert json.loads(disabled_file.read_text(encoding="utf-8")) == ["dis-plugin"]
+
+    # 列表显示 disabled
+    resp = client.get("/api/plugins", headers=_auth_headers())
+    plugins = {p["name"]: p for p in resp.json()["data"]["plugins"]}
+    assert plugins["dis-plugin"]["disabled"] is True
+
+
+def test_node_proxy_enable_plugin_api(client, isolated_data_dir):
+    """节点代理路径启用插件：/api/node/master/plugins/{name}/enable。"""
+    plugins_dir = Path(isolated_data_dir) / "plugins"
+    _make_plugin(plugins_dir / "dis-plugin", "dis-plugin", "1.0.0")
+
+    client.post(
+        "/api/node/master/plugins/dis-plugin/disable",
+        headers=_auth_headers(),
+        json={"node_id": "master"},
+    )
+    resp = client.post(
+        "/api/node/master/plugins/dis-plugin/enable",
+        headers=_auth_headers(),
+        json={"node_id": "master"},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["success"] is True
+    assert body["data"]["node_id"] == "master"
+
+    # 禁用状态文件已清空
+    disabled_file = Path(isolated_data_dir) / "disabled_plugins.json"
+    assert json.loads(disabled_file.read_text(encoding="utf-8")) == []
+
+    resp = client.get("/api/plugins", headers=_auth_headers())
+    plugins = {p["name"]: p for p in resp.json()["data"]["plugins"]}
+    assert plugins["dis-plugin"]["disabled"] is False
+
+
+def test_node_proxy_disable_nonexistent_plugin_api(client, isolated_data_dir):
+    """节点代理路径禁用不存在的插件应失败（success=False，不再报 unsupported path）。"""
+    resp = client.post(
+        "/api/node/master/plugins/nonexistent/disable",
+        headers=_auth_headers(),
+        json={"node_id": "master"},
+    )
+    # 节点代理路径失败时返回 HTTP 400（与 /api/plugins 路径恒 200 不同）
+    assert resp.status_code == 400, resp.text
+    body = resp.json()
+    assert body["success"] is False
+    assert body["data"]["node_id"] == "master"

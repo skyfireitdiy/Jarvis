@@ -11245,6 +11245,8 @@ def create_app(
         子节点信任 master 判定，不重复校验。
         """
         from jarvis.jarvis_agent.utils import (
+            disable_plugin,
+            enable_plugin,
             install_plugin,
             list_plugins_info,
             uninstall_plugin,
@@ -11294,6 +11296,20 @@ def create_app(
                 if rest.endswith("/upgrade"):
                     name = rest[: -len("/upgrade")].strip("/")
                     ok = upgrade_plugin(name)
+                    return {
+                        "success": bool(ok),
+                        "data": {"node_id": local_node_id, "output": captured},
+                    }
+                if rest.endswith("/disable"):
+                    name = rest[: -len("/disable")].strip("/")
+                    ok = disable_plugin(name)
+                    return {
+                        "success": bool(ok),
+                        "data": {"node_id": local_node_id, "output": captured},
+                    }
+                if rest.endswith("/enable"):
+                    name = rest[: -len("/enable")].strip("/")
+                    ok = enable_plugin(name)
                     return {
                         "success": bool(ok),
                         "data": {"node_id": local_node_id, "output": captured},
