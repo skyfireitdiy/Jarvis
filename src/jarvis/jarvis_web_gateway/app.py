@@ -8546,6 +8546,7 @@ def create_app(
         """
         if node_id in (node_runtime.local_node_id, "master"):
             from jarvis.jarvis_agent.utils import (
+                check_all_plugins_update,
                 install_plugin,
                 list_plugins_info,
                 uninstall_plugin,
@@ -8559,6 +8560,19 @@ def create_app(
                 def emit(self, event: Any) -> None:  # pragma: no cover - 简单收集
                     if getattr(event, "text", None):
                         captured.append(event.text)
+
+            def _refresh_plugin_updates_cache() -> None:
+                """插件安装/卸载/升级后立即刷新更新检测缓存，避免前端
+                等最多 1 小时的定时任务才更新 hasUpdate 状态。失败仅记录，
+                不阻断插件管理操作本身。"""
+                try:
+                    check_all_plugins_update()
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_web_gateway.app",
+                        function="_run_plugin_manage._refresh_plugin_updates_cache",
+                    )
 
             sink = _CaptureSink()
             PrettyOutput.add_sink(sink)
@@ -8575,6 +8589,8 @@ def create_app(
                     source = str(payload.get("source") or "")
                     force = bool(payload.get("force", False))
                     ok = install_plugin(source, force=force)
+                    if ok:
+                        _refresh_plugin_updates_cache()
                     return {
                         "success": ok,
                         "action": action,
@@ -8583,6 +8599,8 @@ def create_app(
                 if action == "uninstall":
                     name = str(payload.get("name") or "")
                     ok = uninstall_plugin(name)
+                    if ok:
+                        _refresh_plugin_updates_cache()
                     return {
                         "success": ok,
                         "action": action,
@@ -8591,6 +8609,8 @@ def create_app(
                 if action == "upgrade":
                     name = str(payload.get("name") or "")
                     ok = upgrade_plugin(name)
+                    if ok:
+                        _refresh_plugin_updates_cache()
                     return {
                         "success": ok,
                         "action": action,
