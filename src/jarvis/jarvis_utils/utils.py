@@ -1569,6 +1569,86 @@ _base_config_dir: Optional[str] = None
 _plugin_reload_lock = threading.Lock()
 
 
+def _disabled_plugins_file() -> Path:
+    """返回插件禁用状态文件路径（<data_dir>/disabled_plugins.json）。"""
+    return Path(get_data_dir()) / "disabled_plugins.json"
+
+
+def get_disabled_plugins() -> set:
+    """读取插件禁用状态集合（按插件 ID）。
+
+    返回:
+        set[str]: 被禁用插件的 ID 集合。文件不存在或解析失败时返回空集合
+        （解析失败打印告警并降级为空，避免一个损坏文件导致所有插件无法加载）。
+    """
+    try:
+        path = _disabled_plugins_file()
+        if not path.exists():
+            return set()
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, list):
+            return {str(item).strip() for item in data if str(item).strip()}
+        if isinstance(data, dict):
+            # 兼容旧格式：{插件名: bool} 或 {插件名: 时间戳}
+            return {str(k).strip() for k, v in data.items() if v}
+    except Exception:
+        PrettyOutput.auto_print(
+            f"⚠️  读取插件禁用状态失败（已降级为全部启用）: {_disabled_plugins_file()}"
+        )
+    return set()
+
+
+def _save_disabled_plugins(disabled: set) -> bool:
+    """原子写入插件禁用状态集合。
+
+    先写临时文件再 rename 覆盖，避免进程中断导致文件损坏。
+
+    参数:
+        disabled: 被禁用插件的 ID 集合
+
+    返回:
+        bool: 写入成功返回 True，失败返回 False
+    """
+    try:
+        path = _disabled_plugins_file()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = path.with_suffix(".json.tmp")
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(sorted(disabled), f, ensure_ascii=False, indent=2)
+        os.replace(tmp_path, path)
+        return True
+    except Exception as e:
+        PrettyOutput.auto_print(f"❌ 写入插件禁用状态失败: {e}")
+        return False
+
+
+def is_plugin_disabled(plugin_id: str) -> bool:
+    """判断插件 ID 是否在禁用集合中。"""
+    return str(plugin_id).strip() in get_disabled_plugins()
+
+
+def set_plugin_disabled(plugin_id: str, disabled: bool) -> bool:
+    """设置插件禁用状态（按插件 ID）。
+
+    参数:
+        plugin_id: 插件唯一标识（config.yaml 的 id 字段，回退 name，再回退目录名）
+        disabled: True 表示禁用，False 表示启用
+
+    返回:
+        bool: 设置成功返回 True，失败返回 False
+    """
+    plugin_id = str(plugin_id).strip()
+    if not plugin_id:
+        return False
+    disabled_set = get_disabled_plugins()
+    if disabled:
+        disabled_set.add(plugin_id)
+    else:
+        disabled_set.discard(plugin_id)
+    return _save_disabled_plugins(disabled_set)
+
+
 def cache_base_config(
     config_data: Dict[str, Any], config_file_dir: Optional[str] = None
 ) -> None:
@@ -1723,6 +1803,18 @@ def _load_plugin_configs(
             plugin_config = yaml.safe_load(rendered_content)
 
             if isinstance(plugin_config, dict):
+                # 插件唯一标识：优先 config.yaml 的 id 字段，回退 name，再回退目录名。
+                # 禁用状态按此 ID 判断（目录名可能重复，ID 才是唯一标识）。
+                plugin_id = str(
+                    plugin_config.get("id")
+                    or plugin_config.get("name")
+                    or plugin_path.name
+                ).strip()
+                plugin_disabled = is_plugin_disabled(plugin_id)
+                if plugin_disabled:
+                    PrettyOutput.auto_print(
+                        f"⚠️  插件已禁用，跳过扩展点注册: {plugin_id} ({plugin_path})"
+                    )
                 # 兼容性检查：读取插件声明的接口版本 api_version（默认 "1.0"）
                 plugin_api_version = str(plugin_config.get("api_version", "1.0"))
                 if not _is_api_version_compatible(plugin_api_version):
@@ -1740,7 +1832,7 @@ def _load_plugin_configs(
                         f"{', '.join(sorted(deprecated_used))}，请尽快迁移"
                     )
                 # 若插件声明了应用于 code_agent，登记到 PluginRegistry（供 code_agent 构建工具列表）
-                if plugin_config.get("code_agent_tools"):
+                if not plugin_disabled and plugin_config.get("code_agent_tools"):
                     from jarvis.jarvis_tools.plugin_registry import PluginRegistry
 
                     PluginRegistry.instance().set_plugin_code_agent_tools(
@@ -1750,7 +1842,7 @@ def _load_plugin_configs(
                 # 精确撤销）。audit.event_types 会被合并进全局配置丢失来源，
                 # 因此必须在解析插件 config 时按插件名登记来源（可逆效应）。
                 _audit_config = plugin_config.get("audit") or {}
-                if isinstance(_audit_config, dict):
+                if not plugin_disabled and isinstance(_audit_config, dict):
                     _audit_event_types = _audit_config.get("event_types") or []
                     if _audit_event_types:
                         from jarvis.jarvis_tools.plugin_registry import PluginRegistry
@@ -1762,7 +1854,7 @@ def _load_plugin_configs(
                 # 精确撤销）。agent_types 会被合并进全局配置丢失来源，因此必须
                 # 在解析插件 config 时按插件名登记来源（可逆效应）。
                 _agent_types = plugin_config.get("agent_types") or []
-                if _agent_types:
+                if not plugin_disabled and _agent_types:
                     from jarvis.jarvis_tools.plugin_registry import PluginRegistry
 
                     PluginRegistry.instance().register_agent_types(
@@ -1772,7 +1864,7 @@ def _load_plugin_configs(
                 # 精确撤销）。gateway 会被合并进全局配置丢失来源，因此必须在
                 # 解析插件 config 时按插件名登记来源（可逆效应）。
                 _gateway_config = plugin_config.get("gateway") or {}
-                if isinstance(_gateway_config, dict):
+                if not plugin_disabled and isinstance(_gateway_config, dict):
                     _gateway_routes = _gateway_config.get("routes") or []
                     if _gateway_routes:
                         from jarvis.jarvis_tools.plugin_registry import PluginRegistry
@@ -1799,8 +1891,10 @@ def _load_plugin_configs(
                         extension_config[key] = value
                     else:
                         private_config[key] = value
-                # 合并扩展点配置：后加载的插件覆盖前面的
-                if extension_config:
+                # 合并扩展点配置：后加载的插件覆盖前面的。
+                # 禁用插件不合并扩展点（不注册工具/规则/MCP/LSP/事件回调等），
+                # 但仍保留私有配置，供 get_plugin_config 读取。
+                if not plugin_disabled and extension_config:
                     combined_plugin_config = _deep_merge(
                         combined_plugin_config, extension_config
                     )

@@ -812,4 +812,82 @@ describe("PluginSidebar", () => {
     expect(marketCall[0]).toContain("installed_names=rea");
     expect(marketCall[0]).not.toContain(encodeURIComponent("REA 逆向工程"));
   });
+
+  test("禁用插件：点击禁用按钮确认后调用 disable API 并刷新列表", async () => {
+    const fetchWithAuth = makeFetch({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
+        success: true,
+        data: { node_id: "master", plugins: [plugin()] },
+      }),
+      "POST http://127.0.0.1:8000/api/node/master/plugins/demo-plugin/disable": () => ({
+        success: true,
+        data: { node_id: "master", disabled: true },
+      }),
+    });
+    const wrapper = mount(PluginSidebar, {
+      props: { ...baseProps, fetchWithAuth },
+    });
+    await flushPromises();
+    // 未禁用时显示禁用按钮
+    expect(wrapper.find(".plugin-disable-btn").exists()).toBe(true);
+    await wrapper.find(".plugin-disable-btn").trigger("click");
+    await flushPromises();
+    const disableCall = fetchWithAuth.mock.calls.find(
+      ([url, opt]) => opt?.method === "POST" && url.includes("/disable"),
+    );
+    expect(disableCall[0]).toContain("/api/node/master/plugins/demo-plugin/disable");
+    // 禁用后重新加载列表（返回未禁用状态），刷新触发第二次 GET
+    const getCalls = fetchWithAuth.mock.calls.filter(
+      ([url]) => url.includes("/api/node/master/plugins") && !url.includes("/disable"),
+    );
+    expect(getCalls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test("启用插件：禁用插件显示已禁用徽标与启用按钮，点击调用 enable API", async () => {
+    const fetchWithAuth = makeFetch({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
+        success: true,
+        data: { node_id: "master", plugins: [plugin({ disabled: true })] },
+      }),
+      "POST http://127.0.0.1:8000/api/node/master/plugins/demo-plugin/enable": () => ({
+        success: true,
+        data: { node_id: "master", disabled: false },
+      }),
+    });
+    const wrapper = mount(PluginSidebar, {
+      props: { ...baseProps, fetchWithAuth },
+    });
+    await flushPromises();
+    // 禁用状态：显示「已禁用」徽标，不显示禁用按钮，显示启用按钮
+    expect(wrapper.text()).toContain("已禁用");
+    expect(wrapper.find(".plugin-disable-btn").exists()).toBe(false);
+    expect(wrapper.find(".plugin-enable-btn").exists()).toBe(true);
+    await wrapper.find(".plugin-enable-btn").trigger("click");
+    await flushPromises();
+    const enableCall = fetchWithAuth.mock.calls.find(
+      ([url, opt]) => opt?.method === "POST" && url.includes("/enable"),
+    );
+    expect(enableCall[0]).toContain("/api/node/master/plugins/demo-plugin/enable");
+  });
+
+  test("禁用插件：禁用失败时通过 showToast 提示错误", async () => {
+    const fetchWithAuth = makeFetch({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
+        success: true,
+        data: { node_id: "master", plugins: [plugin()] },
+      }),
+      "POST http://127.0.0.1:8000/api/node/master/plugins/demo-plugin/disable": () => ({
+        success: false,
+        error: { message: "插件不存在" },
+      }),
+    });
+    const showToast = vi.fn();
+    const wrapper = mount(PluginSidebar, {
+      props: { ...baseProps, fetchWithAuth, showToast },
+    });
+    await flushPromises();
+    await wrapper.find(".plugin-disable-btn").trigger("click");
+    await flushPromises();
+    expect(showToast).toHaveBeenCalledWith("插件不存在", "error");
+  });
 });

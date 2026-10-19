@@ -721,3 +721,76 @@ def test_cross_node_plugin_allowed_for_admin(monkeypatch, isolated_data_dir):
     assert resp.status_code == 200, resp.text
     assert resp.json()["success"] is True
     assert mock_send.called
+
+
+def test_disable_plugin_api(client, isolated_data_dir):
+    """禁用插件 API：禁用后列表显示 disabled 状态。"""
+    plugins_dir = Path(isolated_data_dir) / "plugins"
+    _make_plugin(plugins_dir / "dis-plugin", "dis-plugin", "1.0.0")
+
+    resp = client.post(
+        "/api/plugins/dis-plugin/disable",
+        headers=_auth_headers(),
+        json={"node_id": "master"},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["success"] is True
+    assert body["data"]["disabled"] is True
+
+    # 禁用状态文件已写入
+    disabled_file = Path(isolated_data_dir) / "disabled_plugins.json"
+    assert disabled_file.exists()
+    assert json.loads(disabled_file.read_text(encoding="utf-8")) == ["dis-plugin"]
+
+    # 列表显示 disabled
+    resp = client.get("/api/plugins", headers=_auth_headers())
+    plugins = {p["name"]: p for p in resp.json()["data"]["plugins"]}
+    assert plugins["dis-plugin"]["disabled"] is True
+
+
+def test_enable_plugin_api(client, isolated_data_dir):
+    """启用插件 API：从禁用集合移除，列表恢复。"""
+    plugins_dir = Path(isolated_data_dir) / "plugins"
+    _make_plugin(plugins_dir / "dis-plugin", "dis-plugin", "1.0.0")
+
+    client.post(
+        "/api/plugins/dis-plugin/disable",
+        headers=_auth_headers(),
+        json={"node_id": "master"},
+    )
+    resp = client.post(
+        "/api/plugins/dis-plugin/enable",
+        headers=_auth_headers(),
+        json={"node_id": "master"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["success"] is True
+    assert resp.json()["data"]["disabled"] is False
+
+    # 禁用状态文件已清空
+    disabled_file = Path(isolated_data_dir) / "disabled_plugins.json"
+    assert json.loads(disabled_file.read_text(encoding="utf-8")) == []
+
+    resp = client.get("/api/plugins", headers=_auth_headers())
+    plugins = {p["name"]: p for p in resp.json()["data"]["plugins"]}
+    assert plugins["dis-plugin"]["disabled"] is False
+
+
+def test_disable_nonexistent_plugin_api(client, isolated_data_dir):
+    """禁用不存在的插件应失败。"""
+    resp = client.post(
+        "/api/plugins/nonexistent/disable",
+        headers=_auth_headers(),
+        json={"node_id": "master"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["success"] is False
+
+
+def test_disable_plugin_requires_auth(client, isolated_data_dir):
+    """禁用/启用插件 API 需要认证（无 token 401）。"""
+    resp = client.post("/api/plugins/foo/disable", json={"node_id": "master"})
+    assert resp.status_code == 401
+    resp = client.post("/api/plugins/foo/enable", json={"node_id": "master"})
+    assert resp.status_code == 401
