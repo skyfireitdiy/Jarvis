@@ -1791,6 +1791,40 @@ def get_plugin_agent_types() -> List[Dict[str, Any]]:
     return result
 
 
+def get_plugin_gateway_config() -> Dict[str, Any]:
+    """获取插件声明的网关扩展配置（gateway 扩展点）。
+
+    插件 config.yaml 通过 ``gateway`` 字段声明自带的网关扩展：自定义 API
+    端点（routes）与网关中间件（middleware），安装后自动挂载到网关：
+
+        gateway:
+          routes:
+            - path: "/api/plugins/dhttp/webhook"
+              method: "POST"
+              handler: "{{plugin_dir}}/gateway_routes"
+          middleware:
+            - name: "audit_middleware"
+              handler: "{{plugin_dir}}/gateway_middleware"
+
+    返回:
+        Dict[str, Any]: 插件网关扩展配置，含 ``routes``（路径/方法/实现目录
+        声明列表）与 ``middleware``（名称/实现目录声明列表）
+    """
+    gateway_config = GLOBAL_CONFIG_DATA.get("gateway", {}) or {}
+    if not isinstance(gateway_config, dict):
+        return {}
+    routes = gateway_config.get("routes") or []
+    middleware = gateway_config.get("middleware") or []
+    return {
+        "routes": [r for r in routes if isinstance(r, dict)] if isinstance(routes, list) else [],
+        "middleware": (
+            [m for m in middleware if isinstance(m, dict)]
+            if isinstance(middleware, list)
+            else []
+        ),
+    }
+
+
 def get_gateway_auth_config() -> Dict[str, Any]:
     """
     获取 Gateway 认证配置。

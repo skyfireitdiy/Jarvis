@@ -2538,6 +2538,26 @@ def create_app(
                                 },
                             )
 
+    # 注册插件网关扩展撤销器（可逆效应），供 PluginRegistry.revoke_plugin
+    # 调用；并加载插件声明的网关路由/中间件（gateway 扩展点）。
+    # 插件路由默认带 token 认证（verify_token），与内置路由冲突时不挂载。
+    try:
+        from jarvis.jarvis_web_gateway.gateway_extensions import GatewayExtensionRegistry
+        from jarvis.jarvis_tools.plugin_registry import PluginRegistry
+
+        gateway_registry = GatewayExtensionRegistry.instance()
+        gateway_registry.load_plugin_gateway(app, verify_token)
+        PluginRegistry.instance().set_gateway_revoker(
+            gateway_registry.unregister_by_plugin
+        )
+    except Exception as e:
+        save_exception(
+            e,
+            module="jarvis_web_gateway.app",
+            function="_build_callback_from_metadata",
+        )
+        pass
+
     # HTTP API：登录接口
     @app.post("/api/auth/login")
     async def login(request: Request) -> Dict[str, Any]:

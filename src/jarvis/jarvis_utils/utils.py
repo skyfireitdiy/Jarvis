@@ -1493,6 +1493,7 @@ _PLUGIN_EXTENSION_FIELDS = frozenset(
         "audit",
         "message_types",
         "agent_types",
+        "gateway",
     }
 )
 
@@ -1533,6 +1534,7 @@ _PLUGIN_EXTENSION_FIELD_API_VERSION = {
     "audit": "1.1",
     "message_types": "1.1",
     "agent_types": "1.1",
+    "gateway": "1.1",
 }
 
 
@@ -1766,6 +1768,25 @@ def _load_plugin_configs(
                     PluginRegistry.instance().register_agent_types(
                         plugin_path.name, _agent_types
                     )
+                # 若插件声明了网关路由/中间件，登记到 PluginRegistry（供卸载时
+                # 精确撤销）。gateway 会被合并进全局配置丢失来源，因此必须在
+                # 解析插件 config 时按插件名登记来源（可逆效应）。
+                _gateway_config = plugin_config.get("gateway") or {}
+                if isinstance(_gateway_config, dict):
+                    _gateway_routes = _gateway_config.get("routes") or []
+                    if _gateway_routes:
+                        from jarvis.jarvis_tools.plugin_registry import PluginRegistry
+
+                        PluginRegistry.instance().register_gateway_routes(
+                            plugin_path.name, _gateway_routes
+                        )
+                    _gateway_middleware = _gateway_config.get("middleware") or []
+                    if _gateway_middleware:
+                        from jarvis.jarvis_tools.plugin_registry import PluginRegistry
+
+                        PluginRegistry.instance().register_gateway_middleware(
+                            plugin_path.name, _gateway_middleware
+                        )
                 # 拆分扩展点字段与私有字段：
                 # - 扩展点字段（白名单）合并进全局配置，供 getter 消费
                 # - 其余字段视为插件私有配置，按插件名隔离到 plugin_configs，
