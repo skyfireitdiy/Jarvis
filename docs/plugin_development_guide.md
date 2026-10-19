@@ -112,6 +112,11 @@ tool_load_dirs:
 # --- 消息类型扩展点（可选，声明插件自定义网关消息类型实现目录，见「四.12 消息类型扩展（message_types/）」）---
 # message_types:
 #   - "{{plugin_dir}}/message_types"
+# --- Agent 类型扩展点（可选，声明插件自带的全新 Agent 类型，见「四.13 Agent 类型扩展（agent_types/）」）---
+# agent_types:
+#   - name: "chat_agent"
+#     entry_point: "my_plugin_chat_agent"
+#     description: "专用对话 Agent"
 # --- 编排流水线声明 ---
 orchestration:
   - name: "my-pipeline"
@@ -159,7 +164,7 @@ orchestration:
 
 **要点：**
 
-- 扩展点字段（`rules_load_dirs`/`tool_load_dirs`/`agent_definition_dirs`/`orchestration`/`roles_dirs`/`mcp`/`lsp`/`event_callbacks`/`platforms`/`timer_actions`/`audit`/`message_types` 等）会被合并进全局配置供 getter 消费；其中 `mcp` 声明的 MCP server 列表会被合并进全局 `mcp` 配置，插件安装后自动注册为 MCP 工具，无需用户在全局 `~/.jarvis/config.yaml` 重复配置；`lsp` 声明的语言服务会按语言名深度合并进全局 `lsp.languages`，插件安装后自动生效，无需重启；`platforms` 声明的平台实现目录会在插件安装后自动注册到 `PlatformRegistry`（见「四.9 模型供应商」）；`timer_actions` 声明的定时动作实现目录会在插件安装后自动注册到 `TimerActionRegistry`（见「四.10 定时任务动作」）；`audit` 声明的自定义审计事件类型与审计 sink 目录会在插件安装后自动注册到 `AuditSinkRegistry`（见「四.11 审计扩展」）；`message_types` 声明的消息类型实现目录会在插件安装后自动注册到 `MessageTypeRegistry`（见「四.12 消息类型扩展」）。
+- 扩展点字段（`rules_load_dirs`/`tool_load_dirs`/`agent_definition_dirs`/`orchestration`/`roles_dirs`/`mcp`/`lsp`/`event_callbacks`/`platforms`/`timer_actions`/`audit`/`message_types`/`agent_types` 等）会被合并进全局配置供 getter 消费；其中 `mcp` 声明的 MCP server 列表会被合并进全局 `mcp` 配置，插件安装后自动注册为 MCP 工具，无需用户在全局 `~/.jarvis/config.yaml` 重复配置；`lsp` 声明的语言服务会按语言名深度合并进全局 `lsp.languages`，插件安装后自动生效，无需重启；`platforms` 声明的平台实现目录会在插件安装后自动注册到 `PlatformRegistry`（见「四.9 模型供应商」）；`timer_actions` 声明的定时动作实现目录会在插件安装后自动注册到 `TimerActionRegistry`（见「四.10 定时任务动作」）；`audit` 声明的自定义审计事件类型与审计 sink 目录会在插件安装后自动注册到 `AuditSinkRegistry`（见「四.11 审计扩展」）；`message_types` 声明的消息类型实现目录会在插件安装后自动注册到 `MessageTypeRegistry`（见「四.12 消息类型扩展」）；`agent_types` 声明的自定义 Agent 类型会在插件安装后自动注册到 `AgentTypeRegistry`（见「四.13 Agent 类型扩展」）。
 
 - `{{plugin_dir}}` 是 jinja2 模板变量，运行时渲染为插件目录绝对路径（见 `render_plugin_config_template`），**勿**写死绝对路径。
 - 除扩展点字段外的其余字段（`name`/`description`/`version`/`builtin`/`license`/`dependencies`/`capabilities`/`frontend`/自定义业务字段）会被隔离到全局配置的 `plugin_configs.<plugin_name>`，**不污染全局配置顶层、多个插件同名私有字段互不覆盖**。插件可通过 `get_plugin_config(plugin_name)` 读取自己的私有配置。
@@ -174,7 +179,7 @@ orchestration:
 - **与插件自身 `version` 区分**：`version` 是插件版本（安装时做版本比较），`api_version` 是接口协议版本（决定插件与 Jarvis 接口的兼容性）。
 - **兼容策略**：以主版本号（major）判断。插件声明的 major 不大于当前 Jarvis 支持的接口版本即兼容；声明更高 major 时 Jarvis **降级警告**（不拒绝加载），提示插件可能依赖未来接口能力。
 - **废弃流程**：废弃某扩展点字段时，Jarvis 在加载插件时打印 deprecation 警告，通知开发者迁移；字段本身仍保留（旧插件仍可加载），仅提示尽快迁移。
-- **覆盖范围**：config.yaml 扩展点（`tool_load_dirs`/`rules_load_dirs`/`orchestration`/`mcp`/`lsp`/`frontend` 等）、plugin/api.py 私有功能（`PUBLIC_FUNCTIONS` 白名单）、工具协议（`protocol_version`，见「工具（tools/）」）。`lsp` 扩展点由接口版本 `1.1` 引入（旧插件未声明 `api_version` 时按 `"1.0"` 处理，仍可正常加载，只是不识别 `lsp` 字段）。`event_callbacks` 扩展点同样由接口版本 `1.1` 引入。`platforms` 扩展点由接口版本 `1.1` 引入。`timer_actions` 扩展点同样由接口版本 `1.1` 引入。`audit` 扩展点同样由接口版本 `1.1` 引入。`message_types` 扩展点同样由接口版本 `1.1` 引入。
+- **覆盖范围**：config.yaml 扩展点（`tool_load_dirs`/`rules_load_dirs`/`orchestration`/`mcp`/`lsp`/`frontend` 等）、plugin/api.py 私有功能（`PUBLIC_FUNCTIONS` 白名单）、工具协议（`protocol_version`，见「工具（tools/）」）。`lsp` 扩展点由接口版本 `1.1` 引入（旧插件未声明 `api_version` 时按 `"1.0"` 处理，仍可正常加载，只是不识别 `lsp` 字段）。`event_callbacks` 扩展点同样由接口版本 `1.1` 引入。`platforms` 扩展点由接口版本 `1.1` 引入。`timer_actions` 扩展点同样由接口版本 `1.1` 引入。`audit` 扩展点同样由接口版本 `1.1` 引入。`message_types` 扩展点同样由接口版本 `1.1` 引入。`agent_types` 扩展点同样由接口版本 `1.1` 引入。
 
 ## 四、扩展点开发规范
 
@@ -601,6 +606,25 @@ def register_message_types():
 **与内置消息类型的关系**：内置消息类型（如 `agent_update` / `node_status` / `tool_result` 等）仍由内置 if-chain 处理；插件注册的消息类型与内置类型重名时**内置类型优先**，插件类型不会覆盖内置处理。
 
 **卸载撤销**：插件卸载时，其注册的消息类型会从 `MessageTypeRegistry` 精确移除（可逆效应，见 `PluginRegistry`），已注册的消息类型不再被分发。
+
+### 13. Agent 类型扩展（agent_types/，可选）
+
+插件可在 `config.yaml` 声明 `agent_types`，注册插件自带的**全新 Agent 类型**（自定义执行入口/运行逻辑），安装后自动加载到 `AgentTypeRegistry`。创建 Agent 时 `agent_type` 即可选用插件注册的类型，由插件声明的 `entry_point` 可执行入口启动：
+
+```yaml
+agent_types:
+  - name: "chat_agent"
+    entry_point: "my_plugin_chat_agent"   # 可执行入口（可执行文件/命令名）
+    description: "专用对话 Agent"
+```
+
+`agent_types` 声明的是**对象数组**，每项含 `name`（类型名，创建 Agent 时 `agent_type` 使用）、`entry_point`（可执行入口，由 AgentManager 解析启动）与可选 `description`（类型描述）。与 `agent_definition_dirs`（定义 Agent 实例）互补：前者是「用现有类型配实例」，后者是「造新类型」。
+
+**消费方式**：`AgentManager` 创建 Agent 时会把插件注册的 Agent 类型合并到入口点解析（`_get_agent_entry_points`），`agent_type` 传入插件类型名即可启动对应入口。**内置类型（`agent`/`code_agent`）优先，插件类型不覆盖内置**。
+
+**典型场景**：插件提供专用执行入口（如自定义代码执行器、专用对话 Agent、领域专用 Agent），用户创建 Agent 时选用插件类型。
+
+**卸载撤销**：插件卸载时，其注册的 Agent 类型会从 `AgentTypeRegistry` 精确移除（可逆效应，见 `PluginRegistry`），已注册的 Agent 类型不再可用于创建 Agent。
 
 ## 五、版本管理
 

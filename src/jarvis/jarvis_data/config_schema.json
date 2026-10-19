@@ -262,6 +262,30 @@
       },
       "default": {}
     },
+    "agent_types": {
+      "type": "array",
+      "description": "插件 Agent 类型扩展点：插件声明的全新 Agent 类型列表（对象数组，每项含 name/entry_point/description），创建 Agent 时 agent_type 可选用插件注册的类型，由 entry_point 可执行入口启动，安装后自动注册到 AgentTypeRegistry",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Agent 类型名（创建 Agent 时 agent_type 使用）"
+          },
+          "entry_point": {
+            "type": "string",
+            "description": "可执行入口（可执行文件/命令名）"
+          },
+          "description": {
+            "type": "string",
+            "description": "类型描述"
+          }
+        },
+        "required": ["name", "entry_point"],
+        "additionalProperties": false
+      },
+      "default": []
+    },
     "after_tool_call_cb_dirs": {
       "type": "array",
       "description": "工具调用后回调函数实现目录",

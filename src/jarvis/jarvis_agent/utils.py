@@ -1671,6 +1671,15 @@ def install_plugin(
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 重载插件消息类型失败（可稍后重启生效）: {e}")
 
+        # 免重启重载插件 Agent 类型：使插件声明的自定义 Agent 类型立即注册到
+        # AgentTypeRegistry。失败仅警告，不阻断安装。
+        try:
+            from jarvis.jarvis_web_gateway.agent_types import AgentTypeRegistry
+
+            AgentTypeRegistry.instance().reload_plugin_agent_types()
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 重载插件 Agent 类型失败（可稍后重启生效）: {e}")
+
         PrettyOutput.auto_print(f"✅ 插件安装成功: {plugin_name} -> {target_dir}")
         return True
 
@@ -2603,6 +2612,7 @@ def uninstall_plugin(plugin_id: str) -> bool:
                 or result.get("audit_sinks")
                 or result.get("audit_event_types")
                 or result.get("message_types")
+                or result.get("agent_types")
             ):
                 PrettyOutput.auto_print(
                     f"↩️  已撤销插件 '{plugin_name}' 注册的资源"
@@ -2611,7 +2621,8 @@ def uninstall_plugin(plugin_id: str) -> bool:
                     f"定时动作 {result.get('timer_actions', 0)} 个，"
                     f"审计扩展 {result.get('audit_sinks', 0)} 个 sink、"
                     f"{result.get('audit_event_types', 0)} 个事件类型，"
-                    f"消息类型 {result.get('message_types', 0)} 个）"
+                    f"消息类型 {result.get('message_types', 0)} 个，"
+                    f"Agent 类型 {result.get('agent_types', 0)} 个）"
                 )
     except Exception as e:
         PrettyOutput.auto_print(f"⚠️ 撤销插件资源失败（继续卸载）: {str(e)}")
@@ -2673,6 +2684,15 @@ def uninstall_plugin(plugin_id: str) -> bool:
             MessageTypeRegistry.instance().reload_plugin_message_types()
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 重载插件消息类型失败（可稍后重启生效）: {e}")
+
+        # 免重启重载插件 Agent 类型：使卸载插件的自定义 Agent 类型从
+        # AgentTypeRegistry 移除。失败仅警告，不阻断卸载。
+        try:
+            from jarvis.jarvis_web_gateway.agent_types import AgentTypeRegistry
+
+            AgentTypeRegistry.instance().reload_plugin_agent_types()
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 重载插件 Agent 类型失败（可稍后重启生效）: {e}")
         return True
     except Exception as e:
         PrettyOutput.auto_print(f"❌ 卸载插件失败: {str(e)}")

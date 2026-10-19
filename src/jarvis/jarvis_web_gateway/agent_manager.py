@@ -142,6 +142,24 @@ class AgentManager:
         """绑定用于监控任务的主事件循环。"""
         self._event_loop = event_loop
 
+    def _get_agent_entry_points(self) -> Dict[str, str]:
+        """合并内置与插件注册的 Agent 类型入口点（agent_types 扩展点）。
+
+        内置类型（agent/code_agent）优先，插件类型不覆盖内置（安全）。
+        """
+        entry_points = dict(self.AGENT_ENTRY_POINTS)
+        try:
+            from jarvis.jarvis_web_gateway.agent_types import AgentTypeRegistry
+
+            for agent_type in AgentTypeRegistry.instance().list_agent_types():
+                name = agent_type["name"]
+                if name in entry_points:
+                    continue  # 内置优先，插件不覆盖
+                entry_points[name] = agent_type["entry_point"]
+        except Exception:
+            pass
+        return entry_points
+
     def create_agent(
         self,
         agent_type: str,
@@ -188,10 +206,11 @@ class AgentManager:
             RuntimeError: 启动失败
         """
         # 验证 agent_type
-        if agent_type not in self.AGENT_ENTRY_POINTS:
+        entry_points = self._get_agent_entry_points()
+        if agent_type not in entry_points:
             raise ValueError(
                 f"Invalid agent_type: {agent_type}, "
-                f"must be one of {list(self.AGENT_ENTRY_POINTS.keys())}"
+                f"must be one of {list(entry_points.keys())}"
             )
 
         # 展开工作目录中的 ~ 符号并转为绝对路径
@@ -772,7 +791,7 @@ class AgentManager:
             命令列表
         """
         # 基础命令（解析完整路径，避免 PATH 问题）
-        entry_point = self.AGENT_ENTRY_POINTS[agent_type]
+        entry_point = self._get_agent_entry_points()[agent_type]
         resolved = shutil.which(entry_point)
         if resolved is None:
             # 用 bash 加载用户环境查找（覆盖用户 shell PATH）

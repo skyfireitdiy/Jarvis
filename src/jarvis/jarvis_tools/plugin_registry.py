@@ -39,12 +39,15 @@ class PluginRegistry:
         self._plugin_audit_sinks: Dict[str, Set[str]] = {}
         self._plugin_audit_event_types: Dict[str, Set[str]] = {}
         self._plugin_message_types: Dict[str, Set[str]] = {}
+        # 插件名 -> {Agent 类型名 -> {"entry_point": str, "description": str}}
+        self._plugin_agent_types: Dict[str, Dict[str, Dict[str, str]]] = {}
         self._tool_revoker: Optional[Callable[[str], int]] = None
         self._rules_revoker: Optional[Callable[[str], int]] = None
         self._platform_revoker: Optional[Callable[[str], int]] = None
         self._timer_action_revoker: Optional[Callable[[str], int]] = None
         self._audit_revoker: Optional[Callable[[str], int]] = None
         self._message_type_revoker: Optional[Callable[[str], int]] = None
+        self._agent_type_revoker: Optional[Callable[[str], int]] = None
 
     @classmethod
     def instance(cls) -> "PluginRegistry":
@@ -101,6 +104,15 @@ class PluginRegistry:
         撤销器签名：revoker(plugin_name) -> 被撤销的消息类型数量。
         """
         self._message_type_revoker = revoker
+
+    def set_agent_type_revoker(
+        self, revoker: Optional[Callable[[str], int]]
+    ) -> None:
+        """注册/清除全局 Agent 类型撤销器（由 AgentTypeRegistry 实例注册）。
+
+        撤销器签名：revoker(plugin_name) -> 被撤销的 Agent 类型数量。
+        """
+        self._agent_type_revoker = revoker
 
     # ------------------------------------------------------------------
     # 登记
@@ -189,6 +201,50 @@ class PluginRegistry:
             message_types
         )
 
+    def register_agent_type(
+        self,
+        plugin_name: str,
+        agent_type: str,
+        entry_point: str = "",
+        description: str = "",
+    ) -> None:
+        """登记插件注册的单个 Agent 类型（含入口点与描述元数据）。
+
+        参数:
+            plugin_name: 来源插件名
+            agent_type: Agent 类型名（创建 Agent 时 agent_type 使用）
+            entry_point: 可执行入口（可执行文件/命令名）
+            description: 类型描述
+        """
+        self._plugin_agent_types.setdefault(plugin_name, {})[agent_type] = {
+            "entry_point": entry_point,
+            "description": description,
+        }
+
+    def register_agent_types(
+        self, plugin_name: str, agent_types: List[Dict[str, str]]
+    ) -> None:
+        """登记插件注册的一批 Agent 类型。
+
+        参数:
+            plugin_name: 来源插件名
+            agent_types: 类型声明列表，每项为含 name/entry_point/description 的字典
+        """
+        if not agent_types:
+            return
+        for entry in agent_types:
+            if not isinstance(entry, dict):
+                continue
+            name = entry.get("name")
+            if not name:
+                continue
+            self.register_agent_type(
+                plugin_name,
+                str(name),
+                entry_point=str(entry.get("entry_point") or ""),
+                description=str(entry.get("description") or ""),
+            )
+
     # ------------------------------------------------------------------
     # 查询
     # ------------------------------------------------------------------
@@ -220,6 +276,30 @@ class PluginRegistry:
         """返回插件登记的自定义消息类型列表。"""
         return sorted(self._plugin_message_types.get(plugin_name, set()))
 
+    def get_plugin_agent_types(self, plugin_name: str) -> List[str]:
+        """返回插件登记的 Agent 类型名列表。"""
+        return sorted(self._plugin_agent_types.get(plugin_name, {}).keys())
+
+    def get_plugin_agent_type_entry_point(
+        self, plugin_name: str, agent_type: str
+    ) -> str:
+        """返回插件登记的 Agent 类型的可执行入口。"""
+        return str(
+            self._plugin_agent_types.get(plugin_name, {}).get(agent_type, {}).get(
+                "entry_point", ""
+            )
+        )
+
+    def get_plugin_agent_type_description(
+        self, plugin_name: str, agent_type: str
+    ) -> str:
+        """返回插件登记的 Agent 类型的描述。"""
+        return str(
+            self._plugin_agent_types.get(plugin_name, {}).get(agent_type, {}).get(
+                "description", ""
+            )
+        )
+
     def registered_plugins(self) -> List[str]:
         """返回已登记资源的插件名列表。"""
         return sorted(
@@ -230,6 +310,7 @@ class PluginRegistry:
             | set(self._plugin_audit_sinks.keys())
             | set(self._plugin_audit_event_types.keys())
             | set(self._plugin_message_types.keys())
+            | set(self._plugin_agent_types.keys())
         )
 
     # ------------------------------------------------------------------
@@ -261,11 +342,12 @@ class PluginRegistry:
         返回:
             {"tools": [...], "rules": [...], "platforms": [...],
              "timer_actions": [...], "audit_sinks": [...],
-             "audit_event_types": [...], "message_types": [...]}：该插件登记的
+             "audit_event_types": [...], "message_types": [...],
+             "agent_types": [...]}：该插件登记的
             工具名、规则名、平台名、定时动作名、审计 sink 名、自定义审计事件
-            类型与自定义消息类型。调用方需据此实际执行卸载（从 ToolRegistry /
-            RulesManager / PlatformRegistry / TimerActionRegistry /
-            AuditSinkRegistry / MessageTypeRegistry 移除）。
+            类型、自定义消息类型与 Agent 类型。调用方需据此实际执行卸载（从
+            ToolRegistry / RulesManager / PlatformRegistry / TimerActionRegistry /
+            AuditSinkRegistry / MessageTypeRegistry / AgentTypeRegistry 移除）。
         """
         tools = list(self._plugin_tools.pop(plugin_name, set()))
         rules = list(self._plugin_rules.pop(plugin_name, set()))
@@ -276,6 +358,7 @@ class PluginRegistry:
             self._plugin_audit_event_types.pop(plugin_name, set())
         )
         message_types = list(self._plugin_message_types.pop(plugin_name, set()))
+        agent_types = list(self._plugin_agent_types.pop(plugin_name, {}).keys())
         return {
             "tools": tools,
             "rules": rules,
@@ -284,6 +367,7 @@ class PluginRegistry:
             "audit_sinks": audit_sinks,
             "audit_event_types": audit_event_types,
             "message_types": message_types,
+            "agent_types": agent_types,
         }
 
     def clear_tools(self, plugin_name: str) -> None:
@@ -314,20 +398,26 @@ class PluginRegistry:
         """仅清理指定插件的自定义消息类型登记（不影响其它登记）。"""
         self._plugin_message_types.pop(plugin_name, None)
 
+    def clear_agent_types(self, plugin_name: str) -> None:
+        """仅清理指定插件的 Agent 类型登记（不影响其它登记）。"""
+        self._plugin_agent_types.pop(plugin_name, None)
+
     def revoke_plugin(self, plugin_name: str) -> Dict[str, int]:
         """撤销指定插件注册的全部资源并实际执行卸载。
 
         通过已注册的全局撤销器（ToolRegistry / RulesManager / PlatformRegistry
-        / TimerActionRegistry / AuditSinkRegistry / MessageTypeRegistry 实例）
-        实际移除该插件注册的工具、规则、平台、定时动作、审计扩展与自定义消息
-        类型，并清理登记。
+        / TimerActionRegistry / AuditSinkRegistry / MessageTypeRegistry /
+        AgentTypeRegistry 实例）
+        实际移除该插件注册的工具、规则、平台、定时动作、审计扩展、自定义消息
+        类型与 Agent 类型，并清理登记。
 
         返回:
             {"tools": int, "rules": int, "platforms": int,
              "timer_actions": int, "audit_sinks": int,
-             "audit_event_types": int, "message_types": int}：被撤销的工具数、
-            规则数、平台数、定时动作数、审计 sink 数、自定义审计事件类型数与
-            自定义消息类型数。
+             "audit_event_types": int, "message_types": int,
+             "agent_types": int}：被撤销的工具数、
+            规则数、平台数、定时动作数、审计 sink 数、自定义审计事件类型数、
+            自定义消息类型数与 Agent 类型数。
         """
         tools = self.get_plugin_tools(plugin_name)
         rules = self.get_plugin_rules(plugin_name)
@@ -336,6 +426,7 @@ class PluginRegistry:
         audit_sinks = self.get_plugin_audit_sinks(plugin_name)
         audit_event_types = self.get_plugin_audit_event_types(plugin_name)
         message_types = self.get_plugin_message_types(plugin_name)
+        agent_types = self.get_plugin_agent_types(plugin_name)
         revoked_tools = 0
         revoked_rules = 0
         revoked_platforms = 0
@@ -343,6 +434,7 @@ class PluginRegistry:
         revoked_audit_sinks = 0
         revoked_audit_event_types = 0
         revoked_message_types = 0
+        revoked_agent_types = 0
         if tools and self._tool_revoker is not None:
             try:
                 revoked_tools = int(self._tool_revoker(plugin_name))
@@ -373,6 +465,11 @@ class PluginRegistry:
                 revoked_message_types = int(self._message_type_revoker(plugin_name))
             except Exception:
                 revoked_message_types = 0
+        if agent_types and self._agent_type_revoker is not None:
+            try:
+                revoked_agent_types = int(self._agent_type_revoker(plugin_name))
+            except Exception:
+                revoked_agent_types = 0
         # 清理登记（撤销器内部也会清理，这里兜底）
         self.unregister_plugin(plugin_name)
         return {
@@ -383,6 +480,7 @@ class PluginRegistry:
             "audit_sinks": revoked_audit_sinks,
             "audit_event_types": revoked_audit_event_types,
             "message_types": revoked_message_types,
+            "agent_types": revoked_agent_types,
         }
 
     def has_plugin(self, plugin_name: str) -> bool:
@@ -395,6 +493,7 @@ class PluginRegistry:
             or plugin_name in self._plugin_audit_sinks
             or plugin_name in self._plugin_audit_event_types
             or plugin_name in self._plugin_message_types
+            or plugin_name in self._plugin_agent_types
         )
 
     def clear(self) -> None:
@@ -407,12 +506,14 @@ class PluginRegistry:
         self._plugin_audit_sinks.clear()
         self._plugin_audit_event_types.clear()
         self._plugin_message_types.clear()
+        self._plugin_agent_types.clear()
         self._tool_revoker = None
         self._rules_revoker = None
         self._platform_revoker = None
         self._timer_action_revoker = None
         self._audit_revoker = None
         self._message_type_revoker = None
+        self._agent_type_revoker = None
 
 
 __all__ = ["PluginRegistry"]

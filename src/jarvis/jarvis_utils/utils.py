@@ -1492,6 +1492,7 @@ _PLUGIN_EXTENSION_FIELDS = frozenset(
         "timer_actions",
         "audit",
         "message_types",
+        "agent_types",
     }
 )
 
@@ -1531,6 +1532,7 @@ _PLUGIN_EXTENSION_FIELD_API_VERSION = {
     "timer_actions": "1.1",
     "audit": "1.1",
     "message_types": "1.1",
+    "agent_types": "1.1",
 }
 
 
@@ -1754,6 +1756,16 @@ def _load_plugin_configs(
                         PluginRegistry.instance().register_audit_event_types(
                             plugin_path.name, _audit_event_types
                         )
+                # 若插件声明了自定义 Agent 类型，登记到 PluginRegistry（供卸载时
+                # 精确撤销）。agent_types 会被合并进全局配置丢失来源，因此必须
+                # 在解析插件 config 时按插件名登记来源（可逆效应）。
+                _agent_types = plugin_config.get("agent_types") or []
+                if _agent_types:
+                    from jarvis.jarvis_tools.plugin_registry import PluginRegistry
+
+                    PluginRegistry.instance().register_agent_types(
+                        plugin_path.name, _agent_types
+                    )
                 # 拆分扩展点字段与私有字段：
                 # - 扩展点字段（白名单）合并进全局配置，供 getter 消费
                 # - 其余字段视为插件私有配置，按插件名隔离到 plugin_configs，
