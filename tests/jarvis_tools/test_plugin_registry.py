@@ -91,6 +91,8 @@ class TestPluginRegistry:
             "audit_event_types": 0,
             "message_types": 0,
             "agent_types": 0,
+            "gateway_routes": 0,
+            "gateway_middleware": 0,
         }
         assert not pr.has_plugin("p1")
 
@@ -105,6 +107,8 @@ class TestPluginRegistry:
         pr.register_audit_event_type("p1", "event_x")
         pr.register_message_type("p1", "msg_x")
         pr.register_agent_type("p1", "agent_x", entry_point="my_agent_x")
+        pr.register_gateway_route("p1", "/api/plugins/x", "GET", handler="/tmp/plugins/p1/routes")
+        pr.register_gateway_middleware("p1", "mw_x", handler="/tmp/plugins/p1/middleware")
 
         revoked = {
             "tools": [],
@@ -114,6 +118,7 @@ class TestPluginRegistry:
             "audit_sinks": [],
             "message_types": [],
             "agent_types": [],
+            "gateway": [],
         }
 
         def tool_revoker(name):
@@ -144,6 +149,10 @@ class TestPluginRegistry:
             revoked["agent_types"].append(name)
             return 1
 
+        def gateway_revoker(name):
+            revoked["gateway"].append(name)
+            return 2
+
         pr.set_tool_revoker(tool_revoker)
         pr.set_rules_revoker(rules_revoker)
         pr.set_platform_revoker(platform_revoker)
@@ -151,6 +160,7 @@ class TestPluginRegistry:
         pr.set_audit_revoker(audit_revoker)
         pr.set_message_type_revoker(message_type_revoker)
         pr.set_agent_type_revoker(agent_type_revoker)
+        pr.set_gateway_revoker(gateway_revoker)
 
         result = pr.revoke_plugin("p1")
         assert result == {
@@ -162,6 +172,8 @@ class TestPluginRegistry:
             "audit_event_types": 0,
             "message_types": 1,
             "agent_types": 1,
+            "gateway_routes": 2,
+            "gateway_middleware": 0,
         }
         assert revoked["tools"] == ["p1"]
         assert revoked["rules"] == ["p1"]
@@ -170,6 +182,7 @@ class TestPluginRegistry:
         assert revoked["audit_sinks"] == ["p1"]
         assert revoked["message_types"] == ["p1"]
         assert revoked["agent_types"] == ["p1"]
+        assert revoked["gateway"] == ["p1"]
         assert not pr.has_plugin("p1")
 
     def test_register_and_get_platforms(self):
@@ -251,6 +264,62 @@ class TestPluginRegistry:
         )
         assert pr.get_plugin_agent_types("p1") == ["ok"]
         assert pr.get_plugin_agent_type_entry_point("p1", "ok") == "my_ok"
+
+    def test_register_and_get_gateway(self):
+        """登记/查询/清理插件网关路由与中间件。"""
+        pr = PluginRegistry.instance()
+        pr.register_gateway_route(
+            "p1", "/api/plugins/x", "GET", handler="/tmp/plugins/p1/routes"
+        )
+        pr.register_gateway_routes(
+            "p1",
+            [
+                {"path": "/api/plugins/y", "method": "post", "handler": "/tmp/plugins/p1/routes2"},
+                {"method": "PUT"},  # 缺 path，跳过
+            ],
+        )
+        pr.register_gateway_middleware(
+            "p1", "mw_x", handler="/tmp/plugins/p1/middleware"
+        )
+        pr.register_gateway_middleware_list(
+            "p1",
+            [
+                {"name": "mw_y", "handler": "/tmp/plugins/p1/middleware2"},
+                {"handler": "/tmp/plugins/p1/middleware3"},  # 缺 name，跳过
+            ],
+        )
+        pr.register_gateway_route(
+            "p2", "/api/plugins/w", "GET", handler="/tmp/plugins/p2/routes"
+        )
+
+        assert pr.get_plugin_gateway_routes("p1") == [
+            "GET /api/plugins/x",
+            "POST /api/plugins/y",
+        ]
+        assert pr.get_plugin_gateway_routes("p2") == ["GET /api/plugins/w"]
+        assert pr.get_plugin_gateway_routes("p3") == []
+        assert pr.get_plugin_gateway_route("p1", "GET /api/plugins/x") == {
+            "path": "/api/plugins/x",
+            "method": "GET",
+            "handler": "/tmp/plugins/p1/routes",
+        }
+        assert pr.get_plugin_gateway_middleware("p1") == ["mw_x", "mw_y"]
+        assert pr.get_plugin_gateway_middleware("p2") == []
+        assert pr.get_plugin_gateway_middleware_handler("p1", "mw_x") == (
+            "/tmp/plugins/p1/middleware"
+        )
+        assert pr.get_plugin_gateway_middleware_handler("p1", "nonexistent") == ""
+        assert "p1" in pr.registered_plugins()
+        assert "p2" in pr.registered_plugins()
+
+        pr.clear_gateway_routes("p1")
+        assert pr.get_plugin_gateway_routes("p1") == []
+        # clear_gateway_routes 不影响中间件登记
+        assert pr.get_plugin_gateway_middleware("p1") == ["mw_x", "mw_y"]
+        pr.clear_gateway_middleware("p1")
+        assert pr.get_plugin_gateway_middleware("p1") == []
+        # 清空后仅剩 p2 登记
+        assert pr.has_plugin("p2")
 
     def test_singleton(self):
         assert PluginRegistry.instance() is PluginRegistry.instance()

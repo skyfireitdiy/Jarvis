@@ -1680,6 +1680,17 @@ def install_plugin(
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 重载插件 Agent 类型失败（可稍后重启生效）: {e}")
 
+        # 免重启重载插件网关扩展：使插件声明的网关路由/中间件立即挂载到
+        # GatewayExtensionRegistry。失败仅警告，不阻断安装。
+        try:
+            from jarvis.jarvis_web_gateway.gateway_extensions import (
+                GatewayExtensionRegistry,
+            )
+
+            GatewayExtensionRegistry.instance().reload_plugin_gateway()
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 重载插件网关扩展失败（可稍后重启生效）: {e}")
+
         PrettyOutput.auto_print(f"✅ 插件安装成功: {plugin_name} -> {target_dir}")
         return True
 
@@ -2693,6 +2704,17 @@ def uninstall_plugin(plugin_id: str) -> bool:
             AgentTypeRegistry.instance().reload_plugin_agent_types()
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 重载插件 Agent 类型失败（可稍后重启生效）: {e}")
+
+        # 免重启重载插件网关扩展：使卸载插件的网关路由/中间件从
+        # GatewayExtensionRegistry 移除。失败仅警告，不阻断卸载。
+        try:
+            from jarvis.jarvis_web_gateway.gateway_extensions import (
+                GatewayExtensionRegistry,
+            )
+
+            GatewayExtensionRegistry.instance().reload_plugin_gateway()
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 重载插件网关扩展失败（可稍后重启生效）: {e}")
         return True
     except Exception as e:
         PrettyOutput.auto_print(f"❌ 卸载插件失败: {str(e)}")

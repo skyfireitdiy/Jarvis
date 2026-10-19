@@ -117,6 +117,15 @@ tool_load_dirs:
 #   - name: "chat_agent"
 #     entry_point: "my_plugin_chat_agent"
 #     description: "专用对话 Agent"
+# --- 网关扩展点（可选，声明插件自定义网关 API 路由与中间件，见「四.14 网关扩展（gateway/）」）---
+# gateway:
+#   routes:                              # 插件自定义网关 API 路由（path/method/handler）
+#     - path: "/api/plugins/dhttp/webhook"
+#       method: "POST"
+#       handler: "{{plugin_dir}}/gateway_routes"      # 实现目录（目录内 .py 导出 route_handler(request)）
+#   middleware:                          # 插件网关中间件（name/handler）
+#     - name: "audit_middleware"
+#       handler: "{{plugin_dir}}/gateway_middleware"  # 实现目录（目录内 .py 导出 middleware_handler(request, call_next)）
 # --- 编排流水线声明 ---
 orchestration:
   - name: "my-pipeline"
@@ -164,7 +173,7 @@ orchestration:
 
 **要点：**
 
-- 扩展点字段（`rules_load_dirs`/`tool_load_dirs`/`agent_definition_dirs`/`orchestration`/`roles_dirs`/`mcp`/`lsp`/`event_callbacks`/`platforms`/`timer_actions`/`audit`/`message_types`/`agent_types` 等）会被合并进全局配置供 getter 消费；其中 `mcp` 声明的 MCP server 列表会被合并进全局 `mcp` 配置，插件安装后自动注册为 MCP 工具，无需用户在全局 `~/.jarvis/config.yaml` 重复配置；`lsp` 声明的语言服务会按语言名深度合并进全局 `lsp.languages`，插件安装后自动生效，无需重启；`platforms` 声明的平台实现目录会在插件安装后自动注册到 `PlatformRegistry`（见「四.9 模型供应商」）；`timer_actions` 声明的定时动作实现目录会在插件安装后自动注册到 `TimerActionRegistry`（见「四.10 定时任务动作」）；`audit` 声明的自定义审计事件类型与审计 sink 目录会在插件安装后自动注册到 `AuditSinkRegistry`（见「四.11 审计扩展」）；`message_types` 声明的消息类型实现目录会在插件安装后自动注册到 `MessageTypeRegistry`（见「四.12 消息类型扩展」）；`agent_types` 声明的自定义 Agent 类型会在插件安装后自动注册到 `AgentTypeRegistry`（见「四.13 Agent 类型扩展」）。
+- 扩展点字段（`rules_load_dirs`/`tool_load_dirs`/`agent_definition_dirs`/`orchestration`/`roles_dirs`/`mcp`/`lsp`/`event_callbacks`/`platforms`/`timer_actions`/`audit`/`message_types`/`agent_types`/`gateway` 等）会被合并进全局配置供 getter 消费；其中 `mcp` 声明的 MCP server 列表会被合并进全局 `mcp` 配置，插件安装后自动注册为 MCP 工具，无需用户在全局 `~/.jarvis/config.yaml` 重复配置；`lsp` 声明的语言服务会按语言名深度合并进全局 `lsp.languages`，插件安装后自动生效，无需重启；`platforms` 声明的平台实现目录会在插件安装后自动注册到 `PlatformRegistry`（见「四.9 模型供应商」）；`timer_actions` 声明的定时动作实现目录会在插件安装后自动注册到 `TimerActionRegistry`（见「四.10 定时任务动作」）；`audit` 声明的自定义审计事件类型与审计 sink 目录会在插件安装后自动注册到 `AuditSinkRegistry`（见「四.11 审计扩展」）；`message_types` 声明的消息类型实现目录会在插件安装后自动注册到 `MessageTypeRegistry`（见「四.12 消息类型扩展」）；`agent_types` 声明的自定义 Agent 类型会在插件安装后自动注册到 `AgentTypeRegistry`（见「四.13 Agent 类型扩展」）；`gateway` 声明的网关路由/中间件会在插件安装后自动挂载到 `GatewayExtensionRegistry`（见「四.14 网关扩展」）。
 
 - `{{plugin_dir}}` 是 jinja2 模板变量，运行时渲染为插件目录绝对路径（见 `render_plugin_config_template`），**勿**写死绝对路径。
 - 除扩展点字段外的其余字段（`name`/`description`/`version`/`builtin`/`license`/`dependencies`/`capabilities`/`frontend`/自定义业务字段）会被隔离到全局配置的 `plugin_configs.<plugin_name>`，**不污染全局配置顶层、多个插件同名私有字段互不覆盖**。插件可通过 `get_plugin_config(plugin_name)` 读取自己的私有配置。
@@ -179,7 +188,7 @@ orchestration:
 - **与插件自身 `version` 区分**：`version` 是插件版本（安装时做版本比较），`api_version` 是接口协议版本（决定插件与 Jarvis 接口的兼容性）。
 - **兼容策略**：以主版本号（major）判断。插件声明的 major 不大于当前 Jarvis 支持的接口版本即兼容；声明更高 major 时 Jarvis **降级警告**（不拒绝加载），提示插件可能依赖未来接口能力。
 - **废弃流程**：废弃某扩展点字段时，Jarvis 在加载插件时打印 deprecation 警告，通知开发者迁移；字段本身仍保留（旧插件仍可加载），仅提示尽快迁移。
-- **覆盖范围**：config.yaml 扩展点（`tool_load_dirs`/`rules_load_dirs`/`orchestration`/`mcp`/`lsp`/`frontend` 等）、plugin/api.py 私有功能（`PUBLIC_FUNCTIONS` 白名单）、工具协议（`protocol_version`，见「工具（tools/）」）。`lsp` 扩展点由接口版本 `1.1` 引入（旧插件未声明 `api_version` 时按 `"1.0"` 处理，仍可正常加载，只是不识别 `lsp` 字段）。`event_callbacks` 扩展点同样由接口版本 `1.1` 引入。`platforms` 扩展点由接口版本 `1.1` 引入。`timer_actions` 扩展点同样由接口版本 `1.1` 引入。`audit` 扩展点同样由接口版本 `1.1` 引入。`message_types` 扩展点同样由接口版本 `1.1` 引入。`agent_types` 扩展点同样由接口版本 `1.1` 引入。
+- **覆盖范围**：config.yaml 扩展点（`tool_load_dirs`/`rules_load_dirs`/`orchestration`/`mcp`/`lsp`/`frontend` 等）、plugin/api.py 私有功能（`PUBLIC_FUNCTIONS` 白名单）、工具协议（`protocol_version`，见「工具（tools/）」）。`lsp` 扩展点由接口版本 `1.1` 引入（旧插件未声明 `api_version` 时按 `"1.0"` 处理，仍可正常加载，只是不识别 `lsp` 字段）。`event_callbacks` 扩展点同样由接口版本 `1.1` 引入。`platforms` 扩展点由接口版本 `1.1` 引入。`timer_actions` 扩展点同样由接口版本 `1.1` 引入。`audit` 扩展点同样由接口版本 `1.1` 引入。`message_types` 扩展点同样由接口版本 `1.1` 引入。`agent_types` 扩展点同样由接口版本 `1.1` 引入。`gateway` 扩展点同样由接口版本 `1.1` 引入。
 
 ## 四、扩展点开发规范
 
@@ -625,6 +634,32 @@ agent_types:
 **典型场景**：插件提供专用执行入口（如自定义代码执行器、专用对话 Agent、领域专用 Agent），用户创建 Agent 时选用插件类型。
 
 **卸载撤销**：插件卸载时，其注册的 Agent 类型会从 `AgentTypeRegistry` 精确移除（可逆效应，见 `PluginRegistry`），已注册的 Agent 类型不再可用于创建 Agent。
+
+### 14. 网关扩展（gateway/，可选）
+
+插件可在 `config.yaml` 声明 `gateway`，向网关注册**自定义 API 路由**与**网关中间件**，安装后自动挂载到 `GatewayExtensionRegistry`：
+
+```yaml
+gateway:
+  routes:
+    - path: "/api/plugins/dhttp/webhook"
+      method: "POST"
+      handler: "{{plugin_dir}}/gateway_routes"      # 实现目录
+  middleware:
+    - name: "audit_middleware"
+      handler: "{{plugin_dir}}/gateway_middleware"  # 实现目录
+```
+
+`gateway` 声明的是**对象**，含 `routes`（自定义网关 API 路由对象数组）与 `middleware`（网关中间件对象数组）：
+
+- `routes` 每项含 `path`（路由路径，如 `/api/plugins/dhttp/webhook`）、`method`（HTTP 方法，默认 `GET`）与 `handler`（实现目录，目录内 `.py` 导出 `route_handler(request)` 函数，返回 JSON 可序列化对象）。插件路由**默认带 token 认证**（`verify_token`，支持 `Authorization: Bearer <token>` 与 `X-Jarvis-Token`），与内置路由冲突时不挂载并告警，不覆盖内置路由。
+- `middleware` 每项含 `name`（中间件名）与 `handler`（实现目录，目录内 `.py` 导出 `middleware_handler(request, call_next)` 函数，在 `call_next(request)` 前后实现拦截/增强逻辑）。中间件按声明顺序挂载到网关，对所有请求生效。
+
+**消费方式**：网关启动（`create_app`）时 `GatewayExtensionRegistry.load_plugin_gateway(app, verify_token)` 把插件声明的路由/中间件挂载到 FastAPI app；插件安装/卸载时 `reload_plugin_gateway()` 免重启重挂载，使变更立即生效。
+
+**典型场景**：插件提供自定义 HTTP 接口（如 webhook 接收、自定义 API 端点）或对网关请求做统一拦截/审计/改造（如请求日志、响应头注入）。
+
+**卸载撤销**：插件卸载时，其注册的网关路由/中间件会从 `GatewayExtensionRegistry` 精确移除并重挂载剩余扩展（可逆效应，见 `PluginRegistry`），已挂载的插件路由/中间件不再生效。
 
 ## 五、版本管理
 

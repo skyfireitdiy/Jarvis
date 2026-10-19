@@ -286,6 +286,57 @@
       },
       "default": []
     },
+    "gateway": {
+      "type": "object",
+      "description": "插件网关扩展点：routes 为插件自定义网关 API 路由（对象数组，每项含 path/method/handler，handler 为实现目录，目录内 .py 导出 route_handler(request) 函数，路由自动带 token 认证，与内置路由冲突时不挂载）；middleware 为插件网关中间件（对象数组，每项含 name/handler，handler 为实现目录，目录内 .py 导出 middleware_handler(request, call_next) 函数），安装后自动注册到 GatewayExtensionRegistry",
+      "properties": {
+        "routes": {
+          "type": "array",
+          "description": "插件自定义网关 API 路由",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "description": "路由路径（如 /api/plugin/xxx）"
+              },
+              "method": {
+                "type": "string",
+                "description": "HTTP 方法（GET/POST/PUT/DELETE 等，默认 GET）"
+              },
+              "handler": {
+                "type": "string",
+                "description": "路由实现目录（目录内 .py 导出 route_handler(request) 函数）"
+              }
+            },
+            "required": ["path"],
+            "additionalProperties": false
+          },
+          "default": []
+        },
+        "middleware": {
+          "type": "array",
+          "description": "插件网关中间件",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "中间件名"
+              },
+              "handler": {
+                "type": "string",
+                "description": "中间件实现目录（目录内 .py 导出 middleware_handler(request, call_next) 函数）"
+              }
+            },
+            "required": ["name", "handler"],
+            "additionalProperties": false
+          },
+          "default": []
+        }
+      },
+      "default": {}
+    },
     "after_tool_call_cb_dirs": {
       "type": "array",
       "description": "工具调用后回调函数实现目录",
