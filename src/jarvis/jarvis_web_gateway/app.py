@@ -2268,6 +2268,39 @@ def create_app(
         persist_enabled=custom_app is None,
     )
 
+    # 内置插件更新检测定时任务：每小时检测已安装 git 插件的远端更新，
+    # 结果写入 plugin_updates.json 缓存，供前端插件列表展示 hasUpdate（Issue #213）。
+    # 仅在主网关（非 custom_app 模式）注册：Agent 进程短命且其 TimerManager
+    # 仅作内存态，无需重复检测。任务 persist=False 不落盘——内置任务没有
+    # 可序列化的 action 元数据，落盘后重启 load_persisted_tasks 恢复会失败，
+    # 因此每次启动重新注册。首次延迟 60s 执行（避免启动时立即 git fetch
+    # 拖慢启动），之后每小时循环。callback 在 TimerManager 的 worker 线程中
+    # 同步执行（非事件循环线程），故直接调用 check_all_plugins_update 即可。
+    if custom_app is None:
+
+        def _run_plugin_update_check() -> None:
+            try:
+                from jarvis.jarvis_agent.utils import check_all_plugins_update
+
+                check_all_plugins_update()
+            except Exception as e:
+                save_exception(
+                    e,
+                    module="jarvis_web_gateway.app",
+                    function="_run_plugin_update_check",
+                )
+
+        def _first_plugin_update_check() -> None:
+            try:
+                _run_plugin_update_check()
+            finally:
+                # 首次执行完成后，注册每小时循环任务
+                timer_manager.schedule_every(
+                    3600, _run_plugin_update_check, persist=False
+                )
+
+        timer_manager.schedule_after(60, _first_plugin_update_check, persist=False)
+
     # 保存 router 到全局，用于状态更新时推送消息
     global _router, _terminal_session_manager, _node_connection_manager, _node_runtime
     _router = router

@@ -243,3 +243,42 @@ def test_persist_enabled_still_loads_and_writes(tmp_path, monkeypatch) -> None:
         assert len(loaded) == 1
     finally:
         manager.shutdown()
+
+
+def test_schedule_every_persist_false_does_not_write_file(
+    tmp_path, monkeypatch
+) -> None:
+    """schedule_every(persist=False) 不写入持久化文件。
+
+    内置任务（如插件更新检测）每次启动重新注册，不落盘：
+    避免重启后 load_persisted_tasks 用 task_factory 恢复时，因内置任务
+    没有可序列化的 action 元数据而恢复失败。
+    """
+    persist_file = tmp_path / ".jarvis_timers.json"
+    persist_file.write_text("[]", encoding="utf-8")
+
+    manager = TimerManager(persist_enabled=True)
+    monkeypatch.setattr(type(manager), "PERSISTENCE_FILE", persist_file)
+    try:
+        manager.schedule_every(3600, lambda: None, persist=False)
+        loaded = json.loads(persist_file.read_text(encoding="utf-8"))
+        assert loaded == []
+        # 任务本身已注册（仅不落盘）
+        assert len(manager.list_tasks()) == 1
+    finally:
+        manager.shutdown()
+
+
+def test_schedule_every_persist_true_writes_file(tmp_path, monkeypatch) -> None:
+    """schedule_every 默认 persist=True，行为不变：写入持久化文件。"""
+    persist_file = tmp_path / ".jarvis_timers.json"
+    persist_file.write_text("[]", encoding="utf-8")
+
+    manager = TimerManager(persist_enabled=True)
+    monkeypatch.setattr(type(manager), "PERSISTENCE_FILE", persist_file)
+    try:
+        manager.schedule_every(3600, lambda: None)
+        loaded = json.loads(persist_file.read_text(encoding="utf-8"))
+        assert len(loaded) == 1
+    finally:
+        manager.shutdown()

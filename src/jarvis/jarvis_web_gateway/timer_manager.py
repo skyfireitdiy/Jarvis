@@ -107,12 +107,14 @@ class TimerManager:
         run_at: datetime,
         callback: TimerCallback,
         metadata: Optional[Dict[str, Any]] = None,
+        persist: bool = True,
     ) -> str:
         """注册绝对时间一次任务。"""
         return self._schedule_task(
             run_at=run_at.timestamp(),
             callback=callback,
             metadata=metadata,
+            persist=persist,
         )
 
     def schedule_after(
@@ -120,6 +122,7 @@ class TimerManager:
         delay_seconds: float,
         callback: TimerCallback,
         metadata: Optional[Dict[str, Any]] = None,
+        persist: bool = True,
     ) -> str:
         """注册相对延迟一次任务。"""
         if delay_seconds < 0:
@@ -128,6 +131,7 @@ class TimerManager:
             run_at=time.time() + delay_seconds,
             callback=callback,
             metadata=metadata,
+            persist=persist,
         )
 
     def schedule_every(
@@ -135,8 +139,17 @@ class TimerManager:
         interval_seconds: float,
         callback: TimerCallback,
         metadata: Optional[Dict[str, Any]] = None,
+        persist: bool = True,
     ) -> str:
-        """注册循环定时任务。"""
+        """注册循环定时任务。
+
+        Args:
+            interval_seconds: 触发间隔（秒）
+            callback: 触发回调
+            metadata: 附加元数据
+            persist: 是否持久化到磁盘（重启后恢复）。内置任务通常传
+                False，避免重启后因缺少可序列化的 action 元数据而恢复失败。
+        """
         if interval_seconds <= 0:
             raise ValueError("interval_seconds must be > 0")
         return self._schedule_task(
@@ -144,6 +157,7 @@ class TimerManager:
             callback=callback,
             interval_seconds=interval_seconds,
             metadata=metadata,
+            persist=persist,
         )
 
     def schedule_cron(
@@ -151,6 +165,7 @@ class TimerManager:
         cron_expr: str,
         callback: TimerCallback,
         metadata: Optional[Dict[str, Any]] = None,
+        persist: bool = True,
     ) -> str:
         """注册 cron 表达式循环任务。
 
@@ -166,6 +181,7 @@ class TimerManager:
             callback=callback,
             cron_expr=cron_expr,
             metadata=metadata,
+            persist=persist,
         )
 
     def cancel(self, task_id: str) -> bool:
