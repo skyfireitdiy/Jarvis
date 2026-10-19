@@ -221,17 +221,22 @@ const {
   pluginAdminTabs,
   pluginSidebarViews,
   pluginToolPanels,
+  pluginPaneViews,
   pluginSidebarTitle,
   pluginToolPanelTitle,
+  pluginPaneTitle,
   WORKSPACE_SIDEBAR_TITLES,
   workspaceSidebarTitle,
   loadPluginExtensionsForUi,
   resolvePluginExtensionComponent,
   isPluginSidebarView,
   isPluginToolView,
+  isPluginPaneView,
   pluginSidebarCompCache,
   activePluginSidebarComp,
   activePluginToolPanelComp,
+  resolvePluginPaneComp,
+  activePluginPaneComp,
 } = usePlugins({
   workspaceSidebarView,
   fetchPluginExtensions,
@@ -834,7 +839,8 @@ function setMainViewOnLeaf(view, sessionPanelId = null) {
 // 2) 已存在承载该视图的 pane（chat/terminal 是 host 单例、session 按 panel 复用）→ 激活它；
 // 3) 否则分割当前区域，在新 pane 承载目标视图。
 function ensurePaneForView(view, sessionPanelId) {
-  // 2. 已存在承载该视图的 pane → 复用（chat/terminal host 单例、session 按 panel 复用）
+  // 2. 已存在承载该视图的 pane → 复用（chat/terminal host 单例、session 按 panel 复用、
+  //    插件 pane 视图按 plugin-pane:<id> 单例复用）
   if (view === 'chat' || view === 'terminal') {
     const existing = findWorkspacePaneByView(view)
     if (existing) {
@@ -850,6 +856,13 @@ function ensurePaneForView(view, sessionPanelId) {
   } else if (view === 'diff') {
     // diff 每个 pane 一个独立实例（无 host 单例约束）：已存在 diff pane 则复用，避免覆盖当前区域。
     const existing = findWorkspacePaneByView('diff')
+    if (existing) {
+      activateWorkspacePane(existing.id)
+      return existing.id
+    }
+  } else if (isPluginPaneView(view)) {
+    // 插件 pane 视图：host 单例（同 plugin-pane:<id> 至多一个 pane 承载），已存在则复用
+    const existing = findWorkspacePaneByView(view)
     if (existing) {
       activateWorkspacePane(existing.id)
       return existing.id
@@ -952,6 +965,10 @@ function getWorkspacePaneTitle(pane) {
   if (pane.view === 'empty') return '空区域'
   if (pane.view === 'chat') return '聊天室'
   if (pane.view === 'terminal') return '终端'
+  if (isPluginPaneView(pane.view)) {
+    // 插件 pane 视图：标题取插件声明的 title（未找到时回退通用文案）
+    return pluginPaneTitle(pane.view) || '插件面板'
+  }
   if (pane.view === 'diff') {
     const path = pane.diff?.filePath
     return path ? `diff: ${path.split('/').pop() || path}` : 'diff'
@@ -1076,7 +1093,9 @@ function sanitizeWorkspacePaneNode(raw) {
   }
   if (raw.type === 'leaf') {
     const validViews = ['file', 'session', 'chat', 'terminal', 'diff', 'empty']
-    if (!validViews.includes(raw.view)) return null
+    // 插件 pane 视图：view 形如 plugin-pane:<id>，格式合法即保留（插件未安装时由渲染层降级）
+    const isPluginPane = typeof raw.view === 'string' && raw.view.startsWith('plugin-pane:')
+    if (!validViews.includes(raw.view) && !isPluginPane) return null
     if (typeof raw.id !== 'string' || !raw.id) return null
     const content = raw.content && typeof raw.content === 'object' ? raw.content : null
     if (raw.view === 'diff') {
@@ -1121,12 +1140,14 @@ function sanitizeWorkspacePaneNode(raw) {
   return null
 }
 
-// 校验整棵树：必须是合法节点，且 leaf 数 >= 1；chat/terminal 至多各一个（host 单例约束）
+// 校验整棵树：必须是合法节点，且 leaf 数 >= 1；chat/terminal 至多各一个（host 单例约束），
+// 插件 pane 视图（plugin-pane:<id>）同 id 至多一个。
 function sanitizeWorkspacePaneTree(raw) {
   const node = sanitizeWorkspacePaneNode(raw)
   if (!node) return null
   const leafIds = new Set()
   const viewCount = { chat: 0, terminal: 0 }
+  const pluginPaneCount = new Map()
   let valid = true
   const walk = (n) => {
     if (!valid || !n) return
@@ -1136,6 +1157,10 @@ function sanitizeWorkspacePaneTree(raw) {
       if (n.view === 'chat' || n.view === 'terminal') {
         viewCount[n.view] += 1
         if (viewCount[n.view] > 1) { valid = false; return }
+      }
+      if (typeof n.view === 'string' && n.view.startsWith('plugin-pane:')) {
+        pluginPaneCount.set(n.view, (pluginPaneCount.get(n.view) || 0) + 1)
+        if (pluginPaneCount.get(n.view) > 1) { valid = false; return }
       }
       return
     }
@@ -1476,16 +1501,21 @@ watch(
     pluginAdminTabs,
     pluginSidebarViews,
     pluginToolPanels,
+    pluginPaneViews,
     pluginSidebarTitle,
     pluginToolPanelTitle,
+    pluginPaneTitle,
     WORKSPACE_SIDEBAR_TITLES,
     workspaceSidebarTitle,
     loadPluginExtensionsForUi,
     resolvePluginExtensionComponent,
     isPluginSidebarView,
     isPluginToolView,
+    isPluginPaneView,
     pluginSidebarCompCache,
     activePluginSidebarComp,
     activePluginToolPanelComp,
+    resolvePluginPaneComp,
+    activePluginPaneComp,
   }
 }

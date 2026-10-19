@@ -1,11 +1,11 @@
 // 插件前端扩展 组合式函数。
 //
 // 从 App.vue 的 <script setup> 中拆出（Issue #118 Step 8），保持行为完全一致：
-// - 状态：pluginExtensions / pluginAdminTabs / pluginSidebarViews / pluginToolPanels
-// - 标题映射：pluginSidebarTitle / pluginToolPanelTitle / WORKSPACE_SIDEBAR_TITLES / workspaceSidebarTitle
+// - 状态：pluginExtensions / pluginAdminTabs / pluginSidebarViews / pluginToolPanels / pluginPaneViews
+// - 标题映射：pluginSidebarTitle / pluginToolPanelTitle / pluginPaneTitle / WORKSPACE_SIDEBAR_TITLES / workspaceSidebarTitle
 // - 加载：loadPluginExtensionsForUi / resolvePluginExtensionComponent
-// - 判断：isPluginSidebarView / isPluginToolView
-// - 异步组件缓存与激活：pluginSidebarCompCache / activePluginSidebarComp / activePluginToolPanelComp
+// - 判断：isPluginSidebarView / isPluginToolView / isPluginPaneView
+// - 异步组件缓存与激活：pluginSidebarCompCache / activePluginSidebarComp / activePluginToolPanelComp / activePluginPaneComp
 //
 // 依赖注入（调用方在 setup 中传入，须在其定义之后调用）：
 // - workspaceSidebarView：侧边栏当前 view 的 ref（App.vue 创建，早于本 composable 调用点）
@@ -28,6 +28,7 @@ export function usePlugins({
   const pluginAdminTabs = computed(() => pluginExtensions.value.filter(e => e.extType === 'admin_tabs'))
   const pluginSidebarViews = computed(() => pluginExtensions.value.filter(e => e.extType === 'sidebar_views'))
   const pluginToolPanels = computed(() => pluginExtensions.value.filter(e => e.extType === 'tool_panels'))
+  const pluginPaneViews = computed(() => pluginExtensions.value.filter(e => e.extType === 'pane_views'))
   // 动态侧边栏 view 的标题映射：view 名 = `plugin:${id}`
   function pluginSidebarTitle(view) {
     const ext = pluginSidebarViews.value.find(e => `plugin:${e.id}` === view)
@@ -36,6 +37,11 @@ export function usePlugins({
   // tool_panels 扩展点复用侧边栏渲染：view 名 = `plugin-tool:${id}`
   function pluginToolPanelTitle(view) {
     const ext = pluginToolPanels.value.find(e => `plugin-tool:${e.id}` === view)
+    return ext ? ext.title : ''
+  }
+  // pane_views 扩展点：view 名 = `plugin-pane:${id}`
+  function pluginPaneTitle(view) {
+    const ext = pluginPaneViews.value.find(e => `plugin-pane:${e.id}` === view)
     return ext ? ext.title : ''
   }
   // 侧边栏标题：按当前 view 映射；插件动态 view 走 pluginSidebarTitle / pluginToolPanelTitle
@@ -78,6 +84,10 @@ export function usePlugins({
   function isPluginToolView(view) {
     return typeof view === 'string' && view.startsWith('plugin-tool:')
   }
+  // 判断某个 pane view 是否为插件 pane_views 扩展 view
+  function isPluginPaneView(view) {
+    return typeof view === 'string' && view.startsWith('plugin-pane:')
+  }
   // 缓存插件侧边栏的异步组件实例，避免 computed 每次返回新的 defineAsyncComponent。
   // 若每次返回新实例，Vue 重渲染 <component :is> 时会视为不同组件反复卸载/重载，
   // 导致插件组件"先渲染正常、随后被清空为空"。
@@ -106,22 +116,41 @@ export function usePlugins({
     }
     return pluginSidebarCompCache.get(cacheKey)
   })
+  // 按 view 解析插件 pane 异步组件（供 pane 渲染按 pane.view 解析；复用 pluginSidebarCompCache
+  // 缓存，但用 plugin-pane: 前缀作 key，避免与同名 sidebar_views / tool_panels 扩展互相覆盖）
+  function resolvePluginPaneComp(view) {
+    if (!isPluginPaneView(view)) return null
+    const ext = pluginPaneViews.value.find(e => `plugin-pane:${e.id}` === view)
+    if (!ext) return null
+    const cacheKey = `plugin-pane:${ext.id}`
+    if (!pluginSidebarCompCache.has(cacheKey)) {
+      pluginSidebarCompCache.set(cacheKey, defineAsyncComponent(() => resolvePluginExtensionComponent(ext)))
+    }
+    return pluginSidebarCompCache.get(cacheKey)
+  }
+  // 当前激活的插件 pane view 对应的异步组件（基于 workspaceSidebarView，向后兼容）
+  const activePluginPaneComp = computed(() => resolvePluginPaneComp(workspaceSidebarView.value))
 
   return {
     pluginExtensions,
     pluginAdminTabs,
     pluginSidebarViews,
     pluginToolPanels,
+    pluginPaneViews,
     pluginSidebarTitle,
     pluginToolPanelTitle,
+    pluginPaneTitle,
     WORKSPACE_SIDEBAR_TITLES,
     workspaceSidebarTitle,
     loadPluginExtensionsForUi,
     resolvePluginExtensionComponent,
     isPluginSidebarView,
     isPluginToolView,
+    isPluginPaneView,
     pluginSidebarCompCache,
     activePluginSidebarComp,
     activePluginToolPanelComp,
+    resolvePluginPaneComp,
+    activePluginPaneComp,
   }
 }

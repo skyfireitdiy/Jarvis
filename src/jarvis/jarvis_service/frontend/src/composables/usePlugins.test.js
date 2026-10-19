@@ -49,6 +49,7 @@ describe('usePlugins', () => {
     expect(api.pluginAdminTabs.value).toEqual([])
     expect(api.pluginSidebarViews.value).toEqual([])
     expect(api.pluginToolPanels.value).toEqual([])
+    expect(api.pluginPaneViews.value).toEqual([])
   })
 
   it('loadPluginExtensionsForUi 加载扩展清单并写入 pluginExtensions', async () => {
@@ -77,6 +78,7 @@ describe('usePlugins', () => {
       makeExt({ id: 'a', extType: 'admin_tabs' }),
       makeExt({ id: 'b', extType: 'sidebar_views' }),
       makeExt({ id: 'c', extType: 'tool_panels' }),
+      makeExt({ id: 'd', extType: 'pane_views' }),
     ]
     const { api, workspaceSidebarView } = makeHarness({ exts })
     // 手动写入（模拟 loadPluginExtensionsForUi 结果）
@@ -84,6 +86,7 @@ describe('usePlugins', () => {
     expect(api.pluginAdminTabs.value.map(e => e.id)).toEqual(['a'])
     expect(api.pluginSidebarViews.value.map(e => e.id)).toEqual(['b'])
     expect(api.pluginToolPanels.value.map(e => e.id)).toEqual(['c'])
+    expect(api.pluginPaneViews.value.map(e => e.id)).toEqual(['d'])
     // workspaceSidebarTitle 对普通 view 走 WORKSPACE_SIDEBAR_TITLES
     workspaceSidebarView.value = 'git'
     expect(api.workspaceSidebarTitle.value).toBe('Git')
@@ -99,6 +102,10 @@ describe('usePlugins', () => {
     expect(api.isPluginToolView('plugin-tool:foo')).toBe(true)
     expect(api.isPluginToolView('plugin:foo')).toBe(false)
     expect(api.isPluginToolView(null)).toBe(false)
+    expect(api.isPluginPaneView('plugin-pane:foo')).toBe(true)
+    expect(api.isPluginPaneView('plugin:foo')).toBe(false)
+    expect(api.isPluginPaneView('plugin-tool:foo')).toBe(false)
+    expect(api.isPluginPaneView(null)).toBe(false)
   })
 
   it('pluginSidebarTitle / pluginToolPanelTitle 映射', () => {
@@ -109,6 +116,14 @@ describe('usePlugins', () => {
     expect(api.pluginSidebarTitle('plugin:none')).toBe('')
     expect(api.pluginToolPanelTitle('plugin-tool:t1')).toBe('工具面板')
     expect(api.pluginToolPanelTitle('plugin-tool:none')).toBe('')
+  })
+
+  it('pluginPaneTitle 映射', () => {
+    const exts = [makeExt({ id: 'p1', extType: 'pane_views', title: '插件面板' })]
+    const { api } = makeHarness({ exts })
+    api.pluginExtensions.value = exts
+    expect(api.pluginPaneTitle('plugin-pane:p1')).toBe('插件面板')
+    expect(api.pluginPaneTitle('plugin-pane:none')).toBe('')
   })
 
   it('workspaceSidebarTitle 对插件 view 走动态标题', () => {
@@ -148,5 +163,20 @@ describe('usePlugins', () => {
     // 两个缓存 key 不同（plugin:x vs plugin-tool:x），组件实例不同
     expect(sidebarComp).not.toBe(toolComp)
     expect(api.activePluginToolPanelComp.value).toBe(toolComp)
+  })
+
+  it('activePluginPaneComp 对 plugin-pane view 返回缓存组件（同一实例）', () => {
+    const exts = [makeExt({ id: 'p1', extType: 'pane_views', title: '插件面板' })]
+    const { api, workspaceSidebarView } = makeHarness({ exts })
+    api.pluginExtensions.value = exts
+    workspaceSidebarView.value = 'plugin-pane:p1'
+    const comp1 = api.activePluginPaneComp.value
+    expect(comp1).toBeTruthy()
+    // 再次访问应命中缓存，同一实例
+    const comp2 = api.activePluginPaneComp.value
+    expect(comp1).toBe(comp2)
+    // 非插件 pane view 返回 null
+    workspaceSidebarView.value = 'agents'
+    expect(api.activePluginPaneComp.value).toBe(null)
   })
 })
