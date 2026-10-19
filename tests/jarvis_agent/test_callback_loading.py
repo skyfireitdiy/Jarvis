@@ -22,6 +22,7 @@ from jarvis.jarvis_agent import Agent as RealAgent
 from jarvis.jarvis_agent.event_bus import EventBus
 from jarvis.jarvis_agent.events import AFTER_SUMMARY
 from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
+from jarvis.jarvis_agent.events import AFTER_MODEL_CALL
 from jarvis.jarvis_agent.events import BEFORE_MODEL_CALL
 from jarvis.jarvis_agent.events import BEFORE_SUMMARY
 from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL
@@ -430,29 +431,30 @@ class TestLoadAllEventCallbacks:
     def agent(self):
         return _bind(_make_agent(), "_load_all_event_callbacks")
 
-    def test_invokes_load_event_callbacks_four_times(self, agent):
-        """按四种事件各调用一次 _load_event_callbacks"""
+    def test_invokes_load_event_callbacks_five_times(self, agent):
+        """按五种事件各调用一次 _load_event_callbacks"""
         agent._load_event_callbacks = Mock()
         agent._load_all_event_callbacks()
 
-        assert agent._load_event_callbacks.call_count == 4
+        assert agent._load_event_callbacks.call_count == 5
         kwargs_list = [c.kwargs for c in agent._load_event_callbacks.call_args_list]
         events = [kw["event_name"] for kw in kwargs_list]
         assert events == [
             BEFORE_TOOL_CALL,
             BEFORE_MODEL_CALL,
+            AFTER_MODEL_CALL,
             BEFORE_SUMMARY,
             AFTER_SUMMARY,
         ]
 
     def test_target_kinds_are_correct(self, agent):
-        """hook/modifier/modifier/event 四种目标类型正确"""
+        """hook/modifier/modifier/modifier/event 五种目标类型正确"""
         agent._load_event_callbacks = Mock()
         agent._load_all_event_callbacks()
 
         kwargs_list = [c.kwargs for c in agent._load_event_callbacks.call_args_list]
         targets = [kw.get("target", "event_bus") for kw in kwargs_list]
-        assert targets == ["hook", "modifier", "modifier", "event_bus"]
+        assert targets == ["hook", "modifier", "modifier", "modifier", "event_bus"]
 
     def test_config_getters_are_wired(self, agent):
         """各事件使用对应的目录获取函数"""
@@ -465,8 +467,9 @@ class TestLoadAllEventCallbacks:
         getters = [kw["config_getter"] for kw in kwargs_list]
         assert getters[0] is mod.get_before_tool_call_cb_dirs
         assert getters[1] is mod.get_before_model_call_cb_dirs
-        assert getters[2] is mod.get_summary_cb_dirs
+        assert getters[2] is mod.get_after_model_call_cb_dirs
         assert getters[3] is mod.get_summary_cb_dirs
+        assert getters[4] is mod.get_summary_cb_dirs
 
     def test_callback_names_are_wired(self, agent):
         """各事件使用对应的回调名列表"""
@@ -486,11 +489,16 @@ class TestLoadAllEventCallbacks:
             "register_before_model_call_cb",
         ]
         assert names[2] == [
+            "after_model_call_cb",
+            "get_after_model_call_cb",
+            "register_after_model_call_cb",
+        ]
+        assert names[3] == [
             "before_summary_cb",
             "get_before_summary_cb",
             "register_before_summary_cb",
         ]
-        assert names[3] == [
+        assert names[4] == [
             "after_summary_cb",
             "get_after_summary_cb",
             "register_after_summary_cb",

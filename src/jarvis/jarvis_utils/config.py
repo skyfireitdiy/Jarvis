@@ -1177,6 +1177,34 @@ def get_before_model_call_cb_dirs() -> List[str]:
     ]
 
 
+def get_after_model_call_cb_dirs() -> List[str]:
+    """
+    获取模型调用后回调函数实现目录。
+
+    返回:
+        List[str]: 模型调用后回调函数实现目录列表
+    """
+    return [
+        os.path.expanduser(os.path.expandvars(str(p)))
+        for p in GLOBAL_CONFIG_DATA.get("after_model_call_cb_dirs", [])
+        if p
+    ]
+
+
+def get_tool_output_sanitizer_dirs() -> List[str]:
+    """
+    获取工具输出脱敏器回调函数实现目录。
+
+    返回:
+        List[str]: 工具输出脱敏器回调函数实现目录列表
+    """
+    return [
+        os.path.expanduser(os.path.expandvars(str(p)))
+        for p in GLOBAL_CONFIG_DATA.get("tool_output_sanitizer_dirs", [])
+        if p
+    ]
+
+
 def get_summary_cb_dirs() -> List[str]:
     """
     获取总结回调函数实现目录。

@@ -361,6 +361,22 @@
       },
       "default": []
     },
+    "after_model_call_cb_dirs": {
+      "type": "array",
+      "description": "模型调用后回调函数实现目录（支持修改或还原模型响应）",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "tool_output_sanitizer_dirs": {
+      "type": "array",
+      "description": "工具输出脱敏器回调函数实现目录（防止敏感信息二次泄露）",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
     "summary_cb_dirs": {
       "type": "array",
       "description": "总结回调函数实现目录（包括 before_summary 和 after_summary，支持优化总结效果或注入知识）",

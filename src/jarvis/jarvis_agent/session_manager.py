@@ -1537,6 +1537,9 @@ class SessionManager:
                 "pre_compress_snapshot_count": getattr(
                     self.agent, "_pre_compress_snapshot_count", 0
                 ),
+                "secret_guard_mapping": getattr(
+                    self.agent, "secret_guard_mapping", {}
+                ),
             },
             "metadata": {
                 "agent_name": self.agent_name,
@@ -1765,6 +1768,15 @@ class SessionManager:
                 self.agent._pre_compress_snapshot_count = agent_runtime_state.get(
                     "pre_compress_snapshot_count", 0
                 )
+
+                # 恢复 secret-guard 脱敏映射（占位符→真实值）
+                secret_guard_mapping = agent_runtime_state.get(
+                    "secret_guard_mapping", {}
+                )
+                if isinstance(secret_guard_mapping, dict):
+                    if not hasattr(self.agent, "secret_guard_mapping"):
+                        self.agent.secret_guard_mapping = {}
+                    self.agent.secret_guard_mapping = dict(secret_guard_mapping)
 
                 PrettyOutput.auto_print("✅ Agent运行时状态已恢复")
 

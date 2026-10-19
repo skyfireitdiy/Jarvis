@@ -260,3 +260,108 @@ class TestSessionManager:
         assert not session_manager._is_compressed_summary_msg(
             {"role": "user", "content": ""}
         )
+
+
+class TestSecretGuardPersistence:
+    """secret_guard 脱敏映射随会话状态保存/恢复。"""
+
+    @pytest.fixture
+    def mock_model(self):
+        model = Mock()
+        model.platform_name.return_value = "test_platform"
+        model.name.return_value = "test_model"
+        model.reset = Mock()
+        model.save = Mock(return_value=True)
+        model.restore = Mock(return_value=True)
+        return model
+
+    def _make_agent(self, mapping=None):
+        """构造带完整运行时属性的 agent（避免 Mock 自动创建属性干扰）。"""
+        from types import SimpleNamespace
+
+        agent = SimpleNamespace(
+            secret_guard_mapping=mapping if mapping is not None else {},
+            _addon_prompt_skip_rounds=0,
+            _no_tool_call_count=0,
+            _last_response_content="",
+            recent_memories=[],
+            MAX_RECENT_MEMORIES=10,
+            memory_tags=set(),
+            first=True,
+            pin_content="",
+            _pre_compressed_summary=None,
+            _pre_compressing=False,
+            _pre_compress_snapshot_count=0,
+        )
+        return agent
+
+    def test_build_agent_state_includes_mapping(self, mock_model):
+        """_build_agent_state 包含 secret_guard_mapping。"""
+        agent = self._make_agent({"⟦SECRET_abcdef⟧": "真实口令值"})
+        sm = SessionManager(mock_model, "test_agent", agent=agent)
+        state = sm._build_agent_state("20260101_000000")
+        assert state is not None
+        assert state["agent_runtime"]["secret_guard_mapping"] == {
+            "⟦SECRET_abcdef⟧": "真实口令值"
+        }
+
+    def test_build_agent_state_without_mapping(self, mock_model):
+        """agent 无 secret_guard_mapping 属性时保存空 dict。"""
+        agent = self._make_agent()
+        del agent.secret_guard_mapping
+        sm = SessionManager(mock_model, "test_agent", agent=agent)
+        state = sm._build_agent_state("20260101_000000")
+        assert state is not None
+        assert state["agent_runtime"]["secret_guard_mapping"] == {}
+
+    def test_restore_agent_state_restores_mapping(
+        self, mock_model, tmp_path, monkeypatch
+    ):
+        """_restore_agent_state 恢复 secret_guard_mapping。"""
+        agent = self._make_agent()
+        sm = SessionManager(mock_model, "test_agent", agent=agent)
+        sm.last_restored_session = "/tmp/fake_20260101_000000.json"
+
+        state_data = {
+            "agent_runtime": {
+                "first": False,
+                "secret_guard_mapping": {"⟦SECRET_abcdef⟧": "真实口令值"},
+            }
+        }
+        import json
+
+        session_dir = tmp_path / ".jarvis" / "sessions"
+        session_dir.mkdir(parents=True)
+        state_file = session_dir / "test_agent_20260101_000000_state.json"
+        state_file.write_text(json.dumps(state_data), encoding="utf-8")
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(sm, "_get_session_file_prefix", lambda: "test_agent")
+        monkeypatch.setattr(sm, "_extract_timestamp", lambda s: "20260101_000000")
+
+        sm._restore_agent_state()
+        assert agent.secret_guard_mapping == {"⟦SECRET_abcdef⟧": "真实口令值"}
+
+    def test_restore_agent_state_missing_mapping_skipped(
+        self, mock_model, tmp_path, monkeypatch
+    ):
+        """状态文件无 secret_guard_mapping 时恢复为空 dict。"""
+        agent = self._make_agent({"⟦SECRET_abcdef⟧": "旧值"})
+        sm = SessionManager(mock_model, "test_agent", agent=agent)
+        sm.last_restored_session = "/tmp/fake_20260101_000000.json"
+
+        state_data = {"agent_runtime": {"first": False}}
+        import json
+
+        session_dir = tmp_path / ".jarvis" / "sessions"
+        session_dir.mkdir(parents=True)
+        state_file = session_dir / "test_agent_20260101_000000_state.json"
+        state_file.write_text(json.dumps(state_data), encoding="utf-8")
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(sm, "_get_session_file_prefix", lambda: "test_agent")
+        monkeypatch.setattr(sm, "_extract_timestamp", lambda s: "20260101_000000")
+
+        sm._restore_agent_state()
+        # 状态文件无 mapping 时恢复为空 dict（不保留旧值，静默跳过）
+        assert agent.secret_guard_mapping == {}

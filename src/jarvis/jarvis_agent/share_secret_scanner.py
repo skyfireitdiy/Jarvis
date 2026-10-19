@@ -24,6 +24,14 @@ from typing import Tuple
 # 检测规则：(名称, 正则)
 # 只保留「高置信度、低误报」的真实凭据形态。
 # ---------------------------------------------------------------------------
+# 私钥块头/尾行（供 SECRET_PATTERNS 与 extract_secrets 复用，避免规则漂移）
+_PRIVATE_KEY_BEGIN_RE = re.compile(
+    r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----"
+)
+_PRIVATE_KEY_END_RE = re.compile(
+    r"-----END (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----"
+)
+
 SECRET_PATTERNS: List[Tuple[str, re.Pattern]] = [
     # OpenAI / 类 OpenAI 的 sk- 密钥（真实长度远大于示例）
     ("OpenAI/通用 sk- 密钥", re.compile(r"\bsk-[A-Za-z0-9_-]{32,}\b")),
@@ -37,13 +45,11 @@ SECRET_PATTERNS: List[Tuple[str, re.Pattern]] = [
     # Google API key
     ("Google API key", re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b")),
     # 私钥块
-    (
-        "私钥文件内容",
-        re.compile(r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----"),
-    ),
+    ("私钥文件内容", _PRIVATE_KEY_BEGIN_RE),
     # 通用「赋值型」密钥：key/secret/token/password = 长随机串
     # 注意：前缀边界用 (?<![A-Za-z0-9]) 而非 \b——下划线属于 \w，若用 \b，
     # db_password / DB_PASSWORD / my_api_key 等常见命名会因「_ 与 p 之间无词边界」而漏检。
+    # 命名组 value 供 extract_secrets 提取引号内实际值。
     (
         "疑似硬编码密钥/口令",
         re.compile(
@@ -53,7 +59,7 @@ SECRET_PATTERNS: List[Tuple[str, re.Pattern]] = [
                private[_-]?key|client[_-]?secret|passwd|password)
             \b
             \s*[:=]\s*
-            ["']([A-Za-z0-9_\-/+=]{20,})["']
+            ["'](?P<value>[A-Za-z0-9_\-/+=]{20,})["']
             """
         ),
     ),
@@ -153,6 +159,57 @@ def scan_text(text: str, file_label: str) -> List[Finding]:
                     )
                 )
     return findings
+
+
+def extract_secrets(text: str) -> List[str]:
+    """提取文本中的完整敏感值列表（去重、保持出现顺序）。
+
+    与 :func:`scan_text` 使用同一套规则（``SECRET_PATTERNS`` + 白名单），
+    但返回**完整未脱敏**的值，供 secret-guard 插件生成替换映射使用。
+    绝不用于日志/报告输出。
+
+    特殊处理：
+    - 私钥块：从 ``BEGIN`` 行开始到 ``END`` 行结束的整块内容作为一条敏感值。
+    - 赋值型密钥：提取引号内的实际值（``password = "xxx"`` → ``xxx``），
+      而非含变量名的整行。
+    """
+    secrets: List[str] = []
+    seen: set[str] = set()
+    lines = text.splitlines()
+    i = 0
+    n = len(lines)
+    while i < n:
+        line = lines[i]
+        if is_whitelisted(line):
+            i += 1
+            continue
+        # 私钥块：整块提取
+        begin = _PRIVATE_KEY_BEGIN_RE.search(line)
+        if begin:
+            block_lines = [line]
+            j = i + 1
+            while j < n and not _PRIVATE_KEY_END_RE.search(lines[j]):
+                block_lines.append(lines[j])
+                j += 1
+            if j < n:
+                block_lines.append(lines[j])
+                i = j + 1
+            else:
+                i = n
+            block = "\n".join(block_lines)
+            if block not in seen:
+                seen.add(block)
+                secrets.append(block)
+            continue
+        # 普通规则：逐条匹配，赋值型取命名组 value
+        for _name, pattern in SECRET_PATTERNS:
+            for m in pattern.finditer(line):
+                value = m.group("value") if "value" in m.groupdict() else m.group(0)
+                if value and value not in seen:
+                    seen.add(value)
+                    secrets.append(value)
+        i += 1
+    return secrets
 
 
 def _should_skip(path: str) -> bool:
