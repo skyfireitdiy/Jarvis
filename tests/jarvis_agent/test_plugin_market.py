@@ -154,9 +154,10 @@ def test_list_market_plugins_same_name_different_owner_uses_distinct_cache(
 
     plugins = agent_utils.list_market_plugins()
 
-    # 两个源都被 clone 到不同缓存目录
-    assert len(clone_dests) == 2
-    assert len(set(clone_dests)) == 2
+    # 两个市场源都被 clone 到不同缓存目录；另有一次是版本获取 clone 插件仓库
+    # （owner/foo，复制的是市场仓库内容无 config.yaml，版本获取失败返回空串，不阻断）
+    assert len(clone_dests) == 3
+    assert len(set(clone_dests)) == 3
     assert (data_dir / "plugin_market" / "orgA__market").exists()
     assert (data_dir / "plugin_market" / "orgB__market").exists()
     # 两个源的插件都被解析（market_repo 来源标记正确区分）
@@ -165,6 +166,8 @@ def test_list_market_plugins_same_name_different_owner_uses_distinct_cache(
         "https://github.com/orgA/market",
         "https://github.com/orgB/market",
     }
+    # 版本获取失败时不阻断，version 为空串
+    assert all(p["version"] == "" for p in plugins)
 
 
 @pytest.mark.parametrize(
@@ -367,3 +370,84 @@ def test_filter_market_plugins_installed_marker_with_installed_filter():
     )
     assert all(p["installed"] is False for p in r["plugins"])
     assert {p["id"] for p in r["plugins"]} == {"p3", "p4"}
+
+
+def _make_plugin_repo(tmp_path, version):
+    """构造一个含 config.yaml（带 version）的插件仓库目录。"""
+    repo = tmp_path / "plugin_repo"
+    repo.mkdir(parents=True)
+    (repo / "config.yaml").write_text(
+        yaml.safe_dump({"id": "foo", "name": "Foo", "version": version}),
+        encoding="utf-8",
+    )
+    return repo
+
+
+def test_list_market_plugins_attaches_version(tmp_path, monkeypatch, market_repo):
+    """市场插件附带 version（从插件仓库 config.yaml 读取）。"""
+    data_dir = tmp_path / "data"
+    plugin_repo = _make_plugin_repo(tmp_path, "1.2.3")
+
+    def fake_clone(url, branch, dest):
+        # 市场仓库复制市场内容；插件仓库复制含 config.yaml 的插件内容
+        if "plugin-market" in url:
+            shutil.copytree(str(market_repo), str(dest))
+        else:
+            shutil.copytree(str(plugin_repo), str(dest))
+
+    monkeypatch.setattr(
+        config, "get_plugin_market_repos", lambda: ["https://github.com/skyfireitdiy/plugin-market"]
+    )
+    monkeypatch.setattr(config, "get_data_dir", lambda: str(data_dir))
+    monkeypatch.setattr(agent_utils, "_git_clone_plugin", fake_clone)
+
+    class FakeProc:
+        returncode = 0
+
+    monkeypatch.setattr(agent_utils, "_git_run", lambda *a, **k: FakeProc())
+
+    plugins = agent_utils.list_market_plugins()
+    assert len(plugins) == 1
+    assert plugins[0]["version"] == "1.2.3"
+
+
+def test_get_market_plugin_version_cache_hit(tmp_path, monkeypatch, market_repo):
+    """版本获取结果按 TTL 缓存，二次调用不重复 clone。"""
+    data_dir = tmp_path / "data"
+    plugin_repo = _make_plugin_repo(tmp_path, "2.0.0")
+    clone_calls = []
+
+    def fake_clone(url, branch, dest):
+        clone_calls.append(url)
+        if "plugin-market" in url:
+            shutil.copytree(str(market_repo), str(dest))
+        else:
+            shutil.copytree(str(plugin_repo), str(dest))
+
+    monkeypatch.setattr(
+        config, "get_plugin_market_repos", lambda: ["https://github.com/skyfireitdiy/plugin-market"]
+    )
+    monkeypatch.setattr(config, "get_data_dir", lambda: str(data_dir))
+    monkeypatch.setattr(agent_utils, "_git_clone_plugin", fake_clone)
+
+    class FakeProc:
+        returncode = 0
+
+    monkeypatch.setattr(agent_utils, "_git_run", lambda *a, **k: FakeProc())
+
+    agent_utils.list_market_plugins()
+    # 第一次：市场仓库 clone + 插件仓库 clone（版本获取）
+    assert len(clone_calls) == 2
+    agent_utils.list_market_plugins()
+    # 第二次：市场仓库已缓存走 pull，版本命中 TTL 缓存不再 clone 插件仓库
+    assert len(clone_calls) == 2
+
+
+def test_get_market_plugin_version_failure_returns_empty(tmp_path, monkeypatch, market_repo):
+    """版本获取失败（插件仓库无 config.yaml）返回空串，不阻断市场加载。"""
+    data_dir = tmp_path / "data"
+    _patch_market(monkeypatch, market_repo, data_dir)
+
+    plugins = agent_utils.list_market_plugins()
+    assert len(plugins) == 1
+    assert plugins[0]["version"] == ""

@@ -302,6 +302,7 @@ describe("PluginSidebar", () => {
               branch: "main",
               author: "作者甲",
               categories: ["工具", "效率"],
+              version: "1.2.3",
             },
           ],
         },
@@ -321,6 +322,8 @@ describe("PluginSidebar", () => {
     expect(wrapper.text()).toContain("来自市场的插件");
     expect(wrapper.text()).toContain("作者甲");
     expect(wrapper.text()).toContain("工具");
+    // 市场列表显示版本
+    expect(wrapper.text()).toContain("1.2.3");
   });
 
   test("市场 tab：从市场安装插件用 repo#branch 构造 source", async () => {
@@ -363,6 +366,36 @@ describe("PluginSidebar", () => {
     expect(installCall).toBeTruthy();
     const body = JSON.parse(installCall[1].body);
     expect(body.source).toBe("https://github.com/owner/market-p#main");
+  });
+
+  test("市场 tab：无版本信息时显示占位符 -", async () => {
+    const fetchWithAuth = makeFetch({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
+        success: true,
+        data: { node_id: "master", plugins: [] },
+      }),
+      "GET http://127.0.0.1:8000/api/plugins/market": () => ({
+        success: true,
+        data: {
+          plugins: [
+            {
+              id: "market-p",
+              name: "市场插件",
+              repo: "https://github.com/owner/market-p",
+              branch: "main",
+            },
+          ],
+        },
+      }),
+    });
+    const wrapper = mount(PluginSidebar, {
+      props: { ...baseProps, fetchWithAuth },
+    });
+    await flushPromises();
+    await wrapper.findAll(".plugin-sidebar-tab")[1].trigger("click");
+    await flushPromises();
+    // 版本字段缺失时显示 "-"
+    expect(wrapper.find(".plugin-market-item").text()).toContain("-");
   });
 
   test("市场 tab：已安装插件显示「已安装」徽章，不显示安装按钮", async () => {

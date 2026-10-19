@@ -176,6 +176,9 @@
               <span v-if="mp.categories && mp.categories.length" class="plugin-market-cats">
                 <span class="plugin-item-meta-label">分类</span> {{ mp.categories.join(', ') }}
               </span>
+              <span class="plugin-market-cats">
+                <span class="plugin-item-meta-label">版本</span> {{ mp.version || '-' }}
+              </span>
             </div>
           </div>
         </div>

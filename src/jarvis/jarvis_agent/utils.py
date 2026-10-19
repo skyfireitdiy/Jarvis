@@ -1936,6 +1936,84 @@ def _market_cache_dir_name(repo_url: str) -> str:
     return last or "market"
 
 
+_MARKET_VERSION_CACHE_TTL = 3600  # 市场插件版本缓存有效期（秒），避免每次打开市场都 clone 插件仓库
+
+
+def _get_market_plugin_version(
+    repo: str, branch: str, cache_root: "pathlib.Path"
+) -> str:
+    """从插件仓库 git HEAD 读取 config.yaml 的 version（带 TTL 缓存）。
+
+    市场清单设计上不记录版本号（避免与仓库版本不同步），版本始终以插件
+    仓库最新代码为准。本函数浅克隆插件仓库到缓存目录，读取 config.yaml 的
+    ``version`` 字段；结果按插件仓库 URL 缓存到 ``cache_root/plugin_versions/``
+    （JSON：version + fetched_at），TTL 内直接命中缓存，避免重复 clone。
+
+    参数:
+        repo: 插件源码仓库地址
+        branch: 发布分支
+        cache_root: 版本缓存根目录（市场缓存目录下）
+
+    返回:
+        str: 插件版本号；获取失败（仓库不可达/无 config.yaml/无 version）返回空串。
+    """
+    import json
+    import time
+
+    repo = (repo or "").strip().rstrip("/")
+    if not repo:
+        return ""
+    branch = (branch or "main").strip() or "main"
+    try:
+        cache_dir = cache_root / "plugin_versions"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_file = cache_dir / f"{_market_cache_dir_name(repo)}.json"
+        # 命中有效缓存直接返回
+        try:
+            if cache_file.exists():
+                with open(cache_file, "r", encoding="utf-8") as f:
+                    cached = json.load(f)
+                if (
+                    isinstance(cached, dict)
+                    and cached.get("version")
+                    and time.time() - float(cached.get("fetched_at", 0))
+                    < _MARKET_VERSION_CACHE_TTL
+                ):
+                    return str(cached["version"])
+        except Exception:
+            pass  # 缓存损坏/过期则重新获取
+        # 浅克隆插件仓库到独立缓存目录（按 owner/repo 唯一化）
+        src_dir = cache_dir / "src" / _market_cache_dir_name(repo)
+        try:
+            if not src_dir.exists():
+                _git_clone_plugin(repo, branch, src_dir)
+            else:
+                pull = _git_run(src_dir, "pull", "--quiet")
+                if pull.returncode != 0:
+                    pass  # 保留缓存
+        except Exception:
+            return ""
+        config_file = src_dir / "config.yaml"
+        if not config_file.exists():
+            return ""
+        import yaml
+
+        with open(config_file, "r", encoding="utf-8") as f:
+            cfg = yaml.safe_load(f)
+        version = str(cfg.get("version") or "") if isinstance(cfg, dict) else ""
+        if version:
+            try:
+                with open(cache_file, "w", encoding="utf-8") as f:
+                    json.dump(
+                        {"version": version, "fetched_at": time.time()}, f
+                    )
+            except Exception:
+                pass
+        return version
+    except Exception:
+        return ""
+
+
 def list_market_plugins() -> List[dict]:
     """从插件市场仓库拉取并解析市场插件清单。
 
@@ -1943,7 +2021,8 @@ def list_market_plugins() -> List[dict]:
     （id/name/description/repo/branch/author/license/categories）。
     本函数对每个配置的市场仓库（`get_plugin_market_repos`）克隆到数据目录缓存，
     扫描 `plugins/*.yaml` 解析为结构化插件列表。仓库不可达或清单解析失败时
-    跳过该仓库/该条目，不阻断整体返回。
+    跳过该仓库/该条目，不阻断整体返回。每个市场插件附带 ``version`` 字段
+    （从插件仓库 git HEAD 读取 config.yaml 的 version，带 TTL 缓存）。
 
     返回:
         list[dict]: 每个元素为市场插件信息字典，字段：
@@ -1957,6 +2036,7 @@ def list_market_plugins() -> List[dict]:
             - logo: 插件图标（URL，可选）
             - categories: 分类标签
             - market_repo: 来源市场仓库地址
+            - version: 插件最新版本号（从插件仓库 git HEAD 读取，获取失败为空串）
     """
     import yaml
     from pathlib import Path
@@ -2029,6 +2109,11 @@ def list_market_plugins() -> List[dict]:
                     function="list_market_plugins",
                 )
                 continue
+    # 为每个市场插件附加版本号（从插件仓库 git HEAD 读取，带 TTL 缓存）
+    for p in plugins:
+        p["version"] = _get_market_plugin_version(
+            str(p.get("repo") or ""), str(p.get("branch") or "main"), market_root
+        )
     return plugins
 
 
