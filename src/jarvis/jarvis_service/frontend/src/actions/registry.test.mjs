@@ -10,6 +10,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   ACTIONS,
+  SPACE_COMMANDS,
+  SPACE_COMMAND_ACTIONS,
   filterActions,
   groupActions,
   findShortcutConflicts,
@@ -174,4 +176,61 @@ test("ACTIONS：每项含 id/label/group/icon/run 且 id 唯一", () => {
     assert.equal(typeof action.icon, "string", `icon 非字符串：${action.id}`);
     assert.equal(typeof action.run, "function", `run 非函数：${action.id}`);
   }
+});
+
+// ===== admin-update-system（一键更新系统）专项 =====
+
+test("admin-update-system：action 定义完整（id/label/group/icon/run/enabled/shortcut）", () => {
+  const action = ACTIONS.find((a) => a.id === "admin-update-system");
+  assert.ok(action, "ACTIONS 中必须存在 admin-update-system");
+  assert.equal(action.label, "一键更新系统");
+  assert.equal(action.group, "管理");
+  assert.equal(typeof action.icon, "string");
+  assert.ok(action.icon.length > 0);
+  assert.equal(typeof action.run, "function");
+  assert.equal(typeof action.enabled, "function");
+  assert.equal(action.shortcut, "Space m u");
+  // 中文关键词应能命中「一键更新系统」
+  assert.ok(filterActions([action], "一键").length === 1);
+  assert.ok(filterActions([action], "update").length === 1);
+  assert.ok(filterActions([action], "system").length === 1);
+});
+
+test("admin-update-system：enabled 依赖 ctx.hasPermission('admin:config')", () => {
+  const action = ACTIONS.find((a) => a.id === "admin-update-system");
+  // 无 hasPermission → 禁用
+  assert.equal(action.enabled({}), false);
+  // hasPermission 返回 false → 禁用
+  assert.equal(action.enabled({ hasPermission: () => false }), false);
+  // hasPermission('admin:config') 返回 true → 启用
+  assert.equal(
+    action.enabled({ hasPermission: (p) => p === "admin:config" }),
+    true,
+  );
+  // 其他权限名 → 禁用
+  assert.equal(
+    action.enabled({ hasPermission: (p) => p === "admin:users" }),
+    false,
+  );
+});
+
+test("admin-update-system：run 调用 ctx.confirmUpdateSystem", () => {
+  const action = ACTIONS.find((a) => a.id === "admin-update-system");
+  let called = 0;
+  action.run({ confirmUpdateSystem: () => called++ });
+  assert.equal(called, 1, "run 必须调用 ctx.confirmUpdateSystem");
+  // 无 confirmUpdateSystem 时不应抛错
+  assert.doesNotThrow(() => action.run({}));
+});
+
+test("SPACE_COMMANDS：m.u 映射到 admin-update-system", () => {
+  assert.equal(
+    SPACE_COMMANDS.m.children.u.actionId,
+    "admin-update-system",
+  );
+  assert.equal(SPACE_COMMANDS.m.children.u.label, "一键更新系统");
+});
+
+test("SPACE_COMMAND_ACTIONS：'mu' 指向 admin-update-system", () => {
+  assert.equal(SPACE_COMMAND_ACTIONS["mu"], "admin-update-system");
 });

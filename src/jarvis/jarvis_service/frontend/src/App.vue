@@ -5654,6 +5654,7 @@ const commandPaletteCtx = computed(() => ({
   // 管理类动作（需 admin 权限，registry 中通过 hasPermission 判定）
   hasPermission,
   confirmUpdateCodeToMain,
+  confirmUpdateSystem,
   openAdminPanel: () => { showAdminPanel.value = true; pushOverlayState() },
   openAdminRestartService: () => openAdminSystemAction('restart'),
   openAdminSyncConfig: () => openAdminSystemAction('sync-config'),
