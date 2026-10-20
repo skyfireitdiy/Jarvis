@@ -11,6 +11,7 @@
         :class="{ active: tab.panelId === activeSessionPanelId }"
         :title="tab.label"
         @click.stop="$emit('activate-session-tab', node.id, tab.panelId)"
+        @contextmenu.prevent.stop="$emit('session-tab-context-menu', node.id, tab.panelId, $event)"
       >
         <span class="workspace-pane-session-tab-name">{{ tab.label }}</span>
         <button
@@ -72,7 +73,7 @@ const props = defineProps({
   activeSessionPanelId: { type: String, default: null },
 })
 
-defineEmits(['split', 'close', 'maximize', 'activate-session-tab', 'close-session-tab', 'add-session-tab'])
+defineEmits(['split', 'close', 'maximize', 'activate-session-tab', 'close-session-tab', 'add-session-tab', 'session-tab-context-menu'])
 </script>
 
 <style scoped>

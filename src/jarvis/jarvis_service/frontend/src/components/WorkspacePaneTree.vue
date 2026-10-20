@@ -22,6 +22,7 @@
         @activate-session-tab="(id, panelId) => $emit('activate-session-tab', id, panelId)"
         @close-session-tab="(id, panelId) => $emit('close-session-tab', id, panelId)"
         @add-session-tab="(id) => $emit('add-session-tab', id)"
+        @session-tab-context-menu="(id, panelId, ev) => $emit('session-tab-context-menu', id, panelId, ev)"
       >
         <template #pane-content="slotProps">
           <slot name="pane-content" v-bind="slotProps" />
@@ -50,6 +51,7 @@
         @activate-session-tab="(id, panelId) => $emit('activate-session-tab', id, panelId)"
         @close-session-tab="(id, panelId) => $emit('close-session-tab', id, panelId)"
         @add-session-tab="(id) => $emit('add-session-tab', id)"
+        @session-tab-context-menu="(id, panelId, ev) => $emit('session-tab-context-menu', id, panelId, ev)"
       >
         <template #pane-content="slotProps">
           <slot name="pane-content" v-bind="slotProps" />
@@ -85,6 +87,7 @@
       @activate-session-tab="(id, panelId) => $emit('activate-session-tab', id, panelId)"
       @close-session-tab="(id, panelId) => $emit('close-session-tab', id, panelId)"
       @add-session-tab="(id) => $emit('add-session-tab', id)"
+      @session-tab-context-menu="(id, panelId, ev) => $emit('session-tab-context-menu', id, panelId, ev)"
     />
     <div class="workspace-pane-leaf-body">
       <slot name="pane-content" :pane="node" :active="node.id === activePaneId" />
@@ -108,7 +111,7 @@ const props = defineProps({
   getSessionTabs: { type: Function, default: null },
 })
 
-defineEmits(['activate', 'split', 'close', 'startResize', 'maximize', 'activate-session-tab', 'close-session-tab', 'add-session-tab'])
+defineEmits(['activate', 'split', 'close', 'startResize', 'maximize', 'activate-session-tab', 'close-session-tab', 'add-session-tab', 'session-tab-context-menu'])
 
 function childStyle(index) {
   const ratio = props.node.type === 'split' ? props.node.ratio : 0.5

@@ -725,6 +725,7 @@
             @activate-session-tab="onActivateSessionTab"
             @close-session-tab="onCloseSessionTab"
             @add-session-tab="onAddSessionTab"
+            @session-tab-context-menu="openSessionTabContextMenu"
           >
             <template #pane-content="{ pane }">
               <div class="workspace-pane-content-slot">
@@ -1657,6 +1658,27 @@
         class="file-tree-context-item"
         :disabled="act.enabled === false"
         @click="runTabContextAction(act)"
+      >
+        <span class="file-tree-context-icon">{{ act.icon }}</span>
+        <span class="file-tree-context-label">{{ act.label }}</span>
+      </button>
+    </div>
+
+    <!-- Session 标签栏右键菜单：关闭右侧所有 / 关闭除当前所有 / 关闭所有 -->
+    <div
+      v-if="sessionTabContextMenu.visible"
+      class="file-tree-context-menu"
+      :style="{ left: sessionTabContextMenu.x + 'px', top: sessionTabContextMenu.y + 'px' }"
+      @pointerdown.stop
+      @click.stop
+      @contextmenu.prevent.stop
+    >
+      <button
+        v-for="act in sessionTabContextActions"
+        :key="act.id"
+        class="file-tree-context-item"
+        :disabled="act.enabled === false"
+        @click="runSessionTabContextAction(act)"
       >
         <span class="file-tree-context-icon">{{ act.icon }}</span>
         <span class="file-tree-context-label">{{ act.label }}</span>
@@ -4391,6 +4413,94 @@ function onCloseSessionTab(paneId, panelId) {
       activePanelId.value = null
       workspaceSessionPanelId.value = null
     }
+  }
+}
+
+// ===== session 标签栏右键菜单：关闭右侧所有 / 关闭除当前所有 / 关闭所有 =====
+const sessionTabContextMenu = ref({ visible: false, x: 0, y: 0, paneId: null, panelId: null })
+
+function closeSessionTabContextMenu() {
+  if (sessionTabContextMenu.value.visible) {
+    sessionTabContextMenu.value = { ...sessionTabContextMenu.value, visible: false }
+  }
+}
+
+function openSessionTabContextMenu(paneId, panelId, event) {
+  if (!panelId) return
+  sessionTabContextMenu.value = {
+    visible: true,
+    x: event?.clientX || 0,
+    y: event?.clientY || 0,
+    paneId: paneId || null,
+    panelId,
+  }
+  // 点击空白处关闭（与编辑器标签栏右键菜单同款：pointerdown 一次即解绑）
+  document.addEventListener('pointerdown', closeSessionTabContextMenu, { once: true })
+}
+
+// 当前右键菜单对应的 session tab panelId 列表（按显示顺序）
+function getSessionTabContextPanelIds() {
+  const menu = sessionTabContextMenu.value
+  if (!menu.paneId) return []
+  const pane = findWorkspacePaneById(workspacePaneTree.value, menu.paneId)
+  return pane ? paneSessionPanelIds(pane) : []
+}
+
+const sessionTabContextActions = computed(() => {
+  const ids = getSessionTabContextPanelIds()
+  const index = ids.indexOf(sessionTabContextMenu.value.panelId)
+  const hasRight = index >= 0 && index < ids.length - 1
+  const hasOthers = ids.length > 1
+  return [
+    { id: 'close-right', icon: '⇥', label: '关闭右侧所有', enabled: hasRight },
+    { id: 'close-others', icon: '◎', label: '关闭除当前所有', enabled: hasOthers },
+    { id: 'close-all', icon: '✕', label: '关闭所有', enabled: hasOthers },
+  ]
+})
+
+function runSessionTabContextAction(act) {
+  if (!act || act.enabled === false) return
+  const menu = { ...sessionTabContextMenu.value }
+  const pane = menu.paneId ? findWorkspacePaneById(workspacePaneTree.value, menu.paneId) : null
+  if (!pane) {
+    closeSessionTabContextMenu()
+    return
+  }
+  const ids = paneSessionPanelIds(pane)
+  const index = ids.indexOf(menu.panelId)
+  if (index === -1) {
+    closeSessionTabContextMenu()
+    return
+  }
+
+  let targets = []
+  if (act.id === 'close-right') {
+    targets = ids.slice(index + 1)
+  } else if (act.id === 'close-others') {
+    targets = ids.filter(p => p !== menu.panelId)
+  } else if (act.id === 'close-all') {
+    targets = ids.slice()
+  }
+  closeSessionTabContextMenu()
+  if (!targets.length) return
+
+  // 逐个关闭（closeSessionTabInPane 内部已处理激活 tab 切换与 pane 清空）
+  for (const panelId of targets) {
+    closeSessionTabInPane(pane, panelId)
+  }
+  // 批量关闭后同步激活状态到新激活 tab（若 pane 已空则清空）
+  const nextPanelId = paneActiveSessionPanelId(pane)
+  if (nextPanelId) {
+    activePanelId.value = nextPanelId
+    workspaceSessionPanelId.value = nextPanelId
+    const nextPanel = panels.value.find(p => p.id === nextPanelId)
+    if (nextPanel && nextPanel.agentId) {
+      const nextAgent = agentList.value.find(a => a.agent_id === nextPanel.agentId)
+      if (nextAgent) switchAgent(nextAgent)
+    }
+  } else {
+    activePanelId.value = null
+    workspaceSessionPanelId.value = null
   }
 }
 
