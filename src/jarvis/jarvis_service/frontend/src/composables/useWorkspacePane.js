@@ -283,6 +283,7 @@ const activePaneId = ref(workspacePaneTree.value.id)
 // 再次点击还原即移除 class 嵌回原布局。null 表示无最大化。
 const maximizedPaneId = ref(null)
 // 是否已发生分割（>1 个 leaf）。未分割时模板走原有渲染路径，保证零回归。
+// 折叠的 leaf 仍计入（折叠不销毁 pane，只是视觉隐藏），否则折叠后会被误判为「未分割」。
 const workspacePaneCount = computed(() => {
   let count = 0
   const walk = (node) => {
@@ -292,6 +293,23 @@ const workspacePaneCount = computed(() => {
       return
     }
     ;(node.children || []).forEach(walk)
+  }
+  walk(workspacePaneTree.value)
+  return count
+})
+// 当前可见（未折叠）的 leaf 数量：用于判断「是否还有可见 pane 可选」等交互
+const visibleWorkspacePaneCount = computed(() => {
+  let count = 0
+  const walk = (node) => {
+    if (!node) return
+    if (node.type === 'leaf') {
+      count += 1
+      return
+    }
+    ;(node.children || []).forEach((child, index) => {
+      if (isCollapsedSide(node, index)) return
+      walk(child)
+    })
   }
   walk(workspacePaneTree.value)
   return count
@@ -324,6 +342,122 @@ function findWorkspacePaneParent(node, paneId) {
     if (found) return found
   }
   return null
+}
+
+// ===== 临时折叠（隐藏）=====
+// 模型：折叠信息记录在「父 split」上，而不是 leaf 上：
+//   split.collapsed = { side: 0|1, size: number }
+//   - side：被折叠的子项下标（0 = 左/上，1 = 右/下）；
+//   - size：折叠前的 ratio（折叠前该子项占父 split 的比例），用于展开时恢复原尺寸。
+// 这样 leaf 本身（view / sessionPanelIds / agentId / content）完全不变，
+// 折叠只是「父 split 不再渲染该子树」，内容与运行时状态（Monaco / xterm / Session）零销毁。
+// 折叠状态随布局一起持久化（见 serializeWorkspacePaneTree / sanitizeWorkspacePaneNode）。
+function isCollapsedSide(splitNode, index) {
+  return !!splitNode && !!splitNode.collapsed && splitNode.collapsed.side === index
+}
+// 某个 leaf 是否处于折叠态（其父 split 折叠了它所在的一侧）
+function isWorkspacePaneCollapsed(paneId) {
+  const parent = findWorkspacePaneParent(workspacePaneTree.value, paneId)
+  if (!parent) return false
+  const index = (parent.children || []).findIndex(c => c.type === 'leaf' && c.id === paneId)
+  return index >= 0 && isCollapsedSide(parent, index)
+}
+// 找出所有折叠的 leaf（用于「全部展开」）
+function collectCollapsedPaneIds(node = workspacePaneTree.value, acc = []) {
+  if (!node || node.type === 'leaf') return acc
+  ;(node.children || []).forEach((child, index) => {
+    if (isCollapsedSide(node, index)) {
+      const walkLeaf = (n) => {
+        if (!n) return
+        if (n.type === 'leaf') { acc.push(n.id); return }
+        ;(n.children || []).forEach(walkLeaf)
+      }
+      walkLeaf(child)
+      return
+    }
+    collectCollapsedPaneIds(child, acc)
+  })
+  return acc
+}
+// 折叠后激活态兜底：被折叠的 pane 不可见，需把激活态转移到同 split 的兄弟子树的边缘 leaf。
+// 返回新的激活 pane id（无需转移时返回原 id）。
+function fallbackActivePaneAfterCollapse(parent, collapsedIndex) {
+  const sibling = parent.children[1 - collapsedIndex]
+  const target = findWorkspacePaneEdgeLeaf(sibling, parent.direction === 'row' ? 'left' : 'up')
+  return target ? target.id : null
+}
+// 折叠 / 展开指定 leaf（toggle）。返回折叠后是否处于折叠态；无法折叠（未分割 / 找不到父 split）返回 null。
+function togglePaneCollapse(paneId) {
+  const parent = findWorkspacePaneParent(workspacePaneTree.value, paneId)
+  if (!parent) return null
+  const index = (parent.children || []).findIndex(c => c.type === 'leaf' && c.id === paneId)
+  if (index < 0) return null
+  return togglePaneCollapseSide(parent, index)
+}
+// 折叠 / 展开某个 split 的指定一侧（toggle）。Header 折叠按钮与折叠条点击共用核心逻辑；
+// 直接以 split 节点为操作对象，避免嵌套 split 时按 leaf id 反查父 split 定位到内层 split 的错误。
+// 返回折叠后是否处于折叠态；参数非法返回 null。
+function togglePaneCollapseSide(splitNode, index) {
+  if (!splitNode || splitNode.type !== 'split') return null
+  if (index !== 0 && index !== 1) return null
+  const collapsed = isCollapsedSide(splitNode, index)
+  if (collapsed) {
+    // 展开：恢复折叠前的 ratio（原尺寸）；若记录的 size 不可用则重新分配（0.5）
+    const size = Number(splitNode.collapsed?.size)
+    splitNode.ratio = Number.isFinite(size) ? clamp(size, EDITOR_PANE_MIN_RATIO, EDITOR_PANE_MAX_RATIO) : 0.5
+    splitNode.collapsed = null
+    // 展开后把激活态交给被展开侧子树的边缘 leaf（用户点开它就是为了用它）
+    const edge = findWorkspacePaneEdgeLeaf(splitNode.children[index], splitNode.direction === 'row' ? 'left' : 'up')
+    if (edge) activateWorkspacePane(edge.id)
+  } else {
+    // 折叠：兄弟子树必须存在且非空（split 恒有两个子项）
+    const sibling = splitNode.children[1 - index]
+    if (!sibling) return null
+    // 记录折叠前的 ratio 作为原尺寸；若此前已折叠过另一侧（理论上不会同时折叠两侧），保留最新值
+    splitNode.collapsed = { side: index, size: Number.isFinite(Number(splitNode.ratio)) ? splitNode.ratio : 0.5 }
+    // 收集折叠侧子树内所有 leaf：折叠侧含被最大化的 pane 时清除最大化；含激活 pane 时转移激活态
+    const collapsedLeafIds = []
+    const walkLeaf = (n) => {
+      if (!n) return
+      if (n.type === 'leaf') { collapsedLeafIds.push(n.id); return }
+      ;(n.children || []).forEach(walkLeaf)
+    }
+    walkLeaf(splitNode.children[index])
+    if (maximizedPaneId.value && collapsedLeafIds.includes(maximizedPaneId.value)) {
+      maximizedPaneId.value = null
+    }
+    if (activePaneId.value && collapsedLeafIds.includes(activePaneId.value)) {
+      const nextId = fallbackActivePaneAfterCollapse(splitNode, index)
+      if (nextId) activePaneId.value = nextId
+    }
+  }
+  persistWorkspacePaneLayout()
+  nextTick(() => {
+    remountMonacoEditor()
+    layoutGitDiffEditor()()
+  })
+  return !collapsed
+}
+// 展开全部折叠的 pane（快捷键 Space p u）
+function expandAllCollapsedPanes() {
+  const ids = collectCollapsedPaneIds()
+  if (ids.length === 0) return false
+  const walk = (node) => {
+    if (!node || node.type === 'leaf') return
+    if (node.collapsed) {
+      const size = Number(node.collapsed.size)
+      node.ratio = Number.isFinite(size) ? clamp(size, EDITOR_PANE_MIN_RATIO, EDITOR_PANE_MAX_RATIO) : 0.5
+      node.collapsed = null
+    }
+    ;(node.children || []).forEach(walk)
+  }
+  walk(workspacePaneTree.value)
+  persistWorkspacePaneLayout()
+  nextTick(() => {
+    remountMonacoEditor()
+    layoutGitDiffEditor()()
+  })
+  return true
 }
 function activateWorkspacePane(paneId, { moveFocus = false } = {}) {
   if (!findWorkspacePaneById(workspacePaneTree.value, paneId)) return
@@ -434,6 +568,11 @@ function moveActivePaneInDirection(dir) {
       (dir === 'down' && col && childIdx === 0)
     if (!match) continue
     const targetChild = node.children[1 - childIdx]
+    // 目标子树整体处于折叠态：先展开它（折叠只是临时隐藏，导航到它就是「要用它」）。
+    // 直接以「折叠该侧的 split + side」展开，避免嵌套 split 时按边缘 leaf 反查父 split 定位到内层。
+    if (isCollapsedSide(node, 1 - childIdx)) {
+      togglePaneCollapseSide(node, 1 - childIdx)
+    }
     const targetLeaf = findWorkspacePaneEdgeLeaf(targetChild, dir)
     if (targetLeaf) {
       activateWorkspacePane(targetLeaf.id, { moveFocus: true })
@@ -1089,7 +1228,20 @@ function sanitizeWorkspacePaneNode(raw) {
     let ratio = Number(raw.ratio)
     if (!Number.isFinite(ratio)) ratio = 0.5
     ratio = clamp(ratio, EDITOR_PANE_MIN_RATIO, EDITOR_PANE_MAX_RATIO)
-    return { type: 'split', direction: raw.direction, ratio, children: [left, right] }
+    // 折叠信息：side 必须是 0/1，size 必须是有限数并 clamp 到合法比例区间；
+    // 非法则丢弃折叠信息（回退展开态），绝不因脏数据导致白屏或 0 尺寸布局。
+    let collapsed = null
+    if (raw.collapsed && typeof raw.collapsed === 'object') {
+      const side = Number(raw.collapsed.side)
+      if (side === 0 || side === 1) {
+        let size = Number(raw.collapsed.size)
+        if (!Number.isFinite(size)) size = 0.5
+        collapsed = { side, size: clamp(size, EDITOR_PANE_MIN_RATIO, EDITOR_PANE_MAX_RATIO) }
+      }
+    }
+    const node = { type: 'split', direction: raw.direction, ratio, children: [left, right] }
+    if (collapsed) node.collapsed = collapsed
+    return node
   }
   if (raw.type === 'leaf') {
     const validViews = ['file', 'session', 'chat', 'terminal', 'diff', 'empty']
@@ -1214,7 +1366,12 @@ function serializeWorkspacePaneTree(tree) {
   const clone = (node) => {
     if (!node) return node
     if (node.type === 'split') {
-      return { type: 'split', direction: node.direction, ratio: node.ratio, children: node.children.map(clone) }
+      // 折叠信息随布局持久化：collapsed = { side, size }（size 为折叠前的 ratio）
+      const out = { type: 'split', direction: node.direction, ratio: node.ratio, children: node.children.map(clone) }
+      if (node.collapsed && (node.collapsed.side === 0 || node.collapsed.side === 1)) {
+        out.collapsed = { side: node.collapsed.side, size: node.collapsed.size }
+      }
+      return out
     }
     // leaf：按视图提取内容恢复信息（不序列化运行时状态如 diff 文本、Monaco 实例）
     let content = null
@@ -1472,6 +1629,12 @@ watch(
     findWorkspacePaneById,
     activateWorkspacePane,
     toggleMaximizeWorkspacePane,
+    togglePaneCollapse,
+    togglePaneCollapseSide,
+    expandAllCollapsedPanes,
+    isWorkspacePaneCollapsed,
+    isCollapsedSide,
+    visibleWorkspacePaneCount,
     moveActivePaneInDirection,
     splitWorkspacePane,
     closeWorkspacePane,

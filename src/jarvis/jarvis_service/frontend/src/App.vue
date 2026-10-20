@@ -714,6 +714,7 @@
             :activePaneId="activePaneId"
             :maximizedPaneId="maximizedPaneId"
             :canSplit="windowWidth > 768"
+            :canCollapse="workspacePaneCount > 1"
             :getTitle="getWorkspacePaneTitle"
             :getStatus="getWorkspacePaneStatus"
             :getSessionTabs="getPaneSessionTabs"
@@ -721,6 +722,8 @@
             @split="splitWorkspacePane"
             @close="closeWorkspacePane"
             @maximize="toggleMaximizeWorkspacePane"
+            @collapse="togglePaneCollapse"
+            @toggle-collapse="togglePaneCollapseSide"
             @startResize="startWorkspacePaneResize"
             @activate-session-tab="onActivateSessionTab"
             @close-session-tab="onCloseSessionTab"
@@ -3492,6 +3495,7 @@ const {
   // pane 树核心
   workspacePaneTree, activePaneId, maximizedPaneId, workspacePaneCount, activePane,
   findWorkspacePaneById, activateWorkspacePane, toggleMaximizeWorkspacePane,
+  togglePaneCollapse, expandAllCollapsedPanes, togglePaneCollapseSide,
   moveActivePaneInDirection, splitWorkspacePane, closeWorkspacePane, collapseWorkspacePanes,
   findWorkspacePaneBySessionPanelId, findWorkspacePaneByView, ensureAgentEditorPane,
   ensureEditorPaneForFileOpen, setMainViewOnLeaf, ensurePaneForView, setActivePaneView,
@@ -5756,6 +5760,9 @@ const commandPaletteCtx = computed(() => ({
   // 全局：左右/上下分割编辑器工作区（与 Ctrl+\ / Ctrl+Shift+\ 分支行为一致）
   splitWorkspacePane: (paneId, direction) => splitWorkspacePane(paneId, direction),
   activePaneId: activePaneId.value,
+  // 全局：折叠/展开当前激活区域、展开全部折叠区域（与 Space p c / Space p u 行为一致）
+  toggleCollapseWorkspacePane: () => togglePaneCollapse(activePaneId.value),
+  expandAllCollapsedPanes: () => expandAllCollapsedPanes(),
   // 全局：发送缓冲输入（与 Ctrl+Alt+Enter 分支行为一致）
   sendBufferedInput: () => sendBufferedInput(),
   // 大厅：删除选中的 Agent（与 Delete 分支行为一致）

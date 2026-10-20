@@ -1023,4 +1023,223 @@ describe('useWorkspacePane', () => {
     expect(pane.sessionPanelId).toBe(pane.sessionPanelIds[0])
     expect(pane.content).toBeNull()
   })
+  // ===== 临时折叠（隐藏）=====
+  it('togglePaneCollapse：折叠记录父 split 的 side/size，pane 与内容不销毁', () => {
+    const { api } = makeHarness()
+    const rootId = api.workspacePaneTree.value.id
+    api.splitWorkspacePane(rootId, 'row')
+    const tree = api.workspacePaneTree.value
+    tree.ratio = 0.3
+    const collapsed = api.togglePaneCollapse(rootId)
+    expect(collapsed).toBe(true)
+    expect(tree.collapsed).toEqual({ side: 0, size: 0.3 })
+    // leaf 仍在树中（内容不销毁），只是不可见
+    expect(api.findWorkspacePaneById(tree, rootId)).toBeTruthy()
+    expect(api.workspacePaneCount.value).toBe(2)
+    expect(api.visibleWorkspacePaneCount.value).toBe(1)
+    expect(api.isWorkspacePaneCollapsed(rootId)).toBe(true)
+    expect(api.isCollapsedSide(tree, 0)).toBe(true)
+    expect(api.isCollapsedSide(tree, 1)).toBe(false)
+  })
+  it('togglePaneCollapse：再次调用展开并恢复折叠前 ratio', () => {
+    const { api } = makeHarness()
+    const rootId = api.workspacePaneTree.value.id
+    api.splitWorkspacePane(rootId, 'row')
+    const tree = api.workspacePaneTree.value
+    tree.ratio = 0.25
+    api.togglePaneCollapse(rootId)
+    const expanded = api.togglePaneCollapse(rootId)
+    expect(expanded).toBe(false)
+    expect(tree.collapsed).toBeNull()
+    expect(tree.ratio).toBe(0.25)
+    expect(api.visibleWorkspacePaneCount.value).toBe(2)
+    // 展开后激活态交给被展开的 pane
+    expect(api.activePaneId.value).toBe(rootId)
+  })
+  it('togglePaneCollapse：折叠激活 pane 时激活态转移到兄弟子树', () => {
+    const { api } = makeHarness()
+    const rootId = api.workspacePaneTree.value.id
+    api.splitWorkspacePane(rootId, 'row')
+    const newId = api.activePaneId.value
+    expect(newId).not.toBe(rootId)
+    api.togglePaneCollapse(newId)
+    expect(api.activePaneId.value).toBe(rootId)
+    expect(api.isWorkspacePaneCollapsed(newId)).toBe(true)
+  })
+  it('togglePaneCollapse：未分割（无父 split）返回 null', () => {
+    const { api } = makeHarness()
+    expect(api.togglePaneCollapse(api.workspacePaneTree.value.id)).toBeNull()
+  })
+  it('togglePaneCollapse：折叠时清除该 pane 的最大化', () => {
+    const { api } = makeHarness()
+    const rootId = api.workspacePaneTree.value.id
+    api.splitWorkspacePane(rootId, 'row')
+    const newId = api.activePaneId.value
+    api.toggleMaximizeWorkspacePane(newId)
+    expect(api.maximizedPaneId.value).toBe(newId)
+    api.togglePaneCollapse(newId)
+    expect(api.maximizedPaneId.value).toBeNull()
+  })
+  it('togglePaneCollapse：折叠状态持久化并在恢复后保留', () => {
+    const { api } = makeHarness()
+    const rootId = api.workspacePaneTree.value.id
+    api.splitWorkspacePane(rootId, 'column')
+    const tree = api.workspacePaneTree.value
+    tree.ratio = 0.4
+    api.togglePaneCollapse(rootId)
+    const payload = JSON.parse(localStorage.getItem('jarvis_workspace_pane_layout'))
+    expect(payload.tree.collapsed).toEqual({ side: 0, size: 0.4 })
+    const { api: api2 } = makeHarness()
+    api2.restoreWorkspacePaneLayout()
+    expect(api2.workspacePaneTree.value.collapsed).toEqual({ side: 0, size: 0.4 })
+    expect(api2.isWorkspacePaneCollapsed(rootId)).toBe(true)
+  })
+  it('restoreWorkspacePaneLayout：非法 collapsed 被丢弃', () => {
+    localStorage.setItem('jarvis_workspace_pane_layout', JSON.stringify({
+      version: 3,
+      activePaneId: 'pane-1',
+      tree: {
+        type: 'split',
+        direction: 'row',
+        ratio: 0.5,
+        collapsed: { side: 5, size: 'bad' },
+        children: [
+          { type: 'leaf', id: 'pane-1', view: 'file' },
+          { type: 'leaf', id: 'pane-2', view: 'file' },
+        ],
+      },
+    }))
+    const { api } = makeHarness()
+    api.restoreWorkspacePaneLayout()
+    expect(api.workspacePaneTree.value.collapsed).toBeUndefined()
+    expect(api.visibleWorkspacePaneCount.value).toBe(2)
+  })
+  it('restoreWorkspacePaneLayout：collapsed.size 越界时 clamp 到合法区间', () => {
+    localStorage.setItem('jarvis_workspace_pane_layout', JSON.stringify({
+      version: 3,
+      activePaneId: 'pane-1',
+      tree: {
+        type: 'split',
+        direction: 'row',
+        ratio: 0.5,
+        collapsed: { side: 1, size: 0.99 },
+        children: [
+          { type: 'leaf', id: 'pane-1', view: 'file' },
+          { type: 'leaf', id: 'pane-2', view: 'file' },
+        ],
+      },
+    }))
+    const { api } = makeHarness()
+    api.restoreWorkspacePaneLayout()
+    expect(api.workspacePaneTree.value.collapsed).toEqual({ side: 1, size: 0.85 })
+  })
+  it('expandAllCollapsedPanes：展开所有折叠区域并恢复尺寸', () => {
+    const { api } = makeHarness()
+    expect(api.expandAllCollapsedPanes()).toBe(false)
+    const rootId = api.workspacePaneTree.value.id
+    api.splitWorkspacePane(rootId, 'row')
+    const tree = api.workspacePaneTree.value
+    tree.ratio = 0.2
+    api.togglePaneCollapse(rootId)
+    expect(api.visibleWorkspacePaneCount.value).toBe(1)
+    expect(api.expandAllCollapsedPanes()).toBe(true)
+    expect(tree.collapsed).toBeNull()
+    expect(tree.ratio).toBe(0.2)
+    expect(api.visibleWorkspacePaneCount.value).toBe(2)
+  })
+  it('moveActivePaneInDirection：目标区域折叠时先展开再激活', () => {
+    const { api } = makeHarness()
+    const leftId = api.workspacePaneTree.value.id
+    api.splitWorkspacePane(leftId, 'row')
+    const rightId = api.activePaneId.value
+    // 折叠右侧（激活态转移到左侧）
+    api.togglePaneCollapse(rightId)
+    expect(api.activePaneId.value).toBe(leftId)
+    expect(api.isWorkspacePaneCollapsed(rightId)).toBe(true)
+    const moved = api.moveActivePaneInDirection('right')
+    expect(moved).toBe(true)
+    expect(api.isWorkspacePaneCollapsed(rightId)).toBe(false)
+    expect(api.activePaneId.value).toBe(rightId)
+  })
+  // ===== togglePaneCollapseSide：直接以 split + side 折叠（折叠条点击路径）=====
+  it('togglePaneCollapseSide：嵌套 split 时折叠条点击折叠的是渲染它的 split，而非边缘 leaf 的父 split', () => {
+    const { api } = makeHarness()
+    const rootId = api.workspacePaneTree.value.id
+    api.splitWorkspacePane(rootId, 'row') // 根：row split [pane-1, pane-2]
+    const tree = api.workspacePaneTree.value
+    const rightId = api.activePaneId.value // pane-2
+    // 再对右侧 pane 做 column 分割 → 右侧子树成为嵌套 split（tree.children[1]）
+    api.splitWorkspacePane(rightId, 'column')
+    const rightSplit = tree.children[1]
+    expect(rightSplit.type).toBe('split')
+    expect(rightSplit.direction).toBe('column')
+    // 嵌套 split：children[0] = pane-2（原 rightId），children[1] = pane-3（激活）
+    const pane2Id = rightSplit.children[0].id
+    const pane3Id = rightSplit.children[1].id
+    expect(api.activePaneId.value).toBe(pane3Id)
+    // 折叠「嵌套 split」的 side 0（pane-2 所在侧）：直接操作该 split 节点
+    const result = api.togglePaneCollapseSide(rightSplit, 0)
+    expect(result).toBe(true)
+    expect(rightSplit.collapsed).toEqual({ side: 0, size: 0.5 })
+    // 根 split 不受影响
+    expect(tree.collapsed).toBeUndefined()
+    // 被折叠的是 pane-2（side 0），pane-3（side 1）不受影响
+    expect(api.isWorkspacePaneCollapsed(pane2Id)).toBe(true)
+    expect(api.isWorkspacePaneCollapsed(pane3Id)).toBe(false)
+    // 展开：恢复 ratio 并激活该侧边缘 leaf（pane-2）
+    const expanded = api.togglePaneCollapseSide(rightSplit, 0)
+    expect(expanded).toBe(false)
+    expect(rightSplit.collapsed).toBeNull()
+    expect(api.activePaneId.value).toBe(pane2Id)
+  })
+  it('togglePaneCollapseSide：折叠侧子树含激活 pane 时激活态转移到兄弟子树', () => {
+    const { api } = makeHarness()
+    const rootId = api.workspacePaneTree.value.id
+    api.splitWorkspacePane(rootId, 'row')
+    const tree = api.workspacePaneTree.value
+    const rightId = api.activePaneId.value
+    api.splitWorkspacePane(rightId, 'column')
+    const rightSplit = tree.children[1]
+    const pane2Id = rightSplit.children[0].id
+    const pane3Id = rightSplit.children[1].id
+    expect(api.activePaneId.value).toBe(pane3Id)
+    // 折叠含激活 pane 的 side 1（pane-3 所在侧）→ 激活态转移到 side 0（pane-2）
+    api.togglePaneCollapseSide(rightSplit, 1)
+    expect(api.isWorkspacePaneCollapsed(pane3Id)).toBe(true)
+    expect(api.activePaneId.value).toBe(pane2Id)
+    expect(api.isWorkspacePaneCollapsed(pane2Id)).toBe(false)
+  })
+  it('togglePaneCollapseSide：非法参数返回 null', () => {
+    const { api } = makeHarness()
+    const rootId = api.workspacePaneTree.value.id
+    api.splitWorkspacePane(rootId, 'row')
+    const tree = api.workspacePaneTree.value
+    expect(api.togglePaneCollapseSide(tree, 5)).toBeNull()
+    expect(api.togglePaneCollapseSide({ type: 'leaf' }, 0)).toBeNull()
+    expect(api.togglePaneCollapseSide(null, 0)).toBeNull()
+  })
+  it('moveActivePaneInDirection：嵌套 split 中目标侧折叠时展开的是外层 split 而非边缘 leaf 的父 split', () => {
+    const { api } = makeHarness()
+    const rootId = api.workspacePaneTree.value.id
+    api.splitWorkspacePane(rootId, 'row') // 根 row [pane-1, pane-2]
+    const tree = api.workspacePaneTree.value
+    const rightId = api.activePaneId.value // pane-2
+    api.splitWorkspacePane(rightId, 'column') // 右侧嵌套 column [pane-2, pane-3]
+    const rightSplit = tree.children[1]
+    const pane2Id = rightSplit.children[0].id
+    const pane3Id = rightSplit.children[1].id
+    // 折叠根 split 的右侧（side 1 = 嵌套 split 整棵子树）
+    api.togglePaneCollapseSide(tree, 1)
+    expect(tree.collapsed).toEqual({ side: 1, size: 0.5 })
+    expect(api.isCollapsedSide(tree, 1)).toBe(true)
+    // 激活态转移到根 split 左侧（pane-1）
+    expect(api.activePaneId.value).toBe(rootId)
+    // 向右导航：应展开「根 split 的 side 1」（而非嵌套 split 内层），并激活其边缘 leaf（pane-2）
+    const moved = api.moveActivePaneInDirection('right')
+    expect(moved).toBe(true)
+    expect(tree.collapsed).toBeNull()
+    expect(rightSplit.collapsed).toBeUndefined()
+    expect(api.isWorkspacePaneCollapsed(pane2Id)).toBe(false)
+    expect(api.activePaneId.value).toBe(pane2Id)
+  })
 })
