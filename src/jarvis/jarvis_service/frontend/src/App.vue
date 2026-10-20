@@ -1328,6 +1328,7 @@
       :isRestartingGateway="isRestartingGateway"
       :isSyncingConfig="isSyncingConfig"
       :isUpdatingCode="isUpdatingCode"
+      :isUpdatingSystem="isUpdatingSystem"
       :getToken="getAuthToken"
       :pluginAdminTabs="pluginAdminTabs"
       :pluginExtensions="pluginExtensions"
@@ -1338,6 +1339,7 @@
       @syncConfig="handleSyncConfig"
       @updateCodeToMain="handleUpdateCodeToMain"
       @confirmUpdateCodeToMain="confirmUpdateCodeToMain"
+      @confirmUpdateSystem="confirmUpdateSystem"
     />
 
     <!-- Session 选择对话框 -->
@@ -6681,15 +6683,18 @@ const {
   syncConfigSections,
   isSyncingConfig,
   isUpdatingCode,
+  isUpdatingSystem,
   saveNotifySettings,
   handleSyncConfig,
   handleUpdateCodeToMain,
   openAdminSystemAction,
   confirmUpdateCodeToMain,
   confirmRestartAllNodes,
+  confirmUpdateSystem,
   restartAllNodes,
   syncConfig,
   updateCodeToMain,
+  updateSystem,
 } = useSettings({
   showAdminPanel,
   adminPanelRef,
