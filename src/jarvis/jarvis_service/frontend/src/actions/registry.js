@@ -193,6 +193,30 @@ export const ACTIONS = [
       ctx.splitWorkspacePane(ctx.activePaneId, "column"),
   },
   {
+    // 全局动作：折叠/展开当前激活的编辑器区域（内容不销毁，保留状态）
+    id: "toggle-collapse-workspace-pane",
+    label: "折叠/展开当前区域",
+    shortcut: "Space p c",
+    condition: "需存在当前激活的编辑器区域且已分割",
+    en: "Toggle Collapse Pane",
+    group: "界面",
+    icon: "⏷",
+    keywords: ["折叠", "收起", "隐藏", "区域", "面板", "collapse", "fold", "hide", "pane"],
+    run: (ctx) => ctx.toggleCollapseWorkspacePane && ctx.toggleCollapseWorkspacePane(),
+  },
+  {
+    // 全局动作：展开所有已折叠的编辑器区域
+    id: "expand-all-collapsed-panes",
+    label: "展开所有折叠区域",
+    shortcut: "Space p u",
+    condition: "需存在已折叠的编辑器区域",
+    en: "Expand All Collapsed Panes",
+    group: "界面",
+    icon: "⏶",
+    keywords: ["展开", "全部", "折叠", "区域", "expand", "all", "collapsed", "pane"],
+    run: (ctx) => ctx.expandAllCollapsedPanes && ctx.expandAllCollapsedPanes(),
+  },
+  {
     // 全局动作：关闭当前焦点所在的面板 / 编辑器激活区域
     id: "close-focused-panel",
     label: "关闭当前焦点面板",
@@ -1187,6 +1211,8 @@ export const SPACE_COMMANDS = {
       x: { label: "关闭当前面板", actionId: "close-focused-panel" },
       s: { label: "左右分割", actionId: "split-workspace-pane-row" },
       h: { label: "上下分割", actionId: "split-workspace-pane-column" },
+      c: { label: "折叠/展开当前区域", actionId: "toggle-collapse-workspace-pane" },
+      u: { label: "展开所有折叠区域", actionId: "expand-all-collapsed-panes" },
     },
   },
   a: {

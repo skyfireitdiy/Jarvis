@@ -43,6 +43,14 @@
         @mousedown.prevent
         @click.stop="$emit('maximize', node.id)"
       >{{ maximized ? '⤡' : '⛶' }}</button>
+      <button
+        v-if="canCollapse"
+        tabindex="-1"
+        class="workspace-pane-leaf-btn"
+        title="折叠此区域（内容保留，Space p c 可切换）"
+        @mousedown.prevent
+        @click.stop="$emit('collapse', node.id)"
+      >⏷</button>
       <button v-if="canSplit" tabindex="-1" class="workspace-pane-leaf-btn" title="左右分" @mousedown.prevent @click.stop="$emit('split', node.id, 'row')">◫</button>
       <button v-if="canSplit" tabindex="-1" class="workspace-pane-leaf-btn" title="上下分" @mousedown.prevent @click.stop="$emit('split', node.id, 'column')">⬓</button>
       <button
@@ -65,6 +73,7 @@ const props = defineProps({
   canSplit: { type: Boolean, default: true },
   canClose: { type: Boolean, default: true },
   canMaximize: { type: Boolean, default: true },
+  canCollapse: { type: Boolean, default: true },
   maximized: { type: Boolean, default: false },
   getTitle: { type: Function, default: null },
   getStatus: { type: Function, default: null },
@@ -73,7 +82,7 @@ const props = defineProps({
   activeSessionPanelId: { type: String, default: null },
 })
 
-defineEmits(['split', 'close', 'maximize', 'activate-session-tab', 'close-session-tab', 'add-session-tab', 'session-tab-context-menu'])
+defineEmits(['split', 'close', 'maximize', 'collapse', 'activate-session-tab', 'close-session-tab', 'add-session-tab', 'session-tab-context-menu'])
 </script>
 
 <style scoped>
