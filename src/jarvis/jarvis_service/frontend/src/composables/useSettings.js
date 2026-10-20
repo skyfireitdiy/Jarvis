@@ -42,6 +42,7 @@ export function useSettings({
   const syncConfigSections = ref(['llms', 'llm_groups']) // 要同步的配置类型数组（llms, llm_groups）
   const isSyncingConfig = ref(false) // 是否正在同步配置
   const isUpdatingCode = ref(false) // 是否正在更新代码
+  const isUpdatingSystem = ref(false) // 是否正在一键更新系统
 
   // 保存通知开关设置（仅控制弹窗，不影响提示音）
   function saveNotifySettings() {
@@ -111,6 +112,10 @@ export function useSettings({
       const childNodes = (availableNodeOptions.value || []).filter(node => node.node_id !== 'master')
       const allNodes = [...childNodes, { node_id: 'master', label: 'Master' }]
 
+      let successCount = 0
+      const totalCount = allNodes.length
+      const results = []
+
       for (const node of allNodes) {
         const nodeId = node.node_id
         const normalizedNodeId = nodeId || 'master'
@@ -128,15 +133,20 @@ export function useSettings({
           if (response.ok) {
             const data = await response.json().catch(() => ({}))
             if (data.success === false) {
+              results.push({ node_id: normalizedNodeId, success: false, message: data.error?.message || '未知错误' })
               showToast(`节点 "${normalizedNodeId}" 重启失败：${data.error?.message || '未知错误'}`, 'error')
             } else {
+              successCount++
+              results.push({ node_id: normalizedNodeId, success: true })
               showToast(`已向节点 "${normalizedNodeId}" 发送重启请求`, 'success')
             }
           } else {
+            results.push({ node_id: normalizedNodeId, success: false, message: `HTTP ${response.status}` })
             showToast(`节点 "${normalizedNodeId}" 重启失败：HTTP ${response.status}`, 'error')
           }
         } catch (error) {
           console.error(`[SETTINGS] Failed to restart node ${normalizedNodeId}:`, error)
+          results.push({ node_id: normalizedNodeId, success: false, message: error.message || '未知错误' })
           showToast(`节点 "${normalizedNodeId}" 重启失败：${error.message || '未知错误'}`, 'error')
         }
 
@@ -147,15 +157,58 @@ export function useSettings({
       }
 
       showToast('所有节点重启命令已发送完成', 'success')
+      return { successCount, totalCount, results }
     } catch (error) {
       console.error('[SETTINGS] Failed to restart all nodes:', error)
       showToast(error.message || '重启所有节点失败', 'error')
+      return { successCount: 0, totalCount: 0, results: [] }
     } finally {
       setTimeout(() => {
         isRestartingGateway().value = false
       }, 3000)
     }
   }
+  // 确认一键更新系统：先更新所有节点代码（等待完成），再重启所有节点
+  function confirmUpdateSystem() {
+    showConfirm(
+      '确认要一键更新系统吗？\n\n操作流程：\n1. 更新所有节点代码到 main 分支（等待全部完成）\n2. 依次重启所有节点（子节点在前，master 最后）\n\nmaster 重启时会同步重启前端服务，期间将短暂中断连接。',
+      () => {
+        updateSystem()
+      },
+      () => {},
+      false
+    )
+  }
+
+  // 一键更新系统：串联「更新所有节点代码」→「重启所有节点」
+  // 先更新全部节点代码并等待完成；若更新全部失败则中止重启；否则继续重启所有节点
+  // （master 重启时 restart_frontend 由 restartFrontendService 决定）。
+  async function updateSystem() {
+    if (isUpdatingSystem.value) {
+      return
+    }
+    try {
+      isUpdatingSystem.value = true
+      showToast('开始一键更新系统：正在更新所有节点代码...', 'info')
+
+      // 第一步：更新所有节点代码（等待全部完成）
+      const updateResult = await updateCodeToMain()
+      if (!updateResult || updateResult.successCount === 0) {
+        showToast('代码更新失败，已中止重启流程', 'error')
+        return
+      }
+
+      // 第二步：重启所有节点（master 重启时同步重启前端服务）
+      showToast('代码更新完成，正在重启所有节点...', 'info')
+      await restartAllNodes()
+    } catch (error) {
+      console.error('[SETTINGS] Failed to update system:', error)
+      showToast(error.message || '一键更新系统失败', 'error')
+    } finally {
+      isUpdatingSystem.value = false
+    }
+  }
+
   async function syncConfig() {
     if (isSyncingConfig.value) {
       return
@@ -319,9 +372,7 @@ export function useSettings({
           showToast(`节点 "${nodeId}" 更新失败：${error.message || '未知错误'}`, 'error')
         }
       }
-
       // 显示结果
-
       if (successCount === totalCount) {
         showToast(`代码更新成功，已更新 ${successCount}/${totalCount} 个节点`, 'success')
       } else if (successCount > 0) {
@@ -329,9 +380,12 @@ export function useSettings({
       } else {
         showToast('代码更新失败，没有节点更新成功', 'error')
       }
+
+      return { successCount, totalCount, results }
     } catch (error) {
       console.error('[SETTINGS] Failed to update code:', error)
       showToast(error.message || '代码更新失败', 'error')
+      return { successCount: 0, totalCount: 0, results: [] }
     } finally {
       isUpdatingCode.value = false
     }
@@ -345,14 +399,17 @@ export function useSettings({
     syncConfigSections,
     isSyncingConfig,
     isUpdatingCode,
+    isUpdatingSystem,
     saveNotifySettings,
     handleSyncConfig,
     handleUpdateCodeToMain,
     openAdminSystemAction,
     confirmUpdateCodeToMain,
     confirmRestartAllNodes,
+    confirmUpdateSystem,
     restartAllNodes,
     syncConfig,
     updateCodeToMain,
+    updateSystem,
   }
 }

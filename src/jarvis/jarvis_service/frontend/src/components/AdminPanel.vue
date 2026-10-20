@@ -199,9 +199,15 @@
         <div class="form-group">
           <label>代码更新</label>
           <span class="form-help">将所有节点的 Jarvis 代码切换到 main 分支并拉取最新代码</span>
-          <button class="ghost-btn" @click="updateCodeToMain" :disabled="isUpdatingCode">
-            {{ isUpdatingCode ? '更新中...' : '更新代码到 main 分支' }}
-          </button>
+          <div class="restart-service-row">
+            <button class="ghost-btn" @click="updateCodeToMain" :disabled="isUpdatingCode">
+              {{ isUpdatingCode ? '更新中...' : '更新代码到 main 分支' }}
+            </button>
+            <button class="ghost-btn" @click="confirmUpdateSystem" :disabled="isUpdatingSystem || isUpdatingCode || isRestartingGateway">
+              {{ isUpdatingSystem ? '更新系统中...' : '一键更新系统' }}
+            </button>
+          </div>
+          <span class="form-help">一键更新系统 = 先更新所有节点代码（等待完成），再依次重启所有节点（master 同步重启前端服务）</span>
         </div>
         <!-- 节点连接私钥 -->
         <div class="form-group">
@@ -323,13 +329,14 @@ const props = defineProps({
   isRestartingGateway: { type: Boolean, default: false },
   isSyncingConfig: { type: Boolean, default: false },
   isUpdatingCode: { type: Boolean, default: false },
+  isUpdatingSystem: { type: Boolean, default: false },
   getToken: { type: Function, default: null },
   pluginAdminTabs: { type: Array, default: () => [] },
   pluginExtensions: { type: Array, default: () => [] },
   getNodeDisplayName: { type: Function, default: null },
 })
 
-const emit = defineEmits(['update:visible', 'confirmRestartGateway', 'confirmRestartAllNodes', 'syncConfig', 'updateCodeToMain', 'confirmUpdateCodeToMain'])
+const emit = defineEmits(['update:visible', 'confirmRestartGateway', 'confirmRestartAllNodes', 'syncConfig', 'updateCodeToMain', 'confirmUpdateCodeToMain', 'confirmUpdateSystem'])
 
 // 节点展示名：优先宿主传入的 getNodeDisplayName（别名），否则回退 node_id
 function displayNodeName(nodeId) {
@@ -748,6 +755,10 @@ function syncConfig() {
 
 function updateCodeToMain() {
   emit('confirmUpdateCodeToMain')
+}
+
+function confirmUpdateSystem() {
+  emit('confirmUpdateSystem')
 }
 
 async function fetchNodeSecret() {

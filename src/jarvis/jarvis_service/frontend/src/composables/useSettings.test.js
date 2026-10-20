@@ -272,4 +272,64 @@ describe('useSettings', () => {
     await api.updateCodeToMain()
     expect(fetchWithAuth).not.toHaveBeenCalled()
   })
+
+  it('confirmUpdateSystem 弹出确认框，确认后执行一键更新', async () => {
+    vi.useFakeTimers()
+    const { api, showConfirm, fetchWithAuth, availableNodeOptions, isRestartingGateway } = makeHarness()
+    availableNodeOptions.value = [{ node_id: 'master' }]
+    fetchWithAuth.mockResolvedValue({ ok: true, json: async () => ({ success: true }) })
+    api.confirmUpdateSystem()
+    expect(showConfirm).toHaveBeenCalledTimes(1)
+    const confirmCallback = showConfirm.mock.calls[0][1]
+    confirmCallback()
+    await flushPromises()
+    // updateCodeToMain: master 1 次 code-update；restartAllNodes: master 1 次 restart
+    expect(fetchWithAuth).toHaveBeenCalledTimes(2)
+    expect(api.isUpdatingSystem.value).toBe(false)
+    // finally 里 3000ms 后复位 isRestartingGateway
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(isRestartingGateway.value).toBe(false)
+  })
+
+  it('updateSystem 先更新代码再重启所有节点', async () => {
+    vi.useFakeTimers()
+    const { api, fetchWithAuth, availableNodeOptions, showToast, isRestartingGateway } = makeHarness()
+    availableNodeOptions.value = [{ node_id: 'node-1' }, { node_id: 'master' }]
+    // code-update 与 service/restart 都成功
+    fetchWithAuth.mockResolvedValue({ ok: true, json: async () => ({ success: true }) })
+    const promise = api.updateSystem()
+    await flushPromises()
+    // 更新代码阶段 2 次 code-update + 重启阶段 node-1 第 1 次 restart（node-1 后 await 1s 挂起）
+    expect(fetchWithAuth).toHaveBeenCalledTimes(3)
+    expect(showToast).toHaveBeenCalledWith('开始一键更新系统：正在更新所有节点代码...', 'info')
+    // node-1 重启后等待 1s，然后 master 重启（第4次调用）
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(fetchWithAuth).toHaveBeenCalledTimes(4)
+    // finally 里 3000ms 后复位
+    await vi.advanceTimersByTimeAsync(3000)
+    await promise
+    expect(api.isUpdatingSystem.value).toBe(false)
+    expect(isRestartingGateway.value).toBe(false)
+  })
+
+  it('updateSystem 代码更新全部失败时中止重启', async () => {
+    vi.useFakeTimers()
+    const { api, fetchWithAuth, availableNodeOptions, showToast } = makeHarness()
+    availableNodeOptions.value = [{ node_id: 'node-1' }]
+    fetchWithAuth.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) })
+    const promise = api.updateSystem()
+    await flushPromises()
+    // 仅更新代码阶段调用（1 个节点），不进入重启阶段
+    expect(fetchWithAuth).toHaveBeenCalledTimes(1)
+    expect(showToast).toHaveBeenCalledWith('代码更新失败，已中止重启流程', 'error')
+    await promise
+    expect(api.isUpdatingSystem.value).toBe(false)
+  })
+
+  it('updateSystem 防重入：isUpdatingSystem 为 true 时直接返回', async () => {
+    const { api, fetchWithAuth } = makeHarness()
+    api.isUpdatingSystem.value = true
+    await api.updateSystem()
+    expect(fetchWithAuth).not.toHaveBeenCalled()
+  })
 })
