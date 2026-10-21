@@ -5,9 +5,8 @@
     class="workspace-pane-split"
     :class="node.direction === 'row' ? 'workspace-pane-split-row' : 'workspace-pane-split-column'"
   >
+    <template v-for="index in [0, 1]" :key="index">
     <div
-      v-for="index in [0, 1]"
-      :key="index"
       class="workspace-pane-split-child"
       :class="{ 'workspace-pane-split-child-collapsed': isCollapsed(index) }"
       :style="childStyle(index)"
@@ -51,13 +50,14 @@
         </template>
       </WorkspacePaneTree>
     </div>
-    <!-- 折叠时隐藏分隔条（无可拖拽的两侧） -->
+    <!-- 折叠时隐藏分隔条（无可拖拽的两侧）；放在第一个 child 之后，保持 child-divider-child 顺序 -->
     <div
-      v-if="!node.collapsed"
+      v-if="!node.collapsed && index === 0"
       class="workspace-pane-divider"
       :class="node.direction === 'row' ? 'workspace-pane-divider-vertical' : 'workspace-pane-divider-horizontal'"
       @mousedown="$emit('startResize', $event, node)"
     ></div>
+    </template>
   </div>
 
   <!-- leaf：标题栏 + 内容插槽 -->
