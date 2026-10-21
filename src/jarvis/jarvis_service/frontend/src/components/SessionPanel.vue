@@ -23,6 +23,9 @@
           <span class="session-meta-tag session-meta-tag-proxy" v-if="agent.proxy_node" title="代理节点">
             <span class="session-meta-label">代理</span>{{ getNodeDisplayName ? getNodeDisplayName(agent.proxy_node) : agent.proxy_node }}
           </span>
+          <span class="session-meta-tag session-meta-tag-dir" v-if="agent.working_dir" title="工作目录">
+            <span class="session-meta-label">目录</span>{{ agent.working_dir }}
+          </span>
         </span>
         <span class="session-agent-status" :class="getStatusClass(agent)">{{ getStatusLabel(agent) }}</span>
         <!-- 操作图标已迁移至 Ctrl+P 命令面板「当前 Agent」组 -->
@@ -243,11 +246,11 @@ const props = defineProps({
   suppressTerminal: { type: Boolean, default: false },
 })
 
-// 是否有可展示的运行配置汇总信息（节点 / 模型组 / 代理节点，Issue #200）
+// 是否有可展示的运行配置汇总信息（节点 / 模型组 / 代理节点 / 工作目录，Issue #200）
 const hasMetaInfo = computed(() => {
   const a = props.agent
   if (!a) return false
-  return Boolean(a.node_id || a.llm_group || a.proxy_node)
+  return Boolean(a.node_id || a.llm_group || a.proxy_node || a.working_dir)
 })
 
 const emit = defineEmits([
@@ -993,6 +996,12 @@ function getTerminalStyle(terminalContent) {
 
 .session-meta-tag-proxy {
   color: var(--color-warning);
+}
+
+/* 工作目录标签：放最后，空间不足时不收缩而是整体溢出被容器裁掉（宽度不够则不显示） */
+.session-meta-tag-dir {
+  flex-shrink: 0;
+  max-width: 26ch;
 }
 
 .session-agent-status {
