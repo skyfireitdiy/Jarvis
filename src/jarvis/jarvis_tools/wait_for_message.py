@@ -8,6 +8,7 @@
 
 from typing import Any, Dict
 
+from jarvis.jarvis_gateway.manager import get_current_gateway
 from jarvis.jarvis_utils.input import get_multiline_input
 
 _DEFAULT_TIP = "等待消息（输入完成后按提交键确认）"
@@ -18,10 +19,20 @@ class WaitForMessageTool:
 
     调用 get_multiline_input 并设置 ignore_auto_complete=True，
     使等待过程跳过非交互模式的自动补全分支（不补 !!!COMPLETE!!!），
-    真正阻塞等待多行输入（Gateway 模式等待前端/其他 Agent 注入消息，CLI 模式等待 stdin）。
+    真正阻塞等待多行输入（Gateway 模式等待前端/其他 Agent 注入消息）。
+    仅 Gateway 模式启用；CLI 模式无远端消息来源，不注册该工具。
     """
 
     name = "wait_for_message"
+
+    @staticmethod
+    def check() -> bool:
+        """仅当存在 Gateway 时启用（无 Gateway 时无远端消息来源，等待无意义）。"""
+        try:
+            return get_current_gateway() is not None
+        except Exception:
+            return False
+
     description = (
         "等待消息（等多行输入），忽略 auto_complete 自动补全。"
         "用于多 Agent 编排中阻塞等待其他 Agent 发来的消息，"

@@ -97,10 +97,47 @@ class _FakeGateway:
 class TestWaitForMessageTool:
     """wait_for_message 工具行为"""
 
-    def test_tool_registered_in_registry(self):
-        """工具可被 registry 加载，name 为 wait_for_message"""
-        registry = ToolRegistry()
-        assert "wait_for_message" in registry.tools
+    def test_check_only_gateway_mode(self):
+        """check() 仅当存在 Gateway 时返回 True（CLI 模式不启用）"""
+        with patch(
+            "jarvis.jarvis_tools.wait_for_message.get_current_gateway",
+            return_value=object(),
+        ):
+            assert WaitForMessageTool.check() is True
+        with patch(
+            "jarvis.jarvis_tools.wait_for_message.get_current_gateway",
+            return_value=None,
+        ):
+            assert WaitForMessageTool.check() is False
+        with patch(
+            "jarvis.jarvis_tools.wait_for_message.get_current_gateway",
+            side_effect=RuntimeError("boom"),
+        ):
+            assert WaitForMessageTool.check() is False
+
+    def test_registration_skipped_without_gateway(self):
+        """无 Gateway 时工具不注册（register_tool_by_file 跳过 check() 为 False 的工具）"""
+        import jarvis.jarvis_tools.registry as registry_mod
+
+        with patch(
+            "jarvis.jarvis_tools.wait_for_message.get_current_gateway",
+            return_value=None,
+        ):
+            registry_mod._BUILTIN_TOOLS_CACHE = None
+            r = ToolRegistry()
+            assert "wait_for_message" not in r.tools
+
+    def test_registration_with_gateway(self):
+        """有 Gateway 时工具注册"""
+        import jarvis.jarvis_tools.registry as registry_mod
+
+        with patch(
+            "jarvis.jarvis_tools.wait_for_message.get_current_gateway",
+            return_value=object(),
+        ):
+            registry_mod._BUILTIN_TOOLS_CACHE = None
+            r = ToolRegistry()
+            assert "wait_for_message" in r.tools
 
     def test_execute_returns_input(self):
         """execute 返回用户输入内容"""

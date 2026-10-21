@@ -12,7 +12,8 @@
 **功能边界**：
 
 - 范围：仅新增显式工具，不改变 `get_multiline_input` 的默认行为
-- 等待方式：复用既有多行输入链路（Gateway 模式走 `gateway.request_input` 等待前端/其他 Agent 注入；CLI 模式走 prompt_toolkit 等待 stdin）
+- 等待方式：复用既有多行输入链路（Gateway 模式走 `gateway.request_input` 等待前端/其他 Agent 注入）
+- **启用条件**：工具**仅 Gateway 模式启用**（`check()` 判断 `get_current_gateway() is not None`）；CLI 模式无远端消息来源，工具不注册
 - 忽略对象：仅忽略 auto_complete 的自动补全分支，不改变非交互模式的其它行为
 
 ## 接口定义
@@ -43,6 +44,12 @@ def get_multiline_input(
 class WaitForMessageTool:
     name = "wait_for_message"
     description = "等待消息（等多行输入），忽略 auto_complete 自动补全。用于多 Agent 编排中阻塞等待其他 Agent 的消息。"
+
+    @staticmethod
+    def check() -> bool:
+        """仅当存在 Gateway 时启用（CLI 模式无远端消息来源，不注册）。"""
+        return get_current_gateway() is not None
+
     parameters = {
         "type": "object",
         "properties": {
@@ -76,7 +83,7 @@ class WaitForMessageTool:
 - `ignore_auto_complete=False`（默认）：行为与现状完全一致。非交互 + `auto_complete=True` 时仍返回含 `!!!COMPLETE!!!` 的文本。
 - `ignore_auto_complete=True`：跳过 `input.py:1820-1821` 的非交互自动补全分支，直接进入真实等待。此时：
   - Gateway 模式：`gateway.request_input` 等待前端或其他 Agent 通过 `/message` 接口注入消息
-  - CLI 模式：prompt_toolkit 等待 stdin 输入
+- **仅 Gateway 模式**：`wait_for_message` 工具通过 `check()` 判断 gateway 是否存在，无 gateway（CLI 模式）时不注册该工具
 
 ### 输出
 
@@ -110,4 +117,6 @@ class WaitForMessageTool:
 5. 新增单元测试覆盖：默认行为不受影响、`ignore_auto_complete=True` 绕过补全、工具返回输入内容
 6. `get_multiline_input` 新增 `timeout` 参数（默认 `None`），Gateway 模式下透传并超时返回空字符串；CLI 模式不生效保持阻塞
 7. 工具 `wait_for_message` 支持 `timeout` 参数，超时返回 `success: true, stdout: ""`
-8. 相关既有测试无回归
+8. 工具**仅 Gateway 模式启用**：`check()` 返回 `get_current_gateway() is not None`；无 gateway（CLI 模式）时 registry 跳过注册，工具不出现在清单
+9. 工具已加入 CodeAgent 工具清单（`code_agent.py` 的 `base_tools`）
+10. 相关既有测试无回归
