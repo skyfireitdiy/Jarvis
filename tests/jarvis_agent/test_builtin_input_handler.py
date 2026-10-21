@@ -2,6 +2,7 @@
 """测试 builtin_input_handler 中的工具函数"""
 
 from jarvis.jarvis_agent.builtin_input_handler import (
+    _detect_file_lang,
     _extract_file_path,
     extract_tags_from_text,
 )
@@ -128,3 +129,38 @@ class TestExtractFilePath:
         """测试带说明文字的输入"""
         raw = "请查看 /home/sky/file.md 这个文件"
         assert _extract_file_path(raw) == "/home/sky/file.md"
+
+
+class TestDetectFileLang:
+    """测试 _detect_file_lang 函数（<Cat> 自动识别文件语言）"""
+
+    def test_markdown_file(self):
+        """markdown 文件识别为 markdown"""
+        assert _detect_file_lang("/home/sky/report.md", "# 标题\n\n**加粗**") == "markdown"
+        assert _detect_file_lang("/home/sky/README.markdown", "# 标题") == "markdown"
+
+    def test_python_file(self):
+        """python 文件识别为 python"""
+        assert _detect_file_lang("/home/sky/app.py", 'def hello():\n    print("hi")') == "python"
+
+    def test_common_code_files(self):
+        """常见代码文件识别"""
+        assert _detect_file_lang("/home/sky/main.go", 'package main\nimport "fmt"') == "go"
+        assert _detect_file_lang("/home/sky/script.sh", "#!/bin/bash\necho hi") == "bash"
+        assert _detect_file_lang("/home/sky/config.json", '{"name": "test"}') == "json"
+        assert _detect_file_lang("/home/sky/data.yaml", "name: test") == "yaml"
+        assert _detect_file_lang("/home/sky/app.js", "function hello() {}") == "javascript"
+        assert _detect_file_lang("/home/sky/style.css", "body { color: red; }") == "css"
+        assert _detect_file_lang("/home/sky/index.html", "<html><body>hi</body></html>") == "html"
+
+    def test_plain_text_file(self):
+        """纯文本文件识别为 text"""
+        assert _detect_file_lang("/home/sky/notes.txt", "普通文本") == "text"
+
+    def test_unknown_file(self):
+        """无法识别的文件返回 None"""
+        assert _detect_file_lang("/home/sky/unknown.xyz", "random content") is None
+
+    def test_empty_content(self):
+        """空内容也能按文件名识别"""
+        assert _detect_file_lang("/home/sky/app.py", "") == "python"

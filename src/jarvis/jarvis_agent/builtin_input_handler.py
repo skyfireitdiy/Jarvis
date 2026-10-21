@@ -13,6 +13,9 @@ from typing import Tuple
 
 import yaml
 
+from pygments.lexers import guess_lexer_for_filename
+from pygments.util import ClassNotFound
+
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_platform_manager.main import chat_with_model
 from jarvis.jarvis_utils.config import (
@@ -169,6 +172,62 @@ def _extract_file_path(raw: str) -> str:
         return win_match.group(1)
     # 5. 整行就是路径（去除引号和空白后）
     return text.strip().strip('"').strip("'")
+
+
+def _detect_file_lang(file_path: str, content: str = "") -> str | None:
+    """根据文件名和内容自动识别文件语言，用于前端渲染。
+
+    使用 pygments 的 guess_lexer_for_filename（按文件名+内容检测，比纯内容检测可靠）。
+    markdown 文件前端直接渲染；代码文件前端包成代码块高亮；无法识别返回 None（纯文本）。
+
+    参数:
+        file_path: 文件路径
+        content: 文件内容（可选，辅助检测）
+
+    返回:
+        str | None: 识别到的语言（如 "markdown"、"python"），无法识别返回 None
+    """
+    # pygments lexer.name -> 前端/CLI 使用的语言短名
+    _LEXER_NAME_TO_LANG = {
+        "Python": "python",
+        "JavaScript": "javascript",
+        "TypeScript": "typescript",
+        "Java": "java",
+        "C++": "cpp",
+        "C#": "csharp",
+        "Ruby": "ruby",
+        "PHP": "php",
+        "Go": "go",
+        "Rust": "rust",
+        "Bash": "bash",
+        "Shell": "bash",
+        "HTML": "html",
+        "CSS+Lasso": "css",
+        "CSS": "css",
+        "SQL": "sql",
+        "R": "r",
+        "Kotlin": "kotlin",
+        "Swift": "swift",
+        "Scala": "scala",
+        "Perl": "perl",
+        "Lua": "lua",
+        "YAML": "yaml",
+        "JSON": "json",
+        "XML": "xml",
+        "Markdown": "markdown",
+        "Text only": "text",
+        "Text": "text",
+        "Docker": "dockerfile",
+        "Dockerfile": "dockerfile",
+        "Makefile": "makefile",
+        "INI": "ini",
+        "TOML": "toml",
+    }
+    try:
+        lexer = guess_lexer_for_filename(file_path, content)
+        return _LEXER_NAME_TO_LANG.get(lexer.name)
+    except (ClassNotFound, Exception):
+        return None
 
 
 def _get_rule_content(rule_name: str) -> str | None:
@@ -2072,7 +2131,8 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 PrettyOutput.auto_print(f"🔤 编码: {used_encoding}")
 
                 # 显示文件内容
-                PrettyOutput.auto_print(content)
+                # 自动识别文件语言：markdown 前端直接渲染，代码文件前端高亮
+                PrettyOutput.auto_print(content, lang=_detect_file_lang(file_path, content))
                 PrettyOutput.auto_print("✅ 文件读取完成")
 
             except Exception as e:

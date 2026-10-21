@@ -295,6 +295,20 @@ describe('useMessage', () => {
       expect(html).not.toContain('<script>')
       expect(html).toContain('&lt;script&gt;')
     })
+    it('代码语言包装为 markdown 代码块（语法高亮）', () => {
+      const { api } = makeHarness()
+      const html = api.renderMessageHtml({ text: 'def hello():\n    print("hi")', lang: 'python' })
+      // 应被 marked 渲染为 <pre><code class="language-python"> 代码块
+      expect(html).toContain('language-python')
+      expect(html).toContain('<pre')
+    })
+    it('未知语言保持纯文本转义', () => {
+      const { api } = makeHarness()
+      const html = api.renderMessageHtml({ text: '# 不是标题', lang: 'unknown_lang' })
+      // 未知 lang 不应被当作 markdown 渲染
+      expect(html).not.toContain('<h1')
+      expect(html).toContain('# 不是标题')
+    })
   })
 
   describe('appendOutput', () => {

@@ -739,6 +739,13 @@ function safeSerialize(value) {
 
 
 // 统一的消息HTML渲染函数（用于新消息和历史消息）
+// 已知的代码语言：这些 lang 会被包成 markdown 代码块渲染（复用 marked + highlight.js 高亮）
+const CODE_LANGS = new Set([
+  'python', 'javascript', 'typescript', 'java', 'cpp', 'csharp', 'ruby', 'php',
+  'go', 'rust', 'bash', 'shell', 'html', 'css', 'sql', 'r', 'kotlin', 'swift',
+  'scala', 'perl', 'lua', 'yaml', 'json', 'xml', 'dockerfile', 'makefile',
+  'ini', 'toml', 'diff',
+])
 function renderMessageHtml(payload) {
   if (payload?.output_type === 'DIFF') {
     // 专门的 DIFF 类型：解析 side by side diff 数据
@@ -753,9 +760,9 @@ function renderMessageHtml(payload) {
   }
   if (payload?.lang === 'markdown') {
     return marked.parse(payload.text || '', { breaks: true })
-  } else if (payload?.lang === 'diff') {
-    // 将 diff 包装在 markdown 代码块中，以便语法高亮
-    return marked.parse(`\`\`\`diff\n${payload.text || ''}\n\`\`\``)
+  } else if (CODE_LANGS.has(payload?.lang)) {
+    // 代码语言：包装在 markdown 代码块中，以便语法高亮
+    return marked.parse(`\`\`\`${payload.lang}\n${payload.text || ''}\n\`\`\``)
   } else {
     return escapeHtml(payload.text || '')
   }
