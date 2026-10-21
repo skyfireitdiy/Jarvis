@@ -132,26 +132,43 @@ def extract_tags_from_text(text: str | list | None) -> List[str]:
     return re.findall(r"'<([^>]+)>'", text)
 
 
-def _clean_file_path_input(raw: str) -> str:
-    """清理用户输入的文件路径。
+def _extract_file_path(raw: str) -> str:
+    """从用户输入中提取文件路径。
 
     Gateway 模式下多行输入会自动附加发送人前缀（如 "Administrator："），
-    这里剥离前缀并去除首尾引号，避免路径解析失败。
+    这里不剥离前缀，而是直接匹配其中的路径，避免误伤 Windows 盘符路径。
 
     参数:
-        raw: 用户输入的原始路径字符串
+        raw: 用户输入的原始文本
 
     返回:
-        str: 清理后的路径
+        str: 提取到的路径，未找到则返回空字符串
     """
     if not raw:
         return ""
-    # 剥离发送人前缀（xxx：或xxx:），仅当其后紧跟路径起始符（/、~、.、引号）时，
-    # 避免误伤 Windows 盘符路径（如 C:\\path）
-    m = re.match(r"^[^/\\：:]+?[：:]\s*(?=[/'\"~.])", raw)
-    if m:
-        raw = raw[m.end():]
-    return raw.strip().strip('"').strip("'")
+    text = raw.strip()
+    # 1. 带引号的路径（可含空格）
+    quoted_match = re.search(r'["\']([^"\']+)["\']', text)
+    if quoted_match:
+        return quoted_match.group(1).strip()
+    # 2. 绝对路径或 home 路径（/path 或 ~/path）
+    abs_match = re.search(
+        r'(?:^|[\s：:])((/[^\s：:"\']+)|(~/[^\s：:"\']+))', text
+    )
+    if abs_match:
+        return abs_match.group(1)
+    # 3. 相对路径（./path 或 ../path）
+    rel_match = re.search(r'(?:^|[\s：:])((\.{1,2}/[^\s：:"\']+))', text)
+    if rel_match:
+        return rel_match.group(1)
+    # 4. Windows 路径（C:\path）
+    win_match = re.search(
+        r'(?:^|[\s：:])(([A-Za-z]:[\\/][^\s：:"\']+))', text
+    )
+    if win_match:
+        return win_match.group(1)
+    # 5. 整行就是路径（去除引号和空白后）
+    return text.strip().strip('"').strip("'")
 
 
 def _get_rule_content(rule_name: str) -> str | None:
@@ -1998,7 +2015,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             PrettyOutput.auto_print("请输入文件路径（支持相对路径和绝对路径）:")
 
             # 使用多行输入获取文件路径
-            file_path = _clean_file_path_input(
+            file_path = _extract_file_path(
                 get_multiline_input("输入文件路径，按Enter确认")
             )
 

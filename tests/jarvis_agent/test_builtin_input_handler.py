@@ -2,7 +2,7 @@
 """测试 builtin_input_handler 中的工具函数"""
 
 from jarvis.jarvis_agent.builtin_input_handler import (
-    _clean_file_path_input,
+    _extract_file_path,
     extract_tags_from_text,
 )
 
@@ -71,55 +71,60 @@ class TestExtractTagsFromText:
         assert extract_tags_from_text(text) == []
 
 
-class TestCleanFilePathInput:
-    """测试 _clean_file_path_input 函数"""
+class TestExtractFilePath:
+    """测试 _extract_file_path 函数"""
 
     def test_sender_prefix_with_quoted_path(self):
         """测试带发送人前缀和引号的绝对路径（Bug 复现场景）"""
         raw = "Administrator：'/home/sky/REVERSA_原理分析报告.md'"
-        assert _clean_file_path_input(raw) == "/home/sky/REVERSA_原理分析报告.md"
+        assert _extract_file_path(raw) == "/home/sky/REVERSA_原理分析报告.md"
 
     def test_sender_prefix_with_double_quotes(self):
         """测试带发送人前缀和双引号的路径"""
         raw = 'Administrator:"/home/sky/a b.md"'
-        assert _clean_file_path_input(raw) == "/home/sky/a b.md"
+        assert _extract_file_path(raw) == "/home/sky/a b.md"
 
     def test_sender_prefix_plain_abs_path(self):
         """测试带发送人前缀的无引号绝对路径"""
         raw = "Administrator：/home/sky/file.md"
-        assert _clean_file_path_input(raw) == "/home/sky/file.md"
+        assert _extract_file_path(raw) == "/home/sky/file.md"
 
     def test_sender_prefix_halfwidth_colon(self):
         """测试半角冒号前缀"""
         raw = "Admin:/home/sky/file.md"
-        assert _clean_file_path_input(raw) == "/home/sky/file.md"
+        assert _extract_file_path(raw) == "/home/sky/file.md"
 
     def test_sender_prefix_home_path(self):
         """测试带前缀的 home 路径"""
         raw = "Administrator：~/file.md"
-        assert _clean_file_path_input(raw) == "~/file.md"
+        assert _extract_file_path(raw) == "~/file.md"
 
     def test_sender_prefix_relative_path(self):
         """测试带前缀的相对路径"""
         raw = "Administrator：'./rel/file.md'"
-        assert _clean_file_path_input(raw) == "./rel/file.md"
+        assert _extract_file_path(raw) == "./rel/file.md"
 
     def test_plain_abs_path_unchanged(self):
-        """测试无前缀的绝对路径不被误改"""
+        """测试无前缀的绝对路径"""
         raw = "/home/sky/file.md"
-        assert _clean_file_path_input(raw) == "/home/sky/file.md"
+        assert _extract_file_path(raw) == "/home/sky/file.md"
 
-    def test_windows_drive_path_unchanged(self):
-        """测试 Windows 盘符路径不被误伤"""
+    def test_windows_drive_path(self):
+        """测试 Windows 盘符路径"""
         raw = "C:\\path\\file.md"
-        assert _clean_file_path_input(raw) == "C:\\path\\file.md"
+        assert _extract_file_path(raw) == "C:\\path\\file.md"
 
     def test_empty_input(self):
         """测试空输入"""
-        assert _clean_file_path_input("") == ""
-        assert _clean_file_path_input("   ") == ""
+        assert _extract_file_path("") == ""
+        assert _extract_file_path("   ") == ""
 
-    def test_quoted_path_cleaned(self):
-        """测试引号清理"""
+    def test_quoted_path(self):
+        """测试引号包裹的路径"""
         raw = "'/home/sky/file.md'"
-        assert _clean_file_path_input(raw) == "/home/sky/file.md"
+        assert _extract_file_path(raw) == "/home/sky/file.md"
+
+    def test_path_with_description(self):
+        """测试带说明文字的输入"""
+        raw = "请查看 /home/sky/file.md 这个文件"
+        assert _extract_file_path(raw) == "/home/sky/file.md"
