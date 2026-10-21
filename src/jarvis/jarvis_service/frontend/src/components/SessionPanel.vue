@@ -998,10 +998,11 @@ function getTerminalStyle(terminalContent) {
   color: var(--color-warning);
 }
 
-/* 工作目录标签：放最后，空间不足时不收缩而是整体溢出被容器裁掉（宽度不够则不显示） */
+/* 工作目录标签：放最后，空间足够时完整显示（不设截断宽度）；
+   空间不足时不收缩而是整体溢出被容器裁掉（宽度不够则不显示） */
 .session-meta-tag-dir {
   flex-shrink: 0;
-  max-width: 26ch;
+  max-width: none;
 }
 
 .session-agent-status {
