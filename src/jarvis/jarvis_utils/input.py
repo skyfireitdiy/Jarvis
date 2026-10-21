@@ -1798,7 +1798,12 @@ def _get_multiline_input_internal(
         return CTRL_C_SENTINEL
 
 
-def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
+def get_multiline_input(
+    tip: str,
+    print_on_empty: bool = True,
+    ignore_auto_complete: bool = False,
+    timeout: Optional[float] = None,
+) -> str:
     """
     获取带有增强补全和确认功能的多行输入。
     此函数处理控制流，允许在不破坏终端状态的情况下处理历史记录复制。
@@ -1806,6 +1811,10 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
     参数:
         tip: 提示文本，将显示在底部工具栏中
         print_on_empty: 当输入为空字符串时，是否打印“输入已取消”提示。默认打印。
+        ignore_auto_complete: 是否忽略 auto_complete 自动补全。为 True 时跳过非交互模式的
+            自动补全分支（不补 !!!COMPLETE!!!），直接进入真实等待。默认 False，行为与现状一致。
+        timeout: 等待超时秒数（可选）。仅 Gateway 模式生效；CLI 模式（prompt_toolkit 阻塞）
+            不支持超时，保持无限等待。默认 None 表示无限等待。
     """
     # 获取提交快捷键配置，用于生成提示文本
     submit_keys = get_submit_keys()
@@ -1817,7 +1826,8 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
     preset_cursor: Optional[int] = None
     while True:
         # 基于“当前Agent”精确判断非交互与自动完成，避免多Agent相互干扰
-        if _is_non_interactive_for_current_agent():
+        # ignore_auto_complete=True 时跳过该分支，用于显式等待消息（不补 !!!COMPLETE!!!）
+        if not ignore_auto_complete and _is_non_interactive_for_current_agent():
             return _get_non_interactive_response(_is_auto_complete_for_current_agent())
 
         def _get_input_via_provider() -> str:
@@ -1846,6 +1856,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                     mode="multi",
                     preset=preset,
                     preset_cursor=preset_cursor,
+                    timeout=timeout,
                 )
                 result = gateway.request_input(request)
                 user_input = result.text if result is not None else ""
