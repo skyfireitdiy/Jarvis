@@ -33,6 +33,7 @@ class GatewayInputRequest:
     preset: Optional[str] = None
     preset_cursor: Optional[int] = None
     is_password: bool = False
+    timeout: Optional[float] = None  # 等待超时秒数，None 表示无限等待
     metadata: Optional[Dict[str, Any]] = None
 
 
