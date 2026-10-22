@@ -46,13 +46,10 @@ class TestBuildSnapshotFiles:
         plan = build_snapshot_files("ignored", files)
         assert len(plan) == 4
         by_name = {os.path.basename(p["path"]): p for p in plan}
-        # 主会话 / commit 使用 indent=4
-        assert by_name["a_saved_session_x_20260101_000000.json"]["indent"] == 4
-        assert by_name["a_saved_session_x_20260101_000000_commit.json"]["indent"] == 4
-        # state / tasklist 使用 indent=2
-        assert by_name["a_saved_session_x_20260101_000000_state.json"]["indent"] == 2
-        assert by_name["a_saved_session_x_tasklist.json"]["indent"] == 2
-        # 仅 state 使用 SafeEncoder
+        # 单文件格式：所有文件统一使用 indent=4
+        for name, p in by_name.items():
+            assert p["indent"] == 4, f"{name} 应使用 indent=4"
+        # 仅带 default 编码器的文件使用 SafeEncoder
         assert by_name["a_saved_session_x_20260101_000000_state.json"][
             "use_safe_encoder"
         ]
@@ -89,9 +86,6 @@ class TestSessionDaemonCrash:
     def test_crash_writes_files(self, tmp_path):
         """在独立子进程中运行守护进程，父进程发送快照后直接 _exit 模拟被 kill。"""
         session_file = str(tmp_path / "sess_saved_session_agent_20260101_000000.json")
-        commit_file = session_file[:-5] + "_commit.json"
-        state_file = str(tmp_path / "sess_saved_session_agent_20260101_000000_state.json")
-        tasklist_file = str(tmp_path / "sess_saved_session_agent_tasklist.json")
 
         script = f"""
 import os, time
@@ -99,14 +93,9 @@ from jarvis.jarvis_agent.session_daemon import SessionDaemon
 d = SessionDaemon()
 assert d.start()
 files = [
-    {{"path": {session_file!r}, "data": {{"messages": [{{"role": "user", "content": "hi"}}]}},
+    {{"path": {session_file!r}, "data": {{"messages": [{{"role": "user", "content": "hi"}}],
+      "session_meta": {{"commit": {{"current_commit": "abc", "agent_name": "agent"}}}}}},
       "indent": 4, "use_safe_encoder": False}},
-    {{"path": {commit_file!r}, "data": {{"current_commit": "abc", "agent_name": "agent"}},
-      "indent": 4, "use_safe_encoder": False}},
-    {{"path": {state_file!r}, "data": {{"metadata": {{"agent_name": "agent"}}}},
-      "indent": 2, "use_safe_encoder": True}},
-    {{"path": {tasklist_file!r}, "data": {{"task_lists": {{}}}},
-      "indent": 2, "use_safe_encoder": False}},
 ]
 assert d.send_snapshot(files)
 time.sleep(0.3)
@@ -122,18 +111,14 @@ os._exit(0)
         )
         assert proc.returncode == 0, proc.stderr
 
-        # 守护进程应在 EOF 后落盘 4 个文件
+        # 守护进程应在 EOF 后落盘主会话文件（单文件格式）
         assert _wait_for(lambda: os.path.exists(session_file)), "主会话文件未落盘"
-        assert _wait_for(lambda: os.path.exists(commit_file)), "commit 文件未落盘"
-        assert _wait_for(lambda: os.path.exists(state_file)), "state 文件未落盘"
-        assert _wait_for(lambda: os.path.exists(tasklist_file)), "tasklist 文件未落盘"
 
         # 内容应可被正常解析（格式与 save_session 一致）
         with open(session_file, "r", encoding="utf-8") as f:
             data = json.load(f)
         assert data["messages"][0]["content"] == "hi"
-        with open(commit_file, "r", encoding="utf-8") as f:
-            assert json.load(f)["current_commit"] == "abc"
+        assert data["session_meta"]["commit"]["current_commit"] == "abc"
 
 
 class TestSessionDaemonDisabled:

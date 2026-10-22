@@ -83,45 +83,53 @@ class TestSessionManager:
         mock_model.reset.assert_called_once()
 
     @patch("os.makedirs")
-    def test_save_session_success(self, mock_makedirs, session_manager, mock_model):
-        """测试成功保存会话"""
+    @patch("jarvis.jarvis_agent.session_manager.atomic_write_json")
+    def test_save_session_success(self, mock_write, mock_makedirs, session_manager, mock_model):
+        """测试成功保存会话（单文件格式）"""
         import re
+
+        mock_model.get_messages.return_value = [{"role": "user", "content": "hi"}]
 
         with patch("os.getcwd", return_value="/test/dir"):
             result = session_manager.save_session()
 
             # 验证结果
             assert result is True
-            mock_makedirs.assert_called_once_with(
-                "/test/dir/.jarvis/sessions", exist_ok=True
-            )
+
+            # 验证只写一个文件（主会话文件，单文件格式）
+            assert mock_write.call_count == 1
+            file_path, data = mock_write.call_args[0][0], mock_write.call_args[0][1]
 
             # 验证保存路径格式（文件名包含时间戳）
-            actual_path = mock_model.save.call_args[0][0]
-            # 文件名可能包含会话名称前缀（如：未命名会话）
             expected_pattern = r"/test/dir/\.jarvis/sessions/[^_]*_saved_session_test_agent_\d{8}_\d{6}\.json$"
-            assert re.match(expected_pattern, actual_path), (
-                f"路径格式不匹配: {actual_path}"
+            assert re.match(expected_pattern, file_path), (
+                f"路径格式不匹配: {file_path}"
             )
 
+            # 验证单文件结构：messages + session_meta（commit/state/tasklist）
+            assert "messages" in data
+            assert "session_meta" in data
+
     @patch("os.makedirs")
+    @patch("jarvis.jarvis_agent.session_manager.atomic_write_json")
     def test_save_session_with_special_chars(
-        self, mock_makedirs, session_manager, mock_model
+        self, mock_write, mock_makedirs, session_manager, mock_model
     ):
         """测试带特殊字符的模型名称"""
         import re
 
         mock_model.name.return_value = "test/model\\name"
+        mock_model.get_messages.return_value = [{"role": "user", "content": "hi"}]
 
         with patch("os.getcwd", return_value="/test/dir"):
             session_manager.save_session()
 
             # 验证特殊字符被替换，且文件名包含时间戳
-            actual_path = mock_model.save.call_args[0][0]
+            file_path = mock_write.call_args[0][0]
             # 文件名可能包含会话名称前缀（如：未命名会话）
             expected_pattern = r"/test/dir/\.jarvis/sessions/[^_]*_saved_session_test_agent_\d{8}_\d{6}\.json$"
-            assert re.match(expected_pattern, actual_path), (
-                f"路径格式不匹配: {actual_path}"
+            assert re.match(expected_pattern, file_path), (
+                f"路径格式不匹配: {file_path}"
             )
 
     @patch("os.path.exists")
@@ -320,7 +328,8 @@ class TestSecretGuardPersistence:
         """_restore_agent_state 恢复 secret_guard_mapping。"""
         agent = self._make_agent()
         sm = SessionManager(mock_model, "test_agent", agent=agent)
-        sm.last_restored_session = "/tmp/fake_20260101_000000.json"
+        session_file = tmp_path / "test_agent_20260101_000000.json"
+        sm.last_restored_session = str(session_file)
 
         state_data = {
             "agent_runtime": {
@@ -330,14 +339,13 @@ class TestSecretGuardPersistence:
         }
         import json
 
-        session_dir = tmp_path / ".jarvis" / "sessions"
-        session_dir.mkdir(parents=True)
-        state_file = session_dir / "test_agent_20260101_000000_state.json"
-        state_file.write_text(json.dumps(state_data), encoding="utf-8")
-
-        monkeypatch.chdir(tmp_path)
-        monkeypatch.setattr(sm, "_get_session_file_prefix", lambda: "test_agent")
-        monkeypatch.setattr(sm, "_extract_timestamp", lambda s: "20260101_000000")
+        session_file.write_text(
+            json.dumps(
+                {"messages": [], "session_meta": {"state": state_data}},
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
 
         sm._restore_agent_state()
         assert agent.secret_guard_mapping == {"⟦SECRET_abcdef⟧": "真实口令值"}
@@ -348,20 +356,19 @@ class TestSecretGuardPersistence:
         """状态文件无 secret_guard_mapping 时恢复为空 dict。"""
         agent = self._make_agent({"⟦SECRET_abcdef⟧": "旧值"})
         sm = SessionManager(mock_model, "test_agent", agent=agent)
-        sm.last_restored_session = "/tmp/fake_20260101_000000.json"
+        session_file = tmp_path / "test_agent_20260101_000000.json"
+        sm.last_restored_session = str(session_file)
 
         state_data = {"agent_runtime": {"first": False}}
         import json
 
-        session_dir = tmp_path / ".jarvis" / "sessions"
-        session_dir.mkdir(parents=True)
-        state_file = session_dir / "test_agent_20260101_000000_state.json"
-        state_file.write_text(json.dumps(state_data), encoding="utf-8")
-
-        monkeypatch.chdir(tmp_path)
-        monkeypatch.setattr(sm, "_get_session_file_prefix", lambda: "test_agent")
-        monkeypatch.setattr(sm, "_extract_timestamp", lambda s: "20260101_000000")
+        session_file.write_text(
+            json.dumps(
+                {"messages": [], "session_meta": {"state": state_data}},
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
 
         sm._restore_agent_state()
-        # 状态文件无 mapping 时恢复为空 dict（不保留旧值，静默跳过）
         assert agent.secret_guard_mapping == {}
