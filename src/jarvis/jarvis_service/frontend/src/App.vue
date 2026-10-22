@@ -3499,7 +3499,7 @@ const {
   findWorkspacePaneById, activateWorkspacePane, toggleMaximizeWorkspacePane,
   togglePaneCollapse, expandAllCollapsedPanes, togglePaneCollapseSide,
   moveActivePaneInDirection, splitWorkspacePane, closeWorkspacePane, collapseWorkspacePanes,
-  findWorkspacePaneBySessionPanelId, findWorkspacePaneByView, ensureAgentEditorPane,
+  findWorkspacePaneBySessionPanelId, findWorkspacePaneByView, findEmptyWorkspacePane, ensureAgentEditorPane,
   ensureEditorPaneForFileOpen, setMainViewOnLeaf, ensurePaneForView, setActivePaneView,
   setActivePaneViewForPane, getWorkspacePaneTitle, getWorkspacePaneStatus, getPanePanel,
   isPaneActive, paneSessionPanelIds, paneActiveSessionPanelId,
@@ -4133,7 +4133,7 @@ function activatePanel(panelId) {
 // 返回是否成功（无 empty pane 时返回 false，由调用方走原有逻辑）。
 function openAgentInEmptyPane(agent) {
   if (!agent) return false
-  const emptyPane = findWorkspacePaneByView('empty')
+  const emptyPane = findEmptyWorkspacePane()
   if (!emptyPane) return false
   const targetPanel = {
     id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -5279,15 +5279,23 @@ function onWorkspaceSidebarAgentClick(agent) {
       activateWorkspacePane(hostingPane.id)
     } else {
       // 该 Panel 未被任何 pane 承载（如承载它的 pane 已被关闭但 Panel 残留）：
-      // 优先复用已打开的 session 面板（把该 Panel 追加为 tab），找不到才分割。
-      const sessionPane = findWorkspacePaneByView('session')
-      if (sessionPane) {
-        addSessionTabToPane(sessionPane, existingPanel.id)
-        activateSessionTabInPane(sessionPane, existingPanel.id)
-        activateWorkspacePane(sessionPane.id)
+      // 优先利用空白区域（empty pane），把该 Panel 放入空区域，避免挤占已有 session 面板。
+      const emptyPane = findEmptyWorkspacePane()
+      if (emptyPane) {
+        setActivePaneViewForPane(emptyPane, 'session', existingPanel.id)
+        activateSessionTabInPane(emptyPane, existingPanel.id)
+        activateWorkspacePane(emptyPane.id)
       } else {
-        // 空则原地、否则分割（不覆盖当前区域）
-        ensurePaneForView('session', existingPanel.id)
+        // 无空区域：优先复用已打开的 session 面板（把该 Panel 追加为 tab），找不到才分割。
+        const sessionPane = findWorkspacePaneByView('session')
+        if (sessionPane) {
+          addSessionTabToPane(sessionPane, existingPanel.id)
+          activateSessionTabInPane(sessionPane, existingPanel.id)
+          activateWorkspacePane(sessionPane.id)
+        } else {
+          // 空则原地、否则分割（不覆盖当前区域）
+          ensurePaneForView('session', existingPanel.id)
+        }
       }
     }
     activePanelId.value = existingPanel.id

@@ -1242,4 +1242,37 @@ describe('useWorkspacePane', () => {
     expect(api.isWorkspacePaneCollapsed(pane2Id)).toBe(false)
     expect(api.activePaneId.value).toBe(pane2Id)
   })
+  it('findEmptyWorkspacePane：能识别 view=file 但未绑定文件的空 pane（回归：仅按 empty 查找会漏掉）', () => {
+    const { api, workspaceViewPanes } = makeHarness()
+    const rootId = api.workspacePaneTree.value.id
+    api.splitWorkspacePane(rootId, 'row')
+    const tree = api.workspacePaneTree.value
+    const left = tree.children[0]
+    const right = tree.children[1]
+    // 左侧承载 session（非空区域）
+    left.view = 'session'
+    left.sessionPanelId = 'panel-1'
+    // 右侧是 file 视图但未绑定文件（关闭文件后遗留的空 file pane，标题显示「空区域」）
+    right.view = 'file'
+    // 不应把 session pane 当空区域；应找到右侧 file 空 pane
+    expect(api.findEmptyWorkspacePane()).toBe(right)
+    // 一旦右侧绑定文件（进入 workspaceViewPanes），就不再是空区域
+    workspaceViewPanes.set(right.id, { path: '/a.js' })
+    expect(api.findEmptyWorkspacePane()).toBeNull()
+  })
+
+  it('findEmptyWorkspacePane：优先返回 view=empty 的显式空 pane，且跳过承载 session 的 pane', () => {
+    const { api } = makeHarness()
+    const rootId = api.workspacePaneTree.value.id
+    api.splitWorkspacePane(rootId, 'row')
+    const tree = api.workspacePaneTree.value
+    const left = tree.children[0]
+    const right = tree.children[1]
+    // 两个都是 empty 时返回第一个
+    expect(api.findEmptyWorkspacePane()).toBe(left)
+    // 左侧设为 session 后，返回右侧 empty
+    left.view = 'session'
+    left.sessionPanelId = 'panel-1'
+    expect(api.findEmptyWorkspacePane()).toBe(right)
+  })
 })

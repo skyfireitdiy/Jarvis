@@ -906,7 +906,23 @@ function isPaneEmptyForFileOpen(pane) {
   }
   return false
 }
-
+// 找出第一个可视为「空区域」的 pane（深度优先）：
+// 既包含 view === 'empty'，也包含 view === 'file' 但未绑定文件的空 pane。
+// 用于「打开 Agent 时优先利用空白区域」：仅按 view === 'empty' 查找会漏掉
+// 关闭文件后遗留的空 file pane，导致空白区域未被利用。
+function findEmptyWorkspacePane(exceptPaneId = null) {
+  let found = null
+  const walk = (node) => {
+    if (!node || found) return
+    if (node.type === 'leaf') {
+      if (node.id !== exceptPaneId && isPaneEmptyForFileOpen(node)) found = node
+      return
+    }
+    ;(node.children || []).forEach(walk)
+  }
+  walk(workspacePaneTree.value)
+  return found
+}
 // 找出「已打开的编辑器面板」：优先该 Agent 的 file pane，其次任意 file pane。
 // 用于点击侧边文件时复用已有编辑器面板，而非覆盖当前会话/聊天/终端区域。
 function findAnyFilePane(agentId) {
@@ -1641,6 +1657,7 @@ watch(
     collapseWorkspacePanes,
     findWorkspacePaneBySessionPanelId,
     findWorkspacePaneByView,
+    findEmptyWorkspacePane,
     ensureAgentEditorPane,
     ensureEditorPaneForFileOpen,
     setMainViewOnLeaf,
