@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jarvis-ai-assistant"
-version = "7.0.1"
+version = "7.1.0"
 description = "Jarvis: An AI assistant that uses tools to interact with the system"
 readme = "README.md"
 authors = [{ name = "skyfire", email = "skyfireitdiy@hotmail.com" }]
@@ -146,7 +146,7 @@ dependencies = [
     select = ["E4", "E7", "E9", "F"]
 
     [tool.pytest.ini_options]
-    minversion = "7.0.1"
+    minversion = "7.1.0"
     addopts = "-ra -q --strict-markers -m 'not slow'"
     testpaths = ["tests"]
     python_files = ["test_*.py", "*_test.py"]

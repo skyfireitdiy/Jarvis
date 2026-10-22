@@ -1,7 +1,7 @@
 {
   "name": "jarvis-web-gateway",
   "private": true,
-  "version": "7.0.1",
+  "version": "7.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
