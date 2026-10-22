@@ -4129,7 +4129,29 @@ function activatePanel(panelId) {
 // 说明：只操作激活 pane，绝不动其他 pane 承载的 Panel（否则会把别的区域的会话清掉）。
 // 注意：激活 pane 已承载 Agent 会话时不再覆盖，而是追加 tab（多 tab 语义），
 // 避免命令面板/侧边栏切换 Agent 时把当前会话覆盖掉。
+// 优先在「空白区域」打开 Agent：若存在 empty pane，把该 pane 切换为 session 视图承载 Agent。
+// 返回是否成功（无 empty pane 时返回 false，由调用方走原有逻辑）。
+function openAgentInEmptyPane(agent) {
+  if (!agent) return false
+  const emptyPane = findWorkspacePaneByView('empty')
+  if (!emptyPane) return false
+  const targetPanel = {
+    id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    agentId: agent.agent_id
+  }
+  panels.value.push(targetPanel)
+  activePanelId.value = targetPanel.id
+  workspaceSessionPanelId.value = targetPanel.id
+  setActivePaneViewForPane(emptyPane, 'session', targetPanel.id)
+  activateWorkspacePane(emptyPane.id)
+  switchAgent(agent)
+  nextTick(() => maybeStartTour('panel'))
+  return true
+}
+
 function openAgentInActivePane(agent) {
+  // 优先利用已有空白区域（empty pane），避免在 session 面板追加标签
+  if (openAgentInEmptyPane(agent)) return true
   const activePaneLeaf = activePane.value
   if (!activePaneLeaf) return false
   // 激活 pane 已承载的 Panel
@@ -4314,6 +4336,8 @@ function openAgentInCurrentPanel(agent) {
   // 即替换激活 pane 的「激活 tab」承载的 Agent，tab 数量不变、其他 tab 不受影响。
   const activePaneLeaf = activePane.value
   if (activePaneLeaf && activePaneLeaf.view === 'session') {
+    // 优先利用已有空白区域（empty pane），避免覆盖激活 tab 的会话
+    if (openAgentInEmptyPane(agent)) return
     const activeTabPanelId = paneActiveSessionPanelId(activePaneLeaf)
     if (activeTabPanelId) {
       const activeTabPanel = panels.value.find(p => p.id === activeTabPanelId)
@@ -5278,6 +5302,8 @@ function onWorkspaceSidebarAgentClick(agent) {
   // 有 session 区域，activePaneId 也可能指向 file pane）。
   const activePaneLeaf = activePane.value
   if (activePaneLeaf && activePaneLeaf.view !== 'session') {
+    // 优先利用已有空白区域（empty pane），避免在 session 面板追加标签
+    if (openAgentInEmptyPane(agent)) return
     const sessionPane = findWorkspacePaneByView('session')
     if (sessionPane) {
       const targetPanel = {
