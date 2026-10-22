@@ -977,7 +977,7 @@ function setMainViewOnLeaf(view, sessionPanelId = null) {
 // 1) 当前活动区域为空 → 直接在当前区域创建（不分割）；
 // 2) 已存在承载该视图的 pane（chat/terminal 是 host 单例、session 按 panel 复用）→ 激活它；
 // 3) 否则分割当前区域，在新 pane 承载目标视图。
-function ensurePaneForView(view, sessionPanelId) {
+function ensurePaneForView(view, sessionPanelId, direction) {
   // 2. 已存在承载该视图的 pane → 复用（chat/terminal host 单例、session 按 panel 复用、
   //    插件 pane 视图按 plugin-pane:<id> 单例复用）
   if (view === 'chat' || view === 'terminal') {
@@ -1016,7 +1016,7 @@ function ensurePaneForView(view, sessionPanelId) {
     return active.id
   }
   // 3. 分割当前区域创建
-  splitWorkspacePane(findLargestWorkspacePaneId(), computeSplitDirection())
+  splitWorkspacePane(findLargestWorkspacePaneId(), direction || computeSplitDirection())
   const newPane = activePane.value
   if (newPane) {
     setActivePaneViewForPane(newPane, view, sessionPanelId)
