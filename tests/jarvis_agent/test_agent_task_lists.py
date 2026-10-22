@@ -65,11 +65,11 @@ class TestAgentTaskLists:
         # 确保没有任务列表
         self.agent.task_list_manager.task_lists.clear()
 
-        # 调用保存方法
-        result = self.agent.session._save_task_lists()
+        # 调用构造方法（单文件格式下不落盘，返回数据或 None）
+        result = self.agent.session._build_task_lists()
 
-        # 验证返回值
-        assert result is True
+        # 没有任务列表时应返回 None（不写入 session_meta.tasklist）
+        assert result is None
 
     def test_save_and_restore_task_lists(self):
         """测试任务列表的保存和恢复功能"""
@@ -96,25 +96,26 @@ class TestAgentTaskLists:
         assert task_list is not None
         assert len(task_list.tasks) == 1
 
-        # 保存任务列表
-        save_result = self.agent.session._save_task_lists()
-        assert save_result is True
+        # 构造任务列表数据（单文件格式：内嵌到 session_meta.tasklist）
+        tasklist_data = self.agent.session._build_task_lists()
+        assert tasklist_data is not None
+        assert "task_lists" in tasklist_data
+        assert task_list_id in tasklist_data["task_lists"]
 
-        # 验证保存文件是否存在
-        session_dir = os.path.join(self.temp_dir, ".jarvis", "sessions")
-        tasklist_file = os.path.join(
-            session_dir,
-            f"saved_session_{self.agent.name}_tasklist.json",
+        # 构造单文件会话并落盘
+        session_file = os.path.join(
+            self.temp_dir, f"saved_session_{self.agent.name}_20260101_000000.json"
         )
-
-        assert os.path.exists(tasklist_file) is True
-
-        # 验证保存的文件内容
-        with open(tasklist_file, "r", encoding="utf-8") as f:
-            saved_data = json.load(f)
-
-        assert "task_lists" in saved_data
-        assert task_list_id in saved_data["task_lists"]
+        with open(session_file, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "messages": [{"role": "user", "content": "hi"}],
+                    "session_meta": {"tasklist": tasklist_data},
+                },
+                f,
+                ensure_ascii=False,
+            )
+        self.agent.session.last_restored_session = session_file
 
         # 清空当前任务列表
         self.agent.task_list_manager.task_lists.clear()
@@ -182,23 +183,27 @@ class TestAgentTaskLists:
             task_list_id=task_list_id2, task_info=task_info2, agent_id="test_agent"
         )
 
-        # 保存任务列表
-        save_result = self.agent.session._save_task_lists()
-        assert save_result is True
+        # 构造任务列表数据
+        tasklist_data = self.agent.session._build_task_lists()
+        assert tasklist_data is not None
+        assert len(tasklist_data["task_lists"]) == 2
+        assert task_list_id1 in tasklist_data["task_lists"]
+        assert task_list_id2 in tasklist_data["task_lists"]
 
-        # 验证保存的文件内容
-        session_dir = os.path.join(self.temp_dir, ".jarvis", "sessions")
-        tasklist_file = os.path.join(
-            session_dir,
-            f"saved_session_{self.agent.name}_tasklist.json",
+        # 构造单文件会话并落盘
+        session_file = os.path.join(
+            self.temp_dir, f"saved_session_{self.agent.name}_20260101_000000.json"
         )
-
-        with open(tasklist_file, "r", encoding="utf-8") as f:
-            saved_data = json.load(f)
-
-        assert len(saved_data["task_lists"]) == 2
-        assert task_list_id1 in saved_data["task_lists"]
-        assert task_list_id2 in saved_data["task_lists"]
+        with open(session_file, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "messages": [{"role": "user", "content": "hi"}],
+                    "session_meta": {"tasklist": tasklist_data},
+                },
+                f,
+                ensure_ascii=False,
+            )
+        self.agent.session.last_restored_session = session_file
 
         # 清空当前任务列表
         self.agent.task_list_manager.task_lists.clear()
@@ -256,24 +261,29 @@ class TestAgentTaskLists:
         )
         assert success is True
 
-        # 保存任务列表
-        save_result = self.agent.session._save_task_lists()
-        assert save_result is True
-
-        # 验证保存的文件内容
-        session_dir = os.path.join(self.temp_dir, ".jarvis", "sessions")
-        tasklist_file = os.path.join(
-            session_dir,
-            f"saved_session_{self.agent.name}_tasklist.json",
-        )
-
-        with open(tasklist_file, "r", encoding="utf-8") as f:
-            saved_data = json.load(f)
+        # 构造任务列表数据
+        tasklist_data = self.agent.session._build_task_lists()
+        assert tasklist_data is not None
 
         # 验证依赖关系被正确保存
-        task_list_data = saved_data["task_lists"][task_list_id]
+        task_list_data = tasklist_data["task_lists"][task_list_id]
         assert task_id1 in task_list_data["tasks"]
         assert task_id2 in task_list_data["tasks"]
+
+        # 构造单文件会话并落盘
+        session_file = os.path.join(
+            self.temp_dir, f"saved_session_{self.agent.name}_20260101_000000.json"
+        )
+        with open(session_file, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "messages": [{"role": "user", "content": "hi"}],
+                    "session_meta": {"tasklist": tasklist_data},
+                },
+                f,
+                ensure_ascii=False,
+            )
+        self.agent.session.last_restored_session = session_file
 
         # 清空当前任务列表
         self.agent.task_list_manager.task_lists.clear()
@@ -297,23 +307,15 @@ class TestAgentTaskLists:
         # 确保任务列表管理器中没有任务列表
         self.agent.task_list_manager.task_lists.clear()
 
-        # 保存任务列表（应该成功，即使没有任务）
-        save_result = self.agent.session._save_task_lists()
-        assert save_result is True
+        # 构造任务列表数据（单文件格式下不落盘）
+        tasklist_data = self.agent.session._build_task_lists()
 
-        # 验证不会创建文件
-        session_dir = os.path.join(self.temp_dir, ".jarvis", "sessions")
-        tasklist_file = os.path.join(
-            session_dir,
-            f"saved_session_{self.agent.name}_tasklist.json",
-        )
-
-        # 文件不应存在，因为没有任务列表
-        assert os.path.exists(tasklist_file) is False
+        # 没有任务列表时应返回 None（不写入 session_meta.tasklist）
+        assert tasklist_data is None
 
     def test_restore_session_calls_restore_task_lists(self):
         """测试restore_session方法是否调用了_restore_task_lists"""
-        # 创建一个任务列表以确保会创建保存文件
+        # 创建一个任务列表
         task_list_id, success, error = self.agent.task_list_manager.create_task_list(
             main_goal="Test main goal", agent_id="test_agent"
         )
@@ -331,18 +333,28 @@ class TestAgentTaskLists:
         )
         assert success is True
 
-        # 保存任务列表
-        save_result = self.agent.session._save_task_lists()
-        assert save_result is True
+        # 构造任务列表数据（单文件格式）
+        tasklist_data = self.agent.session._build_task_lists()
+        assert tasklist_data is not None
+
+        # 构造单文件会话并落盘
+        session_file = os.path.join(
+            self.temp_dir, f"saved_session_{self.agent.name}_20260101_000000.json"
+        )
+        with open(session_file, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "messages": [{"role": "user", "content": "hi"}],
+                    "session_meta": {"tasklist": tasklist_data},
+                },
+                f,
+                ensure_ascii=False,
+            )
+        self.agent.session.last_restored_session = session_file
 
         # 清空当前任务列表
         self.agent.task_list_manager.task_lists.clear()
         assert len(self.agent.task_list_manager.task_lists) == 0
-
-        # 保存session以创建session文件
-        with patch.object(self.agent.session, "save_session", return_value=True):
-            session_saved = self.agent.save_session()
-            assert session_saved is True
 
         # Mock restore_session 的依赖项，让它能完整执行
         with patch.object(

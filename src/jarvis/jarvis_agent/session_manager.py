@@ -224,9 +224,31 @@ class SessionManager:
 
         return None
 
+    def _load_session_meta(self, session_file: str) -> Dict[str, Any]:
+        """从单文件会话中读取 session_meta 数据（不落盘）。
+
+        单文件格式：主会话文件内嵌 session_meta（commit/state/tasklist）。
+        读取失败或不存在时返回空字典，不影响主流程。
+
+        参数:
+            session_file: 会话文件路径
+
+        返回:
+            session_meta 字典（可能为空）。
+        """
+        try:
+            with open(session_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            meta = data.get("session_meta", {})
+            if isinstance(meta, dict):
+                return meta
+        except Exception:
+            pass
+        return {}
+
     def _read_session_name(self, session_file: str) -> Optional[str]:
         """
-        从会话的 commit 信息文件中读取会话名称。
+        从会话的 commit 信息中读取会话名称。
 
         Args:
             session_file: 会话文件路径
@@ -235,21 +257,13 @@ class SessionManager:
             会话名称，如果不存在则返回 None。
         """
         try:
-            # 构建对应的 _commit.json 文件路径
-            commit_file = (
-                session_file[:-5] + "_commit.json"
-            )  # 去掉 ".json" 加上 "_commit.json"
-
-            if not os.path.exists(commit_file):
-                return None
-
-            with open(commit_file, "r", encoding="utf-8") as f:
-                commit_info = cast(Dict[str, Any], json.load(f))
-                session_name = commit_info.get("session_name")
-                # 确保返回值类型为 Optional[str]
-                if session_name is not None and isinstance(session_name, str):
-                    return cast(Optional[str], session_name)
-                return None
+            meta = self._load_session_meta(session_file)
+            commit_info = meta.get("commit") or {}
+            session_name = commit_info.get("session_name")
+            # 确保返回值类型为 Optional[str]
+            if session_name is not None and isinstance(session_name, str):
+                return cast(Optional[str], session_name)
+            return None
 
         except Exception:
             # 读取失败不影响主流程，返回 None
@@ -257,7 +271,7 @@ class SessionManager:
 
     def _read_auto_save(self, session_file: str) -> bool:
         """
-        从会话的 commit 信息文件中读取是否为自动保存。
+        从会话的 commit 信息中读取是否为自动保存。
 
         Args:
             session_file: 会话文件路径
@@ -266,17 +280,9 @@ class SessionManager:
             True 表示为自动保存（守护进程实时落盘），否则为 False。
         """
         try:
-            # 构建对应的 _commit.json 文件路径
-            commit_file = (
-                session_file[:-5] + "_commit.json"
-            )  # 去掉 ".json" 加上 "_commit.json"
-
-            if not os.path.exists(commit_file):
-                return False
-
-            with open(commit_file, "r", encoding="utf-8") as f:
-                commit_info = cast(Dict[str, Any], json.load(f))
-                return bool(commit_info.get("auto_save", False))
+            meta = self._load_session_meta(session_file)
+            commit_info = meta.get("commit") or {}
+            return bool(commit_info.get("auto_save", False))
 
         except Exception:
             # 读取失败不影响主流程，返回 False
@@ -324,15 +330,9 @@ class SessionManager:
                 - "no_commit": 没有commit信息（黄色）
         """
         try:
-            # 从 _commit.json 文件读取保存时的 commit
-            commit_file = session_file[:-5] + "_commit.json"
-
-            # 如果 commit 文件不存在，返回没有commit信息
-            if not os.path.exists(commit_file):
-                return "no_commit"
-
-            with open(commit_file, "r", encoding="utf-8") as f:
-                commit_data = json.load(f)
+            # 从会话文件的 session_meta.commit 读取保存时的 commit
+            meta = self._load_session_meta(session_file)
+            commit_data = meta.get("commit") or {}
 
             saved_commit = commit_data.get("current_commit", "")
 
@@ -385,13 +385,9 @@ class SessionManager:
 
         for file_path in files:
             try:
-                # 读取对应的 _commit.json 文件
-                commit_file = file_path[:-5] + "_commit.json"
-                if not os.path.exists(commit_file):
-                    continue
-
-                with open(commit_file, "r", encoding="utf-8") as f:
-                    commit_data = json.load(f)
+                # 从会话文件的 session_meta.commit 读取保存时的 commit
+                meta = self._load_session_meta(file_path)
+                commit_data = meta.get("commit") or {}
 
                 saved_commit = commit_data.get("current_commit", "")
                 # 检查commit是否匹配
@@ -483,11 +479,8 @@ class SessionManager:
         """在内存中构造一次完整会话落盘所需的全部文件内容（不落盘）。
 
         返回 (session_file, files)，其中 files 为
-        [(file_path, data, default_encoder), ...]，覆盖：
-        - 主会话文件（messages）
-        - _commit.json
-        - _state.json
-        - _tasklist.json
+        [(file_path, data, default_encoder), ...]，仅含主会话文件：
+        主文件内嵌 session_meta（commit / state / tasklist），单文件即完整会话。
 
         该方法是 save_session 与实时保存守护进程共用的数据构造入口，
         保证两种路径落盘的文件名与内容格式完全一致。
@@ -495,7 +488,7 @@ class SessionManager:
         参数:
             timestamp: 会话时间戳（%Y%m%d_%H%M%S）；为空时取当前时间。
             auto_save: 是否为自动保存（守护进程实时落盘）。为 True 时在
-                _commit.json 中写入 "auto_save": true 标识，便于恢复时区分。
+                session_meta.commit 中写入 "auto_save": true 标识，便于恢复时区分。
 
         返回:
             (session_file, files)；若没有用户消息（无需保存）则返回 None。
@@ -528,39 +521,38 @@ class SessionManager:
             # 如果检查失败（如 messages 不存在），为了安全起见仍然执行保存
             pass
 
-        # 主会话文件内容（与 BasePlatform.save 一致）
+        # 主会话文件内容：messages + platform_type + session_meta（commit/state/tasklist）
         try:
             messages = self.model.get_messages()
         except Exception:
             messages = []
-        main_data: Dict[str, Any] = {"messages": messages}
+        main_data: Dict[str, Any] = {
+            "messages": messages,
+            "platform_type": getattr(self.model, "platform_type", None),
+            "session_meta": {},
+        }
 
-        files: List[Tuple[str, Any, Optional[Any]]] = [
-            (session_file, main_data, None),
-        ]
-
-        # _commit.json
+        # session_meta.commit（原 _commit.json 内容）
         commit_info = self._build_commit_info(session_file, auto_save=auto_save)
         if commit_info is not None:
-            files.append((session_file[:-5] + "_commit.json", commit_info, None))
+            main_data["session_meta"]["commit"] = commit_info
 
-        # _state.json
+        # session_meta.state（原 _state.json 内容）
         state_data = self._build_agent_state(timestamp)
         if state_data is not None:
-            from jarvis.jarvis_agent import SafeEncoder
+            main_data["session_meta"]["state"] = state_data
 
-            state_file = os.path.join(
-                session_dir, f"{self._get_session_file_prefix()}_{timestamp}_state.json"
-            )
-            files.append((state_file, state_data, SafeEncoder().default))
-
-        # _tasklist.json
+        # session_meta.tasklist（原 _tasklist.json 内容）
         tasklist_data = self._build_task_lists()
         if tasklist_data is not None:
-            tasklist_file = os.path.join(
-                session_dir, f"{self._get_session_file_prefix()}_tasklist.json"
-            )
-            files.append((tasklist_file, tasklist_data, None))
+            main_data["session_meta"]["tasklist"] = tasklist_data
+
+        # 单文件落盘计划：整个 main_data 用 SafeEncoder 序列化（state 含非 JSON 类型）
+        from jarvis.jarvis_agent import SafeEncoder
+
+        files: List[Tuple[str, Any, Optional[Any]]] = [
+            (session_file, main_data, SafeEncoder().default),
+        ]
 
         return session_file, files
 
@@ -568,48 +560,31 @@ class SessionManager:
         """Saves the current session state to a file."""
         session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
         os.makedirs(session_dir, exist_ok=True)
+
         # 清理上次进程被强杀时遗留的原子写临时文件
         cleanup_stale_tmp_files(session_dir)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        # 确定会话名称
-        if self.current_session_name:
-            # 已有会话名称（从恢复的会话继承），直接使用
-            session_name = self.current_session_name
-        else:
-            # 新建会话，使用TextRank从对话记录生成名称
-            session_name = self._generate_session_name()
-            PrettyOutput.auto_print(f"📝 生成会话名称: {session_name}")
+        # 复用统一的数据构造入口，生成单文件落盘计划
+        snapshot = self.build_session_snapshot(auto_save=False)
+        if snapshot is None:
+            # 没有用户消息，不保存会话
+            return False
+        session_file, files = snapshot
 
-            self.current_session_name = session_name
-
-        # 使用session_name作为文件名前缀
-        session_file = os.path.join(
-            session_dir,
-            f"{session_name}_saved_session_{self.agent_name}_{timestamp}.json",
-        )
-
-        # 检查是否有用户消息，如果没有则不保存
-        try:
-            has_user_message = any(
-                msg.get("role") == "user" for msg in self.model.get_messages()
-            )
-            if not has_user_message:
-                # 没有用户消息，不保存会话
-                return False
-        except Exception:
-            # 如果检查失败（如 messages 不存在），为了安全起见仍然执行保存
-            pass
-
-        result = self.model.save(session_file)
-
-        # 保存成功后，保存 commit 信息到辅助文件
+        result = True
+        for file_path, data, encoder in files:
+            try:
+                atomic_write_json(
+                    file_path,
+                    data,
+                    ensure_ascii=False,
+                    indent=4,
+                    default=encoder,
+                )
+            except Exception as e:
+                result = False
+                PrettyOutput.auto_print(f"⚠️  保存会话文件失败: {file_path}: {e}")
         if result:
-            self._save_commit_info(session_file)
-            # 保存Agent运行时状态
-            self._save_agent_state(timestamp)
-            # 保存任务列表
-            self._save_task_lists()
             # 清理旧会话文件（最多保留10个）
             self._cleanup_old_sessions(session_dir)
             # 更新最后保存的会话文件路径
@@ -688,28 +663,6 @@ class SessionManager:
             PrettyOutput.auto_print(f"⚠️  保存 commit 信息失败: {e}")
             return None
 
-    def _save_commit_info(self, session_file: str) -> None:
-        """
-        保存 commit 信息到辅助文件。
-
-        Args:
-            session_file: 会话文件路径
-        """
-        try:
-            commit_info = self._build_commit_info(session_file)
-            if commit_info is None:
-                return
-
-            # 写入 _commit.json 文件
-            commit_file = (
-                session_file[:-5] + "_commit.json"
-            )  # 去掉 ".json" 加上 "_commit.json"
-            atomic_write_json(commit_file, commit_info, indent=4, ensure_ascii=False)
-
-        except Exception as e:
-            # 保存 commit 信息失败不影响主流程
-            PrettyOutput.auto_print(f"⚠️  保存 commit 信息失败: {e}")
-
     def _cleanup_old_sessions(self, session_dir: str) -> None:
         """
         清理旧会话文件，最多保留10个最近的会话。
@@ -787,22 +740,16 @@ class SessionManager:
             bool: True 表示一致或用户选择继续，False 表示用户取消
         """
         try:
-            # 从 _commit.json 文件读取保存时的 commit
-            commit_file = session_file[:-5] + "_commit.json"
-
-            # 如果 commit 文件不存在，跳过检查
-            if not os.path.exists(commit_file):
-                return True
-
-            with open(commit_file, "r", encoding="utf-8") as f:
-                commit_data = json.load(f)
+            # 从会话文件的 session_meta.commit 读取保存时的 commit
+            meta = self._load_session_meta(session_file)
+            commit_data = meta.get("commit") or {}
 
             saved_commit = commit_data.get("current_commit", "")
 
             # 如果会话文件中没有保存 commit 信息，跳过检查
             if not saved_commit:
                 PrettyOutput.auto_print(
-                    "ℹ️  Commit文件存在但缺少current_commit字段，跳过一致性校验"
+                    "ℹ️  会话文件缺少current_commit字段，跳过一致性校验"
                 )
                 return True
 
@@ -1299,31 +1246,6 @@ class SessionManager:
             PrettyOutput.auto_print("⚠️ 用户取消恢复。")
             return False
 
-    def _get_session_file_prefix(self) -> str:
-        """
-        生成会话文件前缀（不含后缀）。
-
-        Returns:
-            str: 会话文件前缀，如 "saved_session_Jarvos"
-        """
-        import os
-
-        session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
-        os.makedirs(session_dir, exist_ok=True)
-
-        # 使用session_name作为前缀（如果存在）
-        if self.current_session_name:
-            # 从session_name提取文件名（移除特殊字符）
-            import re
-
-            safe_name = re.sub(
-                r"[^\u4e00-\u9fa5a-zA-Z0-9_-]", "", self.current_session_name
-            )
-            if safe_name:
-                return f"{safe_name}_saved_session_{self.agent_name}"
-
-        return f"saved_session_{self.agent_name}"
-
     def _build_task_lists(self) -> Optional[Dict[str, Any]]:
         """在内存中构造 _tasklist.json 的内容（不落盘）。
 
@@ -1364,75 +1286,31 @@ class SessionManager:
             PrettyOutput.auto_print(f"⚠️ 保存任务列表失败: {e}")
             return None
 
-    def _save_task_lists(self) -> bool:
-        """保存当前 Agent 的任务列表到文件。
-
-        文件命名规则：{prefix}_tasklist.json
-        与会话文件保存在同一目录下，便于关联。
-
-        Returns:
-            bool: 是否成功保存
-        """
-
-        import os
-
-        try:
-            tasklist_data = self._build_task_lists()
-            if tasklist_data is None:
-                return True  # 没有任务列表，视为成功
-
-            # 构建文件路径
-            session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
-            os.makedirs(session_dir, exist_ok=True)
-
-            prefix = self._get_session_file_prefix()
-            tasklist_file = os.path.join(session_dir, f"{prefix}_tasklist.json")
-
-            # 保存到文件
-            atomic_write_json(
-                tasklist_file,
-                tasklist_data,
-                ensure_ascii=False,
-                indent=2,
-            )
-
-            return True
-        except Exception as e:
-            PrettyOutput.auto_print(f"⚠️ 保存任务列表失败: {e}")
-            return False
-
     def _restore_task_lists(self) -> bool:
-        """从文件恢复当前 Agent 的任务列表。
+        """从会话文件恢复当前 Agent 的任务列表。
 
-        文件命名规则：{prefix}_tasklist.json
-        与会话文件保存在同一目录下，便于关联。
+        任务列表数据保存在单文件会话的 session_meta.tasklist 中。
 
         Returns:
             bool: 是否成功恢复
         """
-        import json
-        import os
         import re
 
         try:
             if not self.agent:
                 return True
 
-            # 构建文件路径
-            session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
-            prefix = self._get_session_file_prefix()
-            tasklist_file = os.path.join(session_dir, f"{prefix}_tasklist.json")
+            if not self.last_restored_session:
+                return True
 
-            if not os.path.exists(tasklist_file):
-                return True  # 文件不存在，视为成功（没有可恢复的任务列表）
-
-            # 从文件加载任务列表数据
-            with open(tasklist_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
+            # 从会话文件的 session_meta.tasklist 读取任务列表数据
+            meta = self._load_session_meta(self.last_restored_session)
+            data = meta.get("tasklist") or {}
+            if not data:
+                return True  # 没有任务列表数据，视为成功
 
             task_lists_data = data.get("task_lists", {})
             manager_state = data.get("manager_state", {})
-
             # 导入TaskList和TaskListManager（避免循环导入）
             from jarvis.jarvis_agent.task_list import TaskList, TaskListManager
 
@@ -1588,127 +1466,50 @@ class SessionManager:
 
         return state_data
 
-    def _save_agent_state(self, timestamp: str) -> None:
-        """保存SessionManager和Agent运行时状态到文件。
-
-        Args:
-            timestamp: 会话时间戳，用于生成文件名
-        """
-        import os
-
-        if not self.agent:
-            return
-
-        state_data = self._build_agent_state(timestamp)
-        if state_data is None:
-            return
-
-        session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
-        os.makedirs(session_dir, exist_ok=True)
-
-        prefix = self._get_session_file_prefix()
-        state_file = os.path.join(
-            session_dir,
-            f"{prefix}_{timestamp}_state.json",
-        )
-
-        # 导入SafeEncoder（避免循环导入）
-        from jarvis.jarvis_agent import SafeEncoder
-
-        try:
-            atomic_write_json(
-                state_file,
-                state_data,
-                ensure_ascii=False,
-                indent=2,
-                default=SafeEncoder().default,
-            )
-            PrettyOutput.auto_print("✅ Agent状态已保存")
-        except Exception as e:
-            PrettyOutput.auto_print(f"⚠️ 保存Agent状态失败: {e}")
-
     def _restore_agent_state(self) -> None:
-        """从文件恢复SessionManager和Agent运行时状态。"""
-        import json
-        import os
-
+        """从会话文件恢复SessionManager和Agent运行时状态。"""
         if not self.agent:
             return
 
         try:
-            # 提取时间戳
             if not self.last_restored_session:
+                return
+
+            # 从会话文件的 session_meta.state 读取状态数据
+            meta = self._load_session_meta(self.last_restored_session)
+            state_data = meta.get("state") or {}
+            if not state_data:
+                PrettyOutput.auto_print("ℹ️ 会话文件无状态数据，跳过状态恢复")
                 return
 
             # 恢复短期记忆
             restored_short_term_count = 0
             try:
-                session_file = os.path.basename(self.last_restored_session)
-                timestamp = self._extract_timestamp(session_file)
-
-                if not timestamp:
-                    PrettyOutput.auto_print("ℹ️ 会话文件无时间戳，跳过短期记忆恢复")
-                else:
-                    # 构建状态文件路径
-                    session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
-                    prefix = self._get_session_file_prefix()
-                    state_file = os.path.join(
-                        session_dir,
-                        f"{prefix}_{timestamp}_state.json",
+                short_term_memories = state_data.get("short_term_memories", [])
+                if short_term_memories:
+                    from jarvis.jarvis_utils.globals import (
+                        add_short_term_memory,
                     )
 
-                    if os.path.exists(state_file):
-                        with open(state_file, "r", encoding="utf-8") as f:
-                            state_data = json.load(f)
+                    for memory_data in short_term_memories:
+                        try:
+                            add_short_term_memory(memory_data)
+                            restored_short_term_count += 1
+                        except Exception as e:
+                            PrettyOutput.auto_print(f"⚠️ 恢复短期记忆失败: {e}")
 
-                        short_term_memories = state_data.get("short_term_memories", [])
-                        if short_term_memories:
-                            from jarvis.jarvis_utils.globals import (
-                                add_short_term_memory,
-                            )
-
-                            for memory_data in short_term_memories:
-                                try:
-                                    add_short_term_memory(memory_data)
-                                    restored_short_term_count += 1
-                                except Exception as e:
-                                    PrettyOutput.auto_print(f"⚠️ 恢复短期记忆失败: {e}")
-
-                            if restored_short_term_count > 0:
-                                PrettyOutput.auto_print(
-                                    f"💾 已恢复 {restored_short_term_count} 条短期记忆"
-                                )
-                            else:
-                                PrettyOutput.auto_print("💾 没有短期记忆需要恢复")
-                        else:
-                            PrettyOutput.auto_print("💾 没有短期记忆需要恢复")
+                    if restored_short_term_count > 0:
+                        PrettyOutput.auto_print(
+                            f"💾 已恢复 {restored_short_term_count} 条短期记忆"
+                        )
+                    else:
+                        PrettyOutput.auto_print("💾 没有短期记忆需要恢复")
+                else:
+                    PrettyOutput.auto_print("💾 没有短期记忆需要恢复")
             except Exception as e:
                 PrettyOutput.auto_print(f"⚠️ 恢复短期记忆失败: {e}")
 
-            session_file = os.path.basename(self.last_restored_session)
-            timestamp = self._extract_timestamp(session_file)
-
-            if not timestamp:
-                PrettyOutput.auto_print("ℹ️ 会话文件无时间戳，跳过状态恢复")
-                return
-
-            # 构建状态文件路径
-            session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
-            prefix = self._get_session_file_prefix()
-            state_file = os.path.join(
-                session_dir,
-                f"{prefix}_{timestamp}_state.json",
-            )
-
-            if not os.path.exists(state_file):
-                PrettyOutput.auto_print("ℹ️ 未找到状态文件，跳过状态恢复")
-                return
-
-            # 从文件加载状态数据
-            with open(state_file, "r", encoding="utf-8") as f:
-                state_data = json.load(f)
-
-            # 注意：短期记忆已在文件开头恢复，这里不再处理
+            # 注意：短期记忆已在上面恢复，这里不再处理
 
             # 恢复SessionManager状态
             session_manager_state = state_data.get("session_manager", {})
@@ -1774,9 +1575,8 @@ class SessionManager:
                     "secret_guard_mapping", {}
                 )
                 if isinstance(secret_guard_mapping, dict):
-                    if not hasattr(self.agent, "secret_guard_mapping"):
-                        self.agent.secret_guard_mapping = {}
-                    self.agent.secret_guard_mapping = dict(secret_guard_mapping)
+                    # 该属性为动态添加，用 setattr 避免类型检查报错
+                    setattr(self.agent, "secret_guard_mapping", dict(secret_guard_mapping))
 
                 PrettyOutput.auto_print("✅ Agent运行时状态已恢复")
 
@@ -1851,9 +1651,8 @@ class SessionManager:
 
     def _restore_start_commit_info(self) -> None:
         """恢复CodeAgent的start_commit信息。"""
-        import json
-        import os
-
+        if not self.agent:
+            return
         if not self.agent:
             return
 
@@ -1865,70 +1664,50 @@ class SessionManager:
             return
 
         try:
-            # 使用 _extract_timestamp 方法来提取时间戳
-            session_file = os.path.basename(self.last_restored_session)
-            timestamp = self._extract_timestamp(session_file)
+            # 从会话文件的 session_meta.commit 读取保存时的 commit 信息
+            meta = self._load_session_meta(self.last_restored_session)
+            commit_data = meta.get("commit") or {}
 
-            # 使用 _get_session_file_prefix() 获取正确的前缀（包含session_name）
-            prefix = self._get_session_file_prefix()
+            # 获取保存的 commit 信息
+            saved_start_commit = commit_data.get("start_commit")
+            saved_last_backup_commit = commit_data.get("last_backup_commit")
+            saved_current_commit = commit_data.get("current_commit")
 
-            # 根据时间戳确定commit文件名
-            if timestamp:
-                # 新格式：包含时间戳
-                commit_filename = f"{prefix}_{timestamp}_commit.json"
+            # 获取当前的最新 commit
+            from jarvis.jarvis_utils.git_utils import get_latest_commit_hash
+
+            current_commit = get_latest_commit_hash()
+
+            # 验证：对比保存的 current_commit 和当前的 current_commit
+            # 如果不一致，说明仓库状态已经改变（有新提交、reset、rebase 等）
+            if saved_current_commit and saved_current_commit != current_commit:
+                # 仓库状态已改变，忽略保存的 start_commit，使用当前最新 commit
+                self.agent.start_commit = current_commit
+                PrettyOutput.auto_print(
+                    f"⚠️ 检测到仓库状态已改变（保存时: {saved_current_commit[:8]}..., 现在: {current_commit[:8] if current_commit else 'None'}...），"
+                    f"已忽略保存的 start_commit，更新为当前 commit"
+                )
+            elif saved_start_commit:
+                # 仓库状态未改变，可以恢复保存的 start_commit
+                self.agent.start_commit = saved_start_commit
+                # 同时恢复 last_backup_commit（如果有且agent支持）
+                if saved_last_backup_commit and hasattr(
+                    self.agent, "last_backup_commit"
+                ):
+                    self.agent.last_backup_commit = saved_last_backup_commit
+                PrettyOutput.auto_print(
+                    f"✅ 已恢复start_commit信息: {self.agent.start_commit[:8] if self.agent.start_commit else 'None'}..."
+                )
+                if saved_last_backup_commit:
+                    PrettyOutput.auto_print(
+                        f"✅ 已恢复last_backup_commit信息: {saved_last_backup_commit[:8]}..."
+                    )
             else:
-                # 旧格式：不包含时间戳
-                commit_filename = f"{prefix}_commit.json"
-
-            session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
-            commit_file = os.path.join(session_dir, commit_filename)
-
-            if os.path.exists(commit_file):
-                with open(commit_file, "r", encoding="utf-8") as f:
-                    commit_data = json.load(f)
-
-                    # 获取保存的 commit 信息
-                    saved_start_commit = commit_data.get("start_commit")
-                    saved_last_backup_commit = commit_data.get("last_backup_commit")
-                    saved_current_commit = commit_data.get("current_commit")
-
-                    # 获取当前的最新 commit
-                    from jarvis.jarvis_utils.git_utils import get_latest_commit_hash
-
-                    current_commit = get_latest_commit_hash()
-
-                    # 验证：对比保存的 current_commit 和当前的 current_commit
-                    # 如果不一致，说明仓库状态已经改变（有新提交、reset、rebase 等）
-                    if saved_current_commit and saved_current_commit != current_commit:
-                        # 仓库状态已改变，忽略保存的 start_commit，使用当前最新 commit
-                        self.agent.start_commit = current_commit
-                        PrettyOutput.auto_print(
-                            f"⚠️ 检测到仓库状态已改变（保存时: {saved_current_commit[:8]}..., 现在: {current_commit[:8] if current_commit else 'None'}...），"
-                            f"已忽略保存的 start_commit，更新为当前 commit"
-                        )
-                    elif saved_start_commit:
-                        # 仓库状态未改变，可以恢复保存的 start_commit
-                        self.agent.start_commit = saved_start_commit
-                        # 同时恢复 last_backup_commit（如果有且agent支持）
-                        if saved_last_backup_commit and hasattr(
-                            self.agent, "last_backup_commit"
-                        ):
-                            self.agent.last_backup_commit = saved_last_backup_commit
-                        PrettyOutput.auto_print(
-                            f"✅ 已恢复start_commit信息: {self.agent.start_commit[:8] if self.agent.start_commit else 'None'}..."
-                        )
-                        if saved_last_backup_commit:
-                            PrettyOutput.auto_print(
-                                f"✅ 已恢复last_backup_commit信息: {saved_last_backup_commit[:8]}..."
-                            )
-                    else:
-                        # 没有保存的 start_commit，使用当前最新 commit
-                        self.agent.start_commit = current_commit
-                        PrettyOutput.auto_print(
-                            f"✅ 已设置start_commit为当前commit: {current_commit[:8] if current_commit else 'None'}..."
-                        )
-            else:
-                PrettyOutput.auto_print(f"ℹ️ 未找到对应的commit文件: {commit_filename}")
+                # 没有保存的 start_commit，使用当前最新 commit
+                self.agent.start_commit = current_commit
+                PrettyOutput.auto_print(
+                    f"✅ 已设置start_commit为当前commit: {current_commit[:8] if current_commit else 'None'}..."
+                )
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 恢复commit信息失败: {e}")
 

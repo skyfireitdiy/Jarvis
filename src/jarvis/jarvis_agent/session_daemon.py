@@ -273,19 +273,14 @@ def build_snapshot_files(
     返回:
         [{"path":..., "data":..., "indent":..., "use_safe_encoder":...}, ...]
     """
-    # 各文件的缩进与 save_session 保持一致
+    # 单文件格式：整个会话（messages + session_meta）写入主文件，缩进 4
     plan: List[Dict[str, Any]] = []
     for path, data, default in files:
-        name = os.path.basename(path)
-        if name.endswith("_state.json") or name.endswith("_tasklist.json"):
-            indent: Optional[int] = 2
-        else:
-            indent = 4
         plan.append(
             {
                 "path": path,
                 "data": data,
-                "indent": indent,
+                "indent": 4,
                 "use_safe_encoder": default is not None,
             }
         )
