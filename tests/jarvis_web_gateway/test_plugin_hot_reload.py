@@ -365,3 +365,44 @@ def test_uninstall_plugin_lsp_reversible_without_restart(
     # 免重启：插件声明的语言项被撤销
     languages = (get_global_config_data().get("lsp") or {}).get("languages", {})
     assert "go" not in languages
+
+
+def test_upgrade_plugin_clears_update_flag_cache(
+    client, isolated_data_dir, loaded_config
+):
+    """升级插件后清除 plugin_updates.json 中的更新标记（Issue: 更新按钮不消失）。
+
+    回归测试：升级前缓存标记该插件 hasUpdate=True（模拟定时任务检测到远端有新版本），
+    升级后本地 HEAD 已等于远端，应把缓存中该插件的标记清除为 False，
+    使前端「更新」按钮立即消失，无需等定时任务每小时刷新。
+    """
+    from jarvis.jarvis_agent.utils import (
+        _load_plugin_updates_cache,
+        _save_plugin_updates_cache,
+    )
+
+    data_dir = Path(isolated_data_dir)
+    source = _make_git_plugin_repo(
+        data_dir / "src-upflag",
+        "upflag-plugin",
+        "1.0.0",
+        tool_dirs=["{{plugin_dir}}/tools"],
+    )
+    resp = _install(client, f"file://{source}")
+    assert resp.status_code == 200
+    assert resp.json()["success"] is True
+
+    # 模拟定时任务检测到该插件有新版本：写入缓存标记 hasUpdate=True
+    _save_plugin_updates_cache({"upflag-plugin": True})
+    assert _load_plugin_updates_cache().get("upflag-plugin") is True
+
+    # 升级插件（此时本地 HEAD 与远端一致，升级本身无内容变化但走完整流程）
+    resp = _upgrade(client, "upflag-plugin")
+    assert resp.status_code == 200
+    assert resp.json()["success"] is True
+
+    # 修复生效：升级后缓存中该插件更新标记被清除为 False
+    cache = _load_plugin_updates_cache()
+    assert cache.get("upflag-plugin") is False, (
+        f"升级后更新标记未清除: {cache}"
+    )

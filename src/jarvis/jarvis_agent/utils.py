@@ -3217,6 +3217,16 @@ def upgrade_plugin(plugin_id: str) -> bool:
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 重载插件配置失败（可稍后重启生效）: {e}")
 
+        # 升级后本地 HEAD 已等于远端，清除该插件的更新标记缓存，
+        # 使前端「更新」按钮立即消失（否则需等定时任务每小时刷新缓存）。
+        try:
+            updates_cache = _load_plugin_updates_cache()
+            if updates_cache.get(plugin_name):
+                updates_cache[plugin_name] = False
+                _save_plugin_updates_cache(updates_cache)
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 更新缓存刷新失败: {e}")
+
         PrettyOutput.auto_print(f"✅ 插件升级成功: {plugin_name}")
         return True
     except Exception as e:
