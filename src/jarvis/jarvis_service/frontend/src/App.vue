@@ -581,6 +581,7 @@
                 :pipelines="pipelineList"
                 :activeId="activePipelineId"
                 mode="compact"
+                :fetchFileContent="fetchPipelineFile"
                 @select="selectPipeline"
                 @jump-agent="onOrchestrationJumpAgent"
                 @expand="openOrchestrationOverlay"
@@ -1499,6 +1500,7 @@
       :visible="showOrchestrationOverlay"
       :pipelines="pipelineList"
       :activeId="activePipelineId"
+      :fetchFileContent="fetchPipelineFile"
       @update:visible="showOrchestrationOverlay = $event"
       @close="closeOrchestrationOverlay"
       @select="selectPipeline"
@@ -6505,6 +6507,22 @@ const {
   globalSearchFileGlob,
   ensureWorkspaceSidebarFileTree,
 })
+
+// 读取流水线工作目录下的文件（如审批报告 .df/approval.md）。
+// 有 flow 的编排强制单节点（阶段间共享文件系统），流水线经 master 网关启动，
+// 故审批报告等产物在 master 节点上，这里固定用 master 读取。
+async function fetchPipelineFile(path) {
+  const { host, port } = getGatewayAddress()
+  const response = await fetchWithAuth(buildNodeHttpUrl(host, port, 'master', 'file-content'), {
+    method: 'POST',
+    body: JSON.stringify({ path, node_id: 'master' }),
+  })
+  const result = await response.json().catch(() => ({}))
+  if (!response.ok || !result.success || !result.data) {
+    throw new Error(result.error?.message || '读取文件失败')
+  }
+  return result.data.content || ''
+}
 
 // 补全列表
 const showCompletions = ref(false) // 是否显示补全列表

@@ -21,6 +21,7 @@
             :pipelines="pipelines"
             :activeId="activeId"
             mode="full"
+            :fetchFileContent="fetchFileContent"
             @select="$emit('select', $event)"
             @jump-agent="$emit('jump-agent', $event)"
             @approve="$emit('approve', $event)"
@@ -41,6 +42,8 @@ const props = defineProps({
   visible: { type: Boolean, default: false },
   pipelines: { type: Array, default: () => [] },
   activeId: { type: String, default: '' },
+  // 读取文件内容（如审批报告）：透传给内部 OrchestrationView
+  fetchFileContent: { type: Function, default: null },
 })
 
 const emit = defineEmits(['update:visible', 'close', 'select', 'jump-agent', 'approve', 'reject', 'retry'])
