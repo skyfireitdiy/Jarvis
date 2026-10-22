@@ -4201,7 +4201,7 @@ function openAgentInActivePane(agent) {
 // 已分割且激活 pane 已承载 Agent 会话时：开新面板（新 pane），保留当前会话。
 // 新建 Panel 并让 ensurePaneForView 分割新 pane 承载它（不覆盖激活 pane 的会话）。
 // 调用方需保证 agent 不在任何既有 Panel 中（openAgentInActivePane 的各调用点均已提前处理）。
-function openAgentInNewPane(agent) {
+function openAgentInNewPane(agent, direction) {
   if (!agent) return
   const targetPanel = {
     id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -4211,7 +4211,7 @@ function openAgentInNewPane(agent) {
   activePanelId.value = targetPanel.id
   workspaceSessionPanelId.value = targetPanel.id
   // 空则原地、已有承载该 Panel 的 pane 则复用、否则分割（不覆盖当前区域）
-  ensurePaneForView('session', targetPanel.id)
+  ensurePaneForView('session', targetPanel.id, direction)
   switchAgent(agent)
   nextTick(() => maybeStartTour('panel'))
 }
@@ -4335,7 +4335,7 @@ function openAgentInCurrentPanel(agent) {
 // 「在新的 Panel 中打开 Agent」：命令面板按 Tab 时使用（显式分屏入口）
 // - Agent 已在某个 Panel 中：激活它（避免重复打开同一 Agent）
 // - 否则新建 Panel 并分割新 pane 承载（分屏，不破坏当前布局）
-function openAgentInNewPanel(agent) {
+function openAgentInNewPanel(agent, direction) {
   if (!agent) return
   if (windowWidth.value <= 768) {
     openAgentInPanel(agent)
@@ -4359,7 +4359,16 @@ function openAgentInNewPanel(agent) {
     switchAgent(agent)
     return
   }
-  openAgentInNewPane(agent)
+  openAgentInNewPane(agent, direction)
+}
+
+// 「水平拆分打开 Agent」：与 openAgentInNewPanel 一致，但强制左右分屏（row 方向）
+function openAgentInNewPanelHorizontal(agent) {
+  openAgentInNewPanel(agent, 'row')
+}
+// 「垂直拆分打开 Agent」：与 openAgentInNewPanel 一致，但强制上下分屏（column 方向）
+function openAgentInNewPanelVertical(agent) {
+  openAgentInNewPanel(agent, 'column')
 }
 
 // 获取 Panel 中的 Agent
@@ -5791,6 +5800,9 @@ const commandPaletteCtx = computed(() => ({
   },
   // 在「新的区域」中打开 Agent（命令面板 Tab / 右键菜单「在新区域中打开」动作）
   openAgentInNewPanel,
+  // 右键菜单「水平拆分打开 / 垂直拆分打开」动作：强制左右 / 上下分屏
+  openAgentInNewPanelHorizontal,
+  openAgentInNewPanelVertical,
   // 「+」新建空 tab 后，命令面板选中的 Agent 放入该空 tab（选中后清空 pending）
   onAgentPick: (agent) => {
     if (!agent) return

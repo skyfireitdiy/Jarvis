@@ -382,6 +382,30 @@ export const ACTIONS = [
     run: (ctx) => ctx.openAgentInNewPanel && ctx.openAgentInNewPanel(ctx.currentAgent),
   },
   {
+    // 右键菜单「水平拆分打开」：新建 Panel 并强制左右分屏（row 方向）承载。
+    id: "open-agent-in-new-pane-horizontal",
+    label: "水平拆分打开",
+    condition: "需选中当前 Agent",
+    en: "Open in Horizontal Split",
+    group: "当前 Agent",
+    icon: "🪟",
+    keywords: ["水平拆分", "左右分屏", "分屏", "打开", "horizontal", "split"],
+    enabled: (ctx) => !!ctx?.currentAgent,
+    run: (ctx) => ctx.openAgentInNewPanelHorizontal && ctx.openAgentInNewPanelHorizontal(ctx.currentAgent),
+  },
+  {
+    // 右键菜单「垂直拆分打开」：新建 Panel 并强制上下分屏（column 方向）承载。
+    id: "open-agent-in-new-pane-vertical",
+    label: "垂直拆分打开",
+    condition: "需选中当前 Agent",
+    en: "Open in Vertical Split",
+    group: "当前 Agent",
+    icon: "🪟",
+    keywords: ["垂直拆分", "上下分屏", "分屏", "打开", "vertical", "split"],
+    enabled: (ctx) => !!ctx?.currentAgent,
+    run: (ctx) => ctx.openAgentInNewPanelVertical && ctx.openAgentInNewPanelVertical(ctx.currentAgent),
+  },
+  {
     id: "current-toggle-output",
     label: "隐藏输出",
     shortcut: "Space a o",
