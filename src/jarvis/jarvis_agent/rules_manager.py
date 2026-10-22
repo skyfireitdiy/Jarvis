@@ -704,6 +704,24 @@ class RulesManager:
         all_dirs.extend(self.rules_dirs)
         return all_dirs
 
+    def _get_project_rule_dirs(self) -> List[str]:
+        """返回项目级规则目录（按优先级排序，仅返回存在的目录）。
+
+        优先级：.jarvis/rules > .agents/skills > .claude/skills。
+        .agents/skills 与 .claude/skills 是社区通用 skill 目录约定，
+        其下每个子目录含 SKILL.md（如 .agents/skills/<agent>/SKILL.md），
+        作为项目级规则来源与 .jarvis/rules 合并注入。
+        """
+        dirs = []
+        for d in (
+            os.path.join(self.root_dir, ".jarvis", "rules"),
+            os.path.join(self.root_dir, ".agents", "skills"),
+            os.path.join(self.root_dir, ".claude", "skills"),
+        ):
+            if os.path.exists(d) and os.path.isdir(d):
+                dirs.append(d)
+        return dirs
+
     def get_named_rule(self, rule_name: str) -> Optional[str]:
         """从 rules 目录中获取指定名称的规则
 
@@ -766,10 +784,8 @@ class RulesManager:
                         if agents_content:
                             return self._add_path_comment(rule_name, agents_content)
                         return None
-                    project_rules_dir = os.path.join(self.root_dir, ".jarvis", "rules")
-                    if os.path.exists(project_rules_dir) and os.path.isdir(
-                        project_rules_dir
-                    ):
+                    # 按优先级查找项目级规则目录（.jarvis/rules > .agents/skills > .claude/skills）
+                    for project_rules_dir in self._get_project_rule_dirs():
                         rule_content = self._read_rule_from_dir(
                             project_rules_dir, actual_name
                         )
@@ -855,6 +871,11 @@ class RulesManager:
 
         # 收集规则目录中的文件规则（支持递归遍历子目录）
         all_rules_dirs = self._get_all_rules_dirs()
+        # 追加项目级社区 skill 目录（.agents/skills、.claude/skills），与 .jarvis/rules 同用 project: 前缀
+        # 注意去重：.jarvis/rules 已在 _get_all_rules_dirs 中，避免重复扫描
+        for d in self._get_project_rule_dirs():
+            if d not in all_rules_dirs:
+                all_rules_dirs.append(d)
         for idx, rules_dir in enumerate(all_rules_dirs):
             if os.path.exists(rules_dir) and os.path.isdir(rules_dir):
                 # 确定来源前缀（根据实际来源动态判断）
@@ -868,9 +889,8 @@ class RulesManager:
                     ):
                         is_central = True
 
-                # 检查是否为项目规则目录
-                project_rules_dir = os.path.join(self.root_dir, ".jarvis", "rules")
-                is_project = rules_dir == project_rules_dir
+                # 检查是否为项目规则目录（.jarvis/rules 或社区 skill 目录）
+                is_project = rules_dir in self._get_project_rule_dirs()
 
                 # 根据实际来源分配前缀
                 global_rules_dir = os.path.join(get_data_dir(), "rules")
@@ -1161,7 +1181,14 @@ class RulesManager:
                             if os.path.isfile(p):
                                 return p
                         return "--"
-                    return os.path.join(self.root_dir, ".jarvis", "rules", actual_name)
+                    # 按优先级返回项目级规则目录下的路径（.jarvis/rules > .agents/skills > .claude/skills）
+                    # 兼容不带 .md 后缀的规则名：用补 .md 的路径判断存在性，
+                    # 但返回 actual_name 原样（与 central/config 分支一致，不补后缀）
+                    for project_rules_dir in self._get_project_rule_dirs():
+                        probe = os.path.join(project_rules_dir, actual_name)
+                        if os.path.isfile(probe) or os.path.isfile(probe + ".md"):
+                            return probe
+                    return "--"
 
                 # 处理 global 前缀
                 elif prefix == "global":
