@@ -214,6 +214,32 @@
           >
             审批报告：{{ active.approvalPath }}
           </div>
+          <button
+            v-if="active.approvalPath"
+            class="orch-btn is-preview"
+            :disabled="approvalReportLoading"
+            @click="toggleApprovalReport"
+          >
+            {{ approvalReportOpen ? '收起审批报告' : '📄 预览审批报告' }}
+          </button>
+          <div
+            v-if="approvalReportOpen"
+            class="orch-approval-report"
+          >
+            <div
+              v-if="approvalReportLoading"
+              class="orch-approval-report-state"
+            >加载中…</div>
+            <div
+              v-else-if="approvalReportError"
+              class="orch-approval-report-state is-err"
+            >{{ approvalReportError }}</div>
+            <div
+              v-else-if="approvalReportHtml"
+              class="orch-approval-report-body"
+              v-html="approvalReportHtml"
+            />
+          </div>
           <textarea
             v-model="approvalNote"
             class="orch-approval-note"
@@ -450,6 +476,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import { marked } from 'marked'
 import { layoutDag, edgePath as buildEdgePath, LAYOUT } from './dagLayout.js'
 
 const props = defineProps({
@@ -457,6 +484,8 @@ const props = defineProps({
   pipelines: { type: Array, default: () => [] },
   activeId: { type: String, default: '' },
   mode: { type: String, default: 'compact' }, // compact | full
+  // 读取文件内容（如审批报告 .df/approval.md）：由父组件注入（绑定流水线所在节点）
+  fetchFileContent: { type: Function, default: null },
 })
 
 const emit = defineEmits(['select', 'jump-agent', 'expand', 'remove', 'approve', 'reject', 'retry'])
@@ -613,6 +642,51 @@ function submitApproval(action) {
   const note = approvalNote.value.trim()
   emit(action, { pipelineId: active.value.pipelineId, note })
   approvalNote.value = ''
+}
+
+// ---- 审批报告预览 ----
+// 懒加载：首次点击「预览审批报告」才读取文件（审批报告在流水线工作目录下，master 节点）
+const approvalReportOpen = ref(false)
+const approvalReportLoading = ref(false)
+const approvalReportError = ref('')
+const approvalReportHtml = ref('')
+
+// 审批报告绝对路径：workingDir + '/' + approvalPath（approvalPath 是相对 working_dir 的产物路径）
+function approvalReportPath() {
+  const st = active.value
+  if (!st || !st.approvalPath) return ''
+  const wd = String(st.workingDir || '').trim()
+  const rel = String(st.approvalPath).replace(/^\/+/, '')
+  if (!rel) return ''
+  return wd ? `${wd}/${rel}` : rel
+}
+
+async function toggleApprovalReport() {
+  if (approvalReportOpen.value) {
+    approvalReportOpen.value = false
+    return
+  }
+  approvalReportOpen.value = true
+  if (approvalReportHtml.value || approvalReportLoading.value) return
+  const path = approvalReportPath()
+  if (!path || typeof props.fetchFileContent !== 'function') {
+    approvalReportError.value = props.fetchFileContent ? '审批报告路径为空' : '当前环境不支持预览审批报告'
+    return
+  }
+  approvalReportLoading.value = true
+  approvalReportError.value = ''
+  try {
+    const content = await props.fetchFileContent(path)
+    if (!content || !String(content).trim()) {
+      approvalReportError.value = '审批报告内容为空'
+      return
+    }
+    approvalReportHtml.value = marked.parse(String(content), { breaks: true })
+  } catch (err) {
+    approvalReportError.value = err?.message || '读取审批报告失败'
+  } finally {
+    approvalReportLoading.value = false
+  }
 }
 </script>
 
@@ -901,6 +975,77 @@ function submitApproval(action) {
 .orch-btn.is-approve:hover:not(:disabled) { border-color: #37d67a; color: #37d67a; background: rgba(55, 214, 122, 0.12); }
 .orch-btn.is-reject:hover:not(:disabled) { border-color: #ff5d6c; color: #ff5d6c; background: rgba(255, 93, 108, 0.12); }
 .orch-btn.is-retry:hover:not(:disabled) { border-color: #20c8ff; color: #20c8ff; background: rgba(32, 200, 255, 0.12); }
+.orch-btn.is-preview:hover:not(:disabled) { border-color: #b98cff; color: #b98cff; background: rgba(185, 140, 255, 0.12); }
+/* 审批报告预览 */
+.orch-approval-report {
+  margin-top: 8px;
+  border: 1px solid rgba(90, 120, 160, 0.25);
+  border-radius: 8px;
+  background: rgba(8, 12, 20, 0.7);
+  overflow: hidden;
+}
+.orch-approval-report-state {
+  padding: 10px;
+  font-size: 11px;
+  color: #8b9cb3;
+  text-align: center;
+}
+.orch-approval-report-state.is-err { color: #ff8a94; }
+.orch-approval-report-body {
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 10px 12px;
+  font-size: 11.5px;
+  line-height: 1.65;
+  color: #c6d4e6;
+  word-break: break-word;
+}
+.orch-approval-report-body :deep(h1),
+.orch-approval-report-body :deep(h2),
+.orch-approval-report-body :deep(h3),
+.orch-approval-report-body :deep(h4) {
+  margin: 8px 0 4px;
+  color: #eaf2ff;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.orch-approval-report-body :deep(h1) { font-size: 14px; }
+.orch-approval-report-body :deep(p) { margin: 4px 0; }
+.orch-approval-report-body :deep(ul),
+.orch-approval-report-body :deep(ol) { margin: 4px 0; padding-left: 18px; }
+.orch-approval-report-body :deep(li) { margin: 2px 0; }
+.orch-approval-report-body :deep(code) {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(90, 120, 160, 0.2);
+  color: #8fd0ff;
+  font-size: 11px;
+}
+.orch-approval-report-body :deep(pre) {
+  margin: 6px 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(10, 16, 26, 0.9);
+  border: 1px solid rgba(90, 120, 160, 0.2);
+  overflow-x: auto;
+}
+.orch-approval-report-body :deep(pre code) { background: none; padding: 0; }
+.orch-approval-report-body :deep(table) { border-collapse: collapse; margin: 6px 0; }
+.orch-approval-report-body :deep(th),
+.orch-approval-report-body :deep(td) {
+  border: 1px solid rgba(90, 120, 160, 0.3);
+  padding: 4px 8px;
+  font-size: 11px;
+}
+.orch-approval-report-body :deep(th) { background: rgba(90, 120, 160, 0.15); color: #eaf2ff; }
+.orch-approval-report-body :deep(blockquote) {
+  margin: 6px 0;
+  padding: 4px 10px;
+  border-left: 3px solid rgba(240, 180, 41, 0.6);
+  color: #9db0c8;
+}
+.orch-approval-report-body :deep(a) { color: #20c8ff; }
+.orch-approval-report-body :deep(hr) { border: none; border-top: 1px solid rgba(90, 120, 160, 0.25); margin: 8px 0; }
 .orch-approval-log {
   margin-top: 10px;
   border-top: 1px solid rgba(90, 120, 160, 0.2);
