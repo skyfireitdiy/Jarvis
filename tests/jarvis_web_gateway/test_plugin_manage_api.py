@@ -867,3 +867,28 @@ def test_node_proxy_disable_nonexistent_plugin_api(client, isolated_data_dir):
     body = resp.json()
     assert body["success"] is False
     assert body["data"]["node_id"] == "master"
+
+
+def test_node_proxy_check_update_api(client, isolated_data_dir, monkeypatch):
+    """节点代理路径手动检查更新：/api/node/master/plugins/check-update。
+
+    手动触发 check_all_plugins_update 刷新 plugin_updates.json 缓存，
+    返回 {插件名: 是否有更新} 结构供前端统计待更新数量。
+    """
+    from jarvis.jarvis_agent import utils as agent_utils
+
+    fake_updates = {"plugin-a": True, "plugin-b": False}
+    monkeypatch.setattr(
+        agent_utils, "check_all_plugins_update", lambda: dict(fake_updates)
+    )
+
+    resp = client.post(
+        "/api/node/master/plugins/check-update",
+        headers=_auth_headers(),
+        json={"node_id": "master"},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["success"] is True
+    assert body["data"]["node_id"] == "master"
+    assert body["data"]["updates"] == fake_updates

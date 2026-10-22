@@ -890,4 +890,70 @@ describe("PluginSidebar", () => {
     await flushPromises();
     expect(showToast).toHaveBeenCalledWith("插件不存在", "error");
   });
+  test("手动检查更新：发现更新时 toast 提示数量并刷新列表", async () => {
+    const fetchWithAuth = makeFetch({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
+        success: true,
+        data: { node_id: "master", plugins: [plugin()] },
+      }),
+      "POST http://127.0.0.1:8000/api/node/master/plugins/check-update": () => ({
+        success: true,
+        data: { node_id: "master", updates: { "plugin-a": true, "plugin-b": false } },
+      }),
+    });
+    const showToast = vi.fn();
+    const wrapper = mount(PluginSidebar, {
+      props: { ...baseProps, fetchWithAuth, showToast },
+    });
+    await flushPromises();
+    // 点击「手动检查更新」按钮
+    await wrapper.find(".plugin-check-update .plugin-btn").trigger("click");
+    await flushPromises();
+    const checkCall = fetchWithAuth.mock.calls.find(
+      ([url, opt]) =>
+        opt?.method === "POST" && url.includes("/plugins/check-update"),
+    );
+    expect(checkCall).toBeTruthy();
+    expect(showToast).toHaveBeenCalledWith("发现 1 个插件有更新", "success");
+  });
+  test("手动检查更新：无更新时提示全部最新", async () => {
+    const fetchWithAuth = makeFetch({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
+        success: true,
+        data: { node_id: "master", plugins: [plugin()] },
+      }),
+      "POST http://127.0.0.1:8000/api/node/master/plugins/check-update": () => ({
+        success: true,
+        data: { node_id: "master", updates: {} },
+      }),
+    });
+    const showToast = vi.fn();
+    const wrapper = mount(PluginSidebar, {
+      props: { ...baseProps, fetchWithAuth, showToast },
+    });
+    await flushPromises();
+    await wrapper.find(".plugin-check-update .plugin-btn").trigger("click");
+    await flushPromises();
+    expect(showToast).toHaveBeenCalledWith("所有插件已是最新", "success");
+  });
+  test("手动检查更新：失败时通过 showToast 提示错误", async () => {
+    const fetchWithAuth = makeFetch({
+      "GET http://127.0.0.1:8000/api/node/master/plugins": () => ({
+        success: true,
+        data: { node_id: "master", plugins: [plugin()] },
+      }),
+      "POST http://127.0.0.1:8000/api/node/master/plugins/check-update": () => ({
+        success: false,
+        error: { message: "检查失败" },
+      }),
+    });
+    const showToast = vi.fn();
+    const wrapper = mount(PluginSidebar, {
+      props: { ...baseProps, fetchWithAuth, showToast },
+    });
+    await flushPromises();
+    await wrapper.find(".plugin-check-update .plugin-btn").trigger("click");
+    await flushPromises();
+    expect(showToast).toHaveBeenCalledWith("检查失败", "error");
+  });
 });

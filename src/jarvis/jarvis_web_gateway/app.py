@@ -8589,6 +8589,15 @@ def create_app(
                         "plugins": plugins,
                         "output": captured,
                     }
+                if action == "check_update":
+                    # 手动触发插件更新检测，刷新 plugin_updates.json 缓存
+                    updates = check_all_plugins_update()
+                    return {
+                        "success": True,
+                        "action": action,
+                        "updates": updates,
+                        "output": captured,
+                    }
                 if action == "install":
                     source = str(payload.get("source") or "")
                     force = bool(payload.get("force", False))
@@ -11247,6 +11256,7 @@ def create_app(
         子节点信任 master 判定，不重复校验。
         """
         from jarvis.jarvis_agent.utils import (
+            check_all_plugins_update,
             disable_plugin,
             enable_plugin,
             install_plugin,
@@ -11275,6 +11285,18 @@ def create_app(
                     "data": {
                         "node_id": local_node_id,
                         "plugins": plugins,
+                        "output": captured,
+                    },
+                }
+            if method == "POST" and normalized_path == "/plugins/check-update":
+                # 手动触发插件更新检测，刷新 plugin_updates.json 缓存，
+                # 使前端 hasUpdate 状态立即更新（无需等定时任务每小时刷新）。
+                updates = check_all_plugins_update()
+                return {
+                    "success": True,
+                    "data": {
+                        "node_id": local_node_id,
+                        "updates": updates,
                         "output": captured,
                     },
                 }

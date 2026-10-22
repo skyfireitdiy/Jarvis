@@ -10,7 +10,6 @@
         @click="loadPlugins"
       >⟳</button>
     </div>
-
     <div class="plugin-sidebar-tabs">
       <button
         class="plugin-sidebar-tab"
@@ -53,6 +52,18 @@
             {{ installingPlugin ? '安装中...' : '安装' }}
           </button>
         </div>
+      </div>
+
+      <!-- 手动检查更新 -->
+      <div v-if="activeTab === 'installed'" class="plugin-check-update">
+        <button
+          class="plugin-btn plugin-btn-sm"
+          :disabled="checkingUpdate || loadingPlugins"
+          @click="checkPluginUpdates"
+        >
+          {{ checkingUpdate ? '检查中...' : '手动检查更新' }}
+        </button>
+        <span class="plugin-check-update-hint">检查 git 插件是否有新版本</span>
       </div>
 
       <!-- 插件列表 -->
@@ -281,6 +292,7 @@ const props = defineProps({
 const pluginNodeId = ref('master')
 const plugins = ref([])
 const loadingPlugins = ref(false)
+const checkingUpdate = ref(false)
 
 const installingPlugin = ref(false)
 const installSource = ref('')
@@ -409,6 +421,24 @@ async function loadPlugins() {
     else props.showToast(result.error?.message || '加载插件失败', 'error')
   } catch (e) { props.showToast('加载插件失败: ' + e.message, 'error') }
   finally { loadingPlugins.value = false }
+}
+
+async function checkPluginUpdates() {
+  checkingUpdate.value = true
+  try {
+    const resp = await props.fetchWithAuth(buildApiUrl(`/api/node/${encodeURIComponent(pluginNodeId.value)}/plugins/check-update`), {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })
+    const result = await resp.json()
+    if (result.success) {
+      const updates = result.data?.updates || {}
+      const pending = Object.keys(updates).filter(k => updates[k])
+      props.showToast(pending.length ? `发现 ${pending.length} 个插件有更新` : '所有插件已是最新', 'success')
+      loadPlugins()
+    } else props.showToast(result.error?.message || '检查更新失败', 'error')
+  } catch (e) { props.showToast('检查更新失败: ' + e.message, 'error') }
+  finally { checkingUpdate.value = false }
 }
 
 async function installPlugin() {
@@ -753,6 +783,16 @@ defineExpose({ loadPlugins })
   justify-content: space-between;
   gap: 8px;
   margin-top: 8px;
+}
+.plugin-check-update {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.plugin-check-update-hint {
+  font-size: 11px;
+  color: var(--text-secondary, #888);
 }
 .plugin-force-label {
   display: flex;
