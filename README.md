@@ -6,6 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI: Run Tests](https://github.com/skyfireitdiy/Jarvis/actions/workflows/test.yml/badge.svg)](https://github.com/skyfireitdiy/Jarvis/actions/workflows/test.yml)
 [![Docs](https://github.com/skyfireitdiy/Jarvis/actions/workflows/deploy-docs.yml/badge.svg)](https://github.com/skyfireitdiy/Jarvis/actions/workflows/deploy-docs.yml)
+[![XERJ Corpus Hub contributor](https://hub.xerj.org/contributors/skyfireitdiy/badge.svg)](https://hub.xerj.org/contributors/skyfireitdiy)
 
 > ## 🏆 第三届开放原子大赛总冠军
 >
