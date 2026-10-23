@@ -9,11 +9,11 @@ description: 当需要在 Windows 真机上替换正在运行的 jarvis-daemon �
 
 在 **Windows 真机**上把正在运行的 `jarvis-daemon.exe` 换成新版本（新编译产物、临时版本、回滚版本），而**不中断服务**。核心难点：**Windows 不允许覆盖或重命名正在运行的 exe**（文件被独占锁），因此必须借一个「父进程退出后再动手」的 helper 子进程完成替换。
 
-本规则只走**一条路径**：**目标机 daemon 执行 `fs.transfer.pull`，从网关节点（Agent 所在节点）拉取编译产物**。
+本规则只走**一条路径**：**目标机 daemon 执行 `fs.transfer.node_to_daemon`，从网关节点（Agent 所在节点）拉取编译产物**。
 
 | 路径                             | 新 exe 来源              | 触发/执行方式                                         | 适用场景                                                     |
 | -------------------------------- | ------------------------ | ----------------------------------------------------- | ------------------------------------------------------------ |
-| **目标机 daemon 从网关节点拉取** | **网关节点上的编译产物** | 目标机 daemon 执行 `fs.transfer.pull`，从网关节点拉取 | Agent 在本节点（网关节点）编译出 exe，目标机是另一台远程机器 |
+| **目标机 daemon 从网关节点拉取** | **网关节点上的编译产物** | 目标机 daemon 执行 `fs.transfer.node_to_daemon`，从网关节点拉取 | Agent 在本节点（网关节点）编译出 exe，目标机是另一台远程机器 |
 
 **为什么只用这条路径**：
 
@@ -24,7 +24,7 @@ description: 当需要在 Windows 真机上替换正在运行的 jarvis-daemon �
 
 **关键概念澄清（易混）**：
 
-- **`fs.transfer.pull` 是「指定远端节点 → 发起方本机」**，**`fs.transfer.push` 是「发起方本机 → 指定远端节点」**。两者都是**站在执行该命令的 daemon 的视角**，且都要求**执行者本机 daemon 已认证网关**。
+- **`fs.transfer.node_to_daemon` 是「指定远端节点 → 发起方本机」**，**`fs.transfer.daemon_to_node` 是「发起方本机 → 指定远端节点」**。两者都是**站在执行该命令的 daemon 的视角**，且都要求**执行者本机 daemon 已认证网关**。
 - **更新 daemon 本身时，`pull`/`push` 不是「更新手段」，而是「文件投递手段」**：真正替换 exe 的永远是「拉起 helper + 自杀」那套（见下方步骤）。
 - 本场景产物在**网关节点**、要送进**目标机**，所以由**目标机**发起 `pull`（`node_id` 指向网关节点）。
 
@@ -38,8 +38,8 @@ description: 当需要在 Windows 真机上替换正在运行的 jarvis-daemon �
 
 **禁止**：
 
-- **禁止用 `windows.fs.write` 手工 base64 分块灌 exe**——已有 `fs.transfer.pull` 专门做跨机直传，手工分块既笨重又污染上下文。
-- **禁止把 `fs.transfer.pull` 当成「更新 daemon 的手段」**——它只是文件投递；替换必须走 helper。
+- **禁止用 `windows.fs.write` 手工 base64 分块灌 exe**——已有 `fs.transfer.node_to_daemon` 专门做跨机直传，手工分块既笨重又污染上下文。
+- **禁止把 `fs.transfer.node_to_daemon` 当成「更新 daemon 的手段」**——它只是文件投递；替换必须走 helper。
 - **禁止在「本机与目标机不共享文件系统」时套用「WSL 里 cp 文件 + schtasks」**——WSL 只有与目标机**同机**时才可用。
 
 ### 2. 再弄清「谁在跑、exe 在哪、怎么启动的」
@@ -82,7 +82,7 @@ daemon 内置实现（`daemon/internal/selfupdate/apply_windows.go` 的 `SpawnAp
 
 ### 路径：目标机 daemon 从网关节点拉取
 
-**适用**：**编译产物在网关节点上**（典型：Agent 在本节点编译出 exe），目标机是**另一台远程机器**，本节点够不到目标机的文件系统。此时让**目标机 daemon 执行 `fs.transfer.pull`**，从网关节点把产物拉过去。
+**适用**：**编译产物在网关节点上**（典型：Agent 在本节点编译出 exe），目标机是**另一台远程机器**，本节点够不到目标机的文件系统。此时让**目标机 daemon 执行 `fs.transfer.node_to_daemon`**，从网关节点把产物拉过去。
 
 **前提**：
 
@@ -101,7 +101,7 @@ daemon(action="list_capabilities", session_id="<目标sid>")
 #    （本节点就是网关节点时，直接 cp 即可；否则用节点直传等方式先送过去）
 
 # 3) 目标机 daemon 执行 pull：从网关节点拉取产物到目标机
-daemon(action="call", session_id="<目标sid>", name="fs.transfer.pull",
+daemon(action="call", session_id="<目标sid>", name="fs.transfer.node_to_daemon",
        params={"gateway": "https://<网关>", "node_id": "<源节点ID，通常为 master>",
                "remote_path": "jarvis-daemon-new.exe",   # 源节点 transfers/ 下的相对路径
                "local_path": "C:\\Users\\<user>\\.jarvis\\bin\\jarvis-daemon-new.exe",
@@ -124,7 +124,7 @@ daemon(action="call", session_id="<目标sid>", name="windows.process.kill",
 
 **方向辨析（务必分清）**：
 
-- `fs.transfer.pull` = **「指定远端节点 → 发起方本机」**；`fs.transfer.push` = **「发起方本机 → 指定远端节点」**。
+- `fs.transfer.node_to_daemon` = **「指定远端节点 → 发起方本机」**；`fs.transfer.daemon_to_node` = **「发起方本机 → 指定远端节点」**。
 - 本场景产物在**网关节点**、要送进**目标机**，所以由**目标机**发起 `pull`（`node_id` 指向网关节点）。
 - 若产物在**执行方本机**、要送到别的节点，才用 `push`。
 
@@ -227,13 +227,13 @@ Invoke-WebRequest -UseBasicParsing -Method POST -Uri http://127.0.0.1:17800/api/
 ### 未验证 / 风险项（如实标注）
 
 - Windows 真机上「目标 exe 被占用 → rename 失败 → 删旧 → 重试」的**完整路径**仅在真机跑通过 helper 分支；直接 rename 失败后的删旧重试分支未单独真机验证。
-- **本规则路径（`fs.transfer.pull` 从网关节点拉取 exe）的完整链路未真机验证**：能力实现与单元测试见 `daemon/internal/capability/transfer_remote.go` 与 `transfer_remote_test.go`；`pull` 的 `remote_path` 收敛规则见网关 `app.py` 的 `_resolve_transfer_path`。首次使用请先确认源节点 node_id 与产物落点。
+- **本规则路径（`fs.transfer.node_to_daemon` 从网关节点拉取 exe）的完整链路未真机验证**：能力实现与单元测试见 `daemon/internal/capability/transfer_remote.go` 与 `transfer_remote_test.go`；`pull` 的 `remote_path` 收敛规则见网关 `app.py` 的 `_resolve_transfer_path`。首次使用请先确认源节点 node_id 与产物落点。
 - helper 替换 + 重启的链路已在真机完整验证（daemon 自更新场景，日志序列：downloading → verifying → applying → 启动 helper → done → restarting → 启动/connected）。
 
 ## 自检清单
 
 - [ ] 是否已把编译产物放到**网关节点（源节点）的 `~/.jarvis/transfers/` 之下**？
-- [ ] `fs.transfer.pull` 的 `node_id` 是否填的是**源节点**（网关节点/master）？
+- [ ] `fs.transfer.node_to_daemon` 的 `node_id` 是否填的是**源节点**（网关节点/master）？
 - [ ] 是否用 `pull` 返回摘要的 sha256 与源产物核对过？
 - [ ] 目标机 daemon 是否已连上网关（有 token）？
 - [ ] 是否确认了目标 exe 的真实路径与启动方式（schtasks / service）？

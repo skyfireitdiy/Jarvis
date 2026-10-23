@@ -60,7 +60,7 @@
 | script      | `script.exec`                                    | ✅  | ✅  |
 | fs          | `fs.read` / `fs.write`                           | ✅  | ✅  |
 | service     | `service.list`                                   | ✅  | ❌  |
-| transfer    | `fs.transfer.push` / `fs.transfer.pull`          | ✅  | ✅  |
+| transfer    | `fs.transfer.daemon_to_node` / `fs.transfer.node_to_daemon` | ✅  | ✅  |
 | browser_ext | `browser.ext.status` / `browser.ext.sync`        | ✅  | ✅  |
 | ocr         | `ocr.recognize`                                  | ✅  | ✅  |
 

@@ -98,7 +98,7 @@ jarvis.listCaps().forEach((c) => print(c.name));
 - `linux.clipboard` / `linux.input` / `linux.window` — 剪贴板 / 输入 / 窗口
 - `linux.screenshot` / `ocr.recognize` — 截图与 OCR
 - `browser.ext.*` — 浏览器扩展管理
-- `fs.transfer.push` / `fs.transfer.pull` — 跨机文件直传
+- `fs.transfer.daemon_to_node` / `fs.transfer.node_to_daemon` — 跨机文件直传
 
 ## 5. 错误处理
 

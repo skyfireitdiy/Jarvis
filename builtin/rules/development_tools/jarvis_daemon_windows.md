@@ -98,7 +98,7 @@ daemon(action="list_capabilities", session_id="<sid>")
 | 列已安装应用                      | `windows.app.list`                                       | `filter`（名称或发布者）                                                              |
 | 启动应用                          | `windows.app.start`                                      | `path`（可执行文件绝对路径）、`args`、`wait`                                          |
 | 文件读写列                        | `windows.fs.read` / `.write` / `.list`                   | `path` 等                                                                             |
-| 跨机传文件（daemon↔节点）         | `fs.transfer.push` / `fs.transfer.pull`                  | `gateway`、`node_id`、`local_path`、`remote_path`（详见 `daemon_file_transfer` 规则） |
+| 跨机传文件（daemon↔节点）         | `fs.transfer.daemon_to_node` / `fs.transfer.node_to_daemon`                  | `gateway`、`node_id`、`local_path`、`remote_path`（详见 `daemon_file_transfer` 规则） |
 | 服务管理                          | `windows.service.*`                                      | `unit`（需管理员权限才能启停）                                                        |
 | 截图                              | `windows.screenshot`                                     | `path`（**只截主屏，返回体不含图像**）                                                |
 | 系统信息                          | `windows.system.info`                                    | 无                                                                                    |
@@ -116,7 +116,7 @@ daemon(action="list_capabilities", session_id="<sid>")
 
 > 这三个能力面向「看内容 / 写小文件」，**不适合搬大文件**（内容要经过 Agent 上下文）。
 
-**跨机传文件**用 `fs.transfer.push` / `fs.transfer.pull`（Linux/Windows 通用，无平台前缀）：
+**跨机传文件**用 `fs.transfer.daemon_to_node` / `fs.transfer.node_to_daemon`（Linux/Windows 通用，无平台前缀）：
 
 - 数据通路是 **daemon ↔ agent 节点**（`/api/node/{node_id}/file-transfer/*`），`node_id` 必须是网关注册的 agent 节点，**不是 daemon 的 client_id**。
 - daemon ↔ daemon 之间传文件需借 agent 节点中转（源机 push → 目标机 pull）。
