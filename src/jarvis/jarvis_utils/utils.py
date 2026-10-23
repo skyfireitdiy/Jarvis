@@ -1496,6 +1496,7 @@ _PLUGIN_EXTENSION_FIELDS = frozenset(
         "message_types",
         "agent_types",
         "gateway",
+        "ENV",
     }
 )
 
@@ -1694,6 +1695,8 @@ def reload_plugin_configs() -> bool:
                 copy.deepcopy(_base_config_cache), _base_config_dir
             )
             set_global_config_data(merged)
+            # 插件声明的 ENV 扩展点需在重载后重新注入环境变量
+            _process_env_variables(merged)
             return True
         except Exception as e:
             PrettyOutput.auto_print(f"❌ 重载插件配置失败: {e}")
