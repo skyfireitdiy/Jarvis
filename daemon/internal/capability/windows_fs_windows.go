@@ -145,6 +145,103 @@ func registerWindowsFS(reg *Registry) {
 		},
 		Handler: handleWindowsFSList,
 	})
+
+	_ = reg.Register(Capability{
+		Name: "windows.fs.edit",
+		Description: "在 Windows 上的文件中查找 search 文本并替换为 replace（精确匹配）。" +
+			"search 需包含足够的上下文以唯一定位；若匹配到多处，默认不替换并报错，" +
+			"可显式设置 replace_all=true 替换全部匹配。支持引号/换行归一化匹配，写入前自动备份。",
+		Platform: PlatformWindows,
+		Parameters: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"path": map[string]any{
+					"type":        "string",
+					"description": "要编辑的文件路径（绝对路径或相对守护进程工作目录），如 C:\\Users\\me\\a.txt。",
+				},
+				"search": map[string]any{
+					"type":        "string",
+					"description": "要查找的原文（需精确匹配，建议包含足够上下文以唯一定位）。",
+				},
+				"replace": map[string]any{
+					"type":        "string",
+					"description": "用于替换 search 的新文本（空字符串表示删除）。",
+				},
+				"replace_all": map[string]any{
+					"type":        "boolean",
+					"description": "是否替换所有匹配项，默认 false（仅当匹配唯一时才替换）。",
+				},
+			},
+			"required": []string{"path", "search", "replace"},
+		},
+		Handler: func(params map[string]any) (any, error) {
+			path, err := requiredString(params, "path")
+			if err != nil {
+				return nil, err
+			}
+			search, err := requiredString(params, "search")
+			if err != nil {
+				return nil, err
+			}
+			replace, err := requiredString(params, "replace")
+			if err != nil {
+				return nil, err
+			}
+			replaceAll, err := optionalBool(params, "replace_all", false)
+			if err != nil {
+				return nil, err
+			}
+			return fsEditFile(path, search, replace, replaceAll)
+		},
+	})
+
+	_ = reg.Register(Capability{
+		Name: "windows.fs.edit_by_line",
+		Description: "用 content 替换 Windows 上文件中指定行号区间的内容（闭区间 [start_line, end_line]）。" +
+			"适用于已知目标行的场景：先用 windows.fs.read 确认行号，再指定要替换的行范围。写入前自动备份。",
+		Platform: PlatformWindows,
+		Parameters: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"path": map[string]any{
+					"type":        "string",
+					"description": "要编辑的文件路径（绝对路径或相对守护进程工作目录），如 C:\\Users\\me\\a.txt。",
+				},
+				"start_line": map[string]any{
+					"type":        "integer",
+					"description": "起始行号（从 1 开始，包含该行）。",
+				},
+				"end_line": map[string]any{
+					"type":        "integer",
+					"description": "结束行号（从 1 开始，包含该行）。",
+				},
+				"content": map[string]any{
+					"type":        "string",
+					"description": "用于替换该行号区间的新内容。",
+				},
+			},
+			"required": []string{"path", "start_line", "end_line", "content"},
+		},
+		Handler: func(params map[string]any) (any, error) {
+			path, err := requiredString(params, "path")
+			if err != nil {
+				return nil, err
+			}
+			startLine, err := optionalInt(params, "start_line", 0)
+			if err != nil {
+				return nil, err
+			}
+			endLine, err := optionalInt(params, "end_line", 0)
+			if err != nil {
+				return nil, err
+			}
+			content, err := requiredString(params, "content")
+			if err != nil {
+				return nil, err
+			}
+			return fsEditByLine(path, startLine, endLine, content)
+		},
+	})
 }
 
 // handleWindowsFSRead 是 windows.fs.read 的实现。
