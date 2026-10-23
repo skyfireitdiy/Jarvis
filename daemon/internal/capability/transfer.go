@@ -1,6 +1,6 @@
 // 本文件提供「分块文件传输」能力的公共核心：常量、范围计算、校验和与编码辅助。
 //
-// 设计目标：让 fs.transfer.push / fs.transfer.pull（跨机文件直传）共享同一份
+// 设计目标：让 fs.transfer.daemon_to_node / fs.transfer.node_to_daemon（跨机文件直传）共享同一份
 // 语义与边界校验，避免两侧实现漂移。
 //
 // 重要：本文件**不带构建标签**，会被编译进所有平台，因此：

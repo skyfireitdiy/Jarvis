@@ -1,13 +1,13 @@
 ---
 name: daemon_file_transfer
-description: 当需要在两台机器（尤其是 jarvis-daemon 之间，如 NAS↔PC）之间搬运文件时触发。每当用户提及"传文件到某机器"、"把文件下载/上传到某设备"、"跨机传文件"、"fs.transfer.push/pull"、"daemon 之间传文件"、"把文件放到桌面"时触发。不触发：同一台机器内复制文件（用 fs.read/write 或 shell cp）；仅读取远端文件内容（用 fs.read）；Web 上传下载（用 browser_ext）。
+description: 当需要在两台机器（尤其是 jarvis-daemon 之间，如 NAS↔PC）之间搬运文件时触发。每当用户提及"传文件到某机器"、"把文件下载/上传到某设备"、"跨机传文件"、"fs.transfer.daemon_to_node/node_to_daemon"、"daemon 之间传文件"、"把文件放到桌面"时触发。不触发：同一台机器内复制文件（用 fs.read/write 或 shell cp）；仅读取远端文件内容（用 fs.read）；Web 上传下载（用 browser_ext）。
 ---
 
-# 跨机文件传输（fs.transfer.push / pull）操作指南
+# 跨机文件传输（fs.transfer.daemon_to_node / node_to_daemon）操作指南
 
 ## 规则简介
 
-`fs.transfer.push` / `fs.transfer.pull` 是 jarvis-daemon 提供的**跨机文件直传**能力：daemon 内部循环分块，字节只在 daemon 与网关之间流动，**不经过 Agent 上下文**，因此搬运大文件也不会撑爆上下文，只返回摘要（路径、大小、sha256）。
+`fs.transfer.daemon_to_node` / `fs.transfer.node_to_daemon` 是 jarvis-daemon 提供的**跨机文件直传**能力：daemon 内部循环分块，字节只在 daemon 与网关之间流动，**不经过 Agent 上下文**，因此搬运大文件也不会撑爆上下文，只返回摘要（路径、大小、sha256）。
 
 本规则记录正确用法与全部已知坑，避免重复踩。
 
@@ -37,7 +37,7 @@ description: 当需要在两台机器（尤其是 jarvis-daemon 之间，如 NAS
 **步骤 A（源机 push 到中转节点）：**
 
 ```text
-daemon(action="call", session_id="<源机 sid>", name="fs.transfer.push",
+daemon(action="call", session_id="<源机 sid>", name="fs.transfer.daemon_to_node",
        params={"gateway":"https://jvs-ai.cn:4443",
                "node_id":"master",              # 必须是 agent 节点
                "local_path":"/源机/路径/文件.jpg",
@@ -50,7 +50,7 @@ daemon(action="call", session_id="<源机 sid>", name="fs.transfer.push",
 **步骤 B（目标机从同一中转节点 pull）：**
 
 ```text
-daemon(action="call", session_id="<目标机 sid>", name="fs.transfer.pull",
+daemon(action="call", session_id="<目标机 sid>", name="fs.transfer.node_to_daemon",
        params={"gateway":"https://jvs-ai.cn:4443",
                "node_id":"master",              # 与步骤 A 同一个节点
                "remote_path":"文件.jpg",         # 与步骤 A 的 remote_path 一致
@@ -68,8 +68,8 @@ daemon(action="call", session_id="<目标机 sid>", name="fs.transfer.pull",
 
 **方向辨析（务必先分清，最容易搞反）**：
 
-- `fs.transfer.push` = **「发起方本机 → 指定远端节点」**。`local_path` 是**发起方本机**的文件，`remote_path` 是**远端节点**上的落点。
-- `fs.transfer.pull` = **「指定远端节点 → 发起方本机」**。`remote_path` 是**远端节点**上的文件，`local_path` 是**发起方本机**的落点。
+- `fs.transfer.daemon_to_node` = **「发起方本机 → 指定远端节点」**。`local_path` 是**发起方本机**的文件，`remote_path` 是**远端节点**上的落点。
+- `fs.transfer.node_to_daemon` = **「指定远端节点 → 发起方本机」**。`remote_path` 是**远端节点**上的文件，`local_path` 是**发起方本机**的落点。
 - 记忆法：**`local` 永远指发起方本机，`remote` 永远指 `node_id` 那个节点**；push 是"推出去"（本机→远端），pull 是"拉进来"（远端→本机）。
 - 谁发起就由谁的 `session_id` 调用：**要往哪台机器放文件，就在那台机器的 daemon 会话上发起**（放进去用 push，从别处取用 pull）。
 - 常见错法：想"把 A 机文件送到 B 机"，却在 A 机上调 `pull`（方向反了）——正确是 **A 机 push 到中转节点，B 机 pull**（见第 2 节两步法）。
@@ -153,7 +153,7 @@ daemon(action="list_sessions")
 ### 第 2 步：源机（NAS）push 到中转节点 master
 
 ```text
-daemon(action="call", session_id="daemon-hinas-11408", name="fs.transfer.push",
+daemon(action="call", session_id="daemon-hinas-11408", name="fs.transfer.daemon_to_node",
        params={"gateway": "https://jvs-ai.cn:4443",
                "node_id": "master",                       # agent 节点，不是 daemon
                "local_path": "/mnt/sdb1/pictures/香蕉派照片/IMG20230827095833.jpg",
@@ -167,7 +167,7 @@ daemon(action="call", session_id="daemon-hinas-11408", name="fs.transfer.push",
 ### 第 3 步：目标机（SF-PC）从同一节点 master pull 到桌面
 
 ```text
-daemon(action="call", session_id="daemon-SF-PC-35748", name="fs.transfer.pull",
+daemon(action="call", session_id="daemon-SF-PC-35748", name="fs.transfer.node_to_daemon",
        params={"gateway": "https://jvs-ai.cn:4443",          # 与第 2 步完全一致
                "node_id": "master",                          # 与第 2 步完全一致
                "remote_path": "IMG20230827095833.jpg",       # 与第 2 步 remote_path 一致
@@ -212,7 +212,7 @@ gateway_manager(action="exec_command", node_id="master",
 
 | 能力               | 方向            | 必填参数                                          | 关键返回                   |
 | ------------------ | --------------- | ------------------------------------------------- | -------------------------- |
-| `fs.transfer.push` | 本机 → 远端节点 | `gateway`、`node_id`、`local_path`、`remote_path` | `size`、`sha256`、`chunks` |
-| `fs.transfer.pull` | 远端节点 → 本机 | `gateway`、`node_id`、`local_path`、`remote_path` | `size`、`sha256`、`chunks` |
+| `fs.transfer.daemon_to_node` | 本机 → 远端节点 | `gateway`、`node_id`、`local_path`、`remote_path` | `size`、`sha256`、`chunks` |
+| `fs.transfer.node_to_daemon` | 远端节点 → 本机 | `gateway`、`node_id`、`local_path`、`remote_path` | `size`、`sha256`、`chunks` |
 
 公共可选参数：`mode`（`file`/`dir`，缺省按 `local_path` 类型推断）、`chunk_size`（**务必传 524288**）。单次上限 512 MiB。

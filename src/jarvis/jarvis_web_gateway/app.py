@@ -9539,7 +9539,7 @@ def create_app(
     # ------------------------------------------------------------------
     # 节点文件直传（file-transfer）：daemon 与节点之间搬运大文件
     # ------------------------------------------------------------------
-    # 背景：daemon 侧 fs.transfer.push/pull 在 daemon 内部循环分块，经网关
+    # 背景：daemon 侧 fs.transfer.daemon_to_node/node_to_daemon 在 daemon 内部循环分块，经网关
     # WS 转发到目标节点，字节不进入 Agent 上下文。因 WS 转发 body 是 JSON
     # 字符串，二进制统一用 base64 承载，单块上限 8MiB（base64 后约 10.7MiB，
     # 低于 uvicorn 默认 16MiB 的 WS 消息上限）。

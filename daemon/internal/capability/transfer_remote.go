@@ -2,9 +2,9 @@
 // 或从远端节点拉回本机。与既有 fs.transfer.read/write 的关键区别：
 //
 //   - fs.transfer.read/write 是「积木」：每次只搬一块，字节要经过调用方（Agent）上下文；
-//   - fs.transfer.push/pull 是「整机搬运」：daemon 内部循环分块，字节只在 daemon 与
-//     网关之间流动，调用方（Agent）只拿到一份摘要（路径、大小、sha256），
-//     因此搬运 512 MiB 文件也不会撑爆上下文。
+//   - fs.transfer.daemon_to_node / fs.transfer.node_to_daemon 是「整机搬运」：
+//     daemon 内部循环分块，字节只在 daemon 与网关之间流动，调用方（Agent）只拿到
+//     一份摘要（路径、大小、sha256），因此搬运 512 MiB 文件也不会撑爆上下文。
 //
 // 数据通路：
 //
@@ -434,7 +434,7 @@ func transferPullFile(
 	return buf.Bytes(), chunks, nil
 }
 
-// handleTransferPush 是 fs.transfer.push 的公共实现：本机 → 远端节点。
+// handleTransferPush 是 fs.transfer.daemon_to_node 的公共实现：本机 → 远端节点。
 func handleTransferPush(params map[string]any) (any, error) {
 	p, err := parseTransferRemoteParams(params)
 	if err != nil {
@@ -503,7 +503,7 @@ func handleTransferPush(params map[string]any) (any, error) {
 	}, nil
 }
 
-// handleTransferPull 是 fs.transfer.pull 的公共实现：远端节点 → 本机。
+// handleTransferPull 是 fs.transfer.node_to_daemon 的公共实现：远端节点 → 本机。
 func handleTransferPull(params map[string]any) (any, error) {
 	p, err := parseTransferRemoteParams(params)
 	if err != nil {
@@ -550,12 +550,12 @@ func handleTransferPull(params map[string]any) (any, error) {
 	}, nil
 }
 
-// registerTransferRemote 注册指定平台的跨机文件直传能力（push/pull）。
+// registerTransferRemote 注册指定平台的跨机文件直传能力（daemon_to_node / node_to_daemon）。
 //
 // 平台差异只体现在 Platform 字段，逻辑完全共享，故由 registry_*.go 传入 platform。
 func registerTransferRemote(reg *Registry, platform Platform) {
 	_ = reg.Register(Capability{
-		Name: "fs.transfer.push",
+		Name: "fs.transfer.daemon_to_node",
 		Description: "把本机文件（或目录）直传到远端节点：daemon 内部循环分块，" +
 			"字节不经过调用方上下文，仅返回摘要（路径、大小、sha256）。" +
 			"目录会自动打包为 tar 并在远端解包。单次上限 512 MiB。",
@@ -595,7 +595,7 @@ func registerTransferRemote(reg *Registry, platform Platform) {
 	})
 
 	_ = reg.Register(Capability{
-		Name: "fs.transfer.pull",
+		Name: "fs.transfer.node_to_daemon",
 		Description: "从远端节点把文件（或目录）直传回本机：daemon 内部循环分块拉取，" +
 			"字节不经过调用方上下文，仅返回摘要（路径、大小、sha256）。" +
 			"目录会在远端打包为 tar 并在本机解包。单次上限 512 MiB。",

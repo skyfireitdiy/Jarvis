@@ -1,4 +1,4 @@
-// 本文件对「跨机文件直传」能力（fs.transfer.push / fs.transfer.pull）做单元测试。
+// 本文件对「跨机文件直传」能力（fs.transfer.daemon_to_node / fs.transfer.node_to_daemon）做单元测试。
 //
 // 测试策略：用 httptest 起一个假网关，模拟 /api/node/{id}/file-transfer/{upload|download}
 // 两个端点，把分块按 offset 拼装成内存文件（模拟远端落盘），再验证：
@@ -161,7 +161,7 @@ func TestTransferPushFileChunked(t *testing.T) {
 	gateway := setupFakeGateway(t, f)
 
 	reg := NewRegistry()
-	res := reg.Execute("fs.transfer.push", map[string]any{
+	res := reg.Execute("fs.transfer.daemon_to_node", map[string]any{
 		"gateway":     gateway,
 		"node_id":     "node-1",
 		"local_path":  src,
@@ -207,7 +207,7 @@ func TestTransferPushEmptyFile(t *testing.T) {
 	gateway := setupFakeGateway(t, f)
 
 	reg := NewRegistry()
-	res := reg.Execute("fs.transfer.push", map[string]any{
+	res := reg.Execute("fs.transfer.daemon_to_node", map[string]any{
 		"gateway":     gateway,
 		"node_id":     "node-1",
 		"local_path":  src,
@@ -242,7 +242,7 @@ func TestTransferPushDirectoryPacksTar(t *testing.T) {
 	gateway := setupFakeGateway(t, f)
 
 	reg := NewRegistry()
-	res := reg.Execute("fs.transfer.push", map[string]any{
+	res := reg.Execute("fs.transfer.daemon_to_node", map[string]any{
 		"gateway":     gateway,
 		"node_id":     "node-1",
 		"local_path":  srcDir,
@@ -290,7 +290,7 @@ func TestTransferPullFileChunked(t *testing.T) {
 	dst := filepath.Join(dir, "out.bin")
 
 	reg := NewRegistry()
-	res := reg.Execute("fs.transfer.pull", map[string]any{
+	res := reg.Execute("fs.transfer.node_to_daemon", map[string]any{
 		"gateway":     gateway,
 		"node_id":     "node-1",
 		"local_path":  dst,
@@ -347,7 +347,7 @@ func TestTransferPullDirectoryUnpacksTar(t *testing.T) {
 	dst := filepath.Join(dir, "unpacked")
 
 	reg := NewRegistry()
-	res := reg.Execute("fs.transfer.pull", map[string]any{
+	res := reg.Execute("fs.transfer.node_to_daemon", map[string]any{
 		"gateway":     gateway,
 		"node_id":     "node-1",
 		"local_path":  dst,
@@ -373,7 +373,7 @@ func TestTransferRequiresCredential(t *testing.T) {
 	t.Cleanup(func() { SetBrowserExtCredentialProvider(nil) })
 
 	reg := NewRegistry()
-	res := reg.Execute("fs.transfer.push", map[string]any{
+	res := reg.Execute("fs.transfer.daemon_to_node", map[string]any{
 		"gateway":     "http://127.0.0.1:8000",
 		"node_id":     "node-1",
 		"local_path":  "/tmp/x",
@@ -425,7 +425,7 @@ func TestTransferParamValidation(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			res := reg.Execute("fs.transfer.push", tc.params)
+			res := reg.Execute("fs.transfer.daemon_to_node", tc.params)
 			if res.Success {
 				t.Fatalf("期望失败，实际成功: %+v", res.Data)
 			}
