@@ -194,3 +194,4 @@ jobs/
 # Reversa
 .reversa/
 _reversa_sdd/
+.jarvis/rules/reversa/
