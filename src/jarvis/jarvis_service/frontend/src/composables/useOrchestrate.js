@@ -40,6 +40,8 @@ export function useOrchestrate({
   dirDialogContext,
   openDirDialog,
   startAgentListRefresh,
+  // 配置中的默认代理节点（default_proxy_node），编排文件未显式指定 proxy_node 时兜底
+  defaultProxyNode,
 }) {
   const showOrchestrateModal = ref(false)          // 编排弹窗
   const orchestrateNodeId = ref('master')          // 编排文件所在节点（也是创建 Agent 的默认节点）
@@ -75,6 +77,10 @@ export function useOrchestrate({
   // 把编排文件里的单个 agent 配置映射为可编辑表单对象（字段缺失时按后端默认值兜底）
   function buildOrchestrateAgentForm(raw = {}, fallbackNodeId = 'master') {
     const acl = raw.access_acl && typeof raw.access_acl === 'object' ? raw.access_acl : {}
+    // 代理节点：编排文件显式指定优先，否则用配置中的默认代理节点（default_proxy_node），再否则无代理
+    const configuredProxy = String(defaultProxyNode?.value || '').trim()
+    const proxyNode = String(raw.proxy_node || '').trim()
+      || (configuredProxy && availableNodeOptions.value.some(n => n.node_id === configuredProxy) ? configuredProxy : '')
     return {
       name: String(raw.name || ''),
       workingDir: String(raw.working_dir || '.'),
@@ -86,7 +92,7 @@ export function useOrchestrate({
       restoreSession: !!raw.restore_session,
       noInteractionMode: !!raw.no_interaction_mode,
       nodeId: String(raw.node_id || fallbackNodeId || 'master'),
-      proxyNode: String(raw.proxy_node || ''),
+      proxyNode,
       accessAclRead: Array.isArray(acl.read) ? acl.read.map(String) : [],
       accessAclInteract: Array.isArray(acl.interact) ? acl.interact.map(String) : [],
     }

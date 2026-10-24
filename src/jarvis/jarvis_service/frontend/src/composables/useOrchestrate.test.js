@@ -31,6 +31,7 @@ function makeHarness(overrides = {}) {
   const dirDialogContext = ref('create-agent')
   const openDirDialog = vi.fn()
   const startAgentListRefresh = vi.fn()
+  const defaultProxyNode = ref('')
   const api = useOrchestrate({
     agentList,
     availableNodeOptions,
@@ -53,6 +54,7 @@ function makeHarness(overrides = {}) {
     dirDialogContext,
     openDirDialog,
     startAgentListRefresh,
+    defaultProxyNode,
     ...overrides,
   })
   return {
@@ -78,6 +80,7 @@ function makeHarness(overrides = {}) {
     dirDialogContext,
     openDirDialog,
     startAgentListRefresh,
+    defaultProxyNode,
   }
 }
 describe('useOrchestrate', () => {
@@ -154,6 +157,24 @@ describe('useOrchestrate', () => {
     expect(empty.nodeId).toBe('fb-node')
     expect(empty.workingDir).toBe('.')
     expect(empty.llmGroup).toBe('default')
+  })
+  it('buildOrchestrateAgentForm：未显式指定 proxy_node 时用配置的默认代理节点兜底', () => {
+    const { api, defaultProxyNode, availableNodeOptions } = makeHarness()
+    // 配置默认代理节点 worker-1 且该节点在可选列表中
+    availableNodeOptions.value = [{ node_id: 'master' }, { node_id: 'worker-1' }]
+    defaultProxyNode.value = 'worker-1'
+    const form = api.buildOrchestrateAgentForm({}, 'master')
+    expect(form.proxyNode).toBe('worker-1')
+    // 编排文件显式指定 proxy_node 时优先于配置默认值
+    const explicit = api.buildOrchestrateAgentForm({ proxy_node: 'worker-2' }, 'master')
+    expect(explicit.proxyNode).toBe('worker-2')
+  })
+  it('buildOrchestrateAgentForm：配置默认代理节点不在可选列表中时回退无代理', () => {
+    const { api, defaultProxyNode, availableNodeOptions } = makeHarness()
+    availableNodeOptions.value = [{ node_id: 'master' }]
+    defaultProxyNode.value = 'worker-1' // 不在可选列表中
+    const form = api.buildOrchestrateAgentForm({}, 'master')
+    expect(form.proxyNode).toBe('')
   })
   it('openOrchestrateModal：打开弹窗、初始化状态、加载模板与最近历史', async () => {
     const { api, fetchNodeStatus, getDefaultCreateAgentNodeId, loadOrchestratePluginTemplates } = makeHarness()
