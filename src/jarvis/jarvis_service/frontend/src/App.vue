@@ -7206,6 +7206,7 @@ const {
   dirDialogContext,
   openDirDialog,
   startAgentListRefresh,
+  defaultProxyNode,
 })
 // 切换当前工作的 Agent
 
