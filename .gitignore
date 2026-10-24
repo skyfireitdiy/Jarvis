@@ -190,3 +190,7 @@ jobs/
 **/symbol_cache/codegraph.db
 **/symbol_cache/codegraph.db-shm
 **/symbol_cache/codegraph.db-wal
+
+# Reversa
+.reversa/
+_reversa_sdd/

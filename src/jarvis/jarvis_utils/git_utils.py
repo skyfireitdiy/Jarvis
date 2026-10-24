@@ -36,6 +36,20 @@ _confirm_add_new_files_called = False
 # 避免用户/Agent 看不到原因而反复重试。
 _last_commit_reject_reason: str = ""
 
+# 需要自动写入 .git/info/exclude 的 AI 工具/编辑器本地配置目录。
+# 这些目录通常是本地个人配置（skills/规则/设置等），不应提交到仓库。
+AI_TOOL_IGNORE_DIRS: Tuple[str, ...] = (
+    ".jarvis/",
+    ".claude/",
+    ".agents/",
+    ".vscode/",
+    ".cursor/",
+    ".windsurf/",
+    ".idea/",
+    ".zed/",
+    ".reversa/",
+)
+
 
 def get_last_commit_reject_reason() -> str:
     """返回 handle_commit_workflow 最近一次拒绝提交的具体原因（可能为空字符串）。"""
@@ -1580,23 +1594,27 @@ def confirm_add_new_files() -> None:
             except Exception:
                 existing_lines = set()
 
-            # 确保 .jarvis 被忽略
-            # 若用户 .gitignore 已提及 .jarvis（规则或注释），尊重用户意图不写入
+            # 确保 AI 工具/编辑器本地配置目录被忽略（如 .jarvis/、.claude/ 等）
+            # 若用户 .gitignore 已提及某目录（规则或注释），尊重用户意图不写入
             try:
                 gitignore_path = os.path.join(repo_root, ".gitignore")
-                gitignore_mentions_jarvis = False
+                gitignore_content = ""
                 if os.path.exists(gitignore_path):
                     with open(
                         gitignore_path, "r", encoding="utf-8", errors="replace"
                     ) as f:
-                        gitignore_mentions_jarvis = ".jarvis" in f.read()
+                        gitignore_content = f.read()
             except Exception:
-                gitignore_mentions_jarvis = False
+                gitignore_content = ""
 
             try:
-                if not gitignore_mentions_jarvis and not any(
-                    ".jarvis" in line for line in existing_lines
-                ):
+                added_dirs = []
+                for ignore_dir in AI_TOOL_IGNORE_DIRS:
+                    # 用户 .gitignore 已提及该目录时尊重用户意图
+                    if ignore_dir in gitignore_content:
+                        continue
+                    if any(ignore_dir in line for line in existing_lines):
+                        continue
                     needs_newline = False
                     if os.path.exists(exclude_path):
                         with open(exclude_path, "r", encoding="utf-8") as f:
@@ -1605,19 +1623,31 @@ def confirm_add_new_files() -> None:
                     with open(exclude_path, "a", encoding="utf-8", newline="\n") as f:
                         if needs_newline:
                             f.write("\n")
-                        f.write("\n.jarvis/\n")
-                    PrettyOutput.auto_print("✅ 已添加 .jarvis/ 到 .git/info/exclude")
+                        f.write("\n" + ignore_dir + "\n")
+                    added_dirs.append(ignore_dir)
+                if added_dirs:
+                    PrettyOutput.auto_print(
+                        "✅ 已添加 "
+                        + ", ".join(added_dirs)
+                        + " 到 .git/info/exclude"
+                    )
             except Exception as e:
                 PrettyOutput.auto_print(
-                    f"⚠ 添加 .jarvis/ 到 .git/info/exclude 失败: {e}"
+                    f"⚠ 添加 AI 工具目录到 .git/info/exclude 失败: {e}"
                 )
 
             # 仅对未跟踪的新文件进行忽略（已跟踪文件无法通过 ignore 规则忽略）
-            # 若用户 .gitignore 已提及 .jarvis，则不动 .jarvis 目录下的文件
+            # 若用户 .gitignore 已提及某 AI 工具目录，则不动该目录下的文件
             files_to_ignore = sorted(set(new_files))
-            if gitignore_mentions_jarvis:
+            if gitignore_content:
                 files_to_ignore = [
-                    f for f in files_to_ignore if not f.startswith(".jarvis/")
+                    f
+                    for f in files_to_ignore
+                    if not any(
+                        f.startswith(ignore_dir)
+                        for ignore_dir in AI_TOOL_IGNORE_DIRS
+                        if ignore_dir in gitignore_content
+                    )
                 ]
 
             # 追加未存在的文件路径到 .git/info/exclude（使用相对于仓库根目录的路径）

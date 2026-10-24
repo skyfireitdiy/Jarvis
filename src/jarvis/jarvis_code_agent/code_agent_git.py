@@ -14,6 +14,7 @@ from typing import Optional
 from typing import Tuple
 
 from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
+from jarvis.jarvis_utils.git_utils import AI_TOOL_IGNORE_DIRS
 from jarvis.jarvis_utils.git_utils import confirm_add_new_files
 from jarvis.jarvis_utils.git_utils import find_git_root_and_cd
 from jarvis.jarvis_utils.git_utils import get_commits_between
@@ -87,29 +88,30 @@ class GitManager:
         return git_dir
 
     def update_ignore_rules(self, git_dir: str) -> None:
-        """确保 .jarvis 被 git 忽略（写入 .git/info/exclude）
+        """确保 AI 工具/编辑器本地配置目录被 git 忽略（写入 .git/info/exclude）
 
         不修改用户的 .gitignore，而是写入 git 本地忽略文件
-        .git/info/exclude（不提交、不影响仓库），仅添加 .jarvis/。
+        .git/info/exclude（不提交、不影响仓库），添加 AI_TOOL_IGNORE_DIRS
+        中的目录（如 .jarvis/、.claude/、.agents/、.vscode/ 等）。
 
-        若用户的 .gitignore 中已提及 .jarvis（无论忽略规则还是
+        若用户的 .gitignore 中已提及某目录（无论忽略规则还是
         注释形式），视为用户已表达意图，尊重用户不写入 exclude。
 
         参数:
             git_dir: git根目录路径
         """
-        # 用户 .gitignore 已提及 .jarvis 时尊重用户意图，不写入 exclude
+        # 用户 .gitignore 已提及的目录，尊重用户意图不写入 exclude
         try:
             gitignore_path = os.path.join(git_dir, ".gitignore")
+            gitignore_content = ""
             if os.path.exists(gitignore_path):
                 with open(
                     gitignore_path, "r", encoding="utf-8", errors="replace"
                 ) as f:
-                    if ".jarvis" in f.read():
-                        return
+                    gitignore_content = f.read()
         except Exception:
             # 读取 .gitignore 失败时继续，不影响主流程
-            pass
+            gitignore_content = ""
 
         try:
             result = subprocess.run(
@@ -135,15 +137,31 @@ class GitManager:
                 with open(exclude_path, "r", encoding="utf-8", errors="replace") as f:
                     existing_content = f.read()
 
-            if ".jarvis" in existing_content:
-                return
+            # 已存在的规则行（去空白后），用于幂等判断
+            existing_lines = set(
+                line.strip() for line in existing_content.splitlines() if line.strip()
+            )
 
-            with open(exclude_path, "a", encoding="utf-8", newline="\n") as f:
-                # 若原文件不以换行结尾，先补一行
-                if existing_content and not existing_content.endswith("\n"):
-                    f.write("\n")
-                f.write("\n.jarvis/\n")
-            PrettyOutput.auto_print("✅ 已将 .jarvis/ 写入 .git/info/exclude 忽略规则")
+            added = []
+            for ignore_dir in AI_TOOL_IGNORE_DIRS:
+                # 用户 .gitignore 已提及该目录时尊重用户意图
+                if ignore_dir in gitignore_content:
+                    continue
+                # 已存在该目录规则（或已有该目录下的文件条目）时跳过
+                if any(ignore_dir in line for line in existing_lines):
+                    continue
+                with open(exclude_path, "a", encoding="utf-8", newline="\n") as f:
+                    # 若原文件不以换行结尾，先补一行
+                    if existing_content and not existing_content.endswith("\n"):
+                        f.write("\n")
+                        existing_content += "\n"
+                    f.write("\n" + ignore_dir + "\n")
+                    existing_content += "\n" + ignore_dir + "\n"
+                    added.append(ignore_dir)
+            if added:
+                PrettyOutput.auto_print(
+                    "✅ 已将 " + ", ".join(added) + " 写入 .git/info/exclude 忽略规则"
+                )
         except Exception as e:
             PrettyOutput.auto_print(f"⚠ 写入 .git/info/exclude 失败: {e}")
 

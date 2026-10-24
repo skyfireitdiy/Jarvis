@@ -173,3 +173,80 @@ class TestHandleCommitConfirmation:
         # 仍应执行提交
         mocks["commiter"].execute.assert_called_once()
         assert agent.start_commit == "newhash123"
+
+
+class TestUpdateIgnoreRules:
+    """测试 GitManager.update_ignore_rules 写入 .git/info/exclude 的行为"""
+
+    def _make_manager(self):
+        return GitManager("/tmp")
+
+    def test_writes_ai_tool_dirs(self, tmp_path):
+        """应把 AI_TOOL_IGNORE_DIRS 中的目录写入 .git/info/exclude"""
+        git_dir = str(tmp_path)
+        (tmp_path / ".git").mkdir()
+        exclude_path = tmp_path / ".git" / "info"
+        exclude_path.mkdir(parents=True)
+        exclude_file = exclude_path / "exclude"
+        exclude_file.write_text("# 初始注释\n", encoding="utf-8")
+
+        with patch(
+            "jarvis.jarvis_code_agent.code_agent_git.subprocess.run"
+        ) as mock_run:
+            mock_run.return_value = MagicMock(
+                stdout=str(exclude_file).encode(), returncode=0
+            )
+            self._make_manager().update_ignore_rules(git_dir)
+
+        content = exclude_file.read_text(encoding="utf-8")
+        from jarvis.jarvis_utils.git_utils import AI_TOOL_IGNORE_DIRS
+
+        for ignore_dir in AI_TOOL_IGNORE_DIRS:
+            assert ignore_dir in content, f"{ignore_dir} 应写入 exclude"
+
+    def test_idempotent(self, tmp_path):
+        """重复调用不应重复写入"""
+        git_dir = str(tmp_path)
+        (tmp_path / ".git").mkdir()
+        exclude_path = tmp_path / ".git" / "info"
+        exclude_path.mkdir(parents=True)
+        exclude_file = exclude_path / "exclude"
+        exclude_file.write_text("", encoding="utf-8")
+
+        with patch(
+            "jarvis.jarvis_code_agent.code_agent_git.subprocess.run"
+        ) as mock_run:
+            mock_run.return_value = MagicMock(
+                stdout=str(exclude_file).encode(), returncode=0
+            )
+            manager = self._make_manager()
+            manager.update_ignore_rules(git_dir)
+            manager.update_ignore_rules(git_dir)
+
+        content = exclude_file.read_text(encoding="utf-8")
+        from jarvis.jarvis_utils.git_utils import AI_TOOL_IGNORE_DIRS
+
+        for ignore_dir in AI_TOOL_IGNORE_DIRS:
+            assert content.count(ignore_dir) == 1, f"{ignore_dir} 不应重复"
+
+    def test_respects_user_gitignore(self, tmp_path):
+        """用户 .gitignore 已提及的目录不应写入 exclude"""
+        git_dir = str(tmp_path)
+        (tmp_path / ".gitignore").write_text(".claude/\n", encoding="utf-8")
+        (tmp_path / ".git").mkdir()
+        exclude_path = tmp_path / ".git" / "info"
+        exclude_path.mkdir(parents=True)
+        exclude_file = exclude_path / "exclude"
+        exclude_file.write_text("", encoding="utf-8")
+
+        with patch(
+            "jarvis.jarvis_code_agent.code_agent_git.subprocess.run"
+        ) as mock_run:
+            mock_run.return_value = MagicMock(
+                stdout=str(exclude_file).encode(), returncode=0
+            )
+            self._make_manager().update_ignore_rules(git_dir)
+
+        content = exclude_file.read_text(encoding="utf-8")
+        assert ".claude/" not in content, "用户 .gitignore 已提及 .claude，不应写入"
+        assert ".jarvis/" in content, "未提及的目录仍应写入"
