@@ -87,3 +87,93 @@ class TestGitCommitTool:
 
         result = tool._get_last_commit_hash()
         assert result == ""
+
+
+class TestSquashCheckpointCommits:
+    """测试 GitCommitTool._squash_checkpoint_commits 压缩 CheckPoint 临时提交"""
+
+    def _make_tool(self):
+        return GitCommitTool()
+
+    def test_squash_when_checkpoint_exists(self):
+        """存在 CheckPoint 临时提交时，执行 git reset --soft 压缩到暂存区"""
+        tool = self._make_tool()
+        with (
+            patch(
+                "jarvis.jarvis_git_utils.git_commiter.find_recent_non_checkout_commit",
+                return_value="abc123",
+            ),
+            patch(
+                "jarvis.jarvis_git_utils.git_commiter.get_latest_commit_hash",
+                return_value="def456",
+            ),
+            patch(
+                "jarvis.jarvis_git_utils.git_commiter.subprocess.run"
+            ) as mock_run,
+        ):
+            mock_run.return_value = MagicMock(returncode=0, stderr=b"")
+            tool._squash_checkpoint_commits()
+
+        # 应执行 git reset --soft <起点>
+        mock_run.assert_called_once()
+        args = mock_run.call_args.args
+        assert args[0] == ["git", "reset", "--soft", "abc123"]
+
+    def test_no_squash_when_head_is_start(self):
+        """无 CheckPoint（起点 == HEAD）时，不执行 reset"""
+        tool = self._make_tool()
+        with (
+            patch(
+                "jarvis.jarvis_git_utils.git_commiter.find_recent_non_checkout_commit",
+                return_value="abc123",
+            ),
+            patch(
+                "jarvis.jarvis_git_utils.git_commiter.get_latest_commit_hash",
+                return_value="abc123",
+            ),
+            patch(
+                "jarvis.jarvis_git_utils.git_commiter.subprocess.run"
+            ) as mock_run,
+        ):
+            tool._squash_checkpoint_commits()
+
+        mock_run.assert_not_called()
+
+    def test_no_squash_in_fresh_repo(self):
+        """全新仓库（找不到非 CheckPoint 提交）时，跳过压缩"""
+        tool = self._make_tool()
+        with (
+            patch(
+                "jarvis.jarvis_git_utils.git_commiter.find_recent_non_checkout_commit",
+                return_value="",
+            ),
+            patch(
+                "jarvis.jarvis_git_utils.git_commiter.get_latest_commit_hash",
+                return_value="",
+            ),
+            patch(
+                "jarvis.jarvis_git_utils.git_commiter.subprocess.run"
+            ) as mock_run,
+        ):
+            tool._squash_checkpoint_commits()
+
+        mock_run.assert_not_called()
+
+    def test_squash_failure_does_not_raise(self):
+        """压缩失败时不抛异常，仅打印警告"""
+        tool = self._make_tool()
+        with (
+            patch(
+                "jarvis.jarvis_git_utils.git_commiter.find_recent_non_checkout_commit",
+                return_value="abc123",
+            ),
+            patch(
+                "jarvis.jarvis_git_utils.git_commiter.get_latest_commit_hash",
+                return_value="def456",
+            ),
+            patch(
+                "jarvis.jarvis_git_utils.git_commiter.subprocess.run"
+            ) as mock_run,
+        ):
+            mock_run.return_value = MagicMock(returncode=1, stderr=b"some error")
+            tool._squash_checkpoint_commits()  # 不应抛异常

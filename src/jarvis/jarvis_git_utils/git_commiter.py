@@ -14,6 +14,8 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import get_git_commit_prompt
 from jarvis.jarvis_utils.git_utils import confirm_add_new_files
 from jarvis.jarvis_utils.git_utils import find_git_root_and_cd
+from jarvis.jarvis_utils.git_utils import find_recent_non_checkout_commit
+from jarvis.jarvis_utils.git_utils import get_latest_commit_hash
 from jarvis.jarvis_utils.git_utils import has_uncommitted_changes
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ct
@@ -199,11 +201,46 @@ class GitCommitTool:
         stdout, _ = process.communicate()
         return decode_output(stdout).strip()
 
+    def _squash_checkpoint_commits(self) -> None:
+        """将 HEAD 之前的 CheckPoint 临时提交压缩到暂存区（与 commit 工具行为一致）
+
+        CodeAgent 修改代码时每次变更都会生成以 "CheckPoint #N" 开头的临时提交。
+        这些临时提交不应直接进入历史。本方法把最近一个非 CheckPoint 提交之后的
+        所有 CheckPoint 临时提交用 `git reset --soft` 压缩到暂存区，随后由
+        提交信息生成流程统一生成正式提交。
+
+        幂等性：若此前已压缩过（最近非 CheckPoint 提交即 HEAD），不触发 reset。
+        全新仓库（找不到任何非 CheckPoint 提交）时跳过，不影响后续流程。
+        """
+        try:
+            start = find_recent_non_checkout_commit()
+            current_head = get_latest_commit_hash()
+            if start and start != current_head:
+                PrettyOutput.auto_print(
+                    f"ℹ️ 检测到 CheckPoint 临时提交，正在压缩到 {start[:7]} ..."
+                )
+                result = subprocess.run(
+                    ["git", "reset", "--soft", start],
+                    capture_output=True,
+                    text=False,
+                    check=False,
+                )
+                if result.returncode != 0:
+                    PrettyOutput.auto_print(
+                        f"⚠️ 压缩 CheckPoint 失败: {decode_output(result.stderr)}"
+                    )
+        except Exception as e:
+            # 压缩失败不阻塞提交流程，后续 has_uncommitted_changes 会兜底
+            PrettyOutput.auto_print(f"⚠️ 压缩 CheckPoint 异常: {str(e)}")
+
     def _prepare_git_environment(self, root_dir: str) -> Optional[str]:
         """Prepare git environment by changing directory and checking for changes"""
         original_dir = os.getcwd()
         os.chdir(root_dir)
         find_git_root_and_cd()
+        # 先压缩 CheckPoint 临时提交（压缩后暂存区有变更，has_uncommitted_changes
+        # 会检测到），再检查是否有未提交的更改。
+        self._squash_checkpoint_commits()
         if not has_uncommitted_changes():
             PrettyOutput.auto_print("✅ 没有未提交的更改")
             return None
