@@ -176,8 +176,9 @@ class MemoryManager:
 
         # 构建提示词，让大模型自己判断并保存记忆
         prompt = """回顾本次任务，判断是否有值得记忆的信息。使用 memory 工具（action=save）保存：
-- 作用域 memory_type: project(项目) / global(全局) / short_term(短期)
+- 作用域 memory_type: project(项目) / global(全局) / short_term(短期) / user(用户)
 - 性质 nature: long_term(长期) / procedural(程序性how-to/踩坑) / episodic(情景归档)
+- 若记录的是关于当前用户的喜好/行为等用户特有信息，用 memory_type=user 并**必须提供 user_name**（从对话上下文提取当前用户身份），保存为用户记忆，不污染全局共享记忆
 如无值得记忆的信息，直接说明。"""
 
         # 处理记忆保存
@@ -241,10 +242,11 @@ class MemoryManager:
             if "memory" in tool_names:
                 memory_prompts += (
                     "\n    - 有关键信息需要沉淀时，用 memory(action=save) 保存，"
-                    "用 memory_type 指定作用域(project/global/short_term)、"
+                    "用 memory_type 指定作用域(project/global/short_term/user)、"
                     "nature 指定性质(long_term/procedural/episodic)："
                     "project+long_term 存项目相关（架构决策、关键配置、实现约定），"
-                    "global+long_term 存通用经验与用户偏好，short_term 存当前任务临时信息"
+                    "global+long_term 存通用经验与用户偏好，short_term 存当前任务临时信息，"
+                    "user 存用户特有信息（喜好/行为，需提供 user_name）"
                 )
                 memory_prompts += "\n    - 需要过往上下文或方案时，用 memory(action=retrieve) 检索相关记忆"
 

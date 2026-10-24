@@ -25,6 +25,7 @@ _NATIVE_TASK_ANALYSIS_PROMPT = """对刚结束的任务做一次复盘。需要�
 2. **记忆沉淀（memory）**：用 memory(action=save) 保存值得长期留存的信息：
    - project_long_term：项目相关（架构决策、关键约定、重要实现）
    - global_long_term：通用经验、用户偏好、方法技巧
+   - user：关于当前用户的喜好/行为等**用户特有信息**，用 memory_type=user 并**必须提供 user_name**（从对话上下文提取当前用户身份），保存为用户记忆，不污染全局共享记忆
    没有值得存的就不存。
 3. **工具生成（meta_agent）**：仅当现有规则/工具都无法覆盖、且该任务确实值得自动化时：
    - 用 meta_agent 生成（function_description 写清目标功能与预期行为；工具须含参数定义与错误处理）。

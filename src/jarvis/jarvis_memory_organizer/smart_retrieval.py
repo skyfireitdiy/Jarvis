@@ -35,6 +35,7 @@ class Memory:
     content: str = ""
     created_at: str = ""
     updated_at: str = ""
+    user_name: str = ""
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Memory":
@@ -47,6 +48,7 @@ class Memory:
             content=data.get("content", ""),
             created_at=data.get("created_at", ""),
             updated_at=data.get("updated_at", ""),
+            user_name=data.get("user_name", ""),
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -59,6 +61,7 @@ class Memory:
             "content": self.content,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
+            "user_name": self.user_name,
         }
 
 
@@ -146,6 +149,7 @@ class SmartRetriever:
         memory_types: Optional[List[str]] = None,
         natures: Optional[List[str]] = None,
         limit: int = 10,
+        user_name: str = "",
     ) -> List[Memory]:
         """语义检索
 
@@ -153,9 +157,10 @@ class SmartRetriever:
 
         Args:
             query: 查询文本
-            memory_types: 要检索的作用域列表（project/global），默认检索所有作用域
+            memory_types: 要检索的作用域列表（project/global/user），默认检索所有作用域
             natures: 要检索的性质列表（long_term/procedural/episodic），默认检索所有性质
             limit: 返回结果的最大数量
+            user_name: 用户名（memory_types 含 user 时必填），仅检索该用户的记忆
 
         Returns:
             按相关性排序的记忆列表
@@ -171,11 +176,11 @@ class SmartRetriever:
 
         # 3. 检索候选记忆
         candidates = self._retrieve_candidates(
-            semantic_query.expanded_tags, memory_types, natures
+            semantic_query.expanded_tags, memory_types, natures, user_name
         )
 
         # 4. 加载所有记忆以构建语料库
-        all_memories = self._load_all_memories(memory_types, natures)
+        all_memories = self._load_all_memories(memory_types, natures, user_name)
         corpus = [memory.content for memory in all_memories]
 
         # 5. 计算相关性得分并排序
@@ -528,14 +533,14 @@ class SmartRetriever:
         return 1.0
 
     def _retrieve_candidates(
-        self, tags: List[str], memory_types: List[str], natures: List[str]
+        self, tags: List[str], memory_types: List[str], natures: List[str], user_name: str = ""
     ) -> List[Memory]:
         """检索候选记忆"""
         candidates = []
 
         for memory_type in memory_types:
             for nature in natures:
-                memories = self._load_memories_by_type(memory_type, nature)
+                memories = self._load_memories_by_type(memory_type, nature, user_name)
                 for memory in memories:
                     # 检查标签匹配
                     if tags:
@@ -548,11 +553,13 @@ class SmartRetriever:
 
         return candidates
 
-    def _load_memories_by_type(self, memory_type: str, nature: str) -> List[Memory]:
+    def _load_memories_by_type(
+        self, memory_type: str, nature: str, user_name: str = ""
+    ) -> List[Memory]:
         """加载指定作用域和性质的所有记忆"""
         memories: List[Memory] = []
 
-        memory_dir = self._get_type_dir(memory_type, nature)
+        memory_dir = self._get_type_dir(memory_type, nature, user_name)
         if memory_dir is None or not memory_dir.exists():
             return memories
 
@@ -566,7 +573,9 @@ class SmartRetriever:
 
         return memories
 
-    def _get_type_dir(self, memory_type: str, nature: str) -> Optional[Path]:
+    def _get_type_dir(
+        self, memory_type: str, nature: str, user_name: str = ""
+    ) -> Optional[Path]:
         """根据作用域和性质返回存储目录（与 MemoryTool._get_memory_dir 保持一致）"""
         if memory_type == "project":
             if nature == "long_term":
@@ -582,16 +591,29 @@ class SmartRetriever:
                 return self.global_memory_dir / "procedural"
             elif nature == "episodic":
                 return self.global_memory_dir / "episodic"
+        elif memory_type == "user":
+            # 用户记忆按用户名区分存储
+            if not user_name:
+                return None
+            user_base = self.global_memory_dir / "users" / user_name
+            if nature == "long_term":
+                return user_base / "attributes"
+            elif nature == "procedural":
+                return user_base / "procedural"
+            elif nature == "episodic":
+                return user_base / "events"
         return None
 
     def _load_all_memories(
-        self, memory_types: List[str], natures: List[str]
+        self, memory_types: List[str], natures: List[str], user_name: str = ""
     ) -> List[Memory]:
         """加载所有指定作用域和性质的记忆"""
         all_memories = []
         for memory_type in memory_types:
             for nature in natures:
-                all_memories.extend(self._load_memories_by_type(memory_type, nature))
+                all_memories.extend(
+                    self._load_memories_by_type(memory_type, nature, user_name)
+                )
         return all_memories
 
     def _load_memory_by_id(self, memory_id: str) -> Optional[Memory]:
