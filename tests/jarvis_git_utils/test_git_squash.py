@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """jarvis_git_squash.main 模块单元测试（-g/--llm-group 模型组参数）"""
 
+import re
 from unittest.mock import patch
 
 from typer.testing import CliRunner
@@ -10,6 +11,14 @@ from jarvis.jarvis_git_squash.main import app
 
 runner = CliRunner()
 
+# 剥离 ANSI 转义码：CI（GitHub Actions）下 typer 会输出带 \x1b[...m 的彩色 help，
+# 导致 "--llm-group" 等长参数名被转义序列拆开、子串断言失败；剥离后断言与终端环境无关。
+ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def strip_ansi(text):
+    return ANSI_ESCAPE.sub("", text)
+
 
 class TestCliLlmGroup:
     """测试 cli() 的 -g/--llm-group 参数"""
@@ -18,9 +27,10 @@ class TestCliLlmGroup:
         """jgs --help 显示 -g/--llm-group 选项及说明"""
         result = runner.invoke(app, ["--help"])
         assert result.exit_code == 0
-        assert "-g" in result.stdout
-        assert "--llm-group" in result.stdout
-        assert "使用的模型组" in result.stdout
+        stdout = strip_ansi(result.stdout)
+        assert "-g" in stdout
+        assert "--llm-group" in stdout
+        assert "使用的模型组" in stdout
 
     def test_cli_passes_llm_group_to_init_env(self):
         """指定 -g 时 init_env 收到对应模型组"""
