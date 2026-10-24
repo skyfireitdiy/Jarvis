@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import subprocess
 from typing import Dict
+from typing import Optional
 
 import typer
 
@@ -61,10 +62,13 @@ class GitSquashTool:
 def cli(
     commit_hash: str = typer.Argument(..., help="要压缩的基础提交哈希"),
     lang: str = typer.Option("Chinese", "--lang", help="提交信息的语言"),
+    llm_group: Optional[str] = typer.Option(
+        None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
+    ),
 ):
-    init_env()
+    init_env(llm_group=llm_group)
     tool = GitSquashTool()
-    tool.execute({"commit_hash": commit_hash, "lang": lang})
+    tool.execute({"commit_hash": commit_hash, "lang": lang, "llm_group": llm_group})
 
 
 def main():
