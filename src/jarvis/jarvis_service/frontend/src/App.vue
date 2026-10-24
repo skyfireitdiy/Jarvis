@@ -3583,6 +3583,7 @@ const {
   hideWorkspaceHostedPanelState,
   layoutMonacoEditor,
   lspBindings,
+  ensureVirtualWorkspaceSession,
   openFileSearchResult,
   openGlobalSearchResult,
   openTabContextMenu,
@@ -3734,6 +3735,45 @@ const {
   topologyExtensionSessions: () => topologyExtensionSessions,
   getWorkspaceTargetNodeId: () => getWorkspaceTargetNodeId,
 })
+// 暴露「在编辑器中打开文件」的钩子给插件前端扩展。
+// 插件常需要展示自己产出的文件（如黑灯工厂的 _reversa_sdd/ 产物），侧边栏内嵌预览
+// 既占空间又无法获得语法高亮/跳转，故提供该通道复用宿主的编辑器打开逻辑。
+// 参数：
+//   path   文件绝对路径（也接受相对路径，按 agentId/当前 Agent 的 working_dir 解析）
+//   options.agentId  已有 Agent 的 id（真实 Agent 或虚拟目录会话）
+//   options.nodeId   目标节点；未给 agentId 时据此建立/复用虚拟目录会话
+//   options.workingDir 与 nodeId 配合，虚拟目录会话的工作目录
+// 返回 { success, path, agentId } 或 { success: false, error }。
+try {
+  window.__jarvisOpenFile = async (path, options = {}) => {
+    const raw = String(path || '').trim()
+    if (!raw) return { success: false, error: '文件路径为空' }
+    let agentId = options.agentId || null
+    // 未指定 Agent 时：优先按路径反查已打开的目录树（真实 Agent 或虚拟目录会话），
+    // 找不到再用 nodeId + workingDir 建一个虚拟目录会话，保证文件能落到正确的节点上。
+    if (!agentId) {
+      const resolved = resolveAgentForPath(raw)
+      if (resolved) {
+        agentId = resolved.agentId
+      } else if (options.nodeId && options.workingDir) {
+        const created = ensureVirtualWorkspaceSession(options.nodeId, options.workingDir)
+        if (!created) return { success: false, error: '无法建立工作目录会话' }
+        agentId = created.agentId
+      }
+    }
+    if (!agentId) {
+      return { success: false, error: '未找到可用的工作目录，请先打开该目录所在的工作区' }
+    }
+    const absPath = resolveAgentRelativePath(raw, agentId)
+    if (!absPath.startsWith('/')) {
+      return { success: false, error: `无法解析为绝对路径: ${raw}` }
+    }
+    await openWorkspaceFile(absPath, agentId)
+    return { success: true, path: absPath, agentId }
+  }
+} catch (e) {
+  /* ignore */
+}
 // ===== 编辑器侧边栏 Git 视图（只读：提交历史/详情/diff/分支） =====
 const {
   // refs

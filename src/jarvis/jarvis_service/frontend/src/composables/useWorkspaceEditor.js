@@ -2398,6 +2398,7 @@ function openWorkspaceGlobalSearch(mode = 'content') {
     getVirtualWorkspaceAgent,
     getWorkspaceTabByPath,
     hideWorkspaceHostedPanelState,
+    ensureVirtualWorkspaceSession,
     layoutMonacoEditor,
     lspBindings,
     openFileSearchResult,

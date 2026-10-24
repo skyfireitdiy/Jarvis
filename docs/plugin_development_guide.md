@@ -324,6 +324,7 @@ export default {
 | `__jarvisShowToast` | `(message, type='success')` | 显示 toast 通知 |
 | `__jarvisSwitchSidebarView` | `(view) => {success}` | 切换工作区侧边栏视图（内置或 `plugin:<id>`/`plugin-tool:<id>`） |
 | `__jarvisOpenPanel` | `(kind) => {success}` | 打开面板/导航（admin/settings/workspace/git/plugins/topology/docs） |
+| `__jarvisOpenFile` | `(path, options) => Promise<{success, path, agentId}>` | 在工作区编辑器中打开文件。`options` 可选 `{agentId}` 或 `{nodeId, workingDir}`（未指定时按路径反查已打开目录，或按节点+目录建立虚拟会话） |
 | `__jarvisGetGatewayInfo` | `() => {host, port, protocol}` | 获取当前网关信息 |
 
 #### 6.4 事件订阅
