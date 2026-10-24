@@ -46,7 +46,7 @@ class MemoryTool:
     name = "memory"
     description = """统一的记忆管理工具，支持三种操作（每次只执行一种，参数随操作而异）：
 
-1. **save**：把信息存入记忆库（支持批量）。记忆有两个正交维度：memory_type=作用域(project项目/global全局/short_term短期)，nature=性质(long_term长期/procedural程序性how-to/episodic情景归档)。例如 project+long_term=项目长期、global+procedural=全局程序性。可选 importance 标注重要性（high/medium/low，默认走启发式价值过滤），可选 source 标注来源。
+1. **save**：把信息存入记忆库（支持批量）。记忆有两个正交维度：memory_type=作用域(project项目/global全局/short_term短期/user用户)，nature=性质(long_term长期/procedural程序性how-to/episodic情景归档)。例如 project+long_term=项目长期、global+procedural=全局程序性。memory_type=user 时**必须提供 user_name**（记录该用户的特有信息，如喜好/行为，按用户名区分存储，不污染全局共享记忆）。可选 importance 标注重要性（high/medium/low，默认走启发式价值过滤），可选 source 标注来源。
 
 2. **retrieve**：检索记忆库中的信息，支持按作用域(memory_type)、性质(nature)与标签过滤、可选语义检索
 
@@ -73,8 +73,12 @@ class MemoryTool:
                     "properties": {
                         "memory_type": {
                             "type": "string",
-                            "enum": ["project", "global", "short_term"],
-                            "description": "记忆作用域：project=项目、global=全局、short_term=短期",
+                            "enum": ["project", "global", "short_term", "user"],
+                            "description": "记忆作用域：project=项目、global=全局、short_term=短期、user=用户(用户特有信息，需提供 user_name)",
+                        },
+                        "user_name": {
+                            "type": "string",
+                            "description": "用户名（memory_type=user 时必填）：记录该用户的特有信息（喜好/行为等），按用户名区分存储",
                         },
                         "nature": {
                             "type": "string",
@@ -109,9 +113,13 @@ class MemoryTool:
                 "type": "array",
                 "items": {
                     "type": "string",
-                    "enum": ["project", "global", "short_term", "all"],
+                    "enum": ["project", "global", "short_term", "user", "all"],
                 },
                 "description": "按作用域过滤记忆（仅 retrieve 使用；all 表示全部作用域）",
+            },
+            "user_name": {
+                "type": "string",
+                "description": "用户名（memory_type=user 时使用）：仅检索该用户的记忆",
             },
             "natures": {
                 "type": "array",
@@ -160,11 +168,15 @@ class MemoryTool:
         self.project_memory_dir = Path(".jarvis/memory")
         self.global_memory_dir = Path(get_data_dir()) / "memory"
 
-    def _get_memory_dir(self, memory_type: str, nature: str = "long_term") -> Path:
+    def _get_memory_dir(
+        self, memory_type: str, nature: str = "long_term", user_name: str = ""
+    ) -> Path:
         """根据作用域(memory_type)与性质(nature)获取存储目录
 
-        作用域：project=项目、global=全局；性质：long_term=长期、procedural=程序性、episodic=情景。
+        作用域：project=项目、global=全局、user=用户；性质：long_term=长期、procedural=程序性、episodic=情景。
         short_term 存内存不落盘，此处返回其占位目录（实际由调用方处理）。
+        user 类型按用户名区分存储到 ~/.jarvis/memory/users/<user_name>/ 下，
+        其中 long_term 对应 attributes（用户属性）、episodic 对应 events（用户事件）。
         """
         if memory_type == "project":
             if nature == "long_term":
@@ -180,6 +192,17 @@ class MemoryTool:
                 return Path(self.global_memory_dir) / "procedural"
             elif nature == "episodic":
                 return Path(self.global_memory_dir) / "episodic"
+        elif memory_type == "user":
+            # 用户记忆按用户名区分存储，不污染全局共享记忆
+            if not user_name:
+                raise ValueError("memory_type=user 时必须提供 user_name")
+            user_base = Path(self.global_memory_dir) / "users" / user_name
+            if nature == "long_term":
+                return user_base / "attributes"
+            elif nature == "procedural":
+                return user_base / "procedural"
+            elif nature == "episodic":
+                return user_base / "events"
         elif memory_type == "short_term":
             return Path(self.global_memory_dir) / "short_term"
         raise ValueError(f"未知的记忆类型: memory_type={memory_type}, nature={nature}")
@@ -363,12 +386,17 @@ class MemoryTool:
         self, memory_data: Dict[str, Any], agent: Any = None
     ) -> Dict[str, Any]:
         """保存单条记忆"""
-        memory_type = memory_data["memory_type"]  # 作用域: project/global/short_term
+        memory_type = memory_data["memory_type"]  # 作用域: project/global/short_term/user
         nature = memory_data.get(
             "nature", "long_term"
         )  # 性质: long_term/procedural/episodic
         tags = memory_data.get("tags", [])
         content = memory_data.get("content", "")
+        user_name = memory_data.get("user_name", "")
+
+        # memory_type=user 时必须提供 user_name（按用户名区分存储）
+        if memory_type == "user" and not user_name:
+            raise ValueError("memory_type=user 时必须提供 user_name")
 
         # 写时记忆价值过滤：未显式标注 importance 且内容无价值时丢弃
         if is_enable_memory_value_filter() and not self._should_store_memory(
@@ -417,6 +445,9 @@ class MemoryTool:
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat(),
         }
+        # user 类型记忆记录归属用户名
+        if memory_type == "user":
+            memory_obj["user_name"] = user_name
         # 压缩过时保留原始完整内容，便于必要时查原文
         if content != original_content:
             memory_obj["original_content"] = original_content
@@ -445,7 +476,7 @@ class MemoryTool:
         else:
             # 长期记忆保存到文件
             # 获取存储目录并确保存在
-            memory_dir = self._get_memory_dir(memory_type, nature)
+            memory_dir = self._get_memory_dir(memory_type, nature, user_name)
             memory_dir.mkdir(parents=True, exist_ok=True)
 
             # 保存记忆文件
@@ -548,6 +579,7 @@ class MemoryTool:
         memory_type: str,
         tags: Optional[List[str]] = None,
         natures: Optional[List[str]] = None,
+        user_name: str = "",
     ) -> List[Dict[str, Any]]:
         """从指定作用域(memory_type)与性质(natures)中检索记忆"""
         memories: List[Dict[str, Any]] = []
@@ -559,7 +591,7 @@ class MemoryTool:
             # 从文件系统获取记忆（按性质分别读取）
             nature_list = natures or ["long_term", "procedural", "episodic"]
             for nature in nature_list:
-                memory_dir = self._get_memory_dir(memory_type, nature)
+                memory_dir = self._get_memory_dir(memory_type, nature, user_name)
                 if not memory_dir.exists():
                     continue
 
@@ -592,11 +624,12 @@ class MemoryTool:
             limit = args.get("limit", None)
             smart_search = args.get("smart_search", False)
             query = args.get("query", "")
+            user_name = args.get("user_name", "")
 
             # 如果启用智能检索模式
             if smart_search:
                 return self._execute_smart_search(
-                    args, memory_types, query, limit, natures
+                    args, memory_types, query, limit, natures, user_name
                 )
 
             # 确定要检索的作用域
@@ -604,6 +637,14 @@ class MemoryTool:
                 types_to_search = ["project", "global", "short_term"]
             else:
                 types_to_search = memory_types
+
+            # 检索 user 类型记忆时必须提供 user_name
+            if "user" in types_to_search and not user_name:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "检索 user 类型记忆时必须提供 user_name",
+                }
 
             # 确定要检索的性质
             if not natures or "all" in natures:
@@ -615,7 +656,7 @@ class MemoryTool:
             all_memories = []
             for memory_type in types_to_search:
                 memories = self._retrieve_from_type(
-                    memory_type, tags, natures_to_search
+                    memory_type, tags, natures_to_search, user_name
                 )
                 all_memories.extend(memories)
 
@@ -737,6 +778,7 @@ class MemoryTool:
         query: str,
         limit: Optional[int],
         natures: Optional[List[str]] = None,
+        user_name: str = "",
     ) -> Dict[str, Any]:
         """执行智能语义检索"""
         try:
@@ -752,8 +794,16 @@ class MemoryTool:
                 types_to_search = ["project", "global"]
             else:
                 types_to_search = [
-                    t for t in memory_types if t in ["project", "global"]
+                    t for t in memory_types if t in ["project", "global", "user"]
                 ]
+
+            # 检索 user 类型记忆时必须提供 user_name
+            if "user" in types_to_search and not user_name:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "检索 user 类型记忆时必须提供 user_name",
+                }
 
             if not types_to_search:
                 return {
@@ -776,6 +826,7 @@ class MemoryTool:
                 memory_types=types_to_search,
                 natures=natures_to_search,
                 limit=search_limit,
+                user_name=user_name,
             )
 
             # 基于 token 预算筛选返回的记忆，防止单条超长记忆撑爆上下文
@@ -891,9 +942,10 @@ class MemoryTool:
         nature: str,
         tags: Optional[List[str]] = None,
         memory_ids: Optional[List[str]] = None,
+        user_name: str = "",
     ) -> Dict[str, int]:
         """清除长期记忆（指定作用域+性质）"""
-        memory_dir = self._get_memory_dir(memory_type, nature)
+        memory_dir = self._get_memory_dir(memory_type, nature, user_name)
 
         if not memory_dir.exists():
             return {"total": 0, "removed": 0}
@@ -949,12 +1001,21 @@ class MemoryTool:
             tags = args.get("tags", [])
             memory_ids = args.get("memory_ids", [])
             confirm = args.get("confirm", False)
+            user_name = args.get("user_name", "")
 
             if not confirm:
                 return {
                     "success": False,
                     "stdout": "",
                     "stderr": "必须设置 confirm=true 才能执行清除操作",
+                }
+
+            # 清除 user 类型记忆时必须提供 user_name
+            if "user" in memory_types and not user_name:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "清除 user 类型记忆时必须提供 user_name",
                 }
 
             # 确定要清除的作用域
@@ -982,7 +1043,7 @@ class MemoryTool:
                 else:
                     for nature in natures_to_clear:
                         result = self._clear_long_term_memories(
-                            memory_type, nature, tags, memory_ids
+                            memory_type, nature, tags, memory_ids, user_name
                         )
                         key = f"{memory_type}/{nature}"
                         results[key] = result

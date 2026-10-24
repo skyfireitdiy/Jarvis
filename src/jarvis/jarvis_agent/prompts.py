@@ -53,7 +53,8 @@ def get_task_analysis_prompt(
 2. 评估是否有值得保存的项目长期记忆或全局长期记忆
 3. 若有价值，用 memory 工具（action=save）保存有价值的信息：
    - project_long_term: 保存与当前项目相关的长期信息（如项目配置、架构决策、开发规范等）
-   - global_long_term: 保存通用信息、用户偏好、知识或方法（如技术知识、最佳实践、用户习惯等）"""
+   - global_long_term: 保存通用信息、用户偏好、知识或方法（如技术知识、最佳实践、用户习惯等）
+   - user: 保存关于当前用户的喜好/行为等用户特有信息，用 memory_type=user 并必须提供 user_name（从对话上下文提取当前用户身份），不污染全局共享记忆"""
 
     # 第一步：规则体系分析部分
     rule_analysis_step = """第一步：分析规则体系
