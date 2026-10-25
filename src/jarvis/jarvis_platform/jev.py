@@ -27,6 +27,7 @@ Jev 与常规对话模型的接口形态差异很大：
 避免臆造默认问题导致静默的错误行为。
 """
 
+import copy
 import json
 import os
 import time
@@ -524,8 +525,10 @@ class JevPlatform(BasePlatform):
 
         Jev 无对话语义，这里仅保留最近一条 user 消息作为待评估输入，
         以便上层复用统一的会话管理接口。
+
+        深拷贝入参，避免调用方后续修改污染本模型的历史。
         """
-        self.messages = messages
+        self.messages = copy.deepcopy(messages)
         for msg in messages:
             if msg.get("role") == "system":
                 self.system_message = msg.get("content", "")
@@ -533,7 +536,7 @@ class JevPlatform(BasePlatform):
 
     def get_messages(self) -> List[Dict[str, Any]]:
         """获取对话历史。"""
-        return self.messages
+        return copy.deepcopy(self.messages)
 
     def set_model_name(self, model_name: str):
         """设置模型名称。"""

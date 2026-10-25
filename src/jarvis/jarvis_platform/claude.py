@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import copy
 import os
 from typing import Any
 from typing import Dict
@@ -202,8 +203,9 @@ class ClaudeModel(BasePlatform):
         注意:
             - 会根据 messages 重新计算 conversation_turn（统计非 system 消息中的 user 消息数量）
             - 如果消息列表包含系统消息，会同时更新 system_message 属性
+            - 深拷贝入参，避免调用方后续修改污染本模型的历史
         """
-        self.messages = messages
+        self.messages = copy.deepcopy(messages)
 
         # 如果消息列表包含系统消息，更新 system_message 属性
         for msg in messages:
@@ -233,7 +235,7 @@ class ClaudeModel(BasePlatform):
         返回:
             List[Dict[str, Any]]: 对话历史列表，每个元素包含 role 和 content
         """
-        return self.messages
+        return copy.deepcopy(self.messages)
 
     def get_model_list(self) -> List[Tuple[str, str]]:
         """
