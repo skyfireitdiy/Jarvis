@@ -139,7 +139,7 @@ class JevPlatform(BasePlatform):
     # 内部工具
     # ------------------------------------------------------------------
     @staticmethod
-    def _is_jev_model_name(model_name: Any) -> bool:
+    def _is_jev_model_name_static(model_name: Any) -> bool:
         """判断模型名是否属于 Jev 系列。
 
         参数:
@@ -538,6 +538,13 @@ class JevPlatform(BasePlatform):
     def set_model_name(self, model_name: str):
         """设置模型名称。"""
         self.model_name = model_name
+
+    def _is_jev_model_name(self, model_name: Any) -> bool:  # type: ignore[override]
+        """判断模型名是否为 Jev 系列（实例方法，供基类配置串台时兜底）。
+
+        与同名 staticmethod 重名会覆盖它，故改用独立方法名，避免遮蔽类级实现。
+        """
+        return bool(JevPlatform._is_jev_model_name_static(model_name))
 
     def set_system_prompt(self, message: str):
         """设置系统提示。

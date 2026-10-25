@@ -529,6 +529,34 @@ def _parse_choice_answers(response: str) -> Dict[str, str]:
     return answers
 
 
+def _parse_noul_scores(response: str) -> Dict[str, float]:
+    """从结构化评估模型的可读答案文本中解析各 noul（是/否）问题的概率。
+
+    答案文本形如：
+        - rule_a [noul]: 0.96
+        - rule_b [noul]: 0.03
+
+    参数:
+        response: 结构化评估模型返回的可读答案文本
+
+    返回:
+        Dict[str, float]: {问题ID: 概率}，解析失败时返回空字典
+    """
+    import re
+
+    pattern = re.compile(r"^-\s*(.+?)\s*\[noul\]:\s*([0-9]*\.?[0-9]+)\s*$")
+    scores: Dict[str, float] = {}
+    for line in response.splitlines():
+        match = pattern.match(line.strip())
+        if not match:
+            continue
+        try:
+            scores[match.group(1)] = float(match.group(2))
+        except ValueError:
+            continue
+    return scores
+
+
 def _front_matter_dict(
     prompt_dirs: List[Path], scenario: str
 ) -> Optional[Dict[str, Any]]:

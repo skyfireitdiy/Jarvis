@@ -762,6 +762,14 @@ def _get_resolved_model_config() -> Dict[str, Any]:
         "cheap_llm_config",
         "smart_llm_config",
         "eval_llm_config",
+        # 平台/模型名同样需要顶层覆盖：组内展开得到的 platform/model 若不被
+        # 顶层配置覆盖，顶层 platform 与组内 model 会混搭（如 openai 平台 + jev 模型名）
+        "cheap_platform",
+        "cheap_model",
+        "smart_platform",
+        "smart_model",
+        "eval_platform",
+        "eval_model",
     ]
     for key in override_keys:
         if key in GLOBAL_CONFIG_DATA:

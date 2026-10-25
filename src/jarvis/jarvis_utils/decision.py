@@ -21,6 +21,16 @@ from jarvis.jarvis_utils.config import is_eval_model_configured
 from jarvis.jarvis_utils.output import PrettyOutput
 
 
+def _is_structured_eval_platform(platform: BasePlatform) -> bool:
+    """判断评估模型是否只接受结构化协议（state + questions 的 JSON）。
+
+    如 Jev 这类"类型化决策"模型不支持自然语言提示词，把自然语言 prompt 直接
+    丢给它只会得到空答案。调用方据此决定：要么做协议转换（decide_choice），
+    要么直接回退到现有流程。
+    """
+    return platform.platform_name() == "jev"
+
+
 def get_eval_platform() -> Optional[BasePlatform]:
     """获取结构化评估模型实例。
 
@@ -60,6 +70,9 @@ def decide(
     """
     platform = get_eval_platform()
     if platform is None:
+        return fallback()
+    if _is_structured_eval_platform(platform):
+        # 结构化评估模型无法消费自然语言 prompt，直接回退，避免白白多一次失败调用
         return fallback()
 
     try:
@@ -103,6 +116,9 @@ def decide_json(
 
     platform = get_eval_platform()
     if platform is None:
+        return fallback()
+    if _is_structured_eval_platform(platform):
+        # 同上：结构化评估模型只接受 JSON 协议，自然语言 prompt 必然失败，直接回退
         return fallback()
 
     try:
@@ -162,10 +178,14 @@ def decide_choice(
     """
     import json
 
+    from jarvis.jarvis_utils.scenario_prompts import _parse_noul_scores
+
     platform = get_eval_platform()
     if platform is None or not candidates:
         return fallback()
-
+    if not _is_structured_eval_platform(platform):
+        # 只做结构化协议转换，非结构化评估模型（普通文本模型）无法消费该 payload
+        return fallback()
     # 为每个候选构造一个 noul 问题，问题 ID 直接用候选 ID
     questions: Dict[str, Any] = {}
     for cid, desc in candidates.items():
@@ -210,31 +230,3 @@ def decide_choice(
         PrettyOutput.auto_print("⚠️  结构化评估未选出任何候选，回退现有流程")
         return fallback()
     return picked
-
-
-def _parse_noul_scores(response: str) -> Dict[str, float]:
-    """从 Jev 的可读答案文本中解析各问题的 noul 概率。
-
-    答案文本形如：
-        - <候选ID> [noul]: 0.96
-        - <候选ID> [noul]: 0.03
-
-    参数:
-        response: Jev 返回的可读答案文本
-
-    返回:
-        Dict[str, float]: {候选ID: 概率}，解析失败时返回空字典
-    """
-    import re
-
-    pattern = re.compile(r"^-\s*(.+?)\s*\[noul\]:\s*([0-9]*\.?[0-9]+)\s*$")
-    scores: Dict[str, float] = {}
-    for line in response.splitlines():
-        match = pattern.match(line.strip())
-        if not match:
-            continue
-        try:
-            scores[match.group(1)] = float(match.group(2))
-        except ValueError:
-            continue
-    return scores
