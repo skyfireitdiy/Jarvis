@@ -2564,6 +2564,43 @@ try {
   /* ignore */
 }
 
+// 显示确认对话框（复用宿主 showConfirm 与 ConfirmDialog 组件），供插件前端扩展做确认类弹窗，
+// 替代原生 window.confirm。message: 提示文本；options.defaultConfirm: 默认高亮按钮
+// （true=确认在前，false=取消在前，默认 true）。返回 Promise<boolean>：确认 resolve(true)，
+// 取消/关闭 resolve(false)。已有未结束的确认请求时，先以 false 结束上一个，避免 Promise 悬挂。
+try {
+  window.__jarvisConfirm = (message, options = {}) => {
+    return new Promise((resolve) => {
+      if (pluginConfirmResolver) {
+        const prev = pluginConfirmResolver
+        pluginConfirmResolver = null
+        prev(false)
+      }
+      pluginConfirmResolver = resolve
+      showConfirm(
+        String(message || ''),
+        () => {
+          if (pluginConfirmResolver) {
+            const r = pluginConfirmResolver
+            pluginConfirmResolver = null
+            r(true)
+          }
+        },
+        () => {
+          if (pluginConfirmResolver) {
+            const r = pluginConfirmResolver
+            pluginConfirmResolver = null
+            r(false)
+          }
+        },
+        options.defaultConfirm !== false
+      )
+    })
+  }
+} catch (e) {
+  /* ignore */
+}
+
 // 切换工作区侧边栏视图（复用宿主 setWorkspaceSidebarView）。
 // view: 内置视图名（agents/files/search/git/manage/timers/plugins/orchestration）
 //       或插件视图（'plugin:<id>' / 'plugin-tool:<id>'）。
@@ -3285,6 +3322,8 @@ let pluginPickDirWithNode = false
 // 插件请求「打开创建 Agent 弹窗并预填参数」时的 Promise resolver：
 // 用户确认创建时 resolve({ confirmed: true, agent })，取消/关闭时 resolve({ confirmed: false })
 let pluginCreateAgentResolver = null
+// 插件请求「确认对话框」时的 Promise resolver：确认时 resolve(true)，取消/关闭时 resolve(false)
+let pluginConfirmResolver = null
 // Git 面板自定义 Git 管理目录（用户指定，优先于 Agent 根目录）：{ nodeId, path }
 const gitCustomDir = ref(null)
 // 自定义 Git 目录的持久化 key：刷新后自动恢复
