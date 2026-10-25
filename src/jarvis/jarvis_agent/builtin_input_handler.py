@@ -1438,7 +1438,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
 
                 if sys.platform == "win32":
                     interpreter = "powershell"
-                    script_content = (
+                    content = (
                         "$remotes = git remote; "
                         "if (-not $remotes) { Write-Output 'NO_REMOTE'; exit 0 }; "
                         "$branch = git branch --show-current; "
@@ -1457,7 +1457,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                     )
                 else:
                     interpreter = "bash"
-                    script_content = (
+                    content = (
                         "remotes=$(git remote); "
                         "if [ -z \"$remotes\" ]; then echo 'NO_REMOTE'; exit 0; fi; "
                         "branch=$(git branch --show-current); "
@@ -1478,7 +1478,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 result = script_tool.execute(
                     {
                         "interpreter": interpreter,
-                        "script_content": script_content,
+                        "content": content,
                         "execution_mode": "interactive",
                     }
                 )

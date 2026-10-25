@@ -98,7 +98,7 @@ class GatewayExecutionStreamPublisher(ExecutionStreamPublisher):
 @dataclass(frozen=True)
 class ExecutionRequest:
     interpreter: str
-    script_content: str
+    content: str
     execution_mode: str
     session_id: Optional[str] = None
     stream_publisher: Optional[ExecutionStreamPublisher] = None
@@ -136,7 +136,7 @@ class ScriptTool:
     """
 
     name = "execute_script"
-    description = "在指定的解释器/终端执行脚本并返回结果。默认解释器：Unix 用 bash，Windows 用 powershell。输出可能很长，请主动用 grep/Select-String 过滤、head/tail 限行，避免一次打爆上下文。\n\n常用写法（Unix）：\n• 查错：script_content='grep -i \"error\" app.log'\n• 只看前 N 行：script_content='head -n 30 large_file.txt'\n• 跑 Python：interpreter='python', script_content='print(1+1)'\n\nWindows 查错：interpreter='powershell', script_content='Select-String -Pattern \"error\" app.log'"
+    description = "在指定的解释器/终端执行脚本并返回结果。默认解释器：Unix 用 bash，Windows 用 powershell。输出可能很长，请主动用 grep/Select-String 过滤、head/tail 限行，避免一次打爆上下文。\n\n常用写法（Unix）：\n• 查错：content='grep -i \"error\" app.log'\n• 只看前 N 行：content='head -n 30 large_file.txt'\n• 跑 Python：interpreter='python', content='print(1+1)'\n\nWindows 查错：interpreter='powershell', content='Select-String -Pattern \"error\" app.log'"
     parameters = {
         "type": "object",
         "properties": {
@@ -144,7 +144,7 @@ class ScriptTool:
                 "type": "string",
                 "description": "脚本解释器。Windows 荐 powershell 或 python；Unix 荐 bash 或 python3。",
             },
-            "script_content": {
+            "content": {
                 "type": "string",
                 "description": "要执行的脚本内容。注意控制输出量：多用 grep/head/tail 或命令管道限行，避免长输出打爆上下文。",
             },
@@ -154,7 +154,7 @@ class ScriptTool:
                 "description": "执行模式（可选，默认 auto）：captured=捕获输出返回；interactive=保留终端让用户交互（适合需 stdin 的程序，如调试器）；auto=根据当前是否非交互自动选择。通常用默认即可，无需填写。",
             },
         },
-        "required": ["script_content"],
+        "required": ["content"],
     }
 
     # Map of common file extensions for interpreters (can be extended as needed)
@@ -1133,7 +1133,7 @@ class ScriptTool:
         self, request: ExecutionRequest, force_non_interactive: bool
     ) -> Dict[str, Any]:
         interpreter = request.interpreter
-        script_content = request.script_content
+        content = request.content
         try:
             extension = self.INTERPRETER_EXTENSIONS.get(interpreter, "script")
             script_path = os.path.join(
@@ -1146,10 +1146,10 @@ class ScriptTool:
             try:
                 enc = "utf-8-sig" if interpreter in ("powershell", "pwsh") else "utf-8"
                 with open(script_path, "w", encoding=enc, errors="ignore") as f:
-                    f.write(script_content)
+                    f.write(content)
 
                 PrettyOutput.print_script_panel(
-                    content=script_content,
+                    content=content,
                     title=f"📜 执行脚本 ({interpreter})",
                     lang=interpreter,
                 )
@@ -1218,7 +1218,7 @@ class ScriptTool:
     def _execute_script_with_interpreter(
         self,
         interpreter: str,
-        script_content: str,
+        content: str,
         execution_mode: str = "auto",
         session_id: Optional[str] = None,
         stream_publisher: Optional[ExecutionStreamPublisher] = None,
@@ -1228,7 +1228,7 @@ class ScriptTool:
     ) -> Dict[str, Any]:
         request = ExecutionRequest(
             interpreter=interpreter,
-            script_content=script_content,
+            content=content,
             execution_mode=execution_mode,
             session_id=session_id,
             stream_publisher=stream_publisher,
@@ -1243,26 +1243,27 @@ class ScriptTool:
         """Execute script based on interpreter and content
 
         Args:
-            args: Dictionary containing interpreter (or script_type) and script_content
+            args: Dictionary containing interpreter (or script_type) and content
 
         Returns:
             Dictionary with execution results
         """
         try:
-            # 兼容不同调用方的键名（script_content/code/command/script）
+            # 兼容不同调用方的键名（content/script_content/code/command/script）
             raw_script = (
-                args.get("script_content")
+                args.get("content")
+                or args.get("script_content")
                 or args.get("script")
                 or args.get("command")
                 or args.get("code")
                 or ""
             )
-            script_content = str(raw_script).strip()
-            if not script_content:
+            content = str(raw_script).strip()
+            if not content:
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": "缺少或为空：script_content（脚本内容）",
+                    "stderr": "缺少或为空：content（脚本内容）",
                 }
 
             # Get interpreter: Windows 默认 powershell，Unix 默认 bash；兼容旧键 script_type
@@ -1333,7 +1334,7 @@ class ScriptTool:
             # Execute the script with the specified interpreter
             return self._execute_script_with_interpreter(
                 interpreter,
-                script_content,
+                content,
                 execution_mode=execution_mode,
                 session_id=session_id if isinstance(session_id, str) else None,
                 stream_publisher=stream_publisher,

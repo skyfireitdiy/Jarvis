@@ -163,7 +163,7 @@ def execute_shell_in_terminal(agent: Any) -> None:
                 "want": "用户在交互式终端中执行命令",
                 "arguments": {
                     "interpreter": _detect_shell_interpreter(script),
-                    "script_content": script,
+                    "content": script,
                     "execution_mode": "interactive",
                 },
             },

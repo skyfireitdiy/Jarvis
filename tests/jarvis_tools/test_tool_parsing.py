@@ -80,7 +80,7 @@ class TestToolParsing:
         ```
         
         然后执行脚本：
-        {"name": "execute_script", "arguments": {"script_content": "echo test"}}
+        {"name": "execute_script", "arguments": {"content": "echo test"}}
         """
 
         result, _, _ = ToolRegistry._extract_tool_calls(content)
