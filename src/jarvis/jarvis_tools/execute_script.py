@@ -197,6 +197,25 @@ class ScriptTool:
         """检测是否为 macOS 系统（macOS 的 script 命令语法与 Linux 不同）"""
         return sys.platform == "darwin"
 
+    # 非交互（agent 自动化）执行时强制覆盖的分页器相关环境变量。
+    # 子进程运行在 PTY 中，git/man 等会因检测到 TTY 而拉起分页器并等待按键，
+    # 导致命令挂起、阻塞全自动化运行，因此统一禁用。
+    NON_INTERACTIVE_PAGER_ENV = {
+        "GIT_PAGER": "cat",  # 禁用 git 分页器
+        "PAGER": "cat",  # 禁用通用分页器（man 等）
+        "MANPAGER": "cat",  # 禁用 man 分页器
+        "LESS": "FRX",  # 兜底：less 自动退出、不初始化终端
+    }
+
+    @classmethod
+    def _apply_non_interactive_pager_env(cls, env: Dict[str, str]) -> Dict[str, str]:
+        """在非交互执行环境中强制禁用分页器（覆盖用户已有配置，如 delta）。
+
+        仅用于 Unix 非交互路径；interactive 模式不调用，保持用户原有体验。
+        """
+        env.update(cls.NON_INTERACTIVE_PAGER_ENV)
+        return env
+
     def _get_windows_command(
         self, interpreter: str, script_path: str, extension: str
     ) -> List[str]:
@@ -1174,6 +1193,8 @@ class ScriptTool:
                     env = os.environ.copy()
                     # 设置 TERM 环境变量，避免 "terminal is not fully functional" 警告
                     env["TERM"] = "xterm-256color"
+                    # 禁用分页器：避免 git show/log/diff、man 等因 PTY 拉起 pager 而挂起
+                    self._apply_non_interactive_pager_env(env)
                     if interpreter in ("python", "python2", "python3"):
                         env["PYTHONIOENCODING"] = "utf-8"
                     argv = [interpreter, script_path]
