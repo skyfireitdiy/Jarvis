@@ -197,7 +197,7 @@ class ScriptTool:
         """检测是否为 macOS 系统（macOS 的 script 命令语法与 Linux 不同）"""
         return sys.platform == "darwin"
 
-    # 非交互（agent 自动化）执行时强制覆盖的分页器相关环境变量。
+    # 执行脚本时强制覆盖的分页器相关环境变量（所有模式统一注入）。
     # 子进程运行在 PTY 中，git/man 等会因检测到 TTY 而拉起分页器并等待按键，
     # 导致命令挂起、阻塞全自动化运行，因此统一禁用。
     NON_INTERACTIVE_PAGER_ENV = {
@@ -209,9 +209,10 @@ class ScriptTool:
 
     @classmethod
     def _apply_non_interactive_pager_env(cls, env: Dict[str, str]) -> Dict[str, str]:
-        """在非交互执行环境中强制禁用分页器（覆盖用户已有配置，如 delta）。
+        """在脚本执行环境中强制禁用分页器（覆盖用户已有配置，如 delta）。
 
-        仅用于 Unix 非交互路径；interactive 模式不调用，保持用户原有体验。
+        所有模式（captured/auto/interactive）统一调用：pager 挂起会阻塞 agent
+        自动化运行，任何模式下都不应出现。
         """
         env.update(cls.NON_INTERACTIVE_PAGER_ENV)
         return env
@@ -1189,31 +1190,13 @@ class ScriptTool:
                         resize_callback=request.resize_callback,
                     )
 
-                if force_non_interactive:
-                    env = os.environ.copy()
-                    # 设置 TERM 环境变量，避免 "terminal is not fully functional" 警告
-                    env["TERM"] = "xterm-256color"
-                    # 禁用分页器：避免 git show/log/diff、man 等因 PTY 拉起 pager 而挂起
-                    self._apply_non_interactive_pager_env(env)
-                    if interpreter in ("python", "python2", "python3"):
-                        env["PYTHONIOENCODING"] = "utf-8"
-                    argv = [interpreter, script_path]
-                    if interpreter in ("python", "python2", "python3"):
-                        argv = [interpreter, "-u", script_path]
-                    return self._execute_on_unix_interactive_pty(
-                        argv=argv,
-                        env=env,
-                        get_timeout=get_script_execution_timeout,
-                        stream_publisher=request.stream_publisher,
-                        session_id=request.session_id,
-                        execution_id=request.execution_id,
-                        input_callback=request.input_callback,
-                        resize_callback=request.resize_callback,
-                    )
-
                 env = os.environ.copy()
                 # 设置 TERM 环境变量，避免 "terminal is not fully functional" 警告
                 env["TERM"] = "xterm-256color"
+                # 禁用分页器：避免 git show/log/diff、man 等因 PTY 拉起 pager 而挂起。
+                # 无论 captured/auto/interactive，一律强制注入——pager 挂起会阻塞
+                # agent 全自动化运行，任何模式都不应出现。
+                self._apply_non_interactive_pager_env(env)
                 if interpreter in ("python", "python2", "python3"):
                     env["PYTHONIOENCODING"] = "utf-8"
                 argv = [interpreter, script_path]
@@ -1222,7 +1205,9 @@ class ScriptTool:
                 return self._execute_on_unix_interactive_pty(
                     argv=argv,
                     env=env,
-                    get_timeout=None,
+                    get_timeout=(
+                        get_script_execution_timeout if force_non_interactive else None
+                    ),
                     stream_publisher=request.stream_publisher,
                     session_id=request.session_id,
                     execution_id=request.execution_id,
