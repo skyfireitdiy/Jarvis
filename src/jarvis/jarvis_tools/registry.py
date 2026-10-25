@@ -83,7 +83,7 @@ tool_call_help = """
 {
   "name": "execute_script",
   "arguments": {
-    "script_content": "echo hello",
+    "content": "echo hello",
     "after": 10
   }
 }
@@ -295,7 +295,7 @@ class ToolRegistry(OutputHandlerProtocol):
                                     return True
 
         # 条件5：扁平格式工具调用——JSON中没有name字段，但顶层key与已注册工具的参数名匹配
-        # 例如：{"files": [...]} 匹配 read_code，{"interpreter": "bash", "script_content": "..."} 匹配 execute_script
+        # 例如：{"files": [...]} 匹配 read_code，{"interpreter": "bash", "content": "..."} 匹配 execute_script
         if self.tools:
             for i, ch in enumerate(response):
                 if ch == "{":

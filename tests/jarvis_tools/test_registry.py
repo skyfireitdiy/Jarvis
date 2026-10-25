@@ -164,11 +164,11 @@ class TestToolRegistry:
 
     def test_parse_special_marker_format_without_end_marker(self):
         """测试解析特殊标记格式（无结束标记）"""
-        content = '<|tool_call_begin|>functions.execute_script:1<|tool_call_argument_begin|>{"script_content": "echo hello"}'
+        content = '<|tool_call_begin|>functions.execute_script:1<|tool_call_argument_begin|>{"content": "echo hello"}'
         result = ToolRegistry._parse_special_marker_format(content)
         assert len(result) == 1
         assert result[0]["name"] == "execute_script"
-        assert result[0]["arguments"] == {"script_content": "echo hello"}
+        assert result[0]["arguments"] == {"content": "echo hello"}
 
     def test_parse_special_marker_format_multiple_calls(self):
         """测试解析多个工具调用"""
@@ -215,14 +215,14 @@ class TestToolRegistry:
     def test_parse_tool_name_json_format_with_nested_json(self):
         """测试解析工具名+嵌套JSON格式（两层嵌套）"""
         content = (
-            'execute_script\n{"interpreter": "bash", "script_content": "echo hello"}'
+            'execute_script\n{"interpreter": "bash", "content": "echo hello"}'
         )
         result = ToolRegistry._parse_tool_name_json_format(content)
         assert len(result) == 1
         assert result[0]["name"] == "execute_script"
         assert result[0]["arguments"] == {
             "interpreter": "bash",
-            "script_content": "echo hello",
+            "content": "echo hello",
         }
 
     def test_parse_xml_parameter_format_basic(self):
@@ -235,12 +235,12 @@ class TestToolRegistry:
 
     def test_parse_xml_parameter_format_multiple_params(self):
         """测试解析XML参数标签格式: 多个parameter子标签"""
-        content = '<execute_script>\n<parameter name="interpreter">bash</parameter>\n<parameter name="script_content">echo hello</parameter>\n</execute_script>'
+        content = '<execute_script>\n<parameter name="interpreter">bash</parameter>\n<parameter name="content">echo hello</parameter>\n</execute_script>'
         result = ToolRegistry._parse_xml_parameter_format(content, [])
         assert len(result) == 1
         assert result[0]["name"] == "execute_script"
         assert result[0]["arguments"]["interpreter"] == "bash"
-        assert result[0]["arguments"]["script_content"] == "echo hello"
+        assert result[0]["arguments"]["content"] == "echo hello"
 
     def test_extract_tool_calls_with_tool_name_json_format(self):
         """测试_extract_tool_calls能正确解析工具名+JSON格式"""
@@ -253,14 +253,13 @@ class TestToolRegistry:
 
     def test_extract_tool_calls_with_xml_parameter_format(self):
         """测试_extract_tool_calls能正确解析XML参数标签格式"""
-        content = '<execute_script>\n<parameter name="interpreter">bash</parameter>\n<parameter name="script_content">grep -n pattern file</parameter>\n</execute_script>'
+        content = '<execute_script>\n<parameter name="interpreter">bash</parameter>\n<parameter name="content">grep -n pattern file</parameter>\n</execute_script>'
         result, error, _ = ToolRegistry._extract_tool_calls(content)
         assert error == ""
         assert len(result) == 1
         assert result[0]["name"] == "execute_script"
         assert result[0]["arguments"]["interpreter"] == "bash"
-        assert result[0]["arguments"]["interpreter"] == "bash"
-        assert result[0]["arguments"]["script_content"] == "grep -n pattern file"
+        assert result[0]["arguments"]["content"] == "grep -n pattern file"
 
     # ────────────── _compress_output 测试 ──────────────
 
