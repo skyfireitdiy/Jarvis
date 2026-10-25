@@ -642,6 +642,52 @@ describe('usePanel', () => {
       expect(h.sendConfirmResult).toHaveBeenCalledWith(true, 'agent-1')
     })
 
+    it('handlePanelKeydown：waiting_confirm 输入框有内容时 Enter 走 sendFromPanel 解析输入', () => {
+      const h = makeHarness()
+      h.getPanelAgent.mockReturnValue({ status: 'running' })
+      h.agentStatuses.value.set('agent-1', { execution_status: 'waiting_confirm' })
+      h.panelInputTexts.value.set('agent-1', 'n')
+      const event = { key: 'Enter', ctrlKey: false, preventDefault: vi.fn() }
+      h.api.handlePanelKeydown(makePanel(), event)
+      expect(event.preventDefault).toHaveBeenCalled()
+      // 不应走默认值逻辑（handlePanelConfirm/handlePanelCancelConfirm）
+      expect(h.handlePanelConfirm).not.toHaveBeenCalled()
+      expect(h.handlePanelCancelConfirm).not.toHaveBeenCalled()
+      // 输入框内容 n 由 sendFromPanel 解析为取消
+      expect(h.sendConfirmResult).toHaveBeenCalledWith(false, 'agent-1')
+    })
+
+    it('handlePanelKeydown：waiting_confirm 输入框有内容 y 时 Enter 解析为确认', () => {
+      const h = makeHarness()
+      h.getPanelAgent.mockReturnValue({ status: 'running' })
+      h.agentStatuses.value.set('agent-1', { execution_status: 'waiting_confirm' })
+      h.panelInputTexts.value.set('agent-1', 'y')
+      const event = { key: 'Enter', ctrlKey: false, preventDefault: vi.fn() }
+      h.api.handlePanelKeydown(makePanel(), event)
+      expect(h.sendConfirmResult).toHaveBeenCalledWith(true, 'agent-1')
+    })
+
+    it('handlePanelKeydown：waiting_confirm 输入框为空时 Enter 走默认值逻辑', () => {
+      const h = makeHarness()
+      h.agentStatuses.value.set('agent-1', { execution_status: 'waiting_confirm' })
+      h.panelConfirmData.value.set('agent-1', { onConfirm: vi.fn(), onCancel: vi.fn() })
+      const event = { key: 'Enter', ctrlKey: false, preventDefault: vi.fn() }
+      h.api.handlePanelKeydown(makePanel(), event)
+      expect(event.preventDefault).toHaveBeenCalled()
+      expect(h.handlePanelConfirm).toHaveBeenCalledWith(makePanel())
+      expect(h.handlePanelCancelConfirm).not.toHaveBeenCalled()
+    })
+
+    it('handlePanelKeydown：waiting_confirm 输入框为空且默认取消时 Enter 走取消', () => {
+      const h = makeHarness()
+      h.agentStatuses.value.set('agent-1', { execution_status: 'waiting_confirm' })
+      h.panelConfirmData.value.set('agent-1', { onConfirm: vi.fn(), onCancel: vi.fn(), defaultConfirm: false })
+      const event = { key: 'Enter', ctrlKey: false, preventDefault: vi.fn() }
+      h.api.handlePanelKeydown(makePanel(), event)
+      expect(h.handlePanelCancelConfirm).toHaveBeenCalledWith(makePanel())
+      expect(h.handlePanelConfirm).not.toHaveBeenCalled()
+    })
+
     it('handlePanelKeydown：单行模式 Enter 提交', () => {
       const h = makeHarness()
       h.getPanelAgent.mockReturnValue({ status: 'running' })
