@@ -7,7 +7,7 @@
 - Windows 不在范围内
 """
 import subprocess
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import pytest
 
