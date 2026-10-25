@@ -1243,22 +1243,13 @@ class ScriptTool:
         """Execute script based on interpreter and content
 
         Args:
-            args: Dictionary containing interpreter (or script_type) and content
+            args: Dictionary containing interpreter and content
 
         Returns:
             Dictionary with execution results
         """
         try:
-            # 兼容不同调用方的键名（content/script_content/code/command/script）
-            raw_script = (
-                args.get("content")
-                or args.get("script_content")
-                or args.get("script")
-                or args.get("command")
-                or args.get("code")
-                or ""
-            )
-            content = str(raw_script).strip()
+            content = str(args.get("content") or "").strip()
             if not content:
                 return {
                     "success": False,
@@ -1266,10 +1257,9 @@ class ScriptTool:
                     "stderr": "缺少或为空：content（脚本内容）",
                 }
 
-            # Get interpreter: Windows 默认 powershell，Unix 默认 bash；兼容旧键 script_type
+            # Get interpreter: Windows 默认 powershell，Unix 默认 bash
             interpreter = (
                 args.get("interpreter")
-                or args.get("script_type")
                 or ("powershell" if self._is_windows() else "bash")
             )
             execution_mode = str(args.get("execution_mode", "auto"))
