@@ -54,6 +54,10 @@ class SessionManager:
         """Gets a value from the user data dictionary."""
         return self.user_data.get(key)
 
+    def delete_user_data(self, key: str) -> None:
+        """Removes a key from the user data dictionary (no-op if absent)."""
+        self.user_data.pop(key, None)
+
     def set_addon_prompt(self, addon_prompt: str) -> None:
         """Sets the addon prompt for the next model call."""
         self.addon_prompt = addon_prompt

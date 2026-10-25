@@ -1,8 +1,29 @@
 # -*- coding: utf-8 -*-
+import inspect
 import json
 from typing import Any
 from typing import Callable
 from typing import Dict
+
+
+def _accepts_kwargs(func: Callable[..., Any]) -> bool:
+    """判断函数是否接受以关键字形式传入任意参数。
+
+    判定为 True 的情形：
+    - 签名含 VAR_KEYWORD（`**kwargs`）；
+    - 签名无法解析（内置函数、C 扩展等），保守按关键字调用尝试。
+
+    参数:
+        func: 待判断的可调用对象
+
+    返回:
+        bool: 可以用 `func(**arguments)` 调用时返回 True
+    """
+    try:
+        params = inspect.signature(func).parameters.values()
+    except (TypeError, ValueError):
+        return True
+    return any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params)
 
 
 class Tool:
@@ -59,13 +80,11 @@ class Tool:
             #   1) 位置参数风格 func(arguments) —— 传统 Tool 用法
             #   2) 关键字参数风格 func(**kwargs) —— 独立类工具的 execute 方法
             #       （如 browser_ext_sessions / daemon_sessions 的 execute(self, **kwargs)）
-            # 优先以关键字参数调用，TypeError 时回退位置参数调用。
-            if isinstance(arguments, dict):
-                try:
-                    # func 可能是 **kwargs 风格，类型标注按位置参数，属误报
-                    return self.func(**arguments)  # ty: ignore[missing-argument]
-                except TypeError:
-                    return self.func(arguments)
+            # 按签名静态判定，不能用 TypeError 兜底：那会把工具内部真实的 TypeError
+            # 误判为"签名不匹配"，从而用位置参数再调一次，掩盖错误且可能以错误参数执行。
+            if isinstance(arguments, dict) and _accepts_kwargs(self.func):
+                # func 可能是 **kwargs 风格，类型标注按位置参数，属误报
+                return self.func(**arguments)  # ty: ignore[missing-argument]
             return self.func(arguments)
         except Exception as e:
             return {

@@ -1082,6 +1082,10 @@ class Agent:
         """Gets user data from the session."""
         return self.session.get_user_data(key)
 
+    def delete_user_data(self, key: str) -> None:
+        """Deletes user data from the session."""
+        self.session.delete_user_data(key)
+
     def get_remaining_token_count(self) -> int:
         """获取剩余可用的token数量
 
