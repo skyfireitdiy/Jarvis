@@ -581,6 +581,13 @@ export function usePanel({
       }
       if (event.key === 'Enter') {
         event.preventDefault()
+        // 输入框中有内容时（如中文输入法下已输入 n/y），优先按输入内容处理，
+        // 由 sendFromPanel 解析 y/n 并发送确认结果；仅空输入才走默认值逻辑。
+        const userInput = (panelInputTexts.value.get(agentId) || '').trim()
+        if (userInput) {
+          sendFromPanel(panel)
+          return
+        }
         const confirmData = panelConfirmData.value.get(agentId)
         const defaultConfirm = confirmData?.defaultConfirm !== false
         if (defaultConfirm) {
