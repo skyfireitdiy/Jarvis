@@ -492,16 +492,24 @@ class BasePlatform(ABC):
             message = self._truncate_message_if_needed(message)
 
         # 根据输出模式选择不同的处理方式
+        # raise_on_error=True：模型 API 的真实异常（如鉴权/参数/网络错误）必须向上抛出，
+        # 交由 while_success 重试并在耗尽后携带真实原因传播。否则渲染层会把异常静默
+        # 吞掉并返回空串，上层无法区分“模型返回空”与“API 调用失败”，最终抛出误导性的
+        # “返回结果为空”，掩盖真实错误（与原生工具路径 _native_confirmed 的处理保持一致）。
         first_token_time = 0.0
         reasoning_content = ""
         if not self.suppress_output:
             if get_pretty_output():
                 response, reasoning_content, first_token_time = (
-                    self._chat_with_pretty_output(message, start_time, max_output)
+                    self._chat_with_pretty_output(
+                        message, start_time, max_output, raise_on_error=True
+                    )
                 )
             else:
                 response, reasoning_content, first_token_time = (
-                    self._chat_with_simple_output(message, start_time, max_output)
+                    self._chat_with_simple_output(
+                        message, start_time, max_output, raise_on_error=True
+                    )
                 )
 
             # 计算响应时间并打印总结（与原生工具路径共用 _print_response_stats）
@@ -510,7 +518,7 @@ class BasePlatform(ABC):
             )
         else:
             response, reasoning_content = self._chat_with_suppressed_output(
-                message, max_output
+                message, max_output, raise_on_error=True
             )
 
         # 处理响应并保存会话历史
