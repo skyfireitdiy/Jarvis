@@ -5,6 +5,7 @@
 支持通过 @Review 内置命令触发单次代码审查。
 """
 
+import copy
 import json
 import re
 from typing import Any, Optional
@@ -166,7 +167,9 @@ class CodeReviewer:
             PrettyOutput.auto_print(f"⚠ 创建模型实例失败: {e}")
             return "任务目标: 完成用户需求\n验收准则: 代码修改应正确完成用户需求"
 
-        new_model.set_messages(messages)
+        # 深拷贝 messages，避免 new_model 的 chat_until_success 往共享 list 追加消息
+        # 污染主 agent 的 model.messages，破坏后续工具调用配对
+        new_model.set_messages(copy.deepcopy(messages))
         new_model.set_suppress_output(False)
 
         # 只获取修改文件列表，不传入完整 diff，避免诱导性验收标准
