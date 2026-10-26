@@ -90,7 +90,7 @@ def test_interactive_mode_also_injects_pager_env(pty_recorder, monkeypatch):
         monkeypatch.delenv(key, raising=False)
 
     tool = ScriptTool()
-    result = tool._execute_script_with_interpreter(
+    tool._execute_script_with_interpreter(
         "bash", "echo hi", execution_mode="interactive"
     )
 
