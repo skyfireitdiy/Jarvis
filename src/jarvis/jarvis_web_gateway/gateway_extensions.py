@@ -29,7 +29,12 @@ from __future__ import annotations
 
 import importlib
 import os
+import threading
+import time
+import uuid
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from dataclasses import field
 from typing import Any
 from typing import Callable
 from typing import Dict
@@ -49,6 +54,8 @@ class GatewayRoute:
     handler: Optional[str]
     plugin: Optional[str]
     function: Optional[Callable[..., Any]]
+    # 后台执行模式：True 时调用立即返回 202 + task_id，handler 在后台线程池执行
+    background: bool = False
 
 
 @dataclass
@@ -59,6 +66,148 @@ class GatewayMiddleware:
     handler: Optional[str]
     plugin: Optional[str]
     function: Optional[Callable[..., Any]]
+
+
+class PluginBackgroundTaskManager:
+    """插件后台任务管理器（进程内全局单例）。
+
+    为插件网关路由提供「后台执行」能力：调用方提交耗时 handler 后立即返回
+    task_id，handler 在独立线程池中执行，不占用 FastAPI 默认线程池，从而
+    避免耗时操作阻塞网关其他正常请求与流程（Issue #353）。
+
+    特性：
+    - 独立 ``ThreadPoolExecutor``（默认 4 线程），与 FastAPI 默认线程池隔离；
+    - 任务状态机：pending -> running -> completed / failed；
+    - 任务结果/错误可查询，结果带过期清理（默认 1 小时）；
+    - 线程安全（内部锁保护任务字典）。
+    """
+
+    _instance: Optional["PluginBackgroundTaskManager"] = None
+
+    # 任务状态
+    STATUS_PENDING = "pending"
+    STATUS_RUNNING = "running"
+    STATUS_COMPLETED = "completed"
+    STATUS_FAILED = "failed"
+
+    # 任务结果保留时长（秒），超时后清理
+    DEFAULT_TTL = 3600
+
+    def __init__(self, max_workers: int = 4) -> None:
+        self._executor = ThreadPoolExecutor(
+            max_workers=max_workers, thread_name_prefix="plugin-bg-task"
+        )
+        self._tasks: Dict[str, Dict[str, Any]] = {}
+        self._lock = threading.Lock()
+
+    @classmethod
+    def instance(cls) -> "PluginBackgroundTaskManager":
+        """获取全局单例。"""
+        if cls._instance is None:
+            cls._instance = PluginBackgroundTaskManager()
+        return cls._instance
+
+    def submit(
+        self,
+        fn: Callable[[Any], Any],
+        request: Any,
+        plugin: Optional[str] = None,
+        route_path: str = "",
+    ) -> str:
+        """提交一个后台任务，立即返回 task_id。
+
+        参数:
+            fn: 要后台执行的 handler（接收 request 参数）
+            request: 传给 handler 的请求对象
+            plugin: 来源插件名（用于追踪）
+            route_path: 触发任务的路由路径
+
+        返回:
+            task_id（uuid 字符串）
+        """
+        task_id = str(uuid.uuid4())
+        with self._lock:
+            self._tasks[task_id] = {
+                "task_id": task_id,
+                "plugin": plugin,
+                "route": route_path,
+                "status": self.STATUS_PENDING,
+                "created_at": time.time(),
+                "started_at": None,
+                "finished_at": None,
+                "result": None,
+                "error": None,
+            }
+        self._executor.submit(self._run, task_id, fn, request)
+        return task_id
+
+    def _run(self, task_id: str, fn: Callable[[Any], Any], request: Any) -> None:
+        """在线程池中执行 handler 并更新任务状态。"""
+        with self._lock:
+            task = self._tasks.get(task_id)
+            if task is None:
+                return
+            task["status"] = self.STATUS_RUNNING
+            task["started_at"] = time.time()
+        try:
+            result = fn(request)
+            with self._lock:
+                task = self._tasks.get(task_id)
+                if task is not None:
+                    task["status"] = self.STATUS_COMPLETED
+                    task["finished_at"] = time.time()
+                    task["result"] = result
+        except Exception as e:  # noqa: BLE001 - 后台任务异常需完整捕获并记录
+            with self._lock:
+                task = self._tasks.get(task_id)
+                if task is not None:
+                    task["status"] = self.STATUS_FAILED
+                    task["finished_at"] = time.time()
+                    task["error"] = f"{type(e).__name__}: {e}"
+
+    def get_status(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """查询任务状态（含结果/错误），任务不存在返回 None。
+
+        返回的 dict 为可序列化副本（去掉内部时间戳等非必要字段）。
+        """
+        self._cleanup()
+        with self._lock:
+            task = self._tasks.get(task_id)
+            if task is None:
+                return None
+            return {
+                "task_id": task["task_id"],
+                "plugin": task["plugin"],
+                "route": task["route"],
+                "status": task["status"],
+                "created_at": task["created_at"],
+                "started_at": task["started_at"],
+                "finished_at": task["finished_at"],
+                "result": task["result"],
+                "error": task["error"],
+            }
+
+    def _cleanup(self) -> None:
+        """清理超过 TTL 的已完成/失败任务，避免内存无限增长。"""
+        now = time.time()
+        with self._lock:
+            expired = [
+                tid
+                for tid, t in self._tasks.items()
+                if t["status"] in (self.STATUS_COMPLETED, self.STATUS_FAILED)
+                and now - (t["finished_at"] or now) > self.DEFAULT_TTL
+            ]
+            for tid in expired:
+                self._tasks.pop(tid, None)
+
+    def clear(self) -> None:
+        """清空全部任务登记（主要用于测试隔离）。"""
+        with self._lock:
+            self._tasks.clear()
+
+    def shutdown(self) -> None:
+        """关闭线程池（进程退出时调用）。"""
+        self._executor.shutdown(wait=False, cancel_futures=True)
 
 
 class GatewayExtensionRegistry:
@@ -80,6 +229,8 @@ class GatewayExtensionRegistry:
         # 当前已挂载的 app 引用与认证依赖（供 install/uninstall 免重启重载）
         self._mounted_app: Optional[Any] = None
         self._verify_token: Optional[Callable] = None
+        # 后台任务状态查询接口是否已挂载（幂等标记）
+        self._task_status_mounted: bool = False
 
     @classmethod
     def instance(cls) -> "GatewayExtensionRegistry":
@@ -98,6 +249,7 @@ class GatewayExtensionRegistry:
         handler: Optional[str] = None,
         plugin: Optional[str] = None,
         function: Optional[Callable[..., Any]] = None,
+        background: bool = False,
     ) -> None:
         """注册单个网关路由声明。
 
@@ -107,6 +259,8 @@ class GatewayExtensionRegistry:
             handler: 实现目录路径（目录内 .py 导出 route_handler）
             plugin: 来源插件名（可逆效应来源追踪）
             function: 已加载的路由处理函数（可选，优先于 handler 目录加载）
+            background: 后台执行模式。True 时调用立即返回 202 + task_id，
+                handler 在后台线程池执行，避免耗时操作阻塞网关其他请求。
         """
         method = (method or "GET").upper()
         key = f"{method} {path}"
@@ -116,6 +270,7 @@ class GatewayExtensionRegistry:
             handler=handler,
             plugin=plugin,
             function=function,
+            background=bool(background),
         )
 
     def unregister_route(self, path: str, method: str) -> bool:
@@ -172,6 +327,7 @@ class GatewayExtensionRegistry:
                 "method": route.method,
                 "handler": route.handler,
                 "plugin": route.plugin,
+                "background": route.background,
             }
             for route in sorted(self._routes.values(), key=lambda r: (r.path, r.method))
         ]
@@ -282,6 +438,8 @@ class GatewayExtensionRegistry:
             handler = str(entry.get("handler") or "").strip()
             if not path or not handler:
                 continue
+            # 后台执行模式：background: true 时调用立即返回 202 + task_id
+            background = bool(entry.get("background") or False)
             source_plugin = self._infer_source_plugin(handler)
             function = self._load_handler_function(
                 handler, "route_handler", f"路由 {method} {path}"
@@ -293,7 +451,12 @@ class GatewayExtensionRegistry:
                 )
                 continue
             self.register_route(
-                path, method, handler=handler, plugin=source_plugin, function=function
+                path,
+                method,
+                handler=handler,
+                plugin=source_plugin,
+                function=function,
+                background=background,
             )
             if source_plugin:
                 registry.register_gateway_route(source_plugin, path, method, handler)
@@ -359,7 +522,48 @@ class GatewayExtensionRegistry:
 
                 # 包装插件路由函数：插件实现导出 route_handler(request)（无需
                 # FastAPI 类型注解），此处注入 Request 对象再调用。
-                def _make_route_wrapper(handler: Callable[..., Any]) -> Callable[..., Any]:
+                #
+                # 支持三种模式：
+                # 1. background=True：调用立即返回 202 + task_id，handler 在
+                #    后台线程池执行，避免耗时操作阻塞网关其他请求（Issue #353）；
+                # 2. async handler（async def route_handler）：直接作为 FastAPI
+                #    async 端点，不占用线程池；
+                # 3. 同步 handler：FastAPI 用线程池执行（向后兼容默认行为）。
+                def _make_route_wrapper(
+                    handler: Callable[..., Any],
+                    background: bool,
+                    route_path: str,
+                    route_plugin: Optional[str],
+                ) -> Callable[..., Any]:
+                    import inspect
+
+                    from fastapi.responses import JSONResponse
+
+                    if background:
+                        task_manager = PluginBackgroundTaskManager.instance()
+
+                        def _bg_wrapper(request: Request) -> Any:
+                            task_id = task_manager.submit(
+                                handler, request, plugin=route_plugin, route_path=route_path
+                            )
+                            return JSONResponse(
+                                status_code=202,
+                                content={
+                                    "task_id": task_id,
+                                    "status": PluginBackgroundTaskManager.STATUS_PENDING,
+                                    "message": "任务已提交，后台执行中",
+                                },
+                            )
+
+                        return _bg_wrapper
+
+                    if inspect.iscoroutinefunction(handler):
+
+                        async def _async_wrapper(request: Request) -> Any:
+                            return await handler(request)
+
+                        return _async_wrapper
+
                     def _wrapper(request: Request) -> Any:
                         return handler(request)
 
@@ -367,12 +571,18 @@ class GatewayExtensionRegistry:
 
                 router.add_api_route(
                     route.path,
-                    _make_route_wrapper(function),
+                    _make_route_wrapper(
+                        function, route.background, route.path, route.plugin
+                    ),
                     methods=[route.method],
                     dependencies=[Depends(verify_token)],
                     name=f"plugin_{route.method}_{route.path}",
                 )
             app.include_router(router)
+
+        # 挂载插件后台任务状态查询接口（GET /api/plugins/tasks/{task_id}）。
+        # 供 background 模式路由提交的任务查询进度/结果。
+        self._mount_task_status_route(app, verify_token)
 
         # 挂载中间件：先移除旧插件中间件（幂等，暂不重建栈），再重新挂载，
         # 最后统一重建中间件栈使新增中间件生效。
@@ -389,10 +599,47 @@ class GatewayExtensionRegistry:
             app.add_middleware(middleware_cls, dispatch=function)
         app.middleware_stack = app.build_middleware_stack()
 
+    def _mount_task_status_route(self, app: Any, verify_token: Callable) -> None:
+        """挂载插件后台任务状态查询接口（GET /api/plugins/tasks/{task_id}）。
+
+        幂等：重复调用不会重复挂载。任务不存在返回 404；任务存在返回其
+        状态（pending/running/completed/failed）与结果/错误。
+        """
+        from fastapi import APIRouter
+        from fastapi import HTTPException
+
+        # 幂等：若已挂载过则跳过
+        if self._task_status_mounted:
+            return
+
+        task_manager = PluginBackgroundTaskManager.instance()
+
+        router = APIRouter()
+
+        @router.get("/api/plugins/tasks/{task_id}")
+        async def get_task_status(task_id: str) -> Dict[str, Any]:
+            status = task_manager.get_status(task_id)
+            if status is None:
+                raise HTTPException(status_code=404, detail="task not found")
+            return status
+
+        app.include_router(router, dependencies=[Depends(verify_token)])
+        self._task_status_mounted = True
+
     def unmount(self, app: Any) -> None:
         """从 app 移除全部插件路由/中间件（可逆效应）。"""
         self._remove_plugin_routes_from_app(app)
         self._remove_plugin_middleware_from_app(app)
+        # 移除后台任务状态查询接口（可逆效应）
+        app.router.routes = [
+            r
+            for r in app.router.routes
+            if not (
+                getattr(r, "path", None) == "/api/plugins/tasks/{task_id}"
+                and "GET" in {m.upper() for m in (getattr(r, "methods", None) or set())}
+            )
+        ]
+        self._task_status_mounted = False
         if self._mounted_app is app:
             self._mounted_app = None
 
@@ -508,6 +755,7 @@ class GatewayExtensionRegistry:
         self._middleware.clear()
         self._mounted_app = None
         self._verify_token = None
+        self._task_status_mounted = False
 
 
 def _noop_verify(request: Any) -> Dict[str, Any]:
@@ -518,4 +766,9 @@ def _noop_verify(request: Any) -> Dict[str, Any]:
 _NOOP_VERIFY = _noop_verify
 
 
-__all__ = ["GatewayExtensionRegistry", "GatewayRoute", "GatewayMiddleware"]
+__all__ = [
+    "GatewayExtensionRegistry",
+    "GatewayRoute",
+    "GatewayMiddleware",
+    "PluginBackgroundTaskManager",
+]

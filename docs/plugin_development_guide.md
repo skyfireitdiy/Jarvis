@@ -666,6 +666,8 @@ gateway:
 `gateway` 声明的是**对象**，含 `routes`（自定义网关 API 路由对象数组）与 `middleware`（网关中间件对象数组）：
 
 - `routes` 每项含 `path`（路由路径，如 `/api/plugins/dhttp/webhook`）、`method`（HTTP 方法，默认 `GET`）与 `handler`（实现目录，目录内 `.py` 导出 `route_handler(request)` 函数，返回 JSON 可序列化对象）。插件路由**默认带 token 认证**（`verify_token`，支持 `Authorization: Bearer <token>` 与 `X-Jarvis-Token`），与内置路由冲突时不挂载并告警，不覆盖内置路由。
+  - **后台执行模式**（可选）：路由项可加 `background: true`，声明该路由为**后台执行**——调用时立即返回 `202 Accepted` + `task_id`，handler 在独立后台线程池执行，**不占用网关默认线程池**，避免耗时操作（如调用外部服务、长任务处理）阻塞网关其他正常请求与流程。后台任务可通过 `GET /api/plugins/tasks/{task_id}`（同样带 token 认证）查询状态（`pending`/`running`/`completed`/`failed`）与结果/错误。
+  - **async handler**（可选）：`route_handler` 也可声明为 `async def route_handler(request)`，此时作为 FastAPI async 端点直接执行，不占用线程池，适合 IO 密集型异步操作。
 - `middleware` 每项含 `name`（中间件名）与 `handler`（实现目录，目录内 `.py` 导出 `middleware_handler(request, call_next)` 函数，在 `call_next(request)` 前后实现拦截/增强逻辑）。中间件按声明顺序挂载到网关，对所有请求生效。
 
 **消费方式**：网关启动（`create_app`）时 `GatewayExtensionRegistry.load_plugin_gateway(app, verify_token)` 把插件声明的路由/中间件挂载到 FastAPI app；插件安装/卸载时 `reload_plugin_gateway()` 免重启重挂载，使变更立即生效。

@@ -8,6 +8,7 @@
 import os
 import shutil
 import tempfile
+import time
 
 import pytest
 from fastapi import FastAPI
@@ -16,10 +17,32 @@ from fastapi.testclient import TestClient
 
 from jarvis.jarvis_tools.plugin_registry import PluginRegistry
 from jarvis.jarvis_web_gateway.gateway_extensions import GatewayExtensionRegistry
+from jarvis.jarvis_web_gateway.gateway_extensions import PluginBackgroundTaskManager
 
 ROUTE_CODE = '''
 def route_handler(request):
     return {"handled": True, "path": request.url.path}
+'''
+
+# 后台执行模式的 handler：耗时操作，返回结果
+BACKGROUND_ROUTE_CODE = '''
+import time
+
+def route_handler(request):
+    time.sleep(0.2)
+    return {"handled": True, "background": True, "path": request.url.path}
+'''
+
+# 后台执行模式 + 抛异常的 handler
+BACKGROUND_ERROR_ROUTE_CODE = '''
+def route_handler(request):
+    raise ValueError("boom")
+'''
+
+# async handler（不占线程池）
+ASYNC_ROUTE_CODE = '''
+async def route_handler(request):
+    return {"handled": True, "async": True, "path": request.url.path}
 '''
 
 MIDDLEWARE_CODE = '''
@@ -399,3 +422,253 @@ def test_revoke_plugin_integration(plugin_gateway_dirs, clean_registry, monkeypa
     assert result["gateway_middleware"] == 0
     assert gateway_registry.list_routes() == []
     assert not clean_registry.has_plugin("demo_plugin")
+
+
+# ---------------------------------------------------------------------------
+# Issue #353：插件网关路由后台执行模式 / async handler
+# ---------------------------------------------------------------------------
+
+
+def _make_route_dir(tmp, plugin_name, code):
+    """创建单个插件路由实现目录并写入 handler 代码，返回目录路径。"""
+    routes_dir = os.path.join(tmp, "plugins", plugin_name, "gateway_routes")
+    os.makedirs(routes_dir, exist_ok=True)
+    open(os.path.join(routes_dir, "__init__.py"), "w").close()
+    with open(os.path.join(routes_dir, "webhook.py"), "w") as f:
+        f.write(code)
+    return routes_dir
+
+
+def test_background_task_manager_submit_and_status(clean_registry):
+    """PluginBackgroundTaskManager 提交任务并查询状态（含结果）。"""
+    manager = PluginBackgroundTaskManager.instance()
+    manager.clear()
+
+    def slow_handler(request):
+        return {"done": True, "received": request is not None}
+
+    task_id = manager.submit(slow_handler, request=None, plugin="demo_plugin")
+    assert task_id
+    # 轮询等待完成
+    status = None
+    for _ in range(50):
+        status = manager.get_status(task_id)
+        if status and status["status"] in (
+            PluginBackgroundTaskManager.STATUS_COMPLETED,
+            PluginBackgroundTaskManager.STATUS_FAILED,
+        ):
+            break
+        time.sleep(0.05)
+    assert status is not None
+    assert status["status"] == PluginBackgroundTaskManager.STATUS_COMPLETED
+    assert status["result"] == {"done": True, "received": False}
+    assert status["plugin"] == "demo_plugin"
+    manager.clear()
+
+
+def test_background_task_manager_error_status(clean_registry):
+    """后台任务异常时状态为 failed 且记录错误。"""
+    manager = PluginBackgroundTaskManager.instance()
+    manager.clear()
+
+    def failing_handler(request):
+        raise ValueError("boom")
+
+    task_id = manager.submit(failing_handler, request=None)
+    status = None
+    for _ in range(50):
+        status = manager.get_status(task_id)
+        if status and status["status"] in (
+            PluginBackgroundTaskManager.STATUS_COMPLETED,
+            PluginBackgroundTaskManager.STATUS_FAILED,
+        ):
+            break
+        time.sleep(0.05)
+    assert status is not None
+    assert status["status"] == PluginBackgroundTaskManager.STATUS_FAILED
+    assert "ValueError" in status["error"]
+    manager.clear()
+
+
+def test_background_task_manager_unknown_task(clean_registry):
+    """查询不存在的任务返回 None。"""
+    manager = PluginBackgroundTaskManager.instance()
+    manager.clear()
+    assert manager.get_status("no-such-task") is None
+    manager.clear()
+
+
+def test_background_route_returns_202_and_queryable(clean_registry, monkeypatch):
+    """background:true 路由调用返回 202 + task_id，后台执行后可查询结果。"""
+    tmp = tempfile.mkdtemp()
+    try:
+        routes_dir = _make_route_dir(tmp, "bg_plugin", BACKGROUND_ROUTE_CODE)
+        monkeypatch.setattr(
+            "jarvis.jarvis_utils.config.GLOBAL_CONFIG_DATA",
+            {
+                "gateway": {
+                    "routes": [
+                        {
+                            "path": "/api/plugins/bg/slow",
+                            "method": "POST",
+                            "handler": routes_dir,
+                            "background": True,
+                        }
+                    ]
+                }
+            },
+        )
+        gateway_registry = GatewayExtensionRegistry.instance()
+        app = FastAPI()
+        gateway_registry.load_plugin_gateway(app, _fake_verify_token)
+
+        # 确认路由声明带 background 标记
+        routes = gateway_registry.list_routes()
+        assert len(routes) == 1
+        assert routes[0]["background"] is True
+
+        client = TestClient(app)
+        # 调用立即返回 202 + task_id
+        resp = client.post(
+            "/api/plugins/bg/slow", headers={"X-Jarvis-Token": "test-token"}
+        )
+        assert resp.status_code == 202
+        body = resp.json()
+        assert "task_id" in body
+        task_id = body["task_id"]
+
+        # 轮询任务状态接口直到完成
+        result = None
+        for _ in range(50):
+            r = client.get(
+                f"/api/plugins/tasks/{task_id}",
+                headers={"X-Jarvis-Token": "test-token"},
+            )
+            assert r.status_code == 200
+            data = r.json()
+            if data["status"] == PluginBackgroundTaskManager.STATUS_COMPLETED:
+                result = data
+                break
+            time.sleep(0.05)
+        assert result is not None
+        assert result["result"]["background"] is True
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_background_route_error_queryable(clean_registry, monkeypatch):
+    """background 路由 handler 异常时任务状态为 failed 且可查询错误。"""
+    tmp = tempfile.mkdtemp()
+    try:
+        routes_dir = _make_route_dir(tmp, "bg_plugin", BACKGROUND_ERROR_ROUTE_CODE)
+        monkeypatch.setattr(
+            "jarvis.jarvis_utils.config.GLOBAL_CONFIG_DATA",
+            {
+                "gateway": {
+                    "routes": [
+                        {
+                            "path": "/api/plugins/bg/error",
+                            "method": "POST",
+                            "handler": routes_dir,
+                            "background": True,
+                        }
+                    ]
+                }
+            },
+        )
+        gateway_registry = GatewayExtensionRegistry.instance()
+        app = FastAPI()
+        gateway_registry.load_plugin_gateway(app, _fake_verify_token)
+
+        client = TestClient(app)
+        resp = client.post(
+            "/api/plugins/bg/error", headers={"X-Jarvis-Token": "test-token"}
+        )
+        assert resp.status_code == 202
+        task_id = resp.json()["task_id"]
+
+        status = None
+        for _ in range(50):
+            r = client.get(
+                f"/api/plugins/tasks/{task_id}",
+                headers={"X-Jarvis-Token": "test-token"},
+            )
+            data = r.json()
+            if data["status"] == PluginBackgroundTaskManager.STATUS_FAILED:
+                status = data
+                break
+            time.sleep(0.05)
+        assert status is not None
+        assert "ValueError" in status["error"]
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_task_status_route_requires_auth(clean_registry, monkeypatch):
+    """任务状态查询接口默认带 token 认证。"""
+    tmp = tempfile.mkdtemp()
+    try:
+        routes_dir = _make_route_dir(tmp, "bg_plugin", BACKGROUND_ROUTE_CODE)
+        monkeypatch.setattr(
+            "jarvis.jarvis_utils.config.GLOBAL_CONFIG_DATA",
+            {
+                "gateway": {
+                    "routes": [
+                        {
+                            "path": "/api/plugins/bg/slow",
+                            "method": "POST",
+                            "handler": routes_dir,
+                            "background": True,
+                        }
+                    ]
+                }
+            },
+        )
+        gateway_registry = GatewayExtensionRegistry.instance()
+        app = FastAPI()
+        gateway_registry.load_plugin_gateway(app, _fake_verify_token)
+
+        client = TestClient(app)
+        # 无 token：401
+        resp = client.get("/api/plugins/tasks/whatever")
+        assert resp.status_code == 401
+        # 有效 token + 不存在任务：404
+        resp = client.get(
+            "/api/plugins/tasks/whatever", headers={"X-Jarvis-Token": "test-token"}
+        )
+        assert resp.status_code == 404
+    finally:
+        shutil.rmtree(tmp)
+
+
+def test_async_route_handler(clean_registry, monkeypatch):
+    """async route_handler 直接作为 FastAPI async 端点，正常工作。"""
+    tmp = tempfile.mkdtemp()
+    try:
+        routes_dir = _make_route_dir(tmp, "async_plugin", ASYNC_ROUTE_CODE)
+        monkeypatch.setattr(
+            "jarvis.jarvis_utils.config.GLOBAL_CONFIG_DATA",
+            {
+                "gateway": {
+                    "routes": [
+                        {
+                            "path": "/api/plugins/async/echo",
+                            "method": "GET",
+                            "handler": routes_dir,
+                        }
+                    ]
+                }
+            },
+        )
+        gateway_registry = GatewayExtensionRegistry.instance()
+        app = FastAPI()
+        gateway_registry.load_plugin_gateway(app, _fake_verify_token)
+
+        client = TestClient(app)
+        resp = client.get(
+            "/api/plugins/async/echo", headers={"X-Jarvis-Token": "test-token"}
+        )
+        assert resp.status_code == 200
+        assert resp.json()["async"] is True
+    finally:
+        shutil.rmtree(tmp)
