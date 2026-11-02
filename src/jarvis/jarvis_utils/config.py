@@ -1294,6 +1294,108 @@ def get_event_callbacks() -> List[Dict[str, Any]]:
     return result
 
 
+def get_plugin_hook_dirs(plugin_name: str) -> Dict[str, Any]:
+    """获取指定插件的 hook 类扩展点字段（供 '<plugin:插件名>' 手动加载）。
+
+    当插件 config.yaml 声明 ``auto_load: false`` 且当前为 agent 进程时，其
+    hook 类扩展点字段（全部扩展点字段，见 utils._PLUGIN_HOOK_FIELDS）不会合并
+    进全局配置（不自动加载），而是保留在私有配置 ``plugin_configs.<plugin_name>``
+    中。本函数从私有配置读取这些字段并返回规范化结果，供 input_handler 处理
+    ``<plugin:插件名>`` 标记时手动注册。
+
+    参数:
+        plugin_name: 插件名（目录名或 config.yaml 的 name/id 字段）
+
+    返回:
+        Dict[str, Any]: 该插件的 hook 类扩展点字段字典。仅包含该插件实际声明的
+        字段；目录类字段（input_handler/工具/规则/角色/agent 定义等）会展开路径，
+        ``event_callbacks`` 会被规范化为 ``[{dir, events, target}, ...]`` 结构
+        （与 :func:`get_event_callbacks` 一致），其余字段（replace_map/mcp 等）
+        按原样返回。未找到插件或插件无 hook 时返回空字典。
+    """
+    from jarvis.jarvis_utils.output import PrettyOutput
+
+    config = get_plugin_config(plugin_name)
+    if not config:
+        return {}
+
+    result: Dict[str, Any] = {}
+    # 目录类 hook 字段：直接读取并展开路径
+    dir_fields = (
+        "builtin_input_handler_dirs",
+        "before_tool_call_cb_dirs",
+        "after_tool_call_cb_dirs",
+        "before_model_call_cb_dirs",
+        "after_model_call_cb_dirs",
+        "summary_cb_dirs",
+        "tool_output_sanitizer_dirs",
+        "rules_load_dirs",
+        "tool_load_dirs",
+        "roles_dirs",
+        "agent_definition_dirs",
+    )
+    for field in dir_fields:
+        value = config.get(field)
+        if not value:
+            continue
+        if isinstance(value, str):
+            value = [value]
+        if isinstance(value, list):
+            result[field] = [
+                os.path.expanduser(os.path.expandvars(str(p)))
+                for p in value
+                if p
+            ]
+    # event_callbacks 字段：规范化（与 get_event_callbacks 一致）
+    event_raw = config.get("event_callbacks")
+    if event_raw is not None:
+        normalized: List[Dict[str, Any]] = []
+        if not isinstance(event_raw, list):
+            PrettyOutput.auto_print(
+                f"⚠️  插件 {plugin_name} 的 event_callbacks 配置格式错误：期望列表，实际 {type(event_raw).__name__}，已忽略"
+            )
+        else:
+            for entry in event_raw:
+                if isinstance(entry, str):
+                    normalized.append(
+                        {
+                            "dir": os.path.expanduser(os.path.expandvars(entry)),
+                            "events": None,
+                            "target": "event_bus",
+                        }
+                    )
+                elif isinstance(entry, dict):
+                    dir_val = entry.get("dir")
+                    if not isinstance(dir_val, str) or not dir_val.strip():
+                        continue
+                    events = entry.get("events")
+                    if events is not None and not isinstance(events, list):
+                        continue
+                    target = entry.get("target", "event_bus")
+                    if target not in ("event_bus", "hook", "modifier"):
+                        continue
+                    normalized.append(
+                        {
+                            "dir": os.path.expanduser(os.path.expandvars(dir_val)),
+                            "events": events,
+                            "target": target,
+                        }
+                    )
+        if normalized:
+            result["event_callbacks"] = normalized
+    # 其余 hook 类字段（replace_map / mcp / orchestration / lsp / platforms /
+    # timer_actions / audit / message_types / agent_types / gateway / ENV 等）
+    # 按原样返回，供手动加载消费。目录类与 event_callbacks 已在上方处理。
+    from jarvis.jarvis_utils.utils import _PLUGIN_HOOK_FIELDS
+
+    for field in _PLUGIN_HOOK_FIELDS:
+        if field in result or field in dir_fields or field == "event_callbacks":
+            continue
+        if field in config and config.get(field) is not None:
+            result[field] = config[field]
+    return result
+
+
 def get_central_tool_repo() -> str:
     """
     获取中心工具Git仓库地址。

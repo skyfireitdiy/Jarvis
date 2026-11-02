@@ -1503,6 +1503,19 @@ _PLUGIN_EXTENSION_FIELDS = frozenset(
 # 全局配置中存放插件私有配置的单独配置项键名
 PLUGIN_CONFIGS_KEY = "plugin_configs"
 
+# 插件 hook 类扩展点字段：这些字段是「运行时回调/事件」类扩展点，随 Agent
+# 启动被自动扫描注册（input_handler / 事件回调 / 工具调用前后回调 / summary /
+# 脱敏器等）。当插件声明 auto_load=false 时，这些字段不合并进全局配置（不自动
+# 加载），而是保留在私有配置 plugin_configs.<name> 中，供用户通过
+# '<plugin:插件名>' 标记在 input_handler 中手动加载。
+#
+# 按管理员「全都纳入」要求，所有扩展点字段都纳入 auto_load 控制，故此处直接
+# 复用 _PLUGIN_EXTENSION_FIELDS 全集。区分进程语义：
+# - agent 进程（jglobals.is_gateway=False）：auto_load=false 插件的这些字段
+#   不自动加载，需通过 '<plugin:插件名>' 手动加载；
+# - gateway 进程（jglobals.is_gateway=True）：始终全部加载，不受 auto_load 影响。
+_PLUGIN_HOOK_FIELDS = frozenset(_PLUGIN_EXTENSION_FIELDS)
+
 # Jarvis 当前支持的插件接口版本（向后兼容机制）。
 # 插件 config.yaml 可声明 api_version 表示其依赖的接口协议版本；
 # 未声明时按 "1.0" 处理（旧插件无需改动，天然向后兼容）。
@@ -1890,12 +1903,30 @@ def _load_plugin_configs(
                 # - 扩展点字段（白名单）合并进全局配置，供 getter 消费
                 # - 其余字段视为插件私有配置，按插件名隔离到 plugin_configs，
                 #   避免污染全局配置顶层、避免多个插件同名私有字段互相覆盖
+                # - auto_load=false 时，hook 类扩展点字段（含规则）不合并进全局
+                #   配置（不自动加载），保留在私有配置中供 '<plugin:插件名>'
+                #   手动加载。
+                # - 手动加载仅对 agent 进程生效：gateway 进程（jglobals.is_gateway）
+                #   始终加载插件的全部扩展点，不受 auto_load 影响。
+                from jarvis.jarvis_utils.globals import is_gateway as _is_gateway
+
+                plugin_auto_load = bool(plugin_config.get("auto_load", True))
                 extension_config: Dict[str, Any] = {}
                 private_config: Dict[str, Any] = {}
                 for key, value in plugin_config.items():
                     if key in _PLUGIN_EXTENSION_FIELDS:
-                        # 插件扩展点字段（含 mcp）直接合并进全局配置，供 getter 消费
-                        extension_config[key] = value
+                        if (
+                            not _is_gateway
+                            and not plugin_auto_load
+                            and key in _PLUGIN_HOOK_FIELDS
+                        ):
+                            # 非自动加载插件（agent 进程）：hook 类字段不合并进
+                            # 全局配置，保留在私有配置供手动加载
+                            # （{{plugin_dir}} 已渲染为绝对路径）
+                            private_config[key] = value
+                        else:
+                            # 插件扩展点字段（含 mcp）直接合并进全局配置，供 getter 消费
+                            extension_config[key] = value
                     else:
                         private_config[key] = value
                 # 合并扩展点配置：后加载的插件覆盖前面的。

@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 from typing import Any
 from typing import Callable
 from typing import List
+from typing import Optional
 
 from jarvis.jarvis_agent.events import AFTER_MODEL_CALL
 from jarvis.jarvis_agent.events import AFTER_SUMMARY
@@ -205,7 +206,9 @@ class CallbackLoader:
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 加载回调目录时发生错误: {e}")
 
-    def load_tool_output_sanitizers(self) -> None:
+    def load_tool_output_sanitizers(
+        self, dirs: Optional[List[str]] = None
+    ) -> None:
         """
         扫描 tool_output_sanitizer_dirs 中的 Python 文件并动态注册工具输出脱敏器。
         约定优先级（任一命中即注册）：
@@ -213,9 +216,15 @@ class CallbackLoader:
         - 工厂方法返回单个或多个可调用对象: get_tool_output_sanitizer_cb(),
           register_tool_output_sanitizer_cb()
         每个脱敏器接收 ``(agent, output)`` 并返回脱敏后的字符串。
+
+        参数:
+            dirs: 可选。指定要扫描的目录列表；缺省时从全局配置
+                ``tool_output_sanitizer_dirs`` 读取（供 ``<plugin:xxx>``
+                手动加载指定插件目录，避免重复扫描已加载目录）。
         """
         try:
-            dirs = get_tool_output_sanitizer_dirs()
+            if dirs is None:
+                dirs = get_tool_output_sanitizer_dirs()
             if not dirs:
                 return
             for d in dirs:

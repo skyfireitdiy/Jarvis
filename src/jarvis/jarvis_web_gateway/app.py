@@ -2146,6 +2146,10 @@ def create_app(
     # 因为 uvicorn.run() 启动子进程会导致 GLOBAL_CONFIG_DATA 被重置，需要重新加载配置
     from jarvis.jarvis_utils.utils import init_env
 
+    # 标记当前为 gateway 进程：gateway 始终加载插件的全部扩展点
+    # （不受插件 auto_load 影响），须在 init_env()（其内部会加载插件配置）之前设置。
+    jglobals.is_gateway = True
+
     init_env(welcome_str="", config_file=None)
 
     # 创建 AgentManager，并设置状态变更回调
@@ -6180,6 +6184,54 @@ def create_app(
                 },
             }
 
+    def _resolve_proxy_node(raw_proxy_node: Any) -> Optional[str]:
+        """解析创建 Agent 时使用的代理节点。
+
+        优先级：调用方显式指定 > 配置文件中的 default_proxy_node > 无代理。
+
+        说明：default_proxy_node 此前仅由前端在创建 Agent 时读取并回填，
+        任何绕过前端 UI 的创建路径（插件、脚本、定时任务、直接调 API）都
+        拿不到默认值，导致 LLM 调用静默走直连。此处下沉到后端做统一兜底，
+        使所有创建路径行为一致。
+
+        不校验代理节点是否在线：Agent 可能创建在别的节点上，且代理节点
+        短暂离线时仍应允许 Agent 启动（待其上线后 LLM 自然可用）。
+        但若配置的节点不在已知节点列表中，记录告警便于排查配置错误。
+        """
+        explicit = str(raw_proxy_node or "").strip()
+        if explicit:
+            return explicit
+        try:
+            from jarvis.jarvis_utils.config import get_global_config_data
+
+            configured = str(
+                get_global_config_data().get("default_proxy_node") or ""
+            ).strip()
+        except Exception as exc:  # 配置读取失败不应阻断创建流程
+            logger.warning("[PROXY NODE] 读取 default_proxy_node 失败: %s", exc)
+            return None
+        if not configured:
+            return None
+        try:
+            known_nodes = {
+                str(n.get("node_id") or "").strip()
+                for n in node_runtime.node_registry.list_all()
+                if isinstance(n, dict)
+            }
+            # master 自身不通过心跳注册，需单独补上
+            known_nodes.add("master")
+            known_nodes.discard("")
+            if known_nodes and configured not in known_nodes:
+                logger.warning(
+                    "[PROXY NODE] default_proxy_node=%s 不在已知节点列表中 "
+                    "(已知: %s)，仍按配置使用，请确认节点是否已注册",
+                    configured,
+                    ", ".join(sorted(known_nodes)),
+                )
+        except Exception as exc:
+            logger.debug("[PROXY NODE] 校验代理节点失败（忽略）: %s", exc)
+        return configured
+
     # HTTP API：创建 Agent（需要认证）
     @app.post("/api/agents", dependencies=[Depends(verify_token)])
     async def create_agent(
@@ -6215,7 +6267,7 @@ def create_app(
                 # 如果是假值（如 False, None），转换为 False
                 restore_session = False
             no_interaction_mode = bool(request_body.get("no_interaction_mode", False))
-            proxy_node = request_body.get("proxy_node")
+            proxy_node = _resolve_proxy_node(request_body.get("proxy_node"))
             access_acl = request_body.get("access_acl")
             target_node_id = str(request_body.get("node_id") or "").strip()
 
@@ -8139,7 +8191,7 @@ def create_app(
 
         def _create_agent_callback() -> None:
             auth_token = os.environ.get("JARVIS_AUTH_TOKEN")
-            proxy_node = action_params.get("proxy_node")
+            proxy_node = _resolve_proxy_node(action_params.get("proxy_node"))
             agent_manager.create_agent_threadsafe(
                 auth_token=auth_token,
                 agent_type=agent_type,
@@ -8958,7 +9010,11 @@ def create_app(
     ) -> Dict[str, Any]:
         """在指定节点上执行插件私有功能（本地/master 直接执行，子节点转发）。"""
         if node_id in (node_runtime.local_node_id, "master"):
-            return _call_plugin_function(plugin, function, arguments)
+            # 插件私有功能是同步阻塞调用（如行情抓取可能耗时 10s+），
+            # 必须放入线程池执行，否则会阻塞 gateway 事件循环，导致整个网关无响应。
+            return await asyncio.to_thread(
+                _call_plugin_function, plugin, function, arguments
+            )
         node_info = node_runtime.node_registry.get(node_id)
         if node_info is None:
             return {
@@ -13085,6 +13141,9 @@ def run(
     import uvicorn
 
     from jarvis.jarvis_utils.utils import init_env
+
+    # 标记当前为 gateway 进程（须在 init_env 加载插件配置之前设置）
+    jglobals.is_gateway = True
 
     # 初始化环境并加载配置文件
     init_env(welcome_str="", config_file=None)

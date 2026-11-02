@@ -41,6 +41,8 @@ description: 插件描述。 # 必填：功能说明
 version: 0.1.0 # 版本号（安装时做版本比较）
 license: MIT # 开源协议
 builtin: true # 内置插件标记（外部插件不写）
+# auto_load: true # 可选：是否随 Agent 启动自动加载全部扩展点（默认 true，向后兼容）。
+#                 # 设为 false 时扩展点不自动加载，需通过 '<plugin:插件名>' 手动加载（见「config.yaml 字段规范」auto_load 说明）
 # --- 扩展点（路径用 {% raw %}{{plugin_dir}}{% endraw %} 占位，运行时由 jinja2 自动渲染为插件绝对路径）---
 rules_load_dirs:
   - "{% raw %}{{plugin_dir}}{% endraw %}/rules"
@@ -103,7 +105,8 @@ orchestration:
 - `orchestration` 每项含 `name`/`description`/`file`，file 路径含 `plugins/<name>/` 时自动反推来源插件名。
 - `capabilities` 顶层字段用于声明事件钩子、@内置命令等自定义能力，与自动推导的能力（rules/tools/agents/orchestration/frontend）合并展示。
 - 插件 config 会被 `_load_plugin_configs` 读取、渲染并 `_deep_merge` 进全局配置，因此 `rules_load_dirs`/`tool_load_dirs`/`replace_map`/`lsp` 等字段会被 `get_rules_load_dirs()`/`get_tool_load_dirs()`/`get_replace_map()`/`get_lsp_config()` 等消费。
-- **私有配置隔离**：插件 config.yaml 中**除扩展点字段**（`tool_load_dirs`/`rules_load_dirs`/`agent_definition_dirs`/`orchestration`/`roles_dirs`/`before_tool_call_cb_dirs`/`after_tool_call_cb_dirs`/`before_model_call_cb_dirs`/`summary_cb_dirs`/`builtin_input_handler_dirs`/`replace_map`/`mcp`/`lsp`/`event_callbacks`）外的其余字段（`name`/`description`/`version`/`builtin`/`license`/`dependencies`/`capabilities`/`frontend`/自定义业务字段）会被隔离到全局配置的 `plugin_configs.<plugin_name>` 单独配置项，**不污染全局配置顶层、多个插件同名私有字段互不覆盖**。插件可通过 `get_plugin_config(plugin_name)` / `get_all_plugin_configs()`（`jarvis.jarvis_utils.config`）读取自己的私有配置。
+- **私有配置隔离**：插件 config.yaml 中**除扩展点字段**（`tool_load_dirs`/`rules_load_dirs`/`agent_definition_dirs`/`orchestration`/`roles_dirs`/`before_tool_call_cb_dirs`/`after_tool_call_cb_dirs`/`before_model_call_cb_dirs`/`after_model_call_cb_dirs`/`summary_cb_dirs`/`tool_output_sanitizer_dirs`/`builtin_input_handler_dirs`/`replace_map`/`mcp`/`lsp`/`event_callbacks`）外的其余字段（`name`/`description`/`version`/`builtin`/`license`/`dependencies`/`capabilities`/`frontend`/自定义业务字段）会被隔离到全局配置的 `plugin_configs.<plugin_name>` 单独配置项，**不污染全局配置顶层、多个插件同名私有字段互不覆盖**。插件可通过 `get_plugin_config(plugin_name)` / `get_all_plugin_configs()`（`jarvis.jarvis_utils.config`）读取自己的私有配置。
+- **`auto_load`（可选，默认 `true`）**：控制插件的全部扩展点是否随 Agent 启动自动加载。默认 `true` 行为与以往一致（向后兼容）；设为 `false` 时，该插件扩展点**不随 Agent 启动自动加载**，需在对话中输入 `'<plugin:插件名>'` 标记手动加载（插件名取 config.yaml 的 `name` 或目录名）。手动加载仅对 **Agent 会话**生效；**网关（gateway）进程始终加载全部插件的全部扩展点**，不受 `auto_load` 影响。同一插件不会重复加载。
 
 ## 扩展点开发规范
 
