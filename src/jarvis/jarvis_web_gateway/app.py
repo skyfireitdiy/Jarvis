@@ -8958,7 +8958,11 @@ def create_app(
     ) -> Dict[str, Any]:
         """在指定节点上执行插件私有功能（本地/master 直接执行，子节点转发）。"""
         if node_id in (node_runtime.local_node_id, "master"):
-            return _call_plugin_function(plugin, function, arguments)
+            # 插件私有功能是同步阻塞调用（如行情抓取可能耗时 10s+），
+            # 必须放入线程池执行，否则会阻塞 gateway 事件循环，导致整个网关无响应。
+            return await asyncio.to_thread(
+                _call_plugin_function, plugin, function, arguments
+            )
         node_info = node_runtime.node_registry.get(node_id)
         if node_info is None:
             return {
