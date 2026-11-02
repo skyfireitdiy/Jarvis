@@ -1175,7 +1175,9 @@ class task_list_manager:
 
             # 获取 Agent ID（使用 Agent 名称作为 ID）
             agent_id = getattr(agent, "name", "main_agent")
-            is_main_agent = True  # CodeAgent 默认是主 Agent
+            # 任务列表不区分主/子 Agent 权限：子 Agent 的 task_list_id 独立存储，
+            # 天然无法操作父 Agent 的列表，无需额外的主 Agent 限制
+            is_main_agent = True
 
             action = args.get("action")
             if not action:
@@ -1276,13 +1278,6 @@ class task_list_manager:
         if task_list_id:
             existing_task_list = task_list_manager.get_task_list(task_list_id)
             if existing_task_list:
-                # 只有主 Agent 才有权删除任务列表；子 Agent 无权自动清除
-                if not is_main_agent:
-                    return {
-                        "success": False,
-                        "stdout": "",
-                        "stderr": f"Agent 已存在任务列表（ID: {task_list_id}），当前为子 Agent 无权自动清除历史任务列表。请由主 Agent 先清除旧任务列表后再创建。",
-                    }
                 del_success, del_msg = task_list_manager.delete_task_list(
                     task_list_id, is_main_agent
                 )
@@ -2586,9 +2581,7 @@ class task_list_manager:
         返回:
             bool: 是否执行了自动清除
         """
-        # 只有主 Agent 才有权限删除任务列表
-        if not is_main_agent:
-            return False
+        # 任务列表不区分主/子 Agent 权限
 
         try:
             task_list = task_list_manager.get_task_list(task_list_id)

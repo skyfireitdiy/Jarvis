@@ -263,10 +263,9 @@ class TaskListManager:
         返回:
             bool: 是否有权限
         """
-        if is_main_agent:
-            return True
-        # 子 Agent 只能访问关联的任务
-        return task_id in self.agent_task_mapping.get(agent_id, set())
+        # 任务列表不区分主/子 Agent 权限：各 Agent 的 task_list_id 独立存储，
+        # 天然无法访问其他 Agent 的任务列表
+        return True
 
     # ========== 接口层：主 Agent 专属接口 ==========
 
@@ -786,8 +785,7 @@ class TaskListManager:
         返回:
             Tuple[bool, Optional[str]]: (是否成功, 错误信息)
         """
-        if not is_main_agent:
-            return False, "只有主 Agent 可以删除任务列表"
+        # 任务列表不区分主/子 Agent 权限
 
         with self._lock:
             if task_list_id not in self.task_lists:
