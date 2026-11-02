@@ -401,9 +401,394 @@ def _load_custom_input_handlers() -> None:
         PrettyOutput.auto_print(f"⚠ 加载自定义输入处理器失败: {e}")
 
 
-def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
-    import os
+def _load_plugin_input_handlers(dirs: List[str]) -> None:
+    """从指定目录扫描并注册自定义输入处理器（供 '<plugin:插件名>' 手动加载）。
 
+    与 :func:`_load_custom_input_handlers` 逻辑一致，但针对传入的目录列表
+    精确加载，避免重复扫描全局配置中已加载的目录。约定优先级（任一命中即注册）：
+    - 模块级可调用对象: input_handler_cb（需有 tag 属性）
+    - 工厂方法返回单个或多个可调用对象: get_input_handler_cb(), register_input_handler_cb()
+
+    handler 签名: handler(user_input, agent, tag) -> Tuple[str, bool]
+    handler 需有 tag 属性标识处理的标记名。
+    """
+    if not dirs:
+        return
+    for d in dirs:
+        p_dir = Path(d)
+        if not p_dir.exists() or not p_dir.is_dir():
+            continue
+        for file_path in p_dir.glob("*.py"):
+            if file_path.name == "__init__.py":
+                continue
+            parent_dir = str(file_path.parent)
+            added_path = False
+            try:
+                if parent_dir not in sys.path:
+                    sys.path.insert(0, parent_dir)
+                    added_path = True
+                module_name = file_path.stem
+
+                # 解析文件头部的 requirements 注释
+                requirements: List[str] = []
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        for line in f:
+                            line = line.strip()
+                            if line.startswith("# requirements:"):
+                                deps_str = line[len("# requirements:") :].strip()
+                                if deps_str:
+                                    requirements = deps_str.split()
+                                break
+                except Exception:
+                    pass
+
+                # 安装依赖
+                if requirements:
+                    PrettyOutput.auto_print(
+                        f"🔧 正在安装输入处理器依赖 [{file_path.name}]: {', '.join(requirements)}"
+                    )
+                    try:
+                        result = subprocess.run(
+                            ["uv", "pip", "install"] + requirements,
+                            capture_output=True,
+                            text=True,
+                            timeout=120,
+                        )
+                        if result.returncode == 0:
+                            PrettyOutput.auto_print(
+                                f"✅ 依赖安装成功 [{file_path.name}]"
+                            )
+                        else:
+                            PrettyOutput.auto_print(
+                                f"❌ 依赖安装失败 [{file_path.name}]: {result.stderr.strip()}"
+                            )
+                    except subprocess.TimeoutExpired:
+                        PrettyOutput.auto_print(
+                            f"❌ 依赖安装超时 [{file_path.name}] (超过 120 秒)"
+                        )
+                    except Exception as e:
+                        PrettyOutput.auto_print(
+                            f"❌ 依赖安装异常 [{file_path.name}]: {e}"
+                        )
+
+                module = __import__(module_name)
+                PrettyOutput.auto_print(f"📦 从配置文件加载输入处理器：{file_path}")
+
+                candidates: List[Callable] = []
+
+                # 1) 直接导出的回调
+                if hasattr(module, "input_handler_cb"):
+                    obj = getattr(module, "input_handler_cb")
+                    if callable(obj):
+                        candidates.append(obj)
+
+                # 2) 工厂方法：get_input_handler_cb()
+                if hasattr(module, "get_input_handler_cb"):
+                    factory = getattr(module, "get_input_handler_cb")
+                    if callable(factory):
+                        try:
+                            ret = factory()
+                            if callable(ret):
+                                candidates.append(ret)
+                            elif isinstance(ret, (list, tuple)):
+                                for c in ret:
+                                    if callable(c):
+                                        candidates.append(c)
+                        except Exception as e:
+                            PrettyOutput.auto_print(
+                                f"⚠ 调用 get_input_handler_cb() 失败: {e}"
+                            )
+
+                # 3) 工厂方法：register_input_handler_cb()
+                if hasattr(module, "register_input_handler_cb"):
+                    factory2 = getattr(module, "register_input_handler_cb")
+                    if callable(factory2):
+                        try:
+                            ret2 = factory2()
+                            if callable(ret2):
+                                candidates.append(ret2)
+                            elif isinstance(ret2, (list, tuple)):
+                                for c in ret2:
+                                    if callable(c):
+                                        candidates.append(c)
+                        except Exception as e:
+                            PrettyOutput.auto_print(
+                                f"⚠ 调用 register_input_handler_cb() 失败: {e}"
+                            )
+
+                for handler in candidates:
+                    tag = getattr(handler, "tag", None)
+                    if not tag:
+                        PrettyOutput.auto_print(
+                            f"⚠ 输入处理器 {file_path.name} 缺少 tag 属性，已跳过"
+                        )
+                        continue
+                    _custom_tag_handlers[tag] = handler
+                    PrettyOutput.auto_print(f"✅ 已注册自定义输入处理器: '<{tag}>'")
+
+            except Exception as e:
+                PrettyOutput.auto_print(
+                    f"⚠ 加载输入处理器 {file_path.name} 失败: {e}"
+                )
+            finally:
+                if added_path:
+                    try:
+                        sys.path.remove(parent_dir)
+                    except ValueError:
+                        pass
+
+
+def _load_plugin_manually(plugin_name: str, agent: Any) -> Tuple[bool, str]:
+    """手动加载指定插件的 hook 类扩展点（处理 '<plugin:插件名>' 标记）。
+
+    仅对 agent 会话生效（gateway 进程始终自动加载全部扩展点，不受影响）。
+    从插件的私有配置读取其 hook 字段（见 :func:`get_plugin_hook_dirs`），
+    合并进全局配置并触发对应加载器注册，使插件扩展点在当前会话内生效。
+
+    已加载记录挂在 **agent 实例**上（``agent._manually_loaded_plugins``），
+    避免多个 Agent 会话共享进程级集合导致跨会话误跳过（回调/工具注册是
+    per-agent 的）。
+
+    参数:
+        plugin_name: 插件名（目录名或 config.yaml 的 name 字段）
+        agent: Agent 实例
+
+    返回:
+        Tuple[bool, str]: (是否成功加载, 提示信息)
+    """
+    try:
+        return _do_load_plugin_manually(plugin_name, agent)
+    except Exception as e:
+        # 内部异常不外抛，避免 '<plugin:xxx>' 标记残留或中断整个输入处理
+        return False, f"手动加载插件 {plugin_name} 失败: {type(e).__name__}: {e}"
+
+
+def _do_load_plugin_manually(plugin_name: str, agent: Any) -> Tuple[bool, str]:
+    """_load_plugin_manually 的实际实现（异常由外层统一捕获）。"""
+    from jarvis.jarvis_agent.events import (
+        AFTER_MODEL_CALL,
+        AFTER_SUMMARY,
+        AFTER_TOOL_CALL,
+        BEFORE_MODEL_CALL,
+        BEFORE_SUMMARY,
+        BEFORE_TOOL_CALL,
+    )
+    from jarvis.jarvis_utils.config import (
+        get_all_plugin_configs,
+        get_global_config_data,
+        get_plugin_hook_dirs,
+    )
+    from jarvis.jarvis_utils.utils import (
+        _PLUGIN_HOOK_FIELDS,
+        _deep_merge,
+    )
+
+    # 已加载记录挂在 agent 实例上（per-agent），避免跨会话误跳过
+    loaded_set = getattr(agent, "_manually_loaded_plugins", None)
+    if loaded_set is None:
+        loaded_set = set()
+        try:
+            setattr(agent, "_manually_loaded_plugins", loaded_set)
+        except Exception:
+            pass
+    if plugin_name in loaded_set:
+        return True, f"插件 {plugin_name} 已手动加载过，跳过"
+
+    # 解析插件名 -> plugin_configs 的 key（目录名）。get_plugin_config 仅按目录名
+    # 索引，这里额外支持 config.yaml 的 name/id 字段回退，与文档描述保持一致。
+    resolved_name = plugin_name
+    all_configs = get_all_plugin_configs()
+    if plugin_name not in all_configs:
+        for key, cfg in all_configs.items():
+            if isinstance(cfg, dict) and plugin_name in (
+                cfg.get("name"),
+                cfg.get("id"),
+            ):
+                resolved_name = key
+                break
+
+    hooks = get_plugin_hook_dirs(resolved_name)
+    if not hooks:
+        # 区分“插件不存在”与“插件已自动加载（auto_load=true）”
+        if resolved_name in all_configs:
+            return False, f"插件 {plugin_name} 已随启动自动加载，无需手动加载"
+        return False, f"插件 {plugin_name} 不存在"
+
+    gdata = get_global_config_data()
+    loader = getattr(agent, "_callback_loader", None)
+    loaded_parts: List[str] = []
+
+    # 0) 通用兜底：把插件全部 hook 字段按 _deep_merge 语义合并进全局配置，
+    #    保证 getter 能读到（列表追加、字典递归合并，不覆盖其他插件已合并内容）。
+    #    各具体加载器随后按精确目录再注册，避免重复扫描。
+    merge_fields = {
+        k: v
+        for k, v in hooks.items()
+        if k not in ("builtin_input_handler_dirs", "rules_load_dirs", "tool_load_dirs")
+    }
+    if merge_fields:
+        merged = _deep_merge(dict(gdata), merge_fields)
+        gdata.clear()
+        gdata.update(merged)
+
+    # 1) 自定义输入处理器
+    ih_dirs = hooks.get("builtin_input_handler_dirs")
+    if ih_dirs:
+        _load_plugin_input_handlers(ih_dirs)
+        loaded_parts.append("input_handler")
+
+    # 2) 工具前后 / 模型前后 / summary 回调（通过 CallbackLoader 精确加载插件目录）
+    if loader is not None:
+        if hooks.get("before_tool_call_cb_dirs"):
+            loader.load_event_callbacks(
+                BEFORE_TOOL_CALL,
+                lambda: hooks["before_tool_call_cb_dirs"],
+                ["before_tool_call_cb", "get_before_tool_call_cb", "register_before_tool_call_cb"],
+                "hook",
+            )
+            loaded_parts.append("before_tool_call")
+        if hooks.get("after_tool_call_cb_dirs"):
+            loader.load_event_callbacks(
+                AFTER_TOOL_CALL,
+                lambda: hooks["after_tool_call_cb_dirs"],
+                ["after_tool_call_cb", "get_after_tool_call_cb", "register_after_tool_call_cb"],
+                "event_bus",
+            )
+            loaded_parts.append("after_tool_call")
+        if hooks.get("before_model_call_cb_dirs"):
+            loader.load_event_callbacks(
+                BEFORE_MODEL_CALL,
+                lambda: hooks["before_model_call_cb_dirs"],
+                ["before_model_call_cb", "get_before_model_call_cb", "register_before_model_call_cb"],
+                "modifier",
+            )
+            loaded_parts.append("before_model_call")
+        if hooks.get("after_model_call_cb_dirs"):
+            loader.load_event_callbacks(
+                AFTER_MODEL_CALL,
+                lambda: hooks["after_model_call_cb_dirs"],
+                ["after_model_call_cb", "get_after_model_call_cb", "register_after_model_call_cb"],
+                "modifier",
+            )
+            loaded_parts.append("after_model_call")
+        if hooks.get("summary_cb_dirs"):
+            loader.load_event_callbacks(
+                BEFORE_SUMMARY,
+                lambda: hooks["summary_cb_dirs"],
+                ["before_summary_cb", "get_before_summary_cb", "register_before_summary_cb"],
+                "modifier",
+            )
+            loader.load_event_callbacks(
+                AFTER_SUMMARY,
+                lambda: hooks["summary_cb_dirs"],
+                ["after_summary_cb", "get_after_summary_cb", "register_after_summary_cb"],
+                "event_bus",
+            )
+            loaded_parts.append("summary")
+        # 工具输出脱敏器
+        if hooks.get("tool_output_sanitizer_dirs"):
+            loader.load_tool_output_sanitizers(dirs=hooks["tool_output_sanitizer_dirs"])
+            loaded_parts.append("tool_output_sanitizer")
+        # 插件 event_callbacks 扩展点
+        for decl in hooks.get("event_callbacks", []):
+            dir_path = decl.get("dir")
+            if not dir_path or not Path(dir_path).is_dir():
+                continue
+            events = decl.get("events")
+            if events is None:
+                events = loader._probe_event_names(dir_path)
+            for event_name in events:
+                loader._load_plugin_event_callback(
+                    dir_path, event_name, decl.get("target", "event_bus")
+                )
+            loaded_parts.append("event_callbacks")
+
+    # 3) 规则：把插件的规则目录追加到 rules_manager，供 '<rule:xxx>' 按名加载
+    rules_dirs = hooks.get("rules_load_dirs")
+    if rules_dirs:
+        rm = getattr(agent, "rules_manager", None)
+        if rm is not None:
+            for rd in rules_dirs:
+                if rd not in rm.rules_dirs:
+                    rm.rules_dirs.append(rd)
+            loaded_parts.append("rules")
+
+    # 4) 工具：逐个注册插件 tool_load_dirs 下的工具
+    tool_dirs = hooks.get("tool_load_dirs")
+    if tool_dirs:
+        registry = (
+            agent.get_tool_registry() if hasattr(agent, "get_tool_registry") else None
+        )
+        if registry is not None:
+            for td in tool_dirs:
+                p_td = Path(td)
+                if not p_td.exists() or not p_td.is_dir():
+                    continue
+                for file_path in p_td.glob("*.py"):
+                    if file_path.name == "__init__.py":
+                        continue
+                    try:
+                        registry.register_tool_by_file(str(file_path))
+                    except Exception as e:
+                        PrettyOutput.auto_print(
+                            f"⚠ 注册插件 {plugin_name} 工具 {file_path.name} 失败: {e}"
+                        )
+            loaded_parts.append("tools")
+
+    # 5) 平台扩展点：agent 进程也消费（模型平台注册），主动触发注册
+    if hooks.get("platforms"):
+        try:
+            from jarvis.jarvis_platform.registry import PlatformRegistry
+
+            PlatformRegistry.instance().load_plugin_platforms()
+            loaded_parts.append("platforms")
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠ 加载插件 {plugin_name} 平台扩展失败: {e}")
+
+    # 6) 审计扩展点：注册自定义审计事件类型（供卸载精确撤销）
+    audit_cfg = hooks.get("audit")
+    if isinstance(audit_cfg, dict) and audit_cfg.get("event_types"):
+        try:
+            from jarvis.jarvis_tools.plugin_registry import PluginRegistry
+
+            PluginRegistry.instance().register_audit_event_types(
+                resolved_name, audit_cfg["event_types"]
+            )
+            loaded_parts.append("audit")
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠ 加载插件 {plugin_name} 审计扩展失败: {e}")
+
+    # 7) 其余 hook 字段（orchestration / lsp / timer_actions / message_types /
+    #    agent_types / gateway / ENV / roles_dirs / agent_definition_dirs 等）已在上方
+    #    通过 _deep_merge 合并进全局配置，供对应 getter 读取；其中 timer_actions /
+    #    message_types / gateway 为网关专属能力，agent 进程无对应加载器，
+    #    gateway 进程始终全量加载，故此处仅合并配置、不触发注册。
+    for field in _PLUGIN_HOOK_FIELDS:
+        if field in hooks and field not in (
+            "builtin_input_handler_dirs",
+            "rules_load_dirs",
+            "tool_load_dirs",
+            "platforms",
+            "audit",
+        ):
+            if field not in loaded_parts and field not in (
+                "before_tool_call_cb_dirs",
+                "after_tool_call_cb_dirs",
+                "before_model_call_cb_dirs",
+                "after_model_call_cb_dirs",
+                "summary_cb_dirs",
+                "tool_output_sanitizer_dirs",
+                "event_callbacks",
+            ):
+                loaded_parts.append(field)
+
+    loaded_set.add(plugin_name)
+    detail = ", ".join(loaded_parts) if loaded_parts else "（无 hook 字段）"
+    return True, f"🟢 已手动加载插件 {plugin_name}: {detail}"
+
+
+def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
     """
     处理内置的特殊输入标记，并追加相应的提示词
 
@@ -2167,8 +2552,20 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 modified_input = modified_input.replace(
                     f"'<{tag}>'", replace_map[tag]["template"]
                 )
+        elif tag.startswith("plugin:"):
+            # 处理 plugin:xxx 格式的插件手动加载标记
+            if tag not in processed_tag:
+                plugin_name = tag[7:]  # 去掉 "plugin:" 前缀
+                processed_tag.add(tag)
+                # 先移除标记本身，确保即使加载异常也不会把标记当普通文本传给模型
+                modified_input = modified_input.replace(f"'<{tag}>'", "")
+
+                ok, msg = _load_plugin_manually(plugin_name, agent)
+                if ok:
+                    PrettyOutput.auto_print(msg)
+                else:
+                    PrettyOutput.auto_print(f"⚠ {msg}")
         elif tag.startswith("rule:"):
-            # 处理 rule:xxx 格式的规则标记
             if tag not in processed_tag:
                 rule_name = tag[5:]  # 去掉 "rule:" 前缀
                 processed_tag.add(tag)

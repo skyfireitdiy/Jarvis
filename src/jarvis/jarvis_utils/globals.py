@@ -53,6 +53,11 @@ input_inject_callback: Optional[Any] = None
 running_agent_stack: List[str] = []  # 正在运行的agent栈（最顶层是当前正在运行的agent）
 # 表示与大模型交互的深度(>0表示正在交互)
 g_in_chat: int = 0
+# 是否运行在 Web Gateway（master/child 网关）进程中。
+# gateway 进程始终加载插件的全部扩展点（不受插件 auto_load 影响）；
+# agent 进程则遵循插件 auto_load 声明，auto_load=false 的插件扩展点不自动
+# 加载，需通过 '<plugin:插件名>' 手动加载。
+is_gateway: bool = False
 # 表示是否接收到中断信号
 g_interrupt: int = 0
 # 当前运行的脚本进程 PID

@@ -59,6 +59,19 @@ jarvis --list-plugins
 
 ## 三、config.yaml 字段规范
 
+### 三.1 auto_load 与手动加载
+
+插件的全部扩展点（`rules_load_dirs` / `tool_load_dirs` / `builtin_input_handler_dirs` / 各类回调目录 / `event_callbacks` / `replace_map` / `mcp` / `roles_dirs` / `agent_definition_dirs` 等）默认随 Agent 启动自动加载。若希望插件**默认不激活**、由用户在需要时按需启用，可在 `config.yaml` 顶层声明 `auto_load: false`：
+
+```yaml
+name: my-plugin
+auto_load: false          # 不随 Agent 启动自动加载扩展点
+```
+
+- **默认 `true`**（向后兼容）：未声明 `auto_load` 的旧插件行为不变，全部扩展点自动加载。
+- **`auto_load: false` 时**：该插件的扩展点不随 Agent 启动合并进全局配置。用户可在对话中输入 `'<plugin:插件名>'` 标记（插件名取 config.yaml 的 `name` 或目录名），手动加载该插件的全部扩展点（输入处理器、工具、规则、回调、脱敏器、`replace_map`、`mcp`、事件回调等）。加载成功/失败均有提示，同一插件不会重复加载。
+- **仅对 Agent 生效**：手动加载机制只作用于 Agent 会话。**网关（gateway）进程始终加载全部插件的全部扩展点**，不受 `auto_load` 影响——因此进程级扩展点（`orchestration` / `lsp` / `platforms` / `timer_actions` / `audit` / `message_types` / `agent_types` / `gateway` / `ENV` 等）在网关侧始终可用。
+
 ```yaml
 ---
 name: my-plugin            # 必填：插件唯一标识（目录名、工具/规则命名依据）
@@ -66,6 +79,9 @@ description: 插件描述。     # 必填：功能说明
 version: 0.1.0             # 版本号（安装时做版本比较）
 license: MIT               # 开源协议
 builtin: true              # 内置插件标记（外部插件不写）
+# auto_load: true           # 可选：是否随 Agent 启动自动加载全部扩展点（默认 true，向后兼容）。
+#                           #   设为 false 时，插件扩展点不自动加载，需通过 '<plugin:插件名>'
+#                           #   标记在对话中手动加载（见「三.1 auto_load 与手动加载」）。
 # api_version: "1.0"        # 可选：插件依赖的接口协议版本（默认 "1.0"，向后兼容；见「接口版本」章节）
 # --- 扩展点（路径用 {{plugin_dir}} 占位，运行时由 jinja2 自动渲染为插件绝对路径）---
 rules_load_dirs:
@@ -190,6 +206,7 @@ orchestration:
 - 除扩展点字段外的其余字段（`name`/`description`/`version`/`builtin`/`license`/`dependencies`/`capabilities`/`frontend`/自定义业务字段）会被隔离到全局配置的 `plugin_configs.<plugin_name>`，**不污染全局配置顶层、多个插件同名私有字段互不覆盖**。插件可通过 `get_plugin_config(plugin_name)` 读取自己的私有配置。
 - **`hooks` 生命周期钩子**：可选，声明插件在安装/升级/卸载前后要执行的 shell 命令（见上方示例）。支持 6 个时机：`pre-install` / `post-install` / `pre-update` / `post-update` / `pre-uninstall` / `post-uninstall`，每个时机是命令字符串列表，命令以**插件目录为工作目录**、经 shell 执行（超时 300s）。**`pre-*` 钩子失败会中止对应操作**（安装/升级/卸载不执行，避免半成品状态）；**`post-*` 钩子失败仅警告**，不影响主体操作结果。注意 `post-uninstall` 执行时插件目录已删除，命令工作目录为插件根目录（即 `plugins/`）。
 - **安装后免重启生效**：插件安装 / 升级 / 卸载完成后，网关会自动重新扫描 `plugins` 目录并把各插件的扩展点合并进全局配置（`reload_plugin_configs`），因此**无需重启网关进程**，`get_tool_load_dirs` / `get_rules_load_dirs` 等 getter 立即返回最新配置。若因环境异常导致重载失败，仅打印警告，可稍后重启生效。
+- **`auto_load`（可选，默认 `true`）**：控制插件的全部扩展点是否随 Agent 启动自动加载。默认 `true` 时行为与以往完全一致（向后兼容）；设为 `false` 时，该插件的扩展点**不随 Agent 启动自动加载**，需通过 `'<plugin:插件名>'` 标记在对话中手动加载（见「三.1 auto_load 与手动加载」）。注意：**手动加载仅对 Agent 进程生效，网关（gateway）进程始终加载全部插件的全部扩展点**，不受 `auto_load` 影响。
 
 ### 接口版本与向后兼容
 
