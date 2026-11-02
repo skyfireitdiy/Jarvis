@@ -1457,9 +1457,9 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
 
             return fix_prompt, False
         elif tag == "SwitchModelGroup":
-            # 处理切换模型组命令（仅在主 agent 中可用）
-            if not getattr(agent, "allow_savesession", False):
-                PrettyOutput.auto_print("⚠️ SwitchModel 命令仅在 jvs/jca 主程序中可用。")
+            # 处理切换模型组命令（主/子 Agent 均可用，用于模型故障时自救）
+            if not getattr(agent, "allow_model_switch", True):
+                PrettyOutput.auto_print("⚠️ SwitchModelGroup 命令已被禁用。")
                 return "", True
 
             if switch_model_group(agent):
@@ -1468,9 +1468,9 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 PrettyOutput.auto_print("❌ 模型组切换失败或已取消。")
             return "", True
         elif tag == "SwitchModel":
-            # 处理切换模型命令（在当前模型组的三个模型之间切换）
-            if not getattr(agent, "allow_savesession", False):
-                PrettyOutput.auto_print("⚠️ SwitchModel 命令仅在 jvs/jca 主程序中可用。")
+            # 处理切换模型命令（在当前模型组的三个模型之间切换，主/子 Agent 均可用）
+            if not getattr(agent, "allow_model_switch", True):
+                PrettyOutput.auto_print("⚠️ SwitchModel 命令已被禁用。")
                 return "", True
 
             if switch_model(agent):
@@ -1479,11 +1479,9 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 PrettyOutput.auto_print("❌ 模型切换失败或已取消。")
             return "", True
         elif tag == "SwitchProxyNode":
-            # 处理切换节点代理命令（仅在主 agent 中可用）
-            if not getattr(agent, "allow_savesession", False):
-                PrettyOutput.auto_print(
-                    "⚠️ SwitchProxyNode 命令仅在 jvs/jca 主程序中可用。"
-                )
+            # 处理切换节点代理命令（主/子 Agent 均可用，用于代理节点故障时自救）
+            if not getattr(agent, "allow_model_switch", True):
+                PrettyOutput.auto_print("⚠️ SwitchProxyNode 命令已被禁用。")
                 return "", True
 
             if switch_proxy_node(agent):

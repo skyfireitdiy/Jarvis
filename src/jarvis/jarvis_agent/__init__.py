@@ -524,6 +524,7 @@ class Agent:
         non_interactive: Optional[bool] = True,
         in_multi_agent: Optional[bool] = None,
         allow_savesession: bool = False,
+        allow_model_switch: bool = True,
         rule_names: Optional[str] = None,
         optimize_system_prompt: bool = False,
         enable_auto_rule_select: bool = True,
@@ -549,6 +550,8 @@ class Agent:
             confirm_callback: 用户确认回调函数，签名为 (tip: str, default: bool) -> bool；默认使用CLI的user_confirm
             non_interactive: 是否以非交互模式运行（优先级最高，覆盖环境变量与配置）
             allow_savesession: 是否允许使用SaveSession命令（默认False，仅jvs/jca主程序传入True）
+            allow_model_switch: 是否允许使用SwitchModelGroup/SwitchModel/SwitchProxyNode命令
+                （默认True，主/子 Agent 均可用，用于模型故障时自救）
             rule_names: 规则名称列表（逗号分隔），用于加载指定的规则
             optimize_system_prompt: 如果为True，将在第一次run()时使用用户输入来优化系统提示词
             enable_auto_rule_select: 是否启用自动规则选择（默认True）
@@ -572,6 +575,7 @@ class Agent:
             non_interactive,
             in_multi_agent,
             allow_savesession,
+            allow_model_switch,
         )
 
         # 模型类型配置
@@ -714,6 +718,7 @@ class Agent:
         non_interactive: Optional[bool],
         in_multi_agent: Optional[bool],
         allow_savesession: bool,
+        allow_model_switch: bool,
     ) -> None:
         """初始化基础属性
 
@@ -734,6 +739,7 @@ class Agent:
             non_interactive: 是否非交互模式
             in_multi_agent: 是否在多智能体模式
             allow_savesession: 是否允许保存会话
+            allow_model_switch: 是否允许切换模型组/模型/代理节点
         """
         # 标识与描述
         self.name = make_agent_name(name)
@@ -771,6 +777,8 @@ class Agent:
 
         # 权限和状态控制
         self.allow_savesession = bool(allow_savesession)  # SaveSession 命令权限控制
+        # 模型组/模型/代理节点切换权限控制：主/子 Agent 默认均可用，便于模型故障时自救
+        self.allow_model_switch = bool(allow_model_switch)
         self._addon_prompt_skip_rounds = 0  # 记录连续未添加 addon_prompt 的轮数
 
         # 记忆标签收集：用于记录当前 agent 及其子 agent 产生的所有记忆标签

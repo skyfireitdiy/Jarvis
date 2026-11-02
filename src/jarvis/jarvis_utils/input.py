@@ -887,6 +887,11 @@ def get_choice(tip: str, choices: List[str]) -> str:
     if not choices:
         raise ValueError("Choices cannot be empty.")
 
+    # 非交互模式（如子 Agent）下不能弹出 fzf 或等待键盘输入，
+    # 否则会永久阻塞。直接返回第一个选项作为默认值。
+    if _is_non_interactive_for_current_agent():
+        return choices[0]
+
     # 检查是否在 Gateway 模式下
     gateway = None
     GatewayInputRequest = None
