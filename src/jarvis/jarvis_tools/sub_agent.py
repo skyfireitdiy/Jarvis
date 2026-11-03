@@ -84,6 +84,16 @@ class SubAgentTool:
           - stderr: 错误信息（如有）
         """
         try:
+            # 禁止子Agent嵌套调用：工具列表过滤只影响模型可见性，
+            # 继承的父历史与 _all_tools 仍可能触达本工具，故在入口做运行时拦截。
+            caller = args.get("agent")
+            if caller is not None and caller.get_user_data("__is_sub_agent__"):
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "子Agent内禁止嵌套调用 sub_agent",
+                }
+
             task: str = str(args.get("task", "")).strip()
             if not task:
                 return {
