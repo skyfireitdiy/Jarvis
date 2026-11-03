@@ -23,6 +23,7 @@ from typing import Optional
 from jarvis.jarvis_agent.events import AFTER_MODEL_CALL
 from jarvis.jarvis_agent.events import AFTER_SUMMARY
 from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
+from jarvis.jarvis_agent.events import BEFORE_COMPLETE_CHECK
 from jarvis.jarvis_agent.events import BEFORE_MODEL_CALL
 from jarvis.jarvis_agent.events import BEFORE_SUMMARY
 from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL
@@ -481,6 +482,8 @@ class CallbackLoader:
                                     # Hook：拦截型，注册到 hooks 列表
                                     if event_name == BEFORE_TOOL_CALL:
                                         self.agent._before_tool_call_hooks.append(cb)
+                                    elif event_name == BEFORE_COMPLETE_CHECK:
+                                        self.agent._before_complete_check_hooks.append(cb)
                                     # 同时注册到 EventBus 作为通知
                                     self.agent.event_bus.subscribe(event_name, cb)
                                 elif target == "modifier":
@@ -593,8 +596,9 @@ class CallbackLoader:
         - ``events`` 为 None 时自动探测目录内 .py 文件（跳过 ``__init__.py``），
           按文件名前缀匹配事件短名（如 ``task_started_cb.py`` → ``task_started``）。
         - ``target`` 决定注册方式：``event_bus``（通知型，默认）、``hook``（拦截型，
-          仅 ``before_tool_call``）、``modifier``（修改型，仅 ``before_model_call``/
-          ``before_summary``）。target 与事件不匹配时显式告警并跳过，避免静默降级。
+          支持 ``before_tool_call``/``before_complete_check``）、``modifier``（修改型，
+          仅 ``before_model_call``/``before_summary``）。target 与事件不匹配时显式告警并跳过，
+          避免静默降级。
         """
         try:
             declarations = get_event_callbacks()
@@ -645,9 +649,12 @@ class CallbackLoader:
                 f"⚠️ event_callbacks 事件短名非法（应为 {', '.join(EVENT_SHORT_NAMES)}），已跳过: {event_name}"
             )
             return
-        if target == "hook" and event_name != BEFORE_TOOL_CALL:
+        if target == "hook" and event_name not in (
+            BEFORE_TOOL_CALL,
+            BEFORE_COMPLETE_CHECK,
+        ):
             PrettyOutput.auto_print(
-                f"⚠️ event_callbacks target=hook 仅支持 before_tool_call，已跳过: {event_name} (dir={dir_path})"
+                f"⚠️ event_callbacks target=hook 仅支持 before_tool_call/before_complete_check，已跳过: {event_name} (dir={dir_path})"
             )
             return
         if target == "modifier" and event_name not in (

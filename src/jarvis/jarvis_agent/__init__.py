@@ -88,6 +88,9 @@ from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ot
 
+# 完成校验默认拒绝原因（hook 返回 False 时使用）
+DEFAULT_COMPLETE_CHECK_REJECT_REASON = "完成校验未通过"
+
 __all__ = [
     "Agent",
     "LoopAction",
@@ -952,6 +955,8 @@ class Agent:
         # Hook/Modifier 机制（独立于 EventBus）
         # Hook：拦截型，回调返回 False 拦截执行
         self._before_tool_call_hooks: List[Callable] = []
+        # Hook：完成校验（拦截型），自动完成时生成总结之前执行，返回 False/(False, reason) 拦截
+        self._before_complete_check_hooks: List[Callable] = []
         # Modifier：修改型，回调返回修改后的值
         self._before_model_call_modifiers: List[Callable] = []
         self._after_model_call_modifiers: List[Callable] = []
@@ -1862,6 +1867,46 @@ class Agent:
             log_event(event_type, **data)
         except Exception:
             pass
+
+    def _run_before_complete_check(
+        self, auto_completed: bool, need_summary: bool
+    ) -> Optional[str]:
+        """执行完成校验 hooks（拦截型）。
+
+        仅在自动完成（auto_completed=True）时由调用方触发；任一回调返回
+        ``False`` 或 ``(False, reason)`` 即判定校验不通过，返回拒绝原因；
+        全部通过（或未注册任何回调）返回 ``None``。
+
+        回调签名：``cb(agent, auto_completed, need_summary) -> bool | tuple[bool, str]``
+        - ``True`` / ``(True, "")``：通过
+        - ``False``：不通过，拒绝原因取默认文案
+        - ``(False, reason)``：不通过，reason 为拒绝原因
+
+        回调内部异常：捕获并忽略，视为通过，不阻塞主流程（与 EventBus.emit
+        异常隔离语义一致）。
+        """
+        for hook in self._before_complete_check_hooks:
+            try:
+                ret = hook(
+                    agent=self,
+                    auto_completed=auto_completed,
+                    need_summary=need_summary,
+                )
+            except Exception:
+                # 回调异常视为通过，不阻塞主流程
+                continue
+            if ret is False:
+                return DEFAULT_COMPLETE_CHECK_REJECT_REASON
+            if (
+                isinstance(ret, tuple)
+                and len(ret) == 2
+                and ret[0] is False
+            ):
+                reason = ret[1]
+                if isinstance(reason, str) and reason.strip():
+                    return reason
+                return DEFAULT_COMPLETE_CHECK_REJECT_REASON
+        return None
 
     def _complete_task(self, auto_completed: bool = False) -> str:
         """完成任务并生成总结(如果需要)

@@ -715,6 +715,23 @@ class AgentRunLoop:
             )
             return True, None
         else:
+            # 完成校验 Hook：自动完成时、生成总结之前执行（仅拦截自动完成链路）
+            # 任一校验回调返回 False/(False, reason) 即阻止完成，把拒绝原因作为
+            # 提示词注入对话，返回 (True, None) 让 agent 回到主循环继续执行。
+            try:
+                rejected_reason = ag._run_before_complete_check(
+                    auto_completed=True,
+                    need_summary=getattr(ag, "need_summary", True),
+                )
+            except Exception:
+                # 校验异常不阻塞主流程，视为通过
+                rejected_reason = None
+            if rejected_reason is not None:
+                ag.set_addon_prompt(
+                    f"[完成校验未通过] 本次任务未能完成，原因：{rejected_reason}。"
+                    "请根据原因修正后继续执行，直到校验通过。"
+                )
+                return True, None
             # 先运行_complete_task，触发记忆整理/事件等副作用，再决定返回值
             result = ag._complete_task(auto_completed=True)
             # 若不需要summary，则将最后一条LLM输出作为返回值

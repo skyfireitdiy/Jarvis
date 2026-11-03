@@ -20,6 +20,9 @@ AFTER_TOOL_CALL = "after_tool_call"
 TASK_STARTED = "task_started"
 TASK_COMPLETED = "task_completed"
 
+# 完成校验（Hook：拦截型，自动完成时生成总结之前执行）
+BEFORE_COMPLETE_CHECK = "before_complete_check"
+
 # 总结阶段
 BEFORE_SUMMARY = "before_summary"
 AFTER_SUMMARY = "after_summary"
@@ -47,6 +50,7 @@ EVENT_SHORT_NAMES: List[str] = [
     AFTER_TOOL_CALL,
     TASK_STARTED,
     TASK_COMPLETED,
+    BEFORE_COMPLETE_CHECK,
     BEFORE_SUMMARY,
     AFTER_SUMMARY,
     BEFORE_ADDON_PROMPT,
@@ -167,6 +171,7 @@ __all__ = [
     "AFTER_TOOL_CALL",
     "TASK_STARTED",
     "TASK_COMPLETED",
+    "BEFORE_COMPLETE_CHECK",
     "BEFORE_SUMMARY",
     "AFTER_SUMMARY",
     "BEFORE_ADDON_PROMPT",
