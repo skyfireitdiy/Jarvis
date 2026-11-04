@@ -112,8 +112,8 @@ class TestAutoClearOnCreate:
         tlm.delete_task_list.assert_not_called()
         tlm.create_task_list.assert_called_once()
 
-    def test_sub_agent_cannot_auto_clear(self):
-        """子 Agent 无权自动清除历史任务列表，返回失败"""
+    def test_sub_agent_can_auto_clear(self):
+        """子 Agent 同样允许自动清除历史任务列表（权限检查已移除，见 cbe4a5fef）"""
         tool = _make_tool()
         agent = _make_agent(old_task_list_id="old_list_001", is_sub_agent=True)
         tlm = _make_task_list_manager(existing=True)
@@ -129,10 +129,39 @@ class TestAutoClearOnCreate:
             agent=agent,
         )
 
+        assert result["success"] is True
+        # 旧列表被删除、新列表被创建（子 Agent 与主 Agent 行为一致）
+        tlm.delete_task_list.assert_called_once_with("old_list_001", False)
+        tlm.create_task_list.assert_called_once()
+
+    def test_sub_agent_cannot_create_sub_type_task(self):
+        """子 Agent 仍被禁止创建 sub 类型任务（避免嵌套子 Agent）"""
+        tool = _make_tool()
+        agent = _make_agent(old_task_list_id=None, is_sub_agent=True)
+        tlm = _make_task_list_manager(existing=False)
+
+        sub_task_info = [
+            {
+                "task_name": "子任务",
+                "task_desc": "描述",
+                "expected_output": "1) 输出",
+                "agent_type": "sub",
+            }
+        ]
+        result = tool._handle_add_tasks(
+            args={
+                "tasks_info": sub_task_info,
+                "main_goal": "新目标",
+            },
+            task_list_manager=tlm,
+            agent_id="test_agent",
+            is_main_agent=False,
+            agent=agent,
+        )
+
         assert result["success"] is False
-        assert "无权自动清除" in result["stderr"]
-        # 未删除、未创建新列表
-        tlm.delete_task_list.assert_not_called()
+        assert "拒绝创建 sub 类型任务" in result["stderr"]
+        # 未创建新列表
         tlm.create_task_list.assert_not_called()
 
     def test_delete_failure_returns_error(self):

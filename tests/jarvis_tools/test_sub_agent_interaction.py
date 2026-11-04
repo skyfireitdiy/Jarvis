@@ -37,6 +37,10 @@ class _FakeParent:
     def add_memory_tags(self, tags):
         pass
 
+    def get_user_data(self, key):
+        # 父替身非子 Agent：返回 None，避免触发 sub_agent 入口的嵌套拦截
+        return None
+
 
 class _FakeCodeParent(CodeAgent):
     """真继承 CodeAgent 的父替身，绕过 __init__ 以便通过 isinstance 校验。"""
@@ -52,6 +56,11 @@ class _FakeCodeParent(CodeAgent):
 
     def add_memory_tags(self, tags):
         pass
+
+    def get_user_data(self, key):
+        # 覆盖 CodeAgent.get_user_data（其实现访问 self.session，而本替身绕过
+        # __init__ 未初始化 session）；父替身非子 Agent，返回 None 不触发嵌套拦截。
+        return None
 
 
 def _capture_non_interactive(cls, tool, parent):
