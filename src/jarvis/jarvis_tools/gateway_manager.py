@@ -1134,6 +1134,13 @@ class GatewayManagerTool:
         if err:
             return err
 
+        # 未显式指定 node_id 时，默认创建到「当前 Agent 所在节点」。
+        # 不兜底的话，网关侧会落到 local_node_id（通常是 master），
+        # 子 Agent 与发起者在不同节点，跨节点文件系统不共享，
+        # 子 Agent 读不到 work_dir 里的状态文件与产物（静默失效）。
+        if not node_id:
+            node_id = self._resolve_current_node_id()
+
         # 校验 worktree 冲突
         conflict = self._check_worktree_conflict(
             agent_type, worktree, working_dir, node_id
@@ -1296,6 +1303,66 @@ class GatewayManagerTool:
                     f"请启用 worktree 或选择其他工作目录。"
                 ),
             }
+
+        return None
+
+    def _resolve_current_node_id(self) -> Optional[str]:
+        """解析「当前 Agent 所在节点」的 node_id，作为创建子 Agent 的默认节点。
+
+        创建 Agent 时若不传 node_id，网关侧会落到 local_node_id（通常是 master），
+        导致子 Agent 与发起者不在同一节点：跨节点文件系统不共享，子 Agent 读不到
+        work_dir 里的状态文件与产物，表现为「创建成功但任务静默做不对」。
+
+        因此这里通过 GET /api/agents 反查 jglobals.agent_id 对应的 node_id，
+        让子 Agent 默认与发起者同节点。
+
+        返回:
+            Optional[str]: 节点 ID；无法解析时返回 None（由网关侧兜底）。
+        """
+        current_agent_id = jglobals.agent_id
+        if not current_agent_id:
+            return None
+
+        # 同一进程内会连续创建多个子 Agent，节点不会变，缓存一次即可
+        cache = getattr(self, "_current_node_id_cache", None)
+        if cache is None:
+            cache = {}
+            self._current_node_id_cache = cache
+        if current_agent_id in cache:
+            return cache[current_agent_id]
+
+        try:
+            result = self._request_gateway(
+                method="GET",
+                path="/api/agents",
+                error_prefix="Failed to resolve current node id",
+            )
+            if not result["success"]:
+                return None
+
+            gateway_data = result["data"]
+            if not isinstance(gateway_data, dict) or not gateway_data.get("success"):
+                return None
+
+            # 兼容 data 为列表或 {"agents": [...]} 两种形态
+            data_field = gateway_data.get("data", {})
+            if isinstance(data_field, list):
+                agents_list = data_field
+            elif isinstance(data_field, dict):
+                agents_list = data_field.get("agents", [])
+            else:
+                agents_list = []
+
+            for agent in agents_list:
+                if str(agent.get("agent_id", "")) != str(current_agent_id):
+                    continue
+                resolved = str(agent.get("node_id") or "").strip()
+                if resolved:
+                    cache[current_agent_id] = resolved
+                    return resolved
+                return None
+        except Exception:
+            return None
 
         return None
 
