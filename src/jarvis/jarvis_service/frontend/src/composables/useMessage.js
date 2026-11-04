@@ -883,9 +883,10 @@ function appendOutput(payload, agentId = null) {
   nextTick(() => {
     requestAnimationFrame(() => {
       if (!shouldAutoScroll || !isAutoScrollEnabled(targetAgentId)) return
-      // 优先使用 Panel 对应的 outputList，其次使用全局 outputList
+      // 优先使用 Panel 对应的 outputList；仅当它就是当前查看的 Agent 且无独立 Panel 容器时，
+      // 才回退到全局 outputList，避免后台 Agent 的消息把用户正在查看的其他 Agent 视图滚到底。
       const targetOutputList = targetPanel ? panelOutputLists.get(targetPanel.id) : null
-      const scrollEl = targetOutputList || outputList.value
+      const scrollEl = targetOutputList || (isCurrentAgent(targetAgentId) ? outputList.value : null)
       if (scrollEl) {
         const scrollHeight = scrollEl.scrollHeight
         scrollEl.scrollTop = scrollHeight

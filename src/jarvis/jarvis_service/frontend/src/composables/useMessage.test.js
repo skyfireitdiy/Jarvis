@@ -68,7 +68,8 @@ function makeHarness(overrides = {}) {
   const streamingMessages = ref(new Map())
   const bufferPanelAgentId = ref(null)
   const bufferEditText = ref('')
-  const panelOutputLists = ref(new Map())
+  // 与 App.vue 一致：panelOutputLists 是普通 Map（panelId -> outputList element），非 ref
+  const panelOutputLists = new Map()
   const chatName = ref('')
   const username = ref('test-user')
   const showBufferPanel = ref(false)
@@ -344,6 +345,44 @@ describe('useMessage', () => {
       const items = allOutputs.value.get('agent-1')
       expect(items).toHaveLength(1)
       expect(items[0].text).toBe('a')
+    })
+    it('非当前 Agent 且 panel 无独立容器时，不滚动全局 outputList（多 tab 场景）', async () => {
+      const { api, allOutputs, panels, panelOutputLists, outputList, isCurrentAgent } = makeHarness()
+      // 模拟多 tab：agent-2 的 panel 存在（非激活 tab），但 panelOutputLists 中没有其 DOM
+      // （只有激活 tab 的 SessionPanel 被渲染，非激活 tab 的 panelId 取不到 DOM）
+      panels.value = [{ id: 'panel-2', agentId: 'agent-2' }]
+      // 当前查看的是 agent-1，outputList 是当前激活 tab 的容器
+      outputList.value = { scrollTop: 0, scrollHeight: 500 }
+      isCurrentAgent.mockReturnValue(false)
+      allOutputs.value.set('agent-2', [])
+      api.appendOutput({ text: 'background msg', output_type: 'stdout', lang: 'text' }, 'agent-2')
+      // 等待 nextTick + requestAnimationFrame
+      await new Promise(r => setTimeout(r, 50))
+      // 不应把当前激活 tab 的容器滚到底
+      expect(outputList.value.scrollTop).toBe(0)
+    })
+    it('当前 Agent 且无独立 panel 容器时，回退滚动全局 outputList', async () => {
+      const { api, allOutputs, panels, outputList, isCurrentAgent } = makeHarness()
+      panels.value = []
+      outputList.value = { scrollTop: 0, scrollHeight: 500 }
+      isCurrentAgent.mockReturnValue(true)
+      allOutputs.value.set('agent-1', [])
+      api.appendOutput({ text: 'current msg', output_type: 'stdout', lang: 'text' }, 'agent-1')
+      await new Promise(r => setTimeout(r, 50))
+      expect(outputList.value.scrollTop).toBe(500)
+    })
+    it('目标 panel 有独立容器时，即使非当前 Agent 也只滚动自身容器，不碰全局 outputList', async () => {
+      const { api, allOutputs, panels, panelOutputLists, outputList, isCurrentAgent } = makeHarness()
+      const panelEl = { scrollTop: 0, scrollHeight: 300 }
+      panels.value = [{ id: 'panel-2', agentId: 'agent-2' }]
+      panelOutputLists.set('panel-2', panelEl)
+      outputList.value = { scrollTop: 0, scrollHeight: 500 }
+      isCurrentAgent.mockReturnValue(false)
+      allOutputs.value.set('agent-2', [])
+      api.appendOutput({ text: 'panel msg', output_type: 'stdout', lang: 'text' }, 'agent-2')
+      await new Promise(r => setTimeout(r, 50))
+      expect(panelEl.scrollTop).toBe(300)
+      expect(outputList.value.scrollTop).toBe(0)
     })
   })
 

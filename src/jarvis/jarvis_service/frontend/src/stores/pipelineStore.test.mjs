@@ -49,6 +49,43 @@ test("pipeline_agents：回填 agentId", () => {
   assert.equal(store.getPipeline("p1").stages.get("s1").agentId, "agent-123");
 });
 
+test("pipeline_agents：增量形式（stage + agent_id）单独回填", () => {
+  const store = new PipelineStore();
+  store.applyEvent(
+    startEvent("p1", [{ stage: "s1" }, { stage: "s2", depends_on: ["s1"] }]),
+  );
+  // 惰性创建：每个 stage 创建时单独广播一条增量事件
+  store.applyEvent({
+    pipeline_id: "p1",
+    type: "pipeline_agents",
+    stage: "s1",
+    agent_id: "agent-1",
+  });
+  store.applyEvent({
+    pipeline_id: "p1",
+    type: "pipeline_agents",
+    stage: "s2",
+    agent_id: "agent-2",
+  });
+  const st = store.getPipeline("p1");
+  assert.equal(st.stages.get("s1").agentId, "agent-1");
+  assert.equal(st.stages.get("s2").agentId, "agent-2");
+});
+
+test("pipeline_agents：增量形式未知 stage 被忽略，不抛错", () => {
+  const store = new PipelineStore();
+  store.applyEvent(startEvent("p1", [{ stage: "s1" }]));
+  store.applyEvent({
+    pipeline_id: "p1",
+    type: "pipeline_agents",
+    stage: "ghost",
+    agent_id: "agent-x",
+  });
+  const st = store.getPipeline("p1");
+  assert.equal(st.stages.get("s1").agentId, "");
+  assert.equal(st.stages.size, 1);
+});
+
 test("stage_update：更新状态与错误信息", () => {
   const store = new PipelineStore();
   store.applyEvent(startEvent("p1", [{ stage: "s1" }]));

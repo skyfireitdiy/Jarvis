@@ -210,21 +210,10 @@ class PipelineRunnerTool:
             nodes=[self._node_event_payload(n) for n in nodes],
         )
 
-        # 5. 创建常驻 jvs Agent（每个 stage 一个）
-        agent_created = self._create_stage_agents(
-            nodes, agents_by_name, work_dir, pipeline_id
-        )
-        if not agent_created["success"]:
-            # 清理已创建的部分 Agent，避免残留
-            self._cleanup_agents(agent_created.get("agent_map") or {})
-            self._emit(
-                pipeline_id, "pipeline_done", success=False, final_status="failed"
-            )
-            return self._error(agent_created["error"])
-        agent_map = agent_created["agent_map"]
-
-        # 5.1 广播 stage → agent_id 映射
-        self._emit(pipeline_id, "pipeline_agents", agent_map=dict(agent_map))
+        # 5. 惰性创建常驻 jvs Agent：不在调度前全量创建，改为阶段即将执行时
+        #    才创建该阶段的 Agent（见 _ensure_agent / _schedule）。
+        #    agent_map 运行时增量填充：{stage: agent_id} 在 stage 首次执行前写入。
+        agent_map: Dict[str, str] = {}
 
         # 6. 调度执行（并行 DAG）
         return self._schedule(
@@ -817,6 +806,57 @@ class PipelineRunnerTool:
             )
         return {"success": True, "agent_map": agent_map}
 
+    def _ensure_agent(
+        self,
+        stage_name: str,
+        agent_def: Dict[str, Any],
+        work_dir: Path,
+        pipeline_id: str,
+        agent_map: Dict[str, str],
+    ) -> tuple:
+        """确保某 stage 的常驻 Agent 已创建（惰性创建核心）。
+
+        - 若 agent_map 已有该 stage 的 agent_id（首次执行已创建），直接复用；
+        - 否则创建（`_create_agent_with_retry`，最多 3 次）+ 就绪等待
+          （`_wait_agent_ready`），成功后写入 agent_map 并广播增量
+          `pipeline_agents` 事件（payload 含 stage/agent_id/pipeline_id）。
+
+        返回:
+            (agent_id, error): agent_id 非空表示就绪可用；失败时为空字符串，
+            error 为错误信息。
+        """
+        existing = agent_map.get(stage_name)
+        if existing:
+            return existing, ""
+        gw = GatewayManagerTool()
+        agent_def = agent_def or {}
+        working_dir = str(agent_def.get("working_dir") or str(work_dir))
+        agent_id, last_error = self._create_agent_with_retry(
+            gw, stage_name, working_dir, pipeline_id=pipeline_id
+        )
+        if not agent_id:
+            return "", (
+                f"创建阶段 [{stage_name}] 常驻 Agent 失败（已重试）: {last_error}"
+            )
+        ready, ready_err = self._wait_agent_ready(gw, agent_id)
+        if not ready:
+            return "", (
+                f"阶段 [{stage_name}] 常驻 Agent 就绪等待超时: {ready_err}"
+            )
+        # 先记录已创建的 Agent，供失败时清理（含就绪超时场景）
+        agent_map[stage_name] = agent_id
+        PrettyOutput.auto_print(
+            f"  🛠 阶段 [{stage_name}] 常驻 Agent 就绪: {agent_id}"
+        )
+        # 增量广播：每个 stage 创建时单独发一条 pipeline_agents 事件
+        self._emit(
+            pipeline_id,
+            "pipeline_agents",
+            stage=stage_name,
+            agent_id=agent_id,
+        )
+        return agent_id, ""
+
     def _wait_agent_ready(
         self, gw: Any, agent_id: str, timeout: float = 60.0, poll_interval: float = 0.5
     ) -> tuple:
@@ -1061,7 +1101,28 @@ class PipelineRunnerTool:
             iter_results: Dict[str, Dict[str, Any]] = {}
             for bs in order:
                 bs_name = bs["stage"]
-                agent_id = agent_map.get(bs_name, "")
+                # 惰性创建：body stage 的 Agent 在 loop 首次执行该 stage 前创建，
+                # 之后整个 loop 复用（_ensure_agent 查 agent_map 已有则直接复用）。
+                agent_id, agent_err = self._ensure_agent(
+                    bs_name,
+                    agents_by_name.get(bs["agent"]),
+                    work_dir,
+                    pipeline_id,
+                    agent_map,
+                )
+                if not agent_id:
+                    return {
+                        "stage": loop_name,
+                        "status": "failed",
+                        "output": "",
+                        "result": {"iterations": iteration},
+                        "error": (
+                            f"loop [{loop_name}] 第 {iteration} 轮阶段 "
+                            f"[{bs_name}] Agent 创建失败: {agent_err}"
+                        ),
+                        "gate_blocked": False,
+                        "approval_path": "",
+                    }
                 # 每轮使用独立 status_file，避免上一轮结果干扰
                 bs_run = dict(bs)
                 bs_run["_status_suffix"] = f"iter{iteration}"
@@ -1285,7 +1346,35 @@ class PipelineRunnerTool:
                 futures = {}
                 for n in effective_ready:
                     state[n["stage"]] = "running"
-                    agent_id = agent_map.get(n["stage"], "")
+                    # 惰性创建：阶段即将执行时才创建该阶段的 Agent。
+                    # - 普通 stage：派发前确保其 Agent 已创建；
+                    # - loop 节点：自身无 agent，其 body stage 的 Agent 在
+                    #   _run_loop 内首次执行前创建（之后整个 loop 复用）。
+                    if n.get("kind") == "loop":
+                        agent_id = ""
+                    else:
+                        agent_id, agent_err = self._ensure_agent(
+                            n["stage"],
+                            agents_by_name.get(n["agent"]),
+                            work_dir,
+                            pipeline_id,
+                            agent_map,
+                        )
+                        if not agent_id:
+                            # 创建失败：清理已创建的部分 Agent，避免残留
+                            self._cleanup_agents(agent_map)
+                            self._emit(
+                                pipeline_id,
+                                "pipeline_done",
+                                success=False,
+                                final_status="failed",
+                                failed_stage=n["stage"],
+                            )
+                            return {
+                                "success": False,
+                                "stdout": "\n".join(stdout_lines),
+                                "stderr": agent_err,
+                            }
                     self._emit(
                         pipeline_id,
                         "stage_update",

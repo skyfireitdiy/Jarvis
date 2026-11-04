@@ -158,10 +158,19 @@ export class PipelineStore {
     if (!state) return null;
 
     if (type === "pipeline_agents") {
-      const map = event.agent_map || {};
-      for (const [stage, agentId] of Object.entries(map)) {
-        const node = state.stages.get(stage);
-        if (node) node.agentId = agentId;
+      // 惰性创建后为增量语义：每个 stage 创建时单独广播一条事件。
+      // 支持两种形式：
+      //   1) 增量形式（新）：event 含 stage + agent_id，单独回填该 stage；
+      //   2) 兼容旧形式：event 含 agent_map，遍历回填。
+      if (event.stage && event.agent_id) {
+        const node = state.stages.get(event.stage);
+        if (node) node.agentId = event.agent_id;
+      } else {
+        const map = event.agent_map || {};
+        for (const [stage, agentId] of Object.entries(map)) {
+          const node = state.stages.get(stage);
+          if (node) node.agentId = agentId;
+        }
       }
       this._persist();
       return state;

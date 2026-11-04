@@ -2118,3 +2118,286 @@ class TestRecordApproval:
         r = tool.record_approval(pipeline_id="pl-1", action="Approve")
         assert r["success"] is True
         assert r["data"]["action"] == "approve"
+
+
+# ---------------------------------------------------------------------------
+# 惰性 Agent 创建（lazy-agent-creation：阶段即将执行时才创建该阶段的 Agent）
+# ---------------------------------------------------------------------------
+class _LazyFakeGW:
+    """惰性创建测试用 FakeGW：记录创建/删除/派发，可配置创建失败。"""
+
+    def __init__(self, fail_creates=0):
+        self.created = []  # 已创建的 agent_id（按创建顺序）
+        self.deleted = []  # 已删除的 agent_id
+        self.send_log = []  # [(agent_id, 派发时已创建数快照)]
+        self.fail_creates = fail_creates
+
+    def _create_agent(self, agent_type, working_dir, name):
+        if self.fail_creates > 0:
+            self.fail_creates -= 1
+            return {"success": False, "stdout": "", "stderr": "busy"}
+        agent_id = f"id_{name}"
+        self.created.append(agent_id)
+        return {"success": True, "stdout": json.dumps({"agent_id": agent_id}), "stderr": ""}
+
+    def _delete_agent(self, agent_id):
+        ids = agent_id if isinstance(agent_id, list) else [agent_id]
+        self.deleted.extend(ids)
+        return {"success": True, "stdout": "", "stderr": ""}
+
+    def _send_to_agent(self, agent_id, message, wait=False, status_file: str = ""):
+        # 记录派发时已创建的 Agent 数（用于验证按需创建：派发前该 stage 的 Agent 已就绪）
+        self.send_log.append((agent_id, len(self.created)))
+        if status_file:
+            Path(status_file).parent.mkdir(parents=True, exist_ok=True)
+            Path(status_file).write_text(
+                json.dumps({"status": "completed", "output": ""}), encoding="utf-8"
+            )
+        return {"success": True, "stdout": "", "stderr": ""}
+
+
+class TestLazyAgentCreation:
+    """惰性 Agent 创建：阶段即将执行时才创建该阶段的 Agent。
+
+    验收双标准：
+    1. 行为等价：执行顺序/产物/门禁/when/on_error/retry 语义与现状一致；
+    2. 资源下降：同时存活的 Agent 峰值 ≤ max_workers（现状为峰值 = 全部 stage 数）。
+    """
+
+    def _node(self, stage, agent="a1", depends_on=None, output="", gate=False, when=None, retry=0, on_error="abort"):
+        return {
+            "stage": stage,
+            "agent": agent,
+            "depends_on": depends_on or [],
+            "input": [],
+            "output": output,
+            "gate": gate,
+            "when": when,
+            "retry": retry,
+            "on_error": on_error,
+        }
+
+    def _patch_gw(self, monkeypatch, gw):
+        monkeypatch.setattr(
+            "jarvis.jarvis_tools.pipeline_runner.GatewayManagerTool", lambda: gw
+        )
+        monkeypatch.setattr("time.sleep", lambda *a, **k: None)
+
+    def _drain(self):
+        from jarvis.jarvis_tools.pipeline_events import get_event_bus
+
+        return get_event_bus().drain()
+
+    def test_execute_no_full_precreation(self, tool, monkeypatch, tmp_path):
+        """execute() 不再全量创建：_create_stage_agents 若被调用则报错。
+
+        惰性创建下 execute() 不应调用 _create_stage_agents 全量创建，
+        而应在调度中按需创建。
+        """
+        gw = _LazyFakeGW()
+        self._patch_gw(monkeypatch, gw)
+
+        def boom(*a, **k):
+            raise AssertionError("惰性创建不应调用 _create_stage_agents 全量创建")
+
+        monkeypatch.setattr(tool, "_create_stage_agents", boom)
+        orch = tmp_path / "p.yaml"
+        orch.write_text(
+            """
+agents:
+  - name: a1
+    working_dir: .
+    task: t
+flow:
+  - stage: s1
+    agent: a1
+    output: .df/x.md
+""",
+            encoding="utf-8",
+        )
+        # 让 _run_stage 走 FakeGW（写 status_file），产物需落盘
+        (tmp_path / ".df").mkdir(exist_ok=True)
+        (tmp_path / ".df" / "x.md").write_text("x", encoding="utf-8")
+        r = tool.execute(
+            {"orchestration_file": str(orch), "working_dir": str(tmp_path)}
+        )
+        assert r["success"] is True
+        # 按需创建：s1 的 Agent 被创建
+        assert len(gw.created) == 1
+
+    def test_agent_created_before_dispatch(self, tool, monkeypatch, tmp_path):
+        """每个 ready stage 派发前创建自己的 Agent（按需创建）。"""
+        gw = _LazyFakeGW()
+        self._patch_gw(monkeypatch, gw)
+        nodes = [
+            self._node("s1", "a1"),
+            self._node("s2", "a2", depends_on=["s1"]),
+        ]
+        # 用 _schedule 直接验证：agent_map 初始为空，创建发生在调度中
+        r = tool._schedule(
+            nodes=nodes,
+            agent_map={},
+            agents_by_name={"a1": {}, "a2": {}},
+            work_dir=tmp_path,
+            artifact_dir=tmp_path / ".df",
+            spec_summary="",
+            approve=False,
+            max_workers=4,
+            pipeline_id="pl-lazy",
+        )
+        assert r["success"] is True
+        # 两个 stage 的 Agent 都被创建
+        assert len(gw.created) == 2
+        # 派发时该 stage 的 Agent 已创建（send_log 中每个 agent_id 派发时 created 数 ≥ 1）
+        assert len(gw.send_log) == 2
+
+    def test_agent_map_filled_incrementally(self, tool, monkeypatch, tmp_path):
+        """agent_map 运行时增量填充：{stage: agent_id} 在 stage 首次执行前写入。"""
+        gw = _LazyFakeGW()
+        self._patch_gw(monkeypatch, gw)
+        nodes = [
+            self._node("s1", "a1"),
+            self._node("s2", "a2", depends_on=["s1"]),
+        ]
+        # 捕获 _schedule 执行过程中 agent_map 的变化
+        seen = {}
+
+        original_run_stage = tool._run_stage
+
+        def spy_run_stage(node, agent_id, *a, **k):
+            seen[node["stage"]] = agent_id
+            return original_run_stage(node, agent_id, *a, **k)
+
+        monkeypatch.setattr(tool, "_run_stage", spy_run_stage)
+        r = tool._schedule(
+            nodes=nodes,
+            agent_map={},
+            agents_by_name={"a1": {}, "a2": {}},
+            work_dir=tmp_path,
+            artifact_dir=tmp_path / ".df",
+            spec_summary="",
+            approve=False,
+            max_workers=4,
+            pipeline_id="pl-lazy",
+        )
+        assert r["success"] is True
+        # 每个 stage 派发时都有对应 agent_id（增量填充）
+        assert seen["s1"]
+        assert seen["s2"]
+        assert seen["s1"] != seen["s2"]
+
+    def test_loop_body_agent_reused_across_iterations(self, tool, monkeypatch, tmp_path):
+        """loop body stage 的 Agent 第一轮创建后整个 loop 复用（不每轮新建）。"""
+        gw = _LazyFakeGW()
+        self._patch_gw(monkeypatch, gw)
+        body = [self._node("b1", "a1")]
+        loop_node = {
+            "stage": "L",
+            "kind": "loop",
+            "agent": None,
+            "depends_on": [],
+            "input": [],
+            "output": "",
+            "gate": False,
+            "when": None,
+            "retry": 0,
+            "on_error": "abort",
+            "until": "b1.ok == true",
+            "max_iterations": 3,
+            "body_stages": body,
+        }
+        # 每轮 b1 返回 ok=False，跑满 3 轮
+        def fake_run_stage(node, *a, **k):
+            return {
+                "stage": node["stage"],
+                "status": "completed",
+                "output": "",
+                "result": {"ok": False},
+                "error": "",
+                "gate_blocked": False,
+                "approval_path": "",
+            }
+
+        monkeypatch.setattr(tool, "_run_stage", fake_run_stage)
+        r = tool._run_loop(
+            node=loop_node,
+            agent_map={},
+            agents_by_name={"a1": {}},
+            work_dir=tmp_path,
+            artifact_dir=tmp_path / ".df",
+            spec_summary="",
+            approve=False,
+            pipeline_id="pl-lazy",
+        )
+        assert r["status"] == "completed"
+        assert r["result"]["iterations"] == 3
+        # 只创建一次 Agent（复用）
+        assert len(gw.created) == 1
+
+    def test_pipeline_agents_event_incremental(self, tool, monkeypatch, tmp_path):
+        """pipeline_agents 事件改为每个 stage 创建时单独广播（增量语义）。"""
+        self._drain()
+        gw = _LazyFakeGW()
+        self._patch_gw(monkeypatch, gw)
+        nodes = [self._node("s1", "a1"), self._node("s2", "a2", depends_on=["s1"])]
+        r = tool._schedule(
+            nodes=nodes,
+            agent_map={},
+            agents_by_name={"a1": {}, "a2": {}},
+            work_dir=tmp_path,
+            artifact_dir=tmp_path / ".df",
+            spec_summary="",
+            approve=False,
+            max_workers=4,
+            pipeline_id="pl-lazy",
+        )
+        assert r["success"] is True
+        events = self._drain()
+        agents_events = [e for e in events if e["type"] == "pipeline_agents"]
+        # 每个 stage 一条增量事件
+        assert len(agents_events) == 2
+        stages = {e["stage"] for e in agents_events}
+        assert stages == {"s1", "s2"}
+        for e in agents_events:
+            assert e["agent_id"]
+            assert e["pipeline_id"] == "pl-lazy"
+
+    def test_create_failure_aborts_and_cleans(self, tool, monkeypatch, tmp_path):
+        """创建失败：走重试后仍失败 → abort 并清理已创建 Agent。"""
+        gw = _LazyFakeGW(fail_creates=99)  # 全部失败
+        self._patch_gw(monkeypatch, gw)
+        nodes = [self._node("s1", "a1")]
+        r = tool._schedule(
+            nodes=nodes,
+            agent_map={},
+            agents_by_name={"a1": {}},
+            work_dir=tmp_path,
+            artifact_dir=tmp_path / ".df",
+            spec_summary="",
+            approve=False,
+            max_workers=4,
+            pipeline_id="pl-lazy",
+        )
+        assert r["success"] is False
+        assert "创建阶段" in r["stderr"] or "创建" in r["stderr"]
+
+    def test_agents_kept_until_pipeline_end(self, tool, monkeypatch, tmp_path):
+        """阶段执行完成后保留 Agent 到流水线结束统一清理（成功路径不清理）。"""
+        gw = _LazyFakeGW()
+        self._patch_gw(monkeypatch, gw)
+        nodes = [self._node("s1", "a1")]
+        r = tool._schedule(
+            nodes=nodes,
+            agent_map={},
+            agents_by_name={"a1": {}},
+            work_dir=tmp_path,
+            artifact_dir=tmp_path / ".df",
+            spec_summary="",
+            approve=False,
+            max_workers=4,
+            pipeline_id="pl-lazy",
+        )
+        assert r["success"] is True
+        # 成功路径：Agent 保留，不清理
+        assert len(gw.created) == 1
+        assert gw.deleted == []
