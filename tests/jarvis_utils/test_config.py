@@ -803,6 +803,31 @@ tool_load_dirs:
         # 软链接安装不写 .source（避免跟随链接污染源码目录）
         assert not (target_dir / ".source").exists()
 
+    def test_install_from_git_repo_default_branch_master(self, tmp_path, monkeypatch):
+        """本地 git 仓库默认分支为 master（无 remote）时安装成功。
+
+        回归：未显式指定分支时不应硬编码 main，否则默认分支非 main 的
+        本地仓库会报 "Remote branch main not found in upstream origin"。
+        """
+        from jarvis.jarvis_agent.utils import install_plugin, _read_plugin_branch
+
+        config_content = """name: master-branch-plugin
+version: 1.0.0
+"""
+        repo = _make_git_repo(tmp_path / "master_plugin", config_content, branch="master")
+
+        test_data_dir = tmp_path / ".jarvis"
+        monkeypatch.setenv("JARVIS_DATA_DIR", str(test_data_dir))
+
+        result = install_plugin(str(repo))
+        assert result is True
+        target_dir = test_data_dir / "plugins" / "master-branch-plugin"
+        assert target_dir.exists()
+        assert (target_dir / "config.yaml").exists()
+        # 保留 .git 元数据，且记录的实际分支为 master（而非硬编码 main）
+        assert (target_dir / ".git").exists()
+        assert _read_plugin_branch(target_dir) == "master"
+
     def test_install_reject_http_non_git_url(self, tmp_path, monkeypatch):
         """http(s) 链接仅支持 git 仓库，非 git 的 http 下载链接被拒绝（Issue #213）"""
         from jarvis.jarvis_agent.utils import install_plugin

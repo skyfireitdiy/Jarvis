@@ -1109,15 +1109,17 @@ def _parse_git_source(source: str) -> "tuple[str, str]":
     """解析 git 安装来源，返回 (仓库 URL, 分支名)。
 
     支持 `url#branch` 形式指定分支（与依赖声明 url+branch/tag 一致）；
-    未指定分支时默认 "main"。
+    未指定分支时返回空分支名，由 git clone 使用仓库默认分支
+    （如 main / master），避免硬编码 main 导致默认分支非 main 的
+    本地仓库（无 remote）安装失败。
     """
     source = (source or "").strip()
     if not source:
         return "", ""
     if "#" in source:
         url, _, branch = source.partition("#")
-        return url.strip().rstrip("/"), (branch or "main").strip()
-    return source.rstrip("/"), "main"
+        return url.strip().rstrip("/"), (branch or "").strip()
+    return source.rstrip("/"), ""
 
 
 def _git_clone_plugin(url: str, branch: str, dest: "pathlib.Path") -> None:
@@ -1156,13 +1158,35 @@ def _read_plugin_source(plugin_dir) -> "Optional[str]":
 
 
 def _read_plugin_branch(plugin_dir) -> str:
-    """读取插件目录记录的安装分支（.git-branch 文件），默认 "main"。"""
+    """读取插件目录记录的安装分支（.git-branch 文件），默认 "main"。
+
+    优先读 .git-branch 文件（显式指定分支安装时写入）；
+    否则从 .git 实际检出分支读取（兼容默认分支非 main 的仓库，
+    如无 remote 的本地仓库默认分支为 master）；
+    两者都不可得时回退 "main"。
+    """
     from pathlib import Path
 
     branch_file = Path(plugin_dir) / ".git-branch"
     try:
         if branch_file.exists():
             branch = branch_file.read_text(encoding="utf-8").strip()
+            if branch:
+                return branch
+    except Exception:
+        pass
+    try:
+        import subprocess
+
+        proc = subprocess.run(
+            ["git", "branch", "--show-current"],
+            cwd=str(plugin_dir),
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        if proc.returncode == 0:
+            branch = proc.stdout.strip()
             if branch:
                 return branch
     except Exception:
@@ -1304,11 +1328,17 @@ def _run_plugin_hook_commands(
 
 
 def _write_plugin_source(plugin_dir, url: str, branch: str) -> None:
-    """记录 git 来源元数据（.source + .git-branch）。"""
+    """记录 git 来源元数据（.source + .git-branch）。
+
+    branch 为空（未显式指定分支，由 git 使用仓库默认分支）时，
+    从克隆产物读取实际检出分支写入，保证元数据始终准确。
+    """
     from pathlib import Path
 
     try:
         (Path(plugin_dir) / ".source").write_text(url, encoding="utf-8")
+        if not branch:
+            branch = _read_plugin_branch(plugin_dir)
         (Path(plugin_dir) / ".git-branch").write_text(branch, encoding="utf-8")
     except Exception as e:
         from jarvis.jarvis_utils.exception_utils import save_exception
@@ -1327,7 +1357,8 @@ def install_plugin(
     参数:
         source_path: 插件来源，支持三种类型：
             - git 仓库地址（https://github.com/owner/repo、git@host:owner/repo.git、
-              file://...、本地目录含 .git），可用 `url#branch` 指定分支（默认 main）。
+              file://...、本地目录含 .git），可用 `url#branch` 指定分支
+              （未指定时使用仓库默认分支，如 main / master）。
               安装后保留 .git 元数据，支持自动检测更新 / 升级。
             - 本地目录（不含 .git）：建立软链接，本地代码更新后立即生效，不支持更新检测。
             - 压缩文件（.zip/.tar/.tar.gz/.tgz）：解压安装，不支持更新检测。
