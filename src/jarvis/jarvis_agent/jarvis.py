@@ -1714,7 +1714,7 @@ def run_cli(
                 )
                 if not should_skip:
                     output_content = agent.run(processed_input)
-                # agent.run() 会抛出 typer.Exit，所以正常不会到达这里
+                # run() 正常返回总结字符串；异常时由上层 except 捕获
                 exit_code = 0
                 error_message = ""
             else:
@@ -1746,7 +1746,7 @@ def run_cli(
                         )
                         if not should_skip:
                             output_content = agent.run(processed_input)
-                        # agent.run() 会抛出 typer.Exit，所以正常不会到达这里
+                        # run() 正常返回总结字符串；异常时由上层 except 捕获
 
                 # 获取用户输入，循环直到需要传递给 agent
                 while True:
