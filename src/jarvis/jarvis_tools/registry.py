@@ -47,6 +47,10 @@ _BUILTIN_TOOLS_CACHE: Optional[Dict[str, Tool]] = None
 # 因此注册时统一把非法字符替换为 '_'。
 _TOOL_NAME_INVALID_CHARS = re.compile(r"[^a-zA-Z0-9_-]")
 
+# secret-guard 占位符格式：⟦SECRET_<6位小写hex>⟧
+# 与 builtin/plugins/secret-guard/callbacks/*.py 保持一致。
+_PLACEHOLDER_RE = re.compile(r"⟦SECRET_[0-9a-f]{6}⟧")
+
 
 def sanitize_tool_name(name: str) -> str:
     """将工具名规范化为平台允许的字符集（^[a-zA-Z0-9_-]+$）。
@@ -1984,6 +1988,49 @@ class ToolRegistry(OutputHandlerProtocol):
             if tool.name not in self._builtin_tool_names
         ]
 
+    @staticmethod
+    def _restore_tool_arguments(
+        arguments: Any, agent: Optional[Any] = None
+    ) -> Any:
+        """把工具参数中的 secret-guard 占位符还原为真实敏感值。
+
+        与 ``after_model_call_cb._restore_text`` 语义一致：占位符
+        ``⟦SECRET_<hex>⟧`` 按 ``agent.secret_guard_mapping`` 查表还原；
+        不在映射中的占位符原样保留（可能是模型幻觉生成，无法安全还原）。
+
+        递归遍历 dict/list，字符串值就地还原；非字符串值原样返回。
+        无映射或未启用 secret-guard 时原样返回，零开销。
+        """
+        mapping = getattr(agent, "secret_guard_mapping", None)
+        if not isinstance(mapping, dict) or not mapping:
+            return arguments
+
+        def _restore_text(text: str) -> str:
+            if not text:
+                return text
+
+            def _repl(match: "re.Match[str]") -> str:
+                placeholder = match.group(0)
+                if placeholder in mapping:
+                    return mapping[placeholder]
+                return placeholder
+
+            return _PLACEHOLDER_RE.sub(_repl, text)
+
+        if isinstance(arguments, str):
+            return _restore_text(arguments)
+        if isinstance(arguments, dict):
+            return {
+                key: ToolRegistry._restore_tool_arguments(value, agent)
+                for key, value in arguments.items()
+            }
+        if isinstance(arguments, list):
+            return [
+                ToolRegistry._restore_tool_arguments(item, agent)
+                for item in arguments
+            ]
+        return arguments
+
     def execute_tool(
         self, name: str, arguments: Dict[str, Any], agent: Optional[Any] = None
     ) -> Dict[str, Any]:
@@ -1997,6 +2044,11 @@ class ToolRegistry(OutputHandlerProtocol):
         返回:
             Dict[str, Any]: 包含执行结果的字典，包含success、stdout和stderr字段
         """
+        # secret-guard 对称还原：模型在 tool_call 参数中可能写入占位符
+        # ⟦SECRET_<hex>⟧（发送前脱敏的产物），执行前还原为真实敏感值，
+        # 与执行后 _sanitize_tool_output 的二次脱敏形成对称。
+        # 真实值仅短暂存在于工具调用栈内，不写入会话历史。
+        arguments = self._restore_tool_arguments(arguments, agent)
         tool = self._all_tools.get(name)
         if tool is None:
             return {
