@@ -44,6 +44,10 @@ _ANSI_ESCAPE = re.compile(
 _OSC_PAYLOAD_ORPHAN = re.compile(
     r"^\s*0;(?:\d+/\d+;?)?(?:[^\n\r]*\.(?:EXE|exe|ps1|bat|cmd|py)\s*)?\s*"
 )
+# 中断时补发的 tool_stream_end 的 reason 取值（仅用于后端日志/排查，前端不据此改样式）
+INTERRUPT_REASON = "interrupted"
+# 进程被 SIGINT 终止时的退出码（Unix 上 Popen.returncode 为 -2）
+SIGINT_EXIT_CODE = -2
 
 
 class ExecutionStreamPublisher(ABC):
@@ -355,6 +359,24 @@ class ScriptTool:
                 sequence += 1
                 return sequence
 
+        end_sent = threading.Event()
+
+        def publish_stream_end(exit_code: int, reason: str) -> None:
+            """发送 tool_stream_end，保证同一 execution 只发送一次（幂等）。"""
+            if end_sent.is_set():
+                return
+            end_sent.set()
+            self._publish_execution_event(
+                stream_publisher,
+                message_type="tool_stream_end",
+                session_id=session_id,
+                execution_id=execution_id,
+                stream="stdout",
+                sequence=next_sequence(),
+                exit_code=exit_code,
+                reason=reason,
+            )
+
         def publish_input_chunk(chunk: str) -> None:
             if not chunk:
                 return
@@ -531,6 +553,43 @@ class ScriptTool:
                 reader_t.join()
             else:
                 reader_t.join(timeout=timeout)
+            if get_interrupt() > 0:
+                # 用户中断：reader 线程已因中断退出，终止进程并补发完成消息
+                for method_name in ("terminate", "kill"):
+                    terminate_method = getattr(proc, method_name, None)
+                    if callable(terminate_method):
+                        try:
+                            terminate_method()
+                            break
+                        except Exception as e:
+                            save_exception(
+                                e,
+                                module="jarvis_tools.execute_script",
+                                function="stdin_forward",
+                            )
+                            pass
+                try:
+                    getattr(proc, "wait", lambda: None)()
+                except Exception as e:
+                    save_exception(
+                        e,
+                        module="jarvis_tools.execute_script",
+                        function="stdin_forward",
+                    )
+                    pass
+                read_done.wait(timeout=2)
+                set_interrupt(False)
+                publish_stream_end(
+                    getattr(proc, "exitstatus", None)
+                    or getattr(proc, "returncode", None)
+                    or SIGINT_EXIT_CODE,
+                    INTERRUPT_REASON,
+                )
+                return {
+                    "success": False,
+                    "stdout": "".join(captured),
+                    "stderr": "执行被用户中断。",
+                }
             if timeout is not None and reader_t.is_alive():
                 for method_name in ("terminate", "kill"):
                     terminate_method = getattr(proc, method_name, None)
@@ -555,17 +614,11 @@ class ScriptTool:
                     )
                     pass
                 read_done.wait(timeout=2)
-                self._publish_execution_event(
-                    stream_publisher,
-                    message_type="tool_stream_end",
-                    session_id=session_id,
-                    execution_id=execution_id,
-                    stream="stdout",
-                    sequence=next_sequence(),
-                    exit_code=getattr(proc, "exitstatus", None)
+                publish_stream_end(
+                    getattr(proc, "exitstatus", None)
                     or getattr(proc, "returncode", None)
                     or -1,
-                    reason="timeout",
+                    "timeout",
                 )
                 return {
                     "success": False,
@@ -586,17 +639,11 @@ class ScriptTool:
                             function="stdin_forward",
                         )
                         pass
-            self._publish_execution_event(
-                stream_publisher,
-                message_type="tool_stream_end",
-                session_id=session_id,
-                execution_id=execution_id,
-                stream="stdout",
-                sequence=next_sequence(),
-                exit_code=getattr(proc, "exitstatus", None)
+            publish_stream_end(
+                getattr(proc, "exitstatus", None)
                 or getattr(proc, "returncode", None)
                 or -1,
-                reason="error",
+                "error",
             )
             return {
                 "success": False,
@@ -610,31 +657,13 @@ class ScriptTool:
         read_done.wait(timeout=2)
         output = "".join(captured).strip()
         if exc_holder:
-            self._publish_execution_event(
-                stream_publisher,
-                message_type="tool_stream_end",
-                session_id=session_id,
-                execution_id=execution_id,
-                stream="stdout",
-                sequence=next_sequence(),
-                exit_code=exit_code,
-                reason="error",
-            )
+            publish_stream_end(exit_code, "error")
             return {
                 "success": False,
                 "stdout": output,
                 "stderr": str(exc_holder[0]),
             }
-        self._publish_execution_event(
-            stream_publisher,
-            message_type="tool_stream_end",
-            session_id=session_id,
-            execution_id=execution_id,
-            stream="stdout",
-            sequence=next_sequence(),
-            exit_code=exit_code,
-            reason="completed" if exit_code == 0 else "error",
-        )
+        publish_stream_end(exit_code, "completed" if exit_code == 0 else "error")
         return {
             "success": exit_code == 0,
             "stdout": output,
@@ -671,6 +700,24 @@ class ScriptTool:
             with sequence_lock:
                 sequence += 1
                 return sequence
+
+        end_sent = threading.Event()
+
+        def publish_stream_end(exit_code: int, reason: str) -> None:
+            """发送 tool_stream_end，保证同一 execution 只发送一次（幂等）。"""
+            if end_sent.is_set():
+                return
+            end_sent.set()
+            self._publish_execution_event(
+                stream_publisher,
+                message_type="tool_stream_end",
+                session_id=session_id,
+                execution_id=execution_id,
+                stream="tty",
+                sequence=next_sequence(),
+                exit_code=exit_code,
+                reason=reason,
+            )
 
         master_fd, slave_fd = pty.openpty()
         old_stdin_attrs = None
@@ -903,6 +950,13 @@ class ScriptTool:
                             proc.wait()
                         clear_script_pid()
                         set_interrupt(False)
+                        # 补发完成消息，让前端关闭 xterm（与正常结束一致）
+                        publish_stream_end(
+                            proc.returncode
+                            if proc.returncode is not None
+                            else SIGINT_EXIT_CODE,
+                            INTERRUPT_REASON,
+                        )
                         return {
                             "success": False,
                             "stdout": "",
@@ -925,6 +979,13 @@ class ScriptTool:
                             proc.wait()
                         clear_script_pid()
                         set_interrupt(False)
+                        # 补发完成消息，让前端关闭 xterm（与正常结束一致）
+                        publish_stream_end(
+                            proc.returncode
+                            if proc.returncode is not None
+                            else SIGINT_EXIT_CODE,
+                            INTERRUPT_REASON,
+                        )
                         return {
                             "success": False,
                             "stdout": "",
@@ -993,48 +1054,21 @@ class ScriptTool:
         exit_code = proc.returncode if proc.returncode is not None else -1
         clear_script_pid()
         if timed_out:
-            self._publish_execution_event(
-                stream_publisher,
-                message_type="tool_stream_end",
-                session_id=session_id,
-                execution_id=execution_id,
-                stream="tty",
-                sequence=next_sequence(),
-                exit_code=exit_code,
-                reason="timeout",
-            )
+            publish_stream_end(exit_code, "timeout")
             return {
                 "success": False,
                 "stdout": output,
                 "stderr": f"执行超时（超过{timeout}秒），进程已被终止。",
             }
         if exc_holder:
-            self._publish_execution_event(
-                stream_publisher,
-                message_type="tool_stream_end",
-                session_id=session_id,
-                execution_id=execution_id,
-                stream="tty",
-                sequence=next_sequence(),
-                exit_code=exit_code,
-                reason="error",
-            )
+            publish_stream_end(exit_code, "error")
             return {
                 "success": False,
                 "stdout": output,
                 "stderr": str(exc_holder[0]),
             }
 
-        self._publish_execution_event(
-            stream_publisher,
-            message_type="tool_stream_end",
-            session_id=session_id,
-            execution_id=execution_id,
-            stream="tty",
-            sequence=next_sequence(),
-            exit_code=exit_code,
-            reason="completed" if exit_code == 0 else "error",
-        )
+        publish_stream_end(exit_code, "completed" if exit_code == 0 else "error")
         return {
             "success": exit_code == 0,
             "stdout": output,
