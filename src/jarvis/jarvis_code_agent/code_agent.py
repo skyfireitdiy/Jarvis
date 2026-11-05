@@ -7,6 +7,7 @@ import hashlib
 import logging
 import os
 from datetime import datetime
+from pathlib import Path
 
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -1040,6 +1041,11 @@ def cli(
     task_file: Optional[str] = typer.Option(
         None, "--task-file", help="从文件读取任务描述"
     ),
+    status_file: Optional[str] = typer.Option(
+        None,
+        "--status-file",
+        help="指定状态文件路径（任务完成后写入 status/output/error 三个文件）",
+    ),
     append_tools: Optional[str] = typer.Option(
         None, "--append-tools", help="要追加的工具列表，用逗号分隔"
     ),
@@ -1154,7 +1160,8 @@ def cli(
         raise typer.Exit(code=1)
 
     # 用于tmux并行任务的状态文件路径
-    status_file_path = None
+    # 优先使用 --status-file CLI 参数；未指定时回退到 task-file JSON 中的 status_file 字段
+    status_file_path = Path(status_file) if status_file else None
     web_gateway_server = None
 
     if task_file:
@@ -1168,10 +1175,11 @@ def cli(
             # 尝试解析为JSON以获取status_file字段
             try:
                 task_data = json.loads(file_content)
-                status_file_path = task_data.get("status_file")
-                if status_file_path:
-                    # 将status_file_path转换为Path对象
-                    status_file_path = Path(status_file_path)
+                if not status_file_path:
+                    status_file_path = task_data.get("status_file")
+                    if status_file_path:
+                        # 将status_file_path转换为Path对象
+                        status_file_path = Path(status_file_path)
                 # 提取实际任务内容
                 if "task_desc" in task_data:
                     task = task_data["task_desc"]
