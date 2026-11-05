@@ -6,6 +6,7 @@
 import hashlib
 import logging
 import os
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -1046,6 +1047,11 @@ def cli(
         "--status-file",
         help="指定状态文件路径（任务完成后写入 status/output/error 三个文件）",
     ),
+    stage: Optional[str] = typer.Option(
+        None,
+        "--stage",
+        help="阶段标识（写入 status 文件的 stage 字段，多阶段流水线中区分）",
+    ),
     append_tools: Optional[str] = typer.Option(
         None, "--append-tools", help="要追加的工具列表，用逗号分隔"
     ),
@@ -1635,6 +1641,9 @@ def cli(
         output_content: Optional[str] = ""
         import json
 
+        # 记录任务开始时间，用于 status 文件的 duration_sec 字段
+        task_start_time = time.time()
+
         try:
             exit_code = 0
             error_message = ""
@@ -1777,18 +1786,12 @@ def cli(
                 from pathlib import Path
 
                 try:
-                    # 写入状态文件
-                    status_data = {
-                        "status": "completed" if exit_code == 0 else "failed",
-                        "exit_code": exit_code,
-                    }
-                    status_file_path.write_text(
-                        json.dumps(status_data, ensure_ascii=False), encoding="utf-8"
-                    )
+                    # 计算输出/错误文件路径（先于 status 文件写入，供 status 内容引用）
+                    output_file = status_file_path.with_suffix(".output")
+                    error_file = status_file_path.with_suffix(".error")
+                    error_file_written = False
 
                     # 写入输出文件（如果存在）
-                    output_file = status_file_path.with_suffix(".output")
-
                     # 将捕获的输出内容写入文件
                     def _convert_to_string(content: Any) -> str:
                         if content is None:
@@ -1813,9 +1816,9 @@ def cli(
 
                     # 写入错误文件
                     if exit_code != 0 and error_message:
-                        error_file = status_file_path.with_suffix(".error")
                         try:
                             error_file.write_text(error_message, encoding="utf-8")
+                            error_file_written = True
                         except Exception as e:
                             save_exception(
                                 e,
@@ -1823,6 +1826,23 @@ def cli(
                                 function="_convert_to_string",
                             )
                             pass
+
+                    # 写入状态文件（只增不改，保持向后兼容）
+                    status_data = {
+                        "status": "completed" if exit_code == 0 else "failed",
+                        "exit_code": exit_code,
+                        "output_file": str(output_file),
+                        "duration_sec": round(time.time() - task_start_time, 2),
+                    }
+                    if error_file_written:
+                        status_data["error_file"] = str(error_file)
+                    if stage:
+                        status_data["stage"] = stage
+                    status_file_path.write_text(
+                        json.dumps(status_data, ensure_ascii=False), encoding="utf-8"
+                    )
+
+                    PrettyOutput.auto_print(f"✅ 已写入状态文件: {status_file_path}")
                 except Exception as status_err:
                     PrettyOutput.auto_print(f"⚠️ 写入状态文件失败: {str(status_err)}")
 

@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from enum import Enum
 import threading
 from datetime import datetime
@@ -825,6 +826,11 @@ def run_cli(
         None,
         "--status-file",
         help="指定状态文件路径（任务完成后写入 status/output/error 三个文件）",
+    ),
+    stage: Optional[str] = typer.Option(
+        None,
+        "--stage",
+        help="阶段标识（写入 status 文件的 stage 字段，多阶段流水线中区分）",
     ),
     llm_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
@@ -1696,6 +1702,9 @@ def run_cli(
             quick_mode=quick_mode,
         )
 
+        # 记录任务开始时间，用于 status 文件的 duration_sec 字段
+        task_start_time = time.time()
+
         # 默认 CLI 模式：运行任务（可能来自 --task 或交互输入）
         output_content = ""
         exit_code = 0
@@ -1820,17 +1829,12 @@ def run_cli(
             # 如果是tmux并行任务，写入状态文件
             if status_file_path:
                 try:
-                    # 写入状态文件
-                    status_data = {
-                        "status": "completed" if exit_code == 0 else "failed",
-                        "exit_code": exit_code,
-                    }
-                    status_file_path.write_text(
-                        json.dumps(status_data, ensure_ascii=False), encoding="utf-8"
-                    )
+                    # 计算输出/错误文件路径（先于 status 文件写入，供 status 内容引用）
+                    output_file = status_file_path.with_suffix(".output")
+                    error_file = status_file_path.with_suffix(".error")
+                    error_file_written = False
 
                     # 写入输出文件（如果存在）
-                    output_file = status_file_path.with_suffix(".output")
                     # 将捕获的输出内容写入文件
                     try:
                         # 确保输出内容为字符串
@@ -1856,8 +1860,29 @@ def run_cli(
 
                     # 写入错误文件
                     if exit_code != 0 and error_message:
-                        error_file = status_file_path.with_suffix(".error")
-                        error_file.write_text(error_message, encoding="utf-8")
+                        try:
+                            error_file.write_text(error_message, encoding="utf-8")
+                            error_file_written = True
+                        except Exception as error_err:
+                            PrettyOutput.auto_print(
+                                f"⚠️ 写入错误文件失败: {str(error_err)}"
+                            )
+                            pass
+
+                    # 写入状态文件（只增不改，保持向后兼容）
+                    status_data = {
+                        "status": "completed" if exit_code == 0 else "failed",
+                        "exit_code": exit_code,
+                        "output_file": str(output_file),
+                        "duration_sec": round(time.time() - task_start_time, 2),
+                    }
+                    if error_file_written:
+                        status_data["error_file"] = str(error_file)
+                    if stage:
+                        status_data["stage"] = stage
+                    status_file_path.write_text(
+                        json.dumps(status_data, ensure_ascii=False), encoding="utf-8"
+                    )
 
                     PrettyOutput.auto_print(f"✅ 已写入状态文件: {status_file_path}")
                 except Exception as status_err:
