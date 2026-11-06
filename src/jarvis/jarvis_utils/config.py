@@ -1157,6 +1157,34 @@ def get_builtin_input_handler_dirs() -> List[str]:
     ]
 
 
+def get_input_source_dirs() -> List[str]:
+    """
+    获取输入源扩展脚本目录（input_sources 扩展点）。
+
+    返回:
+        List[str]: 输入源扩展脚本目录列表
+    """
+    return [
+        os.path.expanduser(os.path.expandvars(str(p)))
+        for p in GLOBAL_CONFIG_DATA.get("input_sources", [])
+        if p
+    ]
+
+
+def get_output_source_dirs() -> List[str]:
+    """
+    获取输出源扩展脚本目录（output_sources 扩展点）。
+
+    返回:
+        List[str]: 输出源扩展脚本目录列表
+    """
+    return [
+        os.path.expanduser(os.path.expandvars(str(p)))
+        for p in GLOBAL_CONFIG_DATA.get("output_sources", [])
+        if p
+    ]
+
+
 def get_before_tool_call_cb_dirs() -> List[str]:
     """
     获取工具调用前回调函数实现目录。
@@ -1333,6 +1361,8 @@ def get_plugin_hook_dirs(plugin_name: str) -> Dict[str, Any]:
         "tool_load_dirs",
         "roles_dirs",
         "agent_definition_dirs",
+        "input_sources",
+        "output_sources",
     )
     for field in dir_fields:
         value = config.get(field)

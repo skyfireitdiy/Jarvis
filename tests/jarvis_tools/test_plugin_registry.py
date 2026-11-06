@@ -93,6 +93,8 @@ class TestPluginRegistry:
             "agent_types": 0,
             "gateway_routes": 0,
             "gateway_middleware": 0,
+            "input_sources": 0,
+            "output_sources": 0,
         }
         assert not pr.has_plugin("p1")
 
@@ -174,6 +176,8 @@ class TestPluginRegistry:
             "agent_types": 1,
             "gateway_routes": 2,
             "gateway_middleware": 0,
+            "input_sources": 0,
+            "output_sources": 0,
         }
         assert revoked["tools"] == ["p1"]
         assert revoked["rules"] == ["p1"]

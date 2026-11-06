@@ -625,6 +625,8 @@ class Agent:
         self._load_after_tool_callbacks()
         self._load_tool_output_sanitizers()
         self._load_all_event_callbacks()
+        # 输入源/输出源扩展点加载
+        self._load_io_sources()
 
         # 会话实时保存守护进程（仅主 Agent 启用；被意外 kill 时落盘最新快照）
         self._session_daemon = None
@@ -1181,6 +1183,30 @@ class Agent:
     def _load_all_event_callbacks(self) -> None:
         """加载所有事件回调（委托至 CallbackLoader）"""
         return self._callback_loader.load_all_event_callbacks()
+
+    def _load_io_sources(self) -> None:
+        """加载输入源/输出源扩展点（io_sources 模块）。
+
+        从全局配置读取 input_sources/output_sources 目录并加载回调：
+        - 输入源：加载后立即以 self 调用回调启动后台监听
+        - 输出源：登记回调，供 _complete_task 结束时异步广播
+        """
+        try:
+            from jarvis.jarvis_agent.io_sources import load_input_sources
+            from jarvis.jarvis_agent.io_sources import load_output_sources
+            from jarvis.jarvis_utils.config import get_input_source_dirs
+            from jarvis.jarvis_utils.config import get_output_source_dirs
+
+            input_dirs = get_input_source_dirs()
+            if input_dirs:
+                load_input_sources(input_dirs, "__global__", self)
+            output_dirs = get_output_source_dirs()
+            if output_dirs:
+                load_output_sources(output_dirs, "__global__", self)
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_agent.__init__", function="_load_io_sources"
+            )
 
     def save_session(self) -> bool:
         """Saves the current session state by delegating to the session manager."""
@@ -2069,6 +2095,16 @@ class Agent:
             need_summary=self.need_summary,
             result=result[:500],
         )
+
+        # 输出源扩展点：把最终文本回复异步广播给所有已注册输出源（不阻塞主流程）
+        try:
+            from jarvis.jarvis_agent.io_sources import broadcast_output_message
+
+            broadcast_output_message(self, result)
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_agent.__init__", function="_complete_task"
+            )
 
         return result
 

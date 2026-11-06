@@ -1496,6 +1496,8 @@ _PLUGIN_EXTENSION_FIELDS = frozenset(
         "message_types",
         "agent_types",
         "gateway",
+        "input_sources",
+        "output_sources",
         "ENV",
     }
 )
@@ -1553,6 +1555,8 @@ _PLUGIN_EXTENSION_FIELD_API_VERSION = {
     "message_types": "1.1",
     "agent_types": "1.1",
     "gateway": "1.1",
+    "input_sources": "1.1",
+    "output_sources": "1.1",
 }
 
 

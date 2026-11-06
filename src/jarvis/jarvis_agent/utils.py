@@ -2748,6 +2748,17 @@ def uninstall_plugin(plugin_id: str) -> bool:
 
         registry = PluginRegistry.instance()
         if registry.has_plugin(plugin_name):
+            # 输入源/输出源扩展点：先调用 stop() 钩子并撤销登记，再整体 revoke
+            try:
+                from jarvis.jarvis_agent.io_sources import stop_input_sources
+                from jarvis.jarvis_agent.io_sources import stop_output_sources
+
+                stop_input_sources(plugin_name)
+                stop_output_sources(plugin_name)
+            except Exception as e:
+                PrettyOutput.auto_print(
+                    f"⚠️ 停止插件 '{plugin_name}' 输入/输出源失败（继续卸载）: {e}"
+                )
             result = registry.revoke_plugin(plugin_name)
             if (
                 result.get("tools")
@@ -2758,6 +2769,8 @@ def uninstall_plugin(plugin_id: str) -> bool:
                 or result.get("audit_event_types")
                 or result.get("message_types")
                 or result.get("agent_types")
+                or result.get("input_sources")
+                or result.get("output_sources")
             ):
                 PrettyOutput.auto_print(
                     f"↩️  已撤销插件 '{plugin_name}' 注册的资源"
@@ -2767,7 +2780,9 @@ def uninstall_plugin(plugin_id: str) -> bool:
                     f"审计扩展 {result.get('audit_sinks', 0)} 个 sink、"
                     f"{result.get('audit_event_types', 0)} 个事件类型，"
                     f"消息类型 {result.get('message_types', 0)} 个，"
-                    f"Agent 类型 {result.get('agent_types', 0)} 个）"
+                    f"Agent 类型 {result.get('agent_types', 0)} 个，"
+                    f"输入源 {result.get('input_sources', 0)} 个，"
+                    f"输出源 {result.get('output_sources', 0)} 个）"
                 )
     except Exception as e:
         PrettyOutput.auto_print(f"⚠️ 撤销插件资源失败（继续卸载）: {str(e)}")

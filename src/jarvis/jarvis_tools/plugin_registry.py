@@ -45,6 +45,9 @@ class PluginRegistry:
         self._plugin_gateway_routes: Dict[str, Dict[str, Dict[str, str]]] = {}
         # 插件名 -> {中间件名 -> {"handler": str}}
         self._plugin_gateway_middleware: Dict[str, Dict[str, Dict[str, str]]] = {}
+        # 插件名 -> 输入源/输出源名集合（io_sources 扩展点）
+        self._plugin_input_sources: Dict[str, Set[str]] = {}
+        self._plugin_output_sources: Dict[str, Set[str]] = {}
         self._tool_revoker: Optional[Callable[[str], int]] = None
         self._rules_revoker: Optional[Callable[[str], int]] = None
         self._platform_revoker: Optional[Callable[[str], int]] = None
@@ -346,6 +349,30 @@ class PluginRegistry:
                 handler=str(entry.get("handler") or ""),
             )
 
+    def register_input_source(self, plugin_name: str, source_name: str) -> None:
+        """登记插件注册的单个输入源。"""
+        self._plugin_input_sources.setdefault(plugin_name, set()).add(source_name)
+
+    def register_input_sources(
+        self, plugin_name: str, source_names: List[str]
+    ) -> None:
+        """登记插件注册的一批输入源。"""
+        if not source_names:
+            return
+        self._plugin_input_sources.setdefault(plugin_name, set()).update(source_names)
+
+    def register_output_source(self, plugin_name: str, source_name: str) -> None:
+        """登记插件注册的单个输出源。"""
+        self._plugin_output_sources.setdefault(plugin_name, set()).add(source_name)
+
+    def register_output_sources(
+        self, plugin_name: str, source_names: List[str]
+    ) -> None:
+        """登记插件注册的一批输出源。"""
+        if not source_names:
+            return
+        self._plugin_output_sources.setdefault(plugin_name, set()).update(source_names)
+
     # ------------------------------------------------------------------
     # 查询
     # ------------------------------------------------------------------
@@ -425,6 +452,14 @@ class PluginRegistry:
             ).get("handler", "")
         )
 
+    def get_plugin_input_sources(self, plugin_name: str) -> List[str]:
+        """返回插件登记的输入源名列表。"""
+        return sorted(self._plugin_input_sources.get(plugin_name, set()))
+
+    def get_plugin_output_sources(self, plugin_name: str) -> List[str]:
+        """返回插件登记的输出源名列表。"""
+        return sorted(self._plugin_output_sources.get(plugin_name, set()))
+
     def registered_plugins(self) -> List[str]:
         """返回已登记资源的插件名列表。"""
         return sorted(
@@ -438,6 +473,8 @@ class PluginRegistry:
             | set(self._plugin_agent_types.keys())
             | set(self._plugin_gateway_routes.keys())
             | set(self._plugin_gateway_middleware.keys())
+            | set(self._plugin_input_sources.keys())
+            | set(self._plugin_output_sources.keys())
         )
 
     # ------------------------------------------------------------------
@@ -490,6 +527,8 @@ class PluginRegistry:
         gateway_middleware = list(
             self._plugin_gateway_middleware.pop(plugin_name, {}).keys()
         )
+        input_sources = list(self._plugin_input_sources.pop(plugin_name, set()))
+        output_sources = list(self._plugin_output_sources.pop(plugin_name, set()))
         return {
             "tools": tools,
             "rules": rules,
@@ -501,6 +540,8 @@ class PluginRegistry:
             "agent_types": agent_types,
             "gateway_routes": gateway_routes,
             "gateway_middleware": gateway_middleware,
+            "input_sources": input_sources,
+            "output_sources": output_sources,
         }
 
     def clear_tools(self, plugin_name: str) -> None:
@@ -543,6 +584,14 @@ class PluginRegistry:
         """仅清理指定插件的网关中间件登记（不影响其它登记）。"""
         self._plugin_gateway_middleware.pop(plugin_name, None)
 
+    def clear_input_sources(self, plugin_name: str) -> None:
+        """仅清理指定插件的输入源登记（不影响其它登记）。"""
+        self._plugin_input_sources.pop(plugin_name, None)
+
+    def clear_output_sources(self, plugin_name: str) -> None:
+        """仅清理指定插件的输出源登记（不影响其它登记）。"""
+        self._plugin_output_sources.pop(plugin_name, None)
+
     def revoke_plugin(self, plugin_name: str) -> Dict[str, int]:
         """撤销指定插件注册的全部资源并实际执行卸载。
 
@@ -571,6 +620,8 @@ class PluginRegistry:
         agent_types = self.get_plugin_agent_types(plugin_name)
         gateway_routes = self.get_plugin_gateway_routes(plugin_name)
         gateway_middleware = self.get_plugin_gateway_middleware(plugin_name)
+        input_sources = self.get_plugin_input_sources(plugin_name)
+        output_sources = self.get_plugin_output_sources(plugin_name)
         revoked_tools = 0
         revoked_rules = 0
         revoked_platforms = 0
@@ -634,6 +685,8 @@ class PluginRegistry:
             "agent_types": revoked_agent_types,
             "gateway_routes": revoked_gateway_routes,
             "gateway_middleware": revoked_gateway_middleware,
+            "input_sources": len(input_sources),
+            "output_sources": len(output_sources),
         }
 
     def has_plugin(self, plugin_name: str) -> bool:
@@ -649,6 +702,8 @@ class PluginRegistry:
             or plugin_name in self._plugin_agent_types
             or plugin_name in self._plugin_gateway_routes
             or plugin_name in self._plugin_gateway_middleware
+            or plugin_name in self._plugin_input_sources
+            or plugin_name in self._plugin_output_sources
         )
 
     def clear(self) -> None:
@@ -664,6 +719,8 @@ class PluginRegistry:
         self._plugin_agent_types.clear()
         self._plugin_gateway_routes.clear()
         self._plugin_gateway_middleware.clear()
+        self._plugin_input_sources.clear()
+        self._plugin_output_sources.clear()
         self._tool_revoker = None
         self._rules_revoker = None
         self._platform_revoker = None

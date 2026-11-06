@@ -704,6 +704,28 @@ def _do_load_plugin_manually(plugin_name: str, agent: Any) -> Tuple[bool, str]:
                 )
             loaded_parts.append("event_callbacks")
 
+    # 2.5) 输入源/输出源扩展点：精确加载插件目录
+    if hooks.get("input_sources"):
+        try:
+            from jarvis.jarvis_agent.io_sources import load_input_sources
+
+            load_input_sources(hooks["input_sources"], resolved_name, agent)
+            loaded_parts.append("input_sources")
+        except Exception as e:
+            PrettyOutput.auto_print(
+                f"⚠ 加载插件 {plugin_name} 输入源扩展失败: {e}"
+            )
+    if hooks.get("output_sources"):
+        try:
+            from jarvis.jarvis_agent.io_sources import load_output_sources
+
+            load_output_sources(hooks["output_sources"], resolved_name, agent)
+            loaded_parts.append("output_sources")
+        except Exception as e:
+            PrettyOutput.auto_print(
+                f"⚠ 加载插件 {plugin_name} 输出源扩展失败: {e}"
+            )
+
     # 3) 规则：把插件的规则目录追加到 rules_manager，供 '<rule:xxx>' 按名加载
     rules_dirs = hooks.get("rules_load_dirs")
     if rules_dirs:
