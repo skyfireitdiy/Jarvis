@@ -16,6 +16,7 @@ import os
 import re
 import subprocess
 import sys
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from jarvis.jarvis_utils.config import (
@@ -851,6 +852,212 @@ def is_file_in_git_repo(filepath: str) -> bool:
         return False
 
 
+# 前端目录相对 Jarvis 源码根目录的固定路径（见 NLSpec code-update-deps-reinstall）
+FRONTEND_DIR_RELATIVE = "src/jarvis/jarvis_service/frontend"
+
+
+def _detect_uv_install_method(src_dir: str) -> str:
+    """探测当前 Jarvis 的 uv 安装方式。
+
+    仅支持两种安装方式：
+    - ``uv_tool_install``：通过 ``uv tool install -e .`` 安装（工具型），
+      特征为 ``uv tool list`` 中存在 ``jarvis-ai-assistant`` 工具，
+      或解释器路径位于 ``~/.local/share/uv/tools/``（复用 is_uv_tool_installed_jarvis 的路径特征）。
+    - ``uv_pip_install``：通过 ``uv pip install -e .`` 安装（venv 型），
+      特征为 ``uv pip show jarvis-ai-assistant`` 成功。
+
+    其他安装方式（Docker、全局 pip、非 uv）返回 ``"skipped"``。
+
+    Args:
+        src_dir: Jarvis 源码根目录（仅用于执行探测命令的 cwd，不影响判定）。
+
+    Returns:
+        str: ``uv_tool_install`` / ``uv_pip_install`` / ``skipped``
+    """
+    # 1. 工具型：uv tool list 中存在 jarvis-ai-assistant
+    try:
+        result = subprocess.run(
+            ["uv", "tool", "list"],
+            cwd=src_dir,
+            capture_output=True,
+            text=False,
+            timeout=15,
+        )
+        if result.returncode == 0 and "jarvis-ai-assistant" in decode_output(
+            result.stdout
+        ):
+            return "uv_tool_install"
+    except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.SubprocessError):
+        pass
+
+    # 2. 工具型路径特征：解释器位于 ~/.local/share/uv/tools/（uv tool install 的安装目录）
+    try:
+        exec_path_str = str(Path(sys.executable).resolve()).lower()
+        if "uv/tools" in exec_path_str:
+            return "uv_tool_install"
+    except Exception:
+        pass
+
+    # 3. venv 型：uv pip show jarvis-ai-assistant 成功
+    try:
+        result = subprocess.run(
+            ["uv", "pip", "show", "jarvis-ai-assistant"],
+            cwd=src_dir,
+            capture_output=True,
+            text=False,
+            timeout=15,
+        )
+        if result.returncode == 0 and "jarvis-ai-assistant" in decode_output(
+            result.stdout
+        ):
+            return "uv_pip_install"
+    except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.SubprocessError):
+        pass
+
+    return "skipped"
+
+
+def _reinstall_uv_deps(src_dir: str, method: str) -> Dict[str, Any]:
+    """按探测到的安装方式重装 uv 依赖。
+
+    Args:
+        src_dir: Jarvis 源码根目录。
+        method: ``uv_tool_install`` / ``uv_pip_install`` / ``skipped``。
+
+    Returns:
+        Dict[str, Any]: uv 环节结果，形如
+        {"attempted": bool, "method": str, "success": bool, "detail": str}
+    """
+    if method == "skipped":
+        return {
+            "attempted": False,
+            "method": "skipped",
+            "success": False,
+            "detail": "非 uv 安装方式，跳过依赖重装",
+        }
+
+    if method == "uv_tool_install":
+        cmd = ["uv", "tool", "install", "-e", ".", "--force"]
+        cmd_desc = "uv tool install -e . --force"
+    else:  # uv_pip_install
+        cmd = ["uv", "pip", "install", "-e", "."]
+        cmd_desc = "uv pip install -e ."
+
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=src_dir,
+            capture_output=True,
+            text=False,
+            timeout=600,
+        )
+        if result.returncode == 0:
+            detail = f"{cmd_desc} 执行成功"
+            PrettyOutput.auto_print(f"✅ {detail}")
+            return {
+                "attempted": True,
+                "method": method,
+                "success": True,
+                "detail": detail,
+            }
+        error_msg = decode_output(result.stderr).strip() or decode_output(
+            result.stdout
+        ).strip()
+        detail = f"{cmd_desc} 执行失败: {error_msg or '未知错误'}"
+        PrettyOutput.auto_print(f"⚠️ {detail}")
+        return {
+            "attempted": True,
+            "method": method,
+            "success": False,
+            "detail": detail,
+        }
+    except Exception as exc:
+        detail = f"{cmd_desc} 执行异常: {str(exc)}"
+        PrettyOutput.auto_print(f"⚠️ {detail}")
+        return {
+            "attempted": True,
+            "method": method,
+            "success": False,
+            "detail": detail,
+        }
+
+
+def _reinstall_frontend_deps(src_dir: str) -> Dict[str, Any]:
+    """在前端目录下执行 npm install（不执行 npm run build）。
+
+    Args:
+        src_dir: Jarvis 源码根目录。
+
+    Returns:
+        Dict[str, Any]: npm 环节结果，形如
+        {"attempted": bool, "success": bool, "detail": str}
+    """
+    frontend_dir = os.path.join(src_dir, FRONTEND_DIR_RELATIVE)
+    if not os.path.isdir(frontend_dir):
+        detail = f"前端目录不存在，跳过 npm install: {frontend_dir}"
+        PrettyOutput.auto_print(f"⚠️ {detail}")
+        return {"attempted": False, "success": False, "detail": detail}
+
+    try:
+        result = subprocess.run(
+            ["npm", "install"],
+            cwd=frontend_dir,
+            capture_output=True,
+            text=False,
+            timeout=1800,
+        )
+        if result.returncode == 0:
+            detail = "npm install 执行成功"
+            PrettyOutput.auto_print(f"✅ {detail}")
+            return {"attempted": True, "success": True, "detail": detail}
+        error_msg = decode_output(result.stderr).strip() or decode_output(
+            result.stdout
+        ).strip()
+        detail = f"npm install 执行失败: {error_msg or '未知错误'}"
+        PrettyOutput.auto_print(f"⚠️ {detail}")
+        return {"attempted": True, "success": False, "detail": detail}
+    except Exception as exc:
+        detail = f"npm install 执行异常: {str(exc)}"
+        PrettyOutput.auto_print(f"⚠️ {detail}")
+        return {"attempted": True, "success": False, "detail": detail}
+
+
+def reinstall_deps_after_update(
+    src_dir: str,
+    *,
+    include_frontend: bool = True,
+) -> Dict[str, Any]:
+    """更新代码后重装依赖。
+
+    在 code-update 流程（git checkout main + git pull 之后）与每日自动更新流程中调用，
+    自动重装 uv 命令行工具与前端 npm 依赖。任一环节失败只记录警告，不抛异常。
+
+    Args:
+        src_dir: Jarvis 源码根目录。
+        include_frontend: 是否执行前端 npm install（child 节点传 False）。
+
+    Returns:
+        Dict[str, Any]: 形如
+        {
+            "uv": {"attempted": bool, "method": str, "success": bool, "detail": str},
+            "npm": {"attempted": bool, "success": bool, "detail": str},
+        }
+    """
+    method = _detect_uv_install_method(src_dir)
+    uv_result = _reinstall_uv_deps(src_dir, method)
+
+    if include_frontend:
+        npm_result = _reinstall_frontend_deps(src_dir)
+    else:
+        npm_result = {
+            "attempted": False,
+            "success": False,
+            "detail": "child 节点跳过前端 npm install",
+        }
+
+    return {"uv": uv_result, "npm": npm_result}
+
+
 def check_and_update_git_repo_background(repo_path: str) -> None:
     """在后台线程中检查并更新git仓库（不进行用户交互）
 
@@ -1018,6 +1225,23 @@ def check_and_update_git_repo_background(repo_path: str) -> None:
                     PrettyOutput.auto_print(
                         "ℹ️ 更新将在下次启动时生效，本次运行将继续使用当前版本。"
                     )
+                    # 代码更新安装成功后自动重装依赖（uv 工具 + 前端 npm install）
+                    try:
+                        from jarvis.jarvis_utils import globals as _jglobals
+
+                        deps_result = reinstall_deps_after_update(
+                            git_root,
+                            include_frontend=not _jglobals.master_url,
+                        )
+                        PrettyOutput.auto_print(
+                            "ℹ️ 依赖重装完成: "
+                            f"uv({deps_result.get('uv', {}).get('success')}), "
+                            f"npm({deps_result.get('npm', {}).get('success')})"
+                        )
+                    except Exception as deps_exc:  # 失败仅警告，不影响主流程
+                        PrettyOutput.auto_print(
+                            f"⚠️ 依赖重装失败（不影响更新结果）: {deps_exc}"
+                        )
                     # 写入重启标记，下次启动时提示用户重启
                     from jarvis.jarvis_utils.utils import _set_update_reboot_flag
 
@@ -1043,6 +1267,23 @@ def check_and_update_git_repo_background(repo_path: str) -> None:
                         PrettyOutput.auto_print(
                             "ℹ️ 更新将在下次启动时生效，本次运行将继续使用当前版本。"
                         )
+                        # 代码更新安装成功后自动重装依赖（uv 工具 + 前端 npm install）
+                        try:
+                            from jarvis.jarvis_utils import globals as _jglobals
+
+                            deps_result = reinstall_deps_after_update(
+                                git_root,
+                                include_frontend=not _jglobals.master_url,
+                            )
+                            PrettyOutput.auto_print(
+                                "ℹ️ 依赖重装完成: "
+                                f"uv({deps_result.get('uv', {}).get('success')}), "
+                                f"npm({deps_result.get('npm', {}).get('success')})"
+                            )
+                        except Exception as deps_exc:  # 失败仅警告，不影响主流程
+                            PrettyOutput.auto_print(
+                                f"⚠️ 依赖重装失败（不影响更新结果）: {deps_exc}"
+                            )
                         # 写入重启标记
                         from jarvis.jarvis_utils.utils import _set_update_reboot_flag
 
@@ -1227,6 +1468,23 @@ def check_and_update_git_repo(repo_path: str) -> bool:
                     PrettyOutput.auto_print(
                         "ℹ️ 更新将在下次启动时生效，本次运行将继续使用当前版本。"
                     )
+                    # 代码更新安装成功后自动重装依赖（uv 工具 + 前端 npm install）
+                    try:
+                        from jarvis.jarvis_utils import globals as _jglobals
+
+                        deps_result = reinstall_deps_after_update(
+                            git_root,
+                            include_frontend=not _jglobals.master_url,
+                        )
+                        PrettyOutput.auto_print(
+                            "ℹ️ 依赖重装完成: "
+                            f"uv({deps_result.get('uv', {}).get('success')}), "
+                            f"npm({deps_result.get('npm', {}).get('success')})"
+                        )
+                    except Exception as deps_exc:  # 失败仅警告，不影响主流程
+                        PrettyOutput.auto_print(
+                            f"⚠️ 依赖重装失败（不影响更新结果）: {deps_exc}"
+                        )
                     # 写入重启标记，下次启动时提示用户重启
                     from jarvis.jarvis_utils.utils import _set_update_reboot_flag
 
@@ -1251,6 +1509,23 @@ def check_and_update_git_repo(repo_path: str) -> bool:
                             PrettyOutput.auto_print(
                                 "ℹ️ 更新将在下次启动时生效，本次运行将继续使用当前版本。"
                             )
+                            # 代码更新安装成功后自动重装依赖（uv 工具 + 前端 npm install）
+                            try:
+                                from jarvis.jarvis_utils import globals as _jglobals
+
+                                deps_result = reinstall_deps_after_update(
+                                    git_root,
+                                    include_frontend=not _jglobals.master_url,
+                                )
+                                PrettyOutput.auto_print(
+                                    "ℹ️ 依赖重装完成: "
+                                    f"uv({deps_result.get('uv', {}).get('success')}), "
+                                    f"npm({deps_result.get('npm', {}).get('success')})"
+                                )
+                            except Exception as deps_exc:  # 失败仅警告，不影响主流程
+                                PrettyOutput.auto_print(
+                                    f"⚠️ 依赖重装失败（不影响更新结果）: {deps_exc}"
+                                )
                             # 写入重启标记，下次启动时提示用户重启
                             from jarvis.jarvis_utils.utils import (
                                 _set_update_reboot_flag,

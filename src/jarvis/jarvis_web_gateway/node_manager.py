@@ -2959,6 +2959,34 @@ class ChildNodeClient:
                 "[NODE CODE_UPDATE] code updated successfully request_id=%s",
                 request_id,
             )
+            # 代码更新成功后自动重装依赖（uv 工具 + 前端 npm install）
+            deps_reinstall = {}
+            try:
+                from jarvis.jarvis_utils import git_utils
+
+                deps_reinstall = git_utils.reinstall_deps_after_update(
+                    jarvis_src_dir,
+                    include_frontend=not self._node_runtime.config.is_child,
+                )
+            except Exception as exc:  # 失败仅警告，不影响主流程
+                logger.warning(
+                    "[NODE CODE_UPDATE] deps reinstall failed request_id=%s error=%s",
+                    request_id,
+                    exc,
+                )
+                deps_reinstall = {
+                    "uv": {
+                        "attempted": False,
+                        "method": "skipped",
+                        "success": False,
+                        "detail": f"依赖重装异常: {exc}",
+                    },
+                    "npm": {
+                        "attempted": False,
+                        "success": False,
+                        "detail": f"依赖重装异常: {exc}",
+                    },
+                }
             return build_node_message(
                 CODE_UPDATE_TO_MAIN_RESPONSE,
                 {
@@ -2966,6 +2994,7 @@ class ChildNodeClient:
                     "data": {
                         "message": "已成功切换到 main 分支并拉取最新代码",
                         "jarvis_src_dir": jarvis_src_dir,
+                        "deps_reinstall": deps_reinstall,
                     },
                 },
                 request_id=request_id,
