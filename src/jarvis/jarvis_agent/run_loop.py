@@ -733,7 +733,22 @@ class AgentRunLoop:
                 )
                 return True, None
             # 先运行_complete_task，触发记忆整理/事件等副作用，再决定返回值
-            result = ag._complete_task(auto_completed=True)
+            # 非交互模式下完成任务时生成总结：返回 _complete_task 的总结结果，
+            # 而非退化为 current_response（!!!COMPLETE!!! 标记）。
+            # 总结失败/为空时回退「任务完成」，不抛异常阻塞主流程。
+            try:
+                result = ag._complete_task(auto_completed=True)
+            except Exception:
+                return False, "任务完成"
+            if getattr(ag, "non_interactive", False) and getattr(
+                ag, "_summary_on_complete", False
+            ):
+                try:
+                    if not result or not str(result).strip():
+                        return False, "任务完成"
+                    return False, result
+                except Exception:
+                    return False, "任务完成"
             # 若不需要summary，则将最后一条LLM输出作为返回值
             if not getattr(ag, "need_summary", True):
                 return False, current_response

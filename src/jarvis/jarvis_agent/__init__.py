@@ -754,6 +754,10 @@ class Agent:
         # 行为控制开关（原始入参值，后续会根据配置进行解析和覆盖）
         self.auto_complete = bool(auto_complete)
         self.need_summary = bool(need_summary)
+        # 非交互完成时生成总结的开关：非交互模式下完成任务时返回 LLM 生成的
+        # 任务总结（而非 !!!COMPLETE!!! 完成标记）。由 set_non_interactive 维护，
+        # 与 need_summary（交互模式语义）解耦，避免破坏交互模式行为。
+        self._summary_on_complete = False
         self.use_methodology = use_methodology
         self.use_analysis = use_analysis
         self.execute_tool_confirm = execute_tool_confirm
@@ -948,6 +952,13 @@ class Agent:
             self.auto_complete = bool(
                 self.auto_complete or (self.non_interactive or False)
             )
+
+        # 构造函数传入非交互模式时（code_agent CLI / jvs CLI / pipeline_runner /
+        # send_to_agent / sub_agent 等均通过构造函数创建，不调用 set_non_interactive），
+        # 同步启用非交互完成总结开关，保证所有非交互入口统一生效：
+        # 完成任务时返回 LLM 生成的总结而非 !!!COMPLETE!!! 标记。
+        if self.non_interactive:
+            self._summary_on_complete = True
 
     def _init_managers(self) -> None:
         """初始化事件总线和管理器"""
@@ -2413,12 +2424,15 @@ class Agent:
         # 根据non_interactive的值调整auto_complete和need_summary
         if value:  # 进入非交互模式
             self.auto_complete = True
-            # 进入非交互模式时，禁用总结（避免自动完成时触发总结）
-            self.need_summary = False
+            # 非交互模式下完成任务时生成总结（返回任务总结而非 !!!COMPLETE!!! 标记）。
+            # 与 need_summary（交互模式语义）解耦：不再强制覆盖 need_summary，
+            # 由 _summary_on_complete 独立控制非交互完成时的总结行为。
+            self._summary_on_complete = True
         else:  # 退出非交互模式
             # 恢复auto_complete和need_summary的原始值
             self.auto_complete = self._auto_complete_backup
             self.need_summary = self._need_summary_backup
+            self._summary_on_complete = False
             # 清理备份，避免状态污染
             delattr(self, "_auto_complete_backup")
             delattr(self, "_need_summary_backup")
