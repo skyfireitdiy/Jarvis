@@ -861,6 +861,16 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             before_pin = modified_input[:pin_index]
             after_pin = modified_input[pin_index + len(pin_marker) :]
 
+            # 【切分规则】当一条消息同时含 Pin 与 Goal 时，Pin 只接管
+            # "自己之后、下一个命令标记之前"的文本，互不吞并；仅含 Pin 时
+            # 保持固定到消息末尾（向后兼容）。
+            if "Goal" in special_tags:
+                next_marker_match = re.search(
+                    r"'<([^>]+)>'", after_pin
+                )
+                if next_marker_match:
+                    after_pin = after_pin[: next_marker_match.start()]
+
             # 将Pin标记之后的内容追加到pin_content
             after_pin_stripped = after_pin.strip()
             if after_pin_stripped:
@@ -895,6 +905,60 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             agent.pin_content = ""
             PrettyOutput.auto_print("🧹 已清理固定内容")
             return "", True
+        elif tag == "ClearGoal":
+            # 清空当前目标，立即返回（类似 ClearPin）
+            agent.goal_content = ""
+            PrettyOutput.auto_print("🧹 已清理当前目标")
+            return "", True
+        elif tag == "Goal":
+            # 设置/替换当前目标：提取 '<Goal>' 之后、下一个命令标记之前的内容；
+            # 同消息多个 '<Goal>' 的内容以换行合并为一个 goal_content；
+            # 合并结果整体替换 agent.goal_content（跨消息替换语义）；
+            # 移除 '<Goal>' 标记本身，保留前后文本（与 Pin 行为一致）。
+            # 注意：必须基于原始 user_input 收集标记位置——Pin 处理在 for 循环
+            # 之前已修改 modified_input（截断内容/移除标记），若基于它解析会
+            # 丢失 Goal 标记或把 Pin 内容吞并进 goal。
+            if tag in processed_tag:
+                # 同消息多个 '<Goal>' 只处理一次（首次已合并全部内容）
+                continue
+            processed_tag.add(tag)
+            goal_marker = "'<Goal>'"
+            goal_parts = []
+            # 收集所有 '<Goal>' 标记位置（基于原始 user_input）
+            goal_positions = []
+            search_from = 0
+            while True:
+                pos = user_input.find(goal_marker, search_from)
+                if pos == -1:
+                    break
+                goal_positions.append(pos)
+                search_from = pos + len(goal_marker)
+            # 每个标记之后到下一个命令标记之前的内容
+            for i, pos in enumerate(goal_positions):
+                seg_start = pos + len(goal_marker)
+                if i + 1 < len(goal_positions):
+                    seg_end = goal_positions[i + 1]
+                else:
+                    seg_end = len(user_input)
+                seg = user_input[seg_start:seg_end]
+                # 截止到下一个命令标记之前
+                next_marker_match = re.search(r"'<([^>]+)>'", seg)
+                if next_marker_match:
+                    seg = seg[: next_marker_match.start()]
+                seg_stripped = seg.strip()
+                if seg_stripped:
+                    goal_parts.append(seg_stripped)
+            if goal_parts:
+                agent.goal_content = "\n".join(goal_parts)
+                PrettyOutput.auto_print(
+                    f"🎯 已设置当前目标: {agent.goal_content[:50]}..."
+                )
+            else:
+                agent.goal_content = ""
+                PrettyOutput.auto_print("🎯 已清空当前目标（无内容）")
+            # 移除所有 '<Goal>' 标记，保留前后文本
+            modified_input = modified_input.replace(goal_marker, "")
+            continue
         elif tag == "ToolUsage":
             agent.set_addon_prompt(agent.get_tool_usage_prompt())
             continue

@@ -1412,6 +1412,7 @@ class SessionManager:
                 "memory_tags": list(getattr(self.agent, "memory_tags", set())),
                 "first": getattr(self.agent, "first", True),
                 "pin_content": getattr(self.agent, "pin_content", ""),
+                "goal_content": getattr(self.agent, "goal_content", ""),
                 "pre_compressed_summary": getattr(
                     self.agent, "_pre_compressed_summary", None
                 ),
@@ -1550,6 +1551,12 @@ class SessionManager:
                 if pin_content:
                     self.agent.pin_content = pin_content
                     PrettyOutput.auto_print(f"✅ 已恢复固定内容: {pin_content[:50]}...")
+
+                # 恢复当前目标
+                goal_content = agent_runtime_state.get("goal_content", "")
+                if goal_content:
+                    self.agent.goal_content = goal_content
+                    PrettyOutput.auto_print(f"✅ 已恢复当前目标: {goal_content[:50]}...")
 
                 # 恢复预压缩状态
                 pre_compressed_summary = agent_runtime_state.get(

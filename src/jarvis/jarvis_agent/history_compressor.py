@@ -597,6 +597,16 @@ class HistoryCompressor:
             pin_section = f"\n\n## 🎯 用户的原始需求和要求（必须始终牢记）\n{chr(10).join(user_fixed_content)}"
             formatted_summary = pin_section + "\n\n" + formatted_summary
 
+        # 【Goal】当前目标非空时，插入到摘要最前面（优先级高于 Pin 区块）
+        # 注意：goal_content 必须是字符串且 strip 后非空才插入（Mock/None 等跳过）
+        _goal_content = getattr(self.agent, "goal_content", "")
+        if isinstance(_goal_content, str) and _goal_content.strip():
+            goal_section = (
+                f"## 🎯 当前目标（必须始终牢记）\n"
+                f"{_goal_content.strip()}"
+            )
+            formatted_summary = goal_section + "\n\n" + formatted_summary
+
         # 获取git diff统计信息
         git_diff_stat = ""
         git_view_command = ""
@@ -904,6 +914,16 @@ class HistoryCompressor:
             pin_section = f"\n\n## 🎯 用户的原始需求和要求（必须始终牢记）\n{chr(10).join(user_fixed_content)}"
             # 将固定内容放在最前面，确保最高优先级
             formatted_summary = pin_section + formatted_summary
+
+        # 【Goal】当前目标非空时，插入到摘要最前面（优先级高于 Pin 区块）
+        # 注意：goal_content 必须是字符串且 strip 后非空才插入（Mock/None 等跳过）
+        _goal_content = getattr(self.agent, "goal_content", "")
+        if isinstance(_goal_content, str) and _goal_content.strip():
+            goal_section = (
+                f"## 🎯 当前目标（必须始终牢记）\n"
+                f"{_goal_content.strip()}"
+            )
+            formatted_summary = goal_section + "\n\n" + formatted_summary
 
         return formatted_summary
 

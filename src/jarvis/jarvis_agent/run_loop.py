@@ -599,6 +599,11 @@ class AgentRunLoop:
         """
         context_parts = []
 
+        # 0. 检查当前目标（goal_content 非空时作为完成判断条件之一）
+        goal_content = getattr(ag, "goal_content", "")
+        if goal_content and goal_content.strip():
+            context_parts.append(f"🎯 当前目标：{goal_content.strip()}")
+
         # 1. 检查代码修改情况
         try:
             if hasattr(ag, "start_commit") and ag.start_commit:
@@ -915,6 +920,14 @@ class AgentRunLoop:
             confirm_prompt_parts.append(
                 "\n⚠️ 重要：在确认完成之前，必须验证所有验收准则都已通过："
             )
+            # 【Goal】当前目标非空时，要求先核对目标是否已达成
+            goal_content = getattr(ag, "goal_content", "")
+            if goal_content and goal_content.strip():
+                confirm_prompt_parts.append(
+                    f"\n🎯 当前目标：{goal_content.strip()}\n"
+                    "请先核对当前目标是否已达成；"
+                    "若目标尚未达成，请回复 <!!!NO!!!> 并继续执行任务。"
+                )
             confirm_prompt_parts.append("1. 检查任务目标是否完全达成")
             confirm_prompt_parts.append("2. 验证所有交付物是否符合要求")
             confirm_prompt_parts.append("3. 确认没有遗漏或未完成的工作项")

@@ -777,6 +777,7 @@ class Agent:
         self.run_input_handlers_next_turn = False
         self.user_data: Dict[str, Any] = {}
         self.pin_content: str = ""  # 记录固定的内容
+        self.goal_content: str = ""  # 记录当前目标（'<Goal>' 设置，'<ClearGoal>' 清空）
         self.original_user_input: Union[str, List[ContentBlock]] = (
             ""  # 记录原始用户输入
         )

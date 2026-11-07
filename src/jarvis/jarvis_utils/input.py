@@ -229,6 +229,8 @@ BUILTIN_COMMANDS = [
     ("Summary", "总结"),
     ("Pin", "固定/置顶内容"),
     ("ClearPin", "清理固定内容"),
+    ("Goal", "设置/替换当前目标"),
+    ("ClearGoal", "清理当前目标"),
     ("Clear", "清除历史"),
     ("Commit", "提交代码"),
     ("ToolUsage", "工具使用说明"),
