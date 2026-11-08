@@ -170,8 +170,12 @@ defineEmits(['split', 'close', 'maximize', 'collapse', 'activate-session-tab', '
 }
 
 .workspace-pane-session-tab.active {
-  background: var(--color-bg-hover);
-  color: var(--color-text-primary);
+  background: var(--color-accent-glow);
+  color: var(--color-accent);
+  font-weight: 600;
+  box-shadow:
+    inset 0 0 0 1px var(--color-border),
+    inset 0 -2px 0 var(--color-accent);
 }
 
 .workspace-pane-session-tab-name {
