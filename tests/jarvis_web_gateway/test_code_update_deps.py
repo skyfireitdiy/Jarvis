@@ -12,8 +12,6 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 from jarvis.jarvis_web_gateway.node_manager import ChildNodeClient  # noqa: E402

@@ -7,7 +7,7 @@
 - child 节点（master_url 非空）include_frontend=False
 - 依赖重装失败不影响更新结果（不抛异常）
 """
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from jarvis.jarvis_utils import git_utils
 

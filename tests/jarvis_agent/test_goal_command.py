@@ -23,9 +23,6 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 from unittest.mock import patch
 
-import pytest
-
-from jarvis.jarvis_agent import Agent as RealAgent
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
 from jarvis.jarvis_agent.history_compressor import HistoryCompressor
 from jarvis.jarvis_agent.run_loop import AgentRunLoop
