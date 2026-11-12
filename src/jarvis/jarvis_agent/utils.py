@@ -1391,6 +1391,8 @@ def install_plugin(
     from jarvis.jarvis_utils.output import PrettyOutput
 
     temp_dir = None  # 预初始化，确保 except 分支可访问（ty 推断局限）
+    target_dir = None  # 预初始化，确保 except 分支可访问
+    target_created = False  # 预初始化：目标目录是否已属于本次安装
 
     # 判断来源类型：git 仓库 / 本地目录 / 压缩文件
     is_git = _is_git_repo_url(source_path)
@@ -1520,6 +1522,10 @@ def install_plugin(
 
         # 目标安装目录
         target_dir = plugins_dir / plugin_name
+        # 标记：目标目录是否已属于本次安装（旧目录删除后、写入前置 True）。
+        # 用于 except 分支区分"本次安装创建的残留目录"与"安装前已存在的旧插件目录"，
+        # 避免误删用户已有的插件目录。
+        target_created = False
 
         # 同 ID 冲突检查（Issue #311）：插件唯一标识是 config.yaml 的 id 字段
         # （回退 name，再回退目录名）。目录名可能重复，但 ID 必须唯一——
@@ -1653,6 +1659,9 @@ def install_plugin(
         # - symlink：本地目录建立软链接（本地代码更新后立即生效），不写 .source
         # - copy：压缩文件解压产物复制（无本地持续更新需求）
         assert plugin_source_dir is not None  # 来源准备阶段已赋值
+        # 目标目录已删除旧内容，从此刻起 target_dir 属于本次安装，
+        # 后续任何失败都应清理该目录，避免残留半成品插件。
+        target_created = True
         if install_mode == "git":
             shutil.move(str(plugin_source_dir), str(target_dir))
             _write_plugin_source(target_dir, url, branch)
@@ -1744,6 +1753,16 @@ def install_plugin(
         if temp_dir and os.path.exists(temp_dir):
             try:
                 shutil.rmtree(temp_dir)
+            except Exception as e:
+                save_exception(
+                    e, module="jarvis_agent.utils", function="install_plugin"
+                )
+                pass
+        # 清理本次安装创建的目标目录，避免残留半成品插件
+        # （仅当 target_dir 已属于本次安装时才清理，防止误删安装前已存在的旧插件目录）
+        if target_created and target_dir and os.path.exists(target_dir):
+            try:
+                _remove_plugin_dir(target_dir)
             except Exception as e:
                 save_exception(
                     e, module="jarvis_agent.utils", function="install_plugin"

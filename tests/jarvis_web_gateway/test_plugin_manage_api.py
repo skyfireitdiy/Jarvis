@@ -913,3 +913,77 @@ def test_node_proxy_install_plugin_failure_returns_detail(client, isolated_data_
     # error.message 应包含具体失败原因，而非空/笼统文案
     assert body["error"]["code"] == "INSTALL_PLUGIN_FAILED"
     assert "不存在" in body["error"]["message"]
+
+
+# ---------------------------------------------------------------------------
+# 安装失败时清理残留插件目录（install_plugin 的 except 分支）
+# ---------------------------------------------------------------------------
+def test_install_plugin_failure_cleans_partial_target_dir(
+    isolated_data_dir, monkeypatch
+):
+    """copy 安装写入中途抛异常时，应清理本次安装创建的目标目录，避免残留。
+
+    模拟 shutil.copytree 先创建目标目录再抛异常（如磁盘满/权限不足），
+    断言 install_plugin 返回 False 且 target_dir 已被清理。
+    """
+    import shutil
+    import zipfile
+
+    import jarvis.jarvis_agent.utils as agent_utils
+
+    # 构造 zip 插件源（copy 模式）
+    source = _make_plugin(
+        Path(isolated_data_dir) / "zip-src", "partial-plugin", "1.0.0"
+    )
+    zip_file = Path(isolated_data_dir) / "plugin.zip"
+    with zipfile.ZipFile(zip_file, "w") as zf:
+        zf.write(source / "config.yaml", "config.yaml")
+        zf.write(source / "admin.js", "admin.js")
+
+    target_dir = Path(isolated_data_dir) / "plugins" / "partial-plugin"
+
+    def _fake_copytree(src, dst, *args, **kwargs):
+        # 模拟写入中途失败：先创建目标目录与部分文件，再抛异常
+        Path(dst).mkdir(parents=True, exist_ok=True)
+        (Path(dst) / "partial.txt").write_text("partial", encoding="utf-8")
+        raise OSError("模拟磁盘写入失败")
+
+    # install_plugin 内部 import shutil 拿到的是全局 shutil 模块，patch 全局生效
+    monkeypatch.setattr(shutil, "copytree", _fake_copytree)
+
+    ok = agent_utils.install_plugin(str(zip_file))
+    assert ok is False
+    # 本次安装创建的目标目录应被清理，不残留半成品插件
+    assert not target_dir.exists()
+
+
+def test_install_plugin_failure_does_not_remove_existing_plugin(
+    isolated_data_dir, monkeypatch
+):
+    """安装失败发生在写入前时，不应误删已存在的旧插件目录。
+
+    模拟 pre-install 钩子抛异常（target_created 仍为 False），
+    断言已存在的插件目录被完整保留。
+    """
+    import jarvis.jarvis_agent.utils as agent_utils
+
+    plugins_dir = Path(isolated_data_dir) / "plugins"
+    existing = plugins_dir / "keep-plugin"
+    _make_plugin(existing, "keep-plugin", "1.0.0")
+    sentinel = existing / "sentinel.txt"
+    sentinel.write_text("keep me", encoding="utf-8")
+
+    source = _make_plugin(
+        Path(isolated_data_dir) / "local-src", "keep-plugin", "2.0.0"
+    )
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("模拟 pre-install 钩子异常")
+
+    monkeypatch.setattr(agent_utils, "_run_plugin_hooks", _boom)
+
+    ok = agent_utils.install_plugin(str(source))
+    assert ok is False
+    # 已存在的旧插件目录必须保留（未被误删）
+    assert existing.exists()
+    assert sentinel.exists()
