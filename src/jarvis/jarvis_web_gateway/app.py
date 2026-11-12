@@ -11356,43 +11356,82 @@ def create_app(
                         "output": captured,
                     },
                 }
+            def _manage_error(fallback_code: str, fallback_msg: str) -> Dict[str, Any]:
+                """把插件管理函数内部捕获的详细输出（captured）作为错误信息返回，
+                避免前端只看到笼统的「安装失败」而无法定位原因。"""
+                detail = "\n".join(captured).strip()
+                return {
+                    "code": fallback_code,
+                    "message": detail or fallback_msg,
+                }
+
             if method == "POST" and normalized_path == "/plugins/install":
                 source = str(payload.get("source") or "")
                 force = bool(payload.get("force", False))
                 ok = install_plugin(source, force=force)
+                if ok:
+                    return {
+                        "success": True,
+                        "data": {"node_id": local_node_id, "output": captured},
+                    }
                 return {
-                    "success": bool(ok),
+                    "success": False,
                     "data": {"node_id": local_node_id, "output": captured},
+                    "error": _manage_error("INSTALL_PLUGIN_FAILED", "插件安装失败"),
                 }
             if method == "POST" and normalized_path.startswith("/plugins/"):
                 rest = normalized_path[len("/plugins/") :].strip("/")
                 if rest.endswith("/uninstall"):
                     name = rest[: -len("/uninstall")].strip("/")
                     ok = uninstall_plugin(name)
+                    if ok:
+                        return {
+                            "success": True,
+                            "data": {"node_id": local_node_id, "output": captured},
+                        }
                     return {
-                        "success": bool(ok),
+                        "success": False,
                         "data": {"node_id": local_node_id, "output": captured},
+                        "error": _manage_error("UNINSTALL_PLUGIN_FAILED", "插件卸载失败"),
                     }
                 if rest.endswith("/upgrade"):
                     name = rest[: -len("/upgrade")].strip("/")
                     ok = upgrade_plugin(name)
+                    if ok:
+                        return {
+                            "success": True,
+                            "data": {"node_id": local_node_id, "output": captured},
+                        }
                     return {
-                        "success": bool(ok),
+                        "success": False,
                         "data": {"node_id": local_node_id, "output": captured},
+                        "error": _manage_error("UPGRADE_PLUGIN_FAILED", "插件升级失败"),
                     }
                 if rest.endswith("/disable"):
                     name = rest[: -len("/disable")].strip("/")
                     ok = disable_plugin(name)
+                    if ok:
+                        return {
+                            "success": True,
+                            "data": {"node_id": local_node_id, "output": captured},
+                        }
                     return {
-                        "success": bool(ok),
+                        "success": False,
                         "data": {"node_id": local_node_id, "output": captured},
+                        "error": _manage_error("DISABLE_PLUGIN_FAILED", "插件禁用失败"),
                     }
                 if rest.endswith("/enable"):
                     name = rest[: -len("/enable")].strip("/")
                     ok = enable_plugin(name)
+                    if ok:
+                        return {
+                            "success": True,
+                            "data": {"node_id": local_node_id, "output": captured},
+                        }
                     return {
-                        "success": bool(ok),
+                        "success": False,
                         "data": {"node_id": local_node_id, "output": captured},
+                        "error": _manage_error("ENABLE_PLUGIN_FAILED", "插件启用失败"),
                     }
             return {
                 "success": False,

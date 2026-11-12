@@ -892,3 +892,24 @@ def test_node_proxy_check_update_api(client, isolated_data_dir, monkeypatch):
     assert body["success"] is True
     assert body["data"]["node_id"] == "master"
     assert body["data"]["updates"] == fake_updates
+
+
+def test_node_proxy_install_plugin_failure_returns_detail(client, isolated_data_dir):
+    """节点代理路径安装插件失败时返回详细错误信息（error.message 含内部输出）。
+
+    前端 PluginSidebar 使用 /api/node/{node_id}/plugins/install 路径，此前失败时
+    只返回 success=False 而无 error 字段，前端只能显示笼统的「插件安装失败」。
+    修复后 error.message 应包含 install_plugin 内部捕获的详细原因（如源路径不存在）。
+    """
+    resp = client.post(
+        "/api/node/master/plugins/install",
+        headers=_auth_headers(),
+        json={"node_id": "master", "source": "/nonexistent/plugin/source"},
+    )
+    assert resp.status_code == 400, resp.text
+    body = resp.json()
+    assert body["success"] is False
+    assert body["data"]["node_id"] == "master"
+    # error.message 应包含具体失败原因，而非空/笼统文案
+    assert body["error"]["code"] == "INSTALL_PLUGIN_FAILED"
+    assert "不存在" in body["error"]["message"]

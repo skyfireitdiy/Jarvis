@@ -441,6 +441,16 @@ async function checkPluginUpdates() {
   finally { checkingUpdate.value = false }
 }
 
+// 插件安装失败时提取可展示的错误信息：优先后端 error.message，
+// 其次用 data.output（插件管理函数内部捕获的详细输出）兜底，避免只显示笼统的「安装失败」。
+function pluginInstallError(result) {
+  if (result?.error?.message) return result.error.message
+  const output = result?.data?.output
+  if (Array.isArray(output) && output.length) return output.join('\n')
+  if (typeof output === 'string' && output.trim()) return output
+  return ''
+}
+
 async function installPlugin() {
   if (!installSource.value) { props.showToast('请填写插件来源', 'warning'); return }
   installingPlugin.value = true
@@ -458,7 +468,7 @@ async function installPlugin() {
       installSource.value = ''
       installForce.value = false
       loadPlugins()
-    } else props.showToast(result.error?.message || '插件安装失败', 'error')
+    } else props.showToast(pluginInstallError(result) || '插件安装失败', 'error')
   } catch (e) { props.showToast('插件安装失败: ' + e.message, 'error') }
   finally { installingPlugin.value = false }
 }
@@ -535,7 +545,7 @@ async function doInstallFromMarket(mp, key, source) {
       props.showToast(`插件 ${mp.name} 安装成功`, 'success')
       activeTab.value = 'installed'
       loadPlugins()
-    } else props.showToast(result.error?.message || '插件安装失败', 'error')
+    } else props.showToast(pluginInstallError(result) || '插件安装失败', 'error')
   } catch (e) { props.showToast('插件安装失败: ' + e.message, 'error') }
   finally { marketBusy.value = { ...marketBusy.value, [key]: false } }
 }
