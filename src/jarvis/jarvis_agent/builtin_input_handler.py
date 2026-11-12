@@ -2832,6 +2832,29 @@ def switch_platform_type(
         return False
 
 
+def _sync_other_running_agents_models(current_agent: Any) -> None:
+    """同步重建同进程内其他正在运行 Agent 的模型实例。
+
+    模型组（llm_group）是进程内全局配置，切换后仅重建当前 Agent 的 model
+    会导致其他正在运行的 Agent（如父 Agent、嵌套调用的 Agent）仍持有旧模型。
+    这里遍历运行栈，用各 Agent 自身的 _model_type 重建其 model，并保留对话历史。
+    """
+    import jarvis.jarvis_utils.globals as jglobals
+
+    seen = set()
+    for agent_name in jglobals.running_agent_stack:
+        other = jglobals.global_agents.get(agent_name)
+        if other is None or other is current_agent or id(other) in seen:
+            continue
+        seen.add(id(other))
+        try:
+            switch_platform_type(other, get_platform_type_from_agent(other))
+        except Exception as e:
+            PrettyOutput.auto_print(
+                f"⚠️ 同步重建 Agent '{agent_name}' 模型失败: {e}"
+            )
+
+
 def perform_switch(
     agent: Any, new_model_group: str, platform_type: str = "normal"
 ) -> bool:
@@ -2853,6 +2876,9 @@ def perform_switch(
         result = switch_platform_type(agent, platform_type, preserve_model_group=False)
         if result:
             agent._model_type = platform_type
+            # 模型组是进程内全局配置，同步重建其他正在运行 Agent 的模型，
+            # 否则父 Agent 等仍持有旧模型组创建的 model 实例
+            _sync_other_running_agents_models(agent)
             # 上报网关，使 Agent 列表展示的模型组与真实运行状态一致
             _report_agent_config_change({"llm_group": new_model_group})
         return result

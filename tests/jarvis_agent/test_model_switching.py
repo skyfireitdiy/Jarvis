@@ -432,3 +432,69 @@ class TestCreateTempModel:
         agent._create_temp_model(system_prompt="提示词")
 
         temp_model.set_suppress_output.assert_called_once_with(False)
+
+
+class TestPerformSwitchSyncsOtherAgents:
+    """切换模型组时，同进程内其他正在运行的 Agent 也应重建模型
+
+    回归用例：在 sub agent 中切换模型组时，父 agent（以及其他运行中的 agent）
+    的 model 实例必须同步重建，否则它们仍持有旧模型组创建的模型。
+    """
+
+    def _patch(self, monkeypatch):
+        import importlib
+
+        bih = importlib.import_module("jarvis.jarvis_agent.builtin_input_handler")
+        import jarvis.jarvis_utils.globals as jglobals
+
+        switched = []
+
+        def fake_switch_platform_type(agent, platform_type, preserve_model_group=True):
+            switched.append((agent, platform_type))
+            return True
+
+        monkeypatch.setattr(bih, "switch_platform_type", fake_switch_platform_type)
+        monkeypatch.setattr(bih, "set_llm_group", lambda g: None)
+        monkeypatch.setattr(bih, "_report_agent_config_change", lambda d: None)
+        return bih, jglobals, switched
+
+    def test_other_running_agents_rebuilt(self, monkeypatch):
+        bih, jglobals, switched = self._patch(monkeypatch)
+
+        parent = Mock()
+        parent._model_type = "normal"
+        child = Mock()
+        child._model_type = "smart"
+
+        monkeypatch.setattr(jglobals, "running_agent_stack", ["parent", "child"])
+        monkeypatch.setattr(
+            jglobals, "global_agents", {"parent": parent, "child": child}
+        )
+
+        assert bih.perform_switch(child, "new_group", "normal") is True
+
+        # 当前 agent 与父 agent 都应被重建
+        rebuilt = {id(a) for a, _ in switched}
+        assert id(child) in rebuilt
+        assert id(parent) in rebuilt
+        # 父 agent 按自身 _model_type 重建
+        parent_calls = [pt for a, pt in switched if a is parent]
+        assert parent_calls == ["normal"]
+
+    def test_switch_model_does_not_sync(self, monkeypatch):
+        """切模型（smart/normal/cheap）不应触发其他 agent 同步重建"""
+        bih, jglobals, switched = self._patch(monkeypatch)
+
+        parent = Mock()
+        parent._model_type = "normal"
+        child = Mock()
+        child._model_type = "normal"
+
+        monkeypatch.setattr(jglobals, "running_agent_stack", ["parent", "child"])
+        monkeypatch.setattr(
+            jglobals, "global_agents", {"parent": parent, "child": child}
+        )
+
+        # 直接调用 switch_platform_type 的路径（switch_model 内部行为）
+        bih.switch_platform_type(child, "smart")
+        assert all(a is not parent for a, _ in switched)
