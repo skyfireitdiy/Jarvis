@@ -51,6 +51,9 @@ jobs:
           path: ./site
 
   deploy:
+    # 仅 push 到 main/master 时部署到 GitHub Pages；
+    # pull_request 只跑 build 验证文档可构建，PR 场景无法部署 Pages 会导致检查失败。
+    if: github.event_name == 'push'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
