@@ -773,8 +773,11 @@ class GatewayManagerTool:
                     target_ids, agent_node_map
                 )
             if not wait_ok:
+                # 用户打断：返回 interrupted 标记，供调用方区分"用户取消"与"任务失败"
+                interrupted = "打断" in wait_err
                 return {
                     "success": False,
+                    "interrupted": interrupted,
                     "stdout": stdout_str,
                     "stderr": wait_err,
                 }
@@ -795,6 +798,7 @@ class GatewayManagerTool:
         """轮询本地 status_file 判断 Agent 是否完成（方案A 的可靠完成信号）。
 
         Agent 完成任务后把 {"status": "completed"|"failed"} 写入该文件。
+        等待期间每轮检查用户输入（input_buffer），有输入则视为用户打断。
 
         返回:
             (ok, error): ok=True 表示 completed，否则为 False 并附错误信息
@@ -802,6 +806,10 @@ class GatewayManagerTool:
         status_path = Path(status_file)
         deadline = time.time() + timeout
         while time.time() < deadline:
+            # 用户输入打断：等待期间用户注入消息则取消等待
+            interrupt = self._check_user_interrupt()
+            if interrupt:
+                return False, interrupt
             if status_path.exists():
                 try:
                     data = json.loads(status_path.read_text(encoding="utf-8"))
@@ -825,6 +833,7 @@ class GatewayManagerTool:
         因 agent 状态机无"空闲/完成"态，仅能通过 execution_status 从 running
         变化到 waiting_* 态近似判断"一条消息处理完成"。这是方案A 的兜底路径，
         可靠完成信号应优先使用 status_file。
+        等待期间每轮检查用户输入（input_buffer），有输入则视为用户打断。
 
         返回:
             (ok, error): ok=True 表示观察到完成信号，否则为 False 并附错误信息
@@ -832,6 +841,10 @@ class GatewayManagerTool:
         deadline = time.time() + timeout
         # 记录各 agent 的初始 execution_status，观察其变化
         while time.time() < deadline:
+            # 用户输入打断：等待期间用户注入消息则取消等待
+            interrupt = self._check_user_interrupt()
+            if interrupt:
+                return False, interrupt
             all_done = True
             for target_id in target_ids:
                 target_node_id = agent_node_map.get(target_id)
@@ -861,6 +874,22 @@ class GatewayManagerTool:
                 return True, ""
             time.sleep(2.0)
         return False, f"等待 Agent 完成超时（>{int(timeout)} 秒）"
+
+    def _check_user_interrupt(self) -> str:
+        """检查等待期间是否有用户注入的输入（input_buffer）。
+
+        用户在等待期间通过前端/定时器/io_sources 等注入消息时，可借此打断
+        阻塞的等待。返回非空字符串表示用户要打断等待（保留缓冲供主循环消费）。
+
+        返回:
+            str: 打断原因描述；无输入时返回空字符串
+        """
+        from jarvis.jarvis_utils.globals import peek_input_buffer
+
+        buffered = peek_input_buffer()
+        if buffered:
+            return "用户输入打断等待（input_buffer 中有待处理消息）"
+        return ""
 
     def _resolve_node_id(self, agent_id: str, node_id: Optional[str] = None) -> str:
         """解析 Agent 所在的节点 ID。
