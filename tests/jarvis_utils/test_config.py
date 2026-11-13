@@ -17,6 +17,7 @@ from jarvis.jarvis_utils.config import (
 )
 from jarvis.jarvis_utils.utils import _load_plugin_configs
 from jarvis.jarvis_utils.utils import _is_api_version_compatible
+from jarvis.jarvis_utils import globals as jglobals
 
 
 @pytest.fixture
@@ -182,6 +183,163 @@ class TestLoadPluginConfigs:
             result["plugin_configs"]["plugin_relative"]["custom_key"]
             == "relative_value"
         )
+
+
+class TestEffectiveScope:
+    """测试 _load_plugin_configs 的 effective_scope 生效范围过滤"""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, disable_auto_discover):
+        """为所有测试禁用自动发现"""
+        pass
+
+    @pytest.fixture
+    def make_plugin(self, tmp_path):
+        """创建带指定 config 的插件目录，返回 (plugin_dir, config)"""
+
+        def _make(name, config):
+            plugin_dir = tmp_path / name
+            plugin_dir.mkdir()
+            with open(plugin_dir / "config.yaml", "w", encoding="utf-8") as f:
+                yaml.dump(config, f)
+            return plugin_dir
+
+        return _make
+
+    def test_default_no_scope_all_effective(self, tmp_path, make_plugin):
+        """未声明 effective_scope 时在所有节点/角色下均生效（向后兼容）"""
+        plugin_dir = make_plugin(
+            "plugin_default",
+            {"mcp": [{"type": "stdio", "name": "default-mcp", "command": "npx"}]},
+        )
+        base_config = {"plugin_dirs": [str(plugin_dir)]}
+
+        for node_mode, agent_role in [
+            ("master", "gateway"),
+            ("child", "agent"),
+            ("child", "code_agent"),
+        ]:
+            jglobals.node_mode = node_mode
+            jglobals.agent_role = agent_role
+            result = _load_plugin_configs(base_config)
+            mcp_names = [item["name"] for item in result["mcp"]]
+            assert mcp_names == ["default-mcp"], (node_mode, agent_role)
+
+    def test_nodes_filter(self, tmp_path, make_plugin):
+        """nodes 限定仅 master 时，child 节点不生效"""
+        plugin_dir = make_plugin(
+            "plugin_master_only",
+            {
+                "effective_scope": {"nodes": ["master"]},
+                "mcp": [{"type": "stdio", "name": "master-mcp", "command": "npx"}],
+            },
+        )
+        base_config = {"plugin_dirs": [str(plugin_dir)]}
+
+        jglobals.node_mode = "master"
+        jglobals.agent_role = "agent"
+        result = _load_plugin_configs(base_config)
+        assert [i["name"] for i in result["mcp"]] == ["master-mcp"]
+
+        jglobals.node_mode = "child"
+        jglobals.agent_role = "agent"
+        result = _load_plugin_configs(base_config)
+        assert "mcp" not in result
+
+    def test_roles_filter(self, tmp_path, make_plugin):
+        """roles 限定仅 gateway 时，agent/code_agent 进程不生效"""
+        plugin_dir = make_plugin(
+            "plugin_gateway_only",
+            {
+                "effective_scope": {"roles": ["gateway"]},
+                "mcp": [{"type": "stdio", "name": "gw-mcp", "command": "npx"}],
+            },
+        )
+        base_config = {"plugin_dirs": [str(plugin_dir)]}
+
+        jglobals.node_mode = "master"
+        jglobals.agent_role = "gateway"
+        result = _load_plugin_configs(base_config)
+        assert [i["name"] for i in result["mcp"]] == ["gw-mcp"]
+
+        for role in ["agent", "code_agent"]:
+            jglobals.agent_role = role
+            result = _load_plugin_configs(base_config)
+            assert "mcp" not in result, role
+
+    def test_nodes_roles_combination(self, tmp_path, make_plugin):
+        """nodes 与 roles 组合限定，须同时满足才生效"""
+        plugin_dir = make_plugin(
+            "plugin_combined",
+            {
+                "effective_scope": {"nodes": ["master"], "roles": ["code_agent"]},
+                "mcp": [{"type": "stdio", "name": "comb-mcp", "command": "npx"}],
+            },
+        )
+        base_config = {"plugin_dirs": [str(plugin_dir)]}
+
+        # 同时满足：master + code_agent → 生效
+        jglobals.node_mode = "master"
+        jglobals.agent_role = "code_agent"
+        result = _load_plugin_configs(base_config)
+        assert [i["name"] for i in result["mcp"]] == ["comb-mcp"]
+
+        # 仅满足其一 → 不生效
+        jglobals.node_mode = "master"
+        jglobals.agent_role = "agent"
+        assert "mcp" not in _load_plugin_configs(base_config)
+
+        jglobals.node_mode = "child"
+        jglobals.agent_role = "code_agent"
+        assert "mcp" not in _load_plugin_configs(base_config)
+
+    def test_filtered_plugin_not_merged_not_kept(self, tmp_path, make_plugin):
+        """被过滤插件：不合并扩展点、不保留私有配置、不登记 PluginRegistry"""
+        plugin_dir = make_plugin(
+            "plugin_filtered",
+            {
+                "effective_scope": {"nodes": ["child"]},
+                "mcp": [{"type": "stdio", "name": "filtered-mcp", "command": "npx"}],
+                "code_agent_tools": True,
+                "custom_key": "custom_value",
+            },
+        )
+        base_config = {"plugin_dirs": [str(plugin_dir)]}
+
+        from jarvis.jarvis_tools.plugin_registry import PluginRegistry
+
+        registry = PluginRegistry.instance()
+        registry.clear()
+
+        jglobals.node_mode = "master"
+        jglobals.agent_role = "agent"
+        result = _load_plugin_configs(base_config)
+
+        # 扩展点不合并进全局配置
+        assert "mcp" not in result
+        # 私有配置不保留
+        assert "plugin_filtered" not in result.get("plugin_configs", {})
+        # 不登记 PluginRegistry
+        assert "plugin_filtered" not in registry.get_code_agent_tool_plugins()
+
+    def test_matched_plugin_normal_merge(self, tmp_path, make_plugin):
+        """匹配的插件正常合并扩展点并保留私有配置"""
+        plugin_dir = make_plugin(
+            "plugin_matched",
+            {
+                "effective_scope": {"nodes": ["master"], "roles": ["agent"]},
+                "mcp": [{"type": "stdio", "name": "ok-mcp", "command": "npx"}],
+                "custom_key": "custom_value",
+            },
+        )
+        base_config = {"plugin_dirs": [str(plugin_dir)]}
+
+        jglobals.node_mode = "master"
+        jglobals.agent_role = "agent"
+        result = _load_plugin_configs(base_config)
+
+        assert [i["name"] for i in result["mcp"]] == ["ok-mcp"]
+        assert result["plugin_configs"]["plugin_matched"]["custom_key"] == "custom_value"
 
 
 class TestConfigPriority:

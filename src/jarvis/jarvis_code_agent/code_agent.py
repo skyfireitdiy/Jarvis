@@ -1234,6 +1234,11 @@ def cli(
     # 传入 config_file 以便在检查前加载配置
     check_and_launch_tmux(config_file=config_file)
 
+    # 设置 code agent 进程的角色与节点模式（供插件 effective_scope 生效范围
+    # 过滤），须在 init_env()（其内部会加载插件配置）之前设置。
+    jglobals.agent_role = "code_agent"
+    jglobals.node_mode = os.environ.get("JARVIS_NODE_MODE", "master").strip() or "master"
+
     init_env(
         "欢迎使用 Jarvis-CodeAgent，您的代码工程助手已准备就绪！",
         config_file=config_file,
