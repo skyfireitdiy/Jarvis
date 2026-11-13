@@ -58,6 +58,14 @@ g_in_chat: int = 0
 # agent 进程则遵循插件 auto_load 声明，auto_load=false 的插件扩展点不自动
 # 加载，需通过 '<plugin:插件名>' 手动加载。
 is_gateway: bool = False
+# 当前进程所在节点模式：master 或 child。
+# gateway 进程在启动时从 node_config 设置；agent 子进程通过 JARVIS_NODE_MODE
+# 环境变量继承。用于插件 effective_scope.nodes 生效范围过滤。
+node_mode: str = "master"
+# 当前进程角色：gateway / agent / code_agent。
+# gateway 进程设为 "gateway"；普通 agent 入口设为 "agent"；code agent 入口
+# 设为 "code_agent"。用于插件 effective_scope.roles 生效范围过滤。
+agent_role: str = "agent"
 # 表示是否接收到中断信号
 g_interrupt: int = 0
 # 当前运行的脚本进程 PID

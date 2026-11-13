@@ -1720,6 +1720,60 @@ def reload_plugin_configs() -> bool:
             return False
 
 
+def _normalize_scope_list(value: Any) -> Optional[set]:
+    """把 effective_scope 中的节点/角色声明规范化为 set。
+
+    支持字符串（如 "master"）或列表（如 ["master", "child"]）；None/空值
+    返回 None 表示「未限定该维度」（即该维度全部生效）。
+
+    参数:
+        value: effective_scope.nodes / effective_scope.roles 的原始值
+
+    返回:
+        Optional[set]: 规范化后的字符串集合；未声明时返回 None
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        items = [value]
+    elif isinstance(value, (list, tuple, set)):
+        items = list(value)
+    else:
+        return None
+    normalized = {str(item).strip().lower() for item in items if str(item).strip()}
+    return normalized or None
+
+
+def _plugin_scope_match(plugin_config: Dict[str, Any]) -> bool:
+    """判断插件在当前进程（节点模式 + 角色）下是否应生效。
+
+    读取插件 config.yaml 声明的 effective_scope：
+    - effective_scope 未声明时全部生效（向后兼容）；
+    - effective_scope.nodes 声明了节点列表时，仅当当前 node_mode 在其中才生效；
+    - effective_scope.roles 声明了角色列表时，仅当当前 agent_role 在其中才生效；
+    - 两个维度同时限定，须同时满足才生效。
+
+    参数:
+        plugin_config: 解析后的插件 config 字典
+
+    返回:
+        bool: 当前进程下该插件是否生效
+    """
+    from jarvis.jarvis_utils.globals import agent_role as _agent_role
+    from jarvis.jarvis_utils.globals import node_mode as _node_mode
+
+    scope = plugin_config.get("effective_scope")
+    if not isinstance(scope, dict):
+        return True
+    nodes = _normalize_scope_list(scope.get("nodes"))
+    roles = _normalize_scope_list(scope.get("roles"))
+    if nodes is not None and str(_node_mode).strip().lower() not in nodes:
+        return False
+    if roles is not None and str(_agent_role).strip().lower() not in roles:
+        return False
+    return True
+
+
 def _load_plugin_configs(
     merged_config: Dict[str, Any], config_file_dir: Optional[str] = None
 ) -> Dict[str, Any]:
@@ -1839,6 +1893,19 @@ def _load_plugin_configs(
                     PrettyOutput.auto_print(
                         f"⚠️  插件已禁用，跳过扩展点注册: {plugin_id} ({plugin_path})"
                     )
+                # 生效范围过滤：插件可声明 effective_scope（nodes/roles）限定自身
+                # 在哪些节点、哪些角色下生效；未声明时全部生效（向后兼容）。
+                # 不匹配时完全跳过该插件（不合并扩展点、不登记 PluginRegistry、
+                # 不保留私有配置），保证所有加载途径（自动+手动）均不生效。
+                if not _plugin_scope_match(plugin_config):
+                    from jarvis.jarvis_utils import globals as _jglobals
+
+                    PrettyOutput.auto_print(
+                        f"⚠️  插件 {plugin_id} ({plugin_path}) 声明 effective_scope，"
+                        f"不适用于当前进程（node={_jglobals.node_mode}, "
+                        f"role={_jglobals.agent_role}），跳过加载"
+                    )
+                    continue
                 # 兼容性检查：读取插件声明的接口版本 api_version（默认 "1.0"）
                 plugin_api_version = str(plugin_config.get("api_version", "1.0"))
                 if not _is_api_version_compatible(plugin_api_version):

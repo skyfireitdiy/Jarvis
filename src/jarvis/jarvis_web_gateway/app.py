@@ -2149,6 +2149,11 @@ def create_app(
     # 标记当前为 gateway 进程：gateway 始终加载插件的全部扩展点
     # （不受插件 auto_load 影响），须在 init_env()（其内部会加载插件配置）之前设置。
     jglobals.is_gateway = True
+    # 设置 gateway 进程的角色与节点模式（供插件 effective_scope 生效范围过滤），
+    # 并把节点模式写入环境变量，供 Agent 子进程（os.environ.copy() 继承）感知。
+    jglobals.agent_role = "gateway"
+    jglobals.node_mode = node_config.node_mode
+    os.environ["JARVIS_NODE_MODE"] = node_config.node_mode
 
     init_env(welcome_str="", config_file=None)
 
@@ -13183,6 +13188,13 @@ def run(
 
     # 标记当前为 gateway 进程（须在 init_env 加载插件配置之前设置）
     jglobals.is_gateway = True
+    # 设置 gateway 进程的角色与节点模式（供插件 effective_scope 生效范围过滤），
+    # 并把节点模式写入环境变量，供 Agent 子进程（os.environ.copy() 继承）感知。
+    if node_config is None:
+        node_config = build_node_runtime_config()
+    jglobals.agent_role = "gateway"
+    jglobals.node_mode = node_config.node_mode
+    os.environ["JARVIS_NODE_MODE"] = node_config.node_mode
 
     # 初始化环境并加载配置文件
     init_env(welcome_str="", config_file=None)
