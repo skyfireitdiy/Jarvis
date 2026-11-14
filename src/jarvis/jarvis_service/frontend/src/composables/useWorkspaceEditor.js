@@ -2238,10 +2238,16 @@ function closeTabContextMenu() {
 
 function openTabContextMenu(paneId, path, event) {
   if (!path) return
+  const MENU_W = 220
+  const MENU_H = 200
+  let x = event?.clientX || 0
+  let y = event?.clientY || 0
+  if (x + MENU_W > window.innerWidth) x = Math.max(window.innerWidth - MENU_W, 0)
+  if (y + MENU_H > window.innerHeight) y = Math.max(window.innerHeight - MENU_H, 0)
   tabContextMenu.value = {
     visible: true,
-    x: event?.clientX || 0,
-    y: event?.clientY || 0,
+    x,
+    y,
     paneId: paneId || null,
     path,
   }

@@ -424,10 +424,12 @@ async function copyTextToClipboard(text) {
 }
 
 // 在目录树节点/工作目录根上右键：就地弹出菜单（视口坐标 + 边界收敛）
+// 先按估算尺寸定位，渲染后测量实际宽高再二次收敛，确保菜单不超出视口。
 function openFileTreeContextMenu(agent, node, event) {
   if (!agent || !event) return
-  const MENU_W = 220
-  const MENU_H = 420
+  // 估算尺寸：宽度按菜单最大宽度，高度按视口 60%（与 CSS max-height 一致）
+  const MENU_W = 320
+  const MENU_H = Math.min(420, window.innerHeight * 0.6)
   let x = event.clientX
   let y = event.clientY
   if (x + MENU_W > window.innerWidth) x = Math.max(window.innerWidth - MENU_W, 0)
@@ -439,8 +441,20 @@ function openFileTreeContextMenu(agent, node, event) {
     agentId: agent.agent_id,
     node: node || null,
   }
-  // 点击菜单外部时关闭（一次性监听，避免常驻 document 监听）
+  // 渲染后按菜单实际宽高二次收敛（菜单项增多/视口变化时仍不越界）
   nextTick(() => {
+    if (!fileTreeContextMenu.value.visible) return
+    const el = document.querySelector('.file-tree-context-menu')
+    if (el) {
+      const rect = el.getBoundingClientRect()
+      let nx = fileTreeContextMenu.value.x
+      let ny = fileTreeContextMenu.value.y
+      if (nx + rect.width > window.innerWidth) nx = Math.max(window.innerWidth - rect.width, 0)
+      if (ny + rect.height > window.innerHeight) ny = Math.max(window.innerHeight - rect.height, 0)
+      if (nx !== fileTreeContextMenu.value.x || ny !== fileTreeContextMenu.value.y) {
+        fileTreeContextMenu.value = { ...fileTreeContextMenu.value, x: nx, y: ny }
+      }
+    }
     document.addEventListener('pointerdown', closeFileTreeContextMenu, { once: true })
   })
 }

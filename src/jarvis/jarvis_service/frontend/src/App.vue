@@ -4562,10 +4562,16 @@ function closeSessionTabContextMenu() {
 
 function openSessionTabContextMenu(paneId, panelId, event) {
   if (!panelId) return
+  const MENU_W = 220
+  const MENU_H = 160
+  let x = event?.clientX || 0
+  let y = event?.clientY || 0
+  if (x + MENU_W > window.innerWidth) x = Math.max(window.innerWidth - MENU_W, 0)
+  if (y + MENU_H > window.innerHeight) y = Math.max(window.innerHeight - MENU_H, 0)
   sessionTabContextMenu.value = {
     visible: true,
-    x: event?.clientX || 0,
-    y: event?.clientY || 0,
+    x,
+    y,
     paneId: paneId || null,
     panelId,
   }
