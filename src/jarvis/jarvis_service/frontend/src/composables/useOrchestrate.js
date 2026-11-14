@@ -42,6 +42,9 @@ export function useOrchestrate({
   startAgentListRefresh,
   // 配置中的默认代理节点（default_proxy_node），编排文件未显式指定 proxy_node 时兜底
   defaultProxyNode,
+  // 模型组列表与刷新（来自 useAgents，供模型组下拉框使用）
+  modelGroups,
+  fetchModelGroups,
 }) {
   const showOrchestrateModal = ref(false)          // 编排弹窗
   const orchestrateNodeId = ref('master')          // 编排文件所在节点（也是创建 Agent 的默认节点）
@@ -115,6 +118,8 @@ export function useOrchestrate({
     orchestrateNodeId.value = allowed.some(n => n.node_id === orchestrateNodeId.value)
       ? orchestrateNodeId.value
       : (getDefaultCreateAgentNodeId() || 'master')
+    // 拉取当前节点上的模型组列表（供模型组下拉框使用）
+    fetchModelGroups(orchestrateNodeId.value)
     // 拉取当前节点上插件声明的编排模板，供用户直接选择
     loadOrchestratePluginTemplates()
     // 加载最近使用过的编排文件历史
@@ -698,11 +703,13 @@ export function useOrchestrate({
   watch(orchestrateDirSearchText, () => {
     orchestrateSelectedIndex.value = -1
   })
-  // 切换编排节点：重新拉取文件列表
+  // 切换编排节点：重新拉取文件列表与模型组
   async function onOrchestrateNodeChange() {
     orchestrateFilePath.value = ''
     orchestrateSelectedFile.value = ''
     orchestrateSelectedIndex.value = -1
+    // 节点切换后重新拉取该节点上的模型组列表（供模型组下拉框使用）
+    fetchModelGroups(orchestrateNodeId.value)
     // 节点切换后重新拉取该节点上的插件编排模板
     loadOrchestratePluginTemplates()
     if (orchestrateShowBrowser.value) {
