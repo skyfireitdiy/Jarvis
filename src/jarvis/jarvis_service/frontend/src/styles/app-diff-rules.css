@@ -339,8 +339,16 @@
 /* ========== Rules 浮动窗口样式结束 ========== */
 
 /* ========== Markdown 预览浮动窗口样式 ========== */
+/* 预览弹窗独立遮罩：半透明背景 + 背景虚化，不影响 diff/rules 等其他弹窗的透明遮罩 */
+.md-preview-overlay {
+  background: rgba(4, 10, 20, 0.6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
 .md-preview-modal {
-  max-width: 860px;
+  max-width: 96vw;
+  width: 96vw;
 }
 
 .md-preview-body {
@@ -350,6 +358,9 @@
   background: var(--color-bg-tertiary);
 }
 
+/* 预览内容：复用会话消息 markdown 样式（App.vue 中内容元素同时带
+   message-body markdown-content 类，命中 app-chat.css 的 :deep() 规则），
+   这里仅保留预览场景自身的排版与容器样式。 */
 .md-preview-content {
   padding: 20px 24px;
   line-height: 1.7;
@@ -358,8 +369,9 @@
   word-wrap: break-word;
 }
 
-/* 复用会话 markdown 内容样式：表格、代码块、引用等 */
-.md-preview-content pre {
+/* 预览内容子元素：scoped 下 v-html 注入的元素无 data-v 属性，普通选择器不生效，
+   须用 :deep() 命中（与 app-chat.css 会话 markdown 样式同法）。 */
+.md-preview-content :deep(pre) {
   background: var(--color-bg-secondary);
   border: 0.5px solid var(--color-border-subtle);
   border-radius: 8px;
@@ -368,37 +380,37 @@
   line-height: 1.5;
 }
 
-.md-preview-content code {
+.md-preview-content :deep(code) {
   font-family: 'SF Mono', Monaco, Consolas, 'Courier New', monospace;
   font-size: 13px;
 }
 
-.md-preview-content table {
+.md-preview-content :deep(table) {
   border-collapse: collapse;
   margin: 12px 0;
   width: 100%;
 }
 
-.md-preview-content th,
-.md-preview-content td {
+.md-preview-content :deep(th),
+.md-preview-content :deep(td) {
   border: 0.5px solid var(--color-border-subtle);
   padding: 6px 12px;
   text-align: left;
 }
 
-.md-preview-content th {
+.md-preview-content :deep(th) {
   background: var(--color-bg-secondary);
   font-weight: 600;
 }
 
-.md-preview-content blockquote {
+.md-preview-content :deep(blockquote) {
   margin: 12px 0;
   padding: 4px 16px;
   border-left: 3px solid var(--color-accent);
   color: var(--color-text-secondary, #8ba3b8);
 }
 
-.md-preview-content img {
+.md-preview-content :deep(img) {
   max-width: 100%;
 }
 

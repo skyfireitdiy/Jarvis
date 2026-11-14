@@ -1395,16 +1395,31 @@
     </div>
 
     <!-- Markdown 预览浮动窗口（目录树右键菜单插件回调，复用会话渲染管线） -->
-    <div v-if="mdPreview" class="diff-modal-overlay" @click.self="closeMarkdownPreview">
+    <div v-if="mdPreview" class="diff-modal-overlay md-preview-overlay" @click.self="closeMarkdownPreview">
       <div class="diff-modal md-preview-modal">
         <div class="diff-modal-header">
           <h3>Markdown 预览<span v-if="mdPreview.title" class="diff-modal-count">（{{ mdPreview.title }}）</span></h3>
-          <button class="icon-btn" @click="closeMarkdownPreview" title="关闭">✕</button>
+          <div class="diff-modal-header-actions">
+            <button class="icon-btn" @click="copyMarkdownPreviewText" title="复制文字" v-if="mdPreview.html">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
+            <button class="icon-btn" @click="exportMarkdownPreviewImage($event)" title="复制为图片" v-if="mdPreview.html">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <path d="M21 15l-5-5L5 21"></path>
+              </svg>
+            </button>
+            <button class="icon-btn" @click="closeMarkdownPreview" title="关闭">✕</button>
+          </div>
         </div>
         <div class="diff-modal-body md-preview-body">
           <div v-if="mdPreview.loading" class="diff-loading">加载中...</div>
           <div v-else-if="mdPreview.error" class="diff-error">{{ mdPreview.error }}</div>
-          <div v-else class="markdown-content md-preview-content" v-html="mdPreview.html"></div>
+          <div v-else class="message-body markdown-content md-preview-content" v-html="mdPreview.html"></div>
         </div>
       </div>
     </div>
@@ -2014,6 +2029,7 @@ import QuickCreateAgentModal from './components/QuickCreateAgentModal.vue'
 import SessionPanel from './components/SessionPanel.vue'
 import { renderSideBySideDiff, escapeHtml } from './diffRenderer.js'
 import { parseUnifiedDiff, extractDiffContext } from './gitDiffParser.js'
+import { exportElementAsImage } from './utils/exportImage.js'
 import { useDiff } from './composables/useDiff.js'
 import RenameAgentModal from './components/RenameAgentModal.vue'
 import InputPromptModal from './components/InputPromptModal.vue'
@@ -6588,9 +6604,60 @@ const {
   BASE_Z_INDEX,
 })
 // Markdown 预览弹窗状态（目录树右键菜单插件回调填充）
-const mdPreview = ref(null) // { title, path, html, loading, error } | null
+const mdPreview = ref(null) // { title, path, content, html, loading, error } | null
 function closeMarkdownPreview() {
   mdPreview.value = null
+}
+// 复制预览原始 Markdown 文本（照 SessionPanel 复制文字逻辑：clipboard 优先，降级 textarea+execCommand）
+async function copyMarkdownPreviewText() {
+  const text = mdPreview.value?.content
+  if (!text) {
+    showToast('没有可复制的文字', 'error')
+    return
+  }
+  try {
+    await navigator.clipboard.writeText(text)
+    showToast('已复制到剪贴板', 'success')
+  } catch (err) {
+    console.error('[COPY] Failed to copy text:', err)
+    try {
+      const textArea = document.createElement('textarea')
+      textArea.value = text
+      textArea.style.position = 'fixed'
+      textArea.style.opacity = '0'
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      showToast('已复制到剪贴板', 'success')
+    } catch (fallbackErr) {
+      console.error('[COPY] Fallback also failed:', fallbackErr)
+      showToast('复制失败，请手动复制', 'error')
+    }
+  }
+}
+// 导出预览内容为图片（照 SessionPanel 导出逻辑：exportElementAsImage 合成带信息条的 PNG，优先复制剪贴板）
+async function exportMarkdownPreviewImage(event) {
+  const contentEl = event?.currentTarget?.closest('.md-preview-modal')?.querySelector('.md-preview-content')
+  if (!contentEl) return
+  const title = mdPreview.value?.title || ''
+  const path = mdPreview.value?.path || ''
+  const result = await exportElementAsImage(contentEl, {
+    title: title || 'Markdown 预览',
+    subtitle: path,
+    time: new Date().toLocaleString(),
+    filename: `jarvis-md-preview-${Date.now()}`,
+  })
+  if (!result.ok) {
+    showToast(result.error || '导出失败', 'error')
+    return
+  }
+  const tip = result.mode === 'clipboard'
+    ? '图片已复制到剪贴板'
+    : result.mode === 'clipboard+download'
+      ? '图片已复制并下载'
+      : '已下载图片'
+  showToast(tip, 'success')
 }
 // 插件目录树右键菜单回调结果处理：条目声明 display: preview 时，插件回调返回
 // 原始 Markdown 文本（data.content），这里用与会话消息一致的渲染管线
@@ -6605,6 +6672,7 @@ function openMarkdownPreview({ data }) {
   mdPreview.value = {
     title: (data && data.title) || '',
     path: (data && data.path) || '',
+    content,
     html: marked.parse(content, { breaks: true }),
     loading: false,
     error: null,
