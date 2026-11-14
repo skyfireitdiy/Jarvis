@@ -18,3 +18,14 @@ after_model_call_cb_dirs:
 # 扩展点：工具输出二次脱敏（防泄露）
 tool_output_sanitizer_dirs:
   - "{{plugin_dir}}/callbacks"
+
+# 能力清单（供前端"能力详情"展示）
+capabilities:
+  - name: "发送前脱敏"
+    description: "模型调用前扫描消息中的敏感凭据（API Key、Token、私钥等），替换为占位符 ⟦SECRET_xxx⟧，防泄露给模型"
+  - name: "返回后还原"
+    description: "模型响应中的占位符还原为真实敏感值，保证用户看到真实内容、模型只看到占位符"
+  - name: "工具输出二次脱敏"
+    description: "工具执行结果回填会话历史前再次扫描，把真实敏感值替换为已有占位符，防二次泄露"
+  - name: "会话持久化"
+    description: "占位符→真实值映射随会话保存/恢复，跨会话保持脱敏一致性"
