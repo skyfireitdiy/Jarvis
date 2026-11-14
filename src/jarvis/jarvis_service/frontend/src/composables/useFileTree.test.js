@@ -8,7 +8,7 @@ function makeAgent({ id = 'agent-1', nodeId = 'node-1', workingDir = '/home/user
   return { agent_id: id, node_id: nodeId, working_dir: workingDir, virtual }
 }
 
-function makeHarness({ agent = null, directoryItems = [], fetchImpl } = {}) {
+function makeHarness({ agent = null, directoryItems = [], fetchImpl, pluginContextMenuItems = [], onPluginContextMenuResult } = {}) {
   const agentList = ref(agent ? [agent] : [])
   const getVirtualWorkspaceAgent = vi.fn((agentId) => (agent && agent.agent_id === agentId ? agent : null))
   const resolveFileTreeAgent = vi.fn((agentId) => (agent && agent.agent_id === agentId ? agent : null))
@@ -29,6 +29,8 @@ function makeHarness({ agent = null, directoryItems = [], fetchImpl } = {}) {
   )
   const buildNodeHttpUrl = vi.fn((host, port, nodeId, path) => `http://${host}:${port}/api/node/${nodeId}/${path}`)
   const getGatewayAddress = vi.fn(() => ({ host: '127.0.0.1', port: '8000' }))
+  const getHttpProtocol = vi.fn(() => 'http')
+  const pluginContextMenuItemsRef = ref(pluginContextMenuItems)
   const showToast = vi.fn()
   const showConfirm = vi.fn((msg, onOk) => onOk && onOk())
   const globalSearchFileGlob = ref('')
@@ -45,10 +47,13 @@ function makeHarness({ agent = null, directoryItems = [], fetchImpl } = {}) {
     fetchWithAuth,
     buildNodeHttpUrl,
     getGatewayAddress,
+    getHttpProtocol,
     showToast,
     showConfirm,
     globalSearchFileGlob,
     ensureWorkspaceSidebarFileTree,
+    pluginContextMenuItems: pluginContextMenuItemsRef,
+    onPluginContextMenuResult,
   })
   return {
     api,
@@ -63,10 +68,12 @@ function makeHarness({ agent = null, directoryItems = [], fetchImpl } = {}) {
     fetchWithAuth,
     buildNodeHttpUrl,
     getGatewayAddress,
+    getHttpProtocol,
     showToast,
     showConfirm,
     globalSearchFileGlob,
     ensureWorkspaceSidebarFileTree,
+    pluginContextMenuItems: pluginContextMenuItemsRef,
   }
 }
 
@@ -424,6 +431,41 @@ describe('useFileTree', () => {
       expect(ids).toContain('rename')
       expect(ids).toContain('delete')
     })
+    it('插件菜单项：有 Agent 时启用，并携带 plugin/pluginExt 信息', () => {
+      const pluginMenuExt = {
+        nodeId: 'node-1',
+        plugin: 'md-preview',
+        extType: 'context_menu_items',
+        id: 'preview',
+        title: 'Markdown 预览',
+        iconSvg: '<svg></svg>',
+      }
+      const { api } = makeHarness({ agent: makeAgent(), pluginContextMenuItems: [pluginMenuExt] })
+      api.openFileTreeContextMenu(makeAgent(), null, { clientX: 0, clientY: 0 })
+      const actions = api.fileTreeContextActions.value
+      const pluginAction = actions.find((a) => a.id === 'plugin:md-preview:preview')
+      expect(pluginAction).toBeTruthy()
+      expect(pluginAction.label).toBe('Markdown 预览')
+      expect(pluginAction.icon).toBe('<svg></svg>')
+      expect(pluginAction.enabled).toBe(true)
+      expect(pluginAction.plugin).toBe('md-preview')
+      expect(pluginAction.pluginExt).toEqual(pluginMenuExt)
+    })
+    it('插件菜单项：无 Agent（未选中）时禁用', () => {
+      const pluginMenuExt = {
+        nodeId: 'node-1',
+        plugin: 'md-preview',
+        extType: 'context_menu_items',
+        id: 'preview',
+        title: 'Markdown 预览',
+      }
+      const { api } = makeHarness({ agent: makeAgent(), pluginContextMenuItems: [pluginMenuExt] })
+      // 未 openFileTreeContextMenu：无 agentId
+      const actions = api.fileTreeContextActions.value
+      const pluginAction = actions.find((a) => a.id === 'plugin:md-preview:preview')
+      expect(pluginAction).toBeTruthy()
+      expect(pluginAction.enabled).toBe(false)
+    })
   })
 
   describe('runFileTreeContextAction', () => {
@@ -506,6 +548,100 @@ describe('useFileTree', () => {
       await api.runFileTreeContextAction(action)
       expect(globalSearchFileGlob.value).toBe('src/**')
       expect(setWorkspaceSidebarView).toHaveBeenCalledWith('search')
+    })
+    it('插件菜单项：调用 function-call 回调并提示成功', async () => {
+      const agent = makeAgent()
+      const pluginMenuExt = {
+        nodeId: 'node-1',
+        plugin: 'md-preview',
+        extType: 'context_menu_items',
+        id: 'preview',
+        title: 'Markdown 预览',
+      }
+      const fetchImpl = vi.fn(async () => ({ ok: true, json: async () => ({ success: true, data: {} }) }))
+      const { api, fetchWithAuth, showToast } = makeHarness({
+        agent,
+        pluginContextMenuItems: [pluginMenuExt],
+        fetchImpl,
+      })
+      const fileNode = { name: 'a.md', path: '/home/user/proj/a.md', type: 'file' }
+      api.openFileTreeContextMenu(agent, fileNode, { clientX: 0, clientY: 0 })
+      const action = api.fileTreeContextActions.value.find((a) => a.id === 'plugin:md-preview:preview')
+      await api.runFileTreeContextAction(action)
+      expect(fetchWithAuth).toHaveBeenCalled()
+      const call = fetchWithAuth.mock.calls.find((c) => String(c[0]).includes('/api/plugins/node-1/function-call'))
+      expect(call).toBeTruthy()
+      const body = JSON.parse(call[1].body)
+      expect(body.plugin).toBe('md-preview')
+      expect(body.function).toBe('preview')
+      expect(body.arguments.nodeId).toBe('node-1')
+      expect(body.arguments.agentId).toBe('agent-1')
+      expect(body.arguments.path).toBe('/home/user/proj/a.md')
+      expect(body.arguments.dirPath).toBe('/home/user/proj')
+      expect(body.arguments.nodeType).toBe('file')
+      expect(body.arguments.workingDir).toBe('/home/user/proj')
+      expect(body.arguments.plugin).toBe('md-preview')
+      expect(body.arguments.itemId).toBe('preview')
+      expect(showToast).toHaveBeenCalledWith('操作完成', 'success')
+    })
+    it('插件菜单项：回调失败时提示错误', async () => {
+      const agent = makeAgent()
+      const pluginMenuExt = {
+        nodeId: 'node-1',
+        plugin: 'md-preview',
+        extType: 'context_menu_items',
+        id: 'preview',
+        title: 'Markdown 预览',
+      }
+      const fetchImpl = vi.fn(async () => ({
+        ok: false,
+        json: async () => ({ success: false, error: { message: '权限不足' } }),
+      }))
+      const { api, fetchWithAuth, showToast } = makeHarness({
+        agent,
+        pluginContextMenuItems: [pluginMenuExt],
+        fetchImpl,
+      })
+      const fileNode = { name: 'a.md', path: '/home/user/proj/a.md', type: 'file' }
+      api.openFileTreeContextMenu(agent, fileNode, { clientX: 0, clientY: 0 })
+      const action = api.fileTreeContextActions.value.find((a) => a.id === 'plugin:md-preview:preview')
+      await api.runFileTreeContextAction(action)
+      expect(fetchWithAuth).toHaveBeenCalled()
+      expect(showToast).toHaveBeenCalledWith('权限不足', 'error')
+    })
+    it('插件菜单项：display: preview 时把回调 data 交给 onPluginContextMenuResult', async () => {
+      const agent = makeAgent()
+      const pluginMenuExt = {
+        nodeId: 'node-1',
+        plugin: 'md-preview',
+        extType: 'context_menu_items',
+        id: 'preview',
+        title: 'Markdown 预览',
+        display: 'preview',
+      }
+      const fetchImpl = vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ success: true, data: { content: '# hi', title: 'a.md' } }),
+      }))
+      const onPluginContextMenuResult = vi.fn()
+      const { api, fetchWithAuth, showToast } = makeHarness({
+        agent,
+        pluginContextMenuItems: [pluginMenuExt],
+        fetchImpl,
+        onPluginContextMenuResult,
+      })
+      const fileNode = { name: 'a.md', path: '/home/user/proj/a.md', type: 'file' }
+      api.openFileTreeContextMenu(agent, fileNode, { clientX: 0, clientY: 0 })
+      const action = api.fileTreeContextActions.value.find((a) => a.id === 'plugin:md-preview:preview')
+      await api.runFileTreeContextAction(action)
+      expect(fetchWithAuth).toHaveBeenCalled()
+      expect(onPluginContextMenuResult).toHaveBeenCalledWith({
+        plugin: 'md-preview',
+        itemId: 'preview',
+        data: { content: '# hi', title: 'a.md' },
+      })
+      // 走了预览分支，不应再提示「操作完成」
+      expect(showToast).not.toHaveBeenCalled()
     })
   })
 

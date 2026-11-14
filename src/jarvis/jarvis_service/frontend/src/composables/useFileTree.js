@@ -53,10 +53,13 @@ export function useFileTree({
   fetchWithAuth,
   buildNodeHttpUrl,
   getGatewayAddress,
+  getHttpProtocol,
   showToast,
   showConfirm,
   globalSearchFileGlob,
   ensureWorkspaceSidebarFileTree,
+  pluginContextMenuItems,
+  onPluginContextMenuResult,
 }) {
 // 文件树状态管理
 const fileTreeState = ref(new Map())        // 每个 Agent 的文件树数据：agent_id -> treeData
@@ -453,6 +456,16 @@ const fileTreeContextActions = computed(() => {
   const isVirtualDir = resolveFileTreeAgent(fileTreeContextMenu.value.agentId)?.virtual === true
   // 「下载」仅对文件节点可用（目录/根不支持）
   const isFileNode = fileTreeContextMenu.value.node?.type === 'file'
+  // 插件声明的目录树右键菜单条目（context_menu_items 扩展点）：
+  // 需要作用对象（Agent + 节点/工作目录），文件类插件可自行按节点类型过滤。
+  const pluginItems = (pluginContextMenuItems?.value || []).map((ext) => ({
+    id: `plugin:${ext.plugin}:${ext.id}`,
+    label: ext.title || ext.id,
+    icon: ext.iconSvg || '',
+    enabled: hasAgent,
+    plugin: ext.plugin,
+    pluginExt: ext,
+  }))
   return [
     { id: 'new-file', label: '新建文件', icon: FILE_TREE_CTX_ICONS.newFile, enabled: hasAgent },
     { id: 'new-folder', label: '新建文件夹', icon: FILE_TREE_CTX_ICONS.newFolder, enabled: hasAgent },
@@ -468,6 +481,7 @@ const fileTreeContextActions = computed(() => {
     { id: 'rename', label: '重命名', icon: FILE_TREE_CTX_ICONS.rename, enabled: hasNode },
     { id: 'delete', label: '删除', icon: FILE_TREE_CTX_ICONS.trash, enabled: hasNode },
     { id: 'remove-dir', label: '移除目录', icon: FILE_TREE_CTX_ICONS.removeDir, enabled: isVirtualDir },
+    ...pluginItems,
   ]
 })
 
@@ -489,6 +503,13 @@ async function runFileTreeContextAction(action) {
   const agent = resolveFileTreeAgent(menu.agentId)
   closeFileTreeContextMenu()
   if (!agent) return
+
+  // 插件菜单项（context_menu_items 扩展点）：id 形如 `plugin:<插件名>:<条目id>`，
+  // 通过插件私有功能代理端点调用回调（PUBLIC_FUNCTIONS 白名单）。
+  if (action.plugin && action.pluginExt) {
+    await runPluginFileTreeContextAction(action, menu, agent)
+    return
+  }
 
   if (action.id === 'remove-dir') {
     removeWorkspaceDir(agent.agent_id)
@@ -642,6 +663,67 @@ async function runFileTreeContextAction(action) {
       () => {},
       false
     )
+  }
+}
+
+// 调用插件目录树右键菜单回调（context_menu_items 扩展点）。
+// 复用插件私有功能代理端点 POST /api/plugins/{node_id}/function-call，
+// 只允许调用插件 plugin/api.py PUBLIC_FUNCTIONS 白名单内的函数。
+// 回调参数：{ nodeId, agentId, path, dirPath, nodeType, workingDir, plugin, itemId }
+async function runPluginFileTreeContextAction(action, menu, agent) {
+  const ext = action.pluginExt
+  const plugin = action.plugin
+  const functionName = ext.callback || ext.id
+  if (!plugin || !functionName) {
+    showToast('插件菜单项缺少回调配置', 'error')
+    return
+  }
+  const nodeId = String(agent.node_id || 'master').trim() || 'master'
+  const targetPath = getFileTreeContextTargetPath()
+  const dirPath = getFileTreeContextDirPath()
+  const nodeType = menu.node?.type || 'root'
+  const protocol = typeof getHttpProtocol === 'function' ? getHttpProtocol() : 'http'
+  const { host, port } = getGatewayAddress()
+  const url = `${protocol}://${host}:${port}/api/plugins/${encodeURIComponent(nodeId)}/function-call`
+  try {
+    const response = await fetchWithAuth(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        plugin,
+        function: functionName,
+        arguments: {
+          nodeId,
+          agentId: agent.agent_id,
+          path: targetPath,
+          dirPath,
+          nodeType,
+          workingDir: agent.working_dir || '',
+          plugin,
+          itemId: ext.id,
+        },
+      }),
+    })
+    let result = null
+    try {
+      result = await response.json()
+    } catch (e) {
+      result = null
+    }
+    if (!response.ok || !result || !result.success) {
+      const err = (result && result.error) || {}
+      throw new Error(err.message || err.code || '插件回调失败')
+    }
+    // 回调成功：条目声明 display: preview 时，把 data 交给上层做 Markdown 预览；
+    // 否则仅提示成功（通用菜单项）。
+    const data = result.result || result.data || null
+    if (ext.display === 'preview' && typeof onPluginContextMenuResult === 'function') {
+      onPluginContextMenuResult({ plugin, itemId: ext.id, data })
+    } else {
+      showToast('操作完成', 'success')
+    }
+  } catch (error) {
+    showToast(error.message || '插件回调失败', 'error')
   }
 }
 
