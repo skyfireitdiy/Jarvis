@@ -32,6 +32,8 @@ function makeHarness(overrides = {}) {
   const openDirDialog = vi.fn()
   const startAgentListRefresh = vi.fn()
   const defaultProxyNode = ref('')
+  const modelGroups = ref([])
+  const fetchModelGroups = vi.fn()
   const api = useOrchestrate({
     agentList,
     availableNodeOptions,
@@ -55,6 +57,8 @@ function makeHarness(overrides = {}) {
     openDirDialog,
     startAgentListRefresh,
     defaultProxyNode,
+    modelGroups,
+    fetchModelGroups,
     ...overrides,
   })
   return {
@@ -81,6 +85,8 @@ function makeHarness(overrides = {}) {
     openDirDialog,
     startAgentListRefresh,
     defaultProxyNode,
+    modelGroups,
+    fetchModelGroups,
   }
 }
 describe('useOrchestrate', () => {
@@ -177,7 +183,7 @@ describe('useOrchestrate', () => {
     expect(form.proxyNode).toBe('')
   })
   it('openOrchestrateModal：打开弹窗、初始化状态、加载模板与最近历史', async () => {
-    const { api, fetchNodeStatus, getDefaultCreateAgentNodeId, loadOrchestratePluginTemplates } = makeHarness()
+    const { api, fetchNodeStatus, getDefaultCreateAgentNodeId, loadOrchestratePluginTemplates, fetchModelGroups } = makeHarness()
     // 不 mock loadOrchestratePluginTemplates，让它真实执行（无 fetchWithAuth mock 时返回空）
     api.showOrchestrateModal.value = false
     await api.openOrchestrateModal()
@@ -189,6 +195,8 @@ describe('useOrchestrate', () => {
     expect(api.orchestrateActiveIndex.value).toBe(0)
     expect(api.orchestrateFilePath.value).toBe('')
     expect(getDefaultCreateAgentNodeId).toHaveBeenCalled()
+    // 打开弹窗时按编排节点刷新模型组列表（供模型组下拉框使用）
+    expect(fetchModelGroups).toHaveBeenCalled()
   })
   it('openOrchestrateModal：节点选项为空时拉取节点状态', async () => {
     const { api, fetchNodeStatus } = makeHarness()

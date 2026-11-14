@@ -1730,7 +1730,7 @@
       @finish="finishTour"
     />
     <!-- 编排弹窗：选节点 + 编排文件 → 解析出 Agent 列表（每个一个标签页，可编辑）→ 一键创建 -->
-    <div v-if="showOrchestrateModal" class="orchestrate-overlay" @click.self="closeOrchestrateModal">
+    <div v-if="showOrchestrateModal" class="orchestrate-overlay">
       <div class="orchestrate-modal">
         <div class="orchestrate-header">
           <h2>编排：批量创建 Agent</h2>
@@ -1867,11 +1867,11 @@
             </div>
             <div class="orchestrate-field">
               <label class="orchestrate-label">模型组</label>
-              <input v-model="orchestrateAgents[orchestrateActiveIndex].llmGroup" class="orchestrate-input" type="text" placeholder="default">
-            </div>
-            <div class="orchestrate-field">
-              <label class="orchestrate-label">工具组</label>
-              <input v-model="orchestrateAgents[orchestrateActiveIndex].toolGroup" class="orchestrate-input" type="text" placeholder="default">
+              <select v-model="orchestrateAgents[orchestrateActiveIndex].llmGroup" class="orchestrate-input">
+                <option v-for="group in modelGroups" :key="group.name" :value="group.name">
+                  {{ group.name }} ({{ group.smart_model }}, {{ group.normal_model }}, {{ group.cheap_model }})
+                </option>
+              </select>
             </div>
             <div class="orchestrate-field">
               <label class="orchestrate-label">目标节点</label>
@@ -7373,6 +7373,8 @@ const {
   openDirDialog,
   startAgentListRefresh,
   defaultProxyNode,
+  modelGroups,
+  fetchModelGroups,
 })
 // 切换当前工作的 Agent
 
