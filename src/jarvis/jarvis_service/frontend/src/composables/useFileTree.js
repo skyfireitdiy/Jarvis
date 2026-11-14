@@ -472,14 +472,30 @@ const fileTreeContextActions = computed(() => {
   const isFileNode = fileTreeContextMenu.value.node?.type === 'file'
   // 插件声明的目录树右键菜单条目（context_menu_items 扩展点）：
   // 需要作用对象（Agent + 节点/工作目录），文件类插件可自行按节点类型过滤。
-  const pluginItems = (pluginContextMenuItems?.value || []).map((ext) => ({
-    id: `plugin:${ext.plugin}:${ext.id}`,
-    label: ext.title || ext.id,
-    icon: ext.iconSvg || '',
-    enabled: hasAgent,
-    plugin: ext.plugin,
-    pluginExt: ext,
-  }))
+  // 条目可声明 match 条件（{ nodeType: 'file'|'directory', ext: ['.md', ...] }），
+  // 不满足当前右键节点时隐藏该条目（缺省不声明则始终显示）。
+  const ctxNode = fileTreeContextMenu.value.node
+  const ctxNodeType = ctxNode?.type || 'root'
+  const ctxNodeName = ctxNode?.name || ''
+  const pluginItems = (pluginContextMenuItems?.value || [])
+    .filter((ext) => {
+      const match = ext.match
+      if (!match || typeof match !== 'object') return true
+      if (match.nodeType && ctxNodeType !== match.nodeType) return false
+      if (Array.isArray(match.ext) && match.ext.length) {
+        const lower = ctxNodeName.toLowerCase()
+        if (!match.ext.some((s) => lower.endsWith(String(s).toLowerCase()))) return false
+      }
+      return true
+    })
+    .map((ext) => ({
+      id: `plugin:${ext.plugin}:${ext.id}`,
+      label: ext.title || ext.id,
+      icon: ext.iconSvg || '',
+      enabled: hasAgent,
+      plugin: ext.plugin,
+      pluginExt: ext,
+    }))
   return [
     { id: 'new-file', label: '新建文件', icon: FILE_TREE_CTX_ICONS.newFile, enabled: hasAgent },
     { id: 'new-folder', label: '新建文件夹', icon: FILE_TREE_CTX_ICONS.newFolder, enabled: hasAgent },
@@ -730,7 +746,12 @@ async function runPluginFileTreeContextAction(action, menu, agent) {
     }
     // 回调成功：条目声明 display: preview 时，把 data 交给上层做 Markdown 预览；
     // 否则仅提示成功（通用菜单项）。
-    const data = result.result || result.data || null
+    // 后端 function-call 返回 { success, result: <插件函数返回值> }，插件函数通常
+    // 返回 { success, data }；这里统一解包到真正的数据层（兼容 result 直接是数据的情况）。
+    let data = result.result || result.data || null
+    if (data && typeof data === 'object' && 'data' in data && !('content' in data) && !('html' in data)) {
+      data = data.data
+    }
     if (ext.display === 'preview' && typeof onPluginContextMenuResult === 'function') {
       onPluginContextMenuResult({ plugin, itemId: ext.id, data })
     } else {

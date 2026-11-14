@@ -466,6 +466,36 @@ describe('useFileTree', () => {
       expect(pluginAction).toBeTruthy()
       expect(pluginAction.enabled).toBe(false)
     })
+    it('插件菜单项：match 条件匹配时显示（.md 文件）', () => {
+      const pluginMenuExt = {
+        nodeId: 'node-1',
+        plugin: 'md-preview',
+        extType: 'context_menu_items',
+        id: 'preview',
+        title: 'Markdown 预览',
+        match: { nodeType: 'file', ext: ['.md', '.markdown'] },
+      }
+      const { api } = makeHarness({ agent: makeAgent(), pluginContextMenuItems: [pluginMenuExt] })
+      const mdNode = { name: 'README.md', path: '/home/user/proj/README.md', type: 'file' }
+      api.openFileTreeContextMenu(makeAgent(), mdNode, { clientX: 0, clientY: 0 })
+      const actions = api.fileTreeContextActions.value
+      expect(actions.find((a) => a.id === 'plugin:md-preview:preview')).toBeTruthy()
+    })
+    it('插件菜单项：match 条件不匹配时隐藏（非 .md 文件）', () => {
+      const pluginMenuExt = {
+        nodeId: 'node-1',
+        plugin: 'md-preview',
+        extType: 'context_menu_items',
+        id: 'preview',
+        title: 'Markdown 预览',
+        match: { nodeType: 'file', ext: ['.md', '.markdown'] },
+      }
+      const { api } = makeHarness({ agent: makeAgent(), pluginContextMenuItems: [pluginMenuExt] })
+      const jsNode = { name: 'app.js', path: '/home/user/proj/app.js', type: 'file' }
+      api.openFileTreeContextMenu(makeAgent(), jsNode, { clientX: 0, clientY: 0 })
+      const actions = api.fileTreeContextActions.value
+      expect(actions.find((a) => a.id === 'plugin:md-preview:preview')).toBeFalsy()
+    })
   })
 
   describe('runFileTreeContextAction', () => {
