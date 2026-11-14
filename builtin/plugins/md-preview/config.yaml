@@ -15,6 +15,9 @@ frontend:
       title: "Markdown 预览"
       entry: frontend/menu.js
       icon: frontend/icon.svg
+      # callback: 回调函数名，须在 plugin/api.py 的 PUBLIC_FUNCTIONS 白名单内；
+      # 不写则默认用条目 id（preview）作为函数名
+      callback: preview_markdown
       # display: preview 表示回调返回原始 Markdown 文本，前端用会话渲染管线
       # （marked + mermaid/dot 图表）渲染为 HTML 展示在预览弹窗
       display: preview

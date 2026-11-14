@@ -17,6 +17,7 @@ const { usePluginsMock, pluginStateShell } = vi.hoisted(() => {
     pluginSidebarViews: null,
     pluginToolPanels: null,
     pluginPaneViews: null,
+    pluginContextMenuItems: null,
     pluginSidebarTitle: vi.fn((view) => ''),
     pluginToolPanelTitle: vi.fn((view) => ''),
     pluginPaneTitle: vi.fn((view) => ''),
@@ -69,6 +70,7 @@ function makeHarness(overrides = {}) {
     pluginSidebarViews: computed(() => pluginState.pluginExtensions.value.filter(e => e.extType === 'sidebar_views')),
     pluginToolPanels: computed(() => pluginState.pluginExtensions.value.filter(e => e.extType === 'tool_panels')),
     pluginPaneViews: computed(() => pluginState.pluginExtensions.value.filter(e => e.extType === 'pane_views')),
+    pluginContextMenuItems: computed(() => pluginState.pluginExtensions.value.filter(e => e.extType === 'context_menu_items')),
     workspaceSidebarTitle: computed(() => ''),
     activePluginSidebarComp: computed(() => null),
     activePluginToolPanelComp: computed(() => null),
@@ -747,7 +749,21 @@ describe('useWorkspacePane', () => {
     const returned = usePluginsMock.mock.results[0].value
     expect(api.pluginExtensions).toBe(returned.pluginExtensions)
     expect(api.pluginAdminTabs).toBe(returned.pluginAdminTabs)
+    expect(api.pluginContextMenuItems).toBe(returned.pluginContextMenuItems)
     expect(api.loadPluginExtensionsForUi).toBe(returned.loadPluginExtensionsForUi)
+  })
+
+  it('透传 pluginContextMenuItems：context_menu_items 扩展点可被过滤出来', () => {
+    const { api } = makeHarness()
+    const returned = usePluginsMock.mock.results[0].value
+    // 写入 context_menu_items 扩展，校验 computed 过滤生效（回归：曾漏透传导致目录树右键菜单无插件项）
+    returned.pluginExtensions.value = [
+      { extType: 'admin_tabs', plugin: 'x', id: 'tab1' },
+      { extType: 'context_menu_items', plugin: 'md-preview', id: 'preview' },
+    ]
+    expect(api.pluginContextMenuItems.value).toEqual([
+      { extType: 'context_menu_items', plugin: 'md-preview', id: 'preview' },
+    ])
   })
 
   it('workspaceSidebarView 默认 agents，可切换', () => {
