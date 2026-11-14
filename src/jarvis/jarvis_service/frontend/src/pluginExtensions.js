@@ -49,6 +49,7 @@ export async function fetchPluginExtensions({
         "sidebar_views",
         "tool_panels",
         "pane_views",
+        "context_menu_items",
       ]) {
         const list = frontend[extType];
         if (!Array.isArray(list)) continue;
@@ -64,6 +65,7 @@ export async function fetchPluginExtensions({
             entry: ext.entry,
             icon: ext.icon || null,
             iconSvg: null,
+            display: ext.display || null,
             url: buildExtensionUrl({
               nodeId,
               plugin: plugin.id || plugin.name,

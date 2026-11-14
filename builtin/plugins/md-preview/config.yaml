@@ -1,0 +1,19 @@
+# md-preview 内置插件：目录树右键菜单 Markdown 预览
+# 演示 context_menu_items 扩展点：在目录树右键菜单增加「Markdown 预览」条目，
+# 点击后经插件私有功能代理端点（/function-call）调用 plugin/api.py 的
+# preview_markdown 函数，返回 .md 文件原始 Markdown 文本，前端用会话渲染
+# 管线（marked + mermaid/dot 图表）渲染为 HTML 展示在预览弹窗。
+id: md-preview
+name: md-preview
+version: 1.0.0
+description: 目录树右键菜单 Markdown 预览（context_menu_items 扩展点示例）
+api_version: "1.0"
+frontend:
+  context_menu_items:
+    - id: preview
+      title: "Markdown 预览"
+      entry: frontend/menu.js
+      icon: frontend/icon.svg
+      # display: preview 表示回调返回原始 Markdown 文本，前端用会话渲染管线
+      # （marked + mermaid/dot 图表）渲染为 HTML 展示在预览弹窗
+      display: preview

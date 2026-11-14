@@ -172,6 +172,11 @@ orchestration:
 #     - id: my-pane
 #       title: "我的面板"
 #       entry: pane.js
+#   context_menu_items:
+#     - id: preview
+#       title: "Markdown 预览"
+#       entry: menu.js
+#       display: preview
 # --- 依赖声明（可选，三类：plugins/python/commands）---
 # dependencies:
 #   plugins:
@@ -293,7 +298,7 @@ YAML 编排流水线，配合 `OrganizeAgents` 与 `jca -n --task-file` 消费�
 
 前端通过 `GET /api/plugins/{node_id}/{name}/frontend/{path}` 动态加载插件 JS，用 Blob URL `import()` 加载为 Vue 组件。插件 JS 应**单文件自包含**（不引用相对路径资源），否则 Blob module 无法解析。
 
-#### 6.1 四个扩展点
+#### 6.1 五个扩展点
 
 | 扩展点 | 渲染位置 | 说明 |
 |--------|----------|------|
@@ -301,8 +306,50 @@ YAML 编排流水线，配合 `OrganizeAgents` 与 `jca -n --task-file` 消费�
 | `sidebar_views` | 工作区侧边栏 | 在活动栏新增入口，view 名为 `plugin:<id>` |
 | `tool_panels` | 工作区侧边栏 | 在活动栏新增入口，view 名为 `plugin-tool:<id>`，与 `sidebar_views` 独立 |
 | `pane_views` | 工作区 pane | 插件 UI 作为工作区自由分割 pane 承载，view 名为 `plugin-pane:<id>`（host 单例，同 id 至多一个 pane） |
+| `context_menu_items` | 目录树右键菜单 | 在目录树右键菜单新增动作条目，点击后调用插件私有功能（`plugin/api.py` 的 `PUBLIC_FUNCTIONS` 白名单函数） |
 
-#### 6.2 统一 props（宿主自动注入）
+#### 6.2 context_menu_items（目录树右键菜单）
+
+`context_menu_items` 与前四个扩展点不同：**不加载 Vue 组件**，而是声明"动作条目 + 回调函数"。每项字段：
+
+| 字段 | 必填 | 说明 |
+|------|------|------|
+| `id` | 是 | 条目唯一标识（同插件内） |
+| `title` | 否 | 菜单显示名（缺省用 `id`） |
+| `entry` | 是 | 占位 JS 文件路径（相对插件 frontend 目录）。该扩展点不加载组件，但 `entry` 字段必须非空才能通过 `fetchPluginExtensions` 校验，可指向一个导出空对象的占位文件 |
+| `icon` | 否 | 图标文件路径（相对插件 frontend 目录） |
+| `display` | 否 | 回调结果展示方式。`preview` 表示回调返回的 `data.content` 是原始 Markdown 文本，前端用**会话渲染管线**（marked + mermaid/dot/plantuml 图表）渲染为 HTML 展示在预览弹窗；缺省则仅 toast「操作完成」 |
+
+示例：
+
+```yaml
+frontend:
+  context_menu_items:
+    - id: preview
+      title: "Markdown 预览"
+      entry: frontend/menu.js
+      icon: frontend/icon.svg
+      display: preview
+```
+
+**回调机制**：点击菜单条目后，前端经 `POST /api/plugins/{node_id}/function-call` 调用插件 `plugin/api.py` 中**同名函数**（函数名 = 条目 `id`，或条目可声明 `callback` 字段指定函数名）。回调参数：
+
+```json
+{
+  "nodeId": "master",
+  "agentId": "agent-id",
+  "path": "/abs/path/to/target",
+  "dirPath": "/abs/path/to/dir",
+  "nodeType": "file | directory | root",
+  "workingDir": "/agent/working/dir",
+  "plugin": "plugin-name",
+  "itemId": "preview"
+}
+```
+
+回调函数返回 `{"success": true, "data": {...}}`；`display: preview` 时前端取 `data.content` 渲染。内置示例见 `builtin/plugins/md-preview/`。
+
+#### 6.3 统一 props（宿主自动注入）
 
 宿主在渲染插件组件时会自动注入以下 props（插件组件通过 `props` 声明接收，未声明则忽略）：
 
@@ -325,7 +372,7 @@ export default {
 };
 ```
 
-#### 6.3 window.__jarvis* 接口族
+#### 6.4 window.__jarvis* 接口族
 
 插件组件也可通过全局 `window.__jarvis*` 接口访问宿主能力（无需声明 props）：
 
@@ -344,7 +391,7 @@ export default {
 | `__jarvisOpenFile` | `(path, options) => Promise<{success, path, agentId}>` | 在工作区编辑器中打开文件。`options` 可选 `{agentId}` 或 `{nodeId, workingDir}`（未指定时按路径反查已打开目录，或按节点+目录建立虚拟会话） |
 | `__jarvisGetGatewayInfo` | `() => {host, port, protocol}` | 获取当前网关信息 |
 
-#### 6.4 事件订阅
+#### 6.5 事件订阅
 
 插件可通过 `window.__jarvisOn(event, handler)` 订阅宿主事件，返回取消订阅函数；`window.__jarvisOff(event, handler)` 取消订阅（handler 省略则清空该事件全部订阅）。
 

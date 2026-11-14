@@ -29,6 +29,7 @@ export function usePlugins({
   const pluginSidebarViews = computed(() => pluginExtensions.value.filter(e => e.extType === 'sidebar_views'))
   const pluginToolPanels = computed(() => pluginExtensions.value.filter(e => e.extType === 'tool_panels'))
   const pluginPaneViews = computed(() => pluginExtensions.value.filter(e => e.extType === 'pane_views'))
+  const pluginContextMenuItems = computed(() => pluginExtensions.value.filter(e => e.extType === 'context_menu_items'))
   // 动态侧边栏 view 的标题映射：view 名 = `plugin:${id}`
   function pluginSidebarTitle(view) {
     const ext = pluginSidebarViews.value.find(e => `plugin:${e.id}` === view)
@@ -137,6 +138,7 @@ export function usePlugins({
     pluginSidebarViews,
     pluginToolPanels,
     pluginPaneViews,
+    pluginContextMenuItems,
     pluginSidebarTitle,
     pluginToolPanelTitle,
     pluginPaneTitle,

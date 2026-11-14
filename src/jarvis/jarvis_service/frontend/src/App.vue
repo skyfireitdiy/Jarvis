@@ -1394,6 +1394,21 @@
       </div>
     </div>
 
+    <!-- Markdown 预览浮动窗口（目录树右键菜单插件回调，复用会话渲染管线） -->
+    <div v-if="mdPreview" class="diff-modal-overlay" @click.self="closeMarkdownPreview">
+      <div class="diff-modal md-preview-modal">
+        <div class="diff-modal-header">
+          <h3>Markdown 预览<span v-if="mdPreview.title" class="diff-modal-count">（{{ mdPreview.title }}）</span></h3>
+          <button class="icon-btn" @click="closeMarkdownPreview" title="关闭">✕</button>
+        </div>
+        <div class="diff-modal-body md-preview-body">
+          <div v-if="mdPreview.loading" class="diff-loading">加载中...</div>
+          <div v-else-if="mdPreview.error" class="diff-error">{{ mdPreview.error }}</div>
+          <div v-else class="markdown-content md-preview-content" v-html="mdPreview.html"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Rules 浮动窗口 -->
     <div v-if="showRulesModal" class="diff-modal-overlay" @click.self="showRulesModal = false">
       <div class="diff-modal rules-modal">
@@ -3546,7 +3561,7 @@ const {
   startWorkspacePaneResize, persistWorkspacePaneLayout,
   restoreWorkspacePaneLayout, restoreWorkspacePaneContents,
   // 插件扩展（usePlugins 返回透传）
-  pluginExtensions, pluginAdminTabs, pluginSidebarViews, pluginToolPanels, pluginPaneViews,
+  pluginExtensions, pluginAdminTabs, pluginSidebarViews, pluginToolPanels, pluginPaneViews, pluginContextMenuItems,
   pluginSidebarTitle, pluginToolPanelTitle, pluginPaneTitle, WORKSPACE_SIDEBAR_TITLES, workspaceSidebarTitle,
   loadPluginExtensionsForUi, resolvePluginExtensionComponent, isPluginSidebarView,
   isPluginToolView, isPluginPaneView, pluginSidebarCompCache, activePluginSidebarComp,
@@ -6566,6 +6581,41 @@ const {
   ACTIVE_Z_INDEX,
   BASE_Z_INDEX,
 })
+// Markdown 预览弹窗状态（目录树右键菜单插件回调填充）
+const mdPreview = ref(null) // { title, path, html, loading, error } | null
+function closeMarkdownPreview() {
+  mdPreview.value = null
+}
+// 插件目录树右键菜单回调结果处理：条目声明 display: preview 时，插件回调返回
+// 原始 Markdown 文本（data.content），这里用与会话消息一致的渲染管线
+// （marked + 自定义 renderer，含 mermaid/dot/plantuml 图表）渲染为 HTML 展示。
+// 本函数不感知具体插件，任何声明 display: preview 的 context_menu_items 均可复用。
+function openMarkdownPreview({ data }) {
+  const content = data && (data.content || data.html)
+  if (typeof content !== 'string') {
+    mdPreview.value = { title: '', error: '插件未返回可预览内容' }
+    return
+  }
+  mdPreview.value = {
+    title: (data && data.title) || '',
+    path: (data && data.path) || '',
+    html: marked.parse(content, { breaks: true }),
+    loading: false,
+    error: null,
+  }
+  // 弹窗 DOM 挂载后渲染 mermaid/dot 图表（与会话消息一致）
+  nextTick(() => {
+    const el = document.querySelector('.md-preview-content')
+    if (!el) return
+    if (el.querySelector('.mermaid-container[data-mermaid-source]')) {
+      renderMermaidDiagrams(el)
+    }
+    if (el.querySelector('.dot-container[data-dot-source]')) {
+      renderDotDiagrams(el)
+    }
+  })
+}
+
 // 文件树（状态 + 节点交互/键盘导航/右键菜单/上传下载/文件CRUD/复制粘贴/拖拽/核心加载），
 // 从 App.vue 拆出到 composables/useFileTree.js
 // 依赖 agentList/getVirtualWorkspaceAgent/resolveFileTreeAgent/resolveAgentForPath/openWorkspaceFile/
@@ -6627,10 +6677,13 @@ const {
   fetchWithAuth,
   buildNodeHttpUrl,
   getGatewayAddress,
+  getHttpProtocol,
   showToast,
   showConfirm,
   globalSearchFileGlob,
   ensureWorkspaceSidebarFileTree,
+  pluginContextMenuItems,
+  onPluginContextMenuResult: openMarkdownPreview,
 })
 
 // 读取流水线工作目录下的文件（如审批报告 .df/approval.md）。
