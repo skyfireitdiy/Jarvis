@@ -7,6 +7,7 @@ id: md-preview
 name: md-preview
 version: 1.0.0
 description: 目录树右键菜单 Markdown 预览（context_menu_items 扩展点示例）
+logo: frontend/icon.svg
 api_version: "1.0"
 frontend:
   context_menu_items:
