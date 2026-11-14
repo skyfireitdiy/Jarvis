@@ -175,3 +175,49 @@ def test_lsp_missing_command_still_shown():
     assert len(lsp_caps) == 1
     assert "无命令" in lsp_caps[0]["description"]
     assert "外部程序" in lsp_caps[0]["description"]
+
+
+def test_frontend_context_menu_items_capability():
+    """context_menu_items 扩展点生成具体右键菜单能力项。"""
+    caps = _build(
+        {
+            "frontend": {
+                "context_menu_items": [
+                    {"id": "preview", "title": "Markdown 预览", "display": "preview"},
+                    {"id": "export", "title": "导出"},
+                ]
+            }
+        }
+    )
+    frontend_caps = [c for c in caps if c["type"] == "frontend"]
+    assert len(frontend_caps) == 2
+    assert frontend_caps[0]["name"] == "右键菜单：Markdown 预览"
+    assert "预览弹窗" in frontend_caps[0]["description"]
+    assert frontend_caps[1]["name"] == "右键菜单：导出"
+    assert "回调" in frontend_caps[1]["description"]
+
+
+def test_frontend_pane_views_counts_as_extension():
+    """仅声明 pane_views 的插件也计入前端扩展能力。"""
+    caps = _build({"frontend": {"pane_views": [{"id": "p1"}]}})
+    frontend_caps = [c for c in caps if c["type"] == "frontend"]
+    assert len(frontend_caps) == 1
+    assert "前端扩展" in frontend_caps[0]["name"]
+    assert "pane_views" in frontend_caps[0]["description"]
+
+
+def test_frontend_context_menu_items_missing_id_skipped():
+    """context_menu_items 缺少 id 或非 dict 的项被跳过。"""
+    caps = _build(
+        {
+            "frontend": {
+                "context_menu_items": [
+                    {"title": "无 id"},
+                    "not-a-dict",
+                    {"id": "ok", "title": "正常"},
+                ]
+            }
+        }
+    )
+    frontend_caps = [c for c in caps if c["type"] == "frontend"]
+    assert [c["name"] for c in frontend_caps] == ["右键菜单：正常"]

@@ -2508,7 +2508,7 @@ def _build_plugin_capabilities(config: dict, plugin_dir=None) -> List[dict]:
     frontend = config.get("frontend")
     if isinstance(frontend, dict):
         frontend_parts = []
-        for key in ("admin_tabs", "sidebar_views", "tool_panels"):
+        for key in ("admin_tabs", "sidebar_views", "tool_panels", "pane_views"):
             if frontend.get(key):
                 frontend_parts.append(key)
         if frontend_parts:
@@ -2517,6 +2517,22 @@ def _build_plugin_capabilities(config: dict, plugin_dir=None) -> List[dict]:
                 "前端扩展",
                 "提供前端界面扩展：" + "、".join(frontend_parts),
             )
+        # 目录树右键菜单条目（context_menu_items）：逐个列出菜单项，说明其行为
+        context_menu_items = frontend.get("context_menu_items")
+        if isinstance(context_menu_items, list):
+            for item in context_menu_items:
+                if not isinstance(item, dict):
+                    continue
+                item_id = str(item.get("id") or "").strip()
+                if not item_id:
+                    continue
+                title = str(item.get("title") or item_id)
+                display = item.get("display")
+                if display == "preview":
+                    desc = f"目录树右键菜单「{title}」：回调返回 Markdown，前端以预览弹窗展示"
+                else:
+                    desc = f"目录树右键菜单「{title}」：点击调用插件私有功能回调"
+                _append("frontend", f"右键菜单：{title}", desc)
     # 插件作者声明的自定义能力（事件钩子、@内置命令等）
     custom = config.get("capabilities")
     if isinstance(custom, list):
