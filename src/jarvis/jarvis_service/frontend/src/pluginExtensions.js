@@ -66,6 +66,7 @@ export async function fetchPluginExtensions({
             icon: ext.icon || null,
             iconSvg: null,
             display: ext.display || null,
+            callback: ext.callback || null,
             url: buildExtensionUrl({
               nodeId,
               plugin: plugin.id || plugin.name,
