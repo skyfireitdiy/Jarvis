@@ -18,6 +18,11 @@ frontend:
       # callback: 回调函数名，须在 plugin/api.py 的 PUBLIC_FUNCTIONS 白名单内；
       # 不写则默认用条目 id（preview）作为函数名
       callback: preview_markdown
+      # match: 菜单项显示条件——仅当右键目标是 .md/.markdown 文件时显示
+      # （nodeType: file 且文件名以 ext 中任一后缀结尾；缺省则始终显示）
+      match:
+        nodeType: file
+        ext: [".md", ".markdown"]
       # display: preview 表示回调返回原始 Markdown 文本，前端用会话渲染管线
       # （marked + mermaid/dot 图表）渲染为 HTML 展示在预览弹窗
       display: preview
