@@ -5,8 +5,12 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"jarvis-daemon/internal/auth"
 )
 
 // TestLoginSuccess 登录成功：校验请求方法/路径/请求体，并解析出 token 与用户信息。
@@ -214,6 +218,62 @@ func TestPushAuthParamErrors(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			err := PushAuth(c.listen, c.gateway, c.token, "")
+			if err == nil {
+				t.Fatal("期望返回错误，实际为 nil")
+			}
+			if !strings.Contains(err.Error(), c.wantMsg) {
+				t.Fatalf("错误信息 = %v, 期望含 %q", err, c.wantMsg)
+			}
+		})
+	}
+}
+
+// TestSaveToken 落盘成功：写入 credentials.json，且能被 auth.LoadStore 重新加载。
+func TestSaveToken(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "credentials.json")
+
+	if err := SaveToken(path, "http://gateway.example", "tok-abcdefgh", "my-pc"); err != nil {
+		t.Fatalf("SaveToken 失败: %v", err)
+	}
+
+	// 文件已生成且权限为 0600。
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("凭据文件未生成: %v", err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o600 {
+		t.Errorf("凭据文件权限 = %o, 期望 600", perm)
+	}
+
+	// 用 auth.LoadStore 重新加载，确认 token 已持久化。
+	store := auth.LoadStore(path)
+	creds, err := store.Get("http://gateway.example")
+	if err != nil {
+		t.Fatalf("重新加载凭据失败: %v", err)
+	}
+	if creds.Token != "tok-abcdefgh" {
+		t.Errorf("Token = %q, 期望 tok-abcdefgh", creds.Token)
+	}
+	if creds.Name != "my-pc" {
+		t.Errorf("Name = %q, 期望 my-pc", creds.Name)
+	}
+}
+
+// TestSaveTokenParamErrors 空网关 / 空 token 应直接返回参数错误。
+func TestSaveTokenParamErrors(t *testing.T) {
+	cases := []struct {
+		name    string
+		gateway string
+		token   string
+		wantMsg string
+	}{
+		{"空网关", "", "t", "网关地址为空"},
+		{"空 token", "http://g", "", "token 为空"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			err := SaveToken(t.TempDir()+"/c.json", c.gateway, c.token, "")
 			if err == nil {
 				t.Fatal("期望返回错误，实际为 nil")
 			}

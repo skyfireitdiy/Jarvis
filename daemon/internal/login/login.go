@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"jarvis-daemon/internal/auth"
 	"jarvis-daemon/internal/proxy"
 )
 
@@ -237,6 +238,27 @@ func PushAuth(listen, gateway, token, name string) error {
 		return fmt.Errorf("推送凭据失败（HTTP %d）: %s",
 			resp.StatusCode, strings.TrimSpace(truncate(raw, maxErrBodyBytes)))
 	}
+	return nil
+}
+
+// SaveToken 把登录获取的 Token 直接落盘到凭据文件（credentials.json）。
+//
+// 与 PushAuth 不同：PushAuth 推送给「正在运行的本地守护进程」，要求服务已启动；
+// SaveToken 直接写入持久化凭据文件，供安装（install）等「服务尚未启动」的场景
+// 使用——守护进程启动时 LoadStore 会加载该文件并自动连接网关，实现免配置。
+//
+// credentialsPath 形如 "<config 目录>/credentials.json"；token 以 0600 权限落盘。
+// name 为空时保留该网关已有名称（与 auth.Store.SetWithName 语义一致）。
+func SaveToken(credentialsPath, gateway, token, name string) error {
+	gateway = NormalizeGateway(gateway)
+	if gateway == "" {
+		return fmt.Errorf("网关地址为空")
+	}
+	if strings.TrimSpace(token) == "" {
+		return fmt.Errorf("token 为空，无法保存凭据")
+	}
+	store := auth.NewPersistentStore(credentialsPath)
+	store.SetWithName(gateway, token, name)
 	return nil
 }
 
