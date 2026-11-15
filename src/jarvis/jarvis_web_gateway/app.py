@@ -2158,18 +2158,7 @@ def create_app(
     init_env(welcome_str="", config_file=None)
 
     # 创建 AgentManager，并设置状态变更回调
-    # 子节点：本机创建的 Agent 应上报给本机网关（配置变更由本机 agent_manager 处理），
-    # 而非 master 网关。master 节点不传 local_gateway_url，保持原有行为（指向本机网关）。
-    local_gateway_url = None
-    if node_config.is_child:
-        effective_host = host.strip() if host else ""
-        if not effective_host or effective_host in ("0.0.0.0", "::", "[::]"):  # nosec B104 - 仅字符串比较判断主机值，非真实绑定
-            effective_host = "127.0.0.1"
-        local_gateway_url = f"http://{effective_host}:{port}"
-    agent_manager = AgentManager(
-        on_status_change=_on_agent_status_change,
-        local_gateway_url=local_gateway_url,
-    )
+    agent_manager = AgentManager(on_status_change=_on_agent_status_change)
     # 保存 agent_manager 到全局，以便回调访问
     global _global_agent_manager
     _global_agent_manager = agent_manager
