@@ -8,13 +8,11 @@
 4. get_session_by_node_id：按 node_id 反查 daemon 会话
 """
 import asyncio
-import json
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 from jarvis.jarvis_web_gateway.daemon_capability_manager import (
     DaemonCapabilityManager,
-    daemon_capability_manager,
 )
 
 
