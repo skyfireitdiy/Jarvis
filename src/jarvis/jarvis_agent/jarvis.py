@@ -1297,6 +1297,7 @@ def run_cli(
     # 过滤），须在 init_env()（其内部会加载插件配置）之前设置。
     jglobals.agent_role = "agent"
     jglobals.node_mode = os.environ.get("JARVIS_NODE_MODE", "master").strip() or "master"
+    jglobals.node_id = os.environ.get("JARVIS_NODE_ID", "").strip() or None
 
     # 初始化环境（传入 llm_group，确保欢迎面板显示正确的模型组）
     init_env(

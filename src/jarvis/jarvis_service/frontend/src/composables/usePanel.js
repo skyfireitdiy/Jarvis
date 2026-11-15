@@ -758,6 +758,17 @@ export function usePanel({
   // 设置 Panel 的输出列表引用
   function setPanelOutputList(panel, el) {
     if (!panel || !panel.agentId) return
+    // 多 tab 共享同一个 SessionPanel DOM：多个 panel 的 ref 回调会映射到同一 el。
+    // 只保留「当前激活 tab」的映射，清除其它指向同一 el 的 panel，
+    // 否则后台 tab 的 Agent 消息会因 panelOutputLists.get(后台panel) 命中该 el，
+    // 而错误滚动当前激活 tab 的视图（见 useMessage 滚动回退逻辑）。
+    if (el) {
+      for (const [pid, prevEl] of panelOutputLists) {
+        if (pid !== panel.id && prevEl === el) {
+          panelOutputLists.delete(pid)
+        }
+      }
+    }
     const prevEl = panelOutputLists.get(panel.id)
     panelOutputLists.set(panel.id, el)
     outputList.value = el

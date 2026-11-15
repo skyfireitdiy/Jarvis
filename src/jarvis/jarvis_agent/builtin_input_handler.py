@@ -66,10 +66,14 @@ def _report_agent_config_change(updates: Dict[str, Any]) -> None:
 
         if not GatewayManagerTool.check():
             return
+        # 携带归属节点 ID，让 master 能直接定位 agent 所在节点（不依赖内存态路由表）
+        body = dict(updates)
+        if getattr(jglobals, "node_id", None):
+            body["node_id"] = jglobals.node_id
         result = GatewayManagerTool()._request_gateway(
             "PATCH",
             f"/api/agents/{jglobals.agent_id}",
-            json_data=updates,
+            json_data=body,
             error_prefix="Report agent config change failed",
         )
         if not result.get("success"):

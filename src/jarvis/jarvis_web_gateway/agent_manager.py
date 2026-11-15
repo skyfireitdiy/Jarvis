@@ -266,6 +266,8 @@ class AgentManager:
             env["JARVIS_AUTH_TOKEN"] = auth_token
         # 告知 Agent 网关记录的模型组，便于 Agent 在记录为 default 时上报真实生效模型组
         env["JARVIS_LLM_GROUP"] = llm_group
+        # 告知 Agent 它所属的节点 ID，便于 Agent 主动上报配置变更时携带归属节点
+        env["JARVIS_NODE_ID"] = node_id or ""
 
         # 启动子进程（不重定向 stdin/stdout/stderr，允许 TTY 环境）
         try:
