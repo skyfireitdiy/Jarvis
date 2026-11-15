@@ -72,6 +72,12 @@ type Options struct {
 	OnDaemonUpdate func(sessionID string, info map[string]any)
 	// Registry 是能力注册表；为 nil 时回退到旧的占位 Dispatch 行为。
 	Registry *capability.Registry
+	// TerminalManager 是 daemon 内部终端会话管理器（不注册 capability）。
+	//
+	// 网关通过 node_terminal_request 消息驱动终端会话（创建/输入/resize/关闭/attach），
+	// 与子节点（Python）的 NODE_TERMINAL_REQUEST 协议对称。为 nil 时收到
+	// node_terminal_request 会回 NO_TERMINAL_MANAGER 错误。
+	TerminalManager *TerminalManager
 }
 
 // Client 是网关 WebSocket 客户端。
@@ -298,6 +304,15 @@ func (c *Client) connectAndServe(ctx context.Context) error {
 	c.setState(StateConnected)
 	log.Printf("[wsclient] 已连接 %s（子协议 %v）", wsURL, conn.Subprotocol())
 
+	// 终端管理器输出回传：把 TerminalManager 的流式输出（node_terminal_output）
+	// 经当前连接写回网关。连接建立后注入（conn 每次重连都会变化，需重新绑定），
+	// 复用 writeJSON 的写锁，保证与心跳/能力结果不并发写同一连接。
+	if c.opts.TerminalManager != nil {
+		c.opts.TerminalManager.SetSender(func(msg map[string]any) error {
+			return c.writeJSON(conn, msg)
+		})
+	}
+
 	// 发送 hello
 	//
 	// 守护进程只上报自身（用户侧服务）的系统信息；浏览器信息由浏览器扩展
@@ -431,6 +446,8 @@ func (c *Client) handleMessage(conn *websocket.Conn, msg map[string]any) {
 		c.handleCapabilityList(conn)
 	case "capability.call":
 		c.handleCapabilityCall(conn, msg)
+	case "node_terminal_request":
+		c.handleNodeTerminalRequest(conn, msg)
 	default:
 		log.Printf("[wsclient] 收到未处理的消息类型: %s", msgType)
 	}
@@ -485,6 +502,41 @@ func (c *Client) handleCapabilityCall(conn *websocket.Conn, msg map[string]any) 
 		}
 		if err := c.writeJSON(conn, reply); err != nil {
 			log.Printf("[wsclient] 回能力调用结果失败: %v", err)
+		}
+	}()
+}
+
+// handleNodeTerminalRequest 处理网关下发的终端请求（node_terminal_request）。
+//
+// 与子节点（Python）的 NODE_TERMINAL_REQUEST 协议对称：请求带 request_id 与
+// payload（action + 参数），响应统一为 node_terminal_response，流式输出通过
+// node_terminal_output 回传。终端会话由 TerminalManager 管理（不注册 capability）。
+//
+// 执行放在独立 goroutine 中，避免阻塞读循环（与 capability.call 同理）。
+func (c *Client) handleNodeTerminalRequest(conn *websocket.Conn, msg map[string]any) {
+	requestID, _ := msg["request_id"].(string)
+	payload, _ := msg["payload"].(map[string]any)
+
+	go func() {
+		var result map[string]any
+		if c.opts.TerminalManager == nil {
+			result = map[string]any{
+				"success": false,
+				"error": map[string]any{
+					"code":    termErrNoTerminalManager,
+					"message": "terminal manager not available",
+				},
+			}
+		} else {
+			result = c.opts.TerminalManager.HandleRequest(payload)
+		}
+		reply := map[string]any{
+			"type":       "node_terminal_response",
+			"request_id": requestID,
+			"payload":    result,
+		}
+		if err := c.writeJSON(conn, reply); err != nil {
+			log.Printf("[wsclient] 回终端请求结果失败: %v", err)
 		}
 	}()
 }

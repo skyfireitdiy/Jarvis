@@ -782,6 +782,11 @@ func runDaemon(args []string) {
 	registry := newRuntimeRegistry(store)
 	log.Printf("[daemon] 已注册 %d 个平台能力", len(registry.ListForPlatform(capability.Current())))
 
+	// 内部终端会话管理器：作为 PTY 宿主承载前端在 daemon 上建立的独立终端。
+	// 刻意不注册进 capability.Registry（对 Agent 不可见，纯用户经前端操作），
+	// 仅通过 node_terminal_request 消息驱动，输出经 node_terminal_output 回传网关。
+	terminalManager := wsclient.NewTerminalManager()
+
 	// 网关黑白名单：由 daemon 自身配置（config.yaml），仅限本机通过
 	// /api/gateway-filter 或 `jarvis-daemon gateway-filter` 修改。
 	// 刻意不走前端页面推送：前端与 daemon 可能不同机，推送语义不通。
@@ -797,6 +802,7 @@ func runDaemon(args []string) {
 			ClientID:          buildClientID(),
 			Version:           version,
 			Registry:          registry,
+			TerminalManager:   terminalManager,
 			HeartbeatInterval: cfg.HeartbeatInterval,
 			ReconnectMin:      cfg.ReconnectMin,
 			ReconnectMax:      cfg.ReconnectMax,
@@ -920,6 +926,8 @@ func runDaemon(args []string) {
 	}
 
 	manager.DisconnectAll()
+	// 关闭全部内部终端会话（回收 PTY 子进程），daemon 退出时调用。
+	terminalManager.CloseAll()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*1e9)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {

@@ -1312,13 +1312,48 @@ describe('useAgents', () => {
   })
   it('fetchNodeStatus：成功拉取并确保 master 存在', async () => {
     const { api, fetchWithAuth, availableNodeOptions } = makeHarness()
-    fetchWithAuth.mockResolvedValue({
-      ok: true,
-      json: async () => ({ success: true, data: { nodes: [{ node_id: 'node1', status: 'running' }] } }),
-    })
+    fetchWithAuth
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, data: { nodes: [{ node_id: 'node1', status: 'running' }] } }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, sessions: [] }),
+      })
     await api.fetchNodeStatus()
     expect(availableNodeOptions.value.some(n => n.node_id === 'master')).toBe(true)
     expect(availableNodeOptions.value).toHaveLength(2)
+  })
+  it('fetchNodeStatus：合并 daemon 节点进候选', async () => {
+    const { api, fetchWithAuth, availableNodeOptions } = makeHarness()
+    fetchWithAuth
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, data: { nodes: [{ node_id: 'node1', status: 'running' }] } }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          sessions: [
+            { node_id: 'daemon-host-123', hostname: 'host', name: 'host', platform: 'linux' },
+          ],
+        }),
+      })
+    await api.fetchNodeStatus()
+    expect(availableNodeOptions.value.some(n => n.node_id === 'master')).toBe(true)
+    expect(availableNodeOptions.value.some(n => n.node_id === 'daemon-host-123')).toBe(true)
+    expect(availableNodeOptions.value).toHaveLength(3)
+    const daemonNode = availableNodeOptions.value.find(n => n.node_id === 'daemon-host-123')
+    expect(daemonNode.daemon).toBe(true)
+    expect(daemonNode.status).toBe('running')
+  })
+  it('fetchDaemonNodeOptions：daemon 会话接口失败返回空数组', async () => {
+    const { api, fetchWithAuth } = makeHarness()
+    fetchWithAuth.mockResolvedValue({ ok: false })
+    const result = await api.fetchDaemonNodeOptions()
+    expect(result).toEqual([])
   })
   it('fetchUserList：成功拉取用户列表', async () => {
     const { api, fetchWithAuth, availableUserOptions } = makeHarness()

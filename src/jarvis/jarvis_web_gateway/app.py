@@ -1335,6 +1335,22 @@ class WebSocketConnectionManager:
                 "master",
                 "",
             ):
+                # daemon 节点：经 daemon_capability_manager 独立通道转发
+                # （daemon 会话在 daemon_capability_manager._sessions，不在
+                # _node_connection_manager._connections，直接走 send_request_to_node
+                # 会报 "node connection not found" 且被静默 pass）。
+                daemon_session = daemon_capability_manager.get_session_by_node_id(
+                    terminal_node_id
+                )
+                if daemon_session is not None:
+                    await self._forward_terminal_to_daemon(
+                        daemon_session,
+                        message_type,
+                        payload,
+                        session_id,
+                        terminal_node_id,
+                    )
+                    return
                 # 转发到远端节点
                 if _node_connection_manager is None:
                     logger.error(
@@ -1703,6 +1719,106 @@ class WebSocketConnectionManager:
         except Exception as e:
             logger.error(
                 f"[WS MESSAGE] Failed to broadcast terminal event to admins: {e}"
+            )
+
+    async def _forward_terminal_to_daemon(
+        self,
+        daemon_session: Dict[str, Any],
+        message_type: str,
+        payload: Dict[str, Any],
+        session_id: str,
+        terminal_node_id: str,
+    ) -> None:
+        """把前端终端请求转发到 daemon 节点（经 daemon_capability_manager 独立通道）。
+
+        daemon 会话在 ``daemon_capability_manager._sessions``（不在
+        ``_node_connection_manager._connections``），故不能走子节点的
+        ``send_request_to_node``。这里经 ``send_node_terminal_request`` 下发
+        ``node_terminal_request``，并把响应按子节点转发逻辑的语义回给前端：
+        - ``terminal_create`` 成功 → 回 ``terminal_created``（含 node_id）+ 登记影子会话
+        - ``terminal_close`` 成功 → 回 ``terminal_closed`` + 移除影子会话
+        - 其余动作（input/resize）无需回包，前端靠实时输出（node_terminal_output）感知
+
+        Args:
+            daemon_session: daemon 会话信息（get_session_by_node_id 返回）。
+            message_type: 前端消息类型（terminal_create 等）。
+            payload: 前端消息 payload。
+            session_id: 前端 WS 会话 ID。
+            terminal_node_id: daemon 节点 ID。
+        """
+        daemon_session_id = str(daemon_session.get("session_id") or "").strip()
+        if not daemon_session_id:
+            logger.warning(
+                "[WS MESSAGE] daemon session has no session_id for node %s",
+                terminal_node_id,
+            )
+            return
+        try:
+            response = await daemon_capability_manager.send_node_terminal_request(
+                daemon_session_id,
+                message_type,
+                payload,
+                frontend_session_id=session_id,
+                user_id=None,
+                is_admin=True,
+            )
+            if message_type == "terminal_create" and response.get("success"):
+                result_data = response.get("data") or {}
+                if not isinstance(result_data, dict):
+                    result_data = {}
+                # 添加 node_id 以便前端知道终端在哪个节点上
+                result_data["node_id"] = terminal_node_id
+                result_msg = {
+                    "type": "terminal_created",
+                    "payload": result_data,
+                }
+                self._router.publish(result_msg, session_id=session_id)
+                # 实时终端共享：广播给所有 admin 用户
+                self._publish_terminal_event_to_admins(result_msg, session_id)
+                # 在 master 登记 daemon 终端的影子会话，使 list_sessions_for_user
+                # 能返回 daemon 终端（前端同步恢复），ACL 决策保持在 master
+                if _terminal_session_manager:
+                    terminal_id = result_data.get("terminal_id")
+                    if terminal_id:
+                        owner_id = ""
+                        if session_id and session_id.startswith("session_"):
+                            owner_id = session_id[len("session_") :]
+                        _terminal_session_manager.register_remote_session(
+                            terminal_id=terminal_id,
+                            node_id=terminal_node_id,
+                            owner_id=owner_id,
+                            session_id=session_id,
+                            interpreter=result_data.get("interpreter", "bash"),
+                            working_dir=result_data.get("working_dir", "."),
+                        )
+            elif message_type == "terminal_close" and response.get("success"):
+                result_msg = {
+                    "type": "terminal_closed",
+                    "payload": {"terminal_id": payload.get("terminal_id")},
+                }
+                self._router.publish(result_msg, session_id=session_id)
+                # 实时终端共享：广播给所有 admin 用户
+                self._publish_terminal_event_to_admins(result_msg, session_id)
+                # 移除 master 上登记的 daemon 终端影子会话
+                if _terminal_session_manager:
+                    _terminal_session_manager.unregister_session(
+                        str(payload.get("terminal_id") or "")
+                    )
+            elif not response.get("success"):
+                logger.warning(
+                    "[WS MESSAGE] daemon terminal request failed: node=%s action=%s error=%s",
+                    terminal_node_id,
+                    message_type,
+                    response.get("error"),
+                )
+        except Exception as e:
+            save_exception(
+                e, module="jarvis_web_gateway.app", function="_forward_terminal_to_daemon"
+            )
+            logger.error(
+                "[WS MESSAGE] Failed to forward terminal request to daemon node %s: %s",
+                terminal_node_id,
+                e,
             )
 
     async def _handle_chat_message(
@@ -2321,6 +2437,10 @@ def create_app(
     # 将 router 和 terminal_session_manager 也注入到 node_connection_manager，用于终端转发
     node_connection_manager._router = router
     node_connection_manager._terminal_session_manager = terminal_session_manager
+    # 将 router 和 terminal_session_manager 也注入到 daemon_capability_manager，
+    # 用于把 daemon 终端输出（node_terminal_output）推送到前端 + 广播 admin
+    daemon_capability_manager.set_router(router)
+    daemon_capability_manager.set_terminal_session_manager(terminal_session_manager)
     auth_store: Dict[str, Optional[Dict[str, Any]]] = {}
     gateway = WebGateway(router, input_registry, auth_store, terminal_input_registry)
     manager = WebSocketConnectionManager(
@@ -12805,41 +12925,89 @@ def create_app(
             # 子节点终端的影子会话：真实输出缓冲在子节点，转发 attach 到子节点拿缓冲
             local_node_id = _node_runtime.local_node_id if _node_runtime else "master"
             node_id = session.node_id or "master"
-            if node_id not in ("master", local_node_id) and _node_connection_manager:
-                try:
-                    resp = await _node_connection_manager.send_request_to_node(
-                        node_id,
-                        NODE_TERMINAL_REQUEST,
-                        {
-                            "action": "terminal_attach",
-                            "payload": {"terminal_id": terminal_id},
-                            "session_id": session_id,
-                        },
-                    )
-                    resp_payload = resp.get("payload") or {}
-                    if resp_payload.get("success"):
-                        data = resp_payload.get("data") or {}
+            if node_id not in ("master", local_node_id):
+                # daemon 节点：真实输出缓冲在 daemon，经 daemon_capability_manager
+                # 独立通道转发 terminal_attach 拿缓冲
+                daemon_session = daemon_capability_manager.get_session_by_node_id(
+                    node_id
+                )
+                if daemon_session is not None:
+                    try:
+                        resp = await daemon_capability_manager.send_node_terminal_request(
+                            daemon_session.get("session_id"),
+                            "terminal_attach",
+                            {"terminal_id": terminal_id},
+                            frontend_session_id=session_id,
+                            user_id=None,
+                            is_admin=True,
+                        )
+                        if resp.get("success"):
+                            data = resp.get("data") or {}
+                            if not isinstance(data, dict):
+                                data = {}
+                            return {
+                                "success": True,
+                                "data": {
+                                    "terminal_id": terminal_id,
+                                    "interpreter": data.get(
+                                        "interpreter", session.interpreter
+                                    ),
+                                    "working_dir": data.get(
+                                        "working_dir", session.working_dir
+                                    ),
+                                    "output": data.get("output") or [],
+                                },
+                            }
                         return {
-                            "success": True,
-                            "data": {
-                                "terminal_id": terminal_id,
-                                "interpreter": data.get(
-                                    "interpreter", session.interpreter
-                                ),
-                                "working_dir": data.get(
-                                    "working_dir", session.working_dir
-                                ),
-                                "output": data.get("output") or [],
+                            "success": False,
+                            "error": {
+                                "code": "NOT_FOUND",
+                                "message": str(resp.get("error") or "daemon 终端不存在"),
                             },
                         }
-                except Exception as e:
-                    return {
-                        "success": False,
-                        "error": {
-                            "code": "INTERNAL_ERROR",
-                            "message": f"转发到子节点失败: {e}",
-                        },
-                    }
+                    except Exception as e:
+                        return {
+                            "success": False,
+                            "error": {
+                                "code": "INTERNAL_ERROR",
+                                "message": f"转发到 daemon 失败: {e}",
+                            },
+                        }
+                if _node_connection_manager:
+                    try:
+                        resp = await _node_connection_manager.send_request_to_node(
+                            node_id,
+                            NODE_TERMINAL_REQUEST,
+                            {
+                                "action": "terminal_attach",
+                                "payload": {"terminal_id": terminal_id},
+                                "session_id": session_id,
+                            },
+                        )
+                        resp_payload = resp.get("payload") or {}
+                        if resp_payload.get("success"):
+                            data = resp_payload.get("data") or {}
+                            return {
+                                "success": True,
+                                "data": {
+                                    "terminal_id": terminal_id,
+                                    "interpreter": data.get(
+                                        "interpreter", session.interpreter
+                                    ),
+                                    "working_dir": data.get(
+                                        "working_dir", session.working_dir
+                                    ),
+                                    "output": data.get("output") or [],
+                                },
+                            }
+                    except Exception as e:
+                        return {
+                            "success": False,
+                            "error": {
+                                "code": "INTERNAL_ERROR",
+                                "message": f"转发到子节点失败: {e}",
+                            },
+                        }
 
             output = [
                 base64.b64encode(chunk).decode("utf-8")

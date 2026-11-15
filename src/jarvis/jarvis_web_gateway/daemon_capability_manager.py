@@ -296,10 +296,32 @@ class DaemonCapabilityManager:
         self._pending_calls: Dict[str, asyncio.Future] = {}
         # session_id -> Future，用于匹配无 id 的能力列表响应
         self._pending_lists: Dict[str, asyncio.Future] = {}
+        # request_id -> Future，用于按 id 匹配 daemon 终端请求响应（node_terminal_response）
+        self._pending_terminal_requests: Dict[str, asyncio.Future] = {}
         # 心跳巡检任务
         self._cleanup_task: Optional[asyncio.Task] = None
         # 网关打包的扩展最新版本提供器（未注入时返回 None，不影响握手）
         self._latest_version_provider: Optional[LatestVersionProvider] = None
+        # 前端消息路由器（由 app.py 注入），用于把 daemon 终端输出推送到前端
+        self._router: Optional[Any] = None
+        # 终端会话管理器（由 app.py 注入），用于广播 daemon 终端输出给 admin 用户
+        self._terminal_session_manager: Optional[Any] = None
+
+    def set_router(self, router: Optional[Any]) -> None:
+        """注入前端消息路由器（app.py 在 lifespan 启动时调用）。
+
+        用于把 daemon 终端会话的实时输出（node_terminal_output）推送到前端，
+        与子节点（node_manager.py）的 NODE_TERMINAL_OUTPUT 处理保持一致。
+        """
+        self._router = router
+
+    def set_terminal_session_manager(self, manager: Optional[Any]) -> None:
+        """注入终端会话管理器（app.py 在 lifespan 启动时调用）。
+
+        用于获取 admin 用户会话 ID 列表，把 daemon 终端输出广播给所有 admin
+        用户（实时终端共享，ACL 决策统一在 master）。
+        """
+        self._terminal_session_manager = manager
 
     def set_latest_version_provider(
         self, provider: Optional[LatestVersionProvider]
@@ -521,6 +543,10 @@ class DaemonCapabilityManager:
                     self._handle_capability_list_result(session_id, message)
                 elif msg_type == "capability.call.result":
                     self._handle_capability_call_result(message)
+                elif msg_type == "node_terminal_response":
+                    self._handle_node_terminal_response(message)
+                elif msg_type == "node_terminal_output":
+                    self._handle_node_terminal_output(message)
                 elif msg_type == "daemon.update.status":
                     # 自更新进度回执（单向）：仅记录日志并更新会话字段，
                     # **绝不回复**（daemon 不等待，旧网关 debug 忽略亦兼容）。
@@ -614,6 +640,70 @@ class DaemonCapabilityManager:
         if future is not None and not future.done():
             future.set_result(message)
 
+    def _handle_node_terminal_response(self, message: Dict[str, Any]) -> None:
+        """把 daemon 终端请求响应（node_terminal_response）投递给等待中的 Future。
+
+        daemon 侧对 ``node_terminal_request`` 的响应统一为
+        ``{type: "node_terminal_response", request_id, payload: {success, data|error}}``，
+        这里按 ``request_id`` 匹配 ``send_node_terminal_request`` 创建的 Future。
+        """
+        request_id = message.get("request_id")
+        if not request_id:
+            return
+        future = self._pending_terminal_requests.get(request_id)
+        if future is not None and not future.done():
+            future.set_result(message)
+
+    def _handle_node_terminal_output(self, message: Dict[str, Any]) -> None:
+        """把 daemon 终端会话的实时输出（node_terminal_output）推送到前端。
+
+        与子节点（``node_manager.py`` 的 NODE_TERMINAL_OUTPUT 处理）保持一致：
+        - 按 ``payload.session_id`` 推送给创建该终端的用户（前端 WS 会话）；
+        - 额外广播给所有 admin 用户（实时终端共享，ACL 决策统一在 master）。
+
+        daemon 侧回传的 ``payload.message`` 就是可直接推给前端的 ``execution``
+        消息（含 base64 编码的 PTY 输出），这里原样透传。
+        """
+        try:
+            terminal_payload = message.get("payload") or {}
+            if not isinstance(terminal_payload, dict):
+                return
+            output_session_id = str(
+                terminal_payload.get("session_id") or "default"
+            ).strip()
+            output_message = terminal_payload.get("message")
+            if not output_message:
+                return
+            if self._router is not None:
+                self._router.publish(output_message, session_id=output_session_id)
+                self._publish_terminal_output_to_admins(
+                    output_message, output_session_id
+                )
+        except Exception as exc:  # pragma: no cover - 防御性
+            logger.warning("[DAEMON TERMINAL] failed to forward output: %s", exc)
+
+    def _publish_terminal_output_to_admins(
+        self, message: Dict[str, Any], exclude_session_id: Optional[str] = None
+    ) -> None:
+        """把 daemon 终端输出广播给所有 admin 用户（ACL 决策统一在 master）。
+
+        与子节点（``node_manager._publish_terminal_output_to_admins``）语义一致：
+        admin 用户经 _access_level 放行（视为 owner）可查看所有终端，因此
+        daemon 终端的输出也应实时推送给所有在线的 admin 用户。离线用户无连接，
+        publish 到其 session_id 无副作用。
+        """
+        try:
+            tsm = self._terminal_session_manager
+            if tsm is None or self._router is None:
+                return
+            for admin_sid in tsm.get_all_admin_session_ids():
+                if admin_sid != exclude_session_id:
+                    self._router.publish(message, session_id=admin_sid)
+        except Exception as exc:  # pragma: no cover - 防御性
+            logger.warning(
+                "[DAEMON TERMINAL] failed to broadcast output to admins: %s", exc
+            )
+
     async def _replace_stale_sessions(
         self,
         new_session_id: str,
@@ -664,6 +754,15 @@ class DaemonCapabilityManager:
                     RuntimeError(f"daemon session disconnected: {session_id}")
                 )
                 self._pending_calls.pop(request_id, None)
+        # 该会话下所有未完成的终端请求立即失败
+        for request_id, future in list(self._pending_terminal_requests.items()):
+            if future.done():
+                continue
+            if getattr(future, "_daemon_session", None) == session_id:
+                future.set_exception(
+                    RuntimeError(f"daemon session disconnected: {session_id}")
+                )
+                self._pending_terminal_requests.pop(request_id, None)
         list_future = self._pending_lists.pop(session_id, None)
         if list_future is not None and not list_future.done():
             list_future.set_exception(
@@ -809,6 +908,94 @@ class DaemonCapabilityManager:
         finally:
             self._pending_calls.pop(call_id, None)
 
+    async def send_node_terminal_request(
+        self,
+        session_id: str,
+        action: str,
+        payload: Optional[Dict[str, Any]] = None,
+        frontend_session_id: Optional[str] = None,
+        timeout: float = DEFAULT_CALL_TIMEOUT,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
+    ) -> Dict[str, Any]:
+        """向 daemon 下发一个终端请求（node_terminal_request）并等待响应。
+
+        与子节点（``node_manager.send_request_to_node`` + NODE_TERMINAL_REQUEST）
+        协议对称：请求带 request_id 与 payload（action + 参数 + 前端会话ID），
+        响应统一为 ``node_terminal_response``。
+
+        Args:
+            session_id: daemon 会话 ID（``get_session_by_node_id`` 反查得到）。
+            action: 终端动作，terminal_create / terminal_close /
+                terminal_session_input / terminal_session_resize / terminal_attach。
+            payload: 动作相关参数（如 terminal_id / data / rows / cols / interpreter）。
+            frontend_session_id: 创建该终端的用户前端 WS 会话 ID（用于输出回传路由）。
+            timeout: 等待响应的超时秒数。
+            user_id / is_admin: 会话归属校验（与 call_capability 一致）。
+
+        Returns:
+            dict: {"success": bool, "data": any, "error": str}
+
+        Raises:
+            RuntimeError: 会话不存在、无访问权限、连接已失效或调用超时。
+        """
+        allowed, reason = self.check_session_access(session_id, user_id, is_admin)
+        if not allowed:
+            raise RuntimeError(reason)
+        session = self._sessions.get(session_id)
+        if session is None:
+            raise RuntimeError(f"daemon session not found: {session_id}")
+        websocket = session.get("websocket")
+        if websocket is None:
+            raise RuntimeError(f"daemon session has no connection: {session_id}")
+
+        request_id = f"term-{uuid.uuid4()}"
+        loop = asyncio.get_running_loop()
+        future: asyncio.Future = loop.create_future()
+        # 记录归属会话，便于断线时批量失败
+        setattr(future, "_daemon_session", session_id)
+        self._pending_terminal_requests[request_id] = future
+        try:
+            logger.info(
+                "[DAEMON TERMINAL] send request session_id=%s action=%s request_id=%s",
+                session_id,
+                action,
+                request_id,
+            )
+            await websocket.send_json(
+                {
+                    "type": "node_terminal_request",
+                    "request_id": request_id,
+                    "payload": {
+                        "action": action,
+                        "payload": payload or {},
+                        "session_id": frontend_session_id or "",
+                    },
+                }
+            )
+            try:
+                response = await asyncio.wait_for(future, timeout=timeout)
+            except asyncio.TimeoutError as exc:
+                raise RuntimeError(
+                    f"daemon terminal request timed out: session_id={session_id}, "
+                    f"action={action}, timeout={timeout}s"
+                ) from exc
+            if not isinstance(response, dict):
+                raise RuntimeError(
+                    f"invalid daemon terminal response: session_id={session_id}, "
+                    f"action={action}"
+                )
+            resp_payload = response.get("payload") or {}
+            if not isinstance(resp_payload, dict):
+                resp_payload = {}
+            return {
+                "success": bool(resp_payload.get("success")),
+                "data": resp_payload.get("data"),
+                "error": resp_payload.get("error") or "",
+            }
+        finally:
+            self._pending_terminal_requests.pop(request_id, None)
+
     def set_event_loop(self, event_loop: asyncio.AbstractEventLoop) -> None:
         """绑定用于跨线程调用能力的主事件循环（网关 lifespan 启动时调用）。"""
         self._event_loop = event_loop
@@ -894,6 +1081,25 @@ class DaemonCapabilityManager:
             "connected_at": session.get("connected_at"),
             "update_state": session.get("update_state"),
         }
+
+    def get_session_by_node_id(self, node_id: str) -> Optional[Dict[str, Any]]:
+        """按节点 ID（node_id）反查 daemon 会话。
+
+        前端终端面板的节点选择器把 daemon 节点（node_id 形如
+        ``daemon-<hostname>-<pid>``）纳入候选后，终端请求的 ``payload.node_id``
+        指向 daemon 节点。网关侧据此反查对应的 daemon 会话，再经
+        ``send_node_terminal_request`` 下发终端请求。
+
+        Args:
+            node_id: daemon 节点 ID。
+
+        Returns:
+            会话信息字典（不含 websocket 对象）或 None（未找到）。
+        """
+        for session_id, session in self._sessions.items():
+            if str(session.get("node_id") or "").strip() == node_id:
+                return self.get_session(session_id)
+        return None
 
     # ------------------------------------------------------------------
     # 工具函数
