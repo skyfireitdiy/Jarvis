@@ -174,6 +174,7 @@
               class="topo-node is-local"
               :class="['st-' + n.state, { 'is-hot': hovered === n.id }]"
               @mouseenter="hovered = n.id"
+              @contextmenu.prevent.stop="onLocalContextMenu(n, $event)"
             >
               <title>{{ n.title }}</title>
               <circle v-if="n.state !== 'offline'" :cx="n.x" :cy="n.y" :r="ACCESS_R + 5"
@@ -226,6 +227,21 @@
               <text :x="layout.center.x" :y="layout.center.y + CENTER_H / 2 + 32" text-anchor="middle" class="topo-node-count">{{ model.center.drawAgents.length }}/{{ model.center.agents.length }} agent</text>
             </g>
           </svg>
+
+          <!-- 接入端节点右键菜单（后台服务 → 创建终端） -->
+          <div
+            v-if="daemonContextMenu.visible"
+            class="file-tree-context-menu topo-context-menu"
+            :style="{ left: daemonContextMenu.x + 'px', top: daemonContextMenu.y + 'px' }"
+            @pointerdown.stop
+            @click.stop
+            @contextmenu.prevent.stop
+          >
+            <button class="file-tree-context-item" @click="runDaemonContextAction('create-terminal')">
+              <span class="file-tree-context-icon" v-html="TERMINAL_ICON"></span>
+              <span class="file-tree-context-label">创建终端</span>
+            </button>
+          </div>
 
           <!-- hover 详情卡 -->
           <div v-if="hoverInfo" class="topo-card" :style="{ left: hoverInfo.left + 'px', top: hoverInfo.top + 'px' }">
@@ -337,7 +353,7 @@ const props = defineProps({
   daemonSessions: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['update:visible', 'close'])
+const emit = defineEmits(['update:visible', 'close', 'daemon-context-menu'])
 
 const W = 1200
 const H = 640
@@ -570,6 +586,7 @@ const localNodes = computed(() => {
     const p = daemonPos[i] || { x: cx, y: cy, labelAbove: true, anchor: 'middle' }
     nodes.push({
       id: `daemon-${s.session_id || i}`,
+      nodeId: s.node_id || null,
       x: p.x,
       y: p.y,
       masterX: cx,
@@ -650,6 +667,43 @@ function onMove(e) {
   mouse.value = {
     x: (e.clientX - rect.left) / scale,
     y: (e.clientY - rect.top) / scale,
+  }
+}
+
+// 接入端节点右键菜单：后台服务（daemon）→ 创建终端
+const TERMINAL_ICON = '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="12" height="8" rx="1.5"/><path d="M5.5 13.5h5M8 11v2.5"/></svg>'
+const daemonContextMenu = ref({ visible: false, x: 0, y: 0, nodeId: null })
+
+function closeDaemonContextMenu() {
+  if (daemonContextMenu.value.visible) {
+    daemonContextMenu.value = { ...daemonContextMenu.value, visible: false }
+  }
+}
+
+// 仅后台服务（daemon）节点可创建终端；浏览器扩展节点右键不弹菜单
+function onLocalContextMenu(n, event) {
+  if (n.icon !== 'daemon') return
+  const MENU_W = 220
+  const MENU_H = 120
+  let x = event?.clientX || 0
+  let y = event?.clientY || 0
+  if (x + MENU_W > window.innerWidth) x = Math.max(window.innerWidth - MENU_W, 0)
+  if (y + MENU_H > window.innerHeight) y = Math.max(window.innerHeight - MENU_H, 0)
+  daemonContextMenu.value = {
+    visible: true,
+    x,
+    y,
+    nodeId: n.nodeId || null,
+  }
+  // 点击空白处关闭（与目录树/标签页右键菜单同款：pointerdown 一次即解绑）
+  document.addEventListener('pointerdown', closeDaemonContextMenu, { once: true })
+}
+
+function runDaemonContextAction(action) {
+  const menu = { ...daemonContextMenu.value }
+  closeDaemonContextMenu()
+  if (action === 'create-terminal' && menu.nodeId) {
+    emit('daemon-context-menu', menu.nodeId)
   }
 }
 

@@ -1523,6 +1523,7 @@
       :daemonSessions="topologyDaemonSessions"
       @update:visible="showTopologyOverlay = $event"
       @close="closeTopologyOverlay"
+      @daemon-context-menu="onTopoDaemonContextMenu"
     />
 
     <!-- 流水线编排大图 -->
@@ -6124,6 +6125,12 @@ function onLobbyNodeContextRun({ action, nodeId }) {
   } else if (action.id === 'node-restart-service') {
     confirmRestartNodeService(nodeId)
   }
+}
+
+// 拓扑图 daemon（后台服务）节点右键菜单点击：在该节点上创建终端
+function onTopoDaemonContextMenu(nodeId) {
+  if (!nodeId) return
+  createTerminalForNode(nodeId)
 }
 
 // 大厅节点右键「更新代码」：二次确认后调用单节点代码更新接口
