@@ -902,6 +902,22 @@ describe('usePanel', () => {
       expect(el2.scrollTop).toBe(500)
     })
 
+    it('setPanelOutputList：多 tab 共享 el 时，注册新 tab 清除指向同一 el 的旧 tab 映射', () => {
+      const h = makeHarness()
+      // 多 tab 共享同一个 SessionPanel DOM：A、B 两个 panel 的 ref 回调都指向同一 el
+      const el = { scrollTop: 0, addEventListener: vi.fn(), removeEventListener: vi.fn() }
+      const panelA = { id: 'panel-A', agentId: 'agent-1' }
+      const panelB = { id: 'panel-B', agentId: 'agent-2' }
+      // 先激活 tab A，注册 A → el
+      h.api.setPanelOutputList(panelA, el)
+      expect(h.panelOutputLists.get('panel-A')).toStrictEqual(el)
+      // 切到 tab B：B 的 ref 回调也指向同一 el（共享 DOM）
+      h.api.setPanelOutputList(panelB, el)
+      // B 注册成功，且 A 的映射被清除（避免后台 tab A 的消息错误滚动当前 tab B）
+      expect(h.panelOutputLists.get('panel-B')).toStrictEqual(el)
+      expect(h.panelOutputLists.has('panel-A')).toBe(false)
+    })
+
     it('setPanelTerminalRef：委托 setTerminalRef', () => {
       const h = makeHarness()
       const el = {}

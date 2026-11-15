@@ -188,6 +188,40 @@ class NodeConnectionManager:
             )
         )
 
+        # child 上线时主动拉取其 agent 列表并重建路由表：
+        # agent_route_registry 是内存态，master 重启后丢失且无恢复机制，
+        # 若不在上线时重建，child 上已存在的 agent 的 PATCH（如模型组切换上报，
+        # 不带 node_id）将无法路由转发到该 child。
+        try:
+            list_response = await self.send_request_to_node(
+                node_id,
+                AGENT_LIST_REQUEST,
+                {},
+                timeout=10.0,
+            )
+            list_payload = list_response.get("payload") or {}
+            if list_payload.get("success"):
+                for agent in list_payload.get("agents") or []:
+                    agent_id = str((agent or {}).get("agent_id") or "")
+                    if not agent_id:
+                        continue
+                    if self._node_runtime.agent_route_registry.get(agent_id) is None:
+                        self._node_runtime.agent_route_registry.register(
+                            AgentRouteInfo(
+                                agent_id=agent_id,
+                                node_id=str((agent or {}).get("node_id") or node_id),
+                                status=str((agent or {}).get("status") or "running"),
+                                working_dir=(agent or {}).get("working_dir"),
+                                port=(agent or {}).get("port"),
+                            )
+                        )
+        except Exception as exc:
+            logger.warning(
+                "[NODE] failed to rebuild agent routes on connect node_id=%s error=%s",
+                node_id,
+                exc,
+            )
+
         try:
             while True:
                 next_message = await websocket.receive_json()

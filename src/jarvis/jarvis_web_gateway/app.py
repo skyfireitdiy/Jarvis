@@ -6500,6 +6500,20 @@ def create_app(
                             continue
                         agents.append(agent)
                         known_agent_ids.add(agent_id)
+                        # 顺带恢复 agent 路由（master 重启后 registry 为内存态会丢失），
+                        # 使不带 node_id 的 PATCH（如 agent 上报模型组切换）能正确转发到所属 child。
+                        if node_runtime.agent_route_registry.get(agent_id) is None:
+                            node_runtime.agent_route_registry.register(
+                                AgentRouteInfo(
+                                    agent_id=agent_id,
+                                    node_id=str(
+                                        (agent or {}).get("node_id") or node_id
+                                    ),
+                                    status=str((agent or {}).get("status") or "running"),
+                                    working_dir=(agent or {}).get("working_dir"),
+                                    port=(agent or {}).get("port"),
+                                )
+                            )
                 except Exception as exc:
                     logger.warning(
                         "[AGENTS] remote list request failed node_id=%s error=%s",
@@ -6813,6 +6827,44 @@ def create_app(
                 route = node_runtime.agent_route_registry.get(agent_id)
                 if route is not None:
                     resolved_target_node = str(route.node_id or "").strip()
+                else:
+                    # route 丢失（如 master 重启后内存态 registry 为空）时，
+                    # 向在线 child 广播查询该 agent 归属，找到则注册路由并转发；
+                    # 找不到则保持原逻辑（走本机 update，最终 AGENT_NOT_FOUND）。
+                    for node_info in node_runtime.node_registry.list_all():
+                        node_id = str((node_info or {}).get("node_id") or "")
+                        node_status = str((node_info or {}).get("status") or "")
+                        if node_id == node_runtime.local_node_id or node_status != "online":
+                            continue
+                        try:
+                            list_response = await node_connection_manager.send_request_to_node(
+                                node_id,
+                                AGENT_LIST_REQUEST,
+                                {},
+                                timeout=10.0,
+                            )
+                            list_payload = list_response.get("payload") or {}
+                            if not list_payload.get("success"):
+                                continue
+                            for candidate in list_payload.get("agents") or []:
+                                candidate_id = str((candidate or {}).get("agent_id") or "")
+                                if candidate_id != agent_id:
+                                    continue
+                                node_runtime.agent_route_registry.register(
+                                    AgentRouteInfo(
+                                        agent_id=agent_id,
+                                        node_id=str((candidate or {}).get("node_id") or node_id),
+                                        status=str((candidate or {}).get("status") or "running"),
+                                        working_dir=(candidate or {}).get("working_dir"),
+                                        port=(candidate or {}).get("port"),
+                                    )
+                                )
+                                resolved_target_node = str((candidate or {}).get("node_id") or node_id)
+                                break
+                        except Exception:
+                            continue
+                        if resolved_target_node:
+                            break
 
             if resolved_target_node and resolved_target_node not in (
                 node_runtime.local_node_id,

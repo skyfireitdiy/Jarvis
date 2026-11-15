@@ -124,6 +124,23 @@ class TestReportAgentConfigChange:
         assert args[1] == "/api/agents/agent-test-1"
         assert kwargs["json_data"] == {"llm_group": "new_group"}
 
+    def test_sends_patch_with_node_id(self, bih, monkeypatch, fake_jglobals):
+        """node_id 存在时，上报 body 携带归属节点，便于 master 定位路由。"""
+        import jarvis.jarvis_utils.globals as jglobals
+
+        jglobals.node_id = "sf-pc"
+        try:
+            fake_tool = _patch_gateway(monkeypatch, bih)
+            bih._report_agent_config_change({"llm_group": "new_group"})
+            fake_tool._request_gateway.assert_called_once()
+            args, kwargs = fake_tool._request_gateway.call_args
+            assert kwargs["json_data"] == {
+                "llm_group": "new_group",
+                "node_id": "sf-pc",
+            }
+        finally:
+            jglobals.node_id = None
+
     def test_failure_is_silent(self, bih, monkeypatch, fake_jglobals):
         """上报失败不抛异常（静默降级）。"""
         _patch_gateway(

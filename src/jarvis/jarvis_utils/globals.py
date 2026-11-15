@@ -46,6 +46,9 @@ proxy_node: Optional[str] = None
 master_url: Optional[str] = None
 # Agent ID：由 Web Gateway 的 AgentManager 分配的唯一标识符，通过 --agent-id 参数传入
 agent_id: Optional[str] = None
+# 当前进程所在节点 ID（master 或 child 节点标识，如 "master"/"sf-pc"）。
+# agent 子进程通过 JARVIS_NODE_ID 环境变量继承，用于主动上报配置变更时携带归属节点。
+node_id: Optional[str] = None
 # 输入注入回调：当 Agent 正在等待输入时，可通过此回调直接注入消息到输入流
 # 设置为 Callable[[str], None]，接收消息文本；不在等待输入时为 None
 input_inject_callback: Optional[Any] = None
