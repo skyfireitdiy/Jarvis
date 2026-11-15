@@ -124,16 +124,24 @@ class AgentManager:
     PERSISTENCE_FILE = Path(get_data_dir()) / "gateway" / ".jarvis_agents.json"
 
     def __init__(
-        self, on_status_change: Optional[Callable[[str, str, Any], None]] = None
+        self,
+        on_status_change: Optional[Callable[[str, str, Any], None]] = None,
+        local_gateway_url: Optional[str] = None,
     ) -> None:
         """初始化 AgentManager。
 
         Args:
             on_status_change: 状态变更回调函数
+            local_gateway_url: 本机网关地址（子节点专用）。
+                子节点上 jglobals.master_url 指向 master 网关，但本机创建的 Agent
+                应上报给本机网关（配置变更由本机 agent_manager 处理并持久化），
+                因此子节点创建 Agent 时传入本机网关地址作为 --master-url。
+                为 None 时回退到 jglobals.master_url（master 节点场景）。
         """
         self._agents: Dict[str, AgentInfo] = {}
         self._on_status_change = on_status_change
         self._event_loop: Optional[asyncio.AbstractEventLoop] = None
+        self._local_gateway_url = local_gateway_url
 
         # 加载已保存的 Agent 列表
         self._load_agents()
@@ -355,6 +363,7 @@ class AgentManager:
         worktree: bool = False,
         proxy_node: Optional[str] = None,
         owner_id: Optional[str] = None,
+        no_interaction_mode: bool = False,
     ) -> Dict[str, Any]:
         """在线程环境中安全地创建 Agent。"""
         if self._event_loop is None:
@@ -374,6 +383,7 @@ class AgentManager:
                 worktree=worktree,
                 proxy_node=proxy_node,
                 owner_id=owner_id,
+                no_interaction_mode=no_interaction_mode,
             ),
             self._event_loop,
         )
@@ -393,6 +403,7 @@ class AgentManager:
         worktree: bool = False,
         proxy_node: Optional[str] = None,
         owner_id: Optional[str] = None,
+        no_interaction_mode: bool = False,
     ) -> Dict[str, Any]:
         """在事件循环上下文中创建 Agent。"""
         return self.create_agent(
@@ -408,6 +419,7 @@ class AgentManager:
             worktree=worktree,
             proxy_node=proxy_node,
             owner_id=owner_id,
+            no_interaction_mode=no_interaction_mode,
         )
 
     def stop_agent(self, agent_id: str) -> Dict[str, Any]:
@@ -851,9 +863,11 @@ class AgentManager:
         if no_interaction_mode:
             cmd.append("--non-interactive")
 
-        # 添加 master URL 参数（如果全局变量中设置了）
-        if jglobals.master_url:
-            cmd.extend(["--master-url", jglobals.master_url])
+        # 添加 master URL 参数：子节点优先使用本机网关地址（Agent 应上报给本机网关），
+        # 否则回退到全局 master_url（master 节点场景，指向本机网关）
+        agent_master_url = self._local_gateway_url or jglobals.master_url
+        if agent_master_url:
+            cmd.extend(["--master-url", agent_master_url])
 
         # 添加 agent_id 参数（由 AgentManager 分配的唯一标识符）
         if agent_id:
