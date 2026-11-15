@@ -116,11 +116,18 @@ func runSubcommand(name string, args []string) error {
 }
 
 // cmdInstall 安装服务：写入服务定义并设为开机自启（不启动）。
+//
+// 支持可选的一次性登录：提供 -u（用户名）时，安装后立即用用户名密码登录网关，
+// 把拿到的 Token 落盘到凭据文件，服务启动后即可自动连接网关（免配置）。
+// 密码通过 -password 传入或交互式隐藏输入；用户名密码只用于登录换取 Token，
+// 不落盘、不打日志。
 func cmdInstall(args []string) error {
 	fs := flag.NewFlagSet("install", flag.ContinueOnError)
 	listenFlag := fs.String("listen", "", "本地 API 监听地址（覆盖配置文件）")
 	gatewayFlag := fs.String("gateway", "", "默认网关地址（覆盖配置文件）")
 	configFlag := fs.String("config", "", "配置文件路径（默认 ~/.jarvis/daemon/config.yaml）")
+	userFlag := fs.String("u", "", "登录用户名（提供时安装后自动登录网关并保存 Token）")
+	passwordFlag := fs.String("password", "", "登录密码（仅用于登录换取 Token，不保存；缺省时交互式输入）")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -143,6 +150,76 @@ func cmdInstall(args []string) error {
 	} else {
 		fmt.Println("[daemon] 提示：使用 jarvis-daemon start 启动服务")
 	}
+
+	// 提供用户名时，安装后立即登录网关并落盘 Token，实现免配置。
+	if strings.TrimSpace(*userFlag) != "" {
+		if err := installLoginAndSaveToken(*configFlag, *gatewayFlag, *userFlag, *passwordFlag); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// installLoginAndSaveToken 在安装时用用户名密码登录网关，并把 Token 落盘到凭据文件。
+//
+// 用户名密码仅用于内存中调用 login.Login 换取 Token，不落盘、不打日志；
+// Token 通过 login.SaveToken 直接写入 credentials.json（0600），服务启动时
+// LoadStore 会自动加载并连接网关。密码未通过 -password 提供时交互式隐藏输入。
+func installLoginAndSaveToken(configPath, gatewayFlag, username, passwordFlag string) error {
+	// 读取配置：用于补齐未在命令行给出的网关地址与凭据文件路径。
+	cfgPath := configPath
+	if cfgPath == "" {
+		cfgPath = config.DefaultPath()
+	}
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		return fmt.Errorf("加载配置失败: %w", err)
+	}
+
+	// 网关地址：命令行优先，其次配置文件。
+	gateway := login.NormalizeGateway(gatewayFlag)
+	if gateway == "" {
+		gateway = login.NormalizeGateway(cfg.Gateway)
+	}
+	if gateway == "" {
+		return fmt.Errorf("未指定网关地址，请用 -gateway 指定，或先在配置文件 %s 中配置 gateway", cfgPath)
+	}
+
+	// 用户名。
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return fmt.Errorf("用户名不能为空")
+	}
+
+	// 密码：命令行优先，否则交互式隐藏输入。密码不落盘、不打日志。
+	password := passwordFlag
+	if password == "" {
+		password, err = login.ReadPassword("密码: ")
+		if err != nil {
+			return fmt.Errorf("读取密码失败: %w", err)
+		}
+	}
+	if password == "" {
+		return fmt.Errorf("密码不能为空")
+	}
+
+	fmt.Printf("[daemon] 正在登录网关 %s ...\n", gateway)
+	result, err := login.Login(gateway, username, password)
+	if err != nil {
+		return err
+	}
+	displayName := result.DisplayName
+	if displayName == "" {
+		displayName = result.Username
+	}
+	fmt.Printf("[daemon] 登录成功: %s（token %s）\n", displayName, login.MaskToken(result.Token))
+
+	// 落盘 Token 到凭据文件（与 config.yaml 同目录），服务启动时自动加载。
+	credentialsPath := filepath.Join(filepath.Dir(cfgPath), "credentials.json")
+	if err := login.SaveToken(credentialsPath, gateway, result.Token, ""); err != nil {
+		return err
+	}
+	fmt.Printf("[daemon] 已保存凭据到 %s，服务启动后将自动连接网关\n", credentialsPath)
 	return nil
 }
 
@@ -583,6 +660,10 @@ func printUsage() {
   -gateway string   默认网关地址（覆盖配置文件）
   -config string    配置文件路径（默认 ~/.jarvis/daemon/config.yaml）
   -web-listen string  Web 登录服务监听地址（覆盖配置文件，默认 0.0.0.0:17801；传空串关闭）
+
+选项（install 专用）:
+  -u string         登录用户名（提供时安装后自动登录网关并保存 Token，实现免配置）
+  -password string  登录密码（仅用于登录换取 Token，不保存；缺省时交互式输入）
 
 选项（login 专用）:
   -gateway string   网关地址（覆盖配置文件）
