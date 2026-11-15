@@ -853,10 +853,47 @@ export function useAgents({
       if (!processedNodes.some(n => n.node_id === 'master')) {
         processedNodes.unshift({ node_id: 'master', status: 'running' })
       }
+      // 合并 daemon 节点（jarvis-daemon 会话）进候选，使终端节点选择器能选中 daemon
+      // 节点创建终端。daemon 会话不在 /api/node/status 的 nodes 里，需额外拉取
+      // /api/daemon/sessions（含 node_id / hostname / name / platform / status）。
+      const daemonNodes = await fetchDaemonNodeOptions()
+      for (const dn of daemonNodes) {
+        if (!processedNodes.some(n => n.node_id === dn.node_id)) {
+          processedNodes.push(dn)
+        }
+      }
       availableNodeOptions.value = processedNodes
     } catch (error) {
       console.error('[NODE] 获取节点状态出错:', error)
       availableNodeOptions.value = []
+    }
+  }
+
+  // 拉取 daemon 会话并转换为节点选项（供终端节点选择器使用）。
+  // 返回形如 [{ node_id, hostname, name, platform, status }] 的数组；
+  // 失败时返回空数组（不影响主节点状态加载）。
+  async function fetchDaemonNodeOptions() {
+    try {
+      const { host, port } = getGatewayAddress()
+      const url = `${getHttpProtocol()}://${host}:${port}/api/daemon/sessions`
+      const response = await fetchWithAuth(url)
+      if (!response.ok) return []
+      const result = await response.json()
+      if (!result || !result.success) return []
+      const sessions = Array.isArray(result.sessions) ? result.sessions : []
+      return sessions
+        .filter(s => s && String(s.node_id || '').trim())
+        .map(s => ({
+          node_id: String(s.node_id || '').trim(),
+          hostname: s.hostname || '',
+          name: s.name || s.hostname || '',
+          platform: s.platform || '',
+          status: 'running',
+          daemon: true,
+        }))
+    } catch (e) {
+      console.warn('[NODE] 获取 daemon 节点失败:', e?.message || e)
+      return []
     }
   }
 
@@ -2661,6 +2698,7 @@ export function useAgents({
     matchPermissionPattern,
     hasPermission,
     fetchNodeStatus,
+    fetchDaemonNodeOptions,
     startNodeStatusRefresh,
     stopNodeStatusRefresh,
     fetchUserList,
