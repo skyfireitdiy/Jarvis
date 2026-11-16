@@ -2795,7 +2795,10 @@ def check_context_limit(
 
 
 def switch_platform_type(
-    agent: Any, platform_type: str, preserve_model_group: bool = True
+    agent: Any,
+    platform_type: str,
+    preserve_model_group: bool = True,
+    sync_other_agents: bool = True,
 ) -> bool:
     """切换平台类型（smart/normal/cheap），保持或更新模型组
 
@@ -2803,6 +2806,13 @@ def switch_platform_type(
         agent: Agent 实例
         platform_type: 平台类型 ('smart', 'normal', 或 'cheap')
         preserve_model_group: 是否保持当前模型组不变（默认True）
+        sync_other_agents: 是否同步重建同进程内其他正在运行 Agent 的模型
+            （默认True）。模型组、代理节点等均为进程内全局配置，重建当前
+            Agent 的 model 后，其他 Agent（如父 Agent）仍持有旧 model 实例，
+            会导致 base_url（构造时静态固化）与动态注入的认证头（每次调用
+            实时读全局配置）不一致，进而请求被网关以 INVALID_TOKEN 拒绝。
+            因此默认同步；_sync_other_running_agents_models 内部调用本函数
+            时须传 False 以避免递归。
 
     返回:
         bool: 是否切换成功
@@ -2830,6 +2840,11 @@ def switch_platform_type(
         # 将新模型设置到现有的 session 中
         agent.session.model = agent.model
 
+        # 同步重建其他正在运行 Agent 的模型，避免全局配置变更（模型组/代理节点）
+        # 后其他 Agent 仍持有旧 model 导致 base_url 与认证头不一致
+        if sync_other_agents:
+            _sync_other_running_agents_models(agent)
+
         return True
     except Exception as e:
         PrettyOutput.auto_print(f"❌ 切换平台类型失败: {e}")
@@ -2852,7 +2867,13 @@ def _sync_other_running_agents_models(current_agent: Any) -> None:
             continue
         seen.add(id(other))
         try:
-            switch_platform_type(other, get_platform_type_from_agent(other))
+            # 传 sync_other_agents=False：本函数本身即为同步逻辑，
+            # 避免 switch_platform_type 内部再次触发同步导致无限递归。
+            switch_platform_type(
+                other,
+                get_platform_type_from_agent(other),
+                sync_other_agents=False,
+            )
         except Exception as e:
             PrettyOutput.auto_print(
                 f"⚠️ 同步重建 Agent '{agent_name}' 模型失败: {e}"
@@ -2877,12 +2898,11 @@ def perform_switch(
         set_llm_group(new_model_group)
 
         # 使用通用的平台类型切换函数
+        # （switch_platform_type 内部已同步重建其他正在运行 Agent 的模型，
+        #  因为模型组是进程内全局配置，父 Agent 等也须一并更新）
         result = switch_platform_type(agent, platform_type, preserve_model_group=False)
         if result:
             agent._model_type = platform_type
-            # 模型组是进程内全局配置，同步重建其他正在运行 Agent 的模型，
-            # 否则父 Agent 等仍持有旧模型组创建的 model 实例
-            _sync_other_running_agents_models(agent)
             # 上报网关，使 Agent 列表展示的模型组与真实运行状态一致
             _report_agent_config_change({"llm_group": new_model_group})
         return result
