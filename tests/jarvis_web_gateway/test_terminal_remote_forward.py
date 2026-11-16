@@ -20,8 +20,6 @@ os.environ["JARVIS_SKIP_INTERACTIVE_CONFIG"] = "1"
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
 import jarvis.jarvis_web_gateway.app as app_module
 from jarvis.jarvis_web_gateway.app import WebSocketConnectionManager
 

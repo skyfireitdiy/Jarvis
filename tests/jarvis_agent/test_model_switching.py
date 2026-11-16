@@ -449,8 +449,18 @@ class TestPerformSwitchSyncsOtherAgents:
 
         switched = []
 
-        def fake_switch_platform_type(agent, platform_type, preserve_model_group=True):
+        # 仅替换「重建模型」这一副作用（避免真实创建平台实例），
+        # 但保留 switch_platform_type 的同步语义：当 sync_other_agents=True 时
+        # 仍调用真实的 _sync_other_running_agents_models，否则被测的
+        # 「切换模型组时同步重建其他 Agent」行为会被 mock 短路掉。
+        real_sync = bih._sync_other_running_agents_models
+
+        def fake_switch_platform_type(
+            agent, platform_type, preserve_model_group=True, sync_other_agents=True
+        ):
             switched.append((agent, platform_type))
+            if sync_other_agents:
+                real_sync(agent)
             return True
 
         monkeypatch.setattr(bih, "switch_platform_type", fake_switch_platform_type)
@@ -482,7 +492,7 @@ class TestPerformSwitchSyncsOtherAgents:
         assert parent_calls == ["normal"]
 
     def test_switch_model_does_not_sync(self, monkeypatch):
-        """切模型（smart/normal/cheap）不应触发其他 agent 同步重建"""
+        """sync_other_agents=False 时不触发其他 agent 同步重建（防递归路径）"""
         bih, jglobals, switched = self._patch(monkeypatch)
 
         parent = Mock()
@@ -495,6 +505,7 @@ class TestPerformSwitchSyncsOtherAgents:
             jglobals, "global_agents", {"parent": parent, "child": child}
         )
 
-        # 直接调用 switch_platform_type 的路径（switch_model 内部行为）
-        bih.switch_platform_type(child, "smart")
-        assert all(a is not parent for a, _ in switched)
+        # _sync_other_running_agents_models 内部调用本函数时传 False，
+        # 该路径不得再次触发同步，否则会无限递归。
+        bih.switch_platform_type(child, "smart", sync_other_agents=False)
+        assert [a for a, _ in switched] == [child]
