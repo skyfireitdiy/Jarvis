@@ -383,6 +383,8 @@ def build_browser_extension_zip(extension_dir: str) -> bytes:
 
 
 MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
+# 单文件硬上限（/file-upload 的 max_size_bytes 不得突破）：64MB
+MAX_FILE_SIZE_BYTES_HARD = 64 * 1024 * 1024
 BINARY_FILE_SAMPLE_SIZE = 4096
 GLOBAL_SEARCH_MAX_QUERY_LENGTH = 200
 GLOBAL_SEARCH_DEFAULT_MAX_RESULTS = 100
@@ -1343,6 +1345,24 @@ class WebSocketConnectionManager:
                     terminal_node_id
                 )
                 if daemon_session is not None:
+                    # input/resize 是高频小消息，若同步等待 daemon 回包（默认 30s
+                    # 超时），一旦 daemon 侧写 ConPTY 阻塞，就会卡住整个 WS 消息
+                    # 循环，表现为"点右键没反应、终端创建不出来"。故这两类动作
+                    # 用后台任务 fire-and-forget，不阻塞消息循环。
+                    if message_type in (
+                        "terminal_session_input",
+                        "terminal_session_resize",
+                    ):
+                        asyncio.create_task(
+                            self._forward_terminal_to_daemon(
+                                daemon_session,
+                                message_type,
+                                payload,
+                                session_id,
+                                terminal_node_id,
+                            )
+                        )
+                        return
                     await self._forward_terminal_to_daemon(
                         daemon_session,
                         message_type,
@@ -1559,6 +1579,12 @@ class WebSocketConnectionManager:
                         }
                         self._router.publish(error_msg, session_id=session_id)
                         return
+                # 远端终端（daemon / 子节点）在 master 上只是影子会话（无 PTY），
+                # 必须转发到真实所在节点，否则写入空会话、前端表现为"输入无反应"。
+                if await self._forward_terminal_to_remote(
+                    terminal_id, message_type, payload, session_id
+                ):
+                    return
                 _terminal_session_manager.write_input(terminal_id, data)
             return
         if message_type == "terminal_session_resize":
@@ -1593,6 +1619,12 @@ class WebSocketConnectionManager:
                         }
                         self._router.publish(error_msg, session_id=session_id)
                         return
+                # 远端终端（daemon / 子节点）在 master 上只是影子会话（无 PTY），
+                # resize 必须转发到真实所在节点，否则只改了影子会话的尺寸。
+                if await self._forward_terminal_to_remote(
+                    terminal_id, message_type, payload, session_id
+                ):
+                    return
                 _terminal_session_manager.resize(terminal_id, rows_int, cols_int)
             return
         if message_type == "file_upload":
@@ -1721,6 +1753,103 @@ class WebSocketConnectionManager:
                 f"[WS MESSAGE] Failed to broadcast terminal event to admins: {e}"
             )
 
+    async def _forward_terminal_to_remote(
+        self,
+        terminal_id: str,
+        message_type: str,
+        payload: Dict[str, Any],
+        session_id: str,
+    ) -> bool:
+        """把已存在终端会话的请求（input/resize）转发到终端真实所在的远端节点。
+
+        master 上为 daemon / 子节点终端登记的是**影子会话**（``register_remote_session``，
+        无 master_fd / proc）。若在 master 本地执行 ``write_input``/``resize``，实际写入
+        的是空会话，前端表现为"输入无反应"；因此必须先按 terminal_id 反查影子会话的
+        node_id，非本地则转发。
+
+        Args:
+            terminal_id: 终端 ID。
+            message_type: 前端消息类型（terminal_session_input / terminal_session_resize）。
+            payload: 前端消息 payload。
+            session_id: 前端 WS 会话 ID。
+
+        Returns:
+            bool: True 表示已转发（调用方应立即返回，不再本地处理）；
+                False 表示终端是本地会话，调用方继续本地处理。
+        """
+        if _terminal_session_manager is None or not terminal_id:
+            return False
+        info = _terminal_session_manager.get_session_info(terminal_id)
+        if not info:
+            return False
+        node_id = str(info.get("node_id") or "").strip()
+        local_node_id = _node_runtime.local_node_id if _node_runtime else "master"
+        if not node_id or node_id in (local_node_id, "master"):
+            return False
+
+        # 远端终端：补全 node_id，便于节点侧按节点路由（daemon 侧忽略该字段）
+        forward_payload = dict(payload)
+        forward_payload["node_id"] = node_id
+        forward_payload["terminal_id"] = terminal_id
+
+        daemon_session = daemon_capability_manager.get_session_by_node_id(node_id)
+        if daemon_session is not None:
+            # 同 _handle_message 中的处理：input/resize 不等回包，避免阻塞 WS 循环
+            if message_type in (
+                "terminal_session_input",
+                "terminal_session_resize",
+            ):
+                asyncio.create_task(
+                    self._forward_terminal_to_daemon(
+                        daemon_session,
+                        message_type,
+                        forward_payload,
+                        session_id,
+                        node_id,
+                    )
+                )
+                return True
+            await self._forward_terminal_to_daemon(
+                daemon_session,
+                message_type,
+                forward_payload,
+                session_id,
+                node_id,
+            )
+            return True
+
+        if _node_connection_manager is None:
+            logger.error(
+                "[WS MESSAGE] Node connection manager is not available, "
+                "cannot forward %s to node %s",
+                message_type,
+                node_id,
+            )
+            return True
+        try:
+            await _node_connection_manager.send_request_to_node(
+                node_id,
+                NODE_TERMINAL_REQUEST,
+                {
+                    "action": message_type,
+                    "payload": forward_payload,
+                    "session_id": session_id,
+                },
+            )
+        except Exception as e:
+            save_exception(
+                e,
+                module="jarvis_web_gateway.app",
+                function="_forward_terminal_to_remote",
+            )
+            logger.error(
+                "[WS MESSAGE] Failed to forward %s to node %s: %s",
+                message_type,
+                node_id,
+                e,
+            )
+        return True
+
     async def _forward_terminal_to_daemon(
         self,
         daemon_session: Dict[str, Any],
@@ -1811,6 +1940,23 @@ class WebSocketConnectionManager:
                     message_type,
                     response.get("error"),
                 )
+                # terminal_create 失败必须回前端，否则前端一直等 terminal_created，
+                # 表现为"面板打开了但终端永远创建不出来"（静默失败最难排查）。
+                if message_type == "terminal_create":
+                    err = response.get("error")
+                    if isinstance(err, dict):
+                        err_msg = str(err.get("message") or err.get("code") or err)
+                    elif err:
+                        err_msg = str(err)
+                    else:
+                        err_msg = "daemon terminal create failed"
+                    self._router.publish(
+                        {
+                            "type": "terminal_error",
+                            "payload": {"error": err_msg, "node_id": terminal_node_id},
+                        },
+                        session_id=session_id,
+                    )
         except Exception as e:
             save_exception(
                 e, module="jarvis_web_gateway.app", function="_forward_terminal_to_daemon"
@@ -1820,6 +1966,21 @@ class WebSocketConnectionManager:
                 terminal_node_id,
                 e,
             )
+            # 同上：create 失败要让前端知道，避免无限等待
+            if message_type == "terminal_create":
+                try:
+                    self._router.publish(
+                        {
+                            "type": "terminal_error",
+                            "payload": {
+                                "error": f"forward to daemon failed: {e}",
+                                "node_id": terminal_node_id,
+                            },
+                        },
+                        session_id=session_id,
+                    )
+                except Exception:
+                    pass
 
     async def _handle_chat_message(
         self,
@@ -10254,12 +10415,19 @@ def create_app(
                     },
                 }
 
-            if len(file_bytes) > MAX_FILE_SIZE_BYTES:
+            # 单文件上限：默认 10MB（前端目录树「上传」场景）。诊断/传输大文件
+            # （如 daemon 可执行文件）时可通过 payload.max_size_bytes 显式放宽，
+            # 上限受 MAX_FILE_SIZE_BYTES_HARD 约束，避免被滥用为无限制写盘。
+            _req_max = payload.get("max_size_bytes")
+            _size_limit = MAX_FILE_SIZE_BYTES
+            if isinstance(_req_max, int) and _req_max > 0:
+                _size_limit = min(_req_max, MAX_FILE_SIZE_BYTES_HARD)
+            if len(file_bytes) > _size_limit:
                 return {
                     "success": False,
                     "error": {
                         "code": "FILE_TOO_LARGE",
-                        "message": "File size exceeds 10MB limit",
+                        "message": f"File size exceeds {_size_limit} bytes limit",
                     },
                 }
 

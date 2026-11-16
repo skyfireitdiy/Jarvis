@@ -478,6 +478,13 @@ function handleMessage(message, agentId = null) {
       }, targetAgentId)
       // 终端初始化由模板 :ref 回调自动触发 setTerminalRef，无需手动调用
     }
+  } else if (type === 'terminal_error') {
+    // 终端操作失败（如 daemon 侧创建失败/转发异常）：复位创建标志并提示，
+    // 避免前端一直等待 terminal_created 导致"面板打开了但终端永远不出现"。
+    isCreatingTerminalSession.value = false
+    const errMsg = payload?.error || '终端操作失败'
+    console.error('[ws] terminal_error:', payload)
+    ElMessage.error(`创建终端失败：${errMsg}`)
   } else if (type === 'terminal_created') {
     // 独立终端创建成功
     isCreatingTerminalSession.value = false
