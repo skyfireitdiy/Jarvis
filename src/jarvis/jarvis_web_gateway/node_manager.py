@@ -15,7 +15,7 @@ import pathlib
 import random
 import shutil
 import uuid
-from typing import Any, AsyncGenerator, Dict, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional
 from urllib.parse import urlparse
 
 import httpx
@@ -258,6 +258,13 @@ class NodeConnectionManager:
                     terminal_payload = next_message.get("payload") or {}
                     output_session_id = terminal_payload.get("session_id") or "default"
                     output_message = terminal_payload.get("message")
+                    # 子节点终端进程自行退出（event_type=closed）时，转换为
+                    # terminal_closed 并清理影子会话，使前端标签页同步移除。
+                    if self._is_terminal_closed_event(output_message):
+                        self._handle_terminal_process_exit(
+                            output_message, output_session_id
+                        )
+                        continue
                     if output_message and self._router:
                         self._router.publish(
                             output_message, session_id=output_session_id
@@ -379,6 +386,65 @@ class NodeConnectionManager:
             self._node_runtime.node_registry.mark_offline(node_id)
             self._connections.pop(node_id, None)
             self._connection_to_node.pop(connection_id, None)
+
+    @staticmethod
+    def _is_terminal_closed_event(message: Any) -> bool:
+        """判断子节点回传的消息是否为「终端进程已退出」通知。"""
+        if not isinstance(message, dict):
+            return False
+        payload = message.get("payload")
+        if not isinstance(payload, dict):
+            return False
+        return str(payload.get("event_type") or "") == "closed"
+
+    def _handle_terminal_process_exit(
+        self, message: Dict[str, Any], output_session_id: str
+    ) -> None:
+        """处理子节点终端进程自行退出：通知前端并清理影子会话。"""
+        payload = message.get("payload") or {}
+        execution_id = str(payload.get("execution_id") or "")
+        terminal_id = (
+            execution_id[len("terminal_") :]
+            if execution_id.startswith("terminal_")
+            else execution_id
+        )
+        if not terminal_id:
+            return
+        closed_message = {
+            "type": "terminal_closed",
+            "payload": {"terminal_id": terminal_id},
+        }
+        targets: List[str] = []
+        tsm = self._terminal_session_manager
+        if tsm is not None:
+            try:
+                targets = tsm.get_access_session_ids(terminal_id)
+            except Exception as e:
+                logger.warning(
+                    "[NODE TERMINAL] failed to get access sessions: %s", e
+                )
+            try:
+                tsm.unregister_session(terminal_id)
+            except Exception as e:
+                logger.warning(
+                    "[NODE TERMINAL] failed to unregister session: %s", e
+                )
+        if output_session_id and output_session_id not in targets:
+            targets.append(output_session_id)
+        if self._router is not None:
+            for sid in targets:
+                try:
+                    self._router.publish(closed_message, session_id=sid)
+                except Exception as e:
+                    logger.warning(
+                        "[NODE TERMINAL] failed to publish terminal_closed: %s", e
+                    )
+        self._publish_terminal_output_to_admins(closed_message, output_session_id)
+        logger.info(
+            "[NODE TERMINAL] terminal process exited: terminal_id=%s session_id=%s",
+            terminal_id,
+            output_session_id,
+        )
 
     def _publish_terminal_output_to_admins(
         self, message: Dict[str, Any], exclude_session_id: Optional[str] = None

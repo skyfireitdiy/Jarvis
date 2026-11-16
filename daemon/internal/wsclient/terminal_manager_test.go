@@ -351,3 +351,87 @@ func TestTerminalManagerResponseSerializable(t *testing.T) {
 		t.Fatalf("响应不可序列化: %v", err)
 	}
 }
+
+// TestTerminalManagerProcessExitNotifies 验证终端进程自行退出（用户输入 exit）
+// 时会回传 event_type=closed 事件，并从 sessions 中移除会话。
+func TestTerminalManagerProcessExitNotifies(t *testing.T) {
+	out := make(chan map[string]any, 64)
+	tm := newTestTerminalManager(t, out)
+	createResp := tm.HandleRequest(map[string]any{
+		"action":     "terminal_create",
+		"payload":    map[string]any{"interpreter": "bash", "working_dir": "/tmp"},
+		"session_id": "session_exit",
+	})
+	terminalID := createResp["data"].(map[string]any)["terminal_id"].(string)
+
+	tm.HandleRequest(map[string]any{
+		"action": "terminal_session_input",
+		"payload": map[string]any{
+			"terminal_id": terminalID,
+			"data":        "exit\n",
+		},
+		"session_id": "session_exit",
+	})
+
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		select {
+		case msg := <-out:
+			if msg["type"] != "node_terminal_output" {
+				continue
+			}
+			payload, _ := msg["payload"].(map[string]any)
+			inner, _ := payload["message"].(map[string]any)
+			innerPayload, _ := inner["payload"].(map[string]any)
+			if innerPayload["event_type"] != "closed" {
+				continue
+			}
+			if innerPayload["execution_id"] != "terminal_"+terminalID {
+				t.Errorf("期望 execution_id=terminal_%s，实际 %v", terminalID, innerPayload["execution_id"])
+			}
+			// 会话必须已从 sessions 移除，后续 input 应报 NOT_FOUND
+			resp := tm.HandleRequest(map[string]any{
+				"action":  "terminal_session_input",
+				"payload": map[string]any{"terminal_id": terminalID, "data": "echo hi\n"},
+			})
+			if resp["success"] != false {
+				t.Errorf("进程退出后会话应已移除，input 应失败，实际 %v", resp)
+			}
+			return
+		case <-time.After(time.Until(deadline)):
+			t.Fatal("未在 5 秒内收到 event_type=closed 的 node_terminal_output")
+		}
+	}
+}
+
+// TestTerminalManagerCloseDoesNotNotifyExit 验证主动 close 不重复回传 closed 事件。
+func TestTerminalManagerCloseDoesNotNotifyExit(t *testing.T) {
+	out := make(chan map[string]any, 64)
+	tm := newTestTerminalManager(t, out)
+	createResp := tm.HandleRequest(map[string]any{
+		"action":     "terminal_create",
+		"payload":    map[string]any{"interpreter": "bash", "working_dir": "/tmp"},
+		"session_id": "session_close",
+	})
+	terminalID := createResp["data"].(map[string]any)["terminal_id"].(string)
+	tm.HandleRequest(map[string]any{
+		"action":  "terminal_close",
+		"payload": map[string]any{"terminal_id": terminalID},
+	})
+
+	// 给 readLoop 一点时间跑完
+	time.Sleep(500 * time.Millisecond)
+	for {
+		select {
+		case msg := <-out:
+			payload, _ := msg["payload"].(map[string]any)
+			inner, _ := payload["message"].(map[string]any)
+			innerPayload, _ := inner["payload"].(map[string]any)
+			if innerPayload["event_type"] == "closed" {
+				t.Fatalf("主动 close 不应回传 closed 事件: %v", msg)
+			}
+		default:
+			return
+		}
+	}
+}

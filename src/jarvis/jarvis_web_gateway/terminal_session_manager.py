@@ -870,6 +870,24 @@ class TerminalSessionManager:
         with self._lock:
             self._sessions.pop(terminal_id, None)
 
+    def get_access_session_ids(self, terminal_id: str) -> List[str]:
+        """返回有权接收该终端事件（输出/关闭）的 WebSocket 会话ID列表。
+
+        用于 daemon 侧终端进程自行退出时，把 ``terminal_closed`` 推给
+        owner、被分享用户与已接管用户，使其前端标签页同步移除。
+
+        Args:
+            terminal_id: 终端ID
+
+        Returns:
+            会话ID列表；会话不存在时返回空列表
+        """
+        with self._lock:
+            session = self._sessions.get(terminal_id)
+            if session is None:
+                return []
+            return session._get_access_session_ids()
+
     def get_session_info(self, terminal_id: str) -> Optional[Dict[str, Any]]:
         """获取会话信息（含 owner 与 ACL）。
 

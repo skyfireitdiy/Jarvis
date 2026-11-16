@@ -184,6 +184,79 @@ class TestHandleNodeTerminalOutput:
         )
 
 
+class TestHandleTerminalProcessExit:
+    """daemon 终端进程自行退出（event_type=closed）→ 前端 terminal_closed。"""
+
+    def _setup(self):
+        manager = DaemonCapabilityManager()
+        published = []
+        router = MagicMock()
+        router.publish = MagicMock(
+            side_effect=lambda msg, session_id=None: published.append((msg, session_id))
+        )
+        tsm = MagicMock()
+        tsm.get_all_admin_session_ids.return_value = ["session_admin1"]
+        tsm.get_access_session_ids.return_value = ["session_u1", "session_u2"]
+        manager.set_router(router)
+        manager.set_terminal_session_manager(tsm)
+        return manager, published, tsm
+
+    def test_closed_event_becomes_terminal_closed(self):
+        manager, published, tsm = self._setup()
+        closed_message = {
+            "type": "execution",
+            "payload": {
+                "event_type": "closed",
+                "data": "",
+                "encoded": True,
+                "sequence": 3,
+                "execution_id": "terminal_t1",
+            },
+        }
+        manager._handle_node_terminal_output(
+            {
+                "type": "node_terminal_output",
+                "payload": {"session_id": "session_u1", "message": closed_message},
+            }
+        )
+        # 不再把 closed 事件当普通输出透传
+        assert not any(msg is closed_message for msg, _ in published)
+        # 推给 owner/被分享用户
+        closed_msgs = [
+            (msg, sid)
+            for msg, sid in published
+            if msg.get("type") == "terminal_closed"
+        ]
+        assert closed_msgs, "应当推送 terminal_closed"
+        for msg, _ in closed_msgs:
+            assert msg["payload"]["terminal_id"] == "t1"
+        sids = {sid for _, sid in closed_msgs}
+        assert {"session_u1", "session_u2", "session_admin1"} <= sids
+        # 影子会话被清理，避免「同步」恢复已死终端
+        tsm.unregister_session.assert_called_once_with("t1")
+
+    def test_stdout_event_not_treated_as_close(self):
+        manager, published, tsm = self._setup()
+        output_message = {
+            "type": "execution",
+            "payload": {
+                "event_type": "stdout",
+                "data": "aGVsbG8=",
+                "encoded": True,
+                "sequence": 1,
+                "execution_id": "terminal_t1",
+            },
+        }
+        manager._handle_node_terminal_output(
+            {
+                "type": "node_terminal_output",
+                "payload": {"session_id": "session_u1", "message": output_message},
+            }
+        )
+        assert any(msg is output_message for msg, _ in published)
+        tsm.unregister_session.assert_not_called()
+
+
 class TestGetSessionByNodeId:
     """get_session_by_node_id 行为。"""
 

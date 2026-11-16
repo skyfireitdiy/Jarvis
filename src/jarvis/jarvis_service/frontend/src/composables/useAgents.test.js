@@ -1,6 +1,6 @@
 // useAgents 单元测试
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { ref, nextTick } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { useAgents } from './useAgents.js'
 // 刷新所有微任务（async 函数多层 await 时用）
 async function flushPromises() {
@@ -1325,8 +1325,9 @@ describe('useAgents', () => {
     expect(availableNodeOptions.value.some(n => n.node_id === 'master')).toBe(true)
     expect(availableNodeOptions.value).toHaveLength(2)
   })
-  it('fetchNodeStatus：合并 daemon 节点进候选', async () => {
+  it('fetchNodeStatus：daemon 会话不并入 availableNodeOptions，单独进 terminalNodeOptions', async () => {
     const { api, fetchWithAuth, availableNodeOptions } = makeHarness()
+    const { daemonNodeOptions, terminalNodeOptions } = api
     fetchWithAuth
       .mockResolvedValueOnce({
         ok: true,
@@ -1342,12 +1343,34 @@ describe('useAgents', () => {
         }),
       })
     await api.fetchNodeStatus()
+    // availableNodeOptions 只含真实网关节点（master + node1），不含 daemon
     expect(availableNodeOptions.value.some(n => n.node_id === 'master')).toBe(true)
-    expect(availableNodeOptions.value.some(n => n.node_id === 'daemon-host-123')).toBe(true)
-    expect(availableNodeOptions.value).toHaveLength(3)
-    const daemonNode = availableNodeOptions.value.find(n => n.node_id === 'daemon-host-123')
+    expect(availableNodeOptions.value).toHaveLength(2)
+    expect(availableNodeOptions.value.some(n => n.node_id === 'daemon-host-123')).toBe(false)
+    expect(availableNodeOptions.value.some(n => n.daemon)).toBe(false)
+    // daemon 会话单独保存
+    expect(daemonNodeOptions.value).toHaveLength(1)
+    expect(daemonNodeOptions.value[0].node_id).toBe('daemon-host-123')
+    expect(daemonNodeOptions.value[0].daemon).toBe(true)
+    // 终端节点选择器 = 真实节点 + daemon
+    expect(terminalNodeOptions.value).toHaveLength(3)
+    const daemonNode = terminalNodeOptions.value.find(n => n.node_id === 'daemon-host-123')
     expect(daemonNode.daemon).toBe(true)
     expect(daemonNode.status).toBe('running')
+  })
+  it('fetchNodeStatus：daemon 接口失败时 terminalNodeOptions 仍为真实节点', async () => {
+    const { api, fetchWithAuth, availableNodeOptions } = makeHarness()
+    const { daemonNodeOptions, terminalNodeOptions } = api
+    fetchWithAuth
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, data: { nodes: [{ node_id: 'node1', status: 'running' }] } }),
+      })
+      .mockResolvedValueOnce({ ok: false })
+    await api.fetchNodeStatus()
+    expect(availableNodeOptions.value).toHaveLength(2)
+    expect(daemonNodeOptions.value).toEqual([])
+    expect(terminalNodeOptions.value).toHaveLength(2)
   })
   it('fetchDaemonNodeOptions：daemon 会话接口失败返回空数组', async () => {
     const { api, fetchWithAuth } = makeHarness()

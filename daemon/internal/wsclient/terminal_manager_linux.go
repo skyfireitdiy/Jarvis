@@ -189,9 +189,60 @@ func (tm *TerminalManager) readLoop(s *terminalSession, sender func(msg map[stri
 			tm.publishOutput(s, chunk)
 		}
 		if err != nil {
-			// PTY 已关闭（进程退出或 close 会话），结束读循环。
+			tm.handleProcessExit(s, sender)
 			return
 		}
+	}
+}
+
+// handleProcessExit 处理终端进程退出：移除会话并通知网关。
+//
+// 读循环结束意味着 PTY 已关闭（进程退出或会话被 close）。若为进程自行退出
+// （用户输入 exit），必须移除会话并回传 event_type=closed 事件，让网关/前端
+// 销毁标签页；主动 close 的会话已从 map 移除且 s.closed=true，此处不再重复通知。
+func (tm *TerminalManager) handleProcessExit(s *terminalSession, sender func(msg map[string]any) error) {
+	tm.mu.Lock()
+	cur, ok := tm.sessions[s.terminalID]
+	removed := ok && cur == s
+	if removed {
+		delete(tm.sessions, s.terminalID)
+	}
+	tm.mu.Unlock()
+
+	s.mu.Lock()
+	alreadyClosed := s.closed
+	s.closed = true
+	s.mu.Unlock()
+
+	if alreadyClosed || !removed {
+		// 主动 close 触发的退出，网关侧已收到 terminal_closed，无需重复通知。
+		return
+	}
+
+	log.Printf("[terminal] process exited terminal_id=%s", s.terminalID)
+
+	if sender == nil {
+		return
+	}
+	seq := s.nextSequence()
+	msg := map[string]any{
+		"type": "node_terminal_output",
+		"payload": map[string]any{
+			"session_id": s.sessionID,
+			"message": map[string]any{
+				"type": "execution",
+				"payload": map[string]any{
+					"event_type":   "closed",
+					"data":         "",
+					"encoded":      true,
+					"sequence":     seq,
+					"execution_id": "terminal_" + s.terminalID,
+				},
+			},
+		},
+	}
+	if err := sender(msg); err != nil {
+		log.Printf("[terminal] 回传退出事件失败 terminal_id=%s: %v", s.terminalID, err)
 	}
 }
 

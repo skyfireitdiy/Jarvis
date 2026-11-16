@@ -829,6 +829,24 @@ export function useAgents({
     const allowed = Array.isArray(perms.allowed) ? perms.allowed : []
     return allowed.some(p => matchPermissionPattern(p, permission))
   }
+  // daemon 会话（接入本网关的后台服务）转换为「终端节点选项」。
+  // 与 availableNodeOptions（网关节点）严格分离：daemon 不是节点，只在终端
+  // 节点选择器里作为可选目标出现，并带 daemon: true 供 UI 区分造型/菜单。
+  const daemonNodeOptions = ref([])
+  // 终端节点选择器的完整候选 = 网关节点 + daemon 会话。
+  // 仅用于终端创建（TerminalPanel 的 nodeOptions）；其它节点操作
+  // （创建 Agent / 更新代码 / 重启服务 / 同步配置 / 编排 / 管理面板）一律
+  // 只认 availableNodeOptions，不得看到 daemon。
+  const terminalNodeOptions = computed(() => {
+    const nodes = Array.isArray(availableNodeOptions.value) ? availableNodeOptions.value : []
+    const daemons = Array.isArray(daemonNodeOptions.value) ? daemonNodeOptions.value : []
+    if (!daemons.length) return nodes
+    const merged = [...nodes]
+    for (const dn of daemons) {
+      if (!merged.some(n => n.node_id === dn.node_id)) merged.push(dn)
+    }
+    return merged
+  })
 
   async function fetchNodeStatus() {
     try {
@@ -853,19 +871,19 @@ export function useAgents({
       if (!processedNodes.some(n => n.node_id === 'master')) {
         processedNodes.unshift({ node_id: 'master', status: 'running' })
       }
-      // 合并 daemon 节点（jarvis-daemon 会话）进候选，使终端节点选择器能选中 daemon
-      // 节点创建终端。daemon 会话不在 /api/node/status 的 nodes 里，需额外拉取
-      // /api/daemon/sessions（含 node_id / hostname / name / platform / status）。
-      const daemonNodes = await fetchDaemonNodeOptions()
-      for (const dn of daemonNodes) {
-        if (!processedNodes.some(n => n.node_id === dn.node_id)) {
-          processedNodes.push(dn)
-        }
-      }
+      // 注意：daemon（接入本网关的后台服务会话）**不是**网关节点，绝不并入
+      // availableNodeOptions。daemon 与 node 是两类不同实体：node 由网关
+      // /api/node/status 注册（可创建 Agent / 更新代码 / 重启服务 / 编排等），
+      // daemon 只是接入端（仅支持终端等本机能力）。二者混用会让 daemon 出现在
+      // 创建 Agent、管理面板、重启/同步/更新代码等节点操作里，属于设计错误。
+      // daemon 会话单独保存在 daemonNodeOptions，仅供终端节点选择器使用
+      // （见 terminalNodeOptions）。
       availableNodeOptions.value = processedNodes
+      daemonNodeOptions.value = await fetchDaemonNodeOptions()
     } catch (error) {
       console.error('[NODE] 获取节点状态出错:', error)
       availableNodeOptions.value = []
+      daemonNodeOptions.value = []
     }
   }
 
@@ -948,7 +966,7 @@ export function useAgents({
     return nodes[0]?.node_id || ''
   }
 
-  watch(availableNodeOptions, (nodes) => {
+  watch(terminalNodeOptions, (nodes) => {
     const hasSelectedNode = nodes.some(node => node.node_id === selectedTerminalNodeId.value)
     if (!hasSelectedNode) {
       selectedTerminalNodeId.value = getDefaultTerminalNodeId(nodes)
@@ -2753,5 +2771,9 @@ export function useAgents({
     switchAgent,
     startAgentListRefresh,
     stopAgentListRefresh,
+    // daemon 会话（接入端）与终端节点候选：与 availableNodeOptions（网关节点）
+    // 严格分离，仅终端节点选择器使用 terminalNodeOptions。
+    daemonNodeOptions,
+    terminalNodeOptions,
   }
 }

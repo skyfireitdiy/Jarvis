@@ -160,3 +160,84 @@ def test_child_terminal_attach_empty_terminal_id_returns_not_found():
     assert payload["error"]["code"] == "NOT_FOUND"
     # 空 terminal_id 不应调用 get_session
     tsm.get_session.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# 子节点终端进程自行退出（event_type=closed）→ 前端 terminal_closed
+# ---------------------------------------------------------------------------
+
+
+def _closed_event(terminal_id="t1"):
+    return {
+        "type": "execution",
+        "payload": {
+            "event_type": "closed",
+            "data": "",
+            "encoded": True,
+            "sequence": 5,
+            "execution_id": f"terminal_{terminal_id}",
+        },
+    }
+
+
+def test_is_terminal_closed_event():
+    """仅 event_type=closed 判定为退出通知。"""
+    assert NodeConnectionManager._is_terminal_closed_event(_closed_event())
+    assert not NodeConnectionManager._is_terminal_closed_event(
+        {"type": "execution", "payload": {"event_type": "stdout"}}
+    )
+    assert not NodeConnectionManager._is_terminal_closed_event(None)
+    assert not NodeConnectionManager._is_terminal_closed_event({"payload": "x"})
+
+
+def test_handle_terminal_process_exit_publishes_terminal_closed():
+    """进程退出应推 terminal_closed 给 owner/被分享用户并清理影子会话。"""
+    published = []
+
+    class FakeRouter:
+        def publish(self, message, session_id=None, connection_id=None):
+            published.append((message, session_id))
+
+    tsm = MagicMock()
+    tsm.get_all_admin_session_ids.return_value = ["session_admin-a"]
+    tsm.get_access_session_ids.return_value = ["session_owner1", "session_viewer"]
+    m = NodeConnectionManager(
+        node_runtime=MagicMock(),
+        agent_manager=MagicMock(),
+        agent_proxy_manager=MagicMock(),
+        node_http_dispatcher=None,
+        router=FakeRouter(),
+        terminal_session_manager=tsm,
+    )
+    m._handle_terminal_process_exit(_closed_event("t1"), "session_owner1")
+    closed = [(msg, sid) for msg, sid in published if msg.get("type") == "terminal_closed"]
+    assert closed, "应当推送 terminal_closed"
+    assert all(msg["payload"]["terminal_id"] == "t1" for msg, _ in closed)
+    sids = {sid for _, sid in closed}
+    assert {"session_owner1", "session_viewer", "session_admin-a"} <= sids
+    tsm.unregister_session.assert_called_once_with("t1")
+    # 不应把 closed 事件当普通输出透传
+    assert not any(msg.get("payload", {}).get("event_type") == "closed" for msg, _ in published)
+
+
+def test_handle_terminal_process_exit_without_manager_is_safe():
+    """无 terminal_session_manager 时也应安全推送 terminal_closed。"""
+    published = []
+
+    class FakeRouter:
+        def publish(self, message, session_id=None, connection_id=None):
+            published.append((message, session_id))
+
+    m = NodeConnectionManager(
+        node_runtime=MagicMock(),
+        agent_manager=MagicMock(),
+        agent_proxy_manager=MagicMock(),
+        node_http_dispatcher=None,
+        router=FakeRouter(),
+        terminal_session_manager=None,
+    )
+    m._handle_terminal_process_exit(_closed_event("t9"), "session_owner1")
+    assert any(
+        msg.get("type") == "terminal_closed" and sid == "session_owner1"
+        for msg, sid in published
+    )

@@ -168,7 +168,8 @@
           v-for="n in accessNodes"
           :key="n.id"
           class="lobby-node is-local"
-          :class="'st-' + n.state"
+          :class="['st-' + n.state, { 'is-daemon': n.icon === 'daemon' }]"
+          @contextmenu.prevent.stop="onAccessNodeContextMenu(n, $event)"
         >
           <title>{{ n.title }}</title>
           <!-- 圆形主体 -->
@@ -964,7 +965,8 @@ const nodeLayout = computed(() => {
   if (master) {
     result.set('master', { node_id: 'master', x: cx, y: cy })
   }
-  const others = list.filter(n => n && n.node_id && n.node_id !== 'master')
+  // 过滤 daemon：daemon 由 accessNodes 圆形接入端渲染，不参与普通节点圆周布局
+  const others = list.filter(n => n && n.node_id && n.node_id !== 'master' && !n.daemon)
   const count = others.length
   others.forEach((n, i) => {
     // 从正上方开始，顺时针均匀分布
@@ -988,7 +990,9 @@ const nodeItems = computed(() => {
     return master && master.version ? String(master.version) : ''
   })()
   return list
-    .filter(n => n && n.node_id && nodeLayout.value.has(n.node_id))
+    // 过滤 daemon 节点：daemon 由 accessNodes 圆形接入端单独渲染，
+    // 若混入 nodeItems 会被画成服务器机箱，与接入端重复（同一 daemon 出现两次）。
+    .filter(n => n && n.node_id && !n.daemon && nodeLayout.value.has(n.node_id))
     .map(n => {
       const pos = nodeLayout.value.get(n.node_id)
       const state = normalizeNodeStatus(n.status)
@@ -1207,6 +1211,7 @@ const accessNodes = computed(() => {
     const p = daemonPos[i] || { x: masterPos.x, y: masterPos.y, labelAbove: true, anchor: 'middle' }
     nodes.push({
       id: `daemon-${s.session_id || i}`,
+      node_id: String((s && s.node_id) || '').trim() || null,
       x: p.x,
       y: p.y,
       state: 'online',
@@ -1619,8 +1624,9 @@ function onStageClick(event) {
 }
 
 // ===== 右键菜单（宠物 / 节点共用） =====
-// 菜单状态：坐标相对舞台左上角；kind 区分来源；name 用于标题
-const contextMenu = ref({ visible: false, x: 0, y: 0, kind: 'pet', agentId: null, nodeId: null, name: '' })
+// 菜单状态：坐标相对舞台左上角；kind 区分来源；name 用于标题；
+// nodeKind 区分「网关机箱节点」与「接入端 daemon 节点」（决定菜单动作集）
+const contextMenu = ref({ visible: false, x: 0, y: 0, kind: 'pet', agentId: null, nodeId: null, nodeKind: null, name: '' })
 
 // 节点菜单内置动作：在节点上创建 Agent / 更新代码 / 重启服务（后续可在此追加更多节点功能）
 const NODE_MENU_ACTIONS = [
@@ -1635,6 +1641,12 @@ const nodeMenuActions = computed(() => {
   return [...NODE_MENU_ACTIONS, ...extra]
 })
 
+// 接入端 daemon 节点菜单动作：仅「打开终端」（daemon 不是网关节点，
+// 创建 Agent / 更新代码 / 重启服务 / 重命名均不适用）
+const DAEMON_MENU_ACTIONS = [
+  { id: 'node-open-terminal', icon: PET_ICONS.terminal, label: '打开终端' },
+]
+
 // 宠物菜单内置动作：添加到分组 / 从分组移出（后续可在此追加更多宠物功能）
 const PET_MENU_ACTIONS = [
   { id: 'pet-add-to-group', icon: PET_ICONS.folder, label: '添加到分组' },
@@ -1642,10 +1654,15 @@ const PET_MENU_ACTIONS = [
 ]
 const petMenuActions = computed(() => [...(props.contextActions || []), ...PET_MENU_ACTIONS])
 
-// 当前菜单项：按 kind 取对应来源
-const contextMenuActions = computed(() =>
-  contextMenu.value.kind === 'node' ? nodeMenuActions.value : petMenuActions.value
-)
+// 当前菜单项：按 kind / nodeKind 取对应来源
+const contextMenuActions = computed(() => {
+  if (contextMenu.value.kind === 'node') {
+    // 接入端 daemon 节点只提供「打开终端」
+    if (contextMenu.value.nodeKind === 'daemon') return DAEMON_MENU_ACTIONS
+    return nodeMenuActions.value
+  }
+  return petMenuActions.value
+})
 
 function closeContextMenu() {
   if (contextMenu.value.visible) contextMenu.value.visible = false
@@ -1712,7 +1729,26 @@ function onNodeContextMenu(node, event) {
     kind: 'node',
     agentId: null,
     nodeId: node.node_id,
+    nodeKind: null,
     name: node.short || node.node_id,
+  }
+}
+
+// 接入端节点右键：仅 daemon（后台服务）可创建终端；浏览器扩展节点不弹菜单
+function onAccessNodeContextMenu(node, event) {
+  if (!node || node.icon !== 'daemon') return
+  if (!node.node_id) return
+  const pos = placeContextMenu(event, DAEMON_MENU_ACTIONS.length)
+  if (!pos) return
+  contextMenu.value = {
+    visible: true,
+    x: pos.x,
+    y: pos.y,
+    kind: 'node',
+    agentId: null,
+    nodeId: node.node_id,
+    nodeKind: 'daemon',
+    name: node.short || '后台服务',
   }
 }
 
@@ -2826,9 +2862,13 @@ defineExpose({ insertCompletionText, toggleAgentOutput, isOutputHidden, openInst
 .lobby-node-body {
   transition: filter 0.15s ease;
 }
-/* 本机执行面节点（浏览器扩展 / 本地后台服务）：仅作展示，不参与节点点击交互 */
+/* 本机执行面节点（浏览器扩展 / 本地后台服务）：默认仅作展示，不参与节点点击交互 */
 .lobby-node.is-local {
   pointer-events: none;
+}
+/* daemon 接入端需要右键「打开终端」，故单独恢复指针事件（扩展节点仍保持不可交互） */
+.lobby-node.is-local.is-daemon {
+  pointer-events: auto;
 }
 .lobby-node.is-local .lobby-node-label {
   fill: rgba(180, 220, 240, 0.6);

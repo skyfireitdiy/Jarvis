@@ -674,6 +674,15 @@ class DaemonCapabilityManager:
             output_message = terminal_payload.get("message")
             if not output_message:
                 return
+            # daemon 侧终端进程自行退出（用户输入 exit / 进程崩溃）时，daemon
+            # 会回传 event_type=closed 的 execution 消息。前端只认
+            # terminal_closed 才会移除标签页，因此这里转换为 terminal_closed，
+            # 并清理 master 上的影子会话（否则「同步」会恢复出已死终端）。
+            if self._is_terminal_closed_event(output_message):
+                self._handle_terminal_process_exit(
+                    output_message, output_session_id
+                )
+                return
             if self._router is not None:
                 self._router.publish(output_message, session_id=output_session_id)
                 self._publish_terminal_output_to_admins(
@@ -681,6 +690,73 @@ class DaemonCapabilityManager:
                 )
         except Exception as exc:  # pragma: no cover - 防御性
             logger.warning("[DAEMON TERMINAL] failed to forward output: %s", exc)
+
+    @staticmethod
+    def _is_terminal_closed_event(message: Any) -> bool:
+        """判断 daemon 回传的消息是否为「终端进程已退出」通知。
+
+        daemon 侧在 ConPTY/PTY 读循环结束（进程退出）时回传
+        ``{"type": "execution", "payload": {"event_type": "closed", ...}}``。
+        """
+        if not isinstance(message, dict):
+            return False
+        payload = message.get("payload")
+        if not isinstance(payload, dict):
+            return False
+        return str(payload.get("event_type") or "") == "closed"
+
+    def _handle_terminal_process_exit(
+        self, message: Dict[str, Any], output_session_id: str
+    ) -> None:
+        """处理 daemon 终端进程自行退出：通知前端并清理影子会话。
+
+        前端 ``terminal_closed`` 分支会调用 closeTerminal 移除标签页；
+        同时移除 master 上登记的影子会话，避免「同步」恢复已死终端。
+        """
+        payload = message.get("payload") or {}
+        execution_id = str(payload.get("execution_id") or "")
+        terminal_id = execution_id[len("terminal_") :] if execution_id.startswith(
+            "terminal_"
+        ) else execution_id
+        if not terminal_id:
+            return
+        closed_message = {
+            "type": "terminal_closed",
+            "payload": {"terminal_id": terminal_id},
+        }
+        targets: List[str] = []
+        tsm = self._terminal_session_manager
+        if tsm is not None:
+            try:
+                targets = tsm.get_access_session_ids(terminal_id)
+            except Exception as exc:  # pragma: no cover - 防御性
+                logger.warning(
+                    "[DAEMON TERMINAL] failed to get access sessions: %s", exc
+                )
+            try:
+                tsm.unregister_session(terminal_id)
+            except Exception as exc:  # pragma: no cover - 防御性
+                logger.warning(
+                    "[DAEMON TERMINAL] failed to unregister session: %s", exc
+                )
+        if output_session_id and output_session_id not in targets:
+            targets.append(output_session_id)
+        if self._router is None:
+            return
+        for sid in targets:
+            try:
+                self._router.publish(closed_message, session_id=sid)
+            except Exception as exc:  # pragma: no cover - 防御性
+                logger.warning(
+                    "[DAEMON TERMINAL] failed to publish terminal_closed: %s", exc
+                )
+        # 实时终端共享：广播给所有 admin 用户（与 terminal_close 路径一致）
+        self._publish_terminal_output_to_admins(closed_message, output_session_id)
+        logger.info(
+            "[DAEMON TERMINAL] terminal process exited: terminal_id=%s session_id=%s",
+            terminal_id,
+            output_session_id,
+        )
 
     def _publish_terminal_output_to_admins(
         self, message: Dict[str, Any], exclude_session_id: Optional[str] = None
