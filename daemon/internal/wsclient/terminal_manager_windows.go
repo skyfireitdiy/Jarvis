@@ -3,10 +3,12 @@
 package wsclient
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"log"
 	"os"
 	"os/exec"
@@ -58,6 +60,10 @@ type terminalSession struct {
 	closed   bool
 	sequence int64
 	buffer   []byte // 输出环形缓冲（约 1MB）
+
+	// exitOnce 保证进程退出处理只执行一次（Wait 监视器与 readLoop 可能同时
+	// 感知到退出）。
+	exitOnce sync.Once
 }
 
 // TerminalManager 是 daemon 内部终端会话管理器（不注册 capability）。
@@ -187,6 +193,11 @@ func (tm *TerminalManager) create(inner map[string]any, sessionID string) map[st
 	tm.mu.Unlock()
 
 	go tm.readLoop(s, sender)
+	// ConPTY 的 cmdOut 管道在子进程退出后**不会**返回 EOF（conhost 仍持有
+	// 写端，句柄不关），因此 readLoop 会一直阻塞在 Read 上，无法感知 exit。
+	// 这里额外起一个监视器：等待子进程退出 → 关闭 ConPTY 打断 Read →
+	// readLoop 返回后由 handleProcessExit 统一处理（exitOnce 保证只一次）。
+	go tm.watchProcessExit(s, sender)
 
 	log.Printf("[terminal] created terminal_id=%s interpreter=%s working_dir=%s session_id=%s",
 		terminalID, commandLine, workingDir, sessionID)
@@ -199,6 +210,39 @@ func (tm *TerminalManager) create(inner map[string]any, sessionID string) map[st
 			"working_dir": workingDir,
 		},
 	}
+}
+
+// watchProcessExit 监视子进程退出。
+//
+// 背景（实测根因）：ConPTY 的 cmdOut 管道在子进程退出后不会返回 EOF——
+// conhost 仍持有写端，句柄未关闭，ReadFile 一直阻塞。因此仅靠 readLoop
+// 读到 err 来感知退出在 Windows 上永远不成立（表现为：用户输入 exit 后
+// cmd 进程已消失，但 daemon 无任何日志、前端标签页残留）。
+//
+// 处理：用 cpty.Wait 轮询等待进程退出；退出后主动 Close ConPTY 打断
+// 阻塞中的 Read，并直接调用 handleProcessExit（幂等，与 readLoop 竞争安全）。
+func (tm *TerminalManager) watchProcessExit(s *terminalSession, sender func(msg map[string]any) error) {
+	if s.cpty == nil {
+		return
+	}
+	code, err := s.waitProcessExit(context.Background())
+	if err != nil {
+		log.Printf("[terminal] wait process failed terminal_id=%s: %v", s.terminalID, err)
+		return
+	}
+	log.Printf("[terminal] child process exited terminal_id=%s exit_code=%d", s.terminalID, code)
+
+	// 关闭 ConPTY 释放句柄并打断 readLoop 中阻塞的 Read。
+	// 注意：不能走 s.close()——它会把 s.closed 置 true，导致
+	// handleProcessExit 误判为"主动关闭"而不通知网关。这里直接关闭底层 ConPTY。
+	s.mu.Lock()
+	cpty := s.cpty
+	s.mu.Unlock()
+	if cpty != nil {
+		_ = cpty.Close()
+	}
+
+	tm.handleProcessExit(s, sender)
 }
 
 // readLoop 读取进程输出，写入环形缓冲并回传网关。
@@ -226,7 +270,16 @@ func (tm *TerminalManager) readLoop(s *terminalSession, sender func(msg map[stri
 }
 
 // handleProcessExit 处理终端进程退出：移除会话并通知网关。
+//
+// 幂等：watchProcessExit（进程退出监视器）与 readLoop（读到 err）可能同时
+// 触发，由 s.exitOnce 保证只执行一次。
 func (tm *TerminalManager) handleProcessExit(s *terminalSession, sender func(msg map[string]any) error) {
+	s.exitOnce.Do(func() {
+		tm.doHandleProcessExit(s, sender)
+	})
+}
+
+func (tm *TerminalManager) doHandleProcessExit(s *terminalSession, sender func(msg map[string]any) error) {
 	tm.mu.Lock()
 	// 仅当 map 中仍是同一会话时移除（close 可能已先移除）。
 	cur, ok := tm.sessions[s.terminalID]
@@ -440,6 +493,14 @@ func (s *terminalSession) close() {
 	if cpty != nil {
 		_ = cpty.Close()
 	}
+}
+
+// waitProcessExit 返回进程退出码；ctx 取消时返回错误。
+func (s *terminalSession) waitProcessExit(ctx context.Context) (uint32, error) {
+	if s.cpty == nil {
+		return 0, errors.New("terminal session has no cpty")
+	}
+	return s.cpty.Wait(ctx)
 }
 
 // errResponse 构造错误响应 payload。

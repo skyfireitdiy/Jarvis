@@ -41,11 +41,16 @@ type terminalSession struct {
 	createdAt   int64
 
 	ptmx *os.File // PTY master
+	cmd  *exec.Cmd
 
 	mu       sync.Mutex
 	closed   bool
 	sequence int64
 	buffer   []byte // 输出环形缓冲（约 1MB）
+
+	// exitOnce 保证进程退出处理只执行一次（Wait 监视器与 readLoop 可能同时
+	// 感知到退出）。
+	exitOnce sync.Once
 }
 
 // TerminalManager 是 daemon 内部终端会话管理器（不注册 capability）。
@@ -154,6 +159,7 @@ func (tm *TerminalManager) create(inner map[string]any, sessionID string) map[st
 		sessionID:   sessionID,
 		createdAt:   time.Now().Unix(),
 		ptmx:        ptmx,
+		cmd:         cmd,
 	}
 
 	tm.mu.Lock()
@@ -163,6 +169,9 @@ func (tm *TerminalManager) create(inner map[string]any, sessionID string) map[st
 
 	// 启动 PTY 读循环：把输出写入环形缓冲并回传网关。
 	go tm.readLoop(s, sender)
+	// 进程退出监视器：子进程退出后关闭 PTY master 打断阻塞中的 Read，
+	// 由 handleProcessExit 统一处理（exitOnce 保证只一次）。
+	go tm.watchProcessExit(s, sender)
 
 	log.Printf("[terminal] created terminal_id=%s interpreter=%s working_dir=%s session_id=%s",
 		terminalID, interpreter, workingDir, sessionID)
@@ -195,12 +204,45 @@ func (tm *TerminalManager) readLoop(s *terminalSession, sender func(msg map[stri
 	}
 }
 
+// watchProcessExit 监视子进程退出。
+//
+// Linux 侧 Read 在子进程退出后通常能返回 EOF/EIO，但为避免个别情况
+// （PTY 被其他进程持有写端等）导致读循环阻塞，这里用 cmd.Wait 兜底：
+// 进程退出后关闭 PTY master 打断 Read，并直接触发退出处理（幂等）。
+func (tm *TerminalManager) watchProcessExit(s *terminalSession, sender func(msg map[string]any) error) {
+	if s.cmd == nil {
+		return
+	}
+	err := s.cmd.Wait()
+	code := 0
+	if s.cmd.ProcessState != nil {
+		code = s.cmd.ProcessState.ExitCode()
+	}
+	if err != nil {
+		log.Printf("[terminal] wait process terminal_id=%s exit_code=%d: %v", s.terminalID, code, err)
+	} else {
+		log.Printf("[terminal] child process exited terminal_id=%s exit_code=%d", s.terminalID, code)
+	}
+	if s.ptmx != nil {
+		_ = s.ptmx.Close()
+	}
+	tm.handleProcessExit(s, sender)
+}
+
 // handleProcessExit 处理终端进程退出：移除会话并通知网关。
 //
 // 读循环结束意味着 PTY 已关闭（进程退出或会话被 close）。若为进程自行退出
 // （用户输入 exit），必须移除会话并回传 event_type=closed 事件，让网关/前端
 // 销毁标签页；主动 close 的会话已从 map 移除且 s.closed=true，此处不再重复通知。
+//
+// 幂等：watchProcessExit 与 readLoop 可能同时触发，由 s.exitOnce 保证只执行一次。
 func (tm *TerminalManager) handleProcessExit(s *terminalSession, sender func(msg map[string]any) error) {
+	s.exitOnce.Do(func() {
+		tm.doHandleProcessExit(s, sender)
+	})
+}
+
+func (tm *TerminalManager) doHandleProcessExit(s *terminalSession, sender func(msg map[string]any) error) {
 	tm.mu.Lock()
 	cur, ok := tm.sessions[s.terminalID]
 	removed := ok && cur == s
@@ -411,6 +453,11 @@ func (s *terminalSession) close() {
 
 	if ptmx != nil {
 		_ = ptmx.Close()
+	}
+	// 关闭 PTY master 不会终止子进程，需显式 Kill，否则会话被关闭后
+	// 子进程（bash 等）会成为孤儿继续运行。
+	if s.cmd != nil && s.cmd.Process != nil {
+		_ = s.cmd.Process.Kill()
 	}
 }
 
