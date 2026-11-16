@@ -7,13 +7,15 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"io"
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"sync"
-	"syscall"
 	"time"
+
+	"github.com/UserExistsError/conpty"
 )
 
 // 终端会话错误码（与子节点 node_manager.py 约定一致）。
@@ -29,11 +31,20 @@ const (
 // 输出环形缓冲容量上限（约 1MB，与 Gateway 终端一致）。
 const terminalOutputBufferLimit = 1024 * 1024
 
-// terminalSession 是一个 daemon 内部终端会话（Windows 管道方案）。
+// terminalSession 是一个 daemon 内部终端会话（Windows ConPTY 方案）。
 //
 // creack/pty 在 Windows 上不支持（StartWithSize 返回 ErrUnsupported），
-// 因此这里用等价管道方案：cmd 的 stdin/stdout/stderr 接管道，读循环读取
-// 输出写入环形缓冲并回传网关。行为与 Linux PTY 路径一致。
+// 因此这里用 Windows ConPTY（Pseudo Console）API：通过
+// github.com/UserExistsError/conpty 启动进程并挂到伪控制台，行为与
+// Linux PTY 路径一致（交互模式 + VT 序列 + UTF-8 输出）。
+//
+// 相比旧的匿名管道方案，ConPTY 解决了两个问题：
+//  1. 输入无反应：cmd.exe 检测到 stdin 非控制台时进入非交互模式
+//     （不回显、不处理按键）；ConPTY 提供真正的伪控制台，进程进入
+//     交互模式，Xterm 输入能正常驱动。
+//  2. 中文乱码：cmd.exe 默认代码页 GBK（cp936），输出 GBK 字节流，
+//     前端按 UTF-8 解码即乱码；ConPTY 输出天然为 UTF-8 + VT 序列，
+//     且创建时执行 `chcp 65001` 把代码页切到 UTF-8，保证中文正确。
 type terminalSession struct {
 	terminalID  string
 	interpreter string
@@ -41,9 +52,7 @@ type terminalSession struct {
 	sessionID   string
 	createdAt   int64
 
-	cmd    *exec.Cmd
-	stdin  io.WriteCloser
-	stdout io.ReadCloser
+	cpty *conpty.ConPty
 
 	mu       sync.Mutex
 	closed   bool
@@ -112,7 +121,7 @@ func (tm *TerminalManager) HandleRequest(msg map[string]any) map[string]any {
 	}
 }
 
-// create 创建终端会话（Windows 管道方案）。
+// create 创建终端会话（Windows ConPTY 方案）。
 func (tm *TerminalManager) create(inner map[string]any, sessionID string) map[string]any {
 	interpreter, _ := inner["interpreter"].(string)
 	if interpreter == "" {
@@ -132,37 +141,44 @@ func (tm *TerminalManager) create(inner map[string]any, sessionID string) map[st
 
 	terminalID := newTerminalID()
 
-	cmd := exec.Command(interpreter)
-	cmd.Dir = workingDir
-	cmd.Env = append(os.Environ(), "TERM=xterm-256color")
-	// 守护进程在 Windows 上以分离进程（无控制台）运行，若不带
-	// CREATE_NO_WINDOW 启动控制台程序会闪黑框，故必须设置 SysProcAttr。
-	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: 0x08000000} // CREATE_NO_WINDOW
+	// ConPTY 的 Start 接收完整命令行字符串（含参数）。interpreter 可能是
+	// "cmd.exe" 或 "powershell.exe" 等，直接作为命令行传给 CreateProcess。
+	//
+	// 注意：conpty 库内部调用 CreateProcess 时 lpApplicationName 恒为 nil，
+	// Windows 会把命令行**第一段**当作可执行文件去解析。因此命令行首段必须
+	// 是真实存在的可执行文件路径，不能是 chcp 这类 cmd 内置命令——否则
+	// CreateProcess 直接返回 ERROR_FILE_NOT_FOUND(2)
+	// （历史 bug：曾拼成 "chcp 65001 >nul & cmd.exe"，导致终端永远创建失败）。
+	commandLine := resolveInterpreterPath(interpreter)
 
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return errResponse(termErrCreateFailed, "failed to create stdin pipe: "+err.Error())
-	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return errResponse(termErrCreateFailed, "failed to create stdout pipe: "+err.Error())
-	}
-	cmd.Stderr = cmd.Stdout
+	// 启动命令：先把代码页切到 UTF-8（65001），保证中文输出正确。
+	// ConPTY 输出为 UTF-8 + VT 序列，但 cmd.exe 的默认代码页是 GBK（cp936），
+	// 若不切换，`chcp` 之前的输出与部分内置命令仍可能按 GBK 编码。
+	// 这里把 chcp 作为**参数**传给解释器（cmd.exe 用 /k，powershell 用 -NoExit），
+	// 保证命令行首段仍是解释器本身。
+	startupCmd := buildStartupCommand(commandLine, interpreter)
 
-	if err := cmd.Start(); err != nil {
+	env := append(os.Environ(), "TERM=xterm-256color")
+
+	cpty, err := conpty.Start(startupCmd,
+		conpty.ConPtyDimensions(80, 24),
+		conpty.ConPtyWorkDir(workingDir),
+		conpty.ConPtyEnv(env),
+	)
+	if err != nil {
 		log.Printf("[terminal] create failed interpreter=%s working_dir=%s: %v", interpreter, workingDir, err)
 		return errResponse(termErrCreateFailed, "failed to start terminal: "+err.Error())
 	}
 
+	// interpreter 回填为实际启动的可执行文件路径（可能是 LookPath 解析后的
+	// 绝对路径），前端标签与后续会话恢复都依赖该字段。
 	s := &terminalSession{
 		terminalID:  terminalID,
-		interpreter: interpreter,
+		interpreter: commandLine,
 		workingDir:  workingDir,
 		sessionID:   sessionID,
 		createdAt:   time.Now().Unix(),
-		cmd:         cmd,
-		stdin:       stdin,
-		stdout:      stdout,
+		cpty:        cpty,
 	}
 
 	tm.mu.Lock()
@@ -173,13 +189,13 @@ func (tm *TerminalManager) create(inner map[string]any, sessionID string) map[st
 	go tm.readLoop(s, sender)
 
 	log.Printf("[terminal] created terminal_id=%s interpreter=%s working_dir=%s session_id=%s",
-		terminalID, interpreter, workingDir, sessionID)
+		terminalID, commandLine, workingDir, sessionID)
 
 	return map[string]any{
 		"success": true,
 		"data": map[string]any{
 			"terminal_id": terminalID,
-			"interpreter": interpreter,
+			"interpreter": commandLine,
 			"working_dir": workingDir,
 		},
 	}
@@ -189,7 +205,7 @@ func (tm *TerminalManager) create(inner map[string]any, sessionID string) map[st
 func (tm *TerminalManager) readLoop(s *terminalSession, sender func(msg map[string]any) error) {
 	buf := make([]byte, 4096)
 	for {
-		n, err := s.stdout.Read(buf)
+		n, err := s.cpty.Read(buf)
 		if n > 0 {
 			chunk := make([]byte, n)
 			copy(chunk, buf[:n])
@@ -197,6 +213,7 @@ func (tm *TerminalManager) readLoop(s *terminalSession, sender func(msg map[stri
 			tm.publishOutput(s, chunk)
 		}
 		if err != nil {
+			// ConPTY 已关闭（进程退出或 close 会话），结束读循环。
 			return
 		}
 	}
@@ -257,14 +274,19 @@ func (tm *TerminalManager) input(inner map[string]any) map[string]any {
 	return map[string]any{"success": true}
 }
 
-// resize 调整终端尺寸（Windows 管道方案不支持，no-op）。
+// resize 调整终端尺寸（ConPTY 支持真实 resize）。
 func (tm *TerminalManager) resize(inner map[string]any) map[string]any {
 	terminalID, _ := inner["terminal_id"].(string)
+	rows := toInt(inner["rows"], 24)
+	cols := toInt(inner["cols"], 80)
 	tm.mu.Lock()
 	s := tm.sessions[terminalID]
 	tm.mu.Unlock()
 	if s == nil {
 		return errResponse(termErrNotFound, "terminal not found")
+	}
+	if err := s.resize(rows, cols); err != nil {
+		return errResponse(termErrInternalError, "resize failed: "+err.Error())
 	}
 	return map[string]any{"success": true}
 }
@@ -296,6 +318,7 @@ func (s *terminalSession) appendOutput(chunk []byte) {
 	defer s.mu.Unlock()
 	s.buffer = append(s.buffer, chunk...)
 	if len(s.buffer) > terminalOutputBufferLimit {
+		// 丢弃最旧部分，保留最近约 1MB。
 		excess := len(s.buffer) - terminalOutputBufferLimit
 		s.buffer = s.buffer[excess:]
 	}
@@ -331,11 +354,24 @@ func (s *terminalSession) writeInput(data string) error {
 	if s.closed {
 		return nil
 	}
-	_, err := io.WriteString(s.stdin, data)
+	_, err := s.cpty.Write([]byte(data))
 	return err
 }
 
-// close 关闭会话：关闭 stdin，终止子进程。
+// resize 调整 ConPTY 尺寸。
+func (s *terminalSession) resize(rows, cols int) error {
+	if rows <= 0 || cols <= 0 {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return nil
+	}
+	return s.cpty.Resize(cols, rows)
+}
+
+// close 关闭会话：关闭 ConPTY（终止子进程）。
 func (s *terminalSession) close() {
 	s.mu.Lock()
 	if s.closed {
@@ -343,15 +379,11 @@ func (s *terminalSession) close() {
 		return
 	}
 	s.closed = true
-	cmd := s.cmd
-	stdin := s.stdin
+	cpty := s.cpty
 	s.mu.Unlock()
 
-	if stdin != nil {
-		_ = stdin.Close()
-	}
-	if cmd != nil && cmd.Process != nil {
-		_ = cmd.Process.Kill()
+	if cpty != nil {
+		_ = cpty.Close()
 	}
 }
 
@@ -370,10 +402,56 @@ func errResponse(code, message string) map[string]any {
 func newTerminalID() string {
 	b := make([]byte, 4)
 	if _, err := rand.Read(b); err != nil {
+		// 极低概率回退：用时间戳低位。
 		now := time.Now().Unix()
 		return hex.EncodeToString([]byte{byte(now), byte(now >> 8), byte(now >> 16), byte(now >> 24)})
 	}
 	return hex.EncodeToString(b)
+}
+
+// resolveInterpreterPath 把解释器名解析为绝对路径。
+//
+// conpty 库调用 CreateProcess 时 lpApplicationName 为 nil，只靠命令行首段
+// 解析可执行文件。虽然系统会按 PATH 查找，但显式解析成绝对路径更稳妥：
+// 避免 daemon 进程环境块异常（如 PATH 缺失/被裁剪）时解析失败。
+// 解析失败时原样返回，交给 CreateProcess 自行处理（错误信息更贴近真实原因）。
+func resolveInterpreterPath(interpreter string) string {
+	if interpreter == "" {
+		return interpreter
+	}
+	// 已含路径分隔符（绝对/相对路径）时不再解析。
+	if strings.ContainsAny(interpreter, `\/`) {
+		return interpreter
+	}
+	if p, err := exec.LookPath(interpreter); err == nil {
+		return p
+	}
+	return interpreter
+}
+
+// buildStartupCommand 构造启动命令行：首段必须是解释器本身，chcp 作为参数。
+//
+// 不同解释器切换代码页的方式不同：
+//   - cmd.exe：/k 保持交互并执行 chcp 65001
+//   - powershell/pwsh：-NoExit 保持交互；代码页由 $OutputEncoding/控制台
+//     UTF-8 决定，chcp 65001 同样有效，用 -Command 执行后保持会话
+//   - 其他（bash 等）：直接原样启动，不做代码页切换
+//
+// 统一保证命令行**第一段**是解释器路径，避免 CreateProcess 把 chcp 当成
+// 可执行文件而返回 ERROR_FILE_NOT_FOUND。
+func buildStartupCommand(interpreterPath, interpreterName string) string {
+	base := strings.ToLower(filepath.Base(interpreterName))
+	if base == "" {
+		base = strings.ToLower(filepath.Base(interpreterPath))
+	}
+	switch {
+	case strings.HasPrefix(base, "cmd"):
+		return interpreterPath + " /k chcp 65001 >nul"
+	case strings.HasPrefix(base, "powershell"), strings.HasPrefix(base, "pwsh"):
+		return interpreterPath + " -NoExit -Command chcp 65001 >$null"
+	default:
+		return interpreterPath
+	}
 }
 
 // toInt 把任意值转为 int；非法时返回默认值。

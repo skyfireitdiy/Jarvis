@@ -3,12 +3,13 @@ module jarvis-daemon
 go 1.27.1
 
 require (
+	github.com/UserExistsError/conpty v0.1.4
+	github.com/creack/pty v1.1.24
 	github.com/dop251/goja v0.0.0-20261001174550-3ccc9c78af18
 	github.com/gorilla/websocket v1.5.3
 )
 
 require (
-	github.com/creack/pty v1.1.24 // indirect
 	github.com/dlclark/regexp2/v2 v2.8.1 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/google/pprof v0.0.0-20230207041349-798e818bf904 // indirect
