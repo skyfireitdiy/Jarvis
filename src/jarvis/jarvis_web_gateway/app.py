@@ -1046,9 +1046,36 @@ class WebSocketConnectionManager:
         try:
             while True:
                 message = await websocket.receive_json()
-                await self._handle_message(
-                    session_id, message, websocket, connection_id
-                )
+                # 单条消息处理异常不能打断整个 WS 连接（否则前端表现为"点了没反应"，
+                # 且后续消息全部丢失）。这里兜住异常并记录，保持连接可用。
+                try:
+                    await self._handle_message(
+                        session_id, message, websocket, connection_id
+                    )
+                except Exception as exc:
+                    save_exception(
+                        exc,
+                        module="jarvis_web_gateway.app",
+                        function="handle",
+                    )
+                    logger.error(
+                        "[WS MESSAGE] handle failed session_id=%s type=%s: %s",
+                        session_id,
+                        (message or {}).get("type") if isinstance(message, dict) else "?",
+                        exc,
+                    )
+                    try:
+                        await websocket.send_json(
+                            {
+                                "type": "error",
+                                "payload": {
+                                    "code": "MESSAGE_HANDLE_FAILED",
+                                    "message": str(exc),
+                                },
+                            }
+                        )
+                    except Exception:
+                        pass
         except WebSocketDisconnect:
             print(
                 "[WS DISCONNECT] "
@@ -1325,6 +1352,10 @@ class WebSocketConnectionManager:
             return
         # 独立终端会话消息处理
         # 检查是否需要转发到远端节点
+        # 注意：terminal_node_id 必须在下面的分支之前初始化——本地处理
+        # terminal_create 时也要用它判断"是否为远端节点"（决定解释器/工作目录
+        # 兜底策略）以及节点访问校验，否则会引用未定义变量。
+        terminal_node_id = ""
         if message_type in (
             "terminal_create",
             "terminal_close",
@@ -1471,11 +1502,29 @@ class WebSocketConnectionManager:
                     }
                     self._router.publish(error_msg, session_id=session_id)
                     return
-            interpreter = payload.get("interpreter") or os.environ.get("SHELL", "bash")
+            # 解释器兜底：前端创建终端时不传 interpreter，master 侧默认取
+            # $SHELL（Linux 上为 /bin/bash）。但远端节点是 Windows 时该值不可用，
+            # 会直接传成 "bash" 导致 daemon 侧 CreateProcess 失败
+            # （ERROR_FILE_NOT_FOUND）。因此对远端节点不预设解释器，交由节点
+            # 侧按自身平台决定（daemon 默认 cmd.exe，子节点默认 $SHELL/bash）。
+            is_remote_node = bool(terminal_node_id) and terminal_node_id not in (
+                _node_runtime.local_node_id if _node_runtime else "master",
+                "master",
+            )
+            raw_interpreter = str(payload.get("interpreter") or "").strip()
+            if raw_interpreter:
+                interpreter = raw_interpreter
+            elif is_remote_node:
+                interpreter = ""
+            else:
+                interpreter = os.environ.get("SHELL", "bash")
             raw_working_dir = payload.get("working_dir")
             working_dir = str(raw_working_dir).strip() if raw_working_dir else ""
             if not working_dir:
-                working_dir = str(pathlib.Path.home())
+                # 远端节点的工作目录由节点侧决定（daemon 用用户家目录），
+                # 不能沿用 master 的 home（Linux 路径在 Windows 上不存在，
+                # 会让 CreateProcess 因工作目录无效而失败）。
+                working_dir = "" if is_remote_node else str(pathlib.Path.home())
             if _terminal_session_manager:
                 terminal_id, error = _terminal_session_manager.create_session(
                     interpreter=interpreter,
@@ -1502,6 +1551,24 @@ class WebSocketConnectionManager:
                     # 实时终端共享：广播给所有 admin 用户（admin 可查看所有终端），
                     # 使其他设备（管理员）能实时看到新终端出现
                     self._publish_terminal_event_to_admins(message, session_id)
+                else:
+                    # 本地创建失败（如解释器不可用、PTY 申请失败）必须回前端，
+                    # 否则前端一直等 terminal_created，表现为"终端创建不出来"。
+                    self._router.publish(
+                        {
+                            "type": "terminal_error",
+                            "payload": {"error": error or "terminal create failed"},
+                        },
+                        session_id=session_id,
+                    )
+            else:
+                self._router.publish(
+                    {
+                        "type": "terminal_error",
+                        "payload": {"error": "terminal session manager unavailable"},
+                    },
+                    session_id=session_id,
+                )
             return
         if message_type == "terminal_close":
             # 权限校验：terminal:create（终端操作统一权限）
@@ -1791,6 +1858,13 @@ class WebSocketConnectionManager:
         forward_payload = dict(payload)
         forward_payload["node_id"] = node_id
         forward_payload["terminal_id"] = terminal_id
+        # 影子会话只保存了 interpreter / working_dir，而前端 input / resize
+        # 消息里不带这两个字段。这里统一补齐，保证下游（daemon / 子节点）拿到
+        # 与创建时一致的会话参数。
+        for _key in ("interpreter", "working_dir"):
+            _val = str(info.get(_key) or "").strip()
+            if _val:
+                forward_payload.setdefault(_key, _val)
 
         daemon_session = daemon_capability_manager.get_session_by_node_id(node_id)
         if daemon_session is not None:
@@ -1897,6 +1971,12 @@ class WebSocketConnectionManager:
                     result_data = {}
                 # 添加 node_id 以便前端知道终端在哪个节点上
                 result_data["node_id"] = terminal_node_id
+                # daemon 侧会回填实际使用的解释器（master 可能未指定，由节点按
+                # 自身平台决定）；前端标签与后续恢复都依赖该字段。
+                if not result_data.get("interpreter"):
+                    result_data["interpreter"] = (
+                        payload.get("interpreter") or "cmd.exe"
+                    )
                 result_msg = {
                     "type": "terminal_created",
                     "payload": result_data,

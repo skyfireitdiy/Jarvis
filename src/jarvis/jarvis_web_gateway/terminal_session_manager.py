@@ -262,8 +262,12 @@ class TerminalSessionManager:
             terminal_id = str(uuid.uuid4())[:8]
 
             try:
-                # 检查解释器是否存在
-                if not shutil.which(interpreter):
+                # 检查解释器是否存在。空解释器表示"由本机平台决定"（远端节点
+                # 创建终端时 master 不预设 interpreter，避免把 Linux 的
+                # $SHELL=/bin/bash 传给 Windows 节点导致 CreateProcess 失败）。
+                if not interpreter:
+                    interpreter = "cmd.exe" if os.name == "nt" else "bash"
+                elif not shutil.which(interpreter):
                     fallback = "cmd.exe" if os.name == "nt" else "bash"
                     print(
                         f"[TerminalSessionManager] Interpreter not found: {interpreter}, falling back to {fallback}"
