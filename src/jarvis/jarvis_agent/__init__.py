@@ -1383,6 +1383,13 @@ class Agent:
         name = call.get("name", "")
         if not name:
             return ""
+        # 始终打印工具调用详情（人类友好格式），便于用户了解正在执行什么
+        try:
+            from jarvis.jarvis_agent.tool_executor import format_tool_call
+
+            PrettyOutput.auto_print(format_tool_call(name, call.get("arguments") or {}))
+        except Exception:
+            pass
         if getattr(self, "execute_tool_confirm", False):
             try:
                 ok = self.confirm_callback(f"执行原生工具 {name} ？", False)
@@ -1394,9 +1401,11 @@ class Agent:
             registry = self.get_tool_registry()
             if registry is None:
                 return f"工具 {name} 执行失败: 工具注册表不可用"
-            return str(registry.execute_native_tool_call(
-                name, call.get("arguments") or {}, self
-            ))
+            return str(
+                registry.execute_native_tool_call(
+                    name, call.get("arguments") or {}, self
+                )
+            )
         except Exception as e:
             return f"工具 {name} 执行异常: {e}"
 
@@ -1441,6 +1450,23 @@ class Agent:
         if not parallel_ok:
             return [self._exec_native_one(c) for c in calls]
 
+        # 并行分支不经过 _exec_native_one，这里统一打印调用详情
+        # （在派发前一次性输出，避免多线程打印交错）
+        try:
+            from jarvis.jarvis_agent.tool_executor import format_tool_call
+
+            valid = [c for c in calls if c.get("name")]
+            for idx, c in enumerate(valid, 1):
+                PrettyOutput.auto_print(
+                    format_tool_call(
+                        c.get("name", ""),
+                        c.get("arguments") or {},
+                        index=idx if len(valid) > 1 else None,
+                    )
+                )
+        except Exception:
+            pass
+
         from concurrent.futures import ThreadPoolExecutor
 
         def run(call: Dict[str, Any]) -> str:
@@ -1448,9 +1474,11 @@ class Agent:
             try:
                 if registry is None:
                     return f"工具 {n} 执行失败: 工具注册表不可用"
-                return str(registry.execute_native_tool_call(
-                    n, call.get("arguments") or {}, self, record=False
-                ))
+                return str(
+                    registry.execute_native_tool_call(
+                        n, call.get("arguments") or {}, self, record=False
+                    )
+                )
             except Exception as e:
                 return f"工具 {n} 执行异常: {e}"
 
@@ -1935,11 +1963,7 @@ class Agent:
                 continue
             if ret is False:
                 return DEFAULT_COMPLETE_CHECK_REJECT_REASON
-            if (
-                isinstance(ret, tuple)
-                and len(ret) == 2
-                and ret[0] is False
-            ):
+            if isinstance(ret, tuple) and len(ret) == 2 and ret[0] is False:
                 reason = ret[1]
                 if isinstance(reason, str) and reason.strip():
                     return reason
@@ -2114,9 +2138,7 @@ class Agent:
 
             broadcast_output_message(self, result)
         except Exception as e:
-            save_exception(
-                e, module="jarvis_agent.__init__", function="_complete_task"
-            )
+            save_exception(e, module="jarvis_agent.__init__", function="_complete_task")
 
         return result
 

@@ -77,25 +77,25 @@ func parseTransferRemoteParams(params map[string]any) (*transferRemoteParams, er
 		return nil, err
 	}
 	gateway = strings.TrimRight(gateway, "/")
-	if !strings.HasPrefix(gateway, "http://") && !strings.HasPrefix(gateway, "https://") {
-		return nil, fmt.Errorf("参数 gateway 必须以 http:// 或 https:// 开头，实际 %s", gateway)
-	}
-
+	// 防御：daemon_call 等调用方可能在参数值中携带空白/换行（如从终端复制命令时
+	// 带入的换行），这里统一清洗，避免把脏值拼进 URL。
+	gateway = strings.Join(strings.Fields(gateway), "")
 	nodeID, err := transferParamString(params, "node_id")
 	if err != nil {
 		return nil, err
 	}
-
+	nodeID = strings.Join(strings.Fields(nodeID), "")
 	localPath, err := transferParamString(params, "local_path")
 	if err != nil {
 		return nil, err
 	}
-
 	remotePath, err := transferParamString(params, "remote_path")
 	if err != nil {
 		return nil, err
 	}
-
+	if !strings.HasPrefix(gateway, "http://") && !strings.HasPrefix(gateway, "https://") {
+		return nil, fmt.Errorf("参数 gateway 必须以 http:// 或 https:// 开头，实际 %s", gateway)
+	}
 	mode := strings.ToLower(strings.TrimSpace(stringOrEmpty(params, "mode")))
 	if mode == "" {
 		// 未显式指定时按本机路径类型推断；push 场景下本机是权威来源。
