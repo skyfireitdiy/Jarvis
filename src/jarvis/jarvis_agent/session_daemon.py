@@ -26,6 +26,7 @@
 import json
 import os
 import struct
+import time
 from typing import Any
 from typing import Dict
 from typing import List
@@ -38,6 +39,36 @@ _MSG_QUIT = b"Q"  # 正常退出通知（清理内存，不落盘）
 # 长度前缀：8 字节无符号大端整数
 _LEN_FMT = ">Q"
 _LEN_SIZE = struct.calcsize(_LEN_FMT)
+
+# 守护子进程事件日志（追加写入，仅记录关键事件，不频繁写盘）
+_LOG_REL_PATH = os.path.join(".jarvis", "sessions", "session_daemon.log")
+
+
+def _log_event(event: str, detail: str = "") -> None:
+    """向守护进程事件日志追加一行。
+
+    守护子进程独立于父进程，无法依赖父进程的日志体系（父进程可能已被
+    kill），因此直接以追加方式写独立文件，便于事后确认"是否真的落盘"。
+
+    只记录关键事件（启动/落盘/跳过），不记录每条快照，避免频繁写盘。
+
+    参数:
+        event: 事件名，如 ``start`` / ``write_done``
+        detail: 附加信息（单行，不含换行）
+    """
+    try:
+        log_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
+        os.makedirs(log_dir, exist_ok=True)
+        path = os.path.join(os.getcwd(), _LOG_REL_PATH)
+        ts = time.strftime("%Y-%m-%d %H:%M:%S")
+        line = f"{ts} pid={os.getpid()} event={event}"
+        if detail:
+            line += f" {detail}"
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except Exception:
+        # 日志失败绝不影响主流程
+        pass
 
 
 class SessionDaemon:
@@ -84,6 +115,10 @@ class SessionDaemon:
                 except Exception:
                     # setsid 失败（如已是会话首进程）不阻断主流程
                     pass
+                _log_event(
+                    "start",
+                    f"ppid={os.getppid()} pgid={os.getpgid(0)} sid={os.getsid(0)}",
+                )
                 self._daemon_loop(read_fd, write_fd)
                 # 理论上 _daemon_loop 不会返回；兜底强制退出，避免执行
                 # 父进程继承来的 atexit / __del__ 等清理逻辑
@@ -219,10 +254,18 @@ class SessionDaemon:
 
         # 正常退出：不落盘（正常路径已由 save_session 落盘）
         if normal_exit or not latest_files:
+            _log_event(
+                "skip_write",
+                f"normal_exit={normal_exit} has_snapshot={bool(latest_files)}",
+            )
             return
 
         # 意外退出：把内存中的最新快照落盘
-        self._write_files(latest_files)
+        written, failed, paths = self._write_files(latest_files)
+        _log_event(
+            "write_done",
+            f"files={len(latest_files)} written={written} failed={failed} paths={paths}",
+        )
 
     @staticmethod
     def _read_exact(fd: int, n: int) -> Optional[bytes]:
@@ -241,8 +284,12 @@ class SessionDaemon:
         return b"".join(chunks)
 
     @staticmethod
-    def _write_files(files: List[Dict[str, Any]]) -> None:
-        """把快照中的文件原子写入磁盘（与 save_session 格式一致）。"""
+    def _write_files(files: List[Dict[str, Any]]) -> tuple:
+        """把快照中的文件原子写入磁盘（与 save_session 格式一致）。
+
+        返回:
+            (成功数, 失败数, 成功写入的路径列表)，供事件日志记录。
+        """
         # 延迟导入，避免子进程在极早期触发重依赖
         from jarvis.jarvis_utils.utils import atomic_write_json
 
@@ -253,10 +300,14 @@ class SessionDaemon:
         except Exception:
             safe_default = None
 
+        written = 0
+        failed = 0
+        paths: List[str] = []
         for item in files:
             try:
                 path = item.get("path")
                 if not path:
+                    failed += 1
                     continue
                 data = item.get("data")
                 indent = item.get("indent")
@@ -268,14 +319,16 @@ class SessionDaemon:
                     ensure_ascii=False,
                     default=default,
                 )
+                written += 1
+                paths.append(os.path.basename(path))
             except Exception:
                 # 单个文件写入失败不影响其他文件
+                failed += 1
                 continue
+        return written, failed, ",".join(paths)
 
 
-def build_snapshot_files(
-    session_file: str, files: List[Any]
-) -> List[Dict[str, Any]]:
+def build_snapshot_files(session_file: str, files: List[Any]) -> List[Dict[str, Any]]:
     """把 ``build_session_snapshot`` 的返回值转换为可 JSON 传输的落盘计划。
 
     参数:
