@@ -844,7 +844,70 @@ class DaemonCapabilityManager:
             list_future.set_exception(
                 RuntimeError(f"daemon session disconnected: {session_id}")
             )
+        # daemon 掉线：清理该节点下的全部影子终端会话，并通知前端移除标签页，
+        # 避免前端「恢复布局」时把已死终端重新创建出来（导致页面卡死）。
+        try:
+            self._cleanup_node_terminals(session.get("node_id"), session_id)
+        except Exception as exc:  # pragma: no cover - 防御性
+            logger.warning(
+                "[DAEMON] failed to cleanup node terminals on disconnect: %s", exc
+            )
         logger.info("[DAEMON] session removed: %s", session_id)
+
+    def _cleanup_node_terminals(
+        self, node_id: Any, daemon_session_id: str = ""
+    ) -> None:
+        """daemon 掉线时清理该节点下所有影子终端，并推送 terminal_closed。
+
+        Args:
+            node_id: 掉线 daemon 的节点 ID。
+            daemon_session_id: 掉线的 daemon 会话 ID（仅用于日志）。
+        """
+        node_id = str(node_id or "").strip()
+        if not node_id:
+            return
+        tsm = self._terminal_session_manager
+        if tsm is None:
+            return
+        try:
+            terminal_ids = tsm.list_terminal_ids_by_node(node_id)
+        except Exception as exc:  # pragma: no cover - 防御性
+            logger.warning("[DAEMON] failed to list node terminals: %s", exc)
+            return
+        for terminal_id in terminal_ids:
+            try:
+                targets = tsm.get_access_session_ids(terminal_id)
+            except Exception:  # pragma: no cover - 防御性
+                targets = []
+            try:
+                tsm.unregister_session(terminal_id)
+            except Exception as exc:  # pragma: no cover - 防御性
+                logger.warning(
+                    "[DAEMON] failed to unregister terminal %s: %s", terminal_id, exc
+                )
+            closed_message = {
+                "type": "terminal_closed",
+                "payload": {"terminal_id": terminal_id, "reason": "node_offline"},
+            }
+            if self._router is not None:
+                for sid in targets:
+                    try:
+                        self._router.publish(closed_message, session_id=sid)
+                    except Exception:  # pragma: no cover - 防御性
+                        pass
+            try:
+                self._publish_terminal_output_to_admins(
+                    closed_message, daemon_session_id
+                )
+            except Exception:  # pragma: no cover - 防御性
+                pass
+        if terminal_ids:
+            logger.info(
+                "[DAEMON] node offline cleanup: node_id=%s terminals=%d session_id=%s",
+                node_id,
+                len(terminal_ids),
+                daemon_session_id,
+            )
 
     # ------------------------------------------------------------------
     # 会话归属校验

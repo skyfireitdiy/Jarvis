@@ -717,6 +717,26 @@ export function useTerminal({
   }
 
   // 独立终端相关函数
+  // 因容器尺寸为 0 而推迟创建的终端：记录 pending 的 hostEl，待容器可见后重试。
+  // （避免 setTerminalHostRef 命中「hostEl 相同且 terminal 已存在」短路后永不创建）
+  const pendingTerminalInit = new Map() // terminal_id -> hostEl
+  let pendingTerminalInitTimer = null
+  function schedulePendingTerminalInit() {
+    if (pendingTerminalInitTimer !== null) return
+    pendingTerminalInitTimer = setTimeout(() => {
+      pendingTerminalInitTimer = null
+      for (const [terminalId, el] of Array.from(pendingTerminalInit.entries())) {
+        if (!el || !el.isConnected) {
+          pendingTerminalInit.delete(terminalId)
+          continue
+        }
+        if (el.clientWidth === 0 || el.clientHeight === 0) continue
+        pendingTerminalInit.delete(terminalId)
+        initIndependentTerminal(terminalId, el)
+      }
+      if (pendingTerminalInit.size > 0) schedulePendingTerminalInit()
+    }, 300)
+  }
   function setTerminalHostRef(terminalId, el) {
     const session = terminalSessions.value.find(t => t.terminal_id === terminalId)
     if (el) {
@@ -733,6 +753,7 @@ export function useTerminal({
       }
     } else {
       independentTerminalHosts.value.delete(terminalId)
+      pendingTerminalInit.delete(terminalId)
       if (session) {
         session.hostEl = null
       }
@@ -745,6 +766,17 @@ export function useTerminal({
       console.warn(`[independent-terminal] Session not found for ${terminalId}`)
       return
     }
+    // 容器未挂载/尺寸为 0（如 pane 不可见、布局尚未完成）时先不创建 xterm：
+    // 零尺寸下 open() 会得到异常尺寸，随后 ResizeObserver 反复 fit 造成抖动。
+    // 登记到 pending，待容器可见后由定时器重试（不依赖 ref 回调再次触发）。
+    if (!el || !el.isConnected || el.clientWidth === 0 || el.clientHeight === 0) {
+      if (el) {
+        pendingTerminalInit.set(terminalId, el)
+        schedulePendingTerminalInit()
+      }
+      return
+    }
+    pendingTerminalInit.delete(terminalId)
   
     // 如果 terminal 实例已存在（面板切换导致组件重建），先 dispose 旧实例再创建新的
     if (session.terminal) {
@@ -900,6 +932,25 @@ export function useTerminal({
     }
   }
 
+  // 终端「已不可用」通知：restoreTerminalSessions 发现某终端 attach 失败（进程已死 /
+  // 所属 daemon 节点已离线）时触发，供布局层把对应 terminal pane 降级为空 pane，
+  // 避免 pane 停在 terminal 视图却等不到会话、反复兜底拉取。
+  const terminalUnavailableListeners = new Set()
+  function onTerminalUnavailable(listener) {
+    if (typeof listener !== 'function') return () => {}
+    terminalUnavailableListeners.add(listener)
+    return () => terminalUnavailableListeners.delete(listener)
+  }
+  function notifyTerminalUnavailable(terminalId) {
+    for (const listener of Array.from(terminalUnavailableListeners)) {
+      try {
+        listener(terminalId)
+      } catch (e) {
+        console.warn('[independent-terminal] terminal unavailable listener failed:', e)
+      }
+    }
+  }
+
   // 登录/重连后恢复当前用户的存活终端会话（方案A：断开不杀进程 + 输出缓冲回放）
   async function restoreTerminalSessions() {
     if (!socket.value) {
@@ -923,6 +974,7 @@ export function useTerminal({
 
         // 接管会话并获取输出缓冲（供回放）
         let bufferedOutput = []
+        let attachOk = false
         try {
           const attachResp = await fetchWithAuth(
             `${baseUrl}/api/terminals/${encodeURIComponent(terminalId)}/attach`,
@@ -931,9 +983,19 @@ export function useTerminal({
           const attachResult = await attachResp.json()
           if (attachResult.success && Array.isArray(attachResult.data?.output)) {
             bufferedOutput = attachResult.data.output.map(decodeTerminalBase64)
+            attachOk = true
           }
         } catch (e) {
           console.warn('[independent-terminal] Failed to attach session:', terminalId, e)
+        }
+        // 接管失败（终端已死/所属节点已离线）：不要加入会话列表，
+        // 否则会创建出无后端支撑的 XTerm，导致输入无响应甚至页面卡死。
+        if (!attachOk) {
+          console.warn('[independent-terminal] Skip dead terminal on restore:', terminalId)
+          // 通知布局层：该终端已死，对应 pane 应降级，避免 pane 仍停在 terminal 视图
+          // 却等不到会话（进而反复兜底拉取 / 创建空 XTerm）。
+          notifyTerminalUnavailable(terminalId)
+          continue
         }
 
         // 加入会话列表，缓冲输出存入 pending_output，由 initIndependentTerminal 回放
@@ -1508,6 +1570,8 @@ export function useTerminal({
     decodeTerminalBase64,
     attachTerminalSession,
     restoreTerminalSessions,
+    onTerminalUnavailable,
+    notifyTerminalUnavailable,
     markTerminalCreationPending,
     createTerminal,
     createTerminalForSelectedNode,

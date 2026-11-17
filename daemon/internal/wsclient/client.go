@@ -512,33 +512,60 @@ func (c *Client) handleCapabilityCall(conn *websocket.Conn, msg map[string]any) 
 // payload（action + 参数），响应统一为 node_terminal_response，流式输出通过
 // node_terminal_output 回传。终端会话由 TerminalManager 管理（不注册 capability）。
 //
-// 执行放在独立 goroutine 中，避免阻塞读循环（与 capability.call 同理）。
+// 顺序保证（重要）：终端输入必须**按到达顺序**写入 PTY/ConPTY。
+//
+// 历史 bug：这里曾对每条请求统一 `go func(){...}()` 异步处理，导致快速输入时
+// 前端连续发出的多个 terminal_session_input 各起一个 goroutine，它们在
+// TerminalManager 内部抢会话锁的顺序由 Go 调度器决定，与到达顺序无关，
+// 表现为「打字稍快字符就乱序」（网关终端走单线程 FIFO 队列，故不受影响）。
+//
+// 处理策略：
+//   - terminal_session_input / terminal_session_resize / terminal_attach：
+//     在读循环内**同步**处理。这三类动作都是内存操作或一次小写入，耗时在
+//     微秒级，不会阻塞读循环（对比 capability.call 可能耗时数秒）。
+//   - 其余动作（terminal_create / terminal_close）：仍异步执行，避免
+//     ConPTY 启动/进程回收等潜在阻塞拖住读循环（心跳、能力列表查询）。
 func (c *Client) handleNodeTerminalRequest(conn *websocket.Conn, msg map[string]any) {
 	requestID, _ := msg["request_id"].(string)
 	payload, _ := msg["payload"].(map[string]any)
 
-	go func() {
-		var result map[string]any
-		if c.opts.TerminalManager == nil {
-			result = map[string]any{
-				"success": false,
-				"error": map[string]any{
-					"code":    termErrNoTerminalManager,
-					"message": "terminal manager not available",
-				},
-			}
-		} else {
-			result = c.opts.TerminalManager.HandleRequest(payload)
+	action, _ := payload["action"].(string)
+	switch action {
+	case "terminal_session_input", "terminal_session_resize", "terminal_attach":
+		result := c.dispatchTerminalRequest(payload)
+		c.replyTerminalRequest(conn, requestID, result)
+	default:
+		go func() {
+			result := c.dispatchTerminalRequest(payload)
+			c.replyTerminalRequest(conn, requestID, result)
+		}()
+	}
+}
+
+// dispatchTerminalRequest 执行一次终端请求并返回响应 payload。
+func (c *Client) dispatchTerminalRequest(payload map[string]any) map[string]any {
+	if c.opts.TerminalManager == nil {
+		return map[string]any{
+			"success": false,
+			"error": map[string]any{
+				"code":    termErrNoTerminalManager,
+				"message": "terminal manager not available",
+			},
 		}
-		reply := map[string]any{
-			"type":       "node_terminal_response",
-			"request_id": requestID,
-			"payload":    result,
-		}
-		if err := c.writeJSON(conn, reply); err != nil {
-			log.Printf("[wsclient] 回终端请求结果失败: %v", err)
-		}
-	}()
+	}
+	return c.opts.TerminalManager.HandleRequest(payload)
+}
+
+// replyTerminalRequest 回传 node_terminal_response。
+func (c *Client) replyTerminalRequest(conn *websocket.Conn, requestID string, result map[string]any) {
+	reply := map[string]any{
+		"type":       "node_terminal_response",
+		"request_id": requestID,
+		"payload":    result,
+	}
+	if err := c.writeJSON(conn, reply); err != nil {
+		log.Printf("[wsclient] 回终端请求结果失败: %v", err)
+	}
 }
 
 // handleCommand 处理指令并回结果。

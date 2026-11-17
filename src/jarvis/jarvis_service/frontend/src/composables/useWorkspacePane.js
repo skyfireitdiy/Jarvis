@@ -62,6 +62,7 @@ export function useWorkspacePane({
   activeTerminalId,
   terminalSessions,
   restoreTerminalSessions,
+  onTerminalUnavailable,
   focusFirstIn,
 }) {
   // —— getter 化依赖的安全包装（函数类型：调用点不变；Map/ref 类型：调用点改 xxx().get()/xxx().value）——
@@ -1443,10 +1444,48 @@ function restoreWorkspacePaneLayout() {
     : findFirstWorkspacePaneId(tree)
 }
 
+// 终端已不可用（进程已死 / 所属 daemon 节点已离线）：把承载该终端的 pane 降级为空 pane。
+// 由 useTerminal.restoreTerminalSessions 在 attach 失败时通知，避免 pane 停在 terminal
+// 视图却等不到会话（反复兜底拉取 / 创建无后端支撑的 XTerm 导致页面卡死）。
+function downgradeTerminalPanes(terminalId) {
+  const tree = workspacePaneTree.value
+  if (!tree || !terminalId) return
+  const hitIds = []
+  const walk = (n) => {
+    if (!n) return
+    if (n.type === 'leaf') {
+      if (n.view === 'terminal' && n.content && n.content.terminalId === terminalId) {
+        hitIds.push(n.id)
+      }
+      return
+    }
+    ;(n.children || []).forEach(walk)
+  }
+  walk(tree)
+  if (hitIds.length === 0) return
+  for (const id of hitIds) {
+    const leaf = findWorkspacePaneById(workspacePaneTree.value, id)
+    if (!leaf) continue
+    leaf.view = 'empty'
+    leaf.agentId = null
+    leaf.sessionPanelId = null
+    leaf.content = null
+  }
+  if (activeTerminalId().value === terminalId) {
+    activeTerminalId().value = null
+  }
+  console.warn('[workspace-pane] terminal unavailable, downgraded panes:', hitIds)
+  persistWorkspacePaneLayout()
+}
+
 // ===== 阶段 B：恢复每个 pane 的内容（session 会话 / 文件 / diff / terminal） =====
 // 在 agentList 首次就绪后调用（socket 已连、agentList 已加载、restoreTerminalSessions 已执行）。
 // 幂等：只执行一次；无法恢复的 leaf 降级为空 pane（与 Issue #82 补充说明一致）。
 let workspacePaneContentsRestored = false
+// 订阅终端不可用事件（restoreTerminalSessions 内 attach 失败时触发）
+if (typeof onTerminalUnavailable === 'function') {
+  onTerminalUnavailable(downgradeTerminalPanes)
+}
 async function restoreWorkspacePaneContents() {
   if (workspacePaneContentsRestored) return
   // Agent 列表尚未就绪时不得恢复：此时 agentList 为空，session pane 会因
@@ -1551,9 +1590,11 @@ async function restoreWorkspacePaneContents() {
         if (session) {
           activeTerminalId().value = content.terminalId
         } else {
-          // 终端会话已不存在：降级为空 pane
+          // 终端会话已不存在（进程已死 / 所属 daemon 节点已离线）：降级为空 pane，
+          // 不能保留 terminal 视图，否则 TerminalPanel 仍会渲染 host 并创建空 XTerm。
           leaf.view = 'empty'
           leaf.agentId = null
+          leaf.content = null
         }
       }
     } catch (e) {

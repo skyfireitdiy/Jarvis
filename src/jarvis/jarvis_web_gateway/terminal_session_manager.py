@@ -870,6 +870,28 @@ class TerminalSessionManager:
         with self._lock:
             self._sessions.pop(terminal_id, None)
 
+    def list_terminal_ids_by_node(self, node_id: str) -> List[str]:
+        """列出登记在指定节点上的终端ID（影子会话）。
+
+        daemon 掉线时用于找出该节点下所有终端，逐一清理并通知前端，
+        避免前端「恢复布局」时把已死终端重新创建出来。
+
+        Args:
+            node_id: 终端所在节点ID（daemon 节点ID）
+
+        Returns:
+            该节点下的终端ID列表；node_id 为空时返回空列表
+        """
+        node_id = str(node_id or "").strip()
+        if not node_id:
+            return []
+        with self._lock:
+            return [
+                terminal_id
+                for terminal_id, session in self._sessions.items()
+                if str(getattr(session, "node_id", "") or "").strip() == node_id
+            ]
+
     def get_access_session_ids(self, terminal_id: str) -> List[str]:
         """返回有权接收该终端事件（输出/关闭）的 WebSocket 会话ID列表。
 

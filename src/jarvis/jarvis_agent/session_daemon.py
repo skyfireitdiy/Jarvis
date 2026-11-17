@@ -72,6 +72,18 @@ class SessionDaemon:
             pid = os.fork()
             if pid == 0:
                 # 子进程：只负责读管道 + 落盘，绝不返回父进程上下文
+                #
+                # 关键：必须脱离父进程的会话与进程组（setsid）。
+                # 否则父进程被 `kill -- -PGID` / `pkill -f` / 终端关闭 等
+                # 方式杀死时，本守护进程会连带被杀，来不及把内存中的
+                # 最新快照落盘 —— 这正是"进程被 kill 后会话丢失"的根因。
+                # setsid 后本进程成为新会话首进程与新进程组组长，
+                # 针对父进程进程组的信号不会再波及到这里。
+                try:
+                    os.setsid()
+                except Exception:
+                    # setsid 失败（如已是会话首进程）不阻断主流程
+                    pass
                 self._daemon_loop(read_fd, write_fd)
                 # 理论上 _daemon_loop 不会返回；兜底强制退出，避免执行
                 # 父进程继承来的 atexit / __del__ 等清理逻辑

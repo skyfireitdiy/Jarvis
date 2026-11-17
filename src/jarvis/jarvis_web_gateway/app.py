@@ -13082,10 +13082,30 @@ def create_app(
             sessions = terminal_session_manager.list_sessions_for_user(session_id)
             # 补充 node_id（影子会话已带 node_id；本地会话若无则补 master 节点）
             local_node_id = _node_runtime.local_node_id if _node_runtime else "master"
+            # 第二道防线：过滤掉所属 daemon 节点已离线的影子终端，
+            # 避免前端恢复布局时把已死终端重新创建出来（导致页面卡死）。
+            online_node_ids = {
+                str(item.get("node_id") or "").strip()
+                for item in daemon_capability_manager.list_sessions()
+            }
+            filtered: List[Dict[str, Any]] = []
             for s in sessions:
                 if not s.get("node_id"):
                     s["node_id"] = local_node_id
-            return {"success": True, "data": sessions}
+                node_id = str(s.get("node_id") or "").strip()
+                if (
+                    node_id
+                    and node_id not in ("master", local_node_id)
+                    and node_id not in online_node_ids
+                ):
+                    logger.info(
+                        "[TERMINAL] skip offline node terminal: %s node_id=%s",
+                        s.get("terminal_id"),
+                        node_id,
+                    )
+                    continue
+                filtered.append(s)
+            return {"success": True, "data": filtered}
         except Exception as e:
             return {
                 "success": False,
