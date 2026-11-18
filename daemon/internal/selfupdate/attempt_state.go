@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -56,6 +57,15 @@ type AttemptState struct {
 	// InProgress 表示「已开始替换、尚未确认成功」。为 true 且进程重启后版本未变，
 	// 即判定为重启循环。
 	InProgress bool `json:"in_progress"`
+	// RecentUpdates 记录最近若干次「已开始执行更新」的时间戳（Unix 秒），
+	// 用于跨版本的全局熔断（见 RecentUpdateBurst）。
+	//
+	// 为什么需要（与上面以 TargetVersion 为键的熔断互补）：多网关场景下，
+	// 各网关下发的目标版本可能**交替变化**（如 7.2.0 / 7.2.1 轮流），
+	// 每次 TargetVersion 都不同 → 熔断被反复重置，单靠 TargetVersion 完全挡不住。
+	// 用「最近 N 秒内发生了多少次更新」这个与版本无关的维度，才能识别出
+	// 「版本号在抖、但实际在无限重启」的病理状态。
+	RecentUpdates []int64 `json:"recent_updates,omitempty"`
 }
 
 // AttemptStatePath 返回尝试状态文件路径：~/.jarvis/daemon/update-attempt.json。
@@ -144,6 +154,133 @@ func SameVersion(a, b string) bool {
 	return NormalizeVersion(a) == NormalizeVersion(b)
 }
 
+// CompareVersions 比较两个版本号的大小，返回 -1 / 0 / 1。
+//
+// 语义化比较规则（不引入第三方依赖，手写足够）：
+//   - 先归一化（去空白、去前导 v）；
+//   - 按 '.' 切分成数字段，逐段数值比较（"7.10.0" > "7.9.0"，字符串比较会判错）；
+//   - 段数不同时，缺省段按 0 补齐（"7.2" == "7.2.0"）；
+//   - 非数字段（如 "1.0.0-beta"）只比较其数字前缀，"beta" 等后缀忽略——
+//     本项目版本号均为纯数字点分格式，后缀不参与判定。
+//
+// 为什么需要：多网关场景下，版本较旧的网关会下发比当前更低的版本号，
+// 若不判断方向就执行更新，daemon 会被反复降级/升级（见 ShouldSkipUpdate 的说明）。
+func CompareVersions(a, b string) int {
+	as := splitVersion(NormalizeVersion(a))
+	bs := splitVersion(NormalizeVersion(b))
+	n := len(as)
+	if len(bs) > n {
+		n = len(bs)
+	}
+	for i := 0; i < n; i++ {
+		var av, bv int
+		if i < len(as) {
+			av = as[i]
+		}
+		if i < len(bs) {
+			bv = bs[i]
+		}
+		if av < bv {
+			return -1
+		}
+		if av > bv {
+			return 1
+		}
+	}
+	return 0
+}
+
+// splitVersion 把版本号切成数字段；无法解析的段按 0 处理。
+func splitVersion(v string) []int {
+	if v == "" {
+		return nil
+	}
+	parts := strings.Split(v, ".")
+	out := make([]int, 0, len(parts))
+	for _, p := range parts {
+		// 只取前导数字（"0-beta" → 0），遇到非数字即停止。
+		end := 0
+		for end < len(p) && p[end] >= '0' && p[end] <= '9' {
+			end++
+		}
+		if end == 0 {
+			out = append(out, 0)
+			continue
+		}
+		n, err := strconv.Atoi(p[:end])
+		if err != nil {
+			out = append(out, 0)
+			continue
+		}
+		out = append(out, n)
+	}
+	return out
+}
+
+// IsDowngrade 判断 target 是否低于 current（即本次更新是降级）。
+//
+// 多网关场景：daemon 连接多个网关时，每个网关在 hello_ack 中把**自身版本**作为
+// 最新版本下发。若其中某个网关版本较旧，daemon 会认为「有新版本」并降级到旧版，
+// 降级后连到新网关又升回去，形成无限重启循环（真机实测：7.2.0 与 7.2.1 两个网关
+// 交替下发，每 5~10 秒重启一次）。
+//
+// 因此必须显式禁止降级：只允许升级到更高版本。
+func IsDowngrade(currentVersion, targetVersion string) bool {
+	return CompareVersions(targetVersion, currentVersion) < 0
+}
+
+// 全局更新频率熔断参数。
+//
+// 取值依据：正常的版本升级是「偶发事件」（一天几次已属频繁）；而病理性的
+// 版本抖动表现为「几分钟内反复重启」。窗口 10 分钟、阈值 3 次能清晰区分两者：
+// 正常升级几乎不可能在 10 分钟内触发 3 次，而抖动循环几秒一次，必然命中。
+const (
+	// updateBurstWindow 是统计窗口（秒）。
+	updateBurstWindow = 600
+	// updateBurstLimit 是窗口内允许的更新次数上限（达到即熔断）。
+	updateBurstLimit = 3
+	// recentUpdatesKeep 是 RecentUpdates 最多保留的条数（防止无限增长）。
+	recentUpdatesKeep = 10
+)
+
+// RecentUpdateBurst 判断「最近窗口内是否更新过于频繁」，用于跨版本的全局熔断。
+//
+// 与 ShouldSkipUpdate 中以 TargetVersion 为键的熔断互补：后者只能识别
+// 「反复尝试同一个目标版本」；当多个网关交替下发不同版本时，TargetVersion 每次
+// 都在变，那道熔断会被反复重置而失效。本函数只看「多久内更新了几次」，
+// 与版本号无关，因此能兜住版本抖动型重启循环。
+//
+// 返回 (burst, count)：burst 为 true 表示应熔断，count 为窗口内实际次数。
+func RecentUpdateBurst(state AttemptState, now int64) (bool, int) {
+	cutoff := now - updateBurstWindow
+	count := 0
+	for _, ts := range state.RecentUpdates {
+		if ts >= cutoff {
+			count++
+		}
+	}
+	return count >= updateBurstLimit, count
+}
+
+// AppendRecentUpdate 返回追加了本次更新时间戳后的新切片（只保留窗口内且不超过上限）。
+//
+// 为什么要裁剪：状态文件会被反复读写，若不裁剪会无限增长；同时把窗口外的旧记录
+// 丢掉，熔断才能随「安静期」自然恢复（而不是永久锁死）。
+func AppendRecentUpdate(existing []int64, now int64) []int64 {
+	cutoff := now - updateBurstWindow
+	out := make([]int64, 0, len(existing)+1)
+	for _, ts := range existing {
+		if ts >= cutoff {
+			out = append(out, ts)
+		}
+	}
+	out = append(out, now)
+	if len(out) > recentUpdatesKeep {
+		out = out[len(out)-recentUpdatesKeep:]
+	}
+	return out
+}
+
 // ShouldSkipUpdate 判断是否应跳过本次自动更新（防重复的集中判定）。
 //
 // 入参：
@@ -155,6 +292,7 @@ func SameVersion(a, b string) bool {
 // 返回 (skip, reason)：skip 为 true 时应跳过更新，reason 为中文原因（用于日志）。
 //
 // 判定顺序：
+//  0. 禁止降级：目标版本低于当前版本 → 直接跳过（多网关版本不一致时的关键防线）；
 //  1. 熔断：上次「已开始替换」但重启后版本仍是旧的（且目标版本与本次相同）
 //     → 判定为重启循环，跳过，避免无限重启；
 //  2. 熔断恢复：若本次目标版本与熔断记录的目标版本不同（网关发新版了）
@@ -162,6 +300,27 @@ func SameVersion(a, b string) bool {
 //  3. 同版本失败不重试 + 退避：上次失败的目标版本与本次相同，且仍在退避窗口内
 //     → 跳过；窗口已过则允许重试（Attempts 继续累加）。
 func ShouldSkipUpdate(state AttemptState, currentVersion, targetVersion string, now int64) (bool, string) {
+	// 禁止降级：必须先于其他判定。
+	//
+	// 为什么放在最前面：daemon 连接多个网关时，每个网关都把自身版本当作「最新版本」
+	// 下发。若旧网关（如 7.2.0）与当前 daemon（7.2.1）握手，会下发「有新版本 7.2.0」。
+	// 此时若执行更新，daemon 被降级；降级后连到新网关（7.2.1）又升级回去，
+	// 两个网关交替触发形成无限重启循环——且因为 TargetVersion 每次都在变，
+	// 下面的熔断判定（以 TargetVersion 为键）会被反复重置，完全失效。
+	// 真机实测：7.2.0 与 7.2.1 交替出现 573/566 次，每 5~10 秒重启一次。
+	if IsDowngrade(currentVersion, targetVersion) {
+		return true, fmt.Sprintf("目标版本 %s 低于当前版本 %s，禁止降级（多网关版本不一致时属正常现象）",
+			targetVersion, currentVersion)
+	}
+
+	// 全局频率熔断：与版本号无关，兜住「多网关交替下发不同版本」导致的抖动循环。
+	// 必须放在 TargetVersion 相关判定之前——那种场景下 TargetVersion 每次都在变，
+	// 后面的判定都会被重置而失效。
+	if burst, count := RecentUpdateBurst(state, now); burst {
+		return true, fmt.Sprintf("最近 %d 分钟内已执行 %d 次自动更新，判定为更新抖动循环，已熔断（等待 %d 分钟窗口滑过后自动恢复）",
+			updateBurstWindow/60, count, updateBurstWindow/60)
+	}
+
 	if !SameVersion(state.TargetVersion, targetVersion) {
 		// 目标版本变化：无论上次是熔断还是失败，都视为新机会，允许尝试。
 		return false, ""
@@ -197,6 +356,11 @@ func ShouldSkipUpdate(state AttemptState, currentVersion, targetVersion string, 
 // 因此调用方应先经 ShouldSkipUpdate 判定「是否跳过」，仅在跳过时用本函数取等待
 // 时长；若返回 0 则说明是熔断态，不得安排重试。
 func RetryAfter(state AttemptState, currentVersion, targetVersion string, now int64) time.Duration {
+	// 禁止降级：与 ShouldSkipUpdate 保持一致，降级态不安排重试。
+	// 否则会每隔一个退避周期就去「重试」一次注定被拒绝的降级，白白唤醒 goroutine。
+	if IsDowngrade(currentVersion, targetVersion) {
+		return 0
+	}
 	if !SameVersion(state.TargetVersion, targetVersion) {
 		// 目标版本变化：视为新机会，无需等待。
 		return 0

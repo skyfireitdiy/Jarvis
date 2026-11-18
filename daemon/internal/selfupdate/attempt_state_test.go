@@ -3,6 +3,7 @@ package selfupdate
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -113,7 +114,9 @@ func TestAttemptStateSaveLoadClear(t *testing.T) {
 	if !ok {
 		t.Fatal("应能读到尝试状态")
 	}
-	if got != want {
+	// 用 reflect.DeepEqual 而非 ==：AttemptState 含 RecentUpdates []int64 切片，
+	// 结构体已不可直接比较。
+	if !reflect.DeepEqual(got, want) {
 		t.Errorf("读回 = %+v, want %+v", got, want)
 	}
 

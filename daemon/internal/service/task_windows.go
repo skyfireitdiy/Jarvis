@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf16"
 )
 
 // cmdTimeout 是单次外部命令调用的超时时间。
@@ -46,6 +47,10 @@ func BuildTaskCommand(opts Options) (string, error) {
 }
 
 // BuildCreateArgs 生成 schtasks 创建计划任务的参数。
+//
+// Deprecated: 保留仅为兼容既有调用与测试。计划任务改由 buildTaskXML 生成的完整
+// XML 定义注册（见 Install），因为 schtasks 的 /SC ONLOGON 等简单参数无法表达
+// 重启策略、执行时限、电池策略等关键设置，曾导致 daemon 频繁退出且不自动恢复。
 func BuildCreateArgs(opts Options) ([]string, error) {
 	command, err := BuildTaskCommand(opts)
 	if err != nil {
@@ -61,21 +66,217 @@ func BuildCreateArgs(opts Options) ([]string, error) {
 	}, nil
 }
 
+// currentUserID 返回计划任务 Principal 使用的用户标识，形如 "DOMAIN\\user"。
+//
+// 为什么不用 os.Getenv("USERNAME") 单独取值：计划任务的 UserId 需要能唯一定位
+// 账户，纯用户名在域环境下可能重名；优先用 USERDOMAIN\USERNAME 组合，
+// 取不到时退回 USERNAME（本地账户/测试环境）。
+func currentUserID() string {
+	user := strings.TrimSpace(os.Getenv("USERNAME"))
+	if user == "" {
+		return ""
+	}
+	domain := strings.TrimSpace(os.Getenv("USERDOMAIN"))
+	if domain == "" || strings.EqualFold(domain, os.Getenv("COMPUTERNAME")) {
+		// 本地账户：用 "计算机名\用户名" 与 Task Scheduler 的显示一致。
+		if name := strings.TrimSpace(os.Getenv("COMPUTERNAME")); name != "" {
+			return name + `\` + user
+		}
+		return user
+	}
+	return domain + `\` + user
+}
+
+// buildTaskXML 生成计划任务的完整 XML 定义（Task Scheduler schema 1.2）。
+//
+// 为什么必须用 XML 而不是 schtasks 的简单参数：真机实测旧实现创建的任务存在
+// 以下缺陷，直接导致「daemon 经常退出且不恢复」：
+//
+//	RestartCount=0          → 进程崩溃后永不重启，只能等下次登录
+//	ExecutionTimeLimit=PT72H→ 运行满 72 小时被 Task Scheduler 强制结束
+//	DisallowStartIfOnBatteries=True / StopIfGoingOnBatteries=True
+//	                        → 笔记本切到电池供电时任务被停掉
+//	StartWhenAvailable=False→ 错过触发时机后不补跑
+//	MultipleInstances 未设置 → 可能并发起多个实例争抢同一 PID 文件与端口
+//
+// 这些设置 schtasks 命令行都没有对应开关，只能通过 /XML 注册。
+func buildTaskXML(opts Options) (string, error) {
+	execPath, err := ResolveExecPath(opts)
+	if err != nil {
+		return "", err
+	}
+	// Command 与 Arguments 必须分开填：XML 里 <Command> 只放可执行文件路径，
+	// 参数放 <Arguments>。若像 schtasks /TR 那样拼成一整串，Task Scheduler 会把
+	// 整串当作命令名，导致启动失败。
+	arguments := BuildRunArgs(opts)
+
+	userID := currentUserID()
+	if userID == "" {
+		return "", fmt.Errorf("无法确定当前用户（USERNAME 为空），不能创建计划任务")
+	}
+
+	var b strings.Builder
+	b.WriteString(`<?xml version="1.0" encoding="UTF-16"?>` + "\n")
+	b.WriteString(`<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">` + "\n")
+
+	// RegistrationInfo：仅用于在任务计划程序中展示，不影响行为。
+	b.WriteString("  <RegistrationInfo>\n")
+	b.WriteString("    <Description>Jarvis 守护进程（登录时自动启动，异常退出后自动重启）</Description>\n")
+	b.WriteString("  </RegistrationInfo>\n")
+
+	// Triggers：登录时触发。
+	b.WriteString("  <Triggers>\n")
+	b.WriteString("    <LogonTrigger>\n")
+	b.WriteString("      <Enabled>true</Enabled>\n")
+	b.WriteString("    </LogonTrigger>\n")
+	b.WriteString("  </Triggers>\n")
+
+	// Principals：以当前用户身份、最高权限运行。
+	// LogonType=InteractiveToken 对应旧实现的 /IT（仅在有交互登录会话时运行），
+	// 这样进程能访问用户桌面会话（截图、剪贴板等能力依赖它）。
+	b.WriteString("  <Principals>\n")
+	b.WriteString(`    <Principal id="Author">` + "\n")
+	b.WriteString("      <UserId>" + xmlEscape(userID) + "</UserId>\n")
+	b.WriteString("      <LogonType>InteractiveToken</LogonType>\n")
+	b.WriteString("      <RunLevel>HighestAvailable</RunLevel>\n")
+	b.WriteString("    </Principal>\n")
+	b.WriteString("  </Principals>\n")
+
+	b.WriteString("  <Settings>\n")
+	// 已在运行时不启动新实例，避免多实例争抢 PID 文件与监听端口。
+	b.WriteString("    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>\n")
+	// 电池供电时仍允许启动 / 不因切换到电池而停止。
+	b.WriteString("    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>\n")
+	b.WriteString("    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>\n")
+	b.WriteString("    <AllowHardTerminate>true</AllowHardTerminate>\n")
+	// 错过触发时机（如机器休眠）后补跑。
+	b.WriteString("    <StartWhenAvailable>true</StartWhenAvailable>\n")
+	// daemon 自身负责重连网关，不需要网络可用性门控（否则断网时任务不启动）。
+	b.WriteString("    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>\n")
+	b.WriteString("    <IdleSettings>\n")
+	b.WriteString("      <StopOnIdleEnd>false</StopOnIdleEnd>\n")
+	b.WriteString("      <RestartOnIdle>false</RestartOnIdle>\n")
+	b.WriteString("    </IdleSettings>\n")
+	b.WriteString("    <AllowStartOnDemand>true</AllowStartOnDemand>\n")
+	b.WriteString("    <Enabled>true</Enabled>\n")
+	b.WriteString("    <Hidden>false</Hidden>\n")
+	b.WriteString("    <RunOnlyIfIdle>false</RunOnlyIfIdle>\n")
+	b.WriteString("    <WakeToRun>false</WakeToRun>\n")
+	// PT0S = 无执行时限。旧实现默认 PT72H，运行满 72 小时被强制结束。
+	b.WriteString("    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>\n")
+	b.WriteString("    <Priority>7</Priority>\n")
+	// 异常退出后自动重启：每 1 分钟重试，最多 3 次。
+	b.WriteString("    <RestartOnFailure>\n")
+	b.WriteString("      <Interval>PT1M</Interval>\n")
+	b.WriteString("      <Count>3</Count>\n")
+	b.WriteString("    </RestartOnFailure>\n")
+	b.WriteString("  </Settings>\n")
+
+	b.WriteString(`  <Actions Context="Author">` + "\n")
+	b.WriteString("    <Exec>\n")
+	b.WriteString("      <Command>" + xmlEscape(execPath) + "</Command>\n")
+	if len(arguments) > 0 {
+		b.WriteString("      <Arguments>" + xmlEscape(quoteArgs(arguments)) + "</Arguments>\n")
+	}
+	b.WriteString("    </Exec>\n")
+	b.WriteString("  </Actions>\n")
+
+	b.WriteString("</Task>\n")
+	return b.String(), nil
+}
+
+// quoteArgs 把参数列表拼成命令行字符串，含空白的参数用双引号包裹。
+func quoteArgs(args []string) string {
+	parts := make([]string, len(args))
+	for i, a := range args {
+		if strings.ContainsAny(a, " \t") {
+			parts[i] = `"` + a + `"`
+		} else {
+			parts[i] = a
+		}
+	}
+	return strings.Join(parts, " ")
+}
+
+// xmlEscape 转义 XML 文本节点的特殊字符。
+//
+// 为什么手写而不用 encoding/xml：这里生成的是固定模板，手写更直观且能精确控制
+// 元素顺序（Task Scheduler 对 schema 顺序敏感）。需要转义的字符集很小。
+func xmlEscape(s string) string {
+	replacer := strings.NewReplacer(
+		"&", "&amp;",
+		"<", "&lt;",
+		">", "&gt;",
+		`"`, "&quot;",
+		"'", "&apos;",
+	)
+	return replacer.Replace(s)
+}
+
+// encodeUTF16LE 把字符串编码为带 BOM 的 UTF-16LE 字节序列。
+//
+// 为什么必须 UTF-16LE：schtasks /Create /XML 对 XML 文件的编码有硬性要求——
+// 只接受 UTF-16LE（带 BOM）。若写成 UTF-8，即使 XML 声明是 encoding="UTF-8"，
+// schtasks 也会报「XML 格式不正确」或直接乱码解析失败。
+//
+// 不用 golang.org/x/text：项目约束不引入新依赖，标准库 unicode/utf16 足够。
+func encodeUTF16LE(s string) []byte {
+	units := utf16.Encode([]rune(s))
+	out := make([]byte, 0, 2+len(units)*2)
+	out = append(out, 0xFF, 0xFE) // BOM，小端
+	for _, u := range units {
+		out = append(out, byte(u), byte(u>>8))
+	}
+	return out
+}
+
 // Install 创建登录时触发的计划任务（不启动）。
 // 安装前先把可执行文件拷贝到固定安装目录 ~/.jarvis/bin，使计划任务指向的位置稳定。
+//
+// 注册方式为 schtasks /Create /XML：只有 XML 才能表达重启策略、无执行时限、
+// 电池策略等关键设置（详见 buildTaskXML 的说明）。
 func (s *taskService) Install(opts Options) (string, error) {
 	opts, installedPath, err := PrepareInstalledBinary(opts)
 	if err != nil {
 		return "", err
 	}
-	args, err := BuildCreateArgs(opts)
+	xmlBody, err := buildTaskXML(opts)
 	if err != nil {
 		return "", err
 	}
-	if _, err := runCmd("schtasks", args...); err != nil {
+	// schtasks 要求 XML 文件为 UTF-16LE（带 BOM），因此不能直接写字符串。
+	tmpPath, err := writeTaskXMLTemp(xmlBody)
+	if err != nil {
+		return "", err
+	}
+	defer os.Remove(tmpPath)
+
+	if _, err := runCmd("schtasks", "/Create", "/TN", TaskName, "/XML", tmpPath, "/F"); err != nil {
 		return "", fmt.Errorf("创建计划任务失败: %w（该任务以最高权限运行，需在**管理员**终端中执行 install）", err)
 	}
 	return fmt.Sprintf("计划任务已创建：%s（可执行文件：%s）", TaskName, installedPath), nil
+}
+
+// writeTaskXMLTemp 把任务 XML 以 UTF-16LE 写入临时文件并返回路径。
+//
+// 为什么落在系统临时目录而不是 ~/.jarvis：该文件只在 install 期间存活，
+// 注册完立即删除，无需持久化；用 os.CreateTemp 保证文件名唯一，避免并发安装冲突。
+func writeTaskXMLTemp(xmlBody string) (string, error) {
+	f, err := os.CreateTemp("", "jarvis-task-*.xml")
+	if err != nil {
+		return "", fmt.Errorf("创建临时 XML 文件失败: %w", err)
+	}
+	path := f.Name()
+	if _, err := f.Write(encodeUTF16LE(xmlBody)); err != nil {
+		f.Close()
+		os.Remove(path)
+		return "", fmt.Errorf("写入临时 XML 文件失败: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(path)
+		return "", fmt.Errorf("关闭临时 XML 文件失败: %w", err)
+	}
+	return path, nil
 }
 
 // Uninstall 停止服务并删除计划任务。

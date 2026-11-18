@@ -1218,11 +1218,16 @@ func maybeAutoUpdateDaemon(gateway, sessionID string, info map[string]any) {
 		if !selfupdate.SameVersion(state.TargetVersion, parsed.LatestVersion) {
 			attempts = 0
 		}
+		// 记录本次更新时间戳，供跨版本的全局频率熔断使用（见 RecentUpdateBurst）。
+		// 必须在真正执行更新前写入：即使本次更新导致进程重启，新进程也能读到。
+		nowUnix := selfupdate.NowUnix()
+		recent := selfupdate.AppendRecentUpdate(state.RecentUpdates, nowUnix)
 		_ = selfupdate.SaveAttemptState(selfupdate.AttemptState{
 			TargetVersion:   parsed.LatestVersion,
 			Attempts:        attempts,
-			LastAttemptUnix: selfupdate.NowUnix(),
+			LastAttemptUnix: nowUnix,
 			InProgress:      true,
+			RecentUpdates:   recent,
 		})
 
 		log.Printf("[daemon] 检测到 daemon 新版本 %s（当前 %s），开始自动更新（网关 %s，目标 %s）",
@@ -1247,6 +1252,9 @@ func maybeAutoUpdateDaemon(gateway, sessionID string, info map[string]any) {
 				LastAttemptUnix: selfupdate.NowUnix(),
 				LastError:       err.Error(),
 				InProgress:      false,
+				// 保留更新历史：失败也计入频率熔断，否则「每次都失败」的
+				// 抖动同样会无限重试（只是不重启而已）。
+				RecentUpdates: recent,
 			})
 			log.Printf("[daemon] 自动更新 daemon 失败（网关 %s，第 %d 次）: %v", gateway, attempts+1, err)
 			return
