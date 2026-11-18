@@ -34,8 +34,13 @@ from jarvis.jarvis_utils.output import PrettyOutput
 # 匹配 ANSI/终端转义序列
 # CSI: ^[[?61;4;6;7;...c（终端能力查询应答）
 # OSC: ^[]0;253971765/49760;C:\...\powershell.EXE（窗口标题/进程信息等，会混入输出）
+# 注意：OSC 分支必须放在最前。原写法把 [@-Z\\-_] 放在首位，而该字符类区间
+# 已覆盖 ']'(0x5D)，导致 "\x1b]" 被当作两字符转义优先匹配，OSC payload
+# （如 "0;title\x07"）残留到输出中并可能触发 colorama 的 convert_osc 崩溃。
 _ANSI_ESCAPE = re.compile(
-    r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)?)"
+    r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?"
+    r"|\x1b\[[0-?]*[ -/]*[@-~]"
+    r"|\x1b[@-Z\\-_]"
 )
 # Windows ConPTY 有时只输出 OSC payload 而 ESC 被吞掉，导致混入：
 # 格式1: 0;pid/pid;C:\path\exe.EXE
@@ -453,7 +458,11 @@ class ScriptTool:
                                 execution_id=execution_id,
                                 sequence=next_sequence(),
                             )
-                            sys.stdout.write(raw_text)
+                            # 写入前剥离 ANSI/OSC 序列：colorama 的 convert_osc 在
+                            # 非 tty + 非 Windows 下 winterm 为 None，遇到单分号 OSC
+                            # 标题序列（如 ESC]0;title BEL）会抛
+                            # 'NoneType' object has no attribute 'set_title'
+                            sys.stdout.write(display_text or self._strip_ansi(raw_text))
                             sys.stdout.flush()
                     except (EOFError, OSError):
                         break
@@ -479,7 +488,11 @@ class ScriptTool:
                                     execution_id=execution_id,
                                     sequence=next_sequence(),
                                 )
-                                sys.stdout.write(raw_text)
+                                # 同上：剥离 ANSI/OSC 后再写 stdout，避免 colorama
+                                # convert_osc 在 winterm=None 时抛 AttributeError
+                                sys.stdout.write(
+                                    display_text or self._strip_ansi(raw_text)
+                                )
                                 sys.stdout.flush()
                         else:
                             break
@@ -803,7 +816,10 @@ class ScriptTool:
                     if display_text:
                         with captured_lock:
                             captured.append(display_text)
-                    sys.stdout.write(raw_text)
+                    # 剥离 ANSI/OSC 后再写 stdout：colorama 的 convert_osc 在非 tty
+                    # 且非 Windows 时 winterm 为 None，遇到单分号 OSC 标题序列会抛
+                    # 'NoneType' object has no attribute 'set_title'
+                    sys.stdout.write(display_text or self._strip_ansi(raw_text))
                     sys.stdout.flush()
             except Exception as e:
                 exc_holder.append(e)
