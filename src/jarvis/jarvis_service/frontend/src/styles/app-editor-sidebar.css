@@ -73,6 +73,23 @@
   flex-direction: column;
   overflow: hidden;
 }
+/* 插件扩展视图（sidebar_views / tool_panels）兜底滚动。
+   插件组件由第三方编写，根元素常为 min-height:100% 的普通 div，
+   自身不建滚动容器；而父级 .workspace-sidebar-content 是 overflow:hidden，
+   内容超出即被裁掉，表现为"鼠标滚轮滚不动"。
+   这里把插件视图容器改为可滚动，并让插件根元素撑满高度：
+   - overflow-y:auto 保证超长内容可滚
+   - 子元素 height:100% 让插件自带的 height:100% 布局正常生效
+   插件若自己声明了 overflow（如 height:100%;overflow:auto），
+   其根元素会成为内层滚动容器，滚动仍由插件自身接管，行为不变。 */
+.workspace-sidebar-content.workspace-sidebar-plugin {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.workspace-sidebar-content.workspace-sidebar-plugin > * {
+  flex: 1 0 auto;
+  min-height: 0;
+}
 
 .workspace-file-tree-panel {
   flex: 1;

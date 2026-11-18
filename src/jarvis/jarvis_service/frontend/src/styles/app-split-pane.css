@@ -180,11 +180,14 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  /* 插件组件由第三方编写，根元素常不建滚动容器（如 min-height:100% 的普通 div），
+     容器若 overflow:hidden 会把超长内容裁掉，表现为"鼠标滚轮滚不动"。
+     改为可滚动兜底；插件自带 overflow 时其根元素成为内层滚动容器，行为不变。 */
+  overflow-y: auto;
+  overflow-x: hidden;
 }
-
 .workspace-pane-plugin-wrap > * {
-  flex: 1;
+  flex: 1 0 auto;
   min-height: 0;
   min-width: 0;
 }

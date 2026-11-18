@@ -550,7 +550,7 @@
                 :availableNodeOptions="availableNodeOptions"
               />
             </div>
-            <div v-else-if="isPluginSidebarView(workspaceSidebarView) && activePluginSidebarComp" class="workspace-sidebar-content">
+            <div v-else-if="isPluginSidebarView(workspaceSidebarView) && activePluginSidebarComp" class="workspace-sidebar-content workspace-sidebar-plugin">
               <component
                 :is="activePluginSidebarComp"
                 :workingDir="pluginSidebarWorkingDir"
@@ -563,7 +563,7 @@
                 :showToast="showToast"
               />
             </div>
-            <div v-else-if="isPluginToolView(workspaceSidebarView) && activePluginToolPanelComp" class="workspace-sidebar-content">
+            <div v-else-if="isPluginToolView(workspaceSidebarView) && activePluginToolPanelComp" class="workspace-sidebar-content workspace-sidebar-plugin">
               <component
                 :is="activePluginToolPanelComp"
                 :workingDir="pluginSidebarWorkingDir"
