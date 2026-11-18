@@ -271,12 +271,7 @@ class AgentManager:
 
         # 启动子进程（不重定向 stdin/stdout/stderr，允许 TTY 环境）
         try:
-            process = subprocess.Popen(
-                cmd,
-                cwd=working_dir,
-                env=env,
-                start_new_session=True,
-            )
+            process = self._spawn_agent_process(cmd, working_dir, env)
         except Exception as e:
             raise RuntimeError(f"Failed to start agent: {e}")
 
@@ -721,6 +716,69 @@ class AgentManager:
         self._save_agents()
 
         return agent.to_dict()
+
+    def _spawn_agent_process(
+        self, cmd: List[str], working_dir: str, env: Dict[str, str]
+    ) -> subprocess.Popen:
+        """启动 Agent 子进程，尽量使其脱离 service 的 cgroup。
+
+        在 Linux 且 systemd 可用时，通过 `systemd-run --user --scope` 把 Agent 放进
+        独立的 scope，这样 jarvis-service 被停止/重启（systemd 默认 KillMode=control-group
+        会清理整个 cgroup）时，Agent 不会被连带杀死。
+
+        `systemd-run --scope` 是同步等待的，且会 exec 替换为实际命令，因此 Popen 返回的
+        pid 就是真实的 Agent 进程 pid。为了让 `systemd-run` 自身也不受父进程会话影响，
+        额外用 setsid 使其进入新会话。
+
+        Args:
+            cmd: Agent 启动命令
+            working_dir: 工作目录
+            env: 环境变量
+
+        Returns:
+            已启动的子进程
+
+        Raises:
+            RuntimeError: 启动失败
+        """
+        logger = logging.getLogger(__name__)
+        systemd_run = shutil.which("systemd-run")
+        if sys.platform.startswith("linux") and systemd_run:
+            unit_name = f"jarvis-agent-{uuid.uuid4().hex[:12]}"
+            scope_cmd = [
+                systemd_run,
+                "--user",
+                "--scope",
+                "--collect",
+                "--quiet",
+                "--unit",
+                unit_name,
+                *cmd,
+            ]
+            try:
+                process = subprocess.Popen(
+                    scope_cmd,
+                    cwd=working_dir,
+                    env=env,
+                    start_new_session=True,
+                )
+                logger.info(
+                    f"Agent started in systemd scope '{unit_name}' (pid={process.pid})"
+                )
+                return process
+            except Exception as e:
+                logger.warning(
+                    f"Failed to start agent via systemd-run scope, "
+                    f"falling back to plain Popen: {e}"
+                )
+
+        logger.info("Starting agent with plain Popen (no systemd scope)")
+        return subprocess.Popen(
+            cmd,
+            cwd=working_dir,
+            env=env,
+            start_new_session=True,
+        )
 
     def _allocate_port(self) -> Optional[int]:
         """分配随机端口。
