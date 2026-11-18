@@ -6560,13 +6560,20 @@ def create_app(
         拿不到默认值，导致 LLM 调用静默走直连。此处下沉到后端做统一兜底，
         使所有创建路径行为一致。
 
+        三态语义（关键）：
+        - raw_proxy_node 为 None（字段未传）→ 视为"未指定"，回落到 default_proxy_node；
+        - raw_proxy_node 为空字符串/空白（显式选择"无代理"）→ 直接返回 None，
+          不再回填默认值，保证前端 UI 上的"无代理"选项真实生效；
+        - 非空 → 使用调用方显式指定的节点。
+
         不校验代理节点是否在线：Agent 可能创建在别的节点上，且代理节点
         短暂离线时仍应允许 Agent 启动（待其上线后 LLM 自然可用）。
         但若配置的节点不在已知节点列表中，记录告警便于排查配置错误。
         """
-        explicit = str(raw_proxy_node or "").strip()
-        if explicit:
-            return explicit
+        if raw_proxy_node is not None:
+            explicit = str(raw_proxy_node).strip()
+            # 显式传了空值（"" / 空白）→ 调用方明确要求"无代理"，不回填默认值
+            return explicit or None
         try:
             from jarvis.jarvis_utils.config import get_global_config_data
 

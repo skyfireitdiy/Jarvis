@@ -682,6 +682,43 @@ describe('useAgents', () => {
     expect(body.working_dir).toBe('/w')
     expect(body.node_id).toBe('master')
   })
+  it('createAgentWithOptions：显式选择无代理时不回填默认代理节点', async () => {
+    const { api, fetchWithAuth, defaultProxyNode, availableNodeOptions } = makeHarness()
+    defaultProxyNode.value = 'worker-83'
+    availableNodeOptions.value = [{ node_id: 'master' }, { node_id: 'worker-83' }]
+    fetchWithAuth.mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: { agent_id: 'ag1', node_id: 'master' } }),
+    })
+    await api.createAgentWithOptions({ workingDir: '/w', proxyNode: '' })
+    const body = JSON.parse(fetchWithAuth.mock.calls[0][1].body)
+    // 必须原样传空字符串，让后端识别为"显式无代理"
+    expect(body.proxy_node).toBe('')
+  })
+  it('createAgentWithOptions：未指定代理节点时回填配置的默认代理节点', async () => {
+    const { api, fetchWithAuth, defaultProxyNode, availableNodeOptions } = makeHarness()
+    defaultProxyNode.value = 'worker-83'
+    availableNodeOptions.value = [{ node_id: 'master' }, { node_id: 'worker-83' }]
+    fetchWithAuth.mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: { agent_id: 'ag1', node_id: 'master' } }),
+    })
+    await api.createAgentWithOptions({ workingDir: '/w' })
+    const body = JSON.parse(fetchWithAuth.mock.calls[0][1].body)
+    expect(body.proxy_node).toBe('worker-83')
+  })
+  it('createAgentWithOptions：显式指定代理节点时优先于默认值', async () => {
+    const { api, fetchWithAuth, defaultProxyNode, availableNodeOptions } = makeHarness()
+    defaultProxyNode.value = 'worker-83'
+    availableNodeOptions.value = [{ node_id: 'master' }, { node_id: 'worker-83' }, { node_id: 'worker-9' }]
+    fetchWithAuth.mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: { agent_id: 'ag1', node_id: 'master' } }),
+    })
+    await api.createAgentWithOptions({ workingDir: '/w', proxyNode: 'worker-9' })
+    const body = JSON.parse(fetchWithAuth.mock.calls[0][1].body)
+    expect(body.proxy_node).toBe('worker-9')
+  })
   it('createAgentWithOptions：后端失败返回错误', async () => {
     const { api, fetchWithAuth } = makeHarness()
     fetchWithAuth.mockResolvedValue({

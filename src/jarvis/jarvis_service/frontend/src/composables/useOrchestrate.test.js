@@ -175,6 +175,13 @@ describe('useOrchestrate', () => {
     const explicit = api.buildOrchestrateAgentForm({ proxy_node: 'worker-2' }, 'master')
     expect(explicit.proxyNode).toBe('worker-2')
   })
+  it('buildOrchestrateAgentForm：编排文件显式写空 proxy_node 时不回填默认代理节点', () => {
+    const { api, defaultProxyNode, availableNodeOptions } = makeHarness()
+    availableNodeOptions.value = [{ node_id: 'master' }, { node_id: 'worker-1' }]
+    defaultProxyNode.value = 'worker-1'
+    const form = api.buildOrchestrateAgentForm({ proxy_node: '' }, 'master')
+    expect(form.proxyNode).toBe('')
+  })
   it('buildOrchestrateAgentForm：配置默认代理节点不在可选列表中时回退无代理', () => {
     const { api, defaultProxyNode, availableNodeOptions } = makeHarness()
     availableNodeOptions.value = [{ node_id: 'master' }]

@@ -1030,17 +1030,20 @@ export function useAgents({
       noInteractionMode = false,
       task = '',
       nodeId = '',
-      proxyNode: proxyNodeInput = '',
+      // proxyNode 三态：undefined=未指定（回填默认代理）；''=显式无代理；非空=指定节点
+      proxyNode: proxyNodeInput,
       accessAclRead = [],
       accessAclInteract = [],
       toolGroup = '',
       configFile = '',
       additionalArgs = '',
     } = options
-    // 默认代理节点：调用方未显式指定代理节点时，使用配置中的 default_proxy_node（若在可选节点列表中）
+    // 默认代理节点：仅当调用方"未指定"（undefined/null）时才回填配置的 default_proxy_node；
+    // 传空字符串 '' 表示调用方显式选择"无代理"，必须尊重，不得回填。
     const configuredProxy = String(defaultProxyNode.value || '').trim()
-    const proxyNode = String(proxyNodeInput || '').trim()
-      || (configuredProxy && availableNodeOptions.value.some(n => n.node_id === configuredProxy) ? configuredProxy : '')
+    const proxyNode = proxyNodeInput === undefined || proxyNodeInput === null
+      ? (configuredProxy && availableNodeOptions.value.some(n => n.node_id === configuredProxy) ? configuredProxy : '')
+      : String(proxyNodeInput).trim()
 
     const trimmedDir = String(workingDir || '').trim()
     if (!trimmedDir) return { ok: false, error: '工作目录不能为空' }
@@ -1072,7 +1075,9 @@ export function useAgents({
           no_interaction_mode: noInteractionMode,
           task: trimmedTask || undefined,
           node_id: targetNodeId,
-          proxy_node: proxyNode || undefined,
+          // proxy_node 必须三态透传：'' 表示显式无代理（后端据此不回填默认代理），
+          // 因此不能用 `|| undefined` 丢弃空值，否则后端会误判为"未指定"。
+          proxy_node: proxyNode,
           access_acl: (accessAclRead.length || accessAclInteract.length) ? {
             read: accessAclRead,
             interact: accessAclInteract,
@@ -1543,7 +1548,8 @@ export function useAgents({
       no_interaction_mode: Boolean(agent.no_interaction_mode),
       task: agent.task || '',
       node_id: targetNodeId || agent.node_id || undefined,
-      proxy_node: agent.proxy_node || undefined,
+      // 三态透传：原 Agent 无代理时传 ''，避免后端回填默认代理
+      proxy_node: agent.proxy_node ?? '',
     }
 
   }
@@ -2158,7 +2164,8 @@ export function useAgents({
             // 无损重生不应携带创建时的初始任务；仅无交互模式（硬约束需 task 才能启动）保留
             task: agent.no_interaction_mode ? (agent.task || undefined) : undefined,
             node_id: targetNodeId,
-            proxy_node: agent.proxy_node || undefined,
+            // 三态透传：原 Agent 无代理时传 ''，避免后端回填默认代理
+      proxy_node: agent.proxy_node ?? '',
             access_acl: agent.access_acl || undefined,
           }
           const createResp = await fetchWithAuth(buildNodeHttpUrl(host, port, targetNodeId, 'agents'), {

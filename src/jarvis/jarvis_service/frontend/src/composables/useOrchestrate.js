@@ -80,10 +80,12 @@ export function useOrchestrate({
   // 把编排文件里的单个 agent 配置映射为可编辑表单对象（字段缺失时按后端默认值兜底）
   function buildOrchestrateAgentForm(raw = {}, fallbackNodeId = 'master') {
     const acl = raw.access_acl && typeof raw.access_acl === 'object' ? raw.access_acl : {}
-    // 代理节点：编排文件显式指定优先，否则用配置中的默认代理节点（default_proxy_node），再否则无代理
+    // 代理节点三态：编排文件未写该字段（undefined/null）→ 用配置的 default_proxy_node；
+    // 显式写空值 '' → 表示"无代理"，不回填；非空 → 使用指定节点。
     const configuredProxy = String(defaultProxyNode?.value || '').trim()
-    const proxyNode = String(raw.proxy_node || '').trim()
-      || (configuredProxy && availableNodeOptions.value.some(n => n.node_id === configuredProxy) ? configuredProxy : '')
+    const proxyNode = raw.proxy_node === undefined || raw.proxy_node === null
+      ? (configuredProxy && availableNodeOptions.value.some(n => n.node_id === configuredProxy) ? configuredProxy : '')
+      : String(raw.proxy_node).trim()
     return {
       name: String(raw.name || ''),
       workingDir: String(raw.working_dir || '.'),
