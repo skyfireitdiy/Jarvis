@@ -74,19 +74,23 @@ daemon(action="call", session_id="<目标机 sid>", name="fs.transfer.node_to_da
 - 谁发起就由谁的 `session_id` 调用：**要往哪台机器放文件，就在那台机器的 daemon 会话上发起**（放进去用 push，从别处取用 pull）。
 - 常见错法：想"把 A 机文件送到 B 机"，却在 A 机上调 `pull`（方向反了）——正确是 **A 机 push 到中转节点，B 机 pull**（见第 2 节两步法）。
 
-### 3. chunk_size 必须 <= 524288（512 KiB）——否则 413
+### 3. chunk_size 与 nginx `client_max_body_size`
 
-网关前面的 **nginx 默认 `client_max_body_size` 为 1 MB**，而分块内容以 base64 传输（膨胀约 4/3）。daemon 默认块大小是 **1 MiB**，base64 后约 1.4 MB，**必然被 nginx 拒绝**，报：
+分块内容以 base64 传输（膨胀约 4/3）。daemon 默认块大小已从 1 MiB 调到 **4 MiB**
+（base64 后约 5.33 MiB），配合下面的 nginx 配置可显著减少往返次数、提升吞吐。
+
+**前提：网关前面的 nginx 必须放开 `client_max_body_size`。** nginx 默认 1 MB，会拒绝
+大于 1 MiB 的块并报：
 
 ```text
 413 Request Entity Too Large (nginx)
 ```
 
-**必须显式传 `chunk_size`，且满足：`chunk_size * 4/3 < 1 MB`，即 `chunk_size <= ~750 KB`。**
+本仓库部署的 4443 server 已在 `location /` 配置 `client_max_body_size 512m;` 与
+`proxy_request_buffering off;`，因此默认 4 MiB 块可直接使用，无需再显式传 `chunk_size`。
 
-**推荐值 `524288`（512 KiB，base64 后约 683 KB）**，安全且往返次数可接受。
-
-> 若误用默认值看到 413，不要怀疑 daemon 或网络，直接改小 `chunk_size` 重试。
+> 若在其他环境遇到 413，说明该环境的 nginx 仍是默认 1 MB：要么在 nginx 放开
+> `client_max_body_size`（推荐），要么显式传较小的 `chunk_size`（如 `524288`）绕过。
 
 ### 4. gateway 必须是 daemon 已认证的**精确地址（含端口）**
 

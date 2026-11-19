@@ -11,7 +11,6 @@ _node_http_dispatcher，从而走真实的 /file-transfer/* 分派逻辑。
 """
 
 import base64
-import hashlib
 import os
 import sys
 from pathlib import Path
@@ -155,8 +154,8 @@ def test_upload_multiple_chunks_concatenate(dispatcher):
     assert expected.read_bytes() == part1 + part2
 
 
-def test_upload_chunk_sha256_returned(dispatcher):
-    """返回的 sha256 应与该分块一致。"""
+def test_upload_chunk_no_block_sha256(dispatcher):
+    """上传响应不再返回块级 sha256（daemon 只用整包 sha256 校验）。"""
     disp, _ = dispatcher
     chunk = b"hash-me"
     result = _call(
@@ -170,7 +169,9 @@ def test_upload_chunk_sha256_returned(dispatcher):
         },
     )
     body = _body(result)
-    assert body["data"]["sha256"] == hashlib.sha256(chunk).hexdigest()
+    assert body["success"] is True
+    assert "sha256" not in body["data"]
+    assert body["data"]["written"] == len(chunk)
 
 
 # ----------------------------------------------------------------------

@@ -19,6 +19,8 @@ package capability
 import (
 	"archive/tar"
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -26,6 +28,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"jarvis-daemon/internal/proxy"
@@ -286,6 +289,21 @@ func transferPackDirToTar(dir string) ([]byte, error) {
 //
 // 安全：拒绝任何逃出目标目录的成员（防 tar 穿越），与网关侧 _safe_extract_tar 同义。
 func transferUnpackTarToDir(data []byte, destDir string) error {
+	return transferUnpackTarReader(bytes.NewReader(data), destDir)
+}
+
+// transferUnpackTarToDirFile 把磁盘上的 tar 文件解包到目标目录（流式读取，不整体载入内存）。
+func transferUnpackTarToDirFile(tarPath, destDir string) error {
+	f, err := os.Open(tarPath)
+	if err != nil {
+		return fmt.Errorf("打开 tar 文件 %s 失败: %w", tarPath, err)
+	}
+	defer f.Close()
+	return transferUnpackTarReader(f, destDir)
+}
+
+// transferUnpackTarReader 从 r 流式读取 tar 并解包到 destDir。
+func transferUnpackTarReader(r io.Reader, destDir string) error {
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return fmt.Errorf("创建目录 %s 失败: %w", destDir, err)
 	}
@@ -294,7 +312,7 @@ func transferUnpackTarToDir(data []byte, destDir string) error {
 		return fmt.Errorf("解析目录绝对路径失败: %w", err)
 	}
 
-	tr := tar.NewReader(bytes.NewReader(data))
+	tr := tar.NewReader(r)
 	for {
 		hdr, err := tr.Next()
 		if err == io.EOF {
@@ -338,9 +356,22 @@ func transferUnpackTarToDir(data []byte, destDir string) error {
 	return nil
 }
 
+// transferPushConcurrency 是 push 分块并发窗口大小。
+//
+// 取值理由：直传的瓶颈是每块的串行往返开销（TLS、鉴权、WS 调度）。在首块
+// （truncate）落定后，后续分块彼此独立（节点侧按 offset 定位写入），可并发
+// 发送以隐藏往返延迟。窗口 4 在常见 1~10 MiB 文件上已能把往返次数压到 1~3
+// 轮，同时不会对网关/节点造成过大瞬时压力；过大窗口收益递减且更易触发限流。
+const transferPushConcurrency = 4
+
 // transferPushFile 把一段字节按分块上传到远端。
 //
 // 返回上传字节数与分块次数。最后一块会带 final=true（dir 模式下触发远端解包）。
+//
+// 并发策略：首块（offset==0，truncate=true）必须先单独完成——它负责清空远端
+// 目标文件，若与后续块并发，后续块的定位写入可能被 truncate 覆盖。首块完成后，
+// 其余分块按 transferPushConcurrency 的窗口并发发送；节点侧每块独立打开文件并按
+// offset 定位写入，不同 offset 的并发写互不干扰。任一失败即取消其余并返回错误。
 func transferPushFile(
 	gateway, token, nodeID, remotePath, mode string,
 	data []byte, chunkSize int,
@@ -352,47 +383,85 @@ func transferPushFile(
 	}
 
 	url := transferRemoteURL(gateway, nodeID, "upload")
-	offset := 0
-	chunks := 0
-	for offset < total || (total == 0 && chunks == 0) {
+
+	// 先切分出所有块的 [start,end) 区间，避免并发时对 data 做额外拷贝。
+	type chunkRange struct{ start, end int }
+	var ranges []chunkRange
+	for offset := 0; offset < total || (total == 0 && len(ranges) == 0); {
 		end := offset + chunkSize
 		if end > total {
 			end = total
 		}
-		chunk := data[offset:end]
-		isLast := end >= total
-
-		payload := map[string]any{
-			"path":     remotePath,
-			"data":     TransferEncodeBase64(chunk),
-			"offset":   offset,
-			"mode":     mode,
-			"truncate": offset == 0,
-			"final":    isLast,
-		}
-		if _, err := transferRemotePost(gateway, token, url, payload); err != nil {
-			return chunks, err
-		}
-
-		chunks++
-		offset = end
+		ranges = append(ranges, chunkRange{offset, end})
 		if total == 0 {
 			break
 		}
+		offset = end
 	}
-	return chunks, nil
+
+	sendChunk := func(r chunkRange) error {
+		isLast := r.end >= total
+		payload := map[string]any{
+			"path":     remotePath,
+			"data":     TransferEncodeBase64(data[r.start:r.end]),
+			"offset":   r.start,
+			"mode":     mode,
+			"truncate": r.start == 0,
+			"final":    isLast,
+		}
+		_, err := transferRemotePost(gateway, token, url, payload)
+		return err
+	}
+
+	// 首块串行完成（truncate 语义），失败直接返回。
+	if err := sendChunk(ranges[0]); err != nil {
+		return 0, err
+	}
+	chunks := 1
+	rest := ranges[1:]
+	if len(rest) == 0 {
+		return chunks, nil
+	}
+
+	// 其余分块按窗口并发：用带缓冲的信号量限制在飞请求数。
+	sem := make(chan struct{}, transferPushConcurrency)
+	errCh := make(chan error, len(rest))
+	var wg sync.WaitGroup
+	for _, r := range rest {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(r chunkRange) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			if err := sendChunk(r); err != nil {
+				errCh <- err
+			}
+		}(r)
+	}
+	wg.Wait()
+	close(errCh)
+	if err := <-errCh; err != nil {
+		// 返回已完成块数的下界（首块 + 已成功块未知），这里只保证错误可见。
+		return chunks, err
+	}
+	return len(ranges), nil
 }
 
-// transferPullFile 从远端按分块拉取内容，返回完整字节与分块次数。
+// transferPullFile 从远端按分块拉取内容，边收边写入 w，并返回分块次数与整包
+// SHA-256（小写十六进制）。
+//
+// 采用流式写入而非全量累积到内存：大文件（上限 512 MiB）全量驻留内存会带来
+// 明显的峰值内存占用与 GC 压力。SHA-256 边写边算，避免事后再遍历一遍。
 func transferPullFile(
 	gateway, token, nodeID, remotePath, mode string,
-	chunkSize int,
-) ([]byte, int, error) {
+	chunkSize int, w io.Writer,
+) (int, string, error) {
 	url := transferRemoteURL(gateway, nodeID, "download")
 
-	var buf bytes.Buffer
+	hasher := sha256.New()
 	offset := int64(0)
 	chunks := 0
+	total := int64(0)
 	for {
 		payload := map[string]any{
 			"path":   remotePath,
@@ -402,23 +471,27 @@ func transferPullFile(
 		}
 		resp, err := transferRemotePost(gateway, token, url, payload)
 		if err != nil {
-			return nil, chunks, err
+			return chunks, "", err
 		}
 		data, err := transferRemoteData(resp)
 		if err != nil {
-			return nil, chunks, err
+			return chunks, "", err
 		}
 
 		b64, _ := data["data"].(string)
 		chunk, err := TransferDecodeBase64(b64)
 		if err != nil {
-			return nil, chunks, err
+			return chunks, "", err
 		}
-		if int64(buf.Len())+int64(len(chunk)) > transferRemoteMaxFileSize {
-			return nil, chunks, fmt.Errorf("拉取内容超出上限 %d 字节（512 MiB）",
+		total += int64(len(chunk))
+		if total > transferRemoteMaxFileSize {
+			return chunks, "", fmt.Errorf("拉取内容超出上限 %d 字节（512 MiB）",
 				transferRemoteMaxFileSize)
 		}
-		buf.Write(chunk)
+		if _, err := w.Write(chunk); err != nil {
+			return chunks, "", fmt.Errorf("写入拉取内容失败: %w", err)
+		}
+		hasher.Write(chunk)
 		chunks++
 
 		eof, _ := data["eof"].(bool)
@@ -431,7 +504,7 @@ func transferPullFile(
 			break
 		}
 	}
-	return buf.Bytes(), chunks, nil
+	return chunks, hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
 // handleTransferPush 是 fs.transfer.daemon_to_node 的公共实现：本机 → 远端节点。
@@ -515,24 +588,62 @@ func handleTransferPull(params map[string]any) (any, error) {
 		return nil, fmt.Errorf("网关 %s 没有可用凭据，无法发起直传；请先登录并推送登录信息", p.Gateway)
 	}
 
-	payload, chunks, err := transferPullFile(
-		p.Gateway, token, p.NodeID, p.RemotePath, p.Mode, p.ChunkSize,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	// 落盘：file 模式直接写文件；dir 模式解包到 local_path 目录。
+	// 落盘：file 模式边收边写 .part 临时文件，完成后 rename 到目标路径；
+	// dir 模式先落到临时 tar 文件，再解包到 local_path 目录。
+	var size int64
+	var sum string
+	var chunks int
 	if p.Mode == "dir" {
-		if err := transferUnpackTarToDir(payload, p.LocalPath); err != nil {
+		tmpTar, err := os.CreateTemp("", "jarvis-pull-*.tar")
+		if err != nil {
+			return nil, fmt.Errorf("创建临时文件失败: %w", err)
+		}
+		tmpTarPath := tmpTar.Name()
+		defer os.Remove(tmpTarPath)
+		chunks, sum, err = transferPullFile(
+			p.Gateway, token, p.NodeID, p.RemotePath, p.Mode, p.ChunkSize, tmpTar,
+		)
+		closeErr := tmpTar.Close()
+		if err != nil {
+			return nil, err
+		}
+		if closeErr != nil {
+			return nil, fmt.Errorf("关闭临时文件失败: %w", closeErr)
+		}
+		if size, err = fileSize(tmpTarPath); err != nil {
+			return nil, err
+		}
+		if err := transferUnpackTarToDirFile(tmpTarPath, p.LocalPath); err != nil {
 			return nil, err
 		}
 	} else {
 		if err := os.MkdirAll(filepath.Dir(p.LocalPath), 0o755); err != nil {
 			return nil, fmt.Errorf("创建目录 %s 失败: %w", filepath.Dir(p.LocalPath), err)
 		}
-		if err := os.WriteFile(p.LocalPath, payload, 0o644); err != nil {
-			return nil, fmt.Errorf("写入本机文件 %s 失败: %w", p.LocalPath, err)
+		partPath := p.LocalPath + ".part"
+		fh, err := os.OpenFile(partPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+		if err != nil {
+			return nil, fmt.Errorf("创建临时文件 %s 失败: %w", partPath, err)
+		}
+		chunks, sum, err = transferPullFile(
+			p.Gateway, token, p.NodeID, p.RemotePath, p.Mode, p.ChunkSize, fh,
+		)
+		closeErr := fh.Close()
+		if err != nil {
+			os.Remove(partPath)
+			return nil, err
+		}
+		if closeErr != nil {
+			os.Remove(partPath)
+			return nil, fmt.Errorf("关闭文件 %s 失败: %w", partPath, closeErr)
+		}
+		if size, err = fileSize(partPath); err != nil {
+			os.Remove(partPath)
+			return nil, err
+		}
+		if err := os.Rename(partPath, p.LocalPath); err != nil {
+			os.Remove(partPath)
+			return nil, fmt.Errorf("重命名 %s 到 %s 失败: %w", partPath, p.LocalPath, err)
 		}
 	}
 
@@ -543,11 +654,20 @@ func handleTransferPull(params map[string]any) (any, error) {
 		Mode:       p.Mode,
 		LocalPath:  p.LocalPath,
 		RemotePath: p.RemotePath,
-		Size:       int64(len(payload)),
-		SHA256:     TransferBytesSHA256(payload),
+		Size:       size,
+		SHA256:     sum,
 		Chunks:     chunks,
 		ChunkSize:  p.ChunkSize,
 	}, nil
+}
+
+// fileSize 返回文件字节数。
+func fileSize(path string) (int64, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return 0, fmt.Errorf("读取文件 %s 信息失败: %w", path, err)
+	}
+	return info.Size(), nil
 }
 
 // registerTransferRemote 注册指定平台的跨机文件直传能力（daemon_to_node / node_to_daemon）。

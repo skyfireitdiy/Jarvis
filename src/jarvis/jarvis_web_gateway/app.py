@@ -10118,7 +10118,6 @@ def create_app(
           - final: dir 模式下最后一块传 True 时解包 tar 到目标目录
         """
         import base64
-        import hashlib
         import tarfile
 
         try:
@@ -10209,7 +10208,6 @@ def create_app(
 
             written = len(chunk)
             size = os.path.getsize(write_path)
-            chunk_sha256 = hashlib.sha256(chunk).hexdigest()
 
             # dir 模式最后一块：解包 tar 到目标目录并删除临时 tar
             if mode == "dir" and bool(payload.get("final")):
@@ -10218,6 +10216,8 @@ def create_app(
                     _safe_extract_tar(tar, target_path)
                 os.remove(write_path)
 
+            # 不返回块级 sha256：daemon 只用整包 sha256 校验，块级摘要无人消费，
+            # 每块额外计算一次会白白消耗 CPU（大块时尤为明显）。
             return {
                 "success": True,
                 "data": {
@@ -10225,7 +10225,6 @@ def create_app(
                     "offset": offset,
                     "written": written,
                     "size": size,
-                    "sha256": chunk_sha256,
                 },
             }
         except PermissionError:
@@ -10263,7 +10262,6 @@ def create_app(
           - mode: "file" | "dir"（dir 表示把目录打包为 tar 后分块）
         """
         import base64
-        import hashlib
 
         try:
             raw_path = str(payload.get("path", "")).strip()
@@ -10348,7 +10346,6 @@ def create_app(
                     "size": total_size,
                     "eof": eof,
                     "data": base64.b64encode(chunk).decode("ascii"),
-                    "sha256": hashlib.sha256(chunk).hexdigest(),
                 },
             }
         except PermissionError:

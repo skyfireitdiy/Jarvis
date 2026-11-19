@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -32,7 +33,8 @@ import (
 // 它把上传的分块按 offset 拼装到 remote 缓冲区（模拟远端落盘），
 // 并支持按 offset/length 分块下载该缓冲区。
 type fakeGateway struct {
-	remote   []byte // 远端「文件」内容（dir 模式下为 tar 字节）
+	mu       sync.Mutex // 保护 remote/uploads/download：daemon 侧并发 push 会并发到达
+	remote   []byte     // 远端「文件」内容（dir 模式下为 tar 字节）
 	mode     string
 	uploads  int // 收到的上传分块次数
 	download int // 收到的下载分块次数
@@ -63,6 +65,8 @@ func (f *fakeGateway) handler() http.HandlerFunc {
 }
 
 func (f *fakeGateway) handleUpload(w http.ResponseWriter, payload map[string]any) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	rawData, _ := payload["data"].(string)
 	chunk, err := base64.StdEncoding.DecodeString(rawData)
 	if err != nil {
@@ -95,6 +99,8 @@ func (f *fakeGateway) handleUpload(w http.ResponseWriter, payload map[string]any
 }
 
 func (f *fakeGateway) handleDownload(w http.ResponseWriter, payload map[string]any) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	offset := int(toInt64(payload["offset"]))
 	length := int(toInt64(payload["length"]))
 	if offset > len(f.remote) {

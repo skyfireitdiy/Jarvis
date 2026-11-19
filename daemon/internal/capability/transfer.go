@@ -30,11 +30,15 @@ const (
 	// 再大则应改用独立二进制通道，而不是本能力。
 	TransferMaxFileSize int64 = 512 << 20 // 512 MiB
 
-	// TransferDefaultChunkSize 是未指定块大小时使用的默认块字节数（1 MiB）。
+	// TransferDefaultChunkSize 是未指定块大小时使用的默认块字节数（4 MiB）。
 	//
-	// 取值理由：1 MiB 经 base64 后约 1.33 MiB，单帧 JSON 体积可控，
-	// 既不会因块太小导致往返次数过多，也不会因块太大撑爆单帧。
-	TransferDefaultChunkSize = 1 << 20 // 1 MiB
+	// 取值理由：直传是「发一块、等一块」的串行往返，每块固定开销（TLS、鉴权、
+	// WS 调度）远大于传输本身，块越小往返次数越多、总耗时越高。1 MiB 默认值在
+	// 1~10 MiB 的小文件上往返开销占比过高。4 MiB 经 base64 后约 5.33 MiB，单帧
+	// JSON 体积仍可控（远低于 8 MiB 上限与网关 16 MiB 的 WS 消息上限），同时把
+	// 往返次数降到 1/4。注意：网关侧 nginx 必须放开 client_max_body_size（默认
+	// 1 MB 会拒绝大于 1 MiB 的块），本仓库部署配置已放开到 512m。
+	TransferDefaultChunkSize = 4 << 20 // 4 MiB
 
 	// TransferMaxChunkSize 是单次分块读写的最大字节数（8 MiB）。
 	//

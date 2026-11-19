@@ -253,8 +253,8 @@ func TestTransferConstants(t *testing.T) {
 	if TransferMaxFileSize != 512<<20 {
 		t.Fatalf("单文件上限期望 512 MiB，实际 %d", TransferMaxFileSize)
 	}
-	if TransferDefaultChunkSize != 1<<20 {
-		t.Fatalf("默认块期望 1 MiB，实际 %d", TransferDefaultChunkSize)
+	if TransferDefaultChunkSize != 4<<20 {
+		t.Fatalf("默认块期望 4 MiB，实际 %d", TransferDefaultChunkSize)
 	}
 	if TransferMaxChunkSize != 8<<20 {
 		t.Fatalf("最大块期望 8 MiB，实际 %d", TransferMaxChunkSize)
