@@ -189,7 +189,7 @@ class SkillInstaller:
                 )
             raise ValueError(f"Git clone 失败：{stderr}")
 
-        # 定位技能子目录中的 SKILL.md
+        # 定位技能子目录中的 SKILL.md（非强制，找不到也不阻断安装）
         skill_md_path = (
             os.path.join(repo_dir, subdir, "SKILL.md")
             if subdir
@@ -208,15 +208,15 @@ class SkillInstaller:
             if os.path.exists(alt_skill_md_path):
                 skill_md_path = alt_skill_md_path
             else:
-                # clone 成功但找不到 SKILL.md，清理并报错
-                shutil.rmtree(target_skill_dir)
-                raise ValueError(f"在子目录 {subdir} 中未找到 SKILL.md")
+                # clone 成功但未找到 SKILL.md，不清理目录也不报错，
+                # 仅生成索引文件，技能仍可正常安装
+                skill_md_path = None
 
         # 生成 skill.md 索引文件（含 description + skill_path）
         self._generate_skill_md_index(target_skill_dir, skill, repo_name)
 
         # 热加载（不修改 SKILL.md，保持原始内容）
-        if self.rules_manager:
+        if self.rules_manager and skill_md_path:
             try:
                 load_method = getattr(self.rules_manager, "load_rule_file", None)
                 if load_method:
@@ -229,7 +229,7 @@ class SkillInstaller:
                 )
                 pass
 
-        return skill_md_path
+        return skill_md_path or target_skill_dir
 
     def _generate_skill_md_index(
         self, target_skill_dir: str, skill: SkillResult, repo_name: str
