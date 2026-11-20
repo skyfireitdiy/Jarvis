@@ -120,6 +120,22 @@ def test_normalize_version_strips_v_prefix():
     assert dcm._normalize_version(None) == ""
 
 
+def test_version_gt_semantic_compare():
+    """语义化版本比较：a > b。"""
+    assert dcm._version_gt("7.3.1", "7.3.0") is True
+    assert dcm._version_gt("7.3.1", "7.2.0") is True
+    assert dcm._version_gt("7.3.1", "6.0.0") is True
+    assert dcm._version_gt("7.3.1", "7.3.1") is False  # 相等不算大于
+    assert dcm._version_gt("7.3.0", "7.3.1") is False  # 小于不算大于
+    assert dcm._version_gt("1.0.0", "1.0.0") is False
+
+
+def test_version_gt_with_v_prefix():
+    """_version_gt 对带 v 前缀的版本号也能正确比较。"""
+    assert dcm._version_gt("v7.3.1", "v7.3.0") is True
+    assert dcm._version_gt("v7.3.0", "v7.3.1") is False
+
+
 def test_build_update_version_compare_ignores_v_prefix(monkeypatch):
     """daemon 上报带 v（git tag），网关自身版本不带 v → 必须判定为同一版本。
 
@@ -136,6 +152,32 @@ def test_build_update_version_compare_ignores_v_prefix(monkeypatch):
     info2 = dcm._build_daemon_update("6.0.0", "linux", "amd64")
     assert info2 is not None
     assert info2["available"] is False
+
+
+def test_build_update_daemon_newer_than_gateway_not_available(monkeypatch):
+    """daemon 版本比网关新 → 不允许降级，available=False 并说明原因。"""
+    monkeypatch.setattr(dcm, "DAEMON_LATEST_VERSION", "6.0.0")
+    # daemon 上报 v7.3.1，比网关版本新
+    info = dcm._build_daemon_update("v7.3.1", "linux", "amd64")
+    assert info is not None
+    assert info["available"] is False
+    assert info["latest_version"] == "6.0.0"
+    assert info["current_version"] == "v7.3.1"
+    assert "downgrade not allowed" in info["note"]
+
+
+def test_build_update_daemon_older_than_gateway_available(monkeypatch):
+    """daemon 版本比网关旧 → 正常下发更新，available=True。"""
+    monkeypatch.setattr(dcm, "DAEMON_LATEST_VERSION", "7.3.1")
+    monkeypatch.setattr(
+        dcm, "DAEMON_RELEASE_BASE_URL", "https://github.com/o/r/releases/download"
+    )
+    monkeypatch.setattr(dcm, "DAEMON_ASSETS", {})
+    info = dcm._build_daemon_update("v6.0.0", "linux", "amd64")
+    assert info is not None
+    assert info["available"] is True
+    assert info["latest_version"] == "7.3.1"
+    assert info["current_version"] == "v6.0.0"
 
 
 def test_daemon_latest_version_comes_from_gateway_version():

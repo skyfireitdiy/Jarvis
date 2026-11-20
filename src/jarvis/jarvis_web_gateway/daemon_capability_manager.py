@@ -202,6 +202,25 @@ def _normalize_version(value: Any) -> str:
     return text
 
 
+def _version_tuple(version: str) -> Tuple[int, ...]:
+    """把归一化后的版本号转成元组，用于语义化版本比较。
+
+    例如 "7.3.1" → (7, 3, 1)；非法段落按 0 处理。
+    """
+    parts: List[int] = []
+    for part in str(version or "").split("."):
+        try:
+            parts.append(int(part))
+        except (ValueError, TypeError):
+            parts.append(0)
+    return tuple(parts)
+
+
+def _version_gt(a: str, b: str) -> bool:
+    """判断版本 a 是否严格大于版本 b。"""
+    return _version_tuple(a) > _version_tuple(b)
+
+
 def _release_tag(version: Any) -> str:
     """把版本号转成 GitHub Release 的 tag。
 
@@ -245,6 +264,11 @@ def _build_daemon_update(
     # 版本一致（归一化后）→ 已是最新，available=false 并说明原因。
     if _normalize_version(current) == _normalize_version(latest):
         info["note"] = "already up to date"
+        return info
+
+    # 当前版本比网关版本新 → 不允许降级，available=false 并说明。
+    if _version_gt(_normalize_version(current), _normalize_version(latest)):
+        info["note"] = "daemon version newer than gateway, downgrade not allowed"
         return info
 
     # 平台/架构不受支持（如 macOS）→ available=false 并说明。
