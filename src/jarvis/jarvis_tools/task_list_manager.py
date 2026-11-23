@@ -620,6 +620,9 @@ class task_list_manager:
                 "name": agent_name,
                 "agent": parent_agent,
                 "quick_mode": getattr(parent_agent, "quick_mode", False),
+                # 工具调用可能并行创建多个子 Agent，必须强制非交互，
+                # 否则多个子 Agent 会同时抢占终端输入导致错乱。
+                "force_non_interactive": True,
             }
         )
 

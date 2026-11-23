@@ -63,7 +63,7 @@ class _FakeCodeParent(CodeAgent):
         return None
 
 
-def _capture_non_interactive(cls, tool, parent):
+def _capture_non_interactive(cls, tool, parent, extra_args=None):
     """调用 tool.execute，捕获子 Agent 构造时的 non_interactive 实参。
 
     patch 目标类的 __init__，记录 kwargs 后不执行真实初始化，并让实例带上
@@ -79,8 +79,11 @@ def _capture_non_interactive(cls, tool, parent):
         self.set_user_data = MagicMock()
         self.set_use_tools = MagicMock()
 
+    args = {"task": "t", "agent": parent}
+    if extra_args:
+        args.update(extra_args)
     with patch.object(cls, "__init__", fake_init):
-        result = tool.execute({"task": "t", "agent": parent})
+        result = tool.execute(args)
 
     assert result["success"] is True, result
     assert captured, "子 Agent 未被构造"
@@ -138,3 +141,25 @@ def test_sub_agent_no_parent_is_interactive():
     tool = sub_agent_mod.SubAgentTool()
     got = _capture_non_interactive(Agent, tool, None)
     assert got is False
+
+
+@pytest.mark.parametrize("force", [True, False])
+def test_sub_agent_force_non_interactive_overrides_parent(force):
+    """显式传 force_non_interactive 时覆盖父 Agent 的交互设置（工具调用场景传 True）。"""
+    parent = _FakeParent(False, False)
+    tool = sub_agent_mod.SubAgentTool()
+    got = _capture_non_interactive(
+        Agent, tool, parent, {"force_non_interactive": force}
+    )
+    assert got is force
+
+
+@pytest.mark.parametrize("force", [True, False])
+def test_sub_code_agent_force_non_interactive_overrides_parent(force):
+    """显式传 force_non_interactive 时覆盖父 Agent 的交互设置（工具调用场景传 True）。"""
+    parent = _FakeCodeParent(False, False)
+    tool = sub_code_agent_mod.SubCodeAgentTool()
+    got = _capture_non_interactive(
+        CodeAgent, tool, parent, {"force_non_interactive": force}
+    )
+    assert got is force

@@ -8,6 +8,7 @@ sub_code_agent 工具
 - 可选参数：background
 - 不依赖父 Agent，所有配置使用系统默认与全局变量
 - 子Agent必须自动完成(auto_complete=True)且需要summary(need_summary=True)
+- 非交互模式：默认继承父 Agent 的交互设置；调用方可通过 force_non_interactive=True 强制子 Agent 非交互（工具调用场景应强制，避免并行子 Agent 抢占终端输入）
 """
 
 from typing import Any, Dict, List
@@ -66,6 +67,10 @@ class SubCodeAgentTool:
             "goal": {
                 "type": "string",
                 "description": "子任务的目标描述（可选，用于明确子Agent的执行目标）",
+            },
+            "force_non_interactive": {
+                "type": "boolean",
+                "description": "是否强制子Agent以非交互模式运行（可选）。不传则沿用父Agent的交互设置；工具调用场景应传 true，避免并行子Agent抢占终端输入。",
             },
         },
         "required": ["task"],
@@ -233,9 +238,15 @@ class SubCodeAgentTool:
 
             # 继承父 Agent 的交互配置：父Agent非交互或自动完成时，子Agent强制非交互；
             # 否则子Agent保持可交互，与父Agent一致。
-            force_non_interactive = (
-                parent_non_interactive is True or parent_auto_complete is True
-            )
+            # 调用方可通过 force_non_interactive 显式覆盖（工具调用场景传 True，
+            # 避免并行子 Agent 抢占终端输入；手动命令不传，保持继承）。
+            force_non_interactive_arg = args.get("force_non_interactive")
+            if force_non_interactive_arg is None:
+                force_non_interactive = (
+                    parent_non_interactive is True or parent_auto_complete is True
+                )
+            else:
+                force_non_interactive = bool(force_non_interactive_arg)
 
             # 自动禁用review功能
             disable_review = True
