@@ -3124,7 +3124,10 @@ def create_app(
     async def api_browser_ext_list_sessions(request: Request) -> Dict[str, Any]:
         """列出当前在线的浏览器扩展会话。
 
-        可选 query 参数：user_id（仅返回该用户的会话）。
+        可选 query 参数：
+          - user_id：仅返回该用户的会话；
+          - include_capabilities=true：返回完整能力 schema（默认只返回精简的
+            capability_names / capability_count，避免响应体积膨胀）。
         非管理员未显式传 user_id 时，默认只返回自己（token 对应 user_id）的会话。
         """
         user_info = request.state.user_info or {}
@@ -3138,6 +3141,15 @@ def create_app(
             if user_id != current_user_id:
                 return {"success": False, "error": "forbidden: cannot list other users"}
         sessions = browser_extension_manager.list_sessions(user_id=user_id)
+        if not _query_flag(
+            request.query_params.get("include_capabilities"), default=False
+        ):
+            sessions = [
+                _slim_session_capabilities(
+                    s, include_names=True, include_full=False
+                )
+                for s in sessions
+            ]
         return {"success": True, "sessions": sessions}
 
     @app.post("/api/browser-ext/command", dependencies=[Depends(verify_token)])
@@ -3181,6 +3193,43 @@ def create_app(
     # ------------------------------------------------------------------
     # 守护进程（jarvis-daemon）API：供 Agent 工具层（子进程）通过 HTTP 调用
     # ------------------------------------------------------------------
+    def _query_flag(raw: Optional[str], default: bool = False) -> bool:
+        """解析 query 参数中的布尔开关（"1/true/yes/on" 为真，"0/false/no/off" 为假）。"""
+        if raw is None or str(raw).strip() == "":
+            return default
+        return str(raw).strip().lower() in ("1", "true", "yes", "on")
+
+    def _slim_session_capabilities(
+        session: Dict[str, Any],
+        include_names: bool = True,
+        include_full: bool = False,
+    ) -> Dict[str, Any]:
+        """裁剪会话中的 capabilities 字段，降低会话列表响应体积。
+
+        会话列表默认只保留精简能力名（``capability_names``），完整 schema
+        （description/parameters/platform）按需通过
+        ``POST /api/daemon/capability/list`` 获取。``include_full=True`` 时
+        保持原样（向后兼容旧调用方）。
+        """
+        if include_full:
+            return session
+        slim = dict(session)
+        capabilities = slim.pop("capabilities", None) or []
+        if not include_names:
+            slim.pop("capability_names", None)
+            return slim
+        names: List[str] = []
+        for cap in capabilities:
+            if isinstance(cap, dict):
+                name = str(cap.get("name") or "").strip()
+            else:
+                name = str(cap or "").strip()
+            if name:
+                names.append(name)
+        slim["capability_names"] = names
+        slim["capability_count"] = len(names)
+        return slim
+
     def _resolve_daemon_session_node(session_id: str) -> Optional[str]:
         """返回承载指定守护进程会话的远端节点 ID；本机会话返回 None。
 
@@ -3213,8 +3262,16 @@ def create_app(
 
     @app.get("/api/daemon/sessions", dependencies=[Depends(verify_token)])
     async def api_daemon_list_sessions(request: Request) -> Dict[str, Any]:
-        """列出当前在线的守护进程会话（含各自已注册的能力列表）。
+        """列出当前在线的守护进程会话。
 
+        默认只返回会话元信息 + 精简能力名列表（capability_names），不返回每个
+        能力的完整 description/parameters —— 单会话 30~45 个能力的完整 schema
+        会让响应膨胀到数十万字符，而绝大多数调用方（拓扑图、版本展示、Agent
+        列会话）只需要会话标识与环境信息。
+        可选 query 参数：
+          - include_capabilities=true：返回完整 capabilities（旧行为，向后兼容）；
+          - include_capability_names=false：连精简能力名也不返回。
+        需要完整能力 schema 时优先走 POST /api/daemon/capability/list。
         非管理员只能看到属于自己（token 对应 user_id）的会话。
         """
         user_info = request.state.user_info or {}
@@ -3224,6 +3281,19 @@ def create_app(
             sessions = daemon_capability_manager.list_sessions(user_id=user_id)
         else:
             sessions = daemon_capability_manager.list_sessions()
+        include_capabilities = _query_flag(
+            request.query_params.get("include_capabilities"), default=False
+        )
+        include_names = _query_flag(
+            request.query_params.get("include_capability_names"), default=True
+        )
+        if not include_capabilities:
+            sessions = [
+                _slim_session_capabilities(
+                    s, include_names=include_names, include_full=False
+                )
+                for s in sessions
+            ]
         return {"success": True, "sessions": sessions}
 
     @app.post("/api/daemon/capability/list", dependencies=[Depends(verify_token)])

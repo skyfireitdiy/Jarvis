@@ -41,7 +41,9 @@ class BrowserExtSessionsTool:
         return jglobals.agent_id is not None
 
     description = """列出当前在线的浏览器扩展会话（通过用户安装的浏览器扩展）。
-返回 session_id 列表，每个会话还包含该扩展上报的能力清单（capabilities）与浏览器信息（browser_info）等。
+返回 session_id 列表，每个会话还包含浏览器信息（browser_info）与精简能力名列表
+（capability_names / capability_count）；不含每个能力的 description/parameters，
+需要完整能力 schema 时用 browser_ext_capabilities（传 session_id）。
 **应先调用本工具获取 session_id**，再用 browser_ext_capabilities 看能力、browser_ext_call 调用。
 若用户未安装扩展或扩展未连接，本工具会返回空列表提示。"""
 

@@ -154,9 +154,11 @@ class BrowserExtCapabilitiesTool:
                 "stderr": "session_id is required. 请先调用 browser_ext_sessions 获取。",
             }
 
+        # 会话列表默认只返回精简能力名，本工具需要完整 schema，显式要求全量。
         result = self._request_gateway(
             "GET",
             "/api/browser-ext/sessions",
+            params={"include_capabilities": "true"},
             error_prefix="Failed to list browser sessions",
         )
         if not result.get("success"):

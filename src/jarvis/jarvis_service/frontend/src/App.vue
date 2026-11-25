@@ -2923,10 +2923,13 @@ async function fetchBrowserExtensionVersion() {
 
 // 查询本机后台服务（daemon）在线会话：返回会话数组，供大厅拓扑图展示接入的 daemon 节点。
 // 非管理员仅返回自己（token 对应用户）的会话，由网关侧限制。
-async function fetchDaemonSessions() {
+// 默认只返回精简能力名（capability_names），避免每个会话数十个能力的完整 schema
+// 把响应撑到数十万字符；能力清单视图需要完整 schema 时传 includeCapabilities=true。
+async function fetchDaemonSessions(options = {}) {
   try {
     const { host, port } = getGatewayAddress()
-    const url = `${getHttpProtocol()}://${host}:${port}/api/daemon/sessions`
+    const query = options.includeCapabilities ? '?include_capabilities=true' : ''
+    const url = `${getHttpProtocol()}://${host}:${port}/api/daemon/sessions${query}`
     const response = await fetchWithAuth(url)
     if (!response.ok) return []
     const result = await response.json()
@@ -3001,10 +3004,13 @@ async function deleteTimer(task) {
 // 注意：/api/browser-ext/version 的 sessions 只含 session_id/extension_version，
 // 不含 name，故这里单独调 /api/browser-ext/sessions。
 // 非管理员仅返回自己（token 对应用户）的会话，由网关侧限制。
-async function fetchBrowserExtensionSessions() {
+// 默认只返回精简能力名（capability_names）；能力清单视图需要完整 schema 时
+// 传 includeCapabilities=true。
+async function fetchBrowserExtensionSessions(options = {}) {
   try {
     const { host, port } = getGatewayAddress()
-    const url = `${getHttpProtocol()}://${host}:${port}/api/browser-ext/sessions`
+    const query = options.includeCapabilities ? '?include_capabilities=true' : ''
+    const url = `${getHttpProtocol()}://${host}:${port}/api/browser-ext/sessions${query}`
     const response = await fetchWithAuth(url)
     if (!response.ok) return []
     const result = await response.json()
@@ -3114,9 +3120,11 @@ const {
 // 刷新能力清单数据（浏览器扩展会话 + daemon 会话 + 已安装脚本 + 网关脚本）。
 // 能力清单缓存：仅在首次打开或手动点刷新按钮时调用，避免频繁请求。
 async function refreshManageCapabilities() {
+  // 能力清单要展示每个能力的 description/parameters，故显式要求完整 schema
+  // （会话列表默认只返回精简能力名，避免响应体积膨胀）。
   const [extSessions, daemonSessions, installedScripts, gatewayScripts] = await Promise.all([
-    fetchBrowserExtensionSessions(),
-    fetchDaemonSessions(),
+    fetchBrowserExtensionSessions({ includeCapabilities: true }),
+    fetchDaemonSessions({ includeCapabilities: true }),
     fetchInstalledScripts(),
     fetchGatewayScripts(),
   ])

@@ -58,22 +58,15 @@ def _sessions_response(sessions):
 
 
 def test_sessions_passes_through_sessions(sessions_tool, monkeypatch):
-    """browser_ext_sessions 的 stdout 必须包含网关返回的会话（含 capabilities）。"""
-    capabilities = [
-        {
-            "name": "tab.list",
-            "description": "列出标签页",
-            "parameters": {},
-            "platform": "browser",
-        }
-    ]
+    """browser_ext_sessions 的 stdout 必须包含网关返回的会话（含精简能力名）。"""
     gateway_response = _sessions_response(
         [
             {
                 "session_id": "sess-1",
                 "name": "Chrome 扩展",
                 "browser_info": {"name": "Chrome", "version": "120"},
-                "capabilities": capabilities,
+                "capability_names": ["tab.list"],
+                "capability_count": 1,
             }
         ]
     )
@@ -86,7 +79,9 @@ def test_sessions_passes_through_sessions(sessions_tool, monkeypatch):
     payload = json.loads(result["stdout"])
     assert len(payload) == 1
     assert payload[0]["session_id"] == "sess-1"
-    assert payload[0]["capabilities"] == capabilities
+    # 会话列表默认只返回精简能力名，不含完整 schema
+    assert payload[0]["capability_names"] == ["tab.list"]
+    assert "capabilities" not in payload[0]
 
 
 def test_sessions_empty_returns_hint(sessions_tool, monkeypatch):

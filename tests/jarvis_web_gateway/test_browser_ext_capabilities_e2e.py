@@ -5,7 +5,9 @@
 1. 扩展首帧 hello 携带 ``capabilities`` 数组时必须被落库到会话；
 2. ``list_sessions()`` / ``get_session()`` 返回中必须带 ``capabilities``；
 3. 兼容旧版：hello 未携带 capabilities（或非 list）时回退为 ``[]``，不抛异常；
-4. GET /api/browser-ext/sessions 端到端返回的 capabilities 与上报一致。
+4. GET /api/browser-ext/sessions 默认只返回精简能力名（capability_names /
+   capability_count），显式传 include_capabilities=true 时返回完整 capabilities
+   且与上报一致（避免会话列表响应被完整 schema 撑大）。
 
 隔离：数据目录由 conftest.py 的 autouse fixture 重定向到 tmp_path；
 全程使用 TestClient（ASGI 内存传输），不监听端口。
@@ -73,7 +75,7 @@ def test_hello_capabilities_persisted(client, auth_token):
         ack = ws.receive_json()
         assert ack["type"] == "hello_ack"
 
-        # 通过 HTTP 接口读会话
+        # 通过 HTTP 接口读会话：默认精简（只返回能力名），不返回完整 schema
         resp = client.get(
             "/api/browser-ext/sessions",
             headers={"Authorization": f"Bearer {auth_token}"},
@@ -81,6 +83,18 @@ def test_hello_capabilities_persisted(client, auth_token):
         assert resp.status_code == 200
         sessions = resp.json()["sessions"]
         assert len(sessions) >= 1
+        session = next(s for s in sessions if s["client_id"] == "ext-client-1")
+        assert "capabilities" not in session
+        assert session["capability_names"] == [c["name"] for c in CAPS]
+        assert session["capability_count"] == len(CAPS)
+
+        # 显式要求完整 schema 时（能力清单视图 / browser_ext_capabilities 工具）返回全量
+        resp = client.get(
+            "/api/browser-ext/sessions?include_capabilities=true",
+            headers={"Authorization": f"Bearer {auth_token}"},
+        )
+        assert resp.status_code == 200
+        sessions = resp.json()["sessions"]
         session = next(s for s in sessions if s["client_id"] == "ext-client-1")
         assert session["capabilities"] == CAPS
 
@@ -110,4 +124,6 @@ def test_hello_without_capabilities_falls_back_to_empty(client, auth_token):
         sessions = resp.json()["sessions"]
         assert len(sessions) >= 1
         session = next(s for s in sessions if s["client_id"] == "ext-client-legacy")
-        assert session["capabilities"] == []
+        # 默认精简视图：无能力时 capability_names 为空列表
+        assert session["capability_names"] == []
+        assert session["capability_count"] == 0

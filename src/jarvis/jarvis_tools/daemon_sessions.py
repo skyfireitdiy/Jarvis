@@ -45,6 +45,8 @@ class DaemonSessionsTool:
 返回 session_id 列表，每个会话还包含该后台服务所在机器的系统信息
 （system_info：hostname/os_name/os_version/arch/cpu_count/cpu_model/
 mem_total_kb/mem_available_kb/uptime_sec/user/home 等），可据此判断该机器的环境与可调用的能力。
+默认只返回精简能力名列表（capability_names / capability_count），不含每个能力的
+description/parameters；需要完整能力 schema 时用 daemon_capabilities（传 session_id）。
 **应先调用本工具获取 session_id**，再用 daemon_capabilities 看能力、daemon_call 调用。
 若用户未安装或未启动守护进程，本工具会返回空列表提示。"""
 
@@ -143,9 +145,12 @@ mem_total_kb/mem_available_kb/uptime_sec/user/home 等），可据此判断该�
         if err is not None:
             return err
 
+        # 默认走精简模式（网关只返回 capability_names），避免把每个会话 30~45 个
+        # 能力的完整 schema 全部塞进上下文；需要完整能力时用 daemon_capabilities。
         result = self._request_gateway(
             "GET",
             "/api/daemon/sessions",
+            params={"include_capability_names": "true"},
             error_prefix="Failed to list daemon sessions",
         )
         if not result.get("success"):

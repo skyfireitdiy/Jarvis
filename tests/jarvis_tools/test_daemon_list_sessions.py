@@ -95,6 +95,26 @@ def test_sessions_passes_through_system_info(sessions_tool, monkeypatch):
     assert payload[0]["session_id"] == "sess-1"
 
 
+def test_sessions_requests_slim_mode(sessions_tool, monkeypatch):
+    """daemon_sessions 默认走精简模式：请求带 include_capability_names，
+    且不请求完整 capabilities（避免数十万字符的 schema 灌进上下文）。"""
+    captured = {}
+
+    def fake_request_gateway(method, path, json_data=None, **kw):
+        captured["method"] = method
+        captured["path"] = path
+        captured["params"] = kw.get("params")
+        return {"success": True, "data": {"success": True, "sessions": []}}
+
+    monkeypatch.setattr(sessions_tool, "_request_gateway", fake_request_gateway)
+    sessions_tool.execute()
+    assert captured["method"] == "GET"
+    assert captured["path"] == "/api/daemon/sessions"
+    params = captured["params"] or {}
+    assert params.get("include_capability_names") == "true"
+    assert "include_capabilities" not in params
+
+
 def test_sessions_empty_returns_hint(sessions_tool, monkeypatch):
     """无会话时返回提示文本，不报错。"""
     monkeypatch.setattr(
