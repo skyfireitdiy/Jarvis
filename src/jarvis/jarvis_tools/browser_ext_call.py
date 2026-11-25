@@ -19,8 +19,33 @@ from typing import Any, Dict, Optional
 import httpx
 
 import jarvis.jarvis_utils.globals as jglobals
+from jarvis.jarvis_utils.output import PrettyOutput
 
 logger = logging.getLogger(__name__)
+
+# 前台打印结果的最大字符数，避免远端返回超大内容刷屏
+_MAX_PRINT_CHARS = 2000
+
+
+def _print_call_result(name: str, stdout: str = "", stderr: str = "") -> None:
+    """把远端能力调用结果打印到前台，便于用户直接看到执行结果。
+
+    长文本截断，避免刷屏；失败时打印错误原因。
+    """
+    try:
+        if stderr:
+            PrettyOutput.auto_print(f"❌ {name} 执行失败: {stderr}")
+            return
+        text = stdout if stdout else "执行成功"
+        if len(text) > _MAX_PRINT_CHARS:
+            text = (
+                text[:_MAX_PRINT_CHARS]
+                + f"\n...(结果过长，已截断，共 {len(stdout)} 字符)"
+            )
+        PrettyOutput.auto_print(f"✅ {name} 执行结果:\n{text}")
+    except Exception:
+        # 打印失败不影响主流程
+        pass
 
 
 class BrowserExtCallTool:
@@ -226,29 +251,36 @@ class BrowserExtCallTool:
             timeout=timeout + 5.0,
         )
         if not result.get("success"):
+            error = result.get("error") or "unknown error"
+            _print_call_result(name, stderr=error)
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": result.get("error") or "unknown error",
+                "stderr": error,
             }
         data = result.get("data") or {}
         if not data.get("success"):
+            error = self._format_error(data.get("error"))
+            _print_call_result(name, stderr=error)
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": self._format_error(data.get("error")),
+                "stderr": error,
             }
         # 网关信封：{"success": true, "result": {id, type:"result", success, data, error}}
         payload = data.get("result") or {}
         if not payload.get("success"):
+            error = self._format_error(payload.get("error")) or f"{name} 执行失败"
+            _print_call_result(name, stderr=error)
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": self._format_error(payload.get("error"))
-                or f"{name} 执行失败",
+                "stderr": error,
             }
+        stdout = self._format_result(name, payload.get("data"))
+        _print_call_result(name, stdout=stdout)
         return {
             "success": True,
-            "stdout": self._format_result(name, payload.get("data")),
+            "stdout": stdout,
             "stderr": "",
         }
