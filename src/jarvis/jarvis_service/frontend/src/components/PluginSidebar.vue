@@ -712,7 +712,7 @@ defineExpose({ loadPlugins })
 .plugin-sidebar-tabs {
   display: flex;
   gap: 4px;
-  padding: 6px 12px;
+  padding: 8px 12px 10px;
   border-bottom: 1px solid var(--border-color, #1a2a3a);
   flex-shrink: 0;
 }
