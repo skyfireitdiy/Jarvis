@@ -746,7 +746,12 @@
                   <!-- 文件标签：渲染在本 pane 内部顶部（不再横跨整个工作区）。
                        已分割时每个 pane 用自己独立的标签列表（getPaneTabs），
                        关闭某个 pane 的标签不会影响其他 pane。 -->
-                  <div v-if="getPaneTabs(pane.id).length > 0" class="workspace-tabs workspace-pane-tabs" @mousedown="activateWorkspacePane(pane.id)">
+                  <div
+                    v-if="getPaneTabs(pane.id).length > 0"
+                    class="workspace-tabs workspace-pane-tabs"
+                    @mousedown="activateWorkspacePane(pane.id)"
+                    @wheel="onPaneTabsWheel"
+                  >
                     <div
                       v-for="tab in getPaneTabs(pane.id)"
                       :key="tab.path"
@@ -4517,6 +4522,21 @@ function openAgentInNewPanelVertical(agent) {
 function getPanelAgent(panel) {
   if (!panel || !panel.agentId) return null
   return agentList.value.find(a => a.agent_id === panel.agentId) || null
+}
+
+// 文件标签栏：鼠标滚轮 → 横向滚动（与 session 标签栏一致，避免右侧标签被裁掉点不到）。
+// 未溢出或已到边界时不拦截，把滚动交还给外层。
+function onPaneTabsWheel(event) {
+  const el = event.currentTarget
+  if (!el) return
+  const maxScroll = el.scrollWidth - el.clientWidth
+  if (maxScroll <= 0) return
+  const delta = Math.abs(event.deltaY) > Math.abs(event.deltaX) ? event.deltaY : event.deltaX
+  if (!delta) return
+  const next = Math.max(0, Math.min(maxScroll, el.scrollLeft + delta))
+  if (next === el.scrollLeft) return
+  event.preventDefault()
+  el.scrollLeft = next
 }
 
 // ===== session 多 tab：tab 栏数据与事件 =====

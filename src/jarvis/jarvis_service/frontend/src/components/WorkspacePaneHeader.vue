@@ -3,25 +3,52 @@
        统一两处的标题/状态/分屏/关闭按钮，避免出现「未分割没有分屏入口」的割裂。 -->
   <div class="workspace-pane-leaf-header">
     <!-- session 多 tab：该 pane 承载多个 Agent 会话时渲染 tab 栏 -->
-    <div v-if="node.view === 'session' && sessionTabs && sessionTabs.length > 0" class="workspace-pane-session-tabs" @mousedown.stop>
+    <div v-if="node.view === 'session' && sessionTabs && sessionTabs.length > 0" class="workspace-pane-session-tabs-wrap" @mousedown.stop>
+      <!-- 左溢出箭头：有标签被滚出左侧时出现 -->
+      <button
+        v-if="hiddenLeft"
+        class="workspace-pane-session-tab-arrow"
+        tabindex="-1"
+        title="向左滚动标签"
+        @mousedown.prevent
+        @click.stop="scrollByStep(-1)"
+      >‹</button>
       <div
-        v-for="tab in sessionTabs"
-        :key="tab.panelId"
-        class="workspace-pane-session-tab"
-        :class="{ active: tab.panelId === activeSessionPanelId }"
-        :title="tab.label"
-        @click.stop="$emit('activate-session-tab', node.id, tab.panelId)"
-        @contextmenu.prevent.stop="$emit('session-tab-context-menu', node.id, tab.panelId, $event)"
+        ref="stripRef"
+        class="workspace-pane-session-tabs"
+        @wheel="onWheel"
+        @scroll="updateOverflow"
       >
-        <span class="workspace-pane-session-tab-name">{{ tab.label }}</span>
-        <button
-          class="workspace-pane-session-tab-close"
-          tabindex="-1"
-          :title="`关闭 ${tab.label}`"
-          @mousedown.prevent
-          @click.stop="$emit('close-session-tab', node.id, tab.panelId)"
-        >✕</button>
+        <div
+          v-for="tab in sessionTabs"
+          :key="tab.panelId"
+          class="workspace-pane-session-tab"
+          :class="{ active: tab.panelId === activeSessionPanelId }"
+          :data-tab-key="tab.panelId"
+          :title="tab.label"
+          @click.stop="$emit('activate-session-tab', node.id, tab.panelId)"
+          @contextmenu.prevent.stop="$emit('session-tab-context-menu', node.id, tab.panelId, $event)"
+        >
+          <span class="workspace-pane-session-tab-name">{{ tab.label }}</span>
+          <button
+            class="workspace-pane-session-tab-close"
+            tabindex="-1"
+            :title="`关闭 ${tab.label}`"
+            @mousedown.prevent
+            @click.stop="$emit('close-session-tab', node.id, tab.panelId)"
+          >✕</button>
+        </div>
       </div>
+      <!-- 右溢出箭头：有标签被滚出右侧时出现 -->
+      <button
+        v-if="hiddenRight"
+        class="workspace-pane-session-tab-arrow"
+        tabindex="-1"
+        title="向右滚动标签"
+        @mousedown.prevent
+        @click.stop="scrollByStep(1)"
+      >›</button>
+
       <button
         class="workspace-pane-session-tab-add"
         tabindex="-1"
@@ -66,7 +93,8 @@
 </template>
 
 <script setup>
-import { defineProps, defineEmits } from 'vue'
+import { defineProps, defineEmits, watch, nextTick } from 'vue'
+import { useTabStripScroll } from '../composables/useTabStripScroll.js'
 
 const props = defineProps({
   node: { type: Object, required: true },
@@ -82,7 +110,31 @@ const props = defineProps({
   activeSessionPanelId: { type: String, default: null },
 })
 
-defineEmits(['split', 'close', 'maximize', 'collapse', 'activate-session-tab', 'close-session-tab', 'add-session-tab', 'session-tab-context-menu'])
+const emit = defineEmits(['split', 'close', 'maximize', 'collapse', 'activate-session-tab', 'close-session-tab', 'add-session-tab', 'session-tab-context-menu'])
+
+// ===== session 标签栏横向滚动 / 溢出箭头 =====
+const {
+  stripRef,
+  hiddenLeft,
+  hiddenRight,
+  onWheel,
+  updateOverflow,
+  scrollByStep,
+  scrollActiveIntoView,
+} = useTabStripScroll({ activeKey: () => props.activeSessionPanelId })
+
+// 标签数量或激活项变化后，重算溢出并把激活标签滚入可视区
+watch(
+  () => [props.sessionTabs && props.sessionTabs.length, props.activeSessionPanelId],
+  () => {
+    nextTick(() => {
+      updateOverflow()
+      scrollActiveIntoView()
+    })
+  },
+  { immediate: true },
+)
+
 </script>
 
 <style scoped>
@@ -135,7 +187,16 @@ defineEmits(['split', 'close', 'maximize', 'collapse', 'activate-session-tab', '
   color: var(--color-text-primary);
 }
 
-/* session 多 tab 栏 */
+/* session 多 tab 栏：外层容器负责箭头/下拉/加号固定，内层只负责滚动 */
+.workspace-pane-session-tabs-wrap {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
 .workspace-pane-session-tabs {
   display: flex;
   align-items: center;
@@ -143,7 +204,9 @@ defineEmits(['split', 'close', 'maximize', 'collapse', 'activate-session-tab', '
   flex: 1;
   min-width: 0;
   overflow-x: auto;
+  overflow-y: hidden;
   scrollbar-width: none;
+  scroll-behavior: smooth;
 }
 
 .workspace-pane-session-tabs::-webkit-scrollbar {
@@ -212,6 +275,24 @@ defineEmits(['split', 'close', 'maximize', 'collapse', 'activate-session-tab', '
 }
 
 .workspace-pane-session-tab-add:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+/* 溢出滚动箭头（左/右） */
+.workspace-pane-session-tab-arrow {
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 3px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.workspace-pane-session-tab-arrow:hover {
   background: var(--color-bg-hover);
   color: var(--color-text-primary);
 }
