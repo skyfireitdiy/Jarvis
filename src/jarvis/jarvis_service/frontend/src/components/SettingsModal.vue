@@ -162,6 +162,51 @@
         </div>
       </div>
 
+      <!-- 外观：壁纸与界面透明度 -->
+      <div class="form-group">
+        <label>工作区壁纸</label>
+        <div class="form-help" style="margin-bottom:10px">上传一张图片作为工作区背景（支持 png / jpeg / webp / gif，不超过 8MB）。壁纸会保存到网关，所有终端共享同一张。</div>
+        <div class="wallpaper-row">
+          <div class="wallpaper-preview" :class="{ empty: !wallpaperPreviewUrl }">
+            <img v-if="wallpaperPreviewUrl" :src="wallpaperPreviewUrl" alt="壁纸预览" />
+            <span v-else>未设置壁纸</span>
+          </div>
+          <div class="wallpaper-actions">
+            <button class="ghost-btn" @click="triggerWallpaperPick" :disabled="wallpaperUploading">
+              {{ wallpaperUploading ? '上传中…' : '选择图片' }}
+            </button>
+            <button class="danger-btn" @click="removeWallpaper" :disabled="wallpaperUploading || !wallpaperUrl">
+              移除壁纸
+            </button>
+            <input
+              ref="wallpaperInputRef"
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              class="wallpaper-file-input"
+              @change="handleWallpaperFileChange"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>界面透明度</label>
+        <div class="form-help" style="margin-bottom:10px">调整工作区各面板与控件的背景透明度，数值越低越透明（壁纸透出越明显），100 为完全不透明。</div>
+        <div class="opacity-row">
+          <input
+            type="range"
+            min="20"
+            max="100"
+            step="1"
+            class="opacity-slider"
+            :value="localUiOpacity"
+            @input="onUiOpacityInput($event.target.value)"
+            @change="onUiOpacityCommit"
+          />
+          <span class="opacity-value">{{ localUiOpacity }}%</span>
+        </div>
+      </div>
+
       <div class="modal-actions">
         <button class="ghost-btn" @click="close">关闭</button>
       </div>
@@ -207,7 +252,11 @@ const props = defineProps({
   hideWorkingDir: { type: Boolean, default: false },
   autoInstallBrowserExt: { type: Boolean, default: false },
   terminalName: { type: String, default: '' },
-  daemonPort: { type: String, default: '' }
+  daemonPort: { type: String, default: '' },
+  // 工作区壁纸 URL（网关 /uploads/wallpaper/... 相对路径，空串表示未设置）
+  wallpaperUrl: { type: String, default: '' },
+  // 界面透明度（20~100，100 表示完全不透明）
+  uiOpacity: { type: Number, default: 100 }
 })
 
 const emit = defineEmits([
@@ -227,7 +276,10 @@ const emit = defineEmits([
   'update:terminalName',
   'saveTerminalNameSetting',
   'update:daemonPort',
-  'saveDaemonPortSetting'
+  'saveDaemonPortSetting',
+  'saveWallpaperSetting',
+  'update:uiOpacity',
+  'saveUiOpacitySetting'
 ])
 
 // 本地状态
@@ -238,6 +290,12 @@ const localHideWorkingDir = ref(props.hideWorkingDir)
 const localAutoInstallBrowserExt = ref(props.autoInstallBrowserExt)
 const localTerminalName = ref(props.terminalName)
 const localDaemonPort = ref(props.daemonPort)
+// 壁纸：预览用绝对 URL（相对路径需拼网关地址），上传中标记
+const wallpaperInputRef = ref(null)
+const wallpaperUploading = ref(false)
+const wallpaperPreviewUrl = ref(buildWallpaperAbsoluteUrl(props.wallpaperUrl))
+// 界面透明度（20~100）
+const localUiOpacity = ref(normalizeOpacity(props.uiOpacity))
 const changePasswordForm = ref({ old_password: '', new_password: '', confirm_password: '' })
 const loading = ref(false)
 // 节点显示名本地副本（编辑中，input 时即时更新并向上同步）
@@ -286,6 +344,113 @@ function buildApiUrl(path) {
   return `${proto}://${host}:${port}${path}`
 }
 
+// 壁纸 URL 归一化：后端返回 /uploads/wallpaper/xxx 相对路径，需拼网关地址才能作为 img src
+function buildWallpaperAbsoluteUrl(url) {
+  const raw = String(url || '').trim()
+  if (!raw) return ''
+  if (/^(https?:|data:|blob:)/i.test(raw)) return raw
+  return buildApiUrl(raw.startsWith('/') ? raw : `/${raw}`)
+}
+
+// 透明度归一化到 20~100 的整数
+function normalizeOpacity(value) {
+  const num = Number(value)
+  if (!Number.isFinite(num)) return 100
+  return Math.min(100, Math.max(20, Math.round(num)))
+}
+
+// 壁纸单文件上限，与网关 /api/wallpaper/upload 保持一致
+const WALLPAPER_MAX_BYTES = 8 * 1024 * 1024
+
+function triggerWallpaperPick() {
+  wallpaperInputRef.value?.click()
+}
+
+// 读取文件为 base64（去掉 dataURL 前缀，网关兼容两种格式但这里保持精简）
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = String(reader.result || '')
+      const commaIndex = result.indexOf(',')
+      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result)
+    }
+    reader.onerror = () => reject(reader.error || new Error('读取文件失败'))
+    reader.readAsDataURL(file)
+  })
+}
+
+// 选择图片后上传到网关，成功后把返回的 URL 抛给父组件持久化
+async function handleWallpaperFileChange(event) {
+  const input = event.target
+  const file = input?.files?.[0]
+  // 允许重复选择同一文件（否则 change 不再触发）
+  if (input) input.value = ''
+  if (!file) return
+  if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) {
+    props.showToast('仅支持 png / jpeg / webp / gif 图片', 'error')
+    return
+  }
+  if (file.size > WALLPAPER_MAX_BYTES) {
+    props.showToast('图片不能超过 8MB', 'error')
+    return
+  }
+  wallpaperUploading.value = true
+  try {
+    const data = await readFileAsBase64(file)
+    const response = await props.fetchWithAuth(buildApiUrl('/api/wallpaper/upload'), {
+      method: 'POST',
+      body: JSON.stringify({ data, filename: file.name })
+    })
+    const result = await response.json()
+    if (!response.ok || !result?.success) {
+      const message = result?.error?.message || `上传失败（HTTP ${response.status}）`
+      props.showToast(message, 'error')
+      return
+    }
+    wallpaperPreviewUrl.value = buildWallpaperAbsoluteUrl(result.url)
+    emit('saveWallpaperSetting', result.url || '')
+    props.showToast('壁纸已更新', 'success')
+  } catch (error) {
+    console.warn('[WALLPAPER] Upload failed:', error)
+    props.showToast('壁纸上传失败，请检查网络或权限', 'error')
+  } finally {
+    wallpaperUploading.value = false
+  }
+}
+
+// 移除壁纸：删除网关文件并清空本地设置
+async function removeWallpaper() {
+  wallpaperUploading.value = true
+  try {
+    const response = await props.fetchWithAuth(buildApiUrl('/api/wallpaper'), { method: 'DELETE' })
+    const result = await response.json()
+    if (!response.ok || !result?.success) {
+      const message = result?.error?.message || `删除失败（HTTP ${response.status}）`
+      props.showToast(message, 'error')
+      return
+    }
+    wallpaperPreviewUrl.value = ''
+    emit('saveWallpaperSetting', '')
+    props.showToast('壁纸已移除', 'success')
+  } catch (error) {
+    console.warn('[WALLPAPER] Remove failed:', error)
+    props.showToast('移除壁纸失败，请检查网络或权限', 'error')
+  } finally {
+    wallpaperUploading.value = false
+  }
+}
+
+// 透明度滑块：拖动时实时预览（不落盘），松手后持久化
+function onUiOpacityInput(value) {
+  localUiOpacity.value = normalizeOpacity(value)
+  emit('update:uiOpacity', localUiOpacity.value)
+}
+
+function onUiOpacityCommit() {
+  emit('saveUiOpacitySetting', localUiOpacity.value)
+}
+
 // 监听props变化
 watch(() => props.autoLoginEnabled, (newVal) => {
   localAutoLoginEnabled.value = newVal
@@ -316,6 +481,16 @@ watch(() => props.terminalName, (newVal) => {
 
 watch(() => props.daemonPort, (newVal) => {
   localDaemonPort.value = newVal
+})
+watch(() => props.wallpaperUrl, (newVal) => {
+  // 外部（其他终端）更新壁纸时同步预览
+  if (wallpaperUploading.value) return
+  wallpaperPreviewUrl.value = buildWallpaperAbsoluteUrl(newVal)
+})
+watch(() => props.uiOpacity, (newVal) => {
+  // 上传/拖动过程中避免被父组件回写覆盖
+  if (wallpaperUploading.value) return
+  localUiOpacity.value = normalizeOpacity(newVal)
 })
 
 // 本机后台服务端口输入：更新本地副本并向上同步（父组件负责持久化到 localStorage）。
@@ -894,6 +1069,74 @@ async function changePassword() {
 .node-name-input {
   flex: 1;
   min-width: 0;
+}
+
+/* ========== 外观设置：壁纸与透明度 ========== */
+.wallpaper-row {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.wallpaper-preview {
+  flex: 0 0 168px;
+  width: 168px;
+  height: 96px;
+  border-radius: var(--tile-radius-xs, 8px);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-tertiary, rgba(18, 30, 50, 0.65));
+  border: 1px solid var(--color-border, rgba(32, 200, 255, 0.18));
+  color: var(--text-secondary, #8ba3b8);
+  font-size: 12px;
+}
+
+.wallpaper-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.wallpaper-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.wallpaper-actions .ghost-btn,
+.wallpaper-actions .danger-btn {
+  width: auto;
+  margin: 0;
+}
+
+/* 原生 file input 隐藏，由「选择图片」按钮触发 */
+.wallpaper-file-input {
+  display: none;
+}
+
+.opacity-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.opacity-slider {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--color-accent, #20c8ff);
+  cursor: pointer;
+}
+
+.opacity-value {
+  flex: 0 0 48px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary, #8ba3b8);
+  font-size: 13px;
 }
 
 /* ========== 私钥显示区域样式 ========== */

@@ -12496,6 +12496,158 @@ def create_app(
             )
         return await _handle_file_upload_raw_request(body)
 
+    # --- 工作区壁纸：上传/查询/删除 ---
+    # 壁纸统一存放在 {data_dir}/uploads/wallpaper/ 下，文件名固定为 wallpaper.<ext>，
+    # 借助已挂载的 /uploads 静态服务直接以 URL 方式访问，前端只需记住该 URL。
+    _WALLPAPER_MAX_BYTES = 8 * 1024 * 1024
+    # 允许的图片类型：扩展名 -> 文件头魔数前缀
+    _WALLPAPER_MAGIC_PREFIXES = (
+        ("png", (b"\x89PNG\r\n\x1a\n",)),
+        ("jpg", (b"\xff\xd8\xff",)),
+        ("gif", (b"GIF87a", b"GIF89a")),
+        ("webp", (b"RIFF",)),
+    )
+
+    def _wallpaper_dir() -> str:
+        """壁纸目录：{data_dir}/uploads/wallpaper（不存在则创建）。"""
+        from jarvis.jarvis_utils.config import get_data_dir as _get_data_dir
+
+        directory = os.path.join(_get_data_dir(), "uploads", "wallpaper")
+        os.makedirs(directory, exist_ok=True)
+        return directory
+
+    def _detect_wallpaper_ext(file_bytes: bytes) -> Optional[str]:
+        """按文件头魔数识别图片真实类型，返回扩展名；无法识别返回 None。"""
+        for ext, prefixes in _WALLPAPER_MAGIC_PREFIXES:
+            for prefix in prefixes:
+                if not file_bytes.startswith(prefix):
+                    continue
+                # webp 需要额外校验 RIFF 容器内的 WEBP 标识
+                if ext == "webp" and file_bytes[8:12] != b"WEBP":
+                    continue
+                return ext
+        return None
+
+    def _find_wallpaper_file() -> Optional[str]:
+        """查找当前壁纸文件路径（wallpaper.<ext>），不存在返回 None。"""
+        directory = _wallpaper_dir()
+        for ext in ("png", "jpg", "gif", "webp"):
+            candidate = os.path.join(directory, f"wallpaper.{ext}")
+            if os.path.isfile(candidate):
+                return candidate
+        return None
+
+    def _wallpaper_url(file_path: Optional[str]) -> Optional[str]:
+        """把壁纸文件路径转换为 /uploads 静态 URL。"""
+        if not file_path:
+            return None
+        return f"/uploads/wallpaper/{os.path.basename(file_path)}"
+
+    @app.post("/api/wallpaper/upload", dependencies=[Depends(verify_token)])
+    async def upload_wallpaper(
+        request: Request, body: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """上传工作区壁纸（base64 图片），覆盖旧壁纸并返回可访问 URL。"""
+        import base64
+
+        from fastapi import HTTPException
+
+        if _check_file_permission(request.state.user_info, "file:upload"):
+            raise HTTPException(
+                status_code=403, detail="Permission denied: file:upload"
+            )
+        raw_data = body.get("data") if isinstance(body, dict) else None
+        if not isinstance(raw_data, str) or not raw_data:
+            return {
+                "success": False,
+                "error": {
+                    "code": "INVALID_DATA",
+                    "message": "Data must be a non-empty base64 string",
+                },
+            }
+        # 兼容 dataURL 前缀（data:image/png;base64,xxxx）
+        if raw_data.strip().lower().startswith("data:") and "," in raw_data:
+            raw_data = raw_data.split(",", 1)[1]
+        try:
+            file_bytes = base64.b64decode(raw_data, validate=True)
+        except Exception:
+            return {
+                "success": False,
+                "error": {
+                    "code": "INVALID_DATA",
+                    "message": "Data is not valid base64",
+                },
+            }
+        if not file_bytes:
+            return {
+                "success": False,
+                "error": {"code": "INVALID_DATA", "message": "Image is empty"},
+            }
+        if len(file_bytes) > _WALLPAPER_MAX_BYTES:
+            return {
+                "success": False,
+                "error": {
+                    "code": "FILE_TOO_LARGE",
+                    "message": (
+                        f"Wallpaper size exceeds {_WALLPAPER_MAX_BYTES} bytes limit"
+                    ),
+                },
+            }
+        ext = _detect_wallpaper_ext(file_bytes)
+        if ext is None:
+            return {
+                "success": False,
+                "error": {
+                    "code": "INVALID_IMAGE",
+                    "message": "Only png/jpeg/webp/gif images are supported",
+                },
+            }
+        directory = _wallpaper_dir()
+        target_path = os.path.join(directory, f"wallpaper.{ext}")
+        # 换格式时清理旧的其它扩展名文件，避免残留多个壁纸
+        for old_ext in ("png", "jpg", "gif", "webp"):
+            old_path = os.path.join(directory, f"wallpaper.{old_ext}")
+            if old_ext != ext and os.path.isfile(old_path):
+                try:
+                    os.remove(old_path)
+                except OSError as exc:
+                    logger.warning(f"[WALLPAPER] Failed to remove {old_path}: {exc}")
+        with open(target_path, "wb") as wallpaper_file:
+            wallpaper_file.write(file_bytes)
+        url = _wallpaper_url(target_path)
+        logger.info(f"[WALLPAPER] Saved wallpaper ({len(file_bytes)} bytes) -> {url}")
+        return {"success": True, "url": url}
+
+    @app.get("/api/wallpaper", dependencies=[Depends(verify_token)])
+    async def get_wallpaper(request: Request) -> Dict[str, Any]:
+        """查询当前工作区壁纸 URL（未设置时返回 None）。"""
+        from fastapi import HTTPException
+
+        if _check_file_permission(request.state.user_info, "file:read"):
+            raise HTTPException(status_code=403, detail="Permission denied: file:read")
+        return {"success": True, "url": _wallpaper_url(_find_wallpaper_file())}
+
+    @app.delete("/api/wallpaper", dependencies=[Depends(verify_token)])
+    async def delete_wallpaper(request: Request) -> Dict[str, Any]:
+        """删除当前工作区壁纸。"""
+        from fastapi import HTTPException
+
+        if _check_file_permission(request.state.user_info, "file:upload"):
+            raise HTTPException(
+                status_code=403, detail="Permission denied: file:upload"
+            )
+        directory = _wallpaper_dir()
+        removed = False
+        for ext in ("png", "jpg", "gif", "webp"):
+            candidate = os.path.join(directory, f"wallpaper.{ext}")
+            if os.path.isfile(candidate):
+                try:
+                    os.remove(candidate)
+                    removed = True
+                except OSError as exc:
+                    logger.warning(f"[WALLPAPER] Failed to remove {candidate}: {exc}")
+        return {"success": True, "removed": removed}
+
     @app.post("/api/file-create", dependencies=[Depends(verify_token)])
     async def create_file_or_directory(
         request: Request, body: Dict[str, Any]

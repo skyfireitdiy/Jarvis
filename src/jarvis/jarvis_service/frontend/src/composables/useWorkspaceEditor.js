@@ -498,6 +498,75 @@ function markWorkspaceTabExternalModified(path, value) {
 // ===== 蓝色系 Monaco 主题（对应原 CodeMirror blueDark）=====
 const EDITOR_FONT_FAMILY = "'Consolas', 'Microsoft YaHei', monospace"
 
+// 工作区壁纸透明主题：编辑器底色改为透明，让壁纸从编辑器区域透出。
+// Monaco 的 editor.background 支持 8 位 hex（#RRGGBBAA），#00000000 即全透明；
+// 代码可读性由外层 .workspace-panel 的半透明底 + 毛玻璃保证。
+const TRANSPARENT_EDITOR_THEME = 'blueDarkTransparent'
+monaco.editor.defineTheme(TRANSPARENT_EDITOR_THEME, {
+  base: 'vs-dark',
+  inherit: true,
+  rules: [
+    { token: 'comment', foreground: '5a7a9a' },
+    { token: 'keyword', foreground: '7aa2f7' },
+    { token: 'keyword.control', foreground: '7aa2f7' },
+    { token: 'string', foreground: '9ece6a' },
+    { token: 'string.escape', foreground: '56b6c2' },
+    { token: 'number', foreground: 'e0af68' },
+    { token: 'regexp', foreground: '56b6c2' },
+    { token: 'operator', foreground: '56b6c2' },
+    { token: 'delimiter', foreground: 'a8c8e8' },
+    { token: 'type', foreground: 'e0af68' },
+    { token: 'type.identifier', foreground: 'e0af68' },
+    { token: 'namespace', foreground: 'e0af68' },
+    { token: 'annotation', foreground: 'e0af68' },
+    { token: 'modifier', foreground: 'e0af68' },
+    { token: 'identifier', foreground: 'a8c8e8' },
+    { token: 'variable', foreground: 'a8c8e8' },
+    { token: 'variable.predefined', foreground: 'ff9e64' },
+    { token: 'constant', foreground: 'ff9e64' },
+    { token: 'tag', foreground: 'f7768e' },
+    { token: 'attribute.name', foreground: 'f7768e' },
+    { token: 'function', foreground: '82aaff' },
+    { token: 'invalid', foreground: 'ffffff' },
+    { token: 'strong', fontStyle: 'bold' },
+    { token: 'emphasis', fontStyle: 'italic' },
+    { token: 'strikethrough', fontStyle: 'strikethrough' },
+  ],
+  colors: {
+    'editor.foreground': '#a8c8e8',
+    'editor.background': '#00000000',
+    'editorCursor.foreground': '#528bff',
+    'editor.lineHighlightBackground': '#1a2a3a44',
+    'editor.selectionBackground': '#264f78',
+    'editor.inactiveSelectionBackground': '#264f7855',
+    'editor.selectionHighlightBackground': '#264f7855',
+    'editor.findMatchBackground': '#72a1ff59',
+    'editor.findMatchHighlightBackground': '#6199ff2f',
+    'editorBracketMatch.background': '#264f78aa',
+    'editorLineNumber.foreground': '#5a7a9a',
+    'editorLineNumber.activeForeground': '#a8c8e8',
+    'editorGutter.background': '#00000000',
+    'editorWidget.background': '#16263aee',
+    'editorWidget.border': '#1a2a3a',
+    'editorSuggestWidget.background': '#16263aee',
+    'editorSuggestWidget.selectedBackground': '#1a2a3a',
+    'editorHoverWidget.background': '#16263aee',
+    'editorHoverWidget.border': '#1a2a3a',
+    'editorIndentGuide.background1': '#1a2a3a',
+    'editorIndentGuide.activeBackground1': '#2a4a6a',
+    'scrollbarSlider.background': '#1a2a3a88',
+    'scrollbarSlider.hoverBackground': '#2a4a6aaa',
+  },
+})
+
+// 当前应使用的编辑器主题：有壁纸时用透明主题，让壁纸从编辑器区域透出
+function resolveEditorTheme() {
+  if (typeof document === 'undefined') return 'blueDark'
+  return document.body.classList.contains('jarvis-has-wallpaper')
+    ? TRANSPARENT_EDITOR_THEME
+    : 'blueDark'
+}
+
 monaco.editor.defineTheme('blueDark', {
   base: 'vs-dark',
   inherit: true,
@@ -648,7 +717,7 @@ function getActiveWorkspaceView() {
 function buildEditorOptions() {
   return {
     model: null,
-    theme: 'blueDark',
+    theme: resolveEditorTheme(),
     fontFamily: EDITOR_FONT_FAMILY,
     fontSize: 13,
     lineHeight: 20,
@@ -1803,6 +1872,30 @@ function toggleWorkspaceEditable() {
   }
 }
 
+// 壁纸开关切换后，把已存在的所有 Monaco 编辑器（含 diff 编辑器）切到对应主题。
+// 由 App.vue 的壁纸 watch 调用：body 类名切换后必须立刻同步主题，
+// 否则已打开的编辑器仍用旧主题（透明主题下底色透明、普通主题下不透明）。
+function applyEditorThemeToAll() {
+  const theme = resolveEditorTheme()
+  for (const [, view] of editorViews) {
+    try {
+      view.updateOptions({ theme })
+    } catch (error) {
+      console.warn('[APPEARANCE] Failed to switch editor theme:', error)
+    }
+  }
+  for (const [, entry] of diffEditorViews) {
+    const editor = entry && entry.editor
+    if (!editor) continue
+    try {
+      // DiffEditor 的 updateOptions 会透传给内部两个编辑器
+      editor.updateOptions({ theme })
+    } catch (error) {
+      console.warn('[APPEARANCE] Failed to switch diff editor theme:', error)
+    }
+  }
+}
+
 function hasDirtyWorkspaceTabs() {
   return workspaceTabs.value.some(tab => tab.isDirty)
 }
@@ -2380,6 +2473,9 @@ function openWorkspaceGlobalSearch(mode = 'content') {
 }
   return {
     EDITOR_FONT_FAMILY,
+    TRANSPARENT_EDITOR_THEME,
+    resolveEditorTheme,
+    applyEditorThemeToAll,
     UI_ICONS,
     activateWorkspaceTab,
     activeWorkspaceTab,

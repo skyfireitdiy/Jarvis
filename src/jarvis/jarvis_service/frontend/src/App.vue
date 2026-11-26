@@ -1,5 +1,15 @@
 <template>
-  <div class="app" :class="{ 'not-connected': showConnectModal }">
+  <div
+    class="app"
+    :class="{
+      'not-connected': showConnectModal,
+      'has-wallpaper': !!wallpaperUrl,
+      'ui-translucent': uiOpacity < 100
+    }"
+    :style="appearanceStyle"
+  >
+    <!-- 工作区壁纸层：根级固定层，位于所有内容之下（z-index:-1），不拦截交互 -->
+    <div v-if="wallpaperAbsoluteUrl" class="jarvis-wallpaper-layer" aria-hidden="true"></div>
     <!-- 主宠物挂件：全局浮动宠物（放技能/拖拽/贴边），长按可一句话创建 Agent -->
     <PetWidget
       ref="petWidgetRef"
@@ -1293,6 +1303,8 @@
       :autoInstallBrowserExt="autoInstallBrowserExt"
       :terminalName="terminalName"
       :daemonPort="daemonPort"
+      :wallpaperUrl="wallpaperUrl"
+      :uiOpacity="uiOpacity"
       @update:visible="showSettingsModal = $event"
       @update:autoLoginEnabled="autoLoginEnabled = $event"
       @saveAutoLoginSetting="saveAutoLoginSetting"
@@ -1308,6 +1320,9 @@
       @saveTerminalNameSetting="saveTerminalNameSetting"
       @update:daemonPort="daemonPort = $event"
       @saveDaemonPortSetting="saveDaemonPortSetting"
+      @saveWallpaperSetting="saveWallpaperSetting"
+      @update:uiOpacity="uiOpacity = $event"
+      @saveUiOpacitySetting="saveUiOpacitySetting"
       @confirmClearHistory="confirmClearHistory"
       @disconnectAll="disconnectAll"
     />
@@ -3674,6 +3689,8 @@ const {
   openWorkspaceFile,
   openWorkspaceGlobalSearch,
   remountMonacoEditor,
+  resolveEditorTheme,
+  applyEditorThemeToAll,
   removeWorkspaceDir,
   resolveAgentForPath,
   resolveAgentRelativePath,
@@ -3884,6 +3901,7 @@ const {
   formatGitCommitInfo, formatGitCommitTooltip, showGitCommitInfoModal,
 } = useGitView({
   EDITOR_FONT_FAMILY,
+  resolveEditorTheme,
   buildNodeHttpUrl,
   fetchWithAuth,
   getGatewayAddress,
@@ -6428,6 +6446,109 @@ function saveHideWorkingDirSetting(nextValue = hideWorkingDir.value) {
     console.warn('[WORKDIR] Failed to save hide working dir setting:', error)
   }
 }
+// 工作区外观：壁纸（存网关，URL 记在 localStorage）与界面透明度（0~100）
+// 壁纸只保存网关返回的相对 URL（/uploads/wallpaper/xxx），渲染时拼网关地址；
+// 透明度用 CSS 变量驱动底色 alpha，不使用 opacity（会让 backdrop-filter 失效）。
+const WALLPAPER_STORAGE_KEY = 'jarvis_wallpaper_url'
+const UI_OPACITY_STORAGE_KEY = 'jarvis_ui_opacity'
+const UI_OPACITY_MIN = 20
+function normalizeUiOpacity(value) {
+  const num = Number(value)
+  if (!Number.isFinite(num)) return 100
+  return Math.min(100, Math.max(UI_OPACITY_MIN, Math.round(num)))
+}
+function loadWallpaperUrl() {
+  try {
+    return String(localStorage.getItem(WALLPAPER_STORAGE_KEY) || '').trim()
+  } catch (error) {
+    console.warn('[APPEARANCE] Failed to load wallpaper setting:', error)
+    return ''
+  }
+}
+function loadUiOpacity() {
+  try {
+    const raw = localStorage.getItem(UI_OPACITY_STORAGE_KEY)
+    return raw === null ? 100 : normalizeUiOpacity(raw)
+  } catch (error) {
+    console.warn('[APPEARANCE] Failed to load ui opacity setting:', error)
+    return 100
+  }
+}
+const wallpaperUrl = ref(loadWallpaperUrl())
+const uiOpacity = ref(loadUiOpacity())
+// 壁纸绝对地址（相对路径拼网关地址；网关地址变化时自动重算）
+// 注意：本段代码位于 setup 顶层，而 gatewayUrl 由 useGatewayConnection 在更后面才定义
+// （const 声明，存在 TDZ）。若这里直接调用 getGatewayAddress()（内部读 gatewayUrl.value），
+// 压缩后就会抛 "Cannot access 'xxx' before initialization" 导致整页白屏。
+// 故这里只依赖「本段之前已定义」的符号：gatewayUrl 改为在 onMounted 后再求值（见下方
+// wallpaperGatewayReady），并额外 watch 网关地址变化。
+const wallpaperGatewayReady = ref(false)
+const wallpaperAbsoluteUrl = computed(() => {
+  const raw = String(wallpaperUrl.value || '').trim()
+  if (!raw) return ''
+  if (/^(https?:|data:|blob:)/i.test(raw)) return raw
+  if (!wallpaperGatewayReady.value) return ''
+  const { host, port } = getGatewayAddress()
+  const path = raw.startsWith('/') ? raw : `/${raw}`
+  return `${getHttpProtocol()}://${host}:${port}${path}`
+})
+// 注入到根元素的 CSS 变量：壁纸层与透明度
+const appearanceStyle = computed(() => ({
+  '--jarvis-wallpaper': wallpaperAbsoluteUrl.value ? `url("${wallpaperAbsoluteUrl.value}")` : 'none',
+  '--jarvis-ui-opacity': String(uiOpacity.value / 100)
+}))
+function saveWallpaperSetting(nextUrl = wallpaperUrl.value) {
+  wallpaperUrl.value = String(nextUrl || '').trim()
+  try {
+    if (wallpaperUrl.value) {
+      localStorage.setItem(WALLPAPER_STORAGE_KEY, wallpaperUrl.value)
+    } else {
+      localStorage.removeItem(WALLPAPER_STORAGE_KEY)
+    }
+  } catch (error) {
+    console.warn('[APPEARANCE] Failed to save wallpaper setting:', error)
+  }
+}
+function saveUiOpacitySetting(nextValue = uiOpacity.value) {
+  uiOpacity.value = normalizeUiOpacity(nextValue)
+  try {
+    localStorage.setItem(UI_OPACITY_STORAGE_KEY, String(uiOpacity.value))
+  } catch (error) {
+    console.warn('[APPEARANCE] Failed to save ui opacity setting:', error)
+  }
+}
+// 有壁纸时给 body 加类名，让 body 的渐变背景透明（否则会遮住壁纸层），
+// 同时把已创建的 Monaco 编辑器切换到透明主题，让壁纸从编辑器区域透出。
+watch(
+  wallpaperAbsoluteUrl,
+  (url) => {
+    if (typeof document === 'undefined') return
+    document.body.classList.toggle('jarvis-has-wallpaper', !!url)
+    // 已存在的 Monaco 编辑器（含 diff 编辑器）同步切换主题
+    applyEditorThemeToAll()
+    // 已存在的 xterm 终端同步切换主题（canvas 绘制，CSS 覆盖不到）
+    // 注意：applyTerminalThemeToAll 由 useTerminal 在更后面才定义（const 解构），
+    // 本 watch 是 immediate 的、会在 setup 同步阶段执行，直接调用会踩 TDZ
+    // （Cannot access 'xxx' before initialization 白屏）。故推迟到微任务里执行。
+    nextTick(() => {
+      if (typeof applyTerminalThemeToAll === 'function') applyTerminalThemeToAll()
+    })
+  },
+  { immediate: true }
+)
+// 网关地址就绪后（onMounted，此时 useGatewayConnection 已执行完、gatewayUrl 已初始化）
+// 再允许壁纸地址求值；之后网关地址变化时自动重算壁纸绝对地址。
+// 注意：watch 的 getter 会在 setup 同步阶段立即求值一次，若直接写 gatewayUrl.value
+// 仍会踩 TDZ（Cannot access 'xxx' before initialization），故必须用 ready 守卫。
+onMounted(() => {
+  wallpaperGatewayReady.value = true
+})
+watch(
+  () => (wallpaperGatewayReady.value ? gatewayUrl.value : ''),
+  () => {
+    if (wallpaperGatewayReady.value) wallpaperGatewayReady.value = true
+  }
+)
 // 自动安装/更新浏览器扩展：默认关闭。开启后本机 daemon 会在网关扩展版本变化时
 // 自动下载并覆盖本地扩展目录（不会重启浏览器）。状态只存浏览器 localStorage，
 // 随登录态一并推送给 daemon（daemon 只保留内存态，不落盘）。
@@ -7433,6 +7554,7 @@ const {
   initIndependentTerminal,
   attachTerminalSession,
   restoreTerminalSessions,
+  applyTerminalThemeToAll,
   createTerminalForSelectedNode,
   createTerminalForNode,
   createTerminalForAgent,

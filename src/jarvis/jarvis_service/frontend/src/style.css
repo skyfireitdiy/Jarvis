@@ -47,8 +47,21 @@
   --gradient-bg: linear-gradient(180deg, #060911 0%, #0a1420 50%, #0d1a2e 100%);
   --gradient-blue: linear-gradient(135deg, #0a3a5c 0%, #20c8ff 100%);
 
+  /* 工作区外观（由 App.vue 依据设置动态覆盖 --jarvis-wallpaper / --jarvis-ui-opacity）
+     默认无壁纸、完全不透明，保持原有视觉不变。
+     透明度用 color-mix 调底色 alpha 实现，禁止用父级 opacity（实测会让子元素
+     backdrop-filter 失效，导致毛玻璃不生效）。 */
+  --jarvis-wallpaper: none;
+  --jarvis-ui-opacity: 1;
+  /* 注意：不要在 :root 里定义依赖 --jarvis-ui-opacity 的 color-mix 变量。
+     --jarvis-ui-opacity 实际由 App.vue 写在 .app 上，:root 求值时取不到，
+     会把百分比固化成 100% 导致 alpha 丢失。需要半透明底色的规则请直接内联
+     color-mix(... calc(var(--jarvis-ui-opacity, 1) * 100%) ...)。 */
+
   color: var(--color-text-primary);
-  background: var(--color-bg-primary);
+  /* 根元素背景保持透明：壁纸层是 z-index:-1 的固定层，若 html 有不透明底色会把它压住。
+     无壁纸时由 body 的渐变背景负责视觉（见下方 body 规则）。 */
+  background: transparent;
 }
 
 /* 深空全息背景 */
@@ -1197,4 +1210,233 @@ button:not(:disabled):active,
 
 .message-body.markdown-content li::marker {
   color: #20c8ff;
+}
+
+/* ===== 工作区壁纸与界面透明度（由 App.vue 注入 CSS 变量） =====
+   设计要点：
+   1. 壁纸层必须是**根级固定层**（.jarvis-wallpaper-layer），不能挂在 .app 上：
+      body 有不透明渐变背景，而 .app 的 isolation:isolate 会让 z-index:-1 的伪元素
+      锁在 .app 的层叠上下文内，被 body 背景遮挡（实测壁纸完全不显示）。
+   2. 透明度一律通过 --jarvis-ui-opacity 驱动 rgba/color-mix 底色，
+      **不使用 opacity 属性**：实测父级 opacity 会让子元素 backdrop-filter 失效，
+      导致毛玻璃与壁纸透出效果同时丢失。 */
+.jarvis-wallpaper-layer {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--jarvis-wallpaper);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  /* 壁纸略微压暗，保证前景文字可读 */
+  filter: brightness(0.72) saturate(1.05);
+}
+
+/* 有壁纸时减弱原有网格/极光氛围，避免与壁纸叠得杂乱 */
+.app.has-wallpaper::before {
+  opacity: 0.35;
+}
+
+/* ===== 工作区面板半透明：有壁纸即生效（不看透明度滑块） =====
+   用户语义：只要设了壁纸，工作区面板/控件就应半透明让壁纸透出；
+   透明度滑块只调节"透出多少"（100% = 最不透明，但仍保留半透明底）。
+   注意：这里只作用于工作区（.workspace-panel 及其内部），不影响大厅/连接页。 */
+.app.has-wallpaper .workspace-panel {
+  /* 注意：不能引用 :root 上的 --jarvis-panel-bg-strong。该变量在 :root 求值时
+     --jarvis-ui-opacity 尚未定义（它定义在 .app 上），会 fallback 成 1，
+     于是 color-mix 的百分比被固化成 100%，alpha 丢失（实测 backgroundColor
+     解析为不透明色）。这里直接内联 color-mix，让 --jarvis-ui-opacity 在 .app
+     作用域内求值。 */
+  background: color-mix(
+    in srgb,
+    #0d1a2e calc(var(--jarvis-ui-opacity, 1) * 100%),
+    transparent
+  );
+  backdrop-filter: blur(18px) saturate(1.15);
+  -webkit-backdrop-filter: blur(18px) saturate(1.15);
+}
+
+/* 工作区面板内部所有用不透明底色的区域（标题栏/标签栏/侧边栏/编辑器容器等）
+   统一换成半透明底，否则内部子元素会把壁纸完全挡住。
+   注意：这些子组件的样式写在各自 .vue 的 <style scoped> 里，scoped 选择器带
+   [data-v-xxx] 属性、特异性高于本文件的普通类选择器，故这里必须用 !important
+   才能真正覆盖（实测不加时 .workspace-main / .workspace-pane-leaf-header 等
+   仍是 var(--color-bg-primary) 不透明底，面板内部一片死黑）。 */
+.app.has-wallpaper .workspace-panel .workspace-tabs,
+.app.has-wallpaper .workspace-panel .workspace-tab.active,
+.app.has-wallpaper .workspace-panel .workspace-monaco-container,
+.app.has-wallpaper .workspace-panel .workspace-sidebar-content,
+.app.has-wallpaper .workspace-panel .workspace-pane-content-slot,
+.app.has-wallpaper .workspace-panel .workspace-pane-session-wrap,
+.app.has-wallpaper .workspace-panel .workspace-pane-embed-wrap,
+.app.has-wallpaper .workspace-panel .workspace-pane-diff-wrap,
+.app.has-wallpaper .workspace-panel .workspace-main,
+.app.has-wallpaper .workspace-panel .workspace-activity-bar,
+.app.has-wallpaper .workspace-panel .workspace-pane-leaf-header,
+.app.has-wallpaper .workspace-panel .workspace-pane-leaf-body,
+.app.has-wallpaper .workspace-panel .workspace-pane-actions,
+.app.has-wallpaper .workspace-panel .workspace-main-file-view {
+  background: transparent !important;
+}
+
+.app.has-wallpaper .workspace-panel .workspace-panel-header {
+  background: color-mix(
+    in srgb,
+    #060911 calc(var(--jarvis-ui-opacity) * 100%),
+    transparent
+  );
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.app.has-wallpaper .workspace-panel .workspace-sidebar {
+  background: color-mix(
+    in srgb,
+    #0b1424 calc(var(--jarvis-ui-opacity, 1) * 100%),
+    transparent
+  );
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* 会话/聊天/终端面板（工作区内嵌）：本身是 rgba(9,16,28,0.86) 近乎不透明，
+   有壁纸时改为跟随透明度变量的半透明底 + 毛玻璃。 */
+.app.has-wallpaper .workspace-panel .session-panel,
+.app.has-wallpaper .workspace-panel .chat-panel,
+.app.has-wallpaper .workspace-panel .terminal-panel {
+  background: color-mix(
+    in srgb,
+    #09101c calc(var(--jarvis-ui-opacity) * 100%),
+    transparent
+  );
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+}
+
+/* 会话面板内的输入区/终端历史区等次级不透明底同样半透明 */
+.app.has-wallpaper .workspace-panel .input-area,
+.app.has-wallpaper .workspace-panel .terminal-history {
+  background: color-mix(
+    in srgb,
+    #0b1424 calc(var(--jarvis-ui-opacity) * 100%),
+    transparent
+  );
+}
+
+/* 通用面板/卡片：半透明 + 毛玻璃（透明度 < 100% 时） */
+.app.ui-translucent .panel {
+  background: color-mix(
+    in srgb,
+    #0b1424 calc(var(--jarvis-ui-opacity, 1) * 100%),
+    transparent
+  );
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+}
+
+/* 弹窗：遮罩保持压暗，弹窗本体半透明毛玻璃 */
+.app.ui-translucent .modal-overlay .modal {
+  background: color-mix(
+    in srgb,
+    #0b1424 calc(var(--jarvis-ui-opacity) * 100%),
+    rgba(6, 9, 17, 0.55)
+  );
+  backdrop-filter: blur(20px) saturate(1.15);
+  -webkit-backdrop-filter: blur(20px) saturate(1.15);
+}
+
+/* 输入框/按钮等控件：底色半透明，壁纸透出更自然（有壁纸或透明度 < 100% 时） */
+.app.has-wallpaper input:not([type="range"]):not([type="checkbox"]):not([type="file"]),
+.app.has-wallpaper textarea,
+.app.has-wallpaper select,
+.app.ui-translucent input:not([type="range"]):not([type="checkbox"]):not([type="file"]),
+.app.ui-translucent textarea,
+.app.ui-translucent select {
+  background-color: color-mix(
+    in srgb,
+    #0a1420 calc(var(--jarvis-ui-opacity) * 100%),
+    transparent
+  );
+}
+
+.app.ui-translucent .ghost-btn,
+.app.ui-translucent .danger-btn {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* 有壁纸时让 body 的渐变背景透明，否则会盖住壁纸层 */
+body.jarvis-has-wallpaper {
+  background: transparent;
+}
+
+/* 连接/登录遮罩：有壁纸时同样半透明，让壁纸透出
+   （否则 z-index:9999 的不透明遮罩会完全盖住壁纸层） */
+.app.has-wallpaper .modal-overlay.connect-overlay {
+  background: color-mix(
+    in srgb,
+    #060911 calc(var(--jarvis-ui-opacity) * 100%),
+    transparent
+  );
+  backdrop-filter: blur(16px) saturate(1.1);
+  -webkit-backdrop-filter: blur(16px) saturate(1.1);
+}
+
+/* 连接页内的品牌面板与四象限卡片同样跟随透明度 */
+.app.has-wallpaper .brand-panel {
+  background: color-mix(
+    in srgb,
+    #060911 calc(var(--jarvis-ui-opacity) * 100%),
+    transparent
+  );
+}
+/* ===== 工作区内的「对话区 / 终端区」半透明 =====
+   这两块内容由子组件（SessionPanel.vue / TerminalPanel.vue）的 scoped 样式绘制，
+   且大量使用不透明变量（--color-bg-primary = #060911）或近乎不透明的 rgba，
+   仅靠父级 .session-panel/.terminal-panel 半透明无法让壁纸透出。这里逐个覆盖：
+   - 对话：消息列表底、每条消息气泡、终端历史块、输入区
+   - 终端：xterm 画布（xterm 主题 background 是写死的 #0b1424，见 useTerminal.js）
+   注意：xterm 用 canvas 绘制，主题色必须由 JS 侧改成透明（见 useTerminal.js 的
+   resolveTerminalTheme），这里只负责让承载 DOM 不挡壁纸。 */
+.app.has-wallpaper .workspace-panel .messages,
+.app.has-wallpaper .workspace-panel .terminal-history,
+.app.has-wallpaper .workspace-panel .terminal-history-header,
+.app.has-wallpaper .workspace-panel .terminal-history-content,
+.app.has-wallpaper .workspace-panel .input-area,
+.app.has-wallpaper .workspace-panel .input-wrapper textarea,
+.app.has-wallpaper .workspace-panel .input-wrapper input[type="text"],
+.app.has-wallpaper .workspace-panel .terminal-host-wrapper,
+.app.has-wallpaper .workspace-panel .terminal-host,
+.app.has-wallpaper .workspace-panel .terminal-content,
+.app.has-wallpaper .workspace-panel .terminal-empty,
+.app.has-wallpaper .workspace-panel .xterm,
+.app.has-wallpaper .workspace-panel .xterm-viewport,
+.app.has-wallpaper .workspace-panel .xterm-screen {
+  background: transparent !important;
+}
+/* 消息气泡：保留一点底色以便区分角色，但跟随透明度变量 */
+.app.has-wallpaper .workspace-panel .message,
+.app.has-wallpaper .workspace-panel .message-STREAM {
+  background: color-mix(
+    in srgb,
+    #12203a calc(var(--jarvis-ui-opacity) * 100%),
+    transparent
+  ) !important;
+}
+.app.has-wallpaper .workspace-panel .message-user_input {
+  background: color-mix(
+    in srgb,
+    #20c8ff calc(var(--jarvis-ui-opacity) * 40%),
+    transparent
+  ) !important;
+}
+/* 会话/终端面板标题栏：原本是渐变 + 不透明 tertiary，改为半透明 */
+.app.has-wallpaper .workspace-panel .session-panel-header,
+.app.has-wallpaper .workspace-panel .terminal-panel-header {
+  background: color-mix(
+    in srgb,
+    #12203a calc(var(--jarvis-ui-opacity) * 100%),
+    transparent
+  ) !important;
 }

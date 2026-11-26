@@ -35,6 +35,7 @@ import { parseUnifiedDiff, extractDiffContext } from '../gitDiffParser.js'
 
 export function useGitView({
   EDITOR_FONT_FAMILY,
+  resolveEditorTheme,
   buildNodeHttpUrl,
   fetchWithAuth,
   getGatewayAddress,
@@ -486,7 +487,7 @@ function ensureDiffEditorForPane(paneId) {
   }
   if (entry) return entry
   const editor = monaco.editor.createDiffEditor(container, {
-    theme: 'blueDark',
+    theme: resolveEditorTheme ? resolveEditorTheme() : 'blueDark',
     fontFamily: EDITOR_FONT_FAMILY,
     fontSize: 12,
     lineHeight: 18,

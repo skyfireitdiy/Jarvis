@@ -135,6 +135,32 @@ export function useTerminal({
 
   // 独立终端会话
   const terminalSessions = ref([]) // [{ terminal_id, interpreter, working_dir, terminal, hostEl, fitAddon }]
+  // 终端主题：xterm 用 canvas 绘制，背景色无法用 CSS 覆盖，必须走主题。
+  // 有壁纸时用透明背景（'rgba(0,0,0,0)'），让壁纸从终端区域透出；
+  // 否则保持原来的 #0b1424。判定依据是 body 上的 jarvis-has-wallpaper 类
+  // （由 App.vue 的壁纸 watch 维护）。
+  const TERMINAL_BG_DEFAULT = '#0b1424'
+  const TERMINAL_BG_TRANSPARENT = 'rgba(0, 0, 0, 0)'
+  function resolveTerminalTheme() {
+    const transparent = typeof document !== 'undefined'
+      && document.body.classList.contains('jarvis-has-wallpaper')
+    return { background: transparent ? TERMINAL_BG_TRANSPARENT : TERMINAL_BG_DEFAULT }
+  }
+  // 壁纸开关切换后，把已存在的所有终端（独立会话 + 执行终端）切到对应主题。
+  // 由 App.vue 的壁纸 watch 调用（与 Monaco 主题切换同一时机）。
+  function applyTerminalThemeToAll() {
+    const theme = resolveTerminalTheme()
+    const apply = (terminal) => {
+      if (!terminal || typeof terminal.options !== 'object') return
+      try {
+        terminal.options.theme = theme
+      } catch (error) {
+        console.warn('[APPEARANCE] Failed to switch terminal theme:', error)
+      }
+    }
+    for (const session of terminalSessions.value || []) apply(session.terminal)
+    for (const info of terminals.value || []) apply(info.terminal)
+  }
   const activeTerminalId = ref(null) // 当前激活的终端ID
   const independentTerminalHosts = ref(new Map()) // terminal_id -> hostEl
   const isCreatingTerminalSession = ref(false)
@@ -518,9 +544,7 @@ export function useTerminal({
     // 数组内元素是 Proxy 而闭包捕获的是原始对象，比较恒 false，
     // 导致任何一次 dispose 都抛 "Could not dispose an addon that has not been loaded"。
     termInfo.terminal = markRaw(new Terminal({
-      theme: {
-        background: '#0b1424',
-      },
+      theme: resolveTerminalTheme(),
       fontSize: 12,
       fontFamily: "'Consolas', 'Microsoft YaHei', monospace",
       allowProposedApi: true,
@@ -801,9 +825,7 @@ export function useTerminal({
     // 会在 ResizeObserver 回调中自动调整尺寸
     // markRaw：与 execution 终端同理，避免 Vue 深度代理导致 xterm dispose 引用比较失效
     session.terminal = markRaw(new Terminal({
-      theme: {
-        background: '#0b1424',
-      },
+      theme: resolveTerminalTheme(),
       fontSize: 12,
       fontFamily: "'Consolas', 'Microsoft YaHei', monospace",
       cols: 80,
@@ -1554,6 +1576,8 @@ export function useTerminal({
     getExecutionSessionKey,
     terminalSessions,
     activeTerminalId,
+    resolveTerminalTheme,
+    applyTerminalThemeToAll,
     independentTerminalHosts,
     isCreatingTerminalSession,
     terminalCreationTracker,
