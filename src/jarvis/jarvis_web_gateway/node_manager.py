@@ -15,7 +15,7 @@ import pathlib
 import random
 import shutil
 import uuid
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import Any, AsyncGenerator, Callable, Dict, List, Optional
 from urllib.parse import urlparse
 
 import httpx
@@ -46,6 +46,7 @@ from .node_protocol import (
     AGENT_WS_CLOSE_RESPONSE,
     AGENT_WS_OPEN_REQUEST,
     AGENT_WS_OPEN_RESPONSE,
+    AGENT_WS_OUTPUT,
     AGENT_WS_RECV_REQUEST,
     AGENT_WS_RECV_RESPONSE,
     AGENT_WS_REQUEST,
@@ -87,6 +88,9 @@ CHILD_HEARTBEAT_INTERVAL_SECONDS = 10
 CHILD_RECONNECT_MIN_SECONDS = 5
 CHILD_RECONNECT_MAX_SECONDS = 10
 
+# master 侧 agent WS 输出订阅队列容量上限：慢消费者时丢最旧帧，避免无界增长
+_AGENT_WS_OUTPUT_QUEUE_MAX = 1024
+
 
 class NodeConnectionManager:
     def __init__(
@@ -109,10 +113,30 @@ class NodeConnectionManager:
         self._pending_requests: Dict[str, asyncio.Future] = {}
         self._streaming_queues: Dict[str, asyncio.Queue] = {}
         self._agent_ws_sessions: Dict[str, Any] = {}
+        # 推送式 Agent WS 输出（child 侧）：session_id -> 后台 pump 任务
+        self._agent_ws_pumps: Dict[str, asyncio.Task] = {}
+        # session_id -> 该会话推送泵所属的 master 连接 id。child 只应有一个
+        # master 连接；重连后旧连接 finally 里的清理不能误杀新连接的泵。
+        self._agent_ws_pump_owners: Dict[str, str] = {}
+        # 推送式 Agent WS 输出（master 侧）：session_id -> 订阅队列
+        self._agent_ws_output_queues: Dict[str, asyncio.Queue] = {}
+        # child 侧向 master 推送 Agent WS 输出时使用的连接获取器。
+        # 由 ChildNodeClient 在创建后显式注入（set_child_connection_provider）；
+        # master 侧不注入，保持 None。注意：不要用 getattr(self, "_ws") 之类
+        # 的隐式取法——_ws 属于 ChildNodeClient，本类实例上并不存在该属性。
+        self._child_connection_provider: Optional[Callable[[], Any]] = None
+        # 当前正在处理的 master 连接 id（child 侧）：推送泵据此标记归属连接，
+        # 连接断开时只清理自己那条连接的泵，避免重连竞态误杀新泵。
+        self._current_connection_id: Optional[str] = None
+
+    def set_child_connection_provider(self, provider: Callable[[], Any]) -> None:
+        """注入「获取 child 到 master 的连接」的 callable（仅 child 侧调用）。"""
+        self._child_connection_provider = provider
 
     async def handle_node_websocket(self, websocket: WebSocket) -> None:
         await websocket.accept()
         connection_id = str(uuid.uuid4())
+        self._current_connection_id = connection_id
         try:
             message = await asyncio.wait_for(websocket.receive_json(), timeout=10)
         except Exception:
@@ -343,6 +367,10 @@ class NodeConnectionManager:
                     response = await self._handle_agent_ws_close_request(next_message)
                     await websocket.send_json(response)
                     continue
+                if message_type == AGENT_WS_OUTPUT:
+                    # child 主动推送的 agent WS 输出（推送模式）
+                    self._dispatch_agent_ws_output(next_message)
+                    continue
                 if message_type == DIRECTORY_LIST_REQUEST:
                     logger.info(
                         "[NODE] handling directory list request node_id=%s request_id=%s",
@@ -402,8 +430,16 @@ class NodeConnectionManager:
             self._node_runtime.node_registry.mark_offline(node_id)
             self._connections.pop(node_id, None)
             self._connection_to_node.pop(connection_id, None)
+            if self._current_connection_id == connection_id:
+                self._current_connection_id = None
             if not rebuild_task.done():
                 rebuild_task.cancel()
+            # 通知所有订阅方该节点已断开：投递 closed，让远端代理结束转发
+            for queue in list(self._agent_ws_output_queues.values()):
+                try:
+                    queue.put_nowait({"messages": [], "closed": True})
+                except Exception:
+                    pass
 
     @staticmethod
     def _is_terminal_closed_event(message: Any) -> bool:
@@ -586,6 +622,57 @@ class NodeConnectionManager:
 
         finally:
             self._streaming_queues.pop(request_id, None)
+
+    # ------------------------------------------------------------------
+    # 推送式 Agent WS 输出（master 侧订阅）
+    # ------------------------------------------------------------------
+    def subscribe_agent_ws_output(self, session_id: str) -> asyncio.Queue:
+        """注册一个 agent WS 输出订阅队列并返回。
+
+        推送模式下 child 会主动发 AGENT_WS_OUTPUT，handle_node_websocket 收到
+        后投递到对应队列；订阅方（远端代理）从队列取消息转发给浏览器。
+
+        队列有界（_AGENT_WS_OUTPUT_QUEUE_MAX）：浏览器消费慢于 child 推送时
+        不无界缓冲内存，而是丢弃最旧帧（流式场景丢旧帧比 OOM 更可接受）。
+        """
+        queue: asyncio.Queue = asyncio.Queue(maxsize=_AGENT_WS_OUTPUT_QUEUE_MAX)
+        self._agent_ws_output_queues[session_id] = queue
+        return queue
+
+    def unsubscribe_agent_ws_output(self, session_id: str) -> None:
+        """注销订阅队列（幂等）。"""
+        self._agent_ws_output_queues.pop(session_id, None)
+
+    def _dispatch_agent_ws_output(self, message: Dict[str, Any]) -> None:
+        """把 child 推送的 AGENT_WS_OUTPUT 投递到对应订阅队列。"""
+        payload = message.get("payload") or {}
+        session_id = str(payload.get("session_id") or "").strip()
+        if not session_id:
+            return
+        queue = self._agent_ws_output_queues.get(session_id)
+        if queue is None:
+            logger.debug(
+                "[NODE AGENT WS OUTPUT] no subscriber session_id=%s", session_id
+            )
+            return
+        item = {
+            "messages": payload.get("messages") or [],
+            "closed": bool(payload.get("closed")),
+        }
+        # 有界队列：满了丢最旧帧，避免慢消费者导致无界内存增长
+        while True:
+            try:
+                queue.put_nowait(item)
+                break
+            except asyncio.QueueFull:
+                try:
+                    queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    pass
+                logger.warning(
+                    "[NODE AGENT WS OUTPUT] queue full, dropping oldest session_id=%s",
+                    session_id,
+                )
 
     def _handle_agent_create_request(
         self, message: Dict[str, Any], source_node_id: str
@@ -1381,6 +1468,101 @@ class NodeConnectionManager:
                 request_id=request_id,
             )
 
+
+    # ------------------------------------------------------------------
+    # 推送式 Agent WS 输出（child 侧推送泵）
+    # ------------------------------------------------------------------
+    def _start_agent_ws_pump(self, session_id: str, agent_ws: Any) -> None:
+        """为 agent WS 会话启动推送泵：持续读 agent_ws 并主动推给 master。
+
+        替代 master 侧的 AGENT_WS_RECV 轮询。轮询模式下消息进 agent_ws 后
+        最多要等一个轮询周期（1s）才被取走，是远端 WS 延迟的主要来源；
+        推送模式下延迟降到网络 RTT 级别。
+
+        注意：agent_ws 是单消费者语义，本 pump 是该会话唯一的 recv 调用方；
+        _handle_agent_ws_recv_request 在推送可用时不再直接 recv。
+        """
+        self._stop_agent_ws_pump(session_id)
+
+        async def _pump() -> None:
+            cancelled = False
+            try:
+                async for raw in agent_ws:
+                    text = (
+                        raw if isinstance(raw, str) else raw.decode("utf-8", "replace")
+                    )
+                    await self._send_agent_ws_output(session_id, [text], closed=False)
+            except asyncio.CancelledError:
+                cancelled = True
+                raise
+            except Exception as exc:
+                logger.info(
+                    "[NODE AGENT WS PUMP] session=%s ended: %s", session_id, exc
+                )
+            finally:
+                self._agent_ws_pumps.pop(session_id, None)
+                # 主动取消（close 流程 / 连接断开）由调用方负责通知 master，
+                # 这里不再发 closed，避免与 close 流程重复或在取消态下再次 await。
+                if not cancelled:
+                    self._agent_ws_sessions.pop(session_id, None)
+                    try:
+                        await self._send_agent_ws_output(session_id, [], closed=True)
+                    except Exception as e:
+                        logger.debug(
+                            "[NODE AGENT WS PUMP] failed to send closed: session=%s error=%s",
+                            session_id,
+                            e,
+                        )
+
+        self._agent_ws_pumps[session_id] = asyncio.create_task(_pump())
+        self._agent_ws_pump_owners[session_id] = self._current_connection_id
+
+    def _stop_agent_ws_pump(self, session_id: str) -> None:
+        """停止并清理指定会话的推送泵（幂等）。"""
+        self._agent_ws_pump_owners.pop(session_id, None)
+        task = self._agent_ws_pumps.pop(session_id, None)
+        if task is not None and not task.done():
+            task.cancel()
+
+    def _stop_all_agent_ws_pumps(self, connection_id: Optional[str] = None) -> None:
+        """停止并清理推送泵（连接断开时调用，避免任务泄漏）。
+
+        connection_id 非空时只清理属于该连接的泵：child 重连期间旧连接的
+        finally 可能在新连接建好之后才执行，若无差别清空会把新连接上刚启动
+        的泵一起杀掉，导致远端 Agent 再次完全不通（历史事故）。
+        """
+        for session_id in list(self._agent_ws_pumps.keys()):
+            if connection_id is not None and self._agent_ws_pump_owners.get(
+                session_id
+            ) != connection_id:
+                continue
+            self._stop_agent_ws_pump(session_id)
+            self._agent_ws_sessions.pop(session_id, None)
+        if connection_id is None:
+            self._agent_ws_sessions.clear()
+
+    async def _send_agent_ws_output(
+        self, session_id: str, messages: List[str], closed: bool
+    ) -> None:
+        """把 agent WS 输出推给 master（仅 child 侧，需已注入连接获取器）。"""
+        provider = self._child_connection_provider
+        if provider is None:
+            return
+        ws = provider()
+        if ws is None:
+            return
+        await ws.send(
+            json.dumps(
+                build_node_message(
+                    AGENT_WS_OUTPUT,
+                    {
+                        "session_id": session_id,
+                        "messages": messages,
+                        "closed": closed,
+                    },
+                )
+            )
+        )
     async def _handle_agent_ws_open_request(
         self, message: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -1419,6 +1601,9 @@ class NodeConnectionManager:
                 subprotocols=subprotocols,  # ty: ignore[invalid-argument-type]
             )
             self._agent_ws_sessions[session_id] = agent_ws
+            # 启动推送泵：持续读取 agent_ws 并把消息主动推给 master，
+            # 替代 master 侧的 AGENT_WS_RECV 轮询（轮询间隔 1s 是 WS 延迟的主要来源）。
+            self._start_agent_ws_pump(session_id, agent_ws)
             logger.info(
                 "[NODE AGENT WS OPEN] success agent_id=%s session_id=%s",
                 agent_id,
@@ -1519,6 +1704,20 @@ class NodeConnectionManager:
             agent_ws = self._agent_ws_sessions.get(session_id)
             if agent_ws is None:
                 raise RuntimeError(f"ws session not found: {session_id}")
+            # 推送模式：该会话的 agent_ws 由推送泵独占消费，RECV 不再抢占。
+            # 返回空消息列表 + push_mode=True，master 侧收到 AGENT_WS_OUTPUT
+            # 推送后即会停止轮询；避免并发 recv 抛 RuntimeError 或抢走消息乱序。
+            if session_id in self._agent_ws_pumps:
+                return build_node_message(
+                    AGENT_WS_RECV_RESPONSE,
+                    {
+                        "success": True,
+                        "session_id": session_id,
+                        "messages": [],
+                        "push_mode": True,
+                    },
+                    request_id=request_id,
+                )
             # 清理已关闭的会话
             if agent_ws.state != State.OPEN:
                 self._agent_ws_sessions.pop(session_id, None)
@@ -1570,6 +1769,8 @@ class NodeConnectionManager:
             session_id,
         )
         agent_ws = self._agent_ws_sessions.pop(session_id, None)
+        # 先停推送泵，避免它与 close 竞争 recv / 重复发 closed 通知
+        self._stop_agent_ws_pump(session_id)
         try:
             if agent_ws is not None:
                 await agent_ws.close()
@@ -2235,6 +2436,11 @@ class ChildNodeClient:
         self._node_connection_manager = node_connection_manager
         self._ws: Optional[Any] = None
         self._task: Optional[asyncio.Task] = None
+        # 当前 child->master 连接 id（每次 _connect_once 重新生成）
+        self._connection_id: Optional[str] = None
+        # 把「当前 child->master 连接」显式提供给 NodeConnectionManager，
+        # 供其推送泵发送 AGENT_WS_OUTPUT。_ws 属于本类，不能靠隐式属性查找。
+        node_connection_manager.set_child_connection_provider(lambda: self._ws)
 
     def start(self) -> None:
         if self._task is None:
@@ -2297,6 +2503,11 @@ class ChildNodeClient:
                         )
                         pass
                     self._ws = None
+                # 连接断开：只清理本连接的 agent WS 推送泵，避免后台任务泄漏
+                # 且不误杀重连后新连接上已启动的泵
+                self._node_connection_manager._stop_all_agent_ws_pumps(
+                    self._connection_id
+                )
 
             reconnect_delay = random.uniform(
                 CHILD_RECONNECT_MIN_SECONDS,
@@ -2388,6 +2599,9 @@ class ChildNodeClient:
         # 智能判断是否需要使用代理：检查目标地址是否属于内网或no_proxy列表
         proxy_url = self._get_proxy_for_url(ws_url)
         self._ws = await websockets.connect(ws_url, close_timeout=10, proxy=proxy_url)
+        # 记录「当前这条连接」的 id（master 侧 handle_node_websocket 用同一个
+        # uuid 标记该连接）。推送泵据此归属连接，断连清理时只清自己的泵。
+        self._connection_id = str(uuid.uuid4())
         await self._ws.send(
             json.dumps(
                 build_node_message(

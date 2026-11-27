@@ -4737,27 +4737,49 @@ def create_app(
                             )
 
                 async def forward_remote_to_client() -> None:
-                    while True:
-                        recv_response = (
-                            await node_connection_manager.send_request_to_node(
-                                target_node_id,
-                                AGENT_WS_RECV_REQUEST,
-                                {
-                                    "session_id": remote_ws_session_id,
-                                    "timeout": 1.0,
-                                },
-                                timeout=65.0,
-                            )
-                        )
-                        recv_payload = recv_response.get("payload") or {}
-                        if not recv_payload.get("success"):
-                            raise RuntimeError(
-                                (recv_payload.get("error") or {}).get(
-                                    "message", "Remote websocket receive failed"
+                    # 推送模式：订阅 child 主动推送的 AGENT_WS_OUTPUT；
+                    # 旧版本 child 不支持推送，队列会空闲，此时回退到
+                    # AGENT_WS_RECV 轮询（每 1s 一次），保证兼容。
+                    output_queue = node_connection_manager.subscribe_agent_ws_output(
+                        remote_ws_session_id
+                    )
+                    try:
+                        while True:
+                            try:
+                                item = await asyncio.wait_for(
+                                    output_queue.get(), timeout=1.0
                                 )
-                            )
-                        for item in recv_payload.get("messages") or []:
-                            await websocket.send_text(str(item))
+                            except asyncio.TimeoutError:
+                                recv_response = (
+                                    await node_connection_manager.send_request_to_node(
+                                        target_node_id,
+                                        AGENT_WS_RECV_REQUEST,
+                                        {
+                                            "session_id": remote_ws_session_id,
+                                            "timeout": 1.0,
+                                        },
+                                        timeout=65.0,
+                                    )
+                                )
+                                recv_payload = recv_response.get("payload") or {}
+                                if not recv_payload.get("success"):
+                                    raise RuntimeError(
+                                        (recv_payload.get("error") or {}).get(
+                                            "message",
+                                            "Remote websocket receive failed",
+                                        )
+                                    )
+                                for msg in recv_payload.get("messages") or []:
+                                    await websocket.send_text(str(msg))
+                                continue
+                            for msg in item.get("messages") or []:
+                                await websocket.send_text(str(msg))
+                            if item.get("closed"):
+                                return
+                    finally:
+                        node_connection_manager.unsubscribe_agent_ws_output(
+                            remote_ws_session_id
+                        )
 
                 client_to_remote_task = asyncio.create_task(forward_client_to_remote())
                 remote_to_client_task = asyncio.create_task(forward_remote_to_client())
@@ -4952,25 +4974,47 @@ def create_app(
                         )
 
             async def forward_remote_to_client() -> None:
-                while True:
-                    recv_response = await node_connection_manager.send_request_to_node(
-                        normalized_node_id,
-                        AGENT_WS_RECV_REQUEST,
-                        {
-                            "session_id": remote_ws_session_id,
-                            "timeout": 1.0,
-                        },
-                        timeout=65.0,
-                    )
-                    recv_payload = recv_response.get("payload") or {}
-                    if not recv_payload.get("success"):
-                        raise RuntimeError(
-                            (recv_payload.get("error") or {}).get(
-                                "message", "Remote websocket receive failed"
+                # 推送模式：订阅 child 主动推送的 AGENT_WS_OUTPUT；旧 child
+                # 不支持推送时队列空闲，回退到 AGENT_WS_RECV 轮询（每 1s）。
+                output_queue = node_connection_manager.subscribe_agent_ws_output(
+                    remote_ws_session_id
+                )
+                try:
+                    while True:
+                        try:
+                            item = await asyncio.wait_for(
+                                output_queue.get(), timeout=1.0
                             )
-                        )
-                    for item in recv_payload.get("messages") or []:
-                        await websocket.send_text(str(item))
+                        except asyncio.TimeoutError:
+                            recv_response = (
+                                await node_connection_manager.send_request_to_node(
+                                    normalized_node_id,
+                                    AGENT_WS_RECV_REQUEST,
+                                    {
+                                        "session_id": remote_ws_session_id,
+                                        "timeout": 1.0,
+                                    },
+                                    timeout=65.0,
+                                )
+                            )
+                            recv_payload = recv_response.get("payload") or {}
+                            if not recv_payload.get("success"):
+                                raise RuntimeError(
+                                    (recv_payload.get("error") or {}).get(
+                                        "message", "Remote websocket receive failed"
+                                    )
+                                )
+                            for msg in recv_payload.get("messages") or []:
+                                await websocket.send_text(str(msg))
+                            continue
+                        for msg in item.get("messages") or []:
+                            await websocket.send_text(str(msg))
+                        if item.get("closed"):
+                            return
+                finally:
+                    node_connection_manager.unsubscribe_agent_ws_output(
+                        remote_ws_session_id
+                    )
 
             client_to_remote_task = asyncio.create_task(forward_client_to_remote())
             remote_to_client_task = asyncio.create_task(forward_remote_to_client())
