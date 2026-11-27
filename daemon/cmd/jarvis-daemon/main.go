@@ -822,6 +822,11 @@ func runDaemon(args []string) {
 			// 版本号全局统一，实际同步以 daemon_update.latest_version 为准
 			// （见 OnGatewayDaemonUpdate）；此处仅记录，供开关补查时兜底使用。
 			rememberGatewayExtVersion(gateway, latestExtVersion)
+			// 该网关的版本记录可能变化（如从旧网关切到新网关），据此重算「已连接
+			// 网关中的最高版本」再决定是否同步，保证多网关下目标版本始终取最高。
+			if latest, srcGateway, ok := highestConnectedExtVersion(currentManager); ok {
+				maybeAutoSyncBrowserExt(srcGateway, latest)
+			}
 		},
 		OnGatewayDaemonUpdate: func(gateway, sessionID string, info map[string]any) {
 			// 网关随握手告知 daemon 有新版本；受「自动更新」开关约束，异步执行。
@@ -832,7 +837,10 @@ func runDaemon(args []string) {
 			// 记下来供「扩展开关随后被打开」时补查使用（开关常晚于握手推送）。
 			if latest, _ := info["latest_version"].(string); latest != "" {
 				rememberGatewayExtVersion(gateway, latest)
-				maybeAutoSyncBrowserExt(gateway, latest)
+				// 目标版本取「已连接网关中的最高版本」，避免低版本网关把本地降级。
+				if target, srcGateway, ok := highestConnectedExtVersion(currentManager); ok {
+					maybeAutoSyncBrowserExt(srcGateway, target)
+				}
 			}
 		},
 	})
@@ -991,26 +999,50 @@ func gatewayExtVersionOf(gateway string) (string, bool) {
 	return v, ok
 }
 
+// highestConnectedExtVersion 返回所有「已连接」网关中已知的最高扩展版本及其来源网关。
+//
+// 为什么需要：同一台机器可能同时连接多个网关（如本机开发网关 + 线上网关），它们
+// 的扩展版本可能不同。若按「各自网关下发的版本」逐个同步，低版本网关会把本地扩展
+// 覆盖降级，两个网关交替触发就会反复横跳。因此自动同步的目标版本统一取「已连接
+// 网关中的最高版本」，低版本网关不再驱动任何同步动作。
+//
+// 无任何已连接网关下发过版本时返回 ("", "", false)。
+func highestConnectedExtVersion(manager *wsclient.Manager) (version, gateway string, ok bool) {
+	best := ""
+	bestGateway := ""
+	for _, st := range manager.Status() {
+		if !st.Connected {
+			continue
+		}
+		latest, has := gatewayExtVersionOf(st.Gateway)
+		if !has || latest == "" {
+			continue
+		}
+		if !ok || capability.CompareBrowserExtVersion(latest, best) > 0 {
+			best, bestGateway, ok = latest, st.Gateway, true
+		}
+	}
+	return best, bestGateway, ok
+}
+
 // onBrowserExtSwitchEnabled 在「自动安装/更新浏览器扩展」开关由关闭变为打开时调用，
-// 对所有已连接、且已知网关扩展版本的网关补做一次同步检查。
+// 对已连接网关做一次同步检查。
 //
 // 为什么需要：daemon 启动后先连网关、收 hello_ack 时开关仍是默认 false（前端尚未
 // 推送），于是打印「已关闭，跳过自动同步」；前端随后才把开关推来，但 daemon 不会
 // 重新检查，导致用户明明已打开开关却始终不同步，直到下次重连。此处在开关打开时
 // 主动补查一次，消除该时序依赖。
+//
+// 目标版本取「已连接网关中的最高版本」（见 highestConnectedExtVersion），避免多网关
+// 互相覆盖导致版本反复横跳。
 func onBrowserExtSwitchEnabled(manager *wsclient.Manager) {
-	for _, st := range manager.Status() {
-		if !st.Connected {
-			continue
-		}
-		latest, ok := gatewayExtVersionOf(st.Gateway)
-		if !ok {
-			// 该网关尚未下发过版本（未收到 hello_ack），等其自身握手时再处理。
-			continue
-		}
-		log.Printf("[daemon] 扩展开关已打开，补做一次同步检查（网关 %s，网关版本 %q）", st.Gateway, latest)
-		maybeAutoSyncBrowserExt(st.Gateway, latest)
+	latest, gateway, ok := highestConnectedExtVersion(manager)
+	if !ok {
+		// 尚无网关下发过版本（未收到 hello_ack），等其自身握手时再处理。
+		return
 	}
+	log.Printf("[daemon] 扩展开关已打开，补做一次同步检查（目标版本 %q，来源网关 %s）", latest, gateway)
+	maybeAutoSyncBrowserExt(gateway, latest)
 }
 
 // startBrowserExtPeriodicSync 每 browserExtSyncInterval（10 分钟）对已连接网关
@@ -1029,35 +1061,37 @@ func startBrowserExtPeriodicSync(manager *wsclient.Manager) {
 		ticker := time.NewTicker(browserExtSyncInterval)
 		defer ticker.Stop()
 		for range ticker.C {
-			for _, st := range manager.Status() {
-				if !st.Connected {
-					continue
-				}
-				latest, ok := gatewayExtVersionOf(st.Gateway)
-				if !ok {
-					// 该网关尚未下发过版本（未收到 hello_ack），等其自身握手时再处理。
-					continue
-				}
-				maybeAutoSyncBrowserExt(st.Gateway, latest)
+			// 目标版本取「已连接网关中的最高版本」，只对最高版本做一次检查，
+			// 不让低版本网关驱动降级（见 highestConnectedExtVersion）。
+			latest, gateway, ok := highestConnectedExtVersion(manager)
+			if !ok {
+				// 尚无网关下发过版本（未收到 hello_ack），等其自身握手时再处理。
+				continue
 			}
+			maybeAutoSyncBrowserExt(gateway, latest)
 		}
 	}()
 }
 
-// maybeAutoSyncBrowserExt 在网关下发扩展最新版本且与本地不一致时，异步同步扩展包。
+// maybeAutoSyncBrowserExt 在网关下发的扩展版本高于本地版本时，异步同步扩展包。
 //
 // 设计要点：
 //   - 受「自动安装/更新浏览器扩展」开关约束：开关关闭（默认）时直接跳过，
 //     不下载、不起协程。开关由用户在 Web 设置界面显式打开后随登录态推送给
 //     本机守护进程（只存内存态，不落盘），故守护进程重启后回到关闭，等待
 //     前端再次推送——未收到推送一律不自动同步，这是安全默认；
+//   - **只升不降**：仅当网关版本 > 本地版本时才同步。本地版本更高（例如用户手动
+//     装了更新版，或另一台更高版本网关同步过）时跳过，避免把本地降级；
+//   - **多网关不横跳**：目标版本由调用方取「已连接网关中的最高版本」
+//     （highestConnectedExtVersion），低版本网关不会驱动降级；本函数再加锁后复核
+//     一次，防止等待期间被更高版本抢先同步后又被本次覆盖；
 //   - 立即返回，把下载/解压放到独立 goroutine（下载可能耗时数秒），不阻塞 WS 读循环；
 //   - 版本一致时直接跳过，避免每次重连都重复下载；
 //   - 任何失败只记日志，绝不影响连接与既有能力；
 //   - 不重启浏览器：仅把新版本落盘，由用户在 chrome://extensions 手动刷新。
 //
 // 注意：本开关只约束此处的「自动同步」；手动能力 browser.ext.sync 由用户显式
-// 调用，不受该开关约束。
+// 调用，不受该开关约束，也不受「只升不降」约束（用户显式意图可覆盖）。
 func maybeAutoSyncBrowserExt(gateway, latestVersion string) {
 	// 开关判断必须放在函数入口、goroutine 之外：关闭时提前返回，避免无谓起协程。
 	if !capability.AutoInstallBrowserExt() {
@@ -1071,8 +1105,23 @@ func maybeAutoSyncBrowserExt(gateway, latestVersion string) {
 		return
 	}
 	localVersion := capability.LocalBrowserExtVersion()
-	if localVersion == latestVersion {
+	if localVersion == "" && capability.BrowserExtInstalled() {
+		// 已安装但 manifest 读取/解析失败：不视为「未安装」，跳过并告警，
+		// 避免把用户已有的扩展目录整个覆盖掉。
+		log.Printf("[daemon] 本地浏览器扩展已安装但版本号读取失败（目录 %s），"+
+			"为安全起见跳过自动同步（网关 %s，网关版本 %q）",
+			capability.BrowserExtDirOrEmpty(), gateway, latestVersion)
 		return
+	}
+	if localVersion != "" {
+		if cmp := capability.CompareBrowserExtVersion(latestVersion, localVersion); cmp <= 0 {
+			// 自动同步只升不降：本地同版本或更高版本时不做任何动作。
+			if cmp < 0 {
+				log.Printf("[daemon] 网关扩展版本 %q 低于本地 %q，自动同步不降级，跳过（网关 %s）",
+					latestVersion, localVersion, gateway)
+			}
+			return
+		}
 	}
 
 	go func() {
@@ -1080,11 +1129,12 @@ func maybeAutoSyncBrowserExt(gateway, latestVersion string) {
 		browserExtSyncMu.Lock()
 		defer browserExtSyncMu.Unlock()
 
-		// 加锁后再判断一次：等待期间可能已被其他网关同步到目标版本。
-		if capability.LocalBrowserExtVersion() == latestVersion {
+		// 加锁后再判断一次：等待期间可能已被其他网关同步到同版本或更高版本。
+		if current := capability.LocalBrowserExtVersion(); current != "" &&
+			capability.CompareBrowserExtVersion(latestVersion, current) <= 0 {
 			return
 		}
-		log.Printf("[daemon] 检测到扩展版本不一致（本地 %q → 网关 %q），开始自动同步（网关 %s）",
+		log.Printf("[daemon] 检测到扩展版本可升级（本地 %q → 网关 %q），开始自动同步（网关 %s）",
 			localVersion, latestVersion, gateway)
 
 		count, version, err := capability.SyncBrowserExt(gateway, browserExtTokenFor(gateway))

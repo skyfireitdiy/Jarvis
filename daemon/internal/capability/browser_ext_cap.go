@@ -61,7 +61,10 @@ func handleBrowserExtStatus(params map[string]any) (any, error) {
 	result := map[string]any{
 		"ext_dir":       dir,
 		"local_version": localVersion,
-		"installed":     localVersion != "",
+		// installed 用 BrowserExtInstalled 判定（manifest.json 是否存在），而不是
+		// 「版本号非空」：manifest 存在但读取/解析失败时仍算已安装，自动同步会
+		// 据此跳过而不覆盖用户目录。
+		"installed": BrowserExtInstalled(),
 	}
 
 	gateway, err := browserExtOptionalString(params, "gateway")

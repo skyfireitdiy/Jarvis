@@ -21,6 +21,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -348,6 +349,90 @@ func LocalBrowserExtVersion() string {
 		return ""
 	}
 	return version
+}
+
+// BrowserExtInstalled 报告本地扩展是否已安装（扩展目录内存在 manifest.json）。
+//
+// 与 LocalBrowserExtVersion 的区别：版本号为空既可能是「未安装」，也可能是
+// 「已安装但 manifest 读取/解析失败」。自动同步需要区分这两种情况——未安装
+// 可以自动安装，读取失败则应跳过并保留现场，避免把用户已有的扩展覆盖掉。
+func BrowserExtInstalled() bool {
+	dir, err := BrowserExtDir()
+	if err != nil {
+		return false
+	}
+	info, err := os.Stat(filepath.Join(dir, "manifest.json"))
+	if err != nil {
+		return false
+	}
+	return !info.IsDir()
+}
+
+// CompareBrowserExtVersion 按语义化版本规则比较两个版本号。
+//
+// 返回值：a<b 时 -1，a==b 时 0，a>b 时 1。
+//
+// 规则（与 Chrome 扩展版本号规范一致，最多 4 段数字）：
+//   - 按 "." 分段，逐段比较；缺失的段按 0 补齐（1.2 == 1.2.0）
+//   - 每段取前导数字比较（7.3.2-beta → 7.3.2）
+//   - 段数超过 4 时只比较前 4 段（Chrome 会忽略多余部分）
+//   - 任一侧存在无法解析的段时，退化为字符串相等比较：相等返回 0，否则返回 -1
+//     （即「无法确认更高」，调用方应据此视为不升级，避免误覆盖）
+func CompareBrowserExtVersion(a, b string) int {
+	a = strings.TrimSpace(a)
+	b = strings.TrimSpace(b)
+	if a == b {
+		return 0
+	}
+	aParts, aOK := parseVersionParts(a)
+	bParts, bOK := parseVersionParts(b)
+	if !aOK || !bOK {
+		// 无法解析：不认为任何一方更高
+		return -1
+	}
+	for i := 0; i < 4; i++ {
+		var av, bv int
+		if i < len(aParts) {
+			av = aParts[i]
+		}
+		if i < len(bParts) {
+			bv = bParts[i]
+		}
+		if av < bv {
+			return -1
+		}
+		if av > bv {
+			return 1
+		}
+	}
+	return 0
+}
+
+// parseVersionParts 把版本号解析为数字段；任一段无法解析时返回 ok=false。
+func parseVersionParts(version string) ([]int, bool) {
+	if version == "" {
+		return nil, false
+	}
+	segments := strings.Split(version, ".")
+	parts := make([]int, 0, len(segments))
+	for _, segment := range segments {
+		// 取前导数字：兼容 "2-beta" / "2+build" 这类带后缀的段
+		digits := segment
+		if idx := strings.IndexFunc(segment, func(r rune) bool {
+			return r < '0' || r > '9'
+		}); idx >= 0 {
+			digits = segment[:idx]
+		}
+		if digits == "" {
+			return nil, false
+		}
+		value, err := strconv.Atoi(digits)
+		if err != nil {
+			return nil, false
+		}
+		parts = append(parts, value)
+	}
+	return parts, true
 }
 
 // BrowserExtDirOrEmpty 返回本地扩展目录；无法确定主目录时返回空串。
