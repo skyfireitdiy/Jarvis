@@ -22,7 +22,9 @@ function makeHarness({ agent = null, directoryItems = [], fetchImpl, pluginConte
       (async (url) => {
         const path = String(url).split('/').pop()
         if (path.startsWith('directories?')) {
-          return { ok: true, json: async () => ({ success: true, data: { items: directoryItems } }) }
+          // directoryItems 支持传函数，便于模拟「删除后目录内容变化」
+          const items = typeof directoryItems === 'function' ? directoryItems(url) : directoryItems
+          return { ok: true, json: async () => ({ success: true, data: { items } }) }
         }
         return { ok: true, json: async () => ({ success: true, data: {} }) }
       })
@@ -672,6 +674,103 @@ describe('useFileTree', () => {
       })
       // 走了预览分支，不应再提示「操作完成」
       expect(showToast).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('删除后目录树刷新（父目录刷新）', () => {
+    // 构造：根 /home/user/proj 下有 a.js 与 src/，src 下有 b.js
+    function makeTreeHarness() {
+      const agent = makeAgent()
+      const directoryItems = (url) => {
+        const dir = decodeURIComponent(String(url).split('path=')[1] || '')
+        if (dir === '/home/user/proj') {
+          return [
+            { name: 'a.js', path: '/home/user/proj/a.js', type: 'file' },
+            { name: 'src', path: '/home/user/proj/src', type: 'directory' },
+          ]
+        }
+        if (dir === '/home/user/proj/src') {
+          return [{ name: 'b.js', path: '/home/user/proj/src/b.js', type: 'file' }]
+        }
+        return []
+      }
+      return makeHarness({ agent, directoryItems })
+    }
+    // 模拟后端：file-delete 成功后父目录内容变化
+    function mockDeleteThenList(fetchWithAuth, { parentDir, itemsAfter }) {
+      let deleted = false
+      fetchWithAuth.mockImplementation(async (url) => {
+        const path = String(url).split('/').pop()
+        if (path.startsWith('file-delete')) {
+          deleted = true
+          return { ok: true, json: async () => ({ success: true, data: {} }) }
+        }
+        if (path.startsWith('directories?')) {
+          const dir = decodeURIComponent(String(url).split('path=')[1] || '')
+          const items = deleted && dir === parentDir
+            ? itemsAfter
+            : [
+                { name: 'a.js', path: '/home/user/proj/a.js', type: 'file' },
+                { name: 'src', path: '/home/user/proj/src', type: 'directory' },
+              ]
+          return { ok: true, json: async () => ({ success: true, data: { items } }) }
+        }
+        return { ok: true, json: async () => ({ success: true, data: {} }) }
+      })
+    }
+    it('删除文件后刷新父目录：父目录 children 中不再包含被删文件', async () => {
+      const { api, fetchWithAuth } = makeTreeHarness()
+      await api.initFileTree('agent-1', '/home/user/proj')
+      const root = api.fileTreeState.value.get('agent-1')[0]
+      await api.handleFileTreeNodeClick('agent-1', root) // 展开根
+      expect(root.children.map((c) => c.name)).toEqual(['a.js', 'src'])
+      const fileNode = root.children.find((c) => c.name === 'a.js')
+      mockDeleteThenList(fetchWithAuth, {
+        parentDir: '/home/user/proj',
+        itemsAfter: [{ name: 'src', path: '/home/user/proj/src', type: 'directory' }],
+      })
+      api.openFileTreeContextMenu(makeAgent(), fileNode, { clientX: 0, clientY: 0 })
+      const action = api.fileTreeContextActions.value.find((a) => a.id === 'delete')
+      await api.runFileTreeContextAction(action)
+      await flush()
+      // 关键断言：父目录（根）被重新加载，被删文件从树中消失
+      expect(root.children.map((c) => c.name)).toEqual(['src'])
+      expect(root.loaded).toBe(true)
+      expect(api.getVisibleFileTreeNodes('agent-1').map((x) => x.node.path))
+        .not.toContain('/home/user/proj/a.js')
+    })
+    it('删除已展开的子目录后，其展开状态与选中态被清理', async () => {
+      const { api, fetchWithAuth } = makeTreeHarness()
+      await api.initFileTree('agent-1', '/home/user/proj')
+      const root = api.fileTreeState.value.get('agent-1')[0]
+      await api.handleFileTreeNodeClick('agent-1', root)
+      const srcNode = root.children.find((c) => c.name === 'src')
+      await api.handleFileTreeNodeClick('agent-1', srcNode) // 展开 src
+      api.selectFileTreeNode('agent-1', srcNode)
+      expect(api.fileTreeExpanded.value.get('agent-1').has('/home/user/proj/src')).toBe(true)
+      expect(api.fileTreeSelectedPath.value).toBe('/home/user/proj/src')
+      mockDeleteThenList(fetchWithAuth, {
+        parentDir: '/home/user/proj',
+        itemsAfter: [{ name: 'a.js', path: '/home/user/proj/a.js', type: 'file' }],
+      })
+      api.openFileTreeContextMenu(makeAgent(), srcNode, { clientX: 0, clientY: 0 })
+      const action = api.fileTreeContextActions.value.find((a) => a.id === 'delete')
+      await api.runFileTreeContextAction(action)
+      await flush()
+      expect(root.children.map((c) => c.name)).toEqual(['a.js'])
+      expect(api.fileTreeExpanded.value.get('agent-1').has('/home/user/proj/src')).toBe(false)
+      expect(api.fileTreeSelectedPath.value).toBeNull()
+    })
+    it('findFileTreeDirNodeByPath：精确命中已加载目录，未加载时回退最深已加载祖先', async () => {
+      const { api } = makeTreeHarness()
+      await api.initFileTree('agent-1', '/home/user/proj')
+      const root = api.fileTreeState.value.get('agent-1')[0]
+      await api.handleFileTreeNodeClick('agent-1', root)
+      const srcNode = root.children.find((c) => c.name === 'src')
+      expect(api.findFileTreeDirNodeByPath('agent-1', '/home/user/proj/src')).toBe(srcNode)
+      expect(api.findFileTreeDirNodeByPath('agent-1', '/home/user/proj')).toBe(root)
+      expect(api.findFileTreeDirNodeByPath('agent-1', '/home/user/proj/src/deep/nested')).toBe(srcNode)
+      expect(api.findFileTreeDirNodeByPath('agent-1', '/other/place')).toBeNull()
     })
   })
 

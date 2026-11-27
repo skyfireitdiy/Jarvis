@@ -14,6 +14,7 @@
 //   openInputPrompt / cancelInputPrompt / confirmInputPrompt / fileTreeContextActions / buildDirSearchGlob /
 //   runFileTreeContextAction
 // - 上传下载：uploadFileToDir / readFileAsDataUrl / onFileTreeUploadInputChange / downloadFileFromNode / refreshFileTreeDir
+// - 变更刷新：refreshFileTreeAfterChange / findFileTreeDirNodeByPath（按目录路径定位父目录刷新）
 // - 文件 CRUD：createFileOrDirectory / deleteFileOrDirectory / renameFileOrDirectory
 // - 复制粘贴：listDirectoryEntries / collectDirectorySnapshot / writeClipboardNode / resolvePasteName /
 //   setFileTreeClipboard / pasteFileTreeClipboard
@@ -561,7 +562,7 @@ async function runFileTreeContextAction(action) {
         if (trimmedName.includes('/') || trimmedName.includes('\\')) return '名称不能包含路径分隔符'
         const absPath = `${String(dirPath).replace(/\/$/, '')}/${trimmedName}`
         createFileOrDirectory(agent.agent_id, absPath, kind)
-          .then(() => refreshFileTreeDir(agent.agent_id, menu.node))
+          .then(() => refreshFileTreeAfterChange(agent.agent_id, { dirNode: menu.node, dirPath }))
           .then(() => (kind === 'file' ? openWorkspaceFile(absPath, agent.agent_id) : null))
           .then(() => showToast(`${label}已创建`, 'success'))
           .catch((error) => showToast(error.message || `创建${label}失败`, 'error'))
@@ -616,7 +617,10 @@ async function runFileTreeContextAction(action) {
     const destDir = getFileTreeContextDirPath()
     if (!destDir) return
     await pasteFileTreeClipboard(agent.agent_id, destDir)
-    await refreshFileTreeDir(agent.agent_id, getFileTreeContextDirNode())
+    await refreshFileTreeAfterChange(agent.agent_id, {
+      dirNode: getFileTreeContextDirNode(),
+      dirPath: destDir,
+    })
     return
   }
 
@@ -666,7 +670,11 @@ async function runFileTreeContextAction(action) {
         if (trimmedName === node.name) return null
         const newAbsPath = `${parentPath.replace(/\/$/, '')}/${trimmedName}`
         renameFileOrDirectory(agent.agent_id, node.path, newAbsPath)
-          .then(() => refreshFileTreeDir(agent.agent_id, menu.node))
+          .then(() => {
+            // 旧路径已失效，清理其展开/选中残留
+            pruneFileTreePathState(agent.agent_id, node.path)
+            return refreshFileTreeAfterChange(agent.agent_id, { dirPath: parentPath })
+          })
           .then(() => showToast('重命名成功', 'success'))
           .catch((error) => showToast(error.message || '重命名失败', 'error'))
         return null
@@ -685,8 +693,14 @@ async function runFileTreeContextAction(action) {
     showConfirm(
       confirmMessage,
       () => {
+        // 被删除的节点会从父目录中消失，必须刷新「父目录」而不是节点自身，
+        // 否则父目录 children 仍持有旧节点，界面看不到变化。
+        const parentPath = getParentTreePath(node.path)
         deleteFileOrDirectory(agent.agent_id, node.path, isDir)
-          .then(() => refreshFileTreeDir(agent.agent_id, menu.node))
+          .then(() => {
+            pruneFileTreePathState(agent.agent_id, node.path)
+            return refreshFileTreeAfterChange(agent.agent_id, { dirPath: parentPath })
+          })
           .then(() => showToast('已删除', 'success'))
           .catch((error) => showToast(error.message || '删除失败', 'error'))
       },
@@ -814,7 +828,10 @@ async function onFileTreeUploadInputChange(event) {
       errors.push(`${file.name}: ${error.message || '上传失败'}`)
     }
   }
-  await refreshFileTreeDir(agentId, getFileTreeContextDirNode())
+  await refreshFileTreeAfterChange(agentId, {
+    dirNode: getFileTreeContextDirNode(),
+    dirPath,
+  })
   if (errors.length === 0) {
     showToast(`已上传 ${okCount} 个文件`, 'success')
   } else if (okCount > 0) {
@@ -858,6 +875,78 @@ async function downloadFileFromNode(agentId, filePath) {
   }
 }
 
+// 规范化路径：去掉末尾斜杠（根路径 "/" 保持原样）
+function normalizeTreePath(path) {
+  const raw = String(path || '')
+  const trimmed = raw.replace(/\/+$/, '')
+  return trimmed === '' ? '/' : trimmed
+}
+
+// 取路径的父目录（根路径的父目录为 null）
+function getParentTreePath(path) {
+  const normalized = normalizeTreePath(path)
+  if (normalized === '/') return null
+  const idx = normalized.lastIndexOf('/')
+  if (idx < 0) return null
+  return idx === 0 ? '/' : normalized.slice(0, idx)
+}
+
+// 判断 ancestor 是否为 path 的祖先目录（含相等）；两者都是绝对路径
+function isSameOrAncestorPath(ancestor, path) {
+  const a = normalizeTreePath(ancestor)
+  const p = normalizeTreePath(path)
+  if (!a || !p) return false
+  return p === a || p.startsWith(a === '/' ? '/' : `${a}/`)
+}
+
+// 按路径查找目录节点：优先精确匹配（含根节点），否则回退到「最深的已加载祖先目录」。
+// 用于刷新「节点被删除/移动后已不在树中」的父目录。
+function findFileTreeDirNodeByPath(agentId, dirPath) {
+  const agent = resolveFileTreeAgent(agentId)
+  const workingDir = normalizeTreePath(agent?.working_dir)
+  const normalized = normalizeTreePath(dirPath)
+  if (!normalized) return null
+  const nodes = fileTreeState.value.get(agentId) || []
+  const stack = [...nodes]
+  let best = null
+  let bestLen = -1
+  while (stack.length) {
+    const node = stack.pop()
+    if (node.type === 'directory') {
+      const nodePath = normalizeTreePath(node.path)
+      if (nodePath === normalized) return node
+      if (isSameOrAncestorPath(nodePath, normalized) && nodePath.length > bestLen) {
+        best = node
+        bestLen = nodePath.length
+      }
+    }
+    if (Array.isArray(node.children) && node.children.length) stack.push(...node.children)
+  }
+  // 兜底：工作目录根节点（刷新整棵树）
+  if (best) return best
+  if (workingDir && isSameOrAncestorPath(workingDir, normalized)) {
+    return nodes.find((n) => n.type === 'directory' && normalizeTreePath(n.path) === workingDir) || null
+  }
+  return null
+}
+
+// 清理已不存在路径的残留状态：展开集合、键盘选中态、拖放高亮
+function pruneFileTreePathState(agentId, removedPath) {
+  const expandedSet = fileTreeExpanded.value.get(agentId)
+  if (expandedSet) {
+    for (const p of [...expandedSet]) {
+      if (isSameOrAncestorPath(removedPath, p)) expandedSet.delete(p)
+    }
+  }
+  if (fileTreeSelectedAgentId.value === agentId && fileTreeSelectedPath.value
+    && isSameOrAncestorPath(removedPath, fileTreeSelectedPath.value)) {
+    fileTreeSelectedPath.value = null
+  }
+  if (fileTreeDropTargetPath.value && isSameOrAncestorPath(removedPath, fileTreeDropTargetPath.value)) {
+    fileTreeDropTargetPath.value = ''
+  }
+}
+
 // 刷新指定目录节点（node 为 null 时刷新工作目录根）
 async function refreshFileTreeDir(agentId, node) {
   const agent = resolveFileTreeAgent(agentId)
@@ -873,6 +962,16 @@ async function refreshFileTreeDir(agentId, node) {
   node.children = []
   await loadFileTreeNode(agentId, node)
   triggerRef(fileTreeState)
+}
+
+// 目录内容变更后刷新「变更所在目录」：优先用传入的目录节点，其次按目录路径在树中查找，
+// 最后回退到工作目录根。node 被删除/移走后不再刷新它自身（刷新它对界面无意义）。
+async function refreshFileTreeAfterChange(agentId, { dirNode = null, dirPath = '' } = {}) {
+  const agent = resolveFileTreeAgent(agentId)
+  if (!agent) return
+  let target = dirNode
+  if (!target && dirPath) target = findFileTreeDirNodeByPath(agentId, dirPath)
+  await refreshFileTreeDir(agentId, target || null)
 }
 
 async function createFileOrDirectory(agentId, absPath, kind) {
@@ -1159,11 +1258,15 @@ async function handleFileTreeDrop(event, agentId, destDir) {
       showToast('已移动', 'success')
     }
     // 刷新目标目录；移动时源目录也需刷新
-    await refreshFileTreeDir(agentId, resolveFileTreeDirNodeByPath(agentId, normalizedDest))
+    await refreshFileTreeAfterChange(agentId, {
+      dirNode: resolveFileTreeDirNodeByPath(agentId, normalizedDest),
+      dirPath: normalizedDest,
+    })
     if (!isCopy) {
       const sourceParent = String(drag.path).replace(/\/+$/, '').split('/').slice(0, -1).join('/') || '/'
       if (sourceParent !== normalizedDest) {
-        await refreshFileTreeDir(agentId, resolveFileTreeDirNodeByPath(agentId, sourceParent))
+        pruneFileTreePathState(agentId, drag.path)
+        await refreshFileTreeAfterChange(agentId, { dirPath: sourceParent })
       }
     }
   } catch (error) {
@@ -1395,5 +1498,9 @@ async function toggleNodeExpand(agentId, node) {
     // 核心加载
     initFileTree,
     getVisibleFileTreeNodes,
+    // 变更后刷新（按目录路径定位父目录，节点被删除/移走时也能正确刷新）
+    refreshFileTreeDir,
+    refreshFileTreeAfterChange,
+    findFileTreeDirNodeByPath,
   }
 }
