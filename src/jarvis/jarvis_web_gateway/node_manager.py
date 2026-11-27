@@ -202,15 +202,21 @@ class NodeConnectionManager:
         # agent_route_registry 是内存态，master 重启后丢失且无恢复机制，
         # 若不在上线时重建，child 上已存在的 agent 的 PATCH（如模型组切换上报，
         # 不带 node_id）将无法路由转发到该 child。
-        try:
-            list_response = await self.send_request_to_node(
-                node_id,
-                AGENT_LIST_REQUEST,
-                {},
-                timeout=10.0,
-            )
-            list_payload = list_response.get("payload") or {}
-            if list_payload.get("success"):
+        #
+        # 注意：必须在读循环启动之后再发请求。响应只能由下面的 while 循环
+        # 从 websocket 读出并投递到 _pending_requests，若在此处同步 await，
+        # 读循环尚未运行，响应永远到不了，必然空等 timeout（历史缺陷）。
+        async def _rebuild_agent_routes() -> None:
+            try:
+                list_response = await self.send_request_to_node(
+                    node_id,
+                    AGENT_LIST_REQUEST,
+                    {},
+                    timeout=10.0,
+                )
+                list_payload = list_response.get("payload") or {}
+                if not list_payload.get("success"):
+                    return
                 for agent in list_payload.get("agents") or []:
                     agent_id = str((agent or {}).get("agent_id") or "")
                     if not agent_id:
@@ -225,12 +231,22 @@ class NodeConnectionManager:
                                 port=(agent or {}).get("port"),
                             )
                         )
-        except Exception as exc:
-            logger.warning(
-                "[NODE] failed to rebuild agent routes on connect node_id=%s error=%s",
-                node_id,
-                exc,
-            )
+                logger.info(
+                    "[NODE] rebuilt agent routes on connect node_id=%s count=%s",
+                    node_id,
+                    len(list_payload.get("agents") or []),
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.warning(
+                    "[NODE] failed to rebuild agent routes on connect node_id=%s error=%s",
+                    node_id,
+                    exc,
+                )
+
+        # 读循环启动后再触发路由重建，保证响应能被读循环投递
+        rebuild_task = asyncio.create_task(_rebuild_agent_routes())
 
         try:
             while True:
@@ -400,6 +416,8 @@ class NodeConnectionManager:
             self._node_runtime.node_registry.mark_offline(node_id)
             self._connections.pop(node_id, None)
             self._connection_to_node.pop(connection_id, None)
+            if not rebuild_task.done():
+                rebuild_task.cancel()
             # 通知所有订阅方该节点已断开：向队列投递 closed，让远端代理结束转发
             for queue in list(self._agent_ws_output_queues.values()):
                 try:

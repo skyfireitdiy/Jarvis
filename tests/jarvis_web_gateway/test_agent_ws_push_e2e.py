@@ -84,14 +84,6 @@ async def test_output_frames_reach_master_subscriber_over_real_ws():
     session_id = "sess-e2e"
     queue = master.subscribe_agent_ws_output(session_id)
 
-    # 认证后 master 会同步发送 AGENT_LIST_REQUEST 并等待响应，但读循环此时
-    # 尚未启动（既有实现如此，真实环境会超时 10s 后继续）。测试中打桩跳过，
-    # 避免无关的 10s 等待。
-    async def _noop_list(*args, **kwargs):
-        return {"payload": {"success": True, "agents": []}}
-
-    master.send_request_to_node = _noop_list
-
     async def handler(ws):
         await master.handle_node_websocket(_FastAPIWSAdapter(ws))
 
