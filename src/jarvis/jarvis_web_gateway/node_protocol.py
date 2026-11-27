@@ -33,6 +33,9 @@ AGENT_WS_SEND_REQUEST = "agent_ws_send_request"
 AGENT_WS_SEND_RESPONSE = "agent_ws_send_response"
 AGENT_WS_RECV_REQUEST = "agent_ws_recv_request"
 AGENT_WS_RECV_RESPONSE = "agent_ws_recv_response"
+# 推送式 Agent WS 输出：child 主动把 agent 的消息推给 master（替代 RECV 轮询）。
+# payload: {"session_id": str, "messages": [str], "closed": bool}
+AGENT_WS_OUTPUT = "agent_ws_output"
 AGENT_WS_CLOSE_REQUEST = "agent_ws_close_request"
 AGENT_WS_CLOSE_RESPONSE = "agent_ws_close_response"
 DIRECTORY_LIST_REQUEST = "directory_list_request"
