@@ -46,7 +46,6 @@ from .node_protocol import (
     AGENT_WS_CLOSE_RESPONSE,
     AGENT_WS_OPEN_REQUEST,
     AGENT_WS_OPEN_RESPONSE,
-    AGENT_WS_OUTPUT,
     AGENT_WS_RECV_REQUEST,
     AGENT_WS_RECV_RESPONSE,
     AGENT_WS_REQUEST,
@@ -88,9 +87,6 @@ CHILD_HEARTBEAT_INTERVAL_SECONDS = 10
 CHILD_RECONNECT_MIN_SECONDS = 5
 CHILD_RECONNECT_MAX_SECONDS = 10
 
-# master 侧 agent WS 输出订阅队列容量上限：慢消费者时丢最旧帧，避免无界增长
-_AGENT_WS_OUTPUT_QUEUE_MAX = 1024
-
 
 class NodeConnectionManager:
     def __init__(
@@ -113,12 +109,6 @@ class NodeConnectionManager:
         self._pending_requests: Dict[str, asyncio.Future] = {}
         self._streaming_queues: Dict[str, asyncio.Queue] = {}
         self._agent_ws_sessions: Dict[str, Any] = {}
-        # 推送式 Agent WS 输出：session_id -> 后台 pump 任务（child 侧持续读 agent_ws 并推给 master）
-        self._agent_ws_pumps: Dict[str, asyncio.Task] = {}
-        # RECV 轮询兼容：session_id -> 最近一次收到 agent 输出的时间戳（判断对端是否支持推送）
-        self._agent_ws_push_seen: Dict[str, bool] = {}
-        # master 侧推送分发：session_id -> 订阅队列（远端代理的 forward_remote_to_client 消费）
-        self._agent_ws_output_queues: Dict[str, asyncio.Queue] = {}
 
     async def handle_node_websocket(self, websocket: WebSocket) -> None:
         await websocket.accept()
@@ -202,21 +192,15 @@ class NodeConnectionManager:
         # agent_route_registry 是内存态，master 重启后丢失且无恢复机制，
         # 若不在上线时重建，child 上已存在的 agent 的 PATCH（如模型组切换上报，
         # 不带 node_id）将无法路由转发到该 child。
-        #
-        # 注意：必须在读循环启动之后再发请求。响应只能由下面的 while 循环
-        # 从 websocket 读出并投递到 _pending_requests，若在此处同步 await，
-        # 读循环尚未运行，响应永远到不了，必然空等 timeout（历史缺陷）。
-        async def _rebuild_agent_routes() -> None:
-            try:
-                list_response = await self.send_request_to_node(
-                    node_id,
-                    AGENT_LIST_REQUEST,
-                    {},
-                    timeout=10.0,
-                )
-                list_payload = list_response.get("payload") or {}
-                if not list_payload.get("success"):
-                    return
+        try:
+            list_response = await self.send_request_to_node(
+                node_id,
+                AGENT_LIST_REQUEST,
+                {},
+                timeout=10.0,
+            )
+            list_payload = list_response.get("payload") or {}
+            if list_payload.get("success"):
                 for agent in list_payload.get("agents") or []:
                     agent_id = str((agent or {}).get("agent_id") or "")
                     if not agent_id:
@@ -231,22 +215,12 @@ class NodeConnectionManager:
                                 port=(agent or {}).get("port"),
                             )
                         )
-                logger.info(
-                    "[NODE] rebuilt agent routes on connect node_id=%s count=%s",
-                    node_id,
-                    len(list_payload.get("agents") or []),
-                )
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                logger.warning(
-                    "[NODE] failed to rebuild agent routes on connect node_id=%s error=%s",
-                    node_id,
-                    exc,
-                )
-
-        # 读循环启动后再触发路由重建，保证响应能被读循环投递
-        rebuild_task = asyncio.create_task(_rebuild_agent_routes())
+        except Exception as exc:
+            logger.warning(
+                "[NODE] failed to rebuild agent routes on connect node_id=%s error=%s",
+                node_id,
+                exc,
+            )
 
         try:
             while True:
@@ -353,10 +327,6 @@ class NodeConnectionManager:
                     response = await self._handle_agent_ws_close_request(next_message)
                     await websocket.send_json(response)
                     continue
-                if message_type == AGENT_WS_OUTPUT:
-                    # child 主动推送的 agent WS 输出（推送模式）
-                    self._dispatch_agent_ws_output(next_message)
-                    continue
                 if message_type == DIRECTORY_LIST_REQUEST:
                     logger.info(
                         "[NODE] handling directory list request node_id=%s request_id=%s",
@@ -416,14 +386,6 @@ class NodeConnectionManager:
             self._node_runtime.node_registry.mark_offline(node_id)
             self._connections.pop(node_id, None)
             self._connection_to_node.pop(connection_id, None)
-            if not rebuild_task.done():
-                rebuild_task.cancel()
-            # 通知所有订阅方该节点已断开：向队列投递 closed，让远端代理结束转发
-            for queue in list(self._agent_ws_output_queues.values()):
-                try:
-                    queue.put_nowait({"messages": [], "closed": True})
-                except Exception:
-                    pass
 
     @staticmethod
     def _is_terminal_closed_event(message: Any) -> bool:
@@ -606,57 +568,6 @@ class NodeConnectionManager:
 
         finally:
             self._streaming_queues.pop(request_id, None)
-
-    # ------------------------------------------------------------------
-    # 推送式 Agent WS 输出（master 侧订阅）
-    # ------------------------------------------------------------------
-    def subscribe_agent_ws_output(self, session_id: str) -> asyncio.Queue:
-        """注册一个 agent WS 输出订阅队列，返回该队列。
-
-        推送模式下 child 会主动发 AGENT_WS_OUTPUT，handle_node_websocket 收到后
-        投递到对应队列；订阅方（远端代理）从队列取消息转发给浏览器。
-
-        队列有界（_AGENT_WS_OUTPUT_QUEUE_MAX）：浏览器消费慢于 child 推送时
-        不无界缓冲内存，而是丢弃最旧帧（流式输出场景丢旧帧比 OOM 更可接受）。
-        """
-        queue: asyncio.Queue = asyncio.Queue(maxsize=_AGENT_WS_OUTPUT_QUEUE_MAX)
-        self._agent_ws_output_queues[session_id] = queue
-        return queue
-
-    def unsubscribe_agent_ws_output(self, session_id: str) -> None:
-        """注销订阅队列（幂等）。"""
-        self._agent_ws_output_queues.pop(session_id, None)
-
-    def _dispatch_agent_ws_output(self, message: Dict[str, Any]) -> None:
-        """把 child 推送的 AGENT_WS_OUTPUT 投递到对应订阅队列。"""
-        payload = message.get("payload") or {}
-        session_id = str(payload.get("session_id") or "").strip()
-        if not session_id:
-            return
-        queue = self._agent_ws_output_queues.get(session_id)
-        if queue is None:
-            logger.debug(
-                "[NODE AGENT WS OUTPUT] no subscriber session_id=%s", session_id
-            )
-            return
-        item = {
-            "messages": payload.get("messages") or [],
-            "closed": bool(payload.get("closed")),
-        }
-        # 有界队列：满了丢最旧帧，避免慢消费者导致无界内存增长
-        while True:
-            try:
-                queue.put_nowait(item)
-                break
-            except asyncio.QueueFull:
-                try:
-                    queue.get_nowait()
-                except asyncio.QueueEmpty:
-                    pass
-                logger.warning(
-                    "[NODE AGENT WS OUTPUT] queue full, dropping oldest session_id=%s",
-                    session_id,
-                )
 
     def _handle_agent_create_request(
         self, message: Dict[str, Any], source_node_id: str
@@ -1452,80 +1363,6 @@ class NodeConnectionManager:
                 request_id=request_id,
             )
 
-    def _start_agent_ws_pump(self, session_id: str, agent_ws: Any) -> None:
-        """为 agent WS 会话启动推送泵：持续读 agent_ws 并主动推给 master。
-
-        替代 master 侧的 AGENT_WS_RECV 轮询。轮询模式下消息进 agent_ws 后
-        最多要等一个轮询周期（1s）才被取走，是远端 WS 延迟的主要来源。
-        推送模式下延迟降到网络 RTT 级别。
-
-        注意：agent_ws 是单消费者语义，本 pump 是该会话唯一的 recv 调用方；
-        _handle_agent_ws_recv_request 在推送可用时不再直接 recv（见该函数）。
-        """
-        self._stop_agent_ws_pump(session_id)
-
-        async def _pump() -> None:
-            cancelled = False
-            try:
-                async for raw in agent_ws:
-                    text = raw if isinstance(raw, str) else raw.decode("utf-8", "replace")
-                    await self._send_agent_ws_output(session_id, [text], closed=False)
-            except asyncio.CancelledError:
-                cancelled = True
-                raise
-            except Exception as exc:
-                logger.info(
-                    "[NODE AGENT WS PUMP] session=%s ended: %s", session_id, exc
-                )
-            finally:
-                self._agent_ws_pumps.pop(session_id, None)
-                # 主动取消（close 流程 / 连接断开）由调用方负责通知 master，
-                # 这里不再发 closed，避免与 close 流程重复或在取消态下再次 await。
-                if not cancelled:
-                    self._agent_ws_sessions.pop(session_id, None)
-                    try:
-                        await self._send_agent_ws_output(session_id, [], closed=True)
-                    except Exception as e:
-                        logger.debug(
-                            "[NODE AGENT WS PUMP] failed to send closed: session=%s error=%s",
-                            session_id,
-                            e,
-                        )
-
-        self._agent_ws_pumps[session_id] = asyncio.create_task(_pump())
-
-    def _stop_agent_ws_pump(self, session_id: str) -> None:
-        """停止并清理指定会话的推送泵（幂等）。"""
-        task = self._agent_ws_pumps.pop(session_id, None)
-        if task is not None and not task.done():
-            task.cancel()
-
-    def _stop_all_agent_ws_pumps(self) -> None:
-        """停止并清理所有推送泵（连接断开时调用，避免任务泄漏）。"""
-        for session_id in list(self._agent_ws_pumps.keys()):
-            self._stop_agent_ws_pump(session_id)
-        self._agent_ws_sessions.clear()
-
-    async def _send_agent_ws_output(
-        self, session_id: str, messages: List[str], closed: bool
-    ) -> None:
-        """把 agent WS 输出推给 master。仅在 child 侧（self._ws 存在）生效。"""
-        ws = getattr(self, "_ws", None)
-        if ws is None:
-            return
-        await ws.send(
-            json.dumps(
-                build_node_message(
-                    AGENT_WS_OUTPUT,
-                    {
-                        "session_id": session_id,
-                        "messages": messages,
-                        "closed": closed,
-                    },
-                )
-            )
-        )
-
     async def _handle_agent_ws_open_request(
         self, message: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -1564,9 +1401,6 @@ class NodeConnectionManager:
                 subprotocols=subprotocols,  # ty: ignore[invalid-argument-type]
             )
             self._agent_ws_sessions[session_id] = agent_ws
-            # 启动推送泵：持续读取 agent_ws 并把消息主动推给 master，
-            # 替代 master 侧的 AGENT_WS_RECV 轮询（轮询间隔 1s 是 WS 延迟的主要来源）。
-            self._start_agent_ws_pump(session_id, agent_ws)
             logger.info(
                 "[NODE AGENT WS OPEN] success agent_id=%s session_id=%s",
                 agent_id,
@@ -1667,20 +1501,6 @@ class NodeConnectionManager:
             agent_ws = self._agent_ws_sessions.get(session_id)
             if agent_ws is None:
                 raise RuntimeError(f"ws session not found: {session_id}")
-            # 推送模式：该会话的 agent_ws 由推送泵独占消费，RECV 不再抢占。
-            # 返回空消息列表让 master 侧的回退轮询循环空转（master 收到
-            # AGENT_WS_OUTPUT 推送后会自动停止轮询），避免并发 recv 报错。
-            if session_id in self._agent_ws_pumps:
-                return build_node_message(
-                    AGENT_WS_RECV_RESPONSE,
-                    {
-                        "success": True,
-                        "session_id": session_id,
-                        "messages": [],
-                        "push_mode": True,
-                    },
-                    request_id=request_id,
-                )
             # 清理已关闭的会话
             if agent_ws.state != State.OPEN:
                 self._agent_ws_sessions.pop(session_id, None)
@@ -1732,8 +1552,6 @@ class NodeConnectionManager:
             session_id,
         )
         agent_ws = self._agent_ws_sessions.pop(session_id, None)
-        # 先停推送泵，避免它与 close 竞争 recv / 重复发 closed 通知
-        self._stop_agent_ws_pump(session_id)
         try:
             if agent_ws is not None:
                 await agent_ws.close()
@@ -2461,8 +2279,6 @@ class ChildNodeClient:
                         )
                         pass
                     self._ws = None
-                # 连接断开：清理所有 agent WS 推送泵，避免后台任务泄漏
-                self._node_connection_manager._stop_all_agent_ws_pumps()
 
             reconnect_delay = random.uniform(
                 CHILD_RECONNECT_MIN_SECONDS,
