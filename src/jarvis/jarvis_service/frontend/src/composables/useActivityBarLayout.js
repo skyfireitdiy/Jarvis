@@ -80,12 +80,6 @@ const BUILTIN_ICONS = [
     icon: '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 2.5h3a1 1 0 0 1 1 1v3h-1.2a1.3 1.3 0 0 0 0 2.6H13.5v3a1 1 0 0 1-1 1h-3v-1.2a1.3 1.3 0 0 0-2.6 0V13h-3a1 1 0 0 1-1-1V9.5h1.2a1.3 1.3 0 0 0 0-2.6H2.5v-3a1 1 0 0 1 1-1h3v1.2a1.3 1.3 0 0 0 2.6 0V2.5Z"/></svg>',
   },
   {
-    id: 'manage',
-    title: '增强能力清单',
-    action: { kind: 'sidebar', view: 'manage' },
-    icon: '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1"/><rect x="9" y="2.5" width="4.5" height="4.5" rx="1"/><rect x="2.5" y="9" width="4.5" height="4.5" rx="1"/><rect x="9" y="9" width="4.5" height="4.5" rx="1"/></svg>',
-  },
-  {
     id: 'timers',
     title: '定时任务',
     action: { kind: 'sidebar', view: 'timers' },

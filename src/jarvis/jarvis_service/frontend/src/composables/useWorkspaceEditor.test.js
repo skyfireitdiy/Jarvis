@@ -69,7 +69,6 @@ function makeHarness(overrides = {}) {
   const getLanguageFromFilename = vi.fn(() => 'plaintext')
   const getLanguageExtension = vi.fn(() => 'txt')
   const closePanel = vi.fn()
-  const refreshManageCapabilities = vi.fn()
   const refreshManageTimers = vi.fn()
   const windowWidth = ref(1200)
   const activeWindow = ref('workspace')
@@ -86,8 +85,6 @@ function makeHarness(overrides = {}) {
   const saveWorkspaceSidebarWidth = vi.fn()
   const ACTIVE_Z_INDEX = 2000
   const BASE_Z_INDEX = 1000
-  const manageInstalledScripts = ref([])
-  const manageGatewayScripts = ref([])
   const getDefinition = vi.fn()
   const loadLspServers = vi.fn(async () => {})
   const getServerByLanguage = vi.fn(() => null)
@@ -181,7 +178,6 @@ function makeHarness(overrides = {}) {
     getLanguageFromFilename,
     getLanguageExtension,
     closePanel: () => closePanel,
-    refreshManageCapabilities,
     refreshManageTimers,
     windowWidth,
     activeWindow,
@@ -198,8 +194,6 @@ function makeHarness(overrides = {}) {
     saveWorkspaceSidebarWidth,
     ACTIVE_Z_INDEX,
     BASE_Z_INDEX,
-    manageInstalledScripts,
-    manageGatewayScripts,
     getDefinition,
     loadLspServers,
     getServerByLanguage,
@@ -307,7 +301,7 @@ function makeHarness(overrides = {}) {
       renderDiffForPane, scheduleDiffLayout, getWorkspaceTargetNodeId, closePanel, collapseWorkspacePanes,
       findWorkspacePaneByView, ensureEditorPaneForFileOpen, ensurePaneForView, setMainViewOnLeaf,
       setActivePaneView, setActivePaneViewForPane, normalizeWorkspaceSidebarWidth, saveWorkspaceSidebarWidth,
-      saveWorkspacePanelRect, refreshManageCapabilities, refreshManageTimers, fetchWithAuth, getGatewayAddress,
+      saveWorkspacePanelRect, refreshManageTimers, fetchWithAuth, getGatewayAddress,
       buildNodeHttpUrl, getLanguageFromFilename, getLanguageExtension,
     },
   }

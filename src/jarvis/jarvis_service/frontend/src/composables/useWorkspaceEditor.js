@@ -15,12 +15,12 @@
 // - 直传（定义在本 composable 调用点之前）：fetchWithAuth / getGatewayAddress / getHttpProtocol /
 //   buildNodeHttpUrl / getWebSocketProtocol / buildWebSocketProtocols / getLanguageFromFilename /
 //   getLanguageExtension / showToast / showConfirm / pushOverlayState / getNodeDisplayName /
-//   getCurrentAgentOrNull / isStoppedAgent / refreshManageCapabilities / refreshManageTimers /
+//   getCurrentAgentOrNull / isStoppedAgent / refreshManageTimers /
 //   windowWidth / activeWindow / showWorkspacePanel / showTerminalPanel / showChatPanel /
 //   workspaceSidebarWidth / workspaceSidebarResizeState / currentAgent / socket /
 //   workspaceHostsChat / workspaceHostsTerminal / editorShortcutLocked /
 //   effectiveGlobalSearchAgentId / normalizeWorkspaceSidebarWidth / saveWorkspaceSidebarWidth /
-//   ACTIVE_Z_INDEX / BASE_Z_INDEX / manageInstalledScripts / manageGatewayScripts / getDefinition /
+//   ACTIVE_Z_INDEX / BASE_Z_INDEX / getDefinition /
 //   loadLspServers / getServerByLanguage / getServerByPath / ensureClient / disposeClient
 // - 直传（useWorkspacePane 返回，定义在本调用点之前）：activePaneId / workspaceSessions /
 //   activeWorkspaceSessionId / workspaceTabs / activeWorkspaceTabPath / activeWorkspaceSession /
@@ -58,7 +58,6 @@ export function useWorkspaceEditor({
   getCurrentAgentOrNull: getCurrentAgentOrNullGetter,
   isStoppedAgent: isStoppedAgentGetter,
   closePanel: closePanelGetter,
-  refreshManageCapabilities,
   refreshManageTimers,
   windowWidth,
   activeWindow,
@@ -80,8 +79,6 @@ export function useWorkspaceEditor({
   saveWorkspaceSidebarWidth,
   ACTIVE_Z_INDEX,
   BASE_Z_INDEX,
-  manageInstalledScripts,
-  manageGatewayScripts,
   getDefinition,
   loadLspServers,
   getServerByLanguage,
@@ -1333,25 +1330,6 @@ function setWorkspaceSidebarView(view) {
       if (!gitLogLoading().value) {
         refreshGitView()
       }
-    })
-    return
-  }
-  if (view === 'manage') {
-    // 切到能力清单视图：数据缓存，避免频繁请求；仅首次打开（四个数据源均为空）时加载，
-    // 之后靠侧边栏内「刷新」按钮手动刷新。
-    // 注意：不能用 topologyDaemonSessions/topologyExtensionSessions 是否为空来判断——
-    // 这两个 ref 与网络拓扑图共享，可能已被拓扑图轮询填充，导致 installedScripts/
-    // gatewayScripts 永远不加载（网关脚本库区块不显示）。
-    if (
-      !topologyDaemonSessions().value.length &&
-      !topologyExtensionSessions().value.length &&
-      !manageInstalledScripts.value.length &&
-      !manageGatewayScripts.value.length
-    ) {
-      refreshManageCapabilities()
-    }
-    nextTick(() => {
-      layoutMonacoEditor()
     })
     return
   }

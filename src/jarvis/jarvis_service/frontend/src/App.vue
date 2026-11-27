@@ -532,19 +532,8 @@
                 </template>
               </div>
             </div>
-            <div v-else-if="workspaceSidebarView === 'manage'" class="workspace-sidebar-content">
-              <ManageSidebar
-                view="manage"
-                :daemonSessions="topologyDaemonSessions"
-                :extensionSessions="topologyExtensionSessions"
-                :installedScripts="manageInstalledScripts"
-                :gatewayScripts="manageGatewayScripts"
-                @refresh="refreshManageCapabilities"
-              />
-            </div>
             <div v-else-if="workspaceSidebarView === 'timers'" class="workspace-sidebar-content">
               <ManageSidebar
-                view="timers"
                 :timers="manageTimers"
                 :getNodeDisplayName="getNodeDisplayName"
                 @delete-timer="deleteTimer"
@@ -3065,38 +3054,6 @@ async function openAbout() {
   aboutBrowserExtSessions.value = await fetchBrowserExtensionSessions()
 }
 
-// 查询每个在线浏览器扩展会话已安装的自定义脚本（能力清单用）。
-// GET /api/browser-ext/scripts/installed 返回 {success, sessions:[{session_id, name, scripts}]}
-async function fetchInstalledScripts() {
-  try {
-    const { host, port } = getGatewayAddress()
-    const url = `${getHttpProtocol()}://${host}:${port}/api/browser-ext/scripts/installed`
-    const response = await fetchWithAuth(url)
-    if (!response.ok) return []
-    const result = await response.json()
-    if (!result || !result.success) return []
-    return Array.isArray(result.sessions) ? result.sessions : []
-  } catch (e) {
-    return []
-  }
-}
-
-// 查询网关数据目录下保存的脚本（能力清单用）。
-// GET /api/browser-ext/scripts/list 返回 {success, scripts:[{name, size, updated_at}]}
-async function fetchGatewayScripts() {
-  try {
-    const { host, port } = getGatewayAddress()
-    const url = `${getHttpProtocol()}://${host}:${port}/api/browser-ext/scripts/list`
-    const response = await fetchWithAuth(url)
-    if (!response.ok) return []
-    const result = await response.json()
-    if (!result || !result.success) return []
-    return Array.isArray(result.scripts) ? result.scripts : []
-  } catch (e) {
-    return []
-  }
-}
-
 // 网络拓扑大图（拆自 composable useTopology，见下方 useTopology 调用处）
 const {
   topologyExtensionSessions,
@@ -3138,28 +3095,8 @@ const {
   terminalSessions: () => terminalSessions,
   activeTerminalId: () => activeTerminalId,
 })
-// 刷新能力清单数据（浏览器扩展会话 + daemon 会话 + 已安装脚本 + 网关脚本）。
-// 能力清单缓存：仅在首次打开或手动点刷新按钮时调用，避免频繁请求。
-async function refreshManageCapabilities() {
-  // 能力清单要展示每个能力的 description/parameters，故显式要求完整 schema
-  // （会话列表默认只返回精简能力名，避免响应体积膨胀）。
-  const [extSessions, daemonSessions, installedScripts, gatewayScripts] = await Promise.all([
-    fetchBrowserExtensionSessions({ includeCapabilities: true }),
-    fetchDaemonSessions({ includeCapabilities: true }),
-    fetchInstalledScripts(),
-    fetchGatewayScripts(),
-  ])
-  topologyExtensionSessions.value = Array.isArray(extSessions) ? extSessions : []
-  topologyDaemonSessions.value = Array.isArray(daemonSessions) ? daemonSessions : []
-  manageInstalledScripts.value = Array.isArray(installedScripts) ? installedScripts : []
-  manageGatewayScripts.value = Array.isArray(gatewayScripts) ? gatewayScripts : []
-}
-
 // 管理侧边栏展示的定时任务列表（只读，由 Agent 直接控制）
 const manageTimers = ref([])
-// 能力清单：浏览器扩展已安装脚本 + 网关脚本库（缓存，避免频繁请求，仅手动刷新）
-const manageInstalledScripts = ref([])
-const manageGatewayScripts = ref([])
 
 // 弹窗控制
 const showConnectModal = ref(true)  // 首次打开显示欢迎界面
@@ -3735,7 +3672,6 @@ const {
   getLanguageFromFilename,
   getLanguageExtension,
   closePanel: () => closePanel,
-  refreshManageCapabilities,
   refreshManageTimers,
   windowWidth,
   activeWindow,
@@ -3752,8 +3688,6 @@ const {
   saveWorkspaceSidebarWidth,
   ACTIVE_Z_INDEX,
   BASE_Z_INDEX,
-  manageInstalledScripts,
-  manageGatewayScripts,
   getDefinition,
   loadLspServers,
   getServerByLanguage,

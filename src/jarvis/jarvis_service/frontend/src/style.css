@@ -1440,3 +1440,127 @@ body.jarvis-has-wallpaper {
     transparent
   ) !important;
 }
+
+/* ===== 工作区 Agent 列表（AgentSidebar）半透明 =====
+   问题：Agent 列表项底色是 --color-bg-tertiary = rgba(18,30,50,0.65)，叠在
+   .workspace-sidebar 半透明底之上，两层 alpha 相乘后几乎不透光，壁纸在列表区域
+   基本看不出（实测比面板其他区域明显更"实"）。
+   做法：
+   - 列表项/分组按钮的底色改为跟随 --jarvis-ui-opacity 的 color-mix，且基色比
+     原 tertiary 更淡，让壁纸透出；
+   - hover / 选中 / 等待输入等状态色保留原有色相（用户靠颜色区分状态），但同样
+     跟随透明度变量，避免状态色变成"实心块"。
+   - 列表项本身带 backdrop-filter 毛玻璃：壁纸在列表区域被轻微模糊/压暗，
+     文字依然清晰，同时不再是"死黑块"。
+   注意：AgentSidebar.vue 的样式是 scoped，特异性高于本文件普通类选择器，故必须
+   用 !important 才能真正覆盖（与上方工作区面板内部规则同理）。
+   透明度语义：--jarvis-ui-opacity = 100 时仍保留半透明（这是"有壁纸即半透明"
+   的产品语义），滑块越低调得越透。 */
+.app.has-wallpaper .workspace-panel .agent-item,
+.app.has-wallpaper .workspace-panel .agent-collapsed-toggle {
+  background: color-mix(
+    in srgb,
+    #0e1a2e calc(var(--jarvis-ui-opacity) * 55%),
+    transparent
+  ) !important;
+  backdrop-filter: blur(6px) saturate(1.05);
+  -webkit-backdrop-filter: blur(6px) saturate(1.05);
+}
+
+.app.has-wallpaper .workspace-panel .agent-item:hover,
+.app.has-wallpaper .workspace-panel .agent-collapsed-toggle:hover {
+  background: color-mix(
+    in srgb,
+    #20c8ff calc(var(--jarvis-ui-opacity) * 12%),
+    transparent
+  ) !important;
+}
+
+/* 当前选中（正在查看）的 Agent：保留冰蓝高亮，但跟随透明度 */
+.app.has-wallpaper .workspace-panel .agent-item.active {
+  background: color-mix(
+    in srgb,
+    #20c8ff calc(var(--jarvis-ui-opacity) * 22%),
+    transparent
+  ) !important;
+}
+
+.app.has-wallpaper .workspace-panel .agent-item.selected {
+  background: color-mix(
+    in srgb,
+    #20c8ff calc(var(--jarvis-ui-opacity) * 12%),
+    transparent
+  ) !important;
+}
+
+/* 等待输入：琥珀色警示保留，仅降低不透明度让壁纸透出 */
+.app.has-wallpaper .workspace-panel .agent-item.waiting-input,
+.app.has-wallpaper .workspace-panel .agent-collapsed-toggle.group-waiting-clicked {
+  background: color-mix(
+    in srgb,
+    #d29922 calc(var(--jarvis-ui-opacity) * 30%),
+    transparent
+  ) !important;
+}
+
+.app.has-wallpaper .workspace-panel .agent-item.active.waiting-input {
+  background: color-mix(
+    in srgb,
+    #20c8ff calc(var(--jarvis-ui-opacity) * 28%),
+    transparent
+  ) !important;
+}
+
+/* 呼吸灯（未点击的等待输入）：关键帧里写死了 rgba，需按同一透明度体系重写，
+   否则动画期间会跳回不透明琥珀色。 */
+@keyframes jarvis-wallpaper-breathing {
+  0%, 100% {
+    background: color-mix(in srgb, #d29922 calc(var(--jarvis-ui-opacity) * 30%), transparent);
+  }
+  50% {
+    background: color-mix(in srgb, #d29922 calc(var(--jarvis-ui-opacity) * 55%), transparent);
+  }
+}
+
+.app.has-wallpaper .workspace-panel .agent-item.waiting-input-unread,
+.app.has-wallpaper .workspace-panel .agent-collapsed-toggle.group-waiting-unread {
+  animation: jarvis-wallpaper-breathing 2s ease-in-out infinite !important;
+}
+
+/* 侧边栏头部与批量操作栏：原为不透明 tertiary/secondary，改为半透明 */
+.app.has-wallpaper .workspace-panel .agent-sidebar-header,
+.app.has-wallpaper .workspace-panel .batch-actions-bar {
+  background: color-mix(
+    in srgb,
+    #0b1424 calc(var(--jarvis-ui-opacity) * 70%),
+    transparent
+  ) !important;
+}
+
+/* 列表内的「欢迎横幅」与分组按钮：都是列表区域里的大块底色，同样跟随透明度，
+   否则列表上半部分仍是一块实色，看起来像"只有列表项变透明了"。
+   欢迎横幅原本是 18% 双层渐变，这里保留渐变结构，只把 alpha 接到透明度变量上。 */
+.app.has-wallpaper .workspace-panel .hello-user-banner {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, #7850ff calc(var(--jarvis-ui-opacity) * 20%), transparent),
+    color-mix(in srgb, #00c8ff calc(var(--jarvis-ui-opacity) * 20%), transparent)
+  ) !important;
+}
+
+/* 列表内的操作小按钮（新建/批量/分组等）：原为 tertiary 实色，跟随透明度 */
+.app.has-wallpaper .workspace-panel .agent-sidebar .icon-btn,
+.app.has-wallpaper .workspace-panel .agent-sidebar .icon-btn-small {
+  background: color-mix(
+    in srgb,
+    #12203a calc(var(--jarvis-ui-opacity) * 60%),
+    transparent
+  ) !important;
+}
+
+/* 分组内的 Agent 列表区域：AgentSidebar 内 .agent-list 本身透明，
+   但分组容器若带底色也要跟随；这里统一兜底，避免出现实色块。 */
+.app.has-wallpaper .workspace-panel .agent-sidebar .agent-list,
+.app.has-wallpaper .workspace-panel .agent-sidebar .agent-collapsed-section {
+  background: transparent !important;
+}

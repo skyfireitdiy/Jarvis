@@ -47,8 +47,8 @@ describe('useActivityBarLayout', () => {
       sidebarViews: [makeExt({ id: 'p1', title: '插件1' })],
       toolPanels: [makeExt({ id: 'p2', title: '插件2' })],
     })
-    // 15 内置 + 2 插件
-    expect(api.allIcons.value.length).toBe(17)
+    // 14 内置 + 2 插件
+    expect(api.allIcons.value.length).toBe(16)
     const pluginIcon = api.allIcons.value.find((i) => i.id === 'plugin-view-p1')
     expect(pluginIcon.isPlugin).toBe(true)
     expect(pluginIcon.defaultHidden).toBe(true)
@@ -68,9 +68,9 @@ describe('useActivityBarLayout', () => {
     const { api } = makeHarness({
       sidebarViews: [makeExt({ id: 'p1' }), makeExt({ id: 'p2' }), makeExt({ id: 'p3' }), makeExt({ id: 'p4' })],
     })
-    // 15 内置 + 4 插件 = 19
+    // 14 内置 + 4 插件 = 18
     expect(api.mainIcons.value.length).toBe(api.maxVisible.value)
-    expect(api.moreIcons.value.length).toBe(19 - api.maxVisible.value)
+    expect(api.moreIcons.value.length).toBe(18 - api.maxVisible.value)
   })
 
   it('maxVisible 动态调整时主栏/收纳随之变化', () => {
@@ -80,15 +80,15 @@ describe('useActivityBarLayout', () => {
     // 默认 10
     expect(api.maxVisible.value).toBe(10)
     expect(api.mainIcons.value.length).toBe(10)
-    expect(api.moreIcons.value.length).toBe(9)
-    // 调大到 19：全部显示，无收纳
-    api.maxVisible.value = 19
-    expect(api.mainIcons.value.length).toBe(19)
+    expect(api.moreIcons.value.length).toBe(8)
+    // 调大到 18：全部显示，无收纳
+    api.maxVisible.value = 18
+    expect(api.mainIcons.value.length).toBe(18)
     expect(api.moreIcons.value.length).toBe(0)
     // 调小到 3：主栏 3 个，其余收纳
     api.maxVisible.value = 3
     expect(api.mainIcons.value.length).toBe(3)
-    expect(api.moreIcons.value.length).toBe(16)
+    expect(api.moreIcons.value.length).toBe(15)
   })
 
   it('隐藏图标后从主栏移除', () => {

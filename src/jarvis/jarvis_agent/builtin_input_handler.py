@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 import re
 import subprocess
 import sys
@@ -1158,7 +1159,6 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             return "", True
         elif tag == "OrganizeAgents":
             # 交互式获取编排文件路径（支持多行输入，每行一个路径）
-            import os
             from jarvis.jarvis_utils.input import get_multiline_input
 
             # 自动发现插件声明的编排流水线模板，让用户无需手动查找文件路径
@@ -2540,7 +2540,6 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             return "", True
         elif tag == "Cat":
             # 处理Cat命令，查看文件内容
-            import os
             from jarvis.jarvis_utils.input import get_multiline_input
 
             PrettyOutput.auto_print("🐱 查看文件内容")

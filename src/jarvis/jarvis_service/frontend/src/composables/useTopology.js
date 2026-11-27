@@ -8,9 +8,8 @@
 // 依赖注入（调用方在 setup 中传入，须在其定义之后调用）：
 // - fetchBrowserExtensionSessions / fetchDaemonSessions：会话查询函数（App.vue 定义）
 //
-// 注意：topologyExtensionSessions / topologyDaemonSessions 同时被 App.vue 的
-// refreshManageCapabilities（manage 域）写入，故这两个 ref 由本 composable 返回，
-// App.vue 解构后共享写入。
+// 注意：topologyExtensionSessions / topologyDaemonSessions 由本 composable 返回，
+// App.vue 解构后共享读取（网络拓扑大图与「关于」弹窗等使用）。
 import { ref } from 'vue'
 export function useTopology({
   fetchBrowserExtensionSessions,

@@ -50,7 +50,6 @@ export function usePlugins({
     search: '全局搜索',
     git: 'Git',
     agents: 'Agent 列表',
-    manage: '增强能力清单',
     timers: '定时任务',
     plugins: '插件管理',
     orchestration: '编排查看',

@@ -164,3 +164,82 @@ class TestDetectFileLang:
     def test_empty_content(self):
         """空内容也能按文件名识别"""
         assert _detect_file_lang("/home/sky/app.py", "") == "python"
+
+
+class TestOsNameResolution:
+    """回归测试：builtin_input_handler 内的 os 必须是模块级导入。
+
+    历史 Bug：函数体内 OrganizeAgents / Cat 分支各有局部 ``import os``，
+    使 ``os`` 成为整个函数的局部变量；先走这些分支再走 SubAgent 分支时，
+    ``os.getcwd()`` 抛 UnboundLocalError（cannot access local variable 'os'）。
+    """
+
+    def test_os_is_module_level(self):
+        """os 在模块级可用，且函数内无局部 os 变量"""
+        import dis
+        import types
+
+        import importlib
+
+        m = importlib.import_module("jarvis.jarvis_agent.builtin_input_handler")
+        assert hasattr(m, "os")
+        code = m.builtin_input_handler.__code__
+        assert "os" not in code.co_varnames, "os 不应是函数局部变量"
+        assert "os" not in code.co_cellvars
+        assert "os" not in code.co_freevars
+
+        # 递归检查所有嵌套代码块，除 _get_rule_content（独立函数）外不得有局部 os
+        def walk(c):
+            yield c
+            for const in c.co_consts:
+                if isinstance(const, types.CodeType):
+                    yield from walk(const)
+
+        for c in walk(code):
+            if c.co_name == "_get_rule_content":
+                continue
+            assert "os" not in c.co_varnames, f"{c.co_name} 存在局部 os"
+
+        # 函数内对 os 的引用必须是 LOAD_GLOBAL
+        for ins in dis.get_instructions(code):
+            if ins.argval == "os":
+                assert ins.opname == "LOAD_GLOBAL", (
+                    f"offset {ins.offset} 的 os 引用为 {ins.opname}"
+                )
+
+    def test_subagent_branch_uses_global_os(self, monkeypatch, tmp_path):
+        """先走 Cat 分支再走 SubAgent 分支，不应抛 UnboundLocalError"""
+        import importlib
+
+        m = importlib.import_module("jarvis.jarvis_agent.builtin_input_handler")
+        calls = []
+
+        class _FakeSubAgentTool:
+            def execute(self, params):
+                calls.append(params)
+                return {"success": True, "stdout": "ok"}
+
+        monkeypatch.setattr(
+            "jarvis.jarvis_tools.sub_agent.SubAgentTool", _FakeSubAgentTool
+        )
+        monkeypatch.setattr(m, "get_multiline_input", lambda *a, **k: "", raising=False)
+        monkeypatch.setattr(
+            "jarvis.jarvis_utils.input.get_multiline_input",
+            lambda *a, **k: "做一个任务",
+            raising=False,
+        )
+        monkeypatch.setattr(
+            "jarvis.jarvis_utils.input.user_confirm", lambda *a, **k: False, raising=False
+        )
+
+        agent = type("A", (), {})()
+
+        # 先触发 Cat 分支（历史上会 STORE_FAST os）
+        target = tmp_path / "a.txt"
+        target.write_text("hello", encoding="utf-8")
+        m.builtin_input_handler(f"'<Cat>' {target}", agent)
+
+        # 再触发 SubAgent 分支，此时 os.getcwd() 必须可用
+        ret, done = m.builtin_input_handler("'<SubAgent>'", agent)
+        assert done is True
+        assert calls and "当前工作目录" in calls[0]["background"]
