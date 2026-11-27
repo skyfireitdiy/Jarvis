@@ -1294,6 +1294,7 @@
       :socket="socket"
       :auth="auth"
       :fetchWithAuth="fetchWithAuth"
+      :getToken="getAuthToken"
       :gatewayUrl="gatewayUrl"
       :getHttpProtocol="getHttpProtocol"
       :showToast="showToast"

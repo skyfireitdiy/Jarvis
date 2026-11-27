@@ -18,19 +18,35 @@ function makeFetchMock({ ok = true, body = { success: true, url: '/uploads/wallp
   })
 }
 
+// 打开弹窗时会自动 GET /api/wallpaper 查询网关壁纸（跨终端发现）。
+// 默认 mock 让该查询返回「网关无壁纸」，避免干扰上传/移除用例的调用计数。
+function makeGatewayWallpaperMock({ url = '', wallpapers = null } = {}) {
+  const list = wallpapers || (url ? [{ url, name: url.split('/').pop() }] : [])
+  return vi.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: async () => ({ success: true, url: url || null, wallpapers: list }),
+  })
+}
 function mountModal(props = {}) {
-  return mount(SettingsModal, {
+  const fetchWithAuth = props.fetchWithAuth || makeGatewayWallpaperMock()
+  const wrapper = mount(SettingsModal, {
     props: {
       visible: true,
       historyStorage: {
         getTotalCount: () => 0,
         getStorageInfo: () => ({ totalSizeFormatted: '0 B' }),
       },
-      fetchWithAuth: makeFetchMock(),
       showToast: vi.fn(),
       ...props,
+      fetchWithAuth,
     },
   })
+  return wrapper
+}
+// 取出指定 HTTP 方法的调用（跳过弹窗打开时的 GET 查询）
+function callsOfMethod(fetchWithAuth, method) {
+  return fetchWithAuth.mock.calls.filter(([, options]) => (options?.method || 'GET') === method)
 }
 
 describe('SettingsModal 外观设置 - 渲染', () => {
@@ -107,8 +123,9 @@ describe('SettingsModal 外观设置 - 壁纸上传与移除', () => {
     await new Promise((r) => setTimeout(r, 20))
     await wrapper.vm.$nextTick()
 
-    expect(fetchWithAuth).toHaveBeenCalledTimes(1)
-    const [url, options] = fetchWithAuth.mock.calls[0]
+    const uploadCalls = callsOfMethod(fetchWithAuth, 'POST')
+    expect(uploadCalls).toHaveLength(1)
+    const [url, options] = uploadCalls[0]
     expect(url).toContain('/api/wallpaper/upload')
     expect(options.method).toBe('POST')
     expect(wrapper.emitted('saveWallpaperSetting')?.at(-1)).toEqual([
@@ -116,17 +133,69 @@ describe('SettingsModal 外观设置 - 壁纸上传与移除', () => {
     ])
   })
 
+  it('一次选择多个文件时逐个上传，并启用最后一张', async () => {
+    let seq = 0
+    const fetchWithAuth = vi.fn().mockImplementation(async (url) => {
+      if (String(url).includes('/api/wallpaper/upload')) {
+        seq += 1
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            success: true,
+            url: `/uploads/wallpaper/wallpaper_${seq}.png`,
+          }),
+        }
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          url: '/uploads/wallpaper/wallpaper_2.png',
+          wallpapers: [
+            { url: '/uploads/wallpaper/wallpaper_2.png' },
+            { url: '/uploads/wallpaper/wallpaper_1.png' },
+          ],
+        }),
+      }
+    })
+    const wrapper = mountModal({ fetchWithAuth, wallpaperUrl: '' })
+    await new Promise((r) => setTimeout(r, 20))
+    const files = [
+      new File([new Uint8Array([1])], 'a.png', { type: 'image/png' }),
+      new File([new Uint8Array([2])], 'b.png', { type: 'image/png' }),
+    ]
+    const input = wrapper.find('.wallpaper-file-input')
+    expect(input.attributes('multiple')).toBeDefined()
+    Object.defineProperty(input.element, 'files', { value: files, configurable: true })
+    await input.trigger('change')
+    await new Promise((r) => setTimeout(r, 30))
+
+    expect(callsOfMethod(fetchWithAuth, 'POST')).toHaveLength(2)
+    expect(wrapper.emitted('saveWallpaperSetting')?.at(-1)).toEqual([
+      '/uploads/wallpaper/wallpaper_2.png',
+    ])
+    // 上传后壁纸库列表刷新为 2 张
+    expect(wrapper.findAll('.wallpaper-thumb')).toHaveLength(2)
+  })
+
   it('非图片类型直接提示错误且不发起请求', async () => {
     const fetchWithAuth = makeFetchMock()
     const showToast = vi.fn()
-    const wrapper = mountModal({ fetchWithAuth, showToast })
+    // 本机已有壁纸，避免弹窗打开时的自动发现流程 emit saveWallpaperSetting 干扰断言
+    const wrapper = mountModal({
+      fetchWithAuth,
+      showToast,
+      wallpaperUrl: '/uploads/wallpaper/wallpaper.png',
+    })
     const file = new File(['x'], 'a.txt', { type: 'text/plain' })
     const input = wrapper.find('.wallpaper-file-input')
     Object.defineProperty(input.element, 'files', { value: [file], configurable: true })
     await input.trigger('change')
     await new Promise((r) => setTimeout(r, 20))
 
-    expect(fetchWithAuth).not.toHaveBeenCalled()
+    expect(callsOfMethod(fetchWithAuth, 'POST')).toHaveLength(0)
     expect(showToast).toHaveBeenCalled()
     expect(wrapper.emitted('saveWallpaperSetting')).toBeFalsy()
   })
@@ -144,7 +213,8 @@ describe('SettingsModal 外观设置 - 壁纸上传与移除', () => {
     await input.trigger('change')
     await new Promise((r) => setTimeout(r, 20))
 
-    expect(showToast).toHaveBeenCalledWith('Permission denied: file:upload', 'error')
+    // 多选上传时错误提示带文件名前缀
+    expect(showToast).toHaveBeenCalledWith('「a.png」Permission denied: file:upload', 'error')
     expect(wrapper.emitted('saveWallpaperSetting')).toBeFalsy()
   })
 
@@ -160,9 +230,143 @@ describe('SettingsModal 外观设置 - 壁纸上传与移除', () => {
     await removeBtn.trigger('click')
     await new Promise((r) => setTimeout(r, 20))
 
-    const [url, options] = fetchWithAuth.mock.calls[0]
+    const deleteCalls = callsOfMethod(fetchWithAuth, 'DELETE')
+    expect(deleteCalls).toHaveLength(1)
+    const [url, options] = deleteCalls[0]
     expect(url).toContain('/api/wallpaper')
     expect(options.method).toBe('DELETE')
     expect(wrapper.emitted('saveWallpaperSetting')?.at(-1)).toEqual([''])
+  })
+})
+
+describe('SettingsModal 外观设置 - 跨终端发现网关壁纸', () => {
+  it('本机未设置壁纸时，打开弹窗自动拉取网关壁纸并启用', async () => {
+    const fetchWithAuth = makeGatewayWallpaperMock({ url: '/uploads/wallpaper/wallpaper.png' })
+    const wrapper = mountModal({ fetchWithAuth, wallpaperUrl: '' })
+    await new Promise((r) => setTimeout(r, 20))
+    await wrapper.vm.$nextTick()
+
+    const [url] = fetchWithAuth.mock.calls[0]
+    expect(url).toContain('/api/wallpaper')
+    expect(wrapper.emitted('saveWallpaperSetting')?.at(-1)).toEqual([
+      '/uploads/wallpaper/wallpaper.png',
+    ])
+    const img = wrapper.find('.wallpaper-preview img')
+    expect(img.exists()).toBe(true)
+    expect(img.attributes('src')).toBe('http://127.0.0.1:8000/uploads/wallpaper/wallpaper.png')
+  })
+
+  it('本机已设置壁纸时，自动拉取不会覆盖本机设置', async () => {
+    const fetchWithAuth = makeGatewayWallpaperMock({ url: '/uploads/wallpaper/other.png' })
+    const wrapper = mountModal({
+      fetchWithAuth,
+      wallpaperUrl: '/uploads/wallpaper/mine.png',
+    })
+    await new Promise((r) => setTimeout(r, 20))
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.emitted('saveWallpaperSetting')).toBeFalsy()
+    // 本机与网关当前壁纸不一致时给出提示
+    expect(wrapper.text()).toContain('本机壁纸与网关当前壁纸不一致')
+  })
+
+  it('网关无壁纸时提示「尚未保存任何壁纸」', async () => {
+    const wrapper = mountModal({ wallpaperUrl: '' })
+    await new Promise((r) => setTimeout(r, 20))
+    await wrapper.vm.$nextTick()
+    expect(wrapper.text()).toContain('网关尚未保存任何壁纸')
+  })
+
+  it('渲染网关壁纸库缩略图，点击缩略图切换当前壁纸', async () => {
+    const fetchWithAuth = makeGatewayWallpaperMock({
+      wallpapers: [
+        { url: '/uploads/wallpaper/wallpaper_2.png' },
+        { url: '/uploads/wallpaper/wallpaper_1.png' },
+      ],
+    })
+    const wrapper = mountModal({
+      fetchWithAuth,
+      wallpaperUrl: '/uploads/wallpaper/wallpaper_2.png',
+    })
+    await new Promise((r) => setTimeout(r, 20))
+    await wrapper.vm.$nextTick()
+
+    const thumbs = wrapper.findAll('.wallpaper-thumb')
+    expect(thumbs).toHaveLength(2)
+    // 当前壁纸高亮
+    expect(thumbs[0].classes()).toContain('active')
+
+    await thumbs[1].trigger('click')
+    expect(wrapper.emitted('saveWallpaperSetting')?.at(-1)).toEqual([
+      '/uploads/wallpaper/wallpaper_1.png',
+    ])
+  })
+
+  it('点击缩略图上的删除按钮只删除该张壁纸', async () => {
+    const fetchWithAuth = vi.fn().mockImplementation(async (url, options) => {
+      if ((options?.method || 'GET') === 'DELETE') {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            success: true,
+            removed: true,
+            url: '/uploads/wallpaper/wallpaper_2.png',
+            wallpapers: [{ url: '/uploads/wallpaper/wallpaper_2.png' }],
+          }),
+        }
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          url: '/uploads/wallpaper/wallpaper_2.png',
+          wallpapers: [
+            { url: '/uploads/wallpaper/wallpaper_2.png' },
+            { url: '/uploads/wallpaper/wallpaper_1.png' },
+          ],
+        }),
+      }
+    })
+    const wrapper = mountModal({
+      fetchWithAuth,
+      wallpaperUrl: '/uploads/wallpaper/wallpaper_1.png',
+    })
+    await new Promise((r) => setTimeout(r, 20))
+    await wrapper.vm.$nextTick()
+
+    const removeBtn = wrapper.findAll('.wallpaper-thumb-remove')[1]
+    await removeBtn.trigger('click')
+    await new Promise((r) => setTimeout(r, 30))
+
+    const deleteCalls = callsOfMethod(fetchWithAuth, 'DELETE')
+    expect(deleteCalls).toHaveLength(1)
+    expect(deleteCalls[0][0]).toContain('url=%2Fuploads%2Fwallpaper%2Fwallpaper_1.png')
+    // 删掉的是当前壁纸，自动切到剩余第一张
+    expect(wrapper.emitted('saveWallpaperSetting')?.at(-1)).toEqual([
+      '/uploads/wallpaper/wallpaper_2.png',
+    ])
+  })
+
+  it('点击「使用网关壁纸」按钮启用网关壁纸', async () => {
+    const fetchWithAuth = makeGatewayWallpaperMock({ url: '/uploads/wallpaper/wallpaper.png' })
+    const wrapper = mountModal({ fetchWithAuth, wallpaperUrl: '' })
+    await new Promise((r) => setTimeout(r, 20))
+    const btn = wrapper
+      .findAll('.wallpaper-actions button')
+      .find((b) => b.text().includes('使用网关壁纸'))
+    expect(btn.exists()).toBe(true)
+    await btn.trigger('click')
+    await new Promise((r) => setTimeout(r, 20))
+    expect(callsOfMethod(fetchWithAuth, 'GET').length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('调用网关接口前先回填 token（getToken）', async () => {
+    const getToken = vi.fn()
+    const fetchWithAuth = makeGatewayWallpaperMock({ url: '' })
+    mountModal({ fetchWithAuth, getToken, wallpaperUrl: '' })
+    await new Promise((r) => setTimeout(r, 20))
+    expect(getToken).toHaveBeenCalled()
   })
 })

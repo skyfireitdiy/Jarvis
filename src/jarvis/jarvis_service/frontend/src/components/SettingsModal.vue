@@ -165,15 +165,18 @@
       <!-- 外观：壁纸与界面透明度 -->
       <div class="form-group">
         <label>工作区壁纸</label>
-        <div class="form-help" style="margin-bottom:10px">上传一张图片作为工作区背景（支持 png / jpeg / webp / gif，不超过 8MB）。壁纸会保存到网关，所有终端共享同一张。</div>
+        <div class="form-help" style="margin-bottom:10px">上传图片作为工作区背景（支持 png / jpeg / webp / gif，单张不超过 8MB，最多 {{ WALLPAPER_MAX_COUNT }} 张）。壁纸保存在网关，所有终端共享同一套。</div>
         <div class="wallpaper-row">
           <div class="wallpaper-preview" :class="{ empty: !wallpaperPreviewUrl }">
             <img v-if="wallpaperPreviewUrl" :src="wallpaperPreviewUrl" alt="壁纸预览" />
             <span v-else>未设置壁纸</span>
           </div>
           <div class="wallpaper-actions">
-            <button class="ghost-btn" @click="triggerWallpaperPick" :disabled="wallpaperUploading">
-              {{ wallpaperUploading ? '上传中…' : '选择图片' }}
+            <button class="ghost-btn" @click="triggerWallpaperPick" :disabled="wallpaperUploading || !canUploadMore">
+              {{ wallpaperUploading ? '上传中…' : '添加图片' }}
+            </button>
+            <button class="ghost-btn" @click="fetchGatewayWallpaper" :disabled="wallpaperUploading || wallpaperLoading">
+              {{ wallpaperLoading ? '读取中…' : '使用网关壁纸' }}
             </button>
             <button class="danger-btn" @click="removeWallpaper" :disabled="wallpaperUploading || !wallpaperUrl">
               移除壁纸
@@ -182,10 +185,40 @@
               ref="wallpaperInputRef"
               type="file"
               accept="image/png,image/jpeg,image/webp,image/gif"
+              multiple
               class="wallpaper-file-input"
               @change="handleWallpaperFileChange"
             />
           </div>
+        </div>
+        <!-- 网关壁纸库：所有终端共享，点击缩略图切换当前壁纸 -->
+        <div v-if="gatewayWallpapers.length" class="wallpaper-gallery">
+          <div
+            v-for="item in gatewayWallpapers"
+            :key="item.url"
+            class="wallpaper-thumb"
+            :class="{ active: item.url === wallpaperUrl }"
+            :title="item.url === wallpaperUrl ? '当前壁纸' : '点击使用这张壁纸'"
+            @click="useGatewayWallpaper(item.url)"
+          >
+            <img :src="buildWallpaperAbsoluteUrl(item.url)" :alt="item.name || '壁纸'" />
+            <button
+              class="wallpaper-thumb-remove"
+              title="从网关删除这张壁纸"
+              :disabled="wallpaperUploading"
+              @click.stop="deleteGatewayWallpaper(item.url)"
+            >×</button>
+          </div>
+        </div>
+        <!-- 网关壁纸状态：本机未启用但网关已有壁纸时，提示可一键启用 -->
+        <div v-if="gatewayWallpapers.length && !wallpaperUrl" class="wallpaper-hint">
+          网关已保存 {{ gatewayWallpapers.length }} 张壁纸，本机尚未启用。点击缩略图或「使用网关壁纸」即可启用。
+        </div>
+        <div v-else-if="wallpaperUrl && gatewayWallpapers.length && !gatewayWallpapers.some((item) => item.url === wallpaperUrl)" class="wallpaper-hint">
+          本机壁纸与网关当前壁纸不一致（网关壁纸可能已被其他终端更新）。
+        </div>
+        <div v-else-if="wallpaperChecked && !gatewayWallpapers.length" class="wallpaper-hint">
+          网关尚未保存任何壁纸。
         </div>
       </div>
 
@@ -244,6 +277,8 @@ const props = defineProps({
   },
   auth: { type: Object, default: () => ({}) },
   fetchWithAuth: { type: Function, default: null },
+  // 取当前有效 token（会从 localStorage 回填到内存），用于跨终端发现网关壁纸
+  getToken: { type: Function, default: null },
   gatewayUrl: { type: String, default: '127.0.0.1:8000' },
   getHttpProtocol: { type: Function, default: () => 'http' },
   showToast: { type: Function, default: () => {} },
@@ -294,6 +329,15 @@ const localDaemonPort = ref(props.daemonPort)
 const wallpaperInputRef = ref(null)
 const wallpaperUploading = ref(false)
 const wallpaperPreviewUrl = ref(buildWallpaperAbsoluteUrl(props.wallpaperUrl))
+// 网关侧壁纸库（与「本机是否启用」无关）：用于跨终端发现已上传的壁纸
+const gatewayWallpapers = ref([])
+// 网关当前生效壁纸 URL（列表第一张 / 最近上传的那张）
+const gatewayWallpaperUrl = computed(() => gatewayWallpapers.value[0]?.url || '')
+const wallpaperLoading = ref(false)
+const wallpaperChecked = ref(false)
+// 壁纸库上限，与网关 /api/wallpaper/upload 保持一致
+const WALLPAPER_MAX_COUNT = 20
+const canUploadMore = computed(() => gatewayWallpapers.value.length < WALLPAPER_MAX_COUNT)
 // 界面透明度（20~100）
 const localUiOpacity = ref(normalizeOpacity(props.uiOpacity))
 const changePasswordForm = ref({ old_password: '', new_password: '', confirm_password: '' })
@@ -362,8 +406,58 @@ function normalizeOpacity(value) {
 // 壁纸单文件上限，与网关 /api/wallpaper/upload 保持一致
 const WALLPAPER_MAX_BYTES = 8 * 1024 * 1024
 
+// 把网关返回的壁纸列表归一化为 [{url, name}]，过滤掉非法项
+function normalizeWallpaperList(list) {
+  if (!Array.isArray(list)) return []
+  const seen = new Set()
+  const result = []
+  for (const item of list) {
+    const url = String((typeof item === 'string' ? item : item?.url) || '').trim()
+    if (!url || seen.has(url)) continue
+    seen.add(url)
+    result.push({ url, name: String(item?.name || '') })
+  }
+  return result
+}
+
 function triggerWallpaperPick() {
   wallpaperInputRef.value?.click()
+}
+
+// 查询网关当前保存的壁纸（跨终端共享）：新电脑/新浏览器打开设置时，
+// 即使本机 localStorage 里没有壁纸记录，也能看到网关已有壁纸并一键启用。
+async function fetchGatewayWallpaper() {
+  if (wallpaperLoading.value) return
+  wallpaperLoading.value = true
+  try {
+    // fetchWithAuth 在内存 token 为空时直接返回模拟 401（不会真发请求）。
+    // 新电脑/新浏览器刚打开页面时 token 可能只在 localStorage 里，这里先回填。
+    try {
+      if (typeof props.getToken === 'function') props.getToken()
+    } catch (e) {
+      // 忽略：token 回填失败时按未登录处理
+    }
+    const response = await props.fetchWithAuth(buildApiUrl('/api/wallpaper'))
+    const result = await response.json()
+    if (!response.ok || !result?.success) {
+      // 未登录（401）或权限不足时不打扰用户，静默忽略
+      return
+    }
+    // 兼容两种返回：{wallpapers:[...]}（壁纸库）与 {url}（旧版单张）
+    gatewayWallpapers.value = normalizeWallpaperList(
+      Array.isArray(result.wallpapers) ? result.wallpapers : result.url ? [result.url] : []
+    )
+    wallpaperChecked.value = true
+    // 本机尚未启用壁纸但网关已有：直接启用，让用户「打开设置就看到壁纸」
+    if (gatewayWallpaperUrl.value && !props.wallpaperUrl) {
+      wallpaperPreviewUrl.value = buildWallpaperAbsoluteUrl(gatewayWallpaperUrl.value)
+      emit('saveWallpaperSetting', gatewayWallpaperUrl.value)
+    }
+  } catch (error) {
+    console.warn('[WALLPAPER] Failed to fetch gateway wallpaper:', error)
+  } finally {
+    wallpaperLoading.value = false
+  }
 }
 
 // 读取文件为 base64（去掉 dataURL 前缀，网关兼容两种格式但这里保持精简）
@@ -380,40 +474,106 @@ function readFileAsBase64(file) {
   })
 }
 
-// 选择图片后上传到网关，成功后把返回的 URL 抛给父组件持久化
+// 选择图片后上传到网关（支持一次多选），最后一张上传成功的壁纸自动启用
 async function handleWallpaperFileChange(event) {
   const input = event.target
-  const file = input?.files?.[0]
+  const files = Array.from(input?.files || [])
   // 允许重复选择同一文件（否则 change 不再触发）
   if (input) input.value = ''
-  if (!file) return
-  if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) {
-    props.showToast('仅支持 png / jpeg / webp / gif 图片', 'error')
+  if (!files.length) return
+  const validFiles = []
+  for (const file of files) {
+    if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) {
+      props.showToast(`「${file.name}」不是支持的图片格式（png / jpeg / webp / gif）`, 'error')
+      continue
+    }
+    if (file.size > WALLPAPER_MAX_BYTES) {
+      props.showToast(`「${file.name}」超过 8MB`, 'error')
+      continue
+    }
+    validFiles.push(file)
+  }
+  if (!validFiles.length) return
+  const remaining = WALLPAPER_MAX_COUNT - gatewayWallpapers.value.length
+  if (remaining <= 0) {
+    props.showToast(`壁纸库最多 ${WALLPAPER_MAX_COUNT} 张，请先删除部分壁纸`, 'error')
     return
   }
-  if (file.size > WALLPAPER_MAX_BYTES) {
-    props.showToast('图片不能超过 8MB', 'error')
-    return
+  if (validFiles.length > remaining) {
+    props.showToast(`壁纸库最多 ${WALLPAPER_MAX_COUNT} 张，本次只上传前 ${remaining} 张`, 'error')
+    validFiles.length = remaining
   }
   wallpaperUploading.value = true
+  let lastUrl = ''
+  let uploaded = 0
   try {
-    const data = await readFileAsBase64(file)
-    const response = await props.fetchWithAuth(buildApiUrl('/api/wallpaper/upload'), {
-      method: 'POST',
-      body: JSON.stringify({ data, filename: file.name })
-    })
-    const result = await response.json()
-    if (!response.ok || !result?.success) {
-      const message = result?.error?.message || `上传失败（HTTP ${response.status}）`
-      props.showToast(message, 'error')
-      return
+    for (const file of validFiles) {
+      const data = await readFileAsBase64(file)
+      const response = await props.fetchWithAuth(buildApiUrl('/api/wallpaper/upload'), {
+        method: 'POST',
+        body: JSON.stringify({ data, filename: file.name })
+      })
+      const result = await response.json()
+      if (!response.ok || !result?.success) {
+        const message = result?.error?.message || `上传失败（HTTP ${response.status}）`
+        props.showToast(`「${file.name}」${message}`, 'error')
+        continue
+      }
+      uploaded += 1
+      lastUrl = String(result.url || '')
     }
-    wallpaperPreviewUrl.value = buildWallpaperAbsoluteUrl(result.url)
-    emit('saveWallpaperSetting', result.url || '')
-    props.showToast('壁纸已更新', 'success')
+    if (uploaded > 0) {
+      // 上传后刷新壁纸库列表（网关按最近上传排序）
+      await fetchGatewayWallpaper()
+      if (lastUrl) {
+        wallpaperPreviewUrl.value = buildWallpaperAbsoluteUrl(lastUrl)
+        emit('saveWallpaperSetting', lastUrl)
+      }
+      props.showToast(uploaded > 1 ? `已上传 ${uploaded} 张壁纸` : '壁纸已更新', 'success')
+    }
   } catch (error) {
     console.warn('[WALLPAPER] Upload failed:', error)
     props.showToast('壁纸上传失败，请检查网络或权限', 'error')
+  } finally {
+    wallpaperUploading.value = false
+  }
+}
+
+// 点击缩略图：把该壁纸设为当前壁纸（只改本机 localStorage，不动网关）
+function useGatewayWallpaper(url) {
+  const target = String(url || '').trim()
+  if (!target) return
+  wallpaperPreviewUrl.value = buildWallpaperAbsoluteUrl(target)
+  emit('saveWallpaperSetting', target)
+}
+
+// 从网关删除指定壁纸；若删的是当前壁纸，自动切到剩余第一张（无剩余则清空）
+async function deleteGatewayWallpaper(url) {
+  const target = String(url || '').trim()
+  if (!target || wallpaperUploading.value) return
+  wallpaperUploading.value = true
+  try {
+    const response = await props.fetchWithAuth(
+      buildApiUrl(`/api/wallpaper?url=${encodeURIComponent(target)}`),
+      { method: 'DELETE' }
+    )
+    const result = await response.json()
+    if (!response.ok || !result?.success) {
+      const message = result?.error?.message || `删除失败（HTTP ${response.status}）`
+      props.showToast(message, 'error')
+      return
+    }
+    const wasActive = target === props.wallpaperUrl
+    await fetchGatewayWallpaper()
+    if (wasActive) {
+      const nextUrl = gatewayWallpaperUrl.value || ''
+      wallpaperPreviewUrl.value = buildWallpaperAbsoluteUrl(nextUrl)
+      emit('saveWallpaperSetting', nextUrl)
+    }
+    props.showToast('壁纸已删除', 'success')
+  } catch (error) {
+    console.warn('[WALLPAPER] Delete one failed:', error)
+    props.showToast('删除壁纸失败，请检查网络或权限', 'error')
   } finally {
     wallpaperUploading.value = false
   }
@@ -431,6 +591,8 @@ async function removeWallpaper() {
       return
     }
     wallpaperPreviewUrl.value = ''
+    gatewayWallpapers.value = []
+    wallpaperChecked.value = true
     emit('saveWallpaperSetting', '')
     props.showToast('壁纸已移除', 'success')
   } catch (error) {
@@ -492,6 +654,11 @@ watch(() => props.uiOpacity, (newVal) => {
   if (wallpaperUploading.value) return
   localUiOpacity.value = normalizeOpacity(newVal)
 })
+// 设置弹窗打开时查询网关壁纸：换电脑/换浏览器后本机 localStorage 没有记录，
+// 但网关已保存壁纸，需要让用户看到并启用（否则会以为壁纸丢了）。
+watch(() => props.visible, (visible) => {
+  if (visible) fetchGatewayWallpaper()
+}, { immediate: true })
 
 // 本机后台服务端口输入：更新本地副本并向上同步（父组件负责持久化到 localStorage）。
 // 输入过程中不即时持久化，避免用户逐字符输入时反复写入半成品端口；失焦/回车时提交。
@@ -1116,6 +1283,81 @@ async function changePassword() {
 /* 原生 file input 隐藏，由「选择图片」按钮触发 */
 .wallpaper-file-input {
   display: none;
+}
+
+/* 网关壁纸库缩略图 */
+.wallpaper-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.wallpaper-thumb {
+  position: relative;
+  width: 88px;
+  height: 52px;
+  border-radius: var(--tile-radius-xs, 8px);
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid transparent;
+  background: var(--color-bg-tertiary, rgba(18, 30, 50, 0.65));
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.wallpaper-thumb:hover {
+  transform: translateY(-1px);
+  border-color: var(--color-border-subtle, rgba(32, 200, 255, 0.35));
+}
+
+.wallpaper-thumb.active {
+  border-color: var(--color-accent, #20c8ff);
+  box-shadow: 0 0 0 1px var(--color-accent, #20c8ff);
+}
+
+.wallpaper-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.wallpaper-thumb-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  line-height: 16px;
+  font-size: 14px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.wallpaper-thumb:hover .wallpaper-thumb-remove {
+  opacity: 1;
+}
+
+.wallpaper-thumb-remove:hover {
+  background: var(--color-error, #e5484d);
+}
+
+/* 网关壁纸状态提示 */
+.wallpaper-hint {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: var(--tile-radius-xs, 8px);
+  background: rgba(32, 200, 255, 0.08);
+  border-left: 2px solid var(--color-accent, #20c8ff);
+  color: var(--text-secondary, #8ba3b8);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .opacity-row {

@@ -17,6 +17,7 @@ from queue import Queue
 import logging
 import os
 import pathlib
+import re
 import shutil
 import signal
 import socket
@@ -12497,9 +12498,12 @@ def create_app(
         return await _handle_file_upload_raw_request(body)
 
     # --- 工作区壁纸：上传/查询/删除 ---
-    # 壁纸统一存放在 {data_dir}/uploads/wallpaper/ 下，文件名固定为 wallpaper.<ext>，
-    # 借助已挂载的 /uploads 静态服务直接以 URL 方式访问，前端只需记住该 URL。
+    # 壁纸库：统一存放在 {data_dir}/uploads/wallpaper/ 下，文件名 wallpaper_<时间戳>_<随机串>.<ext>，
+    # 借助已挂载的 /uploads 静态服务直接以 URL 方式访问，前端只需记住 URL。
+    # 支持多张共存（壁纸库），按文件名时间戳倒序即「最近上传优先」。
     _WALLPAPER_MAX_BYTES = 8 * 1024 * 1024
+    # 壁纸库最多保存张数（前端 SettingsModal 的 WALLPAPER_MAX_COUNT 需保持一致）
+    _WALLPAPER_MAX_COUNT = 20
     # 允许的图片类型：扩展名 -> 文件头魔数前缀
     _WALLPAPER_MAGIC_PREFIXES = (
         ("png", (b"\x89PNG\r\n\x1a\n",)),
@@ -12528,20 +12532,67 @@ def create_app(
                 return ext
         return None
 
-    def _find_wallpaper_file() -> Optional[str]:
-        """查找当前壁纸文件路径（wallpaper.<ext>），不存在返回 None。"""
+    # 壁纸库文件名格式：wallpaper_<时间戳毫秒>_<随机串>.<ext>，按文件名倒序即「最近上传优先」。
+    # 兼容历史单张壁纸 wallpaper.<ext>（视为最早的一张）。
+    _WALLPAPER_NAME_RE = re.compile(
+        r"^wallpaper(?:_(\d{10,})_([0-9a-f]{4,32}))?\.(png|jpg|gif|webp)$"
+    )
+
+    def _list_wallpaper_files() -> List[str]:
+        """列出壁纸库中所有壁纸文件路径，按最近上传优先排序。"""
         directory = _wallpaper_dir()
-        for ext in ("png", "jpg", "gif", "webp"):
-            candidate = os.path.join(directory, f"wallpaper.{ext}")
-            if os.path.isfile(candidate):
-                return candidate
-        return None
+        entries: List[Tuple[int, str]] = []
+        try:
+            names = os.listdir(directory)
+        except OSError as exc:
+            logger.warning(f"[WALLPAPER] Failed to list {directory}: {exc}")
+            return []
+        for name in names:
+            match = _WALLPAPER_NAME_RE.match(name)
+            if not match:
+                continue
+            path = os.path.join(directory, name)
+            if not os.path.isfile(path):
+                continue
+            # 旧版单张壁纸没有时间戳，排到最后
+            ts = int(match.group(1)) if match.group(1) else 0
+            entries.append((ts, path))
+        entries.sort(key=lambda item: (item[0], os.path.basename(item[1])), reverse=True)
+        return [path for _, path in entries]
+
+    def _find_wallpaper_file() -> Optional[str]:
+        """查找当前壁纸文件路径（最近上传的一张），不存在返回 None。"""
+        files = _list_wallpaper_files()
+        return files[0] if files else None
 
     def _wallpaper_url(file_path: Optional[str]) -> Optional[str]:
         """把壁纸文件路径转换为 /uploads 静态 URL。"""
         if not file_path:
             return None
         return f"/uploads/wallpaper/{os.path.basename(file_path)}"
+
+    def _wallpaper_items() -> List[Dict[str, str]]:
+        """壁纸库列表：[{url, name}]，最近上传优先。"""
+        return [
+            {"url": _wallpaper_url(path) or "", "name": os.path.basename(path)}
+            for path in _list_wallpaper_files()
+        ]
+
+    def _resolve_wallpaper_path(url: str) -> Optional[str]:
+        """把 /uploads/wallpaper/xxx 或文件名解析为壁纸库内的真实文件路径。
+
+        只接受壁纸库目录下的合法文件名，防止路径穿越。
+        """
+        raw = str(url or "").strip()
+        if not raw:
+            return None
+        name = raw.rsplit("/", 1)[-1]
+        if not name or name != os.path.basename(name):
+            return None
+        if not _WALLPAPER_NAME_RE.match(name):
+            return None
+        path = os.path.join(_wallpaper_dir(), name)
+        return path if os.path.isfile(path) else None
 
     @app.post("/api/wallpaper/upload", dependencies=[Depends(verify_token)])
     async def upload_wallpaper(
@@ -12602,51 +12653,94 @@ def create_app(
                     "message": "Only png/jpeg/webp/gif images are supported",
                 },
             }
+        # 壁纸库容量上限：超出时拒绝，避免磁盘被无限占用
+        existing = _list_wallpaper_files()
+        if len(existing) >= _WALLPAPER_MAX_COUNT:
+            return {
+                "success": False,
+                "error": {
+                    "code": "TOO_MANY_WALLPAPERS",
+                    "message": (
+                        f"Wallpaper count exceeds {_WALLPAPER_MAX_COUNT} limit, "
+                        "please delete some first"
+                    ),
+                },
+            }
         directory = _wallpaper_dir()
-        target_path = os.path.join(directory, f"wallpaper.{ext}")
-        # 换格式时清理旧的其它扩展名文件，避免残留多个壁纸
-        for old_ext in ("png", "jpg", "gif", "webp"):
-            old_path = os.path.join(directory, f"wallpaper.{old_ext}")
-            if old_ext != ext and os.path.isfile(old_path):
-                try:
-                    os.remove(old_path)
-                except OSError as exc:
-                    logger.warning(f"[WALLPAPER] Failed to remove {old_path}: {exc}")
+        # 文件名带时间戳 + 随机串：天然「最近上传优先」排序，且避免并发覆盖
+        stamp = int(time.time() * 1000)
+        suffix = uuid.uuid4().hex[:8]
+        target_path = os.path.join(directory, f"wallpaper_{stamp}_{suffix}.{ext}")
         with open(target_path, "wb") as wallpaper_file:
             wallpaper_file.write(file_bytes)
         url = _wallpaper_url(target_path)
         logger.info(f"[WALLPAPER] Saved wallpaper ({len(file_bytes)} bytes) -> {url}")
-        return {"success": True, "url": url}
+        return {"success": True, "url": url, "wallpapers": _wallpaper_items()}
 
     @app.get("/api/wallpaper", dependencies=[Depends(verify_token)])
     async def get_wallpaper(request: Request) -> Dict[str, Any]:
-        """查询当前工作区壁纸 URL（未设置时返回 None）。"""
+        """查询工作区壁纸库。
+
+        返回：
+        - url: 当前（最近上传）壁纸 URL，未设置时为 None（兼容旧前端）
+        - wallpapers: 壁纸库列表 [{url, name}]，最近上传优先
+        """
         from fastapi import HTTPException
 
         if _check_file_permission(request.state.user_info, "file:read"):
             raise HTTPException(status_code=403, detail="Permission denied: file:read")
-        return {"success": True, "url": _wallpaper_url(_find_wallpaper_file())}
+        items = _wallpaper_items()
+        return {
+            "success": True,
+            "url": items[0]["url"] if items else None,
+            "wallpapers": items,
+        }
 
     @app.delete("/api/wallpaper", dependencies=[Depends(verify_token)])
     async def delete_wallpaper(request: Request) -> Dict[str, Any]:
-        """删除当前工作区壁纸。"""
+        """删除壁纸。
+
+        - 带 ?url=/uploads/wallpaper/xxx：只删除该张壁纸
+        - 不带 url：清空整个壁纸库（兼容旧前端）
+        """
         from fastapi import HTTPException
 
         if _check_file_permission(request.state.user_info, "file:upload"):
             raise HTTPException(
                 status_code=403, detail="Permission denied: file:upload"
             )
-        directory = _wallpaper_dir()
+        target_url = str(request.query_params.get("url") or "").strip()
+        if target_url:
+            target_path = _resolve_wallpaper_path(target_url)
+            if not target_path:
+                return {
+                    "success": False,
+                    "error": {
+                        "code": "WALLPAPER_NOT_FOUND",
+                        "message": "Wallpaper not found",
+                    },
+                }
+            try:
+                os.remove(target_path)
+                removed = True
+            except OSError as exc:
+                logger.warning(f"[WALLPAPER] Failed to remove {target_path}: {exc}")
+                removed = False
+            items = _wallpaper_items()
+            return {
+                "success": True,
+                "removed": removed,
+                "url": items[0]["url"] if items else None,
+                "wallpapers": items,
+            }
         removed = False
-        for ext in ("png", "jpg", "gif", "webp"):
-            candidate = os.path.join(directory, f"wallpaper.{ext}")
-            if os.path.isfile(candidate):
-                try:
-                    os.remove(candidate)
-                    removed = True
-                except OSError as exc:
-                    logger.warning(f"[WALLPAPER] Failed to remove {candidate}: {exc}")
-        return {"success": True, "removed": removed}
+        for candidate in _list_wallpaper_files():
+            try:
+                os.remove(candidate)
+                removed = True
+            except OSError as exc:
+                logger.warning(f"[WALLPAPER] Failed to remove {candidate}: {exc}")
+        return {"success": True, "removed": removed, "url": None, "wallpapers": []}
 
     @app.post("/api/file-create", dependencies=[Depends(verify_token)])
     async def create_file_or_directory(
