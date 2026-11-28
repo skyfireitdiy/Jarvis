@@ -939,6 +939,23 @@ tool_load_dirs:
         # 记录来源与分支
         assert (target_dir / ".source").exists()
         assert (target_dir / ".git-branch").read_text(encoding="utf-8") == "main"
+        # 元数据文件应被加入 .git/info/exclude，不出现在插件仓库的 git status 中
+        exclude_text = (target_dir / ".git" / "info" / "exclude").read_text(
+            encoding="utf-8"
+        )
+        exclude_lines = {line.strip() for line in exclude_text.splitlines()}
+        assert ".source" in exclude_lines
+        assert ".git-branch" in exclude_lines
+        import subprocess as _sp
+
+        status = _sp.run(
+            ["git", "status", "--porcelain"],
+            cwd=str(target_dir),
+            capture_output=True,
+            text=True,
+        ).stdout
+        assert ".source" not in status
+        assert ".git-branch" not in status
 
     def test_install_from_local_directory(self, tmp_path, monkeypatch):
         """本地目录（无 .git）安装成功，建立软链接（Issue #213）"""

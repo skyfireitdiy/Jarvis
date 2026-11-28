@@ -1327,11 +1327,56 @@ def _run_plugin_hook_commands(
     return True
 
 
+# 插件目录下由 Jarvis 生成的元数据文件（git 来源 URL / 安装分支）。
+# git 管理的插件里这两个文件属于本地元数据，不应出现在 `git status` 中，
+# 安装/升级时统一写入 .git/info/exclude（只影响本仓库，不改插件自带的 .gitignore）。
+PLUGIN_META_FILES = (".source", ".git-branch")
+
+
+def _ensure_git_exclude_plugin_meta(plugin_dir) -> None:
+    """把插件元数据文件（.source / .git-branch）加入 .git/info/exclude。
+
+    仅对 git 管理的插件目录生效（存在 .git 目录）。使用 info/exclude 而非
+    .gitignore，是因为前者是本地仓库配置、不会被提交，也不会污染插件自身
+    的版本控制内容；重复调用幂等（已存在同名条目则跳过）。
+    任何失败都静默忽略：排除规则只是改善 `git status` 观感，不影响安装本身。
+    """
+    from pathlib import Path
+
+    try:
+        git_dir = Path(plugin_dir) / ".git"
+        if not git_dir.is_dir():
+            return
+        info_dir = git_dir / "info"
+        info_dir.mkdir(parents=True, exist_ok=True)
+        exclude_file = info_dir / "exclude"
+        existing = ""
+        if exclude_file.exists():
+            existing = exclude_file.read_text(encoding="utf-8", errors="replace")
+        existing_lines = {line.strip() for line in existing.splitlines()}
+        missing = [name for name in PLUGIN_META_FILES if name not in existing_lines]
+        if not missing:
+            return
+        prefix = "" if not existing or existing.endswith("\n") else "\n"
+        with open(exclude_file, "a", encoding="utf-8") as f:
+            f.write(prefix + "\n".join(missing) + "\n")
+    except Exception as e:
+        from jarvis.jarvis_utils.exception_utils import save_exception
+
+        save_exception(
+            e,
+            module="jarvis_agent.utils",
+            function="_ensure_git_exclude_plugin_meta",
+        )
+
+
 def _write_plugin_source(plugin_dir, url: str, branch: str) -> None:
     """记录 git 来源元数据（.source + .git-branch）。
 
     branch 为空（未显式指定分支，由 git 使用仓库默认分支）时，
     从克隆产物读取实际检出分支写入，保证元数据始终准确。
+    写入后把这两个文件加入 .git/info/exclude，避免它们出现在插件仓库的
+    `git status` 未跟踪文件列表里。
     """
     from pathlib import Path
 
@@ -1344,6 +1389,8 @@ def _write_plugin_source(plugin_dir, url: str, branch: str) -> None:
         from jarvis.jarvis_utils.exception_utils import save_exception
 
         save_exception(e, module="jarvis_agent.utils", function="_write_plugin_source")
+        return
+    _ensure_git_exclude_plugin_meta(plugin_dir)
 
 
 def install_plugin(
@@ -3284,6 +3331,11 @@ def upgrade_plugin(plugin_id: str) -> bool:
                 f"{reset.stderr.strip() or reset.stdout.strip()}"
             )
             return False
+
+        # reset --hard 不会删除 .git/info/exclude，但老版本安装的插件可能
+        # 从未写入过排除规则，这里补一次（幂等），保证 .source/.git-branch
+        # 不会出现在插件仓库的 git status 中。
+        _ensure_git_exclude_plugin_meta(plugin_dir)
 
         # 执行 post-update 钩子（从更新后的插件目录 config.yaml 读取）。
         # 失败仅警告，不阻断升级（代码已更新）。
