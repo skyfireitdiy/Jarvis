@@ -503,6 +503,77 @@ export function useTerminal({
     sendMessageToAgentByIdGetter()(termInfo.agentId, message)
   }
 
+  // 兜底结束一个「仍在等待输出」的 execution 终端。
+  //
+  // 背景：execution 终端只有在收到 tool_stream_end 时才会被标记结束并销毁 xterm。
+  // 若该结束消息丢失（断线重连、后端异常、消息被丢弃等），termInfo 会一直保持
+  // active=true / ended=false，xterm 实例残留，界面上表现为「遗留的 xterm」。
+  //
+  // 触发时机：Agent 再次请求用户输入（input_request / confirm）——此时上一轮执行
+  // 必然已经结束，不可能还有命令在跑，因此可以安全地把残留终端标记为完成：
+  // 保存当前 buffer 内容为 terminal_content、置 is_finished、销毁 xterm。
+  //
+  // 只处理该 Agent 名下、terminal 已实例化且尚未结束的终端；后台执行（terminal
+  // 未初始化，内容在 execution_chunks 里）不在此处理，避免误伤后续重建。
+  function finalizeStaleExecutionTerminals(agentId) {
+    const targetAgentId = String(agentId || '').trim()
+    if (!targetAgentId) return 0
+    const staleList = terminals.value.filter(
+      t => t.agentId === targetAgentId && t.terminal && !t.ended
+    )
+    if (staleList.length === 0) return 0
+    const currentOutputs = allOutputs.value.get(targetAgentId) || []
+    let finalizedCount = 0
+    staleList.forEach((termInfo) => {
+      const executionId = termInfo.executionId
+      let terminalContent = ''
+      try {
+        terminalContent = getTerminalBufferContent(termInfo.terminal, true)
+      } catch (error) {
+        console.warn('[terminal] Failed to read stale terminal buffer', error)
+      }
+      const execIndex = currentOutputs.findIndex(
+        item => item.output_type === 'execution' && item.execution_id === executionId
+      )
+      if (execIndex !== -1) {
+        const execMsg = currentOutputs[execIndex]
+        execMsg.is_finished = true
+        execMsg.terminal_content =
+          terminalContent || (execMsg.execution_chunks || []).join('')
+        execMsg.timestamp = new Date().toISOString()
+        allOutputs.value.set(targetAgentId, [...currentOutputs])
+        try {
+          historyStorage.saveMessage({
+            id: `execution_${executionId}`,
+            agent_id: targetAgentId,
+            output_type: 'execution',
+            text: '',
+            lang: 'text',
+            agent_name: execMsg.agent_name,
+            non_interactive: false,
+            timestamp: execMsg.timestamp,
+            execution_id: executionId,
+            context: execMsg.context,
+            is_finished: true,
+            terminal_content: execMsg.terminal_content,
+            execution_chunks: execMsg.execution_chunks || [],
+          })
+        } catch (error) {
+          console.warn('[HISTORY] Failed to save finalized terminal content:', error)
+        }
+      }
+      termInfo.active = false
+      termInfo.ended = true
+      disposeExecutionTerminal(termInfo)
+      terminalHosts.value.delete(getExecutionSessionKey(targetAgentId, executionId))
+      finalizedCount++
+    })
+    if (finalizedCount > 0) {
+      // 与 tool_stream_end 路径一致：终端已切换为文本块，滚动一次让用户看到结果
+      scrollSessionToBottomGetter()(targetAgentId)
+    }
+    return finalizedCount
+  }
   function disposeExecutionTerminal(termInfo) {
     if (termInfo?.resizeObserver) {
       termInfo.resizeObserver.disconnect()
@@ -1587,6 +1658,7 @@ export function useTerminal({
     getTerminalBufferContent,
     syncTerminalSize,
     disposeExecutionTerminal,
+    finalizeStaleExecutionTerminals,
     initExecutionTerminal,
     setTerminalRef,
     setTerminalHostRef,

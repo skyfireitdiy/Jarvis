@@ -116,6 +116,7 @@ function makeHarness(overrides = {}) {
   const initIndependentTerminal = vi.fn()
   const attachTerminalSession = vi.fn()
   const closeTerminal = vi.fn()
+  const finalizeStaleExecutionTerminals = vi.fn(() => 0)
 
   const api = useMessage({
     outputList,
@@ -182,6 +183,7 @@ function makeHarness(overrides = {}) {
     initIndependentTerminal,
     attachTerminalSession,
     closeTerminal,
+    finalizeStaleExecutionTerminals,
     connectErrorMessageGetter: () => connectErrorMessage,
     ensureAgentEditorPane,
     editorModels,
@@ -238,6 +240,7 @@ function makeHarness(overrides = {}) {
     connectErrorMessage,
     showConfirm,
     terminalSessions,
+    finalizeStaleExecutionTerminals,
     appendExecution,
     isCreatingTerminalSession,
     terminalCreationTracker,
@@ -436,6 +439,27 @@ describe('useMessage', () => {
       expect(handleAutoRead).toHaveBeenCalledWith('agent-1', 'waiting_multi')
     })
 
+    it('input_request（多行）：请求输入前兜底结束残留 xterm', () => {
+      const { api, finalizeStaleExecutionTerminals } = makeHarness()
+      api.handleMessage({ type: 'input_request', payload: { tip: '输入', mode: 'multi' }, seq: 1 }, 'agent-1')
+      expect(finalizeStaleExecutionTerminals).toHaveBeenCalledWith('agent-1')
+    })
+    it('input_request（单行）：同样兜底结束残留 xterm', () => {
+      const { api, finalizeStaleExecutionTerminals } = makeHarness()
+      api.handleMessage({ type: 'input_request', payload: { tip: '输入', mode: 'single' }, seq: 1 }, 'agent-1')
+      expect(finalizeStaleExecutionTerminals).toHaveBeenCalledWith('agent-1')
+    })
+    it('confirm：兜底结束残留 xterm', () => {
+      const { api, finalizeStaleExecutionTerminals } = makeHarness()
+      api.handleMessage({ type: 'confirm', payload: { message: '继续?' }, seq: 1 }, 'agent-1')
+      expect(finalizeStaleExecutionTerminals).toHaveBeenCalledWith('agent-1')
+    })
+    it('input_request：兜底函数抛错不影响输入请求处理', () => {
+      const throwing = vi.fn(() => { throw new Error('boom') })
+      const { api, inputRequests } = makeHarness({ finalizeStaleExecutionTerminals: throwing })
+      api.handleMessage({ type: 'input_request', payload: { tip: 't', mode: 'multi' }, seq: 1 }, 'agent-1')
+      expect(inputRequests.value.has('agent-1')).toBe(true)
+    })
     it('input_request：缓冲区有内容时直接发送', () => {
       const { api, inputBuffers, sockets } = makeHarness()
       const ws = makeWs(true)

@@ -767,6 +767,85 @@ describe('useTerminal', () => {
       expect(api.terminals.value[0].ended).toBe(true)
     })
   })
+  describe('finalizeStaleExecutionTerminals（请求输入时兜底结束残留 xterm）', () => {
+    it('把该 Agent 未结束的终端标记完成、保存内容并销毁 xterm', () => {
+      const { api, allOutputs, scrollSessionToBottom, historyStorage } = makeHarness()
+      const term = new MockTerminal()
+      term.buffer = {
+        active: {
+          length: 1,
+          getLine: () => ({ translateToString: () => 'stale output' }),
+        },
+      }
+      allOutputs.value.set('agent-1', [
+        { output_type: 'execution', execution_id: 'exec-1', execution_chunks: ['chunk'] },
+      ])
+      api.terminals.value.push({
+        sessionKey: 'agent-1:exec-1', agentId: 'agent-1', executionId: 'exec-1',
+        terminal: term, active: true, ended: false,
+      })
+      api.terminalHosts.value.set('agent-1:exec-1', {})
+      const count = api.finalizeStaleExecutionTerminals('agent-1')
+      expect(count).toBe(1)
+      const msg = allOutputs.value.get('agent-1')[0]
+      expect(msg.is_finished).toBe(true)
+      expect(msg.terminal_content).toBe('stale output')
+      const termInfo = api.terminals.value[0]
+      expect(termInfo.ended).toBe(true)
+      expect(termInfo.active).toBe(false)
+      expect(termInfo.terminal).toBe(null)
+      expect(term.disposed).toBe(true)
+      expect(api.terminalHosts.value.has('agent-1:exec-1')).toBe(false)
+      expect(historyStorage.saveMessage).toHaveBeenCalled()
+      expect(scrollSessionToBottom).toHaveBeenCalledWith('agent-1')
+    })
+    it('buffer 为空时回退到 execution_chunks', () => {
+      const { api, allOutputs } = makeHarness()
+      const term = new MockTerminal()
+      allOutputs.value.set('agent-1', [
+        { output_type: 'execution', execution_id: 'exec-1', execution_chunks: ['a', 'b'] },
+      ])
+      api.terminals.value.push({
+        sessionKey: 'agent-1:exec-1', agentId: 'agent-1', executionId: 'exec-1',
+        terminal: term, active: true, ended: false,
+      })
+      api.finalizeStaleExecutionTerminals('agent-1')
+      expect(allOutputs.value.get('agent-1')[0].terminal_content).toBe('ab')
+    })
+    it('不动其他 Agent 的终端', () => {
+      const { api, allOutputs } = makeHarness()
+      allOutputs.value.set('agent-2', [
+        { output_type: 'execution', execution_id: 'exec-2', execution_chunks: [] },
+      ])
+      api.terminals.value.push({
+        sessionKey: 'agent-2:exec-2', agentId: 'agent-2', executionId: 'exec-2',
+        terminal: new MockTerminal(), active: true, ended: false,
+      })
+      const count = api.finalizeStaleExecutionTerminals('agent-1')
+      expect(count).toBe(0)
+      expect(api.terminals.value[0].ended).toBe(false)
+      expect(api.terminals.value[0].terminal).not.toBe(null)
+    })
+    it('已结束或未实例化 terminal 的终端不重复处理', () => {
+      const { api } = makeHarness()
+      api.terminals.value.push(
+        {
+          sessionKey: 'agent-1:done', agentId: 'agent-1', executionId: 'done',
+          terminal: new MockTerminal(), active: false, ended: true,
+        },
+        {
+          sessionKey: 'agent-1:bg', agentId: 'agent-1', executionId: 'bg',
+          terminal: null, active: true, ended: false,
+        },
+      )
+      expect(api.finalizeStaleExecutionTerminals('agent-1')).toBe(0)
+    })
+    it('无 agentId 时安全返回', () => {
+      const { api } = makeHarness()
+      expect(api.finalizeStaleExecutionTerminals('')).toBe(0)
+      expect(api.finalizeStaleExecutionTerminals(null)).toBe(0)
+    })
+  })
   describe('共享（openTerminalShareDialog / saveTerminalShare）', () => {
     it('openTerminalShareDialog 打开弹窗并拉取用户列表', async () => {
       const { api, fetchUserList, availableUserOptions } = makeHarness()

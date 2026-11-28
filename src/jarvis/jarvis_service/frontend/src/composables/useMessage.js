@@ -18,7 +18,7 @@
 //   onPipelineEvent/handleChatMessage/resolveAgentRelativePath/openWorkspaceFile/getGatewayAddress/buildNodeHttpUrl/fetchWithAuth/showConfirm
 //   + useTerminal 返回（调用点在 useMessage 之前）：terminalSessions/appendExecution/getExecutionSessionKey/
 //   isCreatingTerminalSession/terminalCreationTracker/activeTerminalId/independentTerminalHosts/initIndependentTerminal/
-//   attachTerminalSession/closeTerminal
+//   attachTerminalSession/closeTerminal/finalizeStaleExecutionTerminals
 // - getter 注入（定义在调用点之后）：connectErrorMessage（useGatewayConnection 返回）
 import { nextTick } from 'vue'
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.main.js'
@@ -92,6 +92,7 @@ export function useMessage({
   initIndependentTerminal,
   attachTerminalSession,
   closeTerminal,
+  finalizeStaleExecutionTerminals,
   connectErrorMessageGetter,
   ensureAgentEditorPane,
   editorModels,
@@ -104,6 +105,25 @@ const inputRespondedAt = new Map()
 // 视为"同一轮交互"的时间窗（毫秒），超出则认为 confirm 是独立请求，照常播放提示音
 const INPUT_RESPONSE_CONFIRM_WINDOW_MS = 5000
 
+// Agent 请求用户输入（input_request / confirm）时，兜底结束该 Agent 残留的 execution 终端。
+//
+// 执行终端的正常结束信号是 tool_stream_end；若该消息丢失（断线重连、后端异常等），
+// xterm 会一直残留（「遗留的 xterm」）。而 Agent 能再次请求输入，说明上一轮执行必然
+// 已结束，因此此时把所有未结束的终端标记为完成是安全的。
+// 单行/多行输入请求与确认请求都算「请求输入」。
+function finalizeStaleTerminalsBeforeInput(targetAgentId) {
+  if (!targetAgentId || typeof finalizeStaleExecutionTerminals !== 'function') return
+  try {
+    const count = finalizeStaleExecutionTerminals(targetAgentId)
+    if (count > 0) {
+      console.warn(
+        `[terminal] finalized ${count} stale execution terminal(s) for agent ${targetAgentId} before input request`
+      )
+    }
+  } catch (error) {
+    console.error('[terminal] Failed to finalize stale terminals:', error)
+  }
+}
 function syncAgentInputMode(targetAgentId, payload) {
   if (!targetAgentId) return
   inputTip.value = payload.tip || ''
@@ -337,6 +357,8 @@ function handleMessage(message, agentId = null) {
   } else if (type === 'input_request') {
 
     const requestAgentId = targetAgentId
+    // 请求输入（单行/多行）意味着上一轮执行已结束：兜底结束残留的 xterm
+    finalizeStaleTerminalsBeforeInput(requestAgentId)
     pendingInputAgentId.value = requestAgentId
 
     // 检查当前是否处于 waiting_confirm 状态，如果是则跳过状态更新（不覆盖确认状态）
@@ -425,6 +447,8 @@ function handleMessage(message, agentId = null) {
       }
     })
   } else if (type === 'confirm') {
+    // 确认请求同样意味着上一轮执行已结束：兜底结束残留的 xterm
+    finalizeStaleTerminalsBeforeInput(targetAgentId)
     // 确认请求通常视为需要输入，播放提示音。
     // 但若该 Agent 刚刚响应过输入（如中断后先请求补充信息、紧接着请求确认工具调用），
     // 说明这是"同一轮交互"里的第二次询问，提示音已播放过，不再重复播放，
