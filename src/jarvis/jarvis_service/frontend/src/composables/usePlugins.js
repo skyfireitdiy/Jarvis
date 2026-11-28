@@ -11,7 +11,7 @@
 // - workspaceSidebarView：侧边栏当前 view 的 ref（App.vue 创建，早于本 composable 调用点）
 // - fetchPluginExtensions / loadExtensionComponent：插件扩展加载器（外部模块导入后传入）
 // - fetchWithAuth / getHttpProtocol / hasAuthToken / getGatewayAddress：网关访问函数
-import { computed, defineAsyncComponent, ref } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 export function usePlugins({
   workspaceSidebarView,
   fetchPluginExtensions,
@@ -60,6 +60,11 @@ export function usePlugins({
     if (isPluginToolView(view)) return pluginToolPanelTitle(view)
     return WORKSPACE_SIDEBAR_TITLES[view] || '目录树'
   })
+  // 插件扩展清单是否已成功加载过（无论结果是否为空）。
+  // 用于区分「尚未加载」与「已加载但确实没有该扩展」：
+  // 刷新后 workspaceSidebarView 可能恢复成 plugin:xxx，此时清单还没回来，
+  // 不能立刻判定「插件不存在」并回退，否则会把合法的插件视图误清掉。
+  const pluginExtensionsLoaded = ref(false)
   // 加载插件扩展清单（登录后调用）；失败静默，不影响主界面
   async function loadPluginExtensionsForUi() {
     if (!hasAuthToken()) return
@@ -71,6 +76,7 @@ export function usePlugins({
       getHttpProtocol,
     })
     pluginExtensions.value = exts
+    pluginExtensionsLoaded.value = true
   }
   // 异步加载插件扩展组件（供侧边栏/管理面板渲染）
   function resolvePluginExtensionComponent(ext) {
@@ -130,9 +136,40 @@ export function usePlugins({
   }
   // 当前激活的插件 pane view 对应的异步组件（基于 workspaceSidebarView，向后兼容）
   const activePluginPaneComp = computed(() => resolvePluginPaneComp(workspaceSidebarView.value))
-
+  // 当前侧边栏 view 是否为插件视图（含 sidebar / tool_panel / pane 三种前缀）
+  function isPluginView(view) {
+    return isPluginSidebarView(view) || isPluginToolView(view) || isPluginPaneView(view)
+  }
+  // 侧边栏插件视图的渲染状态：'none' 非插件视图 / 'loading' 清单未加载完 /
+  // 'unavailable' 清单已加载但找不到该扩展（插件已卸载或扩展被移除） / 'ready' 可渲染。
+  // 渲染层据此区分「加载中」与「插件不可用」，避免恢复出纯空白侧边栏。
+  const pluginSidebarState = computed(() => {
+    const view = workspaceSidebarView.value
+    if (!isPluginView(view)) return 'none'
+    if (!pluginExtensionsLoaded.value) return 'loading'
+    const ready = isPluginSidebarView(view)
+      ? !!activePluginSidebarComp.value
+      : isPluginToolView(view)
+        ? !!activePluginToolPanelComp.value
+        : !!activePluginPaneComp.value
+    return ready ? 'ready' : 'unavailable'
+  })
+  // 插件扩展清单加载完成后校验恢复出来的侧边栏视图：
+  // 若持久化的 plugin:xxx 对应的插件已卸载（或扩展被移除），回退到内置的 agent 列表，
+  // 否则侧边栏会一直停在一个渲染不出来的视图上（内容区空白）。
+  // 只在清单「首次加载完成」时判定一次，之后用户主动切换视图不再干预。
+  watch(pluginExtensionsLoaded, (loaded) => {
+    if (!loaded) return
+    const view = workspaceSidebarView.value
+    if (!isPluginView(view)) return
+    if (pluginSidebarState.value !== 'unavailable') return
+    workspaceSidebarView.value = 'agents'
+  })
   return {
     pluginExtensions,
+    pluginExtensionsLoaded,
+    isPluginView,
+    pluginSidebarState,
     pluginAdminTabs,
     pluginSidebarViews,
     pluginToolPanels,

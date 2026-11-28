@@ -179,4 +179,69 @@ describe('usePlugins', () => {
     workspaceSidebarView.value = 'agents'
     expect(api.activePluginPaneComp.value).toBe(null)
   })
+
+  describe('pluginSidebarState / 插件视图恢复校验', () => {
+    it('非插件视图状态为 none', () => {
+      const { api } = makeHarness({ workspaceSidebarViewValue: 'git' })
+      expect(api.pluginSidebarState.value).toBe('none')
+      expect(api.isPluginView('git')).toBe(false)
+      expect(api.isPluginView('plugin:a')).toBe(true)
+      expect(api.isPluginView('plugin-tool:a')).toBe(true)
+      expect(api.isPluginView('plugin-pane:a')).toBe(true)
+    })
+
+    it('清单未加载完成时状态为 loading（不误判为不可用）', () => {
+      const { api } = makeHarness({ workspaceSidebarViewValue: 'plugin:s1' })
+      expect(api.pluginExtensionsLoaded.value).toBe(false)
+      expect(api.pluginSidebarState.value).toBe('loading')
+    })
+
+    it('清单加载完成且扩展存在时状态为 ready', async () => {
+      const exts = [makeExt({ id: 's1', extType: 'sidebar_views' })]
+      const { api } = makeHarness({ exts, workspaceSidebarViewValue: 'plugin:s1' })
+      await api.loadPluginExtensionsForUi()
+      expect(api.pluginExtensionsLoaded.value).toBe(true)
+      expect(api.pluginSidebarState.value).toBe('ready')
+    })
+
+    it('清单加载完成但扩展不存在时回退 agents', async () => {
+      const { api, workspaceSidebarView } = makeHarness({ exts: [], workspaceSidebarViewValue: 'plugin:s1' })
+      await api.loadPluginExtensionsForUi()
+      // watch 回退：插件已卸载 → 回退 agents（回退后状态自然变回 none）
+      await Promise.resolve()
+      expect(workspaceSidebarView.value).toBe('agents')
+      expect(api.pluginSidebarState.value).toBe('none')
+    })
+
+    it('清单加载完成但扩展不存在时状态为 unavailable（回退前）', async () => {
+      const { api } = makeHarness({ exts: [], workspaceSidebarViewValue: 'plugin:s1' })
+      // 先让清单就绪（此时 watch 会同步判定并回退），故用 flush:'pre' 之外的时机观察：
+      // 直接构造「已加载 + 视图仍为插件视图」的场景，验证状态判定的兜底能力。
+      api.pluginExtensionsLoaded.value = true
+      expect(api.pluginSidebarState.value).toBe('unavailable')
+    })
+
+    it('插件已卸载（清单里没有）时回退到 agents', async () => {
+      const exts = [makeExt({ id: 'other', extType: 'sidebar_views' })]
+      const { api, workspaceSidebarView } = makeHarness({ exts, workspaceSidebarViewValue: 'plugin:gone' })
+      await api.loadPluginExtensionsForUi()
+      await Promise.resolve()
+      expect(workspaceSidebarView.value).toBe('agents')
+    })
+
+    it('插件仍在时保留恢复出来的插件视图', async () => {
+      const exts = [makeExt({ id: 's1', extType: 'sidebar_views' })]
+      const { api, workspaceSidebarView } = makeHarness({ exts, workspaceSidebarViewValue: 'plugin:s1' })
+      await api.loadPluginExtensionsForUi()
+      await Promise.resolve()
+      expect(workspaceSidebarView.value).toBe('plugin:s1')
+    })
+
+    it('内置视图不受清单加载影响', async () => {
+      const { api, workspaceSidebarView } = makeHarness({ exts: [], workspaceSidebarViewValue: 'files' })
+      await api.loadPluginExtensionsForUi()
+      await Promise.resolve()
+      expect(workspaceSidebarView.value).toBe('files')
+    })
+  })
 })

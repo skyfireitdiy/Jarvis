@@ -575,6 +575,27 @@
                 :showToast="showToast"
               />
             </div>
+            <!-- 插件视图占位：刷新后恢复的 plugin:xxx / plugin-tool:xxx / plugin-pane:xxx
+                 在插件清单未加载完时显示「加载中」，清单已加载但找不到扩展（插件已卸载）
+                 时显示「不可用」，避免侧边栏内容区纯空白且无任何提示。 -->
+            <div
+              v-else-if="isPluginView(workspaceSidebarView) && pluginSidebarState !== 'ready'"
+              class="workspace-sidebar-content workspace-sidebar-plugin-state"
+            >
+              <div class="workspace-pane-placeholder">
+                <div class="workspace-placeholder-icon">
+                  🧩
+                </div>
+                <div class="workspace-placeholder-title">
+                  {{ pluginSidebarState === 'loading' ? '插件面板加载中…' : '插件面板不可用' }}
+                </div>
+                <div class="workspace-placeholder-text">
+                  {{ pluginSidebarState === 'loading'
+                    ? '正在加载插件扩展清单，请稍候。'
+                    : '该插件未安装或已卸载，请到「插件管理」中安装后重试。' }}
+                </div>
+              </div>
+            </div>
             <div v-else-if="workspaceSidebarView === 'orchestration'" class="workspace-sidebar-content workspace-sidebar-orchestration">
               <OrchestrationView
                 :pipelines="pipelineList"
@@ -3548,6 +3569,7 @@ const {
   loadPluginExtensionsForUi, resolvePluginExtensionComponent, isPluginSidebarView,
   isPluginToolView, isPluginPaneView, pluginSidebarCompCache, activePluginSidebarComp,
   activePluginToolPanelComp, resolvePluginPaneComp, activePluginPaneComp,
+  isPluginView, pluginSidebarState,
 } = useWorkspacePane({
   // 直传（定义在本调用点之前）
   fetchWithAuth,

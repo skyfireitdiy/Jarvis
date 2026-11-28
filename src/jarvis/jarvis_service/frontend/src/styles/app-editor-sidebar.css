@@ -90,6 +90,10 @@
   flex: 1 0 auto;
   min-height: 0;
 }
+/* 插件视图的加载中 / 不可用占位：复用 pane 占位样式，但侧边栏里不需要手型光标 */
+.workspace-sidebar-content.workspace-sidebar-plugin-state .workspace-pane-placeholder {
+  cursor: default;
+}
 
 .workspace-file-tree-panel {
   flex: 1;

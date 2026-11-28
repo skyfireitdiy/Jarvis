@@ -289,6 +289,9 @@ const {
   activePluginToolPanelComp,
   resolvePluginPaneComp,
   activePluginPaneComp,
+  pluginExtensionsLoaded,
+  isPluginView,
+  pluginSidebarState,
 } = usePlugins({
   workspaceSidebarView,
   fetchPluginExtensions,
@@ -1801,5 +1804,8 @@ watch([workspaceSidebarView, showWorkspaceSidebar], () => {
     activePluginToolPanelComp,
     resolvePluginPaneComp,
     activePluginPaneComp,
+    pluginExtensionsLoaded,
+    isPluginView,
+    pluginSidebarState,
   }
 }
