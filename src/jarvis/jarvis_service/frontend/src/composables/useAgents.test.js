@@ -67,6 +67,8 @@ function makeHarness(overrides = {}) {
   const closeOpenDirDialog = vi.fn()
   const confirmOpenDir = vi.fn()
   const restoreWorkspacePaneContents = vi.fn()
+  // 内容恢复前置条件（socket 已连接 + agentList 非空）的判定函数
+  const canRestoreWorkspacePaneContents = vi.fn(() => true)
   const saveRecentWorkDir = vi.fn()
   const loadRecentWorkDirs = vi.fn()
   const filteredDirList = ref([])
@@ -218,6 +220,7 @@ function makeHarness(overrides = {}) {
     closeOpenDirDialog,
     confirmOpenDir,
     restoreWorkspacePaneContents,
+    canRestoreWorkspacePaneContents,
     saveRecentWorkDir,
     loadRecentWorkDirs,
     filteredDirList,
@@ -371,6 +374,7 @@ function makeHarness(overrides = {}) {
     closeOpenDirDialog,
     confirmOpenDir,
     restoreWorkspacePaneContents,
+    canRestoreWorkspacePaneContents,
     saveRecentWorkDir,
     loadRecentWorkDirs,
     filteredDirList,

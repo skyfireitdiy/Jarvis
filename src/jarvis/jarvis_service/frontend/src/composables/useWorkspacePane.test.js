@@ -5,7 +5,7 @@
 // 插件扩展透传（usePlugins 返回符号）。
 // mock usePlugins（内部调用）与 pluginExtensions 加载器，其余依赖注入直传/getter。
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 
 // ---- mock usePlugins 模块（useWorkspacePane 内部调用）----
 // 注意：vi.hoisted 内不能使用 ref/computed（尚未初始化），故 pluginState 在 hoisted 里只放
@@ -1290,5 +1290,71 @@ describe('useWorkspacePane', () => {
     left.view = 'session'
     left.sessionPanelId = 'panel-1'
     expect(api.findEmptyWorkspacePane()).toBe(right)
+  })
+  // ===== 侧边栏视图 / 显隐 持久化 =====
+  it('workspaceSidebarView：变更即写入 localStorage', async () => {
+    const { api } = makeHarness()
+    api.workspaceSidebarView.value = 'git'
+    await nextTick()
+    expect(localStorage.getItem('jarvis_workspace_sidebar_view')).toBe('git')
+  })
+  it('showWorkspaceSidebar：变更即写入 localStorage（1/0）', async () => {
+    const { api } = makeHarness()
+    api.showWorkspaceSidebar.value = false
+    await nextTick()
+    expect(localStorage.getItem('jarvis_workspace_sidebar_visible')).toBe('0')
+    api.showWorkspaceSidebar.value = true
+    await nextTick()
+    expect(localStorage.getItem('jarvis_workspace_sidebar_visible')).toBe('1')
+  })
+  it('侧边栏视图：刷新后从 localStorage 恢复（含插件视图）', () => {
+    localStorage.setItem('jarvis_workspace_sidebar_view', 'files')
+    expect(makeHarness().api.workspaceSidebarView.value).toBe('files')
+    localStorage.setItem('jarvis_workspace_sidebar_view', 'plugin-tool:my-tool')
+    expect(makeHarness().api.workspaceSidebarView.value).toBe('plugin-tool:my-tool')
+    localStorage.setItem('jarvis_workspace_sidebar_view', 'plugin:my-sidebar')
+    expect(makeHarness().api.workspaceSidebarView.value).toBe('plugin:my-sidebar')
+  })
+  it('侧边栏视图：非法值回退 agents；显隐非法值回退 true', () => {
+    localStorage.setItem('jarvis_workspace_sidebar_view', 'not-a-view')
+    localStorage.setItem('jarvis_workspace_sidebar_visible', 'whatever')
+    const { api } = makeHarness()
+    expect(api.workspaceSidebarView.value).toBe('agents')
+    expect(api.showWorkspaceSidebar.value).toBe(true)
+  })
+  it('侧边栏显隐：刷新后恢复为隐藏', () => {
+    localStorage.setItem('jarvis_workspace_sidebar_visible', '0')
+    expect(makeHarness().api.showWorkspaceSidebar.value).toBe(false)
+  })
+  // ===== 内容恢复前置条件（socket / agentList） =====
+  it('canRestoreWorkspacePaneContents：socket 未连接时返回 false', () => {
+    const socket = ref(null)
+    const { api, agentList } = makeHarness({ socket: () => socket })
+    agentList.value = [{ agent_id: 'agent-1', name: 'Agent 1' }]
+    expect(api.canRestoreWorkspacePaneContents()).toBe(false)
+    socket.value = {}
+    expect(api.canRestoreWorkspacePaneContents()).toBe(true)
+  })
+  it('restoreWorkspacePaneContents：socket 未连接时不恢复、不消耗一次性标志', async () => {
+    const socket = ref(null)
+    const { api, agentList } = makeHarness({ socket: () => socket })
+    const tree = {
+      type: 'leaf',
+      id: 'pane-1',
+      view: 'session',
+      sessionPanelId: null,
+      agentId: 'agent-1',
+      content: { agentId: 'agent-1' },
+    }
+    api.workspacePaneTree.value = tree
+    agentList.value = [{ agent_id: 'agent-1', name: 'Agent 1' }]
+    await api.restoreWorkspacePaneContents()
+    // 未恢复：content 仍保留
+    expect(tree.content).toEqual({ agentId: 'agent-1' })
+    // 连接就绪后补触发即可恢复
+    socket.value = {}
+    await api.restoreWorkspacePaneContents()
+    expect(tree.view).toBe('session')
+    expect(tree.content).toBeNull()
   })
 })

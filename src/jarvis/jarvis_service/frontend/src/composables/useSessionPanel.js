@@ -8,6 +8,12 @@
 // - 样式/边界：getSessionPanelStyle/getSessionPanelBounds/ensureSessionPanelInViewport
 // - 拖拽交互：startSessionPanelMove/startSessionPanelResize/onSessionPanelPointerMove/stopSessionPanelInteraction
 //
+// ⚠️ 现状（pane 树统一后）：会话面板一律以 embedded=true 内嵌在 pane leaf 中渲染，
+// 位置/尺寸由 pane 分割布局（jarvis_workspace_pane_layout）决定，浮动模式不再启用。
+// 因此本 composable 的返回值在 App.vue 中已无消费方，矩形持久化链路（jarvis_session_panel_rect_*）
+// 实际不生效。保留本文件仅为兼容既有单元测试与将来可能的浮动模式回归；
+// 若确认永久不再使用浮动模式，可整体删除。
+//
 // 依赖注入（直传，均定义在调用点之前）：
 // activeWindow/ACTIVE_Z_INDEX/BASE_Z_INDEX/clamp/windowWidth/PANEL_DRAG_ACTIVATION_DISTANCE/focusWindow
 import { ref } from 'vue'

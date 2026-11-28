@@ -13,11 +13,12 @@
 //   panelInputTexts / panelInputModes / panelInputTips / panelConfirmData / pendingInputAgentId /
 //   pendingConfirmAgentId / inputBuffers / allOutputs / outputs / outputList / panelOutputLists /
 //   panels / sessionPanelRefs / showToast / showConfirm / showSettingsModal / showWorkspacePanel /
-//   activeWorkspaceSession / hasNoPanel / isAutoFocusSuppressed / isAnyModalOpen / socket / sockets /
+//   activeWorkspaceSession / hasNoPanel / isAutoFocusSuppressed / isAnyModalOpen / sockets /
 //   auth / username / getHttpProtocol / buildNodeHttpUrl / getGatewayAddress / fetchWithAuth /
 //   escapeHtml / historyStorage / loadHistoryMessages / sendMessageToAgent / setupHistoryScrollListener /
 //   openAgentInPanel / closePanel / closeAgentInPanel / closeOpenDirDialog / confirmOpenDir /
-//   restoreWorkspacePaneContents / saveRecentWorkDir / loadRecentWorkDirs / filteredDirList /
+//   restoreWorkspacePaneContents / canRestoreWorkspacePaneContents / saveRecentWorkDir /
+//   loadRecentWorkDirs / filteredDirList /
 //   sortCompletionItems / recordCompletionSelection / switchGeneration / windowWidth / workspaceAutoOpened /
 //   agentListLoaded / setModalAutoFocusSuppressUntil / MODAL_AUTOFOCUS_SUPPRESS_MS / hasMoreHistory /
 //   historyOffset / showCompletions / completionCursorPos / completionHasAtSymbol / completionAgentId /
@@ -88,7 +89,6 @@ export function useAgents({
   hasNoPanel,
   isAutoFocusSuppressed,
   isAnyModalOpen,
-  socket,
   sockets,
   auth,
   username,
@@ -107,6 +107,7 @@ export function useAgents({
   closeOpenDirDialog,
   confirmOpenDir,
   restoreWorkspacePaneContents,
+  canRestoreWorkspacePaneContents,
   saveRecentWorkDir,
   loadRecentWorkDirs,
   filteredDirList,
@@ -1528,8 +1529,10 @@ export function useAgents({
       // 首次拉取结束（无论成功失败）后放行大厅空状态引导，避免有 Agent 时闪现
       agentListLoaded.value = true
       // 首次拉取到 Agent 列表后恢复每个 pane 的内容（阶段 B；幂等，只执行一次）。
-      // 仅在 socket 已连接时执行：内容恢复依赖文件系统/Git/终端等鉴权能力。
-      if (socket.value) {
+      // 前置条件（socket 已连接 + agentList 非空）由 canRestoreWorkspacePaneContents 统一判定；
+      // 若此刻连接尚未建立，则跳过，由 useGatewayConnection 在 ws.onopen 后补触发
+      // （见 restoreWorkspacePaneContentsOnConnect）。
+      if (canRestoreWorkspacePaneContents()) {
         restoreWorkspacePaneContents()
       }
     }

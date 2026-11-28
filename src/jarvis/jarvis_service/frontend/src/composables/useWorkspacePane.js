@@ -8,6 +8,8 @@
 //   activeWorkspaceTabPath / activeWorkspaceSession / virtualWorkspaceSessions / editorModels /
 //   workspaceFileHeartbeatTimer / isWorkspaceEditable / EDITOR_FILE_HEARTBEAT_INTERVAL /
 //   globalSearch* / fileSearchResults / showWorkspaceSidebar / workspaceSidebarView / workspaceMainView
+//   （showWorkspaceSidebar / workspaceSidebarView 持久化到 localStorage：jarvis_workspace_sidebar_visible /
+//     jarvis_workspace_sidebar_view，刷新后恢复）
 // - pane 树核心：workspacePaneTree / activePaneId / maximizedPaneId / workspacePaneCount /
 //   canSplitWorkspacePane / activePane / findWorkspacePaneById / ... / restoreWorkspacePaneLayout /
 //   restoreWorkspacePaneContents
@@ -64,6 +66,9 @@ export function useWorkspacePane({
   restoreTerminalSessions,
   onTerminalUnavailable,
   focusFirstIn,
+  // 网关 WebSocket（socket.value 非空即已连接）。内容恢复依赖鉴权能力，
+  // 必须等连接就绪；用于在「拉列表早于连接」时于连接建立后补触发恢复。
+  socket,
 }) {
   // —— getter 化依赖的安全包装（函数类型：调用点不变；Map/ref 类型：调用点改 xxx().get()/xxx().value）——
   const clamp = (...args) => clampGetter()(...args)
@@ -213,9 +218,54 @@ const globalSearchExecuted = ref(false)
 // 搜索模式：'content' 搜文件内容，'filename' 按文件名模糊搜索
 const globalSearchMode = ref('content')
 const fileSearchResults = ref([])
-const showWorkspaceSidebar = ref(true)
+// ===== 侧边栏视图 / 显隐 持久化 =====
+// 刷新后恢复用户上次停留的侧边栏视图（agents/files/git/search/plugins/插件视图…）与显隐状态。
+// 视图白名单：内置视图固定；插件视图（plugin:<id> / plugin-tool:<id> / plugin-pane:<id>）
+// 由 usePlugins 动态注册，这里只做前缀校验，插件卸载后由渲染层降级（无匹配分支则不渲染内容）。
+const WORKSPACE_SIDEBAR_STORAGE_KEY = 'jarvis_workspace_sidebar_view'
+const WORKSPACE_SIDEBAR_VISIBLE_STORAGE_KEY = 'jarvis_workspace_sidebar_visible'
+const BUILTIN_SIDEBAR_VIEWS = ['agents', 'files', 'search', 'git', 'timers', 'plugins', 'orchestration']
+function isValidWorkspaceSidebarView(view) {
+  if (typeof view !== 'string' || !view) return false
+  if (BUILTIN_SIDEBAR_VIEWS.includes(view)) return true
+  // 插件扩展视图（侧边栏 plugin:<id> / 工具面板 plugin-tool:<id> / pane 视图 plugin-pane:<id>）
+  return /^plugin(-tool|-pane)?:/.test(view)
+}
+function loadWorkspaceSidebarView() {
+  try {
+    const saved = localStorage.getItem(WORKSPACE_SIDEBAR_STORAGE_KEY)
+    return isValidWorkspaceSidebarView(saved) ? saved : 'agents'
+  } catch (e) {
+    return 'agents'
+  }
+}
+function loadWorkspaceSidebarVisible() {
+  try {
+    const saved = localStorage.getItem(WORKSPACE_SIDEBAR_VISIBLE_STORAGE_KEY)
+    if (saved === '0') return false
+    if (saved === '1') return true
+  } catch (e) {
+    // localStorage 不可用：回退默认
+  }
+  return true
+}
+function persistWorkspaceSidebarView() {
+  try {
+    localStorage.setItem(WORKSPACE_SIDEBAR_STORAGE_KEY, workspaceSidebarView.value)
+  } catch (e) {
+    // 忽略：隐私模式 / 配额满
+  }
+}
+function persistWorkspaceSidebarVisible() {
+  try {
+    localStorage.setItem(WORKSPACE_SIDEBAR_VISIBLE_STORAGE_KEY, showWorkspaceSidebar.value ? '1' : '0')
+  } catch (e) {
+    // 忽略：隐私模式 / 配额满
+  }
+}
+const showWorkspaceSidebar = ref(loadWorkspaceSidebarVisible())
 // 默认展示 Agent 列表（而非文件目录树）
-const workspaceSidebarView = ref('agents')
+const workspaceSidebarView = ref(loadWorkspaceSidebarView())
 // 插件前端扩展（拆自 composable usePlugins，见下方 usePlugins 调用处）
 const {
   pluginExtensions,
@@ -1486,13 +1536,17 @@ let workspacePaneContentsRestored = false
 if (typeof onTerminalUnavailable === 'function') {
   onTerminalUnavailable(downgradeTerminalPanes)
 }
+// 内容恢复的前置条件：网关已连接（鉴权能力就绪）且 Agent 列表非空。
+// 两者缺一都不得恢复——否则 session pane 会因找不到 Agent 被误降级为空 pane，
+// 且 leaf.content 被一次性清空后不再重试。
+function canRestoreWorkspacePaneContents() {
+  if (typeof socket === 'function' && !socket().value) return false
+  return agentList().value.length > 0
+}
 async function restoreWorkspacePaneContents() {
   if (workspacePaneContentsRestored) return
-  // Agent 列表尚未就绪时不得恢复：此时 agentList 为空，session pane 会因
-  // 找不到 Agent 被误降级为空 pane，且恢复信息（leaf.content）会被一次性
-  // 清空、workspacePaneContentsRestored 置位后不再重试。故此处提前返回，
-  // 等下次 fetchAgentList 拿到 Agent 后再触发（不消耗一次性标志）。
-  if (agentList().value.length === 0) return
+  // 前置条件未满足时提前返回，且不消耗一次性标志（等条件就绪后再触发）。
+  if (!canRestoreWorkspacePaneContents()) return
   const tree = workspacePaneTree.value
   if (!tree) return
   workspacePaneContentsRestored = true
@@ -1639,7 +1693,11 @@ watch(
   },
   { flush: 'post', immediate: true },
 )
-
+// 侧边栏视图 / 显隐 持久化：变化即写 localStorage（刷新后恢复上次停留的视图）。
+watch([workspaceSidebarView, showWorkspaceSidebar], () => {
+  persistWorkspaceSidebarView()
+  persistWorkspaceSidebarVisible()
+})
   return {
     EDITOR_PANEL_MIN_WIDTH,
     EDITOR_PANEL_MIN_HEIGHT,
@@ -1678,6 +1736,8 @@ watch(
     fileSearchResults,
     showWorkspaceSidebar,
     workspaceSidebarView,
+    persistWorkspaceSidebarView,
+    persistWorkspaceSidebarVisible,
     workspaceMainView,
     workspacePaneTree,
     activePaneId,
@@ -1719,6 +1779,7 @@ watch(
     persistWorkspacePaneLayout,
     restoreWorkspacePaneLayout,
     restoreWorkspacePaneContents,
+    canRestoreWorkspacePaneContents,
     pluginExtensions,
     pluginAdminTabs,
     pluginSidebarViews,

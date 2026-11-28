@@ -3541,7 +3541,7 @@ const {
   isPaneActive, paneSessionPanelIds, paneActiveSessionPanelId,
   addSessionTabToPane, activateSessionTabInPane, closeSessionTabInPane,
   startWorkspacePaneResize, persistWorkspacePaneLayout,
-  restoreWorkspacePaneLayout, restoreWorkspacePaneContents,
+  restoreWorkspacePaneLayout, restoreWorkspacePaneContents, canRestoreWorkspacePaneContents,
   // 插件扩展（usePlugins 返回透传）
   pluginExtensions, pluginAdminTabs, pluginSidebarViews, pluginToolPanels, pluginPaneViews, pluginContextMenuItems,
   pluginSidebarTitle, pluginToolPanelTitle, pluginPaneTitle, WORKSPACE_SIDEBAR_TITLES, workspaceSidebarTitle,
@@ -3588,6 +3588,8 @@ const {
   terminalSessions: () => terminalSessions,
   restoreTerminalSessions: () => restoreTerminalSessions,
   focusFirstIn: () => focusFirstIn,
+  // getter 注入：网关 WebSocket（socket 定义在 2269 行，早于本调用点，仍以 getter 传入保持一致）
+  socket: () => socket,
 })
 
 // ===== 工作区编辑器 / 文件操作（从 App.vue 拆出到 composables/useWorkspaceEditor.js）=====
@@ -7220,6 +7222,7 @@ const {
   closeOpenDirDialog,
   confirmOpenDir,
   restoreWorkspacePaneContents,
+  canRestoreWorkspacePaneContents,
   saveRecentWorkDir,
   loadRecentWorkDirs,
   filteredDirList,
@@ -7729,7 +7732,16 @@ const {
   showToast,
   showConfirm,
   loadPluginExtensionsForUi,
+  restoreWorkspacePaneContentsOnConnect,
 })
+// 连接建立后补触发编辑器 pane 内容恢复（useGatewayConnection 在 ws.onopen 时调用）。
+// 场景：首次 fetchAgentList 早于网关连接建立，useAgents 内的恢复因缺鉴权被跳过。
+// 幂等：restoreWorkspacePaneContents 内部有一次性标志，且前置条件不满足时不消耗标志。
+function restoreWorkspacePaneContentsOnConnect() {
+  if (canRestoreWorkspacePaneContents()) {
+    restoreWorkspacePaneContents()
+  }
+}
 function sendInterrupt() {
   const message = {
     type: 'interrupt',
@@ -7781,8 +7793,9 @@ function confirmClearHistory() {
 // SessionPanel 浮动面板（状态 + 拖拽/缩放交互），从 App.vue 拆出到 composables/useSessionPanel.js
 // 依赖 activeWindow/ACTIVE_Z_INDEX/BASE_Z_INDEX/clamp/windowWidth/PANEL_DRAG_ACTIVATION_DISTANCE/focusWindow，
 // 均定义在本调用点之前，以直传方式注入。
-// 注：返回的 16 个符号（SESSION_PANEL_* / sessionPanelRects / startSessionPanelMove 等）在 App.vue
-// 中无外部引用（模板用固定 :panelStyle="{}"/:resizeDirections="[]"/:embedded="true"），故不解构。
+// 说明：会话面板现统一由 pane 树承载（SessionPanel 以 embedded=true 内嵌渲染，位置/尺寸由
+// pane 分割布局决定），故浮动模式的位置持久化（jarvis_session_panel_rect_*）已无消费方：
+// 不再接回 sessionPanelRects / getSessionPanelStyle，避免维护一条永远不生效的恢复链路。
 useSessionPanel({
   // 直传（定义在本调用点之前）
   activeWindow,

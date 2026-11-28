@@ -20,7 +20,8 @@
 //   startAgentListRefresh / startNodeStatusRefresh / restoreVirtualWorkspaceDirs / loadGitCustomDir /
 //   refreshUserInfo / fetchUserPermissions / fetchModelGroups / fetchNodeStatus / fetchUserAccessibleNodes /
 //   restoreTerminalSessions / getOrCreateClientId / sendChatMessageToServer / loadHistoryMessages /
-//   closeTerminal / handleMessage / getAgentLastSeq / showToast / showConfirm
+//   closeTerminal / handleMessage / getAgentLastSeq / showToast / showConfirm /
+//   restoreWorkspacePaneContentsOnConnect（可选：连接建立后补触发编辑器 pane 内容恢复）
 import { computed, ref } from 'vue'
 
 export function useGatewayConnection({
@@ -67,6 +68,7 @@ export function useGatewayConnection({
   showToast,
   showConfirm,
   loadPluginExtensionsForUi,
+  restoreWorkspacePaneContentsOnConnect,
 }) {
 // 默认网关地址：协议跟随当前页面（https → wss），域名为当前前端域名，端口固定 8000
 function buildDefaultGatewayUrl() {
@@ -179,6 +181,12 @@ async function connect() {
     fetchUserAccessibleNodes()
     // 恢复当前用户的存活终端会话（方案A：断开不杀进程 + 输出缓冲回放）
     restoreTerminalSessions()
+    // 补触发编辑器 pane 内容恢复：若首次 fetchAgentList 早于本次连接建立，
+    // useAgents 内的恢复会被跳过（内容恢复依赖鉴权能力），此处连接就绪后补一次。
+    // 幂等：已恢复过则内部直接返回；agentList 尚未就绪时也不消耗一次性标志。
+    if (typeof restoreWorkspacePaneContentsOnConnect === 'function') {
+      restoreWorkspacePaneContentsOnConnect()
+    }
     // 自动注册聊天室（避免丢消息，不依赖用户手动打开聊天面板）
     if (!myClientId.value) {
       myClientId.value = getOrCreateClientId()
